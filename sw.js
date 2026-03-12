@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gambit-v1';
+const CACHE_NAME = 'gambit-v2';
 const ASSETS = [
   './',
   './menu.html',
@@ -46,7 +46,8 @@ const ASSETS = [
   './Menu_Art/Rules.png',
   './Menu_Art/Settings.png',
   './Menu_Art/Shop.png',
-  './Menu_Art/Stamp.png'
+  './Menu_Art/Stamp.png',
+  './Menu_Art/iOS icon.png'
 ];
 
 // Install: cache all assets
@@ -67,9 +68,16 @@ self.addEventListener('activate', e => {
   );
 });
 
-// Fetch: serve from cache, fall back to network
+// Fetch: network first, cache fallback (so updates always show)
 self.addEventListener('fetch', e => {
   e.respondWith(
-    caches.match(e.request).then(cached => cached || fetch(e.request))
+    fetch(e.request)
+      .then(response => {
+        // Update cache with fresh response
+        const clone = response.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put(e.request, clone));
+        return response;
+      })
+      .catch(() => caches.match(e.request))
   );
 });
