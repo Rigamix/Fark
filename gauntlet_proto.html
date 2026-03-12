@@ -663,6 +663,7 @@ body{
 .lo-picker.open{display:block}
 .lo-picker-title{font-family:var(--font-px);font-size:7px;color:var(--gold);letter-spacing:2px;margin-bottom:8px}
 .lo-picker-grid{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+.lo-picker-grid.static{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;padding:8px 0}
 .lo-picker-grid.horizontal{
   display:block;overflow-x:auto;overflow-y:hidden;
   -webkit-overflow-scrolling:touch;
@@ -1616,10 +1617,16 @@ function openCardPicker(slotIndex,tappedEl){
     return;
   }
   var currentCard=_loSelectedCards[slotIndex]||null;
-  picker.innerHTML='<div class="lo-picker-title">SELECT CARD</div><div class="lo-picker-grid horizontal" id="loPickerGrid"><div class="lo-picker-track" id="loPickerTrack"></div></div>';
+  var validCards=allCards.filter(function(oc){return !!CARDS_DATA.find(function(cd){return cd.id===oc.id})});
+  var useCarousel=validCards.length>5;
+  if(useCarousel){
+    picker.innerHTML='<div class="lo-picker-title">SELECT CARD</div><div class="lo-picker-grid horizontal" id="loPickerGrid"><div class="lo-picker-track" id="loPickerTrack"></div></div>';
+  }else{
+    picker.innerHTML='<div class="lo-picker-title">SELECT CARD</div><div class="lo-picker-grid static" id="loPickerGrid"></div>';
+  }
   var grid=document.getElementById('loPickerGrid');
-  var track=document.getElementById('loPickerTrack');
-  var realCount=0;
+  var container=useCarousel?document.getElementById('loPickerTrack'):grid;
+  var realCount=validCards.length;
   // How many repetitions needed for infinite scroll (enough to fill 3x viewport)
   var REP_COUNT=7;
   // Helper: create one card element with all styling + events
@@ -1657,17 +1664,20 @@ function openCardPicker(slotIndex,tappedEl){
     })(oc.id,el);
     return el;
   }
-  // Build N copies for infinite scroll
-  var validCards=allCards.filter(function(oc){return !!CARDS_DATA.find(function(cd){return cd.id===oc.id})});
-  realCount=validCards.length;
-  for(var rep=0;rep<REP_COUNT;rep++){
-    validCards.forEach(function(oc){ var el=mkPickerCard(oc); if(el) track.appendChild(el); });
+  if(useCarousel){
+    // Build N copies for infinite scroll
+    for(var rep=0;rep<REP_COUNT;rep++){
+      validCards.forEach(function(oc){ var el=mkPickerCard(oc); if(el) container.appendChild(el); });
+    }
+  }else{
+    // Static: just one copy of each card
+    validCards.forEach(function(oc){ var el=mkPickerCard(oc); if(el) container.appendChild(el); });
   }
   _positionPicker(tappedEl||document.querySelectorAll('#loPCards .lo-hand-slot')[slotIndex]);
   picker.classList.add('open');
   _startPickerOutsideListener();
-  // Setup infinite scroll
-  setTimeout(function(){_setupInfiniteScroll(grid,realCount)},50);
+  // Setup infinite scroll only for carousel mode
+  if(useCarousel) setTimeout(function(){_setupInfiniteScroll(grid,realCount)},50);
 }
 
 function closePicker(){
@@ -2095,8 +2105,8 @@ function renderLoWager(){
     }
     pSlot.style.cursor='pointer';
     pSlot.onclick=function(){
-      var msg=_loWagerCards.map(function(cid){var c=CARDS_DATA.find(function(cd){return cd.id===cid});return c?c.name:'?';}).join(', ');
-      alert('At stake: '+msg);
+      if(_loWagerCards.length===1){loOpenCardZoom(_loWagerCards[0]);}
+      else if(_loWagerCards.length>1){loOpenCardZoom(_loWagerCards[0]);}
     };
   }else{
     pSlot.innerHTML='<span style="font-size:5px">YOUR<br>CARD</span>';
@@ -2123,8 +2133,7 @@ function renderLoWager(){
 /* ── Wager Card Picker — now auto-assigned, shows info only ── */
 function openWagerPicker(){
   if(_loWagerCards.length===0)return;
-  var msg=_loWagerCards.map(function(cid){var c=CARDS_DATA.find(function(cd){return cd.id===cid});return c?c.name:'?';}).join('\n');
-  alert('Auto-wagered (your best):\n'+msg);
+  if(_loWagerCards.length>0)loOpenCardZoom(_loWagerCards[0]);
   return;
   /* Legacy picker code below — kept for reference */
   var equipped=_loSelectedCards.filter(function(c){return !!c});
