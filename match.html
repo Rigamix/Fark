@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="theme-color" content="#0c0a06">
-<link rel="apple-touch-icon" href="Menu_Art/Menu.png">
+<link rel="apple-touch-icon" href="Menu_Art/iOS icon.png">
 <link href="https://fonts.googleapis.com/css2?family=IM+Fell+English&family=Jacquard+24&family=MedievalSharp&family=Press+Start+2P&family=Uncial+Antiqua&display=swap" rel="stylesheet">
 <style>
 @font-face{font-family:'Alagard';src:url('Fonts/Pixel/alagard.ttf') format('truetype')}
@@ -324,7 +324,7 @@ body{
   filter:url(#pixelWobbleLite);
 }
 .gcard-back-name{font-size:22px;color:#c8845a;text-align:center;letter-spacing:0.5px;z-index:2;flex-shrink:0;font-family:'Jacquard 24',serif;margin-top:auto;margin-bottom:8px;text-shadow:0 1px 0 rgba(0,0,0,.6);line-height:1.3;padding:0 6px;word-break:break-word}
-.gcard-back-desc{font-size:9px;color:#b0a890;text-align:center;line-height:2.4;z-index:2;padding:0 8px;width:100%;overflow-y:auto;flex:1;min-height:0}
+.gcard-back-desc{font-size:14px;color:#b0a890;text-align:center;line-height:1.6;z-index:2;padding:0 8px;width:100%;overflow-y:auto;flex:1;min-height:0;display:flex;align-items:center;justify-content:center}
 .gcard-back-frame{display:none}
 .gcard-tap{font-size:6px;color:var(--ctrim2);opacity:.6;letter-spacing:1px;z-index:3;flex-shrink:0;margin-top:auto}
 
@@ -355,7 +355,7 @@ body{
 .cz-wrap .gcard-band{font-size:6px;padding:5px 2px;opacity:1}
 .cz-wrap .gc{width:18px;height:18px}
 .cz-wrap .gcard-back-name{font-size:28px;letter-spacing:0.5px;color:#c8845a;padding:0 10px}
-.cz-wrap .gcard-back-desc{font-size:10px;line-height:2.2;padding:0 14px}
+.cz-wrap .gcard-back-desc{font-size:16px;line-height:1.6;padding:0 14px}
 /* ─── DICE ZOOM OVERLAY ─── */
 .dice-zoom-overlay{
   position:fixed;inset:0;z-index:9700;
@@ -609,11 +609,22 @@ body{
 .mcard-active .gcard{animation:activeGlow 2s ease-in-out infinite;border:1px solid #ffd700}
 @keyframes activeGlow{0%,100%{box-shadow:0 0 6px 2px rgba(255,215,0,.4)}50%{box-shadow:0 0 14px 5px rgba(255,215,0,.7)}}
 .mcard-active.used .gcard{animation:none;box-shadow:none;filter:grayscale(1) brightness(.5);border-color:#555}
-.active-drop-zone{display:none;position:absolute;left:10%;right:10%;bottom:0;height:48px;
-  border:2px dashed rgba(255,215,0,.5);border-radius:10px;background:rgba(255,215,0,.08);
-  z-index:50;pointer-events:none;transition:opacity .3s}
-.active-drop-zone.visible{display:block;animation:dropPulse 1.5s ease-in-out infinite}
-@keyframes dropPulse{0%,100%{border-color:rgba(255,215,0,.4)}50%{border-color:rgba(255,215,0,.9)}}
+.active-drop-zone{display:none}
+#activeBtn{
+  display:none;position:absolute;bottom:clamp(24px,8vw,60px);left:50%;transform:translateX(-50%);
+  font-family:var(--font-px);font-size:clamp(11px,3vw,14px);letter-spacing:1px;
+  color:#fff;background:linear-gradient(135deg,#b8860b,#ffd700);
+  border:2px solid #ffd700;border-radius:6px;padding:12px 20px;cursor:pointer;
+  z-index:200;pointer-events:auto;width:80%;max-width:320px;text-align:center;
+  animation:activeBtnPulse 2s ease-in-out infinite;
+  text-shadow:0 1px 2px rgba(0,0,0,.5);box-shadow:0 0 12px rgba(255,215,0,.4);
+}
+#activeBtn:active{transform:translateX(-50%) scale(.95);filter:brightness(1.2)}
+@keyframes activeBtnPulse{0%,100%{box-shadow:0 0 8px rgba(255,215,0,.4)}50%{box-shadow:0 0 20px rgba(255,215,0,.7)}}
+#activeBtn.disabled-timing{
+  background:linear-gradient(135deg,#444,#666);border-color:#666;color:#999;
+  animation:none;box-shadow:none;pointer-events:none;
+}
 
 /* ─── OVERLAYS ─── */
 #bust-ov{
@@ -1229,6 +1240,7 @@ body{
   <div class="card-zoom-card" id="czCard">
     <div class="cz-wrap" id="czWrap"></div>
   </div>
+  <button id="activeBtn" style="display:none" onclick="handleActivateBtn()">⚡ ACTIVATE</button>
 </div>
 
 <!-- DICE ZOOM OVERLAY -->
@@ -2416,6 +2428,12 @@ function endMatch(win){
   }
 
   // Continue button — visible immediately so players can skip
+  // Exception: Grog (first NPC) — delay until card reveal so new players see their reward
+  const isGrog=G.rung.key==='drunkard';
+  if(isGrog&&win&&revealCard){
+    btnCont.style.opacity='0';btnCont.style.pointerEvents='none';
+    endT(()=>{btnCont.style.opacity='1';btnCont.style.pointerEvents='auto';},5000);
+  }
 }
 
 /* ═══════ QUIT / FLEE ═══════ */
@@ -2586,7 +2604,8 @@ function openCardZoom(cardId){
 }
 function closeCardZoom(){
   document.getElementById('cardZoom').classList.remove('open');
-  _czCardId=null;
+  document.getElementById('activeBtn').style.display='none';
+  _czCardId=null;_activeZoomId=null;
 }
 // Card drag-to-rotate
 (function(){
@@ -2657,61 +2676,36 @@ function openActiveCardZoom(cardId){
   const overlay=document.getElementById('cardZoom');
   overlay.classList.add('open');
   overlay.onclick=(e)=>{if(e.target===overlay&&!_czDragging){closeActiveZoom();}};
-  /* Show drop zone if timing is right */
-  const dz=document.getElementById('activeDropZone');
-  if(canActivateCard(cardId)){dz.classList.add('visible');}else{dz.classList.remove('visible');}
+  /* Show activate button if timing is right */
+  const abtn=document.getElementById('activeBtn');
+  if(canActivateCard(cardId)){
+    abtn.style.display='block';abtn.className='';
+    const cd=CARDS.find(c=>c.id===cardId);
+    abtn.textContent='⚡ ACTIVATE — '+cd.eff;
+  }else{
+    const cd=CARDS.find(c=>c.id===cardId);
+    const uses=G.activeCardState?G.activeCardState.usedCards[cardId]:0;
+    if(!uses||uses<=0){
+      abtn.style.display='block';abtn.className='disabled-timing';
+      abtn.textContent='ALREADY USED';
+    }else{
+      abtn.style.display='block';abtn.className='disabled-timing';
+      const timings=cd.timing.split('|').map(t=>t.toUpperCase()).join(' / ');
+      abtn.textContent='USE DURING: '+timings;
+    }
+  }
 }
 function closeActiveZoom(){
   document.getElementById('cardZoom').classList.remove('open');
-  document.getElementById('activeDropZone').classList.remove('visible');
+  document.getElementById('activeBtn').style.display='none';
   _activeZoomId=null;_czCardId=null;
 }
-/* Vertical drag on card zoom → activate */
-(function(){
-  const czCard=document.getElementById('czCard');
-  let sy=0,sx=0,dragging=false,axis=null;/* axis: null|'h'|'v' */
-  function getXY(e){const t=e.touches?e.touches[0]:e;return{x:t.clientX,y:t.clientY};}
-  function onStart(e){
-    if(!_activeZoomId)return;/* only for active card zooms */
-    if(!e.target.closest('.card-zoom-card'))return;
-    const p=getXY(e);sx=p.x;sy=p.y;dragging=true;axis=null;
+function handleActivateBtn(){
+  if(_activeZoomId&&canActivateCard(_activeZoomId)){
+    activateCard(_activeZoomId);
+    closeActiveZoom();
   }
-  function onMove(e){
-    if(!dragging||!_activeZoomId)return;
-    const p=getXY(e);
-    if(!axis){
-      const dx=Math.abs(p.x-sx),dy=Math.abs(p.y-sy);
-      if(dx>10||dy>10) axis=(dy>dx)?'v':'h';
-      else return;
-    }
-    if(axis==='v'){
-      const dy=sy-p.y;/* positive = upward */
-      const czEl=document.getElementById('czCard');
-      czEl.style.transform='translateY('+(-Math.max(0,dy))+'px)';
-      czEl.style.opacity=Math.max(0.4,1-dy/300);
-    }
-  }
-  function onEnd(e){
-    if(!dragging){return;}
-    dragging=false;
-    if(!_activeZoomId){axis=null;return;}
-    const p=e.changedTouches?e.changedTouches[0]:e;
-    const dy=sy-p.clientY;
-    const czEl=document.getElementById('czCard');
-    czEl.style.transform='';czEl.style.opacity='';
-    if(axis==='v'&&dy>80&&canActivateCard(_activeZoomId)){
-      activateCard(_activeZoomId);
-      closeActiveZoom();
-    }
-    axis=null;
-  }
-  czCard.addEventListener('mousedown',onStart);
-  document.addEventListener('mousemove',onMove);
-  document.addEventListener('mouseup',onEnd);
-  czCard.addEventListener('touchstart',onStart,{passive:true});
-  document.addEventListener('touchmove',onMove,{passive:true});
-  document.addEventListener('touchend',onEnd,{passive:true});
-})();
+}
 
 function markActiveCardUsed(cardId){
   G.activeCardState.usedCards[cardId]=Math.max(0,(G.activeCardState.usedCards[cardId]||0)-1);
