@@ -2230,20 +2230,28 @@ let _pendingResult=null;
 })();
 document.getElementById('gold-display').textContent=S.gold;
 buildGrid();
-// Show subtle gold change next to coin counter
+// Show subtle gold change: number rises into the counter then updates total
 if(_pendingResult){
   setTimeout(function(){
     const r=_pendingResult;_pendingResult=null;
     const gs=r.goldEarned>=0?'+'+r.goldEarned:''+r.goldEarned;
+    const goldEl=document.getElementById('gold-display');
     const pill=document.querySelector('.gold-pill');
-    if(!pill)return;
+    if(!pill||!goldEl)return;
+    const prevGold=S.gold-r.goldEarned;
+    goldEl.textContent=Math.max(0,prevGold);
     const pop=document.createElement('span');
-    pop.style.cssText='position:absolute;right:-8px;top:-14px;font-family:var(--font-px);font-size:10px;letter-spacing:1px;pointer-events:none;white-space:nowrap;opacity:0;transition:opacity .3s ease,transform .8s ease;color:'+(r.goldEarned>=0?'var(--gold)':'var(--red)');
+    pop.style.cssText='position:absolute;left:50%;bottom:-18px;transform:translateX(-50%);font-family:var(--font-px);font-size:10px;letter-spacing:1px;pointer-events:none;white-space:nowrap;opacity:0;transition:opacity .3s ease,transform .8s ease;color:'+(r.goldEarned>=0?'var(--gold)':'var(--red)');
     pop.textContent=gs;
-    pill.style.position='relative';
+    pill.style.position='relative';pill.style.overflow='visible';
     pill.appendChild(pop);
-    requestAnimationFrame(function(){pop.style.opacity='1';pop.style.transform='translateY(-10px)';});
-    setTimeout(function(){pop.style.opacity='0';setTimeout(function(){pop.remove()},400)},2200);
+    requestAnimationFrame(function(){pop.style.opacity='1';pop.style.transform='translateX(-50%) translateY(-20px)';});
+    // After animation, update the total and remove the pop
+    setTimeout(function(){
+      pop.style.opacity='0';
+      goldEl.textContent=S.gold;
+      setTimeout(function(){pop.remove()},400);
+    },1200);
   },400);
 }
 
