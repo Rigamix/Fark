@@ -2521,10 +2521,14 @@ const OPP_DIALOGUE={
       const key=this.portraitKey||this.oppKey.toLowerCase();
       if(PORTRAITS[key])img.src=PORTRAITS[key];
       const full='\u201c'+text+'\u201d';
-      textEl.innerHTML=full.split(' ').map(word=>{
-        const chars=word.split('').map(ch=>{
-          const x=(Math.random()-.5)*.7, y=(Math.random()-.5)*.9, r=(Math.random()-.5)*1.2;
-          return '<span style="display:inline-block;transform:translate('+x.toFixed(2)+'px,'+y.toFixed(2)+'px) rotate('+r.toFixed(2)+'deg)">'+ch+'</span>';
+      textEl.innerHTML=full.replace(/\*([^*]+)\*/g,'<em>$1</em>').split(' ').map(word=>{
+        // Preserve <em> tags, only jitter visible characters
+        const chars=word.replace(/<\/?em>/g,'\x00$&\x00').split('\x00').map(part=>{
+          if(part==='<em>'||part==='</em>')return part;
+          return part.split('').map(ch=>{
+            const x=(Math.random()-.5)*.7, y=(Math.random()-.5)*.9, r=(Math.random()-.5)*1.2;
+            return '<span style="display:inline-block;transform:translate('+x.toFixed(2)+'px,'+y.toFixed(2)+'px) rotate('+r.toFixed(2)+'deg)">'+ch+'</span>';
+          }).join('');
         }).join('');
         return '<span style="white-space:nowrap">'+chars+'</span>';
       }).join(' ');
