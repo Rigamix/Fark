@@ -303,22 +303,22 @@ body{
 
   <!-- MENU BUTTONS -->
   <div class="menu-buttons" id="menuButtons">
-    <div class="menu-btn" onclick="window.location.href='gauntlet_proto.html'">
+    <div class="menu-btn" onclick="SFX.nav();window.location.href='gauntlet_proto.html'">
       <canvas></canvas>
       <span class="btn-label">GAUNTLET</span>
       <img class="btn-icon" src="Menu_Art/Gauntlet.png" alt="Gauntlet">
     </div>
-    <div class="menu-btn" onclick="window.location.href='buy_page.html'">
+    <div class="menu-btn" onclick="SFX.nav();window.location.href='buy_page.html'">
       <canvas></canvas>
       <span class="btn-label">STORE</span>
       <img class="btn-icon" src="Menu_Art/Shop.png" alt="Store">
     </div>
-    <div class="menu-btn" onclick="openRules()">
+    <div class="menu-btn" onclick="SFX.nav();openRules()">
       <canvas></canvas>
       <span class="btn-label">RULES</span>
       <img class="btn-icon" src="Menu_Art/Rules.png" alt="Rules">
     </div>
-    <div class="menu-btn" onclick="openSettings()">
+    <div class="menu-btn" onclick="SFX.nav();openSettings()">
       <canvas></canvas>
       <span class="btn-label">SETTINGS</span>
       <img class="btn-icon" src="Menu_Art/Settings.png" alt="Settings">
@@ -351,8 +351,8 @@ body{
       <div class="setting-check" id="sfxCheck" onclick="toggleAudio('sfx')"></div>
     </div></div>
     <div class="settings-actions">
-      <div class="sbtn" onclick="resetRun()"><canvas></canvas><div class="btn-inner" style="color:var(--red)">NEW RUN</div></div>
-      <div class="sbtn" onclick="closeSettings()"><canvas></canvas><div class="btn-inner" style="color:var(--gold)">BACK</div></div>
+      <div class="sbtn" onclick="SFX.nav();resetRun()"><canvas></canvas><div class="btn-inner" style="color:var(--red)">NEW RUN</div></div>
+      <div class="sbtn" onclick="SFX.nav();closeSettings()"><canvas></canvas><div class="btn-inner" style="color:var(--gold)">BACK</div></div>
     </div>
   </div>
 </div>
@@ -364,9 +364,9 @@ body{
 
     <!-- Tab bar -->
     <div class="rules-tabs" id="rulesTabs">
-      <div class="rules-tab active" data-tab="0" onclick="switchRulesTab(0)">Scoring</div>
-      <div class="rules-tab" data-tab="1" onclick="switchRulesTab(1)">Gameplay</div>
-      <div class="rules-tab" data-tab="2" onclick="switchRulesTab(2)">Cards</div>
+      <div class="rules-tab active" data-tab="0" onclick="SFX.nav();switchRulesTab(0)">Scoring</div>
+      <div class="rules-tab" data-tab="1" onclick="SFX.nav();switchRulesTab(1)">Gameplay</div>
+      <div class="rules-tab" data-tab="2" onclick="SFX.nav();switchRulesTab(2)">Cards</div>
     </div>
 
     <!-- Swipeable content -->
@@ -457,7 +457,7 @@ body{
 
       </div>
     </div>
-    <button class="rules-close" onclick="closeRules()"><img class="seal-img" src="Menu_Art/Stamp.png" alt=""><span class="seal-x">X</span></button>
+    <button class="rules-close" onclick="SFX.nav();closeRules()"><img class="seal-img" src="Menu_Art/Stamp.png" alt=""><span class="seal-x">X</span></button>
   </div>
 </div>
 
@@ -784,6 +784,33 @@ window.addEventListener('DOMContentLoaded',()=>{
     if(rulesScrollRendered)renderRulesScroll();
   });
 });
+
+/* ═══════ SFX ENGINE ═══════ */
+const SFX={
+  _ctx:null,_S:null,
+  _get(){if(!this._ctx)this._ctx=new(window.AudioContext||window.webkitAudioContext)();if(this._ctx.state==='suspended')this._ctx.resume();return this._ctx;},
+  _sfxOn(){if(!this._S){try{this._S=JSON.parse(localStorage.getItem('gambit4'))}catch(e){}};return!this._S||!this._S.settings||this._S.settings.sfx!==false;},
+  _tone(freq,type,vol,attack,decay,start){
+    if(!this._sfxOn())return;start=start||0;
+    try{const ctx=this._get(),t=ctx.currentTime+start;
+    const o=ctx.createOscillator(),g=ctx.createGain();o.connect(g);g.connect(ctx.destination);
+    o.type=type;o.frequency.setValueAtTime(freq,t);g.gain.setValueAtTime(0,t);
+    g.gain.linearRampToValueAtTime(vol,t+attack);g.gain.exponentialRampToValueAtTime(0.0001,t+attack+decay);
+    o.start(t);o.stop(t+attack+decay+0.05);}catch(e){}
+  },
+  _click(freq,vol,dur,start){
+    if(!this._sfxOn())return;start=start||0;
+    try{const ctx=this._get(),t=ctx.currentTime+start;
+    const buf=ctx.createBuffer(1,Math.ceil(ctx.sampleRate*dur),ctx.sampleRate);
+    const d=buf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
+    const src=ctx.createBufferSource(),f=ctx.createBiquadFilter(),g=ctx.createGain();
+    f.type='bandpass';f.frequency.value=freq;f.Q.value=1.2;
+    src.buffer=buf;src.connect(f);f.connect(g);g.connect(ctx.destination);
+    g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    src.start(t);src.stop(t+dur+0.02);}catch(e){}
+  },
+  nav(){this._click(800,0.05,0.03);this._tone(500,'sine',0.03,0.003,0.04);},
+};
 
 /* ── SETTINGS ── */
 let _S=null;

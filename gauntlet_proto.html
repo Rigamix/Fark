@@ -703,6 +703,19 @@ body{
 .lo-actions .btn .btn-inner{position:relative;z-index:2}
 .lo-actions .btn:active{transform:scale(.95);filter:brightness(1.15)}
 
+/* ── GAME MODAL ── */
+.gm-ov{position:fixed;inset:0;z-index:9800;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:20px;opacity:0;pointer-events:none;transition:opacity .25s}
+.gm-ov.show{opacity:1;pointer-events:auto}
+.gm-box{background:#28221c;border:2px solid var(--golddim);border-radius:4px;padding:22px 18px;max-width:300px;width:100%;text-align:center;font-family:var(--font-px)}
+.gm-title{font-family:MedievalSharp,serif;font-size:20px;color:var(--gold);letter-spacing:2px;margin-bottom:14px}
+.gm-msg{font-size:8px;color:var(--textdim);line-height:2.2;margin-bottom:18px}
+.gm-btn{display:inline-block;padding:14px 24px;font-family:var(--font-px);font-size:10px;text-align:center;background:#1a1408;border:2px solid #6a5830;border-radius:3px;color:var(--gold);letter-spacing:1px;cursor:pointer}
+.gm-btn:active{filter:brightness(1.2);transform:scale(.96)}
+.gm-portrait{width:56px;height:56px;border-radius:4px;margin:0 auto 12px;overflow:hidden}
+.gm-portrait img{width:100%;height:100%;object-fit:cover;image-rendering:pixelated}
+.gm-actions{display:flex;gap:10px;justify-content:center}
+.gm-btn.red{border-color:#4a3838;color:var(--red);background:#1e1414}
+
 /* ── SETTINGS SHEET ── */
 .settings-sheet{
   position:fixed;left:0;right:0;bottom:0;
@@ -884,15 +897,15 @@ body{
 
     <div class="settings-actions">
       <div class="btn btn-dim" onclick="resetRun()"><canvas></canvas><div class="btn-inner">NEW RUN</div></div>
-      <div class="btn btn-gold" onclick="closeSettings()"><canvas></canvas><div class="btn-inner">BACK</div></div>
+      <div class="btn btn-gold" onclick="SFX.nav();closeSettings()"><canvas></canvas><div class="btn-inner">BACK</div></div>
     </div>
   </div>
 </div>
 
 <div class="bottom-nav">
-  <div class="nav-btn" onclick="openSettings()"><img class="nav-icon" src="Menu_Art/Settings.png" alt="Settings"><span class="nav-label">SETTINGS</span></div>
-  <div class="nav-btn" onclick="window.location.href='buy_page.html'"><img class="nav-icon" src="Menu_Art/Shop.png" alt="Store"><span class="nav-label">STORE</span></div>
-  <div class="nav-btn" onclick="window.location.href='menu.html'"><img class="nav-icon" src="Menu_Art/Menu.png" alt="Menu"><span class="nav-label">MENU</span></div>
+  <div class="nav-btn" onclick="SFX.nav();openSettings()"><img class="nav-icon" src="Menu_Art/Settings.png" alt="Settings"><span class="nav-label">SETTINGS</span></div>
+  <div class="nav-btn" onclick="SFX.nav();window.location.href='buy_page.html'"><img class="nav-icon" src="Menu_Art/Shop.png" alt="Store"><span class="nav-label">STORE</span></div>
+  <div class="nav-btn" onclick="SFX.nav();window.location.href='menu.html'"><img class="nav-icon" src="Menu_Art/Menu.png" alt="Menu"><span class="nav-label">MENU</span></div>
 </div>
 
 <script>
@@ -1087,7 +1100,7 @@ function buildGrid(){
     requestAnimationFrame(()=>{
       drawPixelPanel(canvas,bevelCol,faceCol,shadowCol,idx*7919+137,0.018);
     });
-    if(!locked&&!cantAfford)card.onclick=()=>openDetail(r,done);
+    if(!locked&&!cantAfford)card.onclick=()=>{SFX.nav();openDetail(r,done);};
     grid.appendChild(card);
   });
 }
@@ -1359,6 +1372,15 @@ function openLoadout(rung,done){
   if(edPop)edPop.classList.remove('show');
   _loRung=rung;
   _loSelectedDice=[...(S.dice||['bone','bone','bone','bone','bone','bone'])];
+  // Validate dice loadout against actual inventory
+  (function(){
+    var owned={};(S.ownedDice||['bone','bone','bone','bone','bone','bone']).forEach(function(d){owned[d]=(owned[d]||0)+1;});
+    var used={};
+    for(var i=0;i<_loSelectedDice.length;i++){
+      var m=_loSelectedDice[i];used[m]=(used[m]||0)+1;
+      if(used[m]>(owned[m]||0)){_loSelectedDice[i]='bone';used[m]--;used['bone']=(used['bone']||0)+1;}
+    }
+  })();
   // Auto-equip up to 3 cards, sorted by rarity (gold > silver > tin)
   // Grog (id 0) = no cards allowed for balance
   var _rarOrd={gold:1,silver:2,tin:3};
@@ -1405,11 +1427,11 @@ function openLoadout(rung,done){
   var act=document.getElementById('loActions');act.innerHTML='';
   var backBtn=document.createElement('div');backBtn.className='btn btn-dim';
   backBtn.innerHTML='<canvas></canvas><div class="btn-inner">BACK</div>';
-  backBtn.addEventListener('click',function(e){e.stopPropagation();closeLoadout()});
+  backBtn.addEventListener('click',function(e){e.stopPropagation();SFX.nav();closeLoadout()});
   act.appendChild(backBtn);
   var fightBtn=document.createElement('div');fightBtn.className='btn btn-gold';
   fightBtn.innerHTML='<canvas></canvas><div class="btn-inner">FIGHT</div>';
-  fightBtn.addEventListener('click',function(e){e.stopPropagation();launchMatch()});
+  fightBtn.addEventListener('click',function(e){e.stopPropagation();SFX.nav();launchMatch()});
   act.appendChild(fightBtn);
 
   // Measure target loadout height
@@ -1586,24 +1608,31 @@ function renderLoHand(){
 
 /* ── Dice Picker ── */
 var _pickerSlot=-1;
+function _diceAvailable(slotIndex){
+  var owned={};(S.ownedDice||S.dice||['bone']).forEach(function(d){owned[d]=(owned[d]||0)+1;});
+  var used={};_loSelectedDice.forEach(function(d,i){if(i!==slotIndex){used[d]=(used[d]||0)+1;}});
+  var avail={};Object.keys(owned).forEach(function(k){avail[k]=owned[k]-(used[k]||0);});
+  return avail;
+}
 function openDicePicker(slotIndex){
   _pickerSlot=slotIndex;
-  renderLoDice(); // re-render to show gold outline on selected die
-  // Get the FRESH die element (renderLoDice just rebuilt the DOM)
+  renderLoDice();
   var freshDie=document.querySelectorAll('#loPDice .lo-die')[slotIndex];
   var picker=document.getElementById('loPicker');
   var currentMat=_loSelectedDice[slotIndex];
-  // Get unique dice types from ownedDice
+  var avail=_diceAvailable(slotIndex);
   var types=[...new Set(S.ownedDice||S.dice||['bone'])];
   picker.innerHTML='<div class="lo-picker-title">SELECT DIE</div><div class="lo-picker-grid" id="loPickerGrid"></div>';
   var grid=document.getElementById('loPickerGrid');
   types.forEach(function(mat){
+    var remaining=avail[mat]||0;
     var wrap=document.createElement('div');
     wrap.style.textAlign='center';
     var die=loMkDie(5,mat);
-    die.style.cursor='pointer';
+    die.style.cursor=remaining>0?'pointer':'not-allowed';
+    if(remaining<=0)die.style.opacity='0.3';
     if(mat===currentMat) die.classList.add('picked');
-    (function(sIdx,mat,dieEl){
+    (function(sIdx,mat,dieEl,rem){
       var pressTimer=null,moved=false;
       dieEl.addEventListener('pointerdown',function(e){
         moved=false;
@@ -1611,14 +1640,14 @@ function openDicePicker(slotIndex){
       });
       dieEl.addEventListener('pointermove',function(){if(pressTimer){moved=true;clearTimeout(pressTimer);pressTimer=null;}});
       dieEl.addEventListener('pointerup',function(){
-        if(pressTimer){clearTimeout(pressTimer);pressTimer=null;if(!moved){_loSelectedDice[sIdx]=mat;closePicker();}}
+        if(pressTimer){clearTimeout(pressTimer);pressTimer=null;if(!moved){if(rem>0){SFX.nav();_loSelectedDice[sIdx]=mat;closePicker();}else{SFX.err();}}}
       });
       dieEl.addEventListener('pointerleave',function(){if(pressTimer){clearTimeout(pressTimer);pressTimer=null;}});
-    })(slotIndex,mat,die);
+    })(slotIndex,mat,die,remaining);
     wrap.appendChild(die);
     var label=document.createElement('div');
     label.className='lo-die-label';
-    label.textContent=mat;
+    label.textContent=mat+(remaining>0?' \xD7'+remaining:'');
     wrap.appendChild(label);
     grid.appendChild(wrap);
   });
@@ -2223,11 +2252,13 @@ function launchMatch(){
   if(!_loRung)return;
   var rung=_loRung;
   if(S.gold<rung.buyIn){
-    alert('Not enough gold! Need '+rung.buyIn+' for buy-in. You have '+S.gold+'.');
+    SFX.err();
+    showModal({portrait:PORTRAITS.innkeeper,title:'Not Enough Gold',msg:'Ye need <span style="color:var(--gold)">'+rung.buyIn+'</span> gold for the buy-in.<br>Ye only have <span style="color:var(--gold)">'+S.gold+'</span>.'});
     return;
   }
   if(rung.wager&&_loWagerCards.length===0){
-    alert('You need at least one card to wager against this opponent!');
+    SFX.err();
+    showModal({portrait:PORTRAITS.innkeeper,title:'No Card to Wager',msg:'Ye need at least one card<br>to stake against this opponent!<br><span style="color:var(--textdim)">Visit the Store to buy cards.</span>'});
     return;
   }
   // Auto-stake is handled by autoStake() — no manual wager needed
@@ -2258,6 +2289,8 @@ let _pendingResult=null;
 })();
 document.getElementById('gold-display').textContent=S.gold;
 buildGrid();
+// If returning broke (not from a match), show modal after short delay
+if(!_pendingResult&&S.gold<=0)setTimeout(function(){_checkBroke()},600);
 // Show subtle gold change: +/- appears below pill, then count up/down to new total
 if(_pendingResult){
   setTimeout(function(){
@@ -2288,7 +2321,31 @@ if(_pendingResult){
       pop.style.opacity='0';
       setTimeout(function(){pop.remove()},500);
     },800);
+    // Check if player is broke after animation
+    setTimeout(function(){_checkBroke()},1800);
   },400);
+}
+function _checkBroke(){
+  if(S.gold>0)return;
+  var hasCards=(S.cards||[]).length>0;
+  if(hasCards){
+    showModal({
+      portrait:PORTRAITS.innkeeper,title:'Out of Gold',
+      msg:'"Ye\'re skint, friend. But I see ye<br>still have possessions. Sell some<br>at the Store and try again."',
+      buttons:[
+        {label:'STORE',action:function(){window.location.href='buy_page.html';}},
+        {label:'NEW RUN',red:true,action:function(){localStorage.removeItem('gambit4');window.location.href='menu.html';}}
+      ]
+    });
+  }else{
+    showModal({
+      portrait:PORTRAITS.innkeeper,title:'Out of Gold',
+      msg:'"Ye\'ve got nothing left, friend.<br>Best start fresh."',
+      buttons:[
+        {label:'NEW RUN',action:function(){localStorage.removeItem('gambit4');window.location.href='menu.html';}}
+      ]
+    });
+  }
 }
 
 /* ── SETTINGS ── */
@@ -2385,23 +2442,73 @@ function updateAudioUI(){
   if(mc)mc.classList.toggle('on',musicOn);
   if(sc)sc.classList.toggle('on',sfxOn);
 }
-function resetRun(){
-  var ov=document.createElement('div');
-  ov.style.cssText='position:fixed;inset:0;z-index:9800;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:20px';
-  ov.innerHTML='<div style="background:#28221c;border:2px solid #a05050;border-radius:4px;padding:22px 18px;max-width:300px;width:100%;text-align:center;font-family:var(--font-px)">'
-    +'<div style="font-family:MedievalSharp,serif;font-size:20px;color:#a05050;letter-spacing:2px;margin-bottom:14px">Start Over?</div>'
-    +'<div style="font-size:8px;color:var(--textdim);line-height:2.2;margin-bottom:18px">All progress will be lost.<br>Gold, cards, dice \u2014 everything.</div>'
-    +'<div style="display:flex;gap:10px;justify-content:center">'
-    +'<div class="btn btn-dim" id="reset-yes" style="flex:1;padding:14px 6px;position:relative;cursor:pointer;font-family:var(--font-px);font-size:10px;text-align:center;background:#1e1414;border:2px solid #4a3838;border-radius:3px;color:#a05050;letter-spacing:1px">CONFIRM</div>'
-    +'<div class="btn btn-gold" id="reset-no" style="flex:1;padding:14px 6px;position:relative;cursor:pointer;font-family:var(--font-px);font-size:10px;text-align:center;background:#1a1408;border:2px solid #6a5830;border-radius:3px;color:var(--gold);letter-spacing:1px">BACK</div>'
-    +'</div></div>';
+/* ═══════ SFX ENGINE ═══════ */
+const SFX={
+  _ctx:null,
+  _get(){if(!this._ctx)this._ctx=new(window.AudioContext||window.webkitAudioContext)();if(this._ctx.state==='suspended')this._ctx.resume();return this._ctx;},
+  _sfxOn(){return!S.settings||S.settings.sfx!==false;},
+  _tone(freq,type,vol,attack,decay,start){
+    if(!this._sfxOn())return;start=start||0;
+    try{const ctx=this._get(),t=ctx.currentTime+start;
+    const o=ctx.createOscillator(),g=ctx.createGain(),lp=ctx.createBiquadFilter();
+    lp.type='lowpass';lp.frequency.value=2400;o.connect(lp);lp.connect(g);g.connect(ctx.destination);
+    o.type=type;o.frequency.setValueAtTime(freq,t);g.gain.setValueAtTime(0,t);
+    g.gain.linearRampToValueAtTime(vol,t+attack);g.gain.exponentialRampToValueAtTime(0.0001,t+attack+decay);
+    o.start(t);o.stop(t+attack+decay+0.05);}catch(e){}
+  },
+  _click(freq,vol,dur,start){
+    if(!this._sfxOn())return;start=start||0;
+    try{const ctx=this._get(),t=ctx.currentTime+start;
+    const buf=ctx.createBuffer(1,Math.ceil(ctx.sampleRate*dur),ctx.sampleRate);
+    const d=buf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
+    const src=ctx.createBufferSource(),f=ctx.createBiquadFilter(),g=ctx.createGain();
+    f.type='bandpass';f.frequency.value=freq;f.Q.value=1.2;
+    src.buffer=buf;src.connect(f);f.connect(g);g.connect(ctx.destination);
+    g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    src.start(t);src.stop(t+dur+0.02);}catch(e){}
+  },
+  nav(){this._click(800,0.05,0.03);this._tone(500,'sine',0.03,0.003,0.04);},
+  err(){this._click(300,0.08,0.05);this._tone(200,'sine',0.05,0.005,0.08);},
+};
+
+/* ═══════ GAME MODAL ═══════ */
+function showModal(opts){
+  var ov=document.createElement('div');ov.className='gm-ov';
+  var html='<div class="gm-box">';
+  if(opts.portrait)html+='<div class="gm-portrait"><img src="'+opts.portrait+'"></div>';
+  if(opts.title)html+='<div class="gm-title"'+(opts.titleColor?' style="color:'+opts.titleColor+'"':'')+'">'+opts.title+'</div>';
+  html+='<div class="gm-msg">'+opts.msg+'</div>';
+  html+='<div class="gm-actions">';
+  (opts.buttons||[{label:'OK'}]).forEach(function(b,i){
+    html+='<div class="gm-btn'+(b.red?' red':'')+'" data-mi="'+i+'">'+b.label+'</div>';
+  });
+  html+='</div></div>';
+  ov.innerHTML=html;
   document.body.appendChild(ov);
-  document.getElementById('reset-yes').onclick=function(){
-    localStorage.removeItem('gambit4');
-    window.location.href='menu.html';
-  };
-  document.getElementById('reset-no').onclick=function(){ov.remove();};
-  ov.onclick=function(e){if(e.target===ov)ov.remove();};
+  requestAnimationFrame(function(){ov.classList.add('show')});
+  ov.querySelectorAll('.gm-btn').forEach(function(btn){
+    btn.onclick=function(){
+      SFX.nav();
+      var idx=parseInt(btn.getAttribute('data-mi'));
+      var cb=(opts.buttons&&opts.buttons[idx]&&opts.buttons[idx].action)||null;
+      ov.classList.remove('show');
+      setTimeout(function(){ov.remove();if(cb)cb();},250);
+    };
+  });
+  ov.onclick=function(e){if(e.target===ov){ov.classList.remove('show');setTimeout(function(){ov.remove()},250);}};
+  return ov;
+}
+
+function resetRun(){
+  SFX.nav();
+  showModal({
+    title:'Start Over?',titleColor:'#a05050',
+    msg:'All progress will be lost.<br>Gold, cards, dice \u2014 everything.',
+    buttons:[
+      {label:'CONFIRM',red:true,action:function(){localStorage.removeItem('gambit4');window.location.href='menu.html';}},
+      {label:'BACK'}
+    ]
+  });
 }
 </script>
 <script>if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');</script>
