@@ -12,6 +12,8 @@
 <link href="https://fonts.googleapis.com/css2?family=IM+Fell+English&family=MedievalSharp&family=Press+Start+2P&family=Uncial+Antiqua&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+button,.btn,.nav-btn,.char-card,.tab-btn,.sbtn,.gm-btn,.setting-check{transition:transform .06s ease,filter .06s ease}
+button:active,.btn:active,.nav-btn:active,.char-card:active,.tab-btn:active,.sbtn:active,.gm-btn:active,.setting-check:active{transform:scale(.93);filter:brightness(1.3)}
 :root{
   --bg:#0c0e16;
   --bg2:#12141c;
@@ -864,7 +866,7 @@ body{
           <div class="setting-name">PHYSICS</div>
           <div class="setting-desc">Dice bounce and scatter on the board</div>
         </div>
-        <div class="setting-toggle" id="diceStyleToggle" onclick="cycleDiceStyle()">
+        <div class="setting-toggle" id="diceStyleToggle" onclick="SFX.nav();cycleDiceStyle()">
           <div class="st-option" id="st-2d">OFF</div>
           <div class="st-option" id="st-3d">ON</div>
           <div class="st-slider" id="st-slider"></div>
@@ -880,7 +882,7 @@ body{
           <div class="setting-name">MUSIC</div>
           <div class="setting-desc">Background music during matches</div>
         </div>
-        <div class="setting-check" id="musicCheck" onclick="toggleAudio('music')"></div>
+        <div class="setting-check" id="musicCheck" onclick="SFX.nav();toggleAudio('music')"></div>
       </div>
     </div>
 
@@ -891,12 +893,12 @@ body{
           <div class="setting-name">SFX</div>
           <div class="setting-desc">Sound effects for rolls, banks and busts</div>
         </div>
-        <div class="setting-check" id="sfxCheck" onclick="toggleAudio('sfx')"></div>
+        <div class="setting-check" id="sfxCheck" onclick="SFX.nav();toggleAudio('sfx')"></div>
       </div>
     </div>
 
     <div class="settings-actions">
-      <div class="btn btn-dim" onclick="resetRun()"><canvas></canvas><div class="btn-inner">NEW RUN</div></div>
+      <div class="btn btn-dim" onclick="SFX.nav();resetRun()"><canvas></canvas><div class="btn-inner">NEW RUN</div></div>
       <div class="btn btn-gold" onclick="SFX.nav();closeSettings()"><canvas></canvas><div class="btn-inner">BACK</div></div>
     </div>
   </div>
@@ -904,8 +906,8 @@ body{
 
 <div class="bottom-nav">
   <div class="nav-btn" onclick="SFX.nav();openSettings()"><img class="nav-icon" src="Menu_Art/Settings.png" alt="Settings"><span class="nav-label">SETTINGS</span></div>
-  <div class="nav-btn" onclick="SFX.nav();window.location.href='buy_page.html'"><img class="nav-icon" src="Menu_Art/Shop.png" alt="Store"><span class="nav-label">STORE</span></div>
-  <div class="nav-btn" onclick="SFX.nav();window.location.href='menu.html'"><img class="nav-icon" src="Menu_Art/Menu.png" alt="Menu"><span class="nav-label">MENU</span></div>
+  <div class="nav-btn" onclick="SFX.nav();setTimeout(()=>window.location.href='buy_page.html',80)"><img class="nav-icon" src="Menu_Art/Shop.png" alt="Store"><span class="nav-label">STORE</span></div>
+  <div class="nav-btn" onclick="SFX.nav();setTimeout(()=>window.location.href='menu.html',80)"><img class="nav-icon" src="Menu_Art/Menu.png" alt="Menu"><span class="nav-label">MENU</span></div>
 </div>
 
 <script>
@@ -1151,7 +1153,7 @@ function openDetail(rung,done){
   const backBtn=document.createElement('div');
   backBtn.className='btn btn-dim';
   backBtn.innerHTML='<canvas></canvas><div class="btn-inner">BACK</div>';
-  backBtn.addEventListener('click',function(e){e.stopPropagation();closeDetail();});
+  backBtn.addEventListener('click',function(e){e.stopPropagation();SFX.nav();closeDetail();});
   actionsEl.appendChild(backBtn);
 
   const mainBtn=document.createElement('div');
@@ -1161,7 +1163,7 @@ function openDetail(rung,done){
   const rungName=rung.name;
   const rungId=rung.id;
   mainBtn.addEventListener('click',function(e){
-    e.stopPropagation();
+    e.stopPropagation();SFX.nav();
     openLoadout(rung,done);
   });
   actionsEl.appendChild(mainBtn);
@@ -1338,7 +1340,7 @@ function generateOppStake(rung){
 
 /* ═══════ LOADOUT OVERLAY ═══════ */
 let _loRung=null,_loSelectedDice=[],_loSelectedCards=[],_loWagerCards=[],_loOppCards=[],_loOppStake=null;
-const MAX_EQUIP=3;
+var MAX_EQUIP=3;
 const LO_DP7={TL:8,TR:12,ML:22,MM:24,MR:26,BL:36,BR:40};
 const LO_FACE_DOTS={1:[LO_DP7.MM],2:[LO_DP7.TL,LO_DP7.BR],3:[LO_DP7.TL,LO_DP7.MM,LO_DP7.BR],4:[LO_DP7.TL,LO_DP7.TR,LO_DP7.BL,LO_DP7.BR],5:[LO_DP7.TL,LO_DP7.TR,LO_DP7.MM,LO_DP7.BL,LO_DP7.BR],6:[LO_DP7.TL,LO_DP7.TR,LO_DP7.ML,LO_DP7.MR,LO_DP7.BL,LO_DP7.BR]};
 function loMkDie(val,mat){
@@ -1385,11 +1387,13 @@ function openLoadout(rung,done){
   // Grog (id 0) = no cards allowed for balance
   var _rarOrd={gold:1,silver:2,tin:3};
   var isGrog=rung.id===0||rung.key==='drunkard';
+  _loOppCards=generateOppCards(rung);
+  // Match player card slots to opponent's card count for fairness
+  MAX_EQUIP=_loOppCards.length||1;
   _loSelectedCards=isGrog?[]:(S.cards||[]).slice().sort(function(a,b){return(_rarOrd[a.rarity]||99)-(_rarOrd[b.rarity]||99)}).slice(0,MAX_EQUIP).map(function(c){return c.id});
   // Auto-stake best cards for wager (based on wagerCount)
   _loWagerCards=[];
   if(rung.wager&&_loSelectedCards.length>0)autoStake();
-  _loOppCards=generateOppCards(rung);
   _loOppStake=rung.wager?generateOppStake(rung):null;
 
   _savedStatsHTML=document.getElementById('dStats').innerHTML;
@@ -2158,6 +2162,7 @@ function renderLoWager(){
     }
     pSlot.style.cursor='pointer';
     pSlot.onclick=function(){
+      SFX.nav();
       if(_loWagerCards.length===1){loOpenCardZoom(_loWagerCards[0]);}
       else if(_loWagerCards.length>1){loOpenCardZoom(_loWagerCards[0]);}
     };
@@ -2173,7 +2178,7 @@ function renderLoWager(){
       oSlot.innerHTML=loMiniCardHTML(oCard,false);
       oSlot.classList.add('filled');
       oSlot.style.cursor='pointer';
-      oSlot.onclick=function(){loOpenCardZoom(_loOppStake)};
+      oSlot.onclick=function(){SFX.nav();loOpenCardZoom(_loOppStake)};
     }
   }else{
     oSlot.innerHTML='<span style="font-size:5px">OPP<br>CARD</span>';
@@ -2274,7 +2279,8 @@ function launchMatch(){
     buyIn:rung.buyIn||0,
     effectiveWager:hasWager
   }));
-  window.location.href='match.html';
+  SFX.nav();
+  setTimeout(()=>{window.location.href='match.html';},80);
 }
 
 /* ═══════ MATCH RESULT HANDLER ═══════ */
@@ -2444,8 +2450,13 @@ function updateAudioUI(){
 }
 /* ═══════ SFX ENGINE ═══════ */
 const SFX={
-  _ctx:null,
-  _get(){if(!this._ctx)this._ctx=new(window.AudioContext||window.webkitAudioContext)();if(this._ctx.state==='suspended')this._ctx.resume();return this._ctx;},
+  _ctx:null,_ready:false,
+  _get(){
+    if(!this._ctx)this._ctx=new(window.AudioContext||window.webkitAudioContext)();
+    if(this._ctx.state==='suspended')this._ctx.resume().then(()=>{this._ready=true;});
+    else this._ready=true;
+    return this._ctx;
+  },
   _sfxOn(){return!S.settings||S.settings.sfx!==false;},
   _tone(freq,type,vol,attack,decay,start){
     if(!this._sfxOn())return;start=start||0;
@@ -2470,6 +2481,9 @@ const SFX={
   nav(){this._click(800,0.05,0.03);this._tone(500,'sine',0.03,0.003,0.04);},
   err(){this._click(300,0.08,0.05);this._tone(200,'sine',0.05,0.005,0.08);},
 };
+/* Pre-warm AudioContext on first user interaction so sounds play immediately */
+document.addEventListener('touchstart',function _warmAudio(){SFX._get();document.removeEventListener('touchstart',_warmAudio);},{once:true});
+document.addEventListener('click',function _warmAudio2(){SFX._get();document.removeEventListener('click',_warmAudio2);},{once:true});
 
 /* ═══════ GAME MODAL ═══════ */
 function showModal(opts){

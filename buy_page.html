@@ -12,6 +12,8 @@
 <link href="https://fonts.googleapis.com/css2?family=IM+Fell+English&family=Jacquard+24&family=MedievalSharp&family=Press+Start+2P&family=Uncial+Antiqua&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+button,.btn,.nav-btn,.tab-btn,.sbtn,.dice-cell,.card-cell{transition:transform .06s ease,filter .06s ease}
+button:active,.btn:active,.nav-btn:active,.tab-btn:active,.sbtn:active,.dice-cell:active,.card-cell:active{transform:scale(.93);filter:brightness(1.3)}
 :root{
   --bg:#0c0e16;
   --bg2:#12141c;
@@ -854,8 +856,8 @@ body{
 <!-- BOTTOM NAV -->
 <div class="bottom-nav">
   <div class="nav-btn" onclick="sfxTap();openSettings()"><img class="nav-icon" src="Menu_Art/Settings.png" alt="Settings"><span class="nav-label">SETTINGS</span></div>
-  <div class="nav-btn" onclick="sfxTap();window.location.href='gauntlet_proto.html'"><img class="nav-icon" src="Menu_Art/Gauntlet.png" alt="Gauntlet"><span class="nav-label">GAUNTLET</span></div>
-  <div class="nav-btn" onclick="sfxTap();window.location.href='menu.html'"><img class="nav-icon" src="Menu_Art/Menu.png" alt="Menu"><span class="nav-label">MENU</span></div>
+  <div class="nav-btn" onclick="sfxTap();setTimeout(()=>window.location.href='gauntlet_proto.html',80)"><img class="nav-icon" src="Menu_Art/Gauntlet.png" alt="Gauntlet"><span class="nav-label">GAUNTLET</span></div>
+  <div class="nav-btn" onclick="sfxTap();setTimeout(()=>window.location.href='menu.html',80)"><img class="nav-icon" src="Menu_Art/Menu.png" alt="Menu"><span class="nav-label">MENU</span></div>
 </div>
 
 <script>
@@ -1155,14 +1157,24 @@ function drawPixelScroll(canvas){
 /* ═══════════════════════════════════════
    SFX (procedural)
    ═══════════════════════════════════════ */
-const _actx = new (window.AudioContext||window.webkitAudioContext)();
+let _actx=null;
+function _getACtx(){
+  if(!_actx)_actx=new (window.AudioContext||window.webkitAudioContext)();
+  if(_actx.state==='suspended')_actx.resume();
+  return _actx;
+}
+function _sfxEnabled(){
+  try{const s=JSON.parse(localStorage.getItem('gambit4')||'{}');return s.settings?s.settings.sfx!==false:true;}catch(e){return true;}
+}
 function playSfx(freq, dur, type, vol){
-  const g=_actx.createGain(),o=_actx.createOscillator();
+  if(!_sfxEnabled())return;
+  const ctx=_getACtx();
+  const g=ctx.createGain(),o=ctx.createOscillator();
   o.type=type||'square';o.frequency.value=freq;
-  g.gain.setValueAtTime(vol||.08,_actx.currentTime);
-  g.gain.exponentialRampToValueAtTime(.001,_actx.currentTime+dur);
-  o.connect(g);g.connect(_actx.destination);
-  o.start();o.stop(_actx.currentTime+dur);
+  g.gain.setValueAtTime(vol||.08,ctx.currentTime);
+  g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+dur);
+  o.connect(g);g.connect(ctx.destination);
+  o.start();o.stop(ctx.currentTime+dur);
 }
 function sfxBuy(){
   playSfx(520,.06,'square',.1);
@@ -1172,6 +1184,9 @@ function sfxBuy(){
 function sfxFlip(){playSfx(400,.04,'triangle',.06);setTimeout(()=>playSfx(600,.05,'triangle',.04),40)}
 function sfxTap(){playSfx(300,.03,'square',.05)}
 function sfxError(){playSfx(180,.15,'sawtooth',.06);setTimeout(()=>playSfx(140,.2,'sawtooth',.04),100)}
+/* Pre-warm AudioContext on first interaction */
+document.addEventListener('touchstart',function _w(){_getACtx();document.removeEventListener('touchstart',_w);},{once:true});
+document.addEventListener('click',function _w2(){_getACtx();document.removeEventListener('click',_w2);},{once:true});
 
 /* ═══════════════════════════════════════
    PURCHASE FX
@@ -1392,14 +1407,14 @@ function buildCardsTab(){
     const canAfford=playerGold>=cost;
     const extras=`<div class="sc-price ${canAfford?'':'cant'}"><span class="sc-coin"><span class="coin-i"></span></span><span class="sc-cost">${cost}</span></div>${owned?'<div class="sc-owned-check">\u2713</div>':''}`;
     html+=`
-      <div class="shop-card${owned?' owned':''} rarity-${c.rarity}" data-id="${c.id}" onclick="openCardZoom('${c.id}')">
+      <div class="shop-card${owned?' owned':''} rarity-${c.rarity}" data-id="${c.id}" onclick="sfxTap();openCardZoom('${c.id}')">
         ${mkGCardFront(c, extras)}
       </div>`;
   });
   html+='</div>';
   /* Refresh stock button — full width at bottom */
   html+=`<div class="refresh-btn-wrap">
-    <div class="refresh-btn${canRefresh?'':' disabled'}" onclick="refreshStock()">
+    <div class="refresh-btn${canRefresh?'':' disabled'}" onclick="sfxTap();refreshStock()">
       <canvas></canvas>
       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" style="image-rendering:pixelated;flex-shrink:0">
         <path d="M17.65 6.35A7.96 7.96 0 0012 4a8 8 0 00-8 8h2.5a5.5 5.5 0 019.17-4.1L12 10h7V3l-1.35 3.35z" fill="var(--gold)"/>
@@ -1591,7 +1606,7 @@ function buildDiceTab(){
     const canAfford=d.cost===0||playerGold>=d.cost;
     const cls=(!canAfford&&d.cost>0)?'cant-afford':'';
     const ownCls=ownCount>0?'owned':'';
-    html+=`<div class="dice-cell dtype-${d.id} ${cls} ${ownCls}" onclick="openDiceZoom('${d.id}')">
+    html+=`<div class="dice-cell dtype-${d.id} ${cls} ${ownCls}" onclick="sfxTap();openDiceZoom('${d.id}')">
       <div class="dice-cell-3d"><div class="dice-cell-cube">`;
     for(let f=0;f<6;f++){
       const val=f+1;
@@ -1877,7 +1892,7 @@ function buildServicesTab(){
     const cv=document.createElement('canvas');
     cv.style.cssText='position:absolute;inset:0;image-rendering:pixelated';
     box.appendChild(cv);
-    box.onclick=()=>{if(_didSwipe)return;svc.action();};
+    box.onclick=()=>{if(_didSwipe)return;sfxTap();svc.action();};
     opts.appendChild(box);
 
     requestAnimationFrame(()=>{
@@ -1992,7 +2007,7 @@ function buildInventoryPanel(mode){
 
     item.innerHTML=cardHtml;
     if(!disabled){
-      item.onclick=()=>selectInvCard(oc.id,item);
+      item.onclick=()=>{sfxTap();selectInvCard(oc.id,item);};
     }
     cardGrid.appendChild(item);
   });
@@ -2044,7 +2059,7 @@ function selectInvCard(cardId,el){
         drawPixelPanel(cv,bv,fc,sh,555,0.008);
       }
     });
-    btn.onclick=()=>executeInvAction();
+    btn.onclick=()=>{sfxTap();executeInvAction();};
   }
 }
 
@@ -2216,8 +2231,8 @@ function resetRun(){
     +'<div id="reset-no" style="flex:1;padding:14px 6px;cursor:pointer;font-family:var(--font-px);font-size:10px;text-align:center;background:#1a1408;border:2px solid #6a5830;border-radius:3px;color:var(--gold);letter-spacing:1px">BACK</div>'
     +'</div></div>';
   document.body.appendChild(ov);
-  document.getElementById('reset-yes').onclick=function(){localStorage.removeItem('gambit4');window.location.href='menu.html';};
-  document.getElementById('reset-no').onclick=function(){ov.remove();};
+  document.getElementById('reset-yes').onclick=function(){sfxTap();localStorage.removeItem('gambit4');setTimeout(()=>window.location.href='menu.html',80);};
+  document.getElementById('reset-no').onclick=function(){sfxTap();ov.remove();};
   ov.onclick=function(e){if(e.target===ov)ov.remove();};
 }
 </script>

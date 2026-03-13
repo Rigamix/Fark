@@ -1,10 +1,7 @@
-const CACHE_NAME = 'gambit-v2';
+const CACHE_NAME = 'gambit-v3';
 const ASSETS = [
   './',
-  './menu.html',
-  './match.html',
-  './gauntlet_proto.html',
-  './buy_page.html',
+  './index.html',
   './manifest.json',
   './Card_ART/Flintlock_face.jpg',
   './Card_ART/Flintlock_face.png',

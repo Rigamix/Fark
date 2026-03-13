@@ -14,6 +14,8 @@
 @font-face{font-family:'Alagard';src:url('Fonts/Pixel/alagard.ttf') format('truetype')}
 @font-face{font-family:'Enchanted Land';src:url('Fonts/Medieval/Enchanted Land.otf') format('opentype')}
 *{margin:0;padding:0;box-sizing:border-box;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+button,.btn,.nav-btn,.menu-btn,.tab-btn,.sbtn,.gm-btn,.quit-btn{transition:transform .06s ease,filter .06s ease}
+button:active,.btn:active,.nav-btn:active,.menu-btn:active,.tab-btn:active,.sbtn:active,.gm-btn:active,.quit-btn:active{transform:scale(.93);filter:brightness(1.3)}
 :root{
   --bg:#0c0e16;
   --bg2:#12141c;
@@ -583,10 +585,20 @@ body{
 .status-msg.green{color:var(--green);opacity:1;font-size:clamp(16px,4.4vw,22px)}
 .status-msg.active{color:var(--text);opacity:.65}
 
+/* ─── YIELD BUTTON (separate, above controls) ─── */
+.yield-btn{
+  display:none;border:none;cursor:pointer;background:transparent;padding:0;
+  width:clamp(160px,44vw,220px);height:clamp(60px,17vw,80px);
+  margin:0 auto 8px;position:relative;
+  transition:transform .06s,filter .06s;
+}
+.yield-btn:active{transform:scale(.93);filter:brightness(1.4)}
+.yield-btn .btn-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;image-rendering:auto;pointer-events:none}
+
 /* ─── CONTROL BUTTONS ─── */
 .controls{
   display:flex;align-items:center;justify-content:space-between;
-  padding:10px 12px;flex-shrink:0;
+  padding:16px 12px calc(20px + env(safe-area-inset-bottom,0px));flex-shrink:0;
   background:rgb(30,18,10);
   border-top:1px solid rgba(200,160,80,.15);
   position:relative;z-index:15;
@@ -1141,6 +1153,11 @@ body{
   <!-- Kept tray -->
   <div class="kept-tray" id="keptTray"></div>
 
+  <!-- Yield button (above status text) -->
+  <button class="yield-btn" id="btnYield" style="display:none" onclick="handleYield()">
+    <img class="btn-bg" src="Match_Art/yield.png" alt="Yield">
+  </button>
+
   <!-- Status strip bottom -->
   <div class="status-strip" id="botStrip">
     <div class="status-msg" id="statusBot"></div>
@@ -1438,7 +1455,11 @@ function drawPixelScroll(canvas){
 /* ═══════ SFX ENGINE ═══════ */
 const SFX={
   _ctx:null,
-  _get(){if(!this._ctx)this._ctx=new(window.AudioContext||window.webkitAudioContext)();if(this._ctx.state==='suspended')this._ctx.resume();return this._ctx;},
+  _get(){
+    if(!this._ctx)this._ctx=new(window.AudioContext||window.webkitAudioContext)();
+    if(this._ctx.state==='suspended')this._ctx.resume();
+    return this._ctx;
+  },
   _sfxOn(){return!S.settings||S.settings.sfx!==false;},
   _tone(freq,type,vol,attack,decay,start){
     if(!this._sfxOn())return;start=start||0;
@@ -1510,6 +1531,9 @@ const SFX={
   err(){this._click(300,0.08,0.05);this._tone(200,'sine',0.05,0.005,0.08);},
   combo(n){n=Math.min(n||3,6);const notes=[440,523,587,659,784,880];for(let i=0;i<n;i++){this._tone(notes[i],'sine',0.045,0.004,0.09,i*0.065);this._click(1200,0.015,0.015,i*0.065);}},
 };
+/* Pre-warm AudioContext on first interaction */
+document.addEventListener('touchstart',function _w(){SFX._get();document.removeEventListener('touchstart',_w);},{once:true});
+document.addEventListener('click',function _w2(){SFX._get();document.removeEventListener('click',_w2);},{once:true});
 
 /* ═══════ GAME CONSTANTS ═══════ */
 const TARNISH_DISABLE=3;
@@ -1592,7 +1616,7 @@ const CARDS=[
   {id:'tyrants_gaze',name:"TYRANT'S GAZE",icon:'👁️',rarity:'gold',eff:'RIVAL CANNOT ADAPT',desc:'Rival loses adaptive strategy ability.'},
   /* ── ACTIVE CARDS (NPC rewards, drag-to-activate) ── */
   {id:'grogs_flask',name:"GROG'S FLASK",icon:'🍺',rarity:'gold',type:'active',npc:'grog',maxUses:1,timing:'choosing',eff:'REROLL 2 NON-SCORING DICE',desc:'Reroll up to 2 non-scoring dice. Activate during dice selection.',rewardQuote:'"Here… take thish. Won it fair an\' shquare."'},
-  {id:'mabels_stitch',name:"MABEL'S STITCH",icon:'🧵',rarity:'gold',type:'active',npc:'mabel',maxUses:1,timing:'idle|yielding',eff:'PROTECT TURN PTS IF BUST',desc:'If you bust this turn, bank your turn points instead of losing them.',rewardQuote:'"Take this. May it mend thy fortune."'},
+  {id:'mabels_stitch',name:"MABEL'S STITCH",icon:'🧵',rarity:'gold',type:'active',npc:'mabel',maxUses:1,timing:'idle|choosing|yielding',eff:'PROTECT TURN PTS IF BUST',desc:'Activate before rolling: if you bust this turn, bank your turn points instead of losing them.',rewardQuote:'"Take this. May it mend thy fortune."'},
   {id:'finnicks_palm',name:"FINNICK'S PALM",icon:'🤏',rarity:'gold',type:'active',npc:'finnick',maxUses:1,timing:'choosing',eff:'SWAP 1 DIE → 1 OR 5',desc:'Change one non-scoring die to a 1 or 5. Activate during dice selection.',rewardQuote:'"Not bad, mate! Keep this, yeah?"'},
   {id:'corvus_ledger',name:"CORVUS'S LEDGER",icon:'📒',rarity:'gold',type:'active',npc:'corvus',maxUses:1,timing:'yielding',eff:'LAST BANK +50%',desc:'After banking, gain 50% of your last bank as bonus points.',rewardQuote:'"Take the ledger. Consider it… a dividend."'},
   {id:'brutus_fist',name:"BRUTUS'S FIST",icon:'👊',rarity:'gold',type:'active',npc:'brutus',maxUses:1,timing:'choosing',eff:'FORCE 1 DIE → 1',desc:'Force one non-scoring die to become a 1. Activate during dice selection.',rewardQuote:'"Iron in thy bones. Take this, soldier."'},
@@ -1943,12 +1967,6 @@ function handleRoll(){
 
 function afterRoll(){
   G.turnRollCount++;const free=G.pool.filter(d=>!d.committed);const freeV=free.map(d=>d.val);const cards=effectiveCards();
-  if(window.DLG&&freeV.length>=3){const sorted=[...freeV].sort();
-    if(freeV.length===6&&new Set(freeV).size===1)DLG.trigger('PLAYER_SIX_KIND');
-    else if(freeV.length>=6&&sorted.join(',')===',1,2,3,4,5,6'.substring(1))DLG.trigger('PLAYER_STRAIGHT');
-    else if(freeV.length>=5&&sorted.slice(0,5).join(',')===',1,2,3,4,5'.substring(1))DLG.trigger('PLAYER_STRAIGHT');
-    else if(freeV.length>=5&&sorted.slice(-5).join(',')===',2,3,4,5,6'.substring(1))DLG.trigger('PLAYER_STRAIGHT');
-    else{const counts={};freeV.forEach(v=>counts[v]=(counts[v]||0)+1);if(Object.values(counts).some(c=>c>=3))DLG.trigger('PLAYER_TRIPLE');}}
   if(!G.flintlockFired&&G.pCards.includes('flintlock')&&freeV.includes(1)){G.flintlockFired=true;G.pPts+=200;triggerCard('flintlock','+200 FLINTLOCK',true);updHUD();}
   /* Aldric's Vow: double roll score if 300+, else lose turn pts */
   if(G.activeCardState&&G.activeCardState.vowActive){
@@ -2082,12 +2100,13 @@ function refreshSelUI(){
 }
 
 function doBust(){
-  /* Cracked Bell: first bust costs nothing */
-  if(!G.crackedBellUsed&&G.pCards.includes('cracked_bell')){
+  /* Cracked Bell: first bust costs nothing — but only if there's score to lose */
+  const bellScore=G.kept.reduce((a,k)=>a+k.pts,0);
+  if(!G.crackedBellUsed&&G.pCards.includes('cracked_bell')&&bellScore>0){
     G.crackedBellUsed=true;
     G.pool.forEach(d=>{if(d.el)d.el.classList.add('bust');});
-    triggerCard('cracked_bell','CRACKED BELL — SAVED!',true);
-    setStatusMsg('BUST BLOCKED!','gold');
+    triggerCard('cracked_bell','CRACKED BELL — SAVED +'+bellScore+'!',true);
+    setStatusMsg('BUST BLOCKED! SAVED '+bellScore,'gold');
     G.safeTurnStreak=0;G.turnPts=0;G.kept=[];updHUD();refreshKeptTray();setBtns(false,false);
     setTimeout(()=>{clearRow('playerDiceRow');G.pool=[];endPTurn();},1200);
     return;
@@ -2180,25 +2199,36 @@ function handleBank(){
 /* ═══════ YIELD PHASE ═══════ */
 function showYieldButton(){
   G.phase='yielding';
-  const btn=document.getElementById('btnRoll');
-  btn.querySelector('.btn-bg').src='Match_Art/yield.png';
-  btn.disabled=false;btn.onclick=handleYield;
+  document.getElementById('btnRoll').disabled=true;
   document.getElementById('btnBank').disabled=true;
+  document.getElementById('btnYield').style.display='block';
   setStatusMsg('YIELD OR ACTIVATE CARD','active');
 }
 function handleYield(){
+  SFX.nav();
   if(window.DLG&&G._lastBankForDlg){
     if(G._lastBankForDlg>=800)DLG.trigger('BIG_BANK');
     else if(G._lastBankForDlg<=200)DLG.trigger('EARLY_BANK');
     G._lastBankForDlg=0;
   }
+  /* Hand-type dialogue triggers — fire on yield so they don't spoil the roll */
+  if(window.DLG){
+    const free=G.pool.filter(d=>!d.committed);const freeV=free.map(d=>d.val);
+    if(freeV.length>=3){const sorted=[...freeV].sort();
+      if(freeV.length===6&&new Set(freeV).size===1)DLG.trigger('PLAYER_SIX_KIND');
+      else if(freeV.length>=6&&sorted.join(',')===',1,2,3,4,5,6'.substring(1))DLG.trigger('PLAYER_STRAIGHT');
+      else if(freeV.length>=5&&sorted.slice(0,5).join(',')===',1,2,3,4,5'.substring(1))DLG.trigger('PLAYER_STRAIGHT');
+      else if(freeV.length>=5&&sorted.slice(-5).join(',')===',2,3,4,5,6'.substring(1))DLG.trigger('PLAYER_STRAIGHT');
+      else{const counts={};freeV.forEach(v=>counts[v]=(counts[v]||0)+1);if(Object.values(counts).some(c=>c>=3))DLG.trigger('PLAYER_TRIPLE');}
+    }
+  }
   restoreRollButton();
   endPTurn();
 }
 function restoreRollButton(){
+  document.getElementById('btnYield').style.display='none';
   const btn=document.getElementById('btnRoll');
-  btn.querySelector('.btn-bg').src='Match_Art/roll.png';
-  btn.onclick=handleRoll;
+  btn.disabled=false;btn.onclick=handleRoll;
 }
 
 function endPTurn(){
@@ -2563,6 +2593,7 @@ const OPP_DIALOGUE={
 
 /* ═══════ LOADOUT PANEL ═══════ */
 function toggleLoadoutPanel(){
+  SFX.nav();
   const ov=document.getElementById('loadout-ov');
   const bd=document.getElementById('loBackdrop');
   if(!ov)return;
@@ -2771,6 +2802,7 @@ function closeActiveZoom(){
   _activeZoomId=null;_czCardId=null;
 }
 function handleActivateBtn(){
+  SFX.nav();
   if(_activeZoomId&&canActivateCard(_activeZoomId)){
     activateCard(_activeZoomId);
     closeActiveZoom();
