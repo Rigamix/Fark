@@ -4309,8 +4309,11 @@ function runOppTurn(){
 /* ═══════ END MATCH ═══════ */
 function _spawnCoinParticles(coinEl,goldAmt,gravDir){
   // gravDir: 1 = gravity pulls down (win), -1 = gravity pulls up (lose)
-  const cr=coinEl.getBoundingClientRect();
-  const cx=cr.left+cr.width/2,cy=cr.top+cr.height/2;
+  // Coin is always centered horizontally in the end overlay; compute vertical from gold wrap
+  const wrap=coinEl.closest('.res-gold-wrap')||coinEl.parentElement;
+  const wr=wrap?wrap.getBoundingClientRect():{left:0,top:0,width:0,height:0};
+  const cx=(wr.width>0)?wr.left+wr.width/2:window.innerWidth/2;
+  const cy=(wr.height>0)?wr.top+wr.height/2:window.innerHeight*0.45;
   const count=Math.max(12,Math.min(35,Math.round(goldAmt/8)));
   const isLoss=gravDir<0;
   SFX.coinScatter(Math.min(Math.round(count/4),8));
@@ -5738,12 +5741,14 @@ function openCardPicker(slotIndex,tappedEl){
     }
     (function(cid,cardEl){
       var pressTimer=null,moved=false;
-      cardEl.addEventListener('pointerdown',function(){
+      cardEl.addEventListener('pointerdown',function(e){
+        e.stopPropagation();
         moved=false;
         pressTimer=setTimeout(function(){pressTimer=null;loOpenCardZoom(cid);},500);
       });
       cardEl.addEventListener('pointermove',function(){if(pressTimer){moved=true;clearTimeout(pressTimer);pressTimer=null;}});
-      cardEl.addEventListener('pointerup',function(){
+      cardEl.addEventListener('pointerup',function(e){
+        e.stopPropagation();e.preventDefault();
         if(pressTimer&&!moved){
           clearTimeout(pressTimer);pressTimer=null;
           var prev=_loSelectedCards.indexOf(cid);
@@ -5756,6 +5761,7 @@ function openCardPicker(slotIndex,tappedEl){
           closePicker();
         }
       });
+      cardEl.addEventListener('click',function(e){e.stopPropagation();e.preventDefault();});
       cardEl.addEventListener('pointerleave',function(){if(pressTimer){clearTimeout(pressTimer);pressTimer=null;}});
     })(oc.id,el);
     return el;
