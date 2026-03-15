@@ -167,6 +167,7 @@ body{
   background:none;border:none;padding:0;
   height:0;/* takes no flex space – cards overflow visually */
 }
+/* tooltip itself has z-index:9000, card bar stays at normal z */
 .bar-lbl{display:none}
 
 /* ─── MATCH CARDS (fanned hand) ─── */
@@ -189,36 +190,79 @@ body{
 .mcard .gc.br{bottom:4px;right:4px}
 .mcard .gcard-band{display:none}
 
+/* Subtle idle wobble on all cards */
+@keyframes cardWobble{
+  0%{transform:translateY(calc(var(--base-ty) - var(--lift,0px))) rotate(calc(var(--rot,0deg) + 0deg))}
+  25%{transform:translateY(calc(var(--base-ty) - var(--lift,0px) - 0.5px)) rotate(calc(var(--rot,0deg) + 0.4deg))}
+  50%{transform:translateY(calc(var(--base-ty) - var(--lift,0px) + 0.3px)) rotate(calc(var(--rot,0deg) - 0.3deg))}
+  75%{transform:translateY(calc(var(--base-ty) - var(--lift,0px) - 0.2px)) rotate(calc(var(--rot,0deg) + 0.2deg))}
+  100%{transform:translateY(calc(var(--base-ty) - var(--lift,0px))) rotate(calc(var(--rot,0deg) + 0deg))}
+}
 /* Bottom fan: player cards tuck behind controls bar */
 .card-bar.bot .mcard{
+  --base-ty:-50%;
   top:0;left:var(--cx,50%);margin-left:-35px;
   transform:translateY(calc(-50% - var(--lift,0px))) rotate(var(--rot,0deg));
+  animation:cardWobble 4s ease-in-out infinite;
+  animation-delay:calc(var(--wobble-d,0) * 1s);
 }
 .card-bar.bot .mcard.peeked{
-  transform:translateY(-190%) rotate(0deg) scale(2);z-index:40;
-  filter:drop-shadow(0 -4px 16px rgba(0,0,0,.6));
+  animation:cardPeekBounce .3s ease-out;
+}
+@keyframes cardPeekBounce{
+  0%{transform:translateY(calc(-50% - var(--lift,0px))) rotate(var(--rot,0deg)) scale(1)}
+  40%{transform:translateY(calc(-50% - var(--lift,0px))) rotate(var(--rot,0deg)) scale(1.12)}
+  100%{transform:translateY(calc(-50% - var(--lift,0px))) rotate(var(--rot,0deg)) scale(1)}
+}
+/* Sheen on peek */
+.card-bar.bot .mcard.peeked .gcard::after{
+  content:'';position:absolute;inset:0;z-index:5;pointer-events:none;
+  background:linear-gradient(105deg,transparent 35%,rgba(255,255,255,.15) 45%,rgba(255,255,255,.25) 50%,rgba(255,255,255,.15) 55%,transparent 65%);
+  animation:cardSheen .5s ease-out forwards;
+}
+@keyframes cardSheen{
+  0%{transform:translateX(-120%)}
+  100%{transform:translateX(120%);opacity:0}
 }
 
 /* Top fan: NPC cards tuck behind HUD bar, content flipped 180° */
+@keyframes cardWobbleTop{
+  0%{transform:translateY(calc(-50% + var(--lift,0px))) rotate(calc(var(--rot,0deg) + 0deg))}
+  25%{transform:translateY(calc(-50% + var(--lift,0px) + 0.5px)) rotate(calc(var(--rot,0deg) - 0.4deg))}
+  50%{transform:translateY(calc(-50% + var(--lift,0px) - 0.3px)) rotate(calc(var(--rot,0deg) + 0.3deg))}
+  75%{transform:translateY(calc(-50% + var(--lift,0px) + 0.2px)) rotate(calc(var(--rot,0deg) - 0.2deg))}
+  100%{transform:translateY(calc(-50% + var(--lift,0px))) rotate(calc(var(--rot,0deg) + 0deg))}
+}
 .card-bar.top .mcard{
   top:0;left:var(--cx,50%);margin-left:-35px;
   transform:translateY(calc(-50% + var(--lift,0px))) rotate(var(--rot,0deg));
+  animation:cardWobbleTop 4s ease-in-out infinite;
+  animation-delay:calc(var(--wobble-d,0) * 1s);
 }
 .card-bar.top .gcard{transform:rotate(180deg)}
 .card-bar.top .mcard.peeked{
-  transform:translateY(65%) rotate(0deg) scale(2);z-index:40;
-  filter:drop-shadow(0 4px 16px rgba(0,0,0,.6));
+  animation:cardPeekBounceTop .3s ease-out;
+}
+@keyframes cardPeekBounceTop{
+  0%{transform:translateY(calc(-50% + var(--lift,0px))) rotate(var(--rot,0deg)) scale(1)}
+  40%{transform:translateY(calc(-50% + var(--lift,0px))) rotate(var(--rot,0deg)) scale(1.12)}
+  100%{transform:translateY(calc(-50% + var(--lift,0px))) rotate(var(--rot,0deg)) scale(1)}
+}
+.card-bar.top .mcard.peeked .gcard::after{
+  content:'';position:absolute;inset:0;z-index:5;pointer-events:none;
+  background:linear-gradient(105deg,transparent 35%,rgba(255,255,255,.15) 45%,rgba(255,255,255,.25) 50%,rgba(255,255,255,.15) 55%,transparent 65%);
+  animation:cardSheen .5s ease-out forwards;
 }
 
 /* ─── CARD PEEK TOOLTIP ─── */
 .mcard-tooltip{
   position:absolute;pointer-events:none;opacity:0;
-  transition:opacity .25s ease .05s;z-index:50;
-  width:140px;
+  transition:opacity .2s ease .05s;z-index:9000;
+  width:clamp(150px,42vw,190px);
   padding:0;overflow:hidden;
-  background:linear-gradient(165deg,var(--cface2) 0%,var(--cface) 55%,var(--cface2) 100%);
-  border:3px solid var(--ctrim2);border-radius:6px;
-  box-shadow:inset 0 0 0 1px var(--ctrim),inset 0 0 0 5px var(--cface),inset 0 0 0 6px var(--ctrim2),0 5px 20px rgba(0,0,0,.85);
+  background:var(--cface);background-image:linear-gradient(165deg,var(--cface2) 0%,var(--cface) 55%,var(--cface2) 100%);
+  border:2px solid var(--ctrim2);border-radius:6px;
+  box-shadow:inset 0 0 0 1px var(--ctrim),inset 0 0 0 4px var(--cface),inset 0 0 0 5px var(--ctrim2),0 4px 16px rgba(0,0,0,1);
   font-family:var(--font-px);
   color:var(--ctxt);text-align:center;image-rendering:auto;
   left:50%;isolation:isolate;
@@ -228,31 +272,216 @@ body{
 .mcard-tooltip .gc.tr{top:3px;right:3px;transform:scaleX(-1)}
 .mcard-tooltip .gc.bl{bottom:3px;left:3px;transform:scaleY(-1)}
 .mcard-tooltip .gc.br{bottom:3px;right:3px;transform:scale(-1,-1)}
-.mcard-tooltip .tip-name{
-  font-size:8px;color:var(--ctxt);letter-spacing:1px;line-height:1.4;
-  padding:8px 10px 3px;z-index:3;position:relative;word-break:break-word;
-}
-.mcard-tooltip .tip-eff{
-  font-size:7px;color:var(--ctrim2);letter-spacing:.3px;line-height:1.5;
-  padding:2px 8px 6px;z-index:3;position:relative;word-break:break-word;
-}
 .mcard-tooltip .tip-band{
   position:relative;z-index:3;text-align:center;
   padding:3px 2px;background:var(--ctrim);
-  font-size:7px;color:var(--ctrim2);letter-spacing:2px;
-  border-top:1px solid var(--ctrim2);opacity:.95;
+  font-size:11px;color:var(--ctrim2);letter-spacing:2px;
+  border-bottom:1px solid var(--ctrim2);opacity:.95;
 }
-.mcard.peeked .mcard-tooltip{opacity:1;pointer-events:auto}
+.mcard-tooltip .tip-name{
+  font-size:14px;color:var(--ctxt);letter-spacing:1px;line-height:1.3;
+  padding:8px 10px 4px;z-index:3;position:relative;white-space:nowrap;
+}
+.mcard-tooltip .tip-eff{
+  font-family:'IM Fell English',serif;
+  font-size:14px;color:var(--ctrim2);letter-spacing:.2px;line-height:1.35;
+  padding:4px 10px 10px;z-index:3;position:relative;word-break:break-word;
+}
+.mcard.peeked .mcard-tooltip{opacity:1;pointer-events:auto;animation:tipGrow .25s ease-out,tipFloat 3s ease-in-out .25s infinite}
+@keyframes tipFloat{
+  0%,100%{transform:translateX(-50%) rotate(0deg) translateY(0)}
+  33%{transform:translateX(-50%) rotate(.4deg) translateY(-1px)}
+  66%{transform:translateX(-50%) rotate(-.3deg) translateY(.5px)}
+}
 /* Player tooltip: above the card */
 .card-bar.bot .mcard-tooltip{
-  bottom:calc(100% + 6px);
-  transform:translateX(-50%) scale(0.75);transform-origin:center bottom;
+  bottom:calc(100% + 8px);
+  transform:translateX(-50%);transform-origin:center bottom;
 }
 /* NPC tooltip: below the card */
 .card-bar.top .mcard-tooltip{
-  top:calc(100% + 6px);
-  transform:translateX(-50%) scale(0.75);transform-origin:center top;
+  top:calc(100% + 8px);
+  transform:translateX(-50%);transform-origin:center top;
 }
+@keyframes cardPopIn{
+  0%{transform:scale(0);opacity:0;filter:brightness(1.8)}
+  60%{transform:scale(1.12);opacity:1;filter:brightness(1.3)}
+  80%{transform:scale(.97);filter:brightness(1.05)}
+  100%{transform:scale(1);opacity:1;filter:brightness(1)}
+}
+@keyframes tipGrow{
+  0%{transform:translateX(-50%) scale(.3);opacity:0}
+  70%{transform:translateX(-50%) scale(1.04);opacity:1}
+  100%{transform:translateX(-50%) scale(1);opacity:1}
+}
+
+/* Tooltip arrow for player cards (points down toward card) */
+.card-bar.bot .mcard-tooltip::after{
+  content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);
+  border:6px solid transparent;border-top-color:var(--ctrim2);
+}
+/* Tooltip arrow for opponent cards (points up toward card) */
+.card-bar.top .mcard-tooltip::after{
+  content:'';position:absolute;bottom:100%;left:50%;transform:translateX(-50%);
+  border:6px solid transparent;border-bottom-color:var(--ctrim2);
+}
+/* Active card tooltip extras */
+.mcard-tooltip .tip-uses{
+  font-size:10px;color:var(--gold);letter-spacing:.5px;
+  padding:3px 10px 2px;z-index:3;position:relative;
+}
+.mcard-tooltip .tip-timing{
+  font-size:9px;color:var(--textdim);letter-spacing:.5px;
+  padding:0 10px 6px;z-index:3;position:relative;
+}
+/* ─── TOOLTIP POSITIONING: non-match screens ─── */
+.shop-card,.lo-mini-card,.lo-hand-slot,.res-card{position:relative;overflow:visible}
+.shop-card .mcard-tooltip,
+.lo-mini-card .mcard-tooltip,
+.lo-hand-slot .mcard-tooltip,
+.res-card .mcard-tooltip{
+  bottom:calc(100% + 8px);
+  transform:translateX(-50%);transform-origin:center bottom;
+}
+.shop-card .mcard-tooltip::after,
+.lo-mini-card .mcard-tooltip::after,
+.lo-hand-slot .mcard-tooltip::after,
+.res-card .mcard-tooltip::after{
+  content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);
+  border:6px solid transparent;border-top-color:var(--ctrim2);
+}
+.shop-card.peeked .mcard-tooltip,
+.lo-mini-card.peeked .mcard-tooltip,
+.lo-hand-slot.peeked .mcard-tooltip,
+.res-card.peeked .mcard-tooltip{
+  opacity:1;pointer-events:auto;
+  animation:tipGrow .25s ease-out,tipFloat 3s ease-in-out .25s infinite;
+}
+/* only the tooltip gets elevated z-index, not the card wrapper */
+
+/* ─── ACTIVATE ZONE (drag target) ─── */
+.activate-zone{
+  position:absolute;left:20%;right:20%;height:76px;
+  bottom:calc(100% + 100px);
+  display:flex;align-items:center;justify-content:center;
+  background:transparent;
+  border:none;border-radius:8px;
+  font-family:var(--font-px);font-size:18px;letter-spacing:3px;
+  color:rgba(180,160,130,.0);
+  transition:background .3s,color .3s;
+  z-index:55;pointer-events:none;
+  overflow:visible;
+}
+/* SVG border — positioned to fill zone exactly */
+.activate-zone .az-border{
+  position:absolute;inset:0;pointer-events:none;
+}
+.activate-zone .az-border rect{
+  fill:none;
+  stroke:rgba(180,160,130,.18);
+  stroke-width:1.5;
+  stroke-dasharray:8 6;
+  stroke-dashoffset:0;
+  width:calc(100% - 2px);height:calc(100% - 2px);
+  rx:8;ry:8;
+  transition:stroke .3s;
+}
+.activate-zone.dragging-active{
+  background:rgba(255,215,0,.05);
+  color:rgba(255,215,0,.6);
+}
+.activate-zone.dragging-active .az-border rect{
+  stroke:rgba(255,215,0,.45);
+  animation:marchDash 2s linear infinite;
+}
+.activate-zone.hot{
+  background:rgba(255,215,0,.12);
+  color:#ffd700;
+}
+.activate-zone.hot .az-border rect{
+  stroke:rgba(255,215,0,.7);
+  animation:marchDash 1s linear infinite;
+}
+.activate-zone.unavailable{
+  background:rgba(160,80,80,.06);
+  color:rgba(160,80,80,.6);
+}
+.activate-zone.unavailable .az-border rect{
+  stroke:rgba(160,80,80,.3);
+  animation:none;
+}
+@keyframes marchDash{
+  0%{stroke-dashoffset:0}
+  100%{stroke-dashoffset:-28}
+}
+/* Card dropped in zone — stays there, browned out like the table */
+.mcard.in-zone{
+  position:absolute!important;
+  z-index:56!important;
+  transform:rotate(0deg)!important;
+  filter:none!important;
+  opacity:1!important;
+  pointer-events:none!important;
+  transition:none!important;
+}
+/* In-zone card: greyed out, no emoji */
+.mcard.in-zone .mcard-tooltip{display:none!important}
+.mcard.in-zone .gcard{filter:brightness(.55) saturate(.3) grayscale(.4)!important}
+.mcard.in-zone .gcard-cover{font-size:0!important}/* hide emoji */
+.mcard.in-zone .gcard-frame{opacity:.3!important}
+.mcard.in-zone .gc{opacity:.2!important}
+/* Card being dragged */
+.mcard.dragging{
+  position:fixed!important;
+  z-index:9500!important;
+  transition:none!important;
+  transform:scale(1.15)!important;
+  filter:drop-shadow(0 8px 24px rgba(0,0,0,.7)) brightness(1.1)!important;
+  pointer-events:none!important;
+}
+/* Snap-back animation — FLIP-based smooth return */
+.mcard.snap-back{
+  pointer-events:none!important;
+  transition:transform .3s ease-out,filter .3s ease-out!important;
+}
+
+/* ─── SHOP BUY ZONE (drag target) ─── */
+.buy-zone{
+  position:relative;width:80%;max-width:340px;height:72px;margin:0 auto 14px;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  background:transparent;border:none;border-radius:8px;
+  font-family:var(--font-px);font-size:16px;letter-spacing:3px;
+  color:rgba(180,160,130,.0);
+  transition:background .3s,color .3s;
+  pointer-events:none;flex-shrink:0;
+}
+.buy-zone .az-border{position:absolute;inset:0;pointer-events:none}
+.buy-zone .az-border rect{
+  fill:none;stroke:rgba(180,160,130,.18);stroke-width:1.5;
+  stroke-dasharray:8 6;stroke-dashoffset:0;
+  width:calc(100% - 2px);height:calc(100% - 2px);rx:8;ry:8;
+  transition:stroke .3s;
+}
+.buy-zone .bz-label{position:relative;z-index:2}
+.buy-zone .bz-price{position:relative;z-index:2;display:none;align-items:center;gap:4px;font-size:18px;color:var(--gold)}
+.buy-zone.dragging-active{
+  background:rgba(255,215,0,.05);color:rgba(255,215,0,.6);pointer-events:none;
+}
+.buy-zone.dragging-active .az-border rect{stroke:rgba(255,215,0,.45);animation:marchDash 2s linear infinite}
+.buy-zone.dragging-active .bz-price{display:flex}
+.buy-zone.hot{background:rgba(255,215,0,.12);color:#ffd700}
+.buy-zone.hot .az-border rect{stroke:rgba(255,215,0,.7);animation:marchDash 1s linear infinite}
+.buy-zone.cant-afford{background:rgba(160,80,80,.06);color:rgba(160,80,80,.6)}
+.buy-zone.cant-afford .az-border rect{stroke:rgba(160,80,80,.3);animation:none}
+.buy-zone.cant-afford .bz-price{display:flex;color:var(--red)}
+/* Shop card dragging */
+.shop-card.dragging{
+  position:fixed!important;z-index:9500!important;transition:none!important;
+  transform:scale(1.15)!important;
+  filter:drop-shadow(0 8px 24px rgba(0,0,0,.7)) brightness(1.1)!important;
+  pointer-events:none!important;
+}
+.shop-card.snap-back{pointer-events:none!important;transition:transform .3s ease-out,filter .3s ease-out!important}
 
 /* ─── CARD CHIP SYSTEM ─── */
 .rarity-tin{--ctrim:#3d352c;--ctrim2:#8a7a68;--cface:#18140f;--cface2:#221e18;--ctxt:#c0b498;--cglow:rgba(138,122,104,.35)}
@@ -314,7 +543,6 @@ body{
 .gcard-cover{position:absolute;inset:0;z-index:0;display:flex;align-items:center;justify-content:center;pointer-events:none;font-size:32px;line-height:1;text-shadow:0 2px 8px rgba(0,0,0,.5);border-radius:4px}
 .mcard .gcard-cover{font-size:28px}
 .res-card .gcard-cover{font-size:40px}
-.cz-wrap .gcard-cover{font-size:72px}
 .cchip-back .gcard-cover{font-size:18px}
 .gcard-frame{position:absolute;top:8px;left:8px;right:8px;bottom:26px;border-radius:3px;pointer-events:none;z-index:1;border:1px solid var(--ctrim2);opacity:.7}
 .gc{position:absolute;z-index:4;pointer-events:none;user-select:none;width:22px;height:22px;color:var(--ctrim2);overflow:visible;filter:drop-shadow(0 0 4px var(--ctrim2)) brightness(1.3)}
@@ -329,51 +557,6 @@ body{
 .gcard-eff{font-size:12px;color:var(--ctrim2);text-align:center;letter-spacing:.3px;line-height:1.5;z-index:3;padding:0 8px;word-break:break-word;flex:1}
 .gcard-band{position:absolute;bottom:0;left:0;right:0;text-align:center;padding:5px 2px;z-index:3;background:var(--ctrim);font-size:12px;color:var(--ctrim2);letter-spacing:2px;border-top:1px solid var(--ctrim2);opacity:.95}
 
-/* ─── CARD BACK (for zoom flip) ─── */
-.gcard-back{
-  position:absolute;inset:0;border-radius:6px;overflow:hidden;
-  background:linear-gradient(165deg,var(--cface2) 0%,var(--cface) 55%,var(--cface2) 100%);
-  border:3px solid var(--ctrim2);
-  box-shadow:0 5px 20px rgba(0,0,0,.85);
-  display:flex;flex-direction:column;align-items:center;
-  padding:16px 12px 10px;gap:6px;
-  backface-visibility:hidden;-webkit-backface-visibility:hidden;
-  transform:rotateY(180deg);isolation:isolate;
-  filter:url(#pixelWobbleLite);
-}
-.gcard-back-name{font-size:22px;color:#c8845a;text-align:center;letter-spacing:0.5px;z-index:2;flex-shrink:0;font-family:'Jacquard 24',serif;margin-top:auto;margin-bottom:8px;text-shadow:0 1px 0 rgba(0,0,0,.6);line-height:1.3;padding:0 6px;word-break:break-word}
-.gcard-back-desc{font-size:14px;color:#b0a890;text-align:center;line-height:1.6;z-index:2;padding:0 8px;width:100%;overflow-y:auto;flex:1;min-height:0;display:flex;align-items:center;justify-content:center}
-.gcard-back-frame{display:none}
-.gcard-tap{font-size:10px;color:var(--ctrim2);opacity:.6;letter-spacing:2px;z-index:3;flex-shrink:0;margin-top:auto}
-
-/* ─── CARD ZOOM OVERLAY ─── */
-.card-zoom-overlay{
-  position:fixed;inset:0;z-index:9700;
-  background:rgba(0,0,0,0);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:16px;pointer-events:none;transition:background .35s ease;
-}
-.card-zoom-overlay.open{background:rgba(0,0,0,.85);pointer-events:auto}
-.card-zoom-card{
-  width:220px;height:330px;perspective:900px;
-  transform:scale(0);transition:transform .45s cubic-bezier(.2,1.2,.3,1);
-}
-.card-zoom-overlay.open .card-zoom-card{
-  transform:scale(1);animation:czFloat 3.5s ease-in-out infinite;
-}
-@keyframes czFloat{0%,100%{transform:scale(1) translateY(0)}50%{transform:scale(1) translateY(-6px)}}
-.cz-wrap{width:100%;height:100%;position:relative;transform-style:preserve-3d}
-.cz-wrap .gcard{backface-visibility:hidden;-webkit-backface-visibility:hidden;position:absolute;inset:0}
-.cz-wrap .gcard-back{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden}
-.cz-wrap .gcard-pip{margin-top:22px}
-.cz-wrap .gcard-icon{font-size:38px}
-.cz-wrap .gcard-name{font-size:14px;padding:0 14px}
-.cz-wrap .gcard-eff{font-size:12px;padding:0 12px;line-height:1.9}
-.cz-wrap .gcard-art{bottom:26px;height:auto}
-.cz-wrap .gcard-band{font-size:10px;padding:5px 2px;opacity:1}
-.cz-wrap .gc{width:18px;height:18px}
-.cz-wrap .gcard-back-name{font-size:28px;letter-spacing:0.5px;color:#c8845a;padding:0 10px}
-.cz-wrap .gcard-back-desc{font-size:16px;line-height:1.6;padding:0 14px}
 /* ─── DICE ZOOM OVERLAY ─── */
 .dice-zoom-overlay{
   position:fixed;inset:0;z-index:9700;
@@ -437,9 +620,10 @@ body{
 /* ─── DICE AREA ─── */
 .dice-area{
   flex:1;min-height:0;display:flex;flex-direction:column;
-  align-items:center;padding:62px 6px 54px;
+  align-items:center;padding:62px 6px 0;
   position:relative;overflow:hidden;
 }
+.dice-spacer{flex:1;min-height:0}
 .opp-dice-row{
   display:flex;flex-wrap:nowrap;gap:4px;
   justify-content:center;align-items:center;
@@ -485,7 +669,7 @@ body{
 .player-dice-row{
   display:flex;flex-wrap:nowrap;gap:clamp(4px,1.8vw,8px);
   justify-content:center;align-items:center;
-  flex:1;min-height:0;overflow:visible;
+  flex-shrink:0;overflow:visible;
 }
 
 /* ─── DIE STYLES ─── */
@@ -550,36 +734,64 @@ body{
 }
 .card-trig-label{
   position:absolute;z-index:60;pointer-events:none;
-  font-family:var(--font-px);font-size:13px;letter-spacing:.5px;
-  color:var(--gold);text-shadow:1px 1px 0 #000,0 0 6px rgba(200,160,80,.5);
-  white-space:nowrap;animation:cardTrigFloat 1.2s ease-out forwards;
+  font-family:var(--font-px);font-size:14px;letter-spacing:.5px;
+  color:var(--gold);
+  white-space:nowrap;animation:cardTrigFloat 1s ease-out forwards;
 }
-.card-trig-label.opponent{color:var(--red);text-shadow:1px 1px 0 #000,0 0 6px rgba(160,80,80,.5)}
+.card-trig-label.opponent{color:var(--red)}
+/* Persistent label — floats up then stays at low opacity */
+.card-trig-label.persist{
+  animation:cardTrigFloatPersist 1s ease-out forwards;
+}
 @keyframes cardTrigFloat{
   0%{opacity:1;transform:translateX(-50%) translateY(0)}
-  60%{opacity:1;transform:translateX(-50%) translateY(-30px)}
-  100%{opacity:0;transform:translateX(-50%) translateY(-45px)}
+  50%{opacity:1;transform:translateX(-50%) translateY(-28px)}
+  100%{opacity:0;transform:translateX(-50%) translateY(-40px)}
 }
-.card-bar.top .card-trig-label{animation:cardTrigFloatDown 1.2s ease-out forwards}
+@keyframes cardTrigFloatPersist{
+  0%{opacity:1;transform:translateX(-50%) translateY(0)}
+  60%{opacity:1;transform:translateX(-50%) translateY(-28px)}
+  100%{opacity:.3;transform:translateX(-50%) translateY(-32px)}
+}
+.card-bar.top .card-trig-label{animation:cardTrigFloatDown 1s ease-out forwards}
 @keyframes cardTrigFloatDown{
   0%{opacity:1;transform:translateX(-50%) translateY(0)}
-  60%{opacity:1;transform:translateX(-50%) translateY(30px)}
-  100%{opacity:0;transform:translateX(-50%) translateY(45px)}
+  50%{opacity:1;transform:translateX(-50%) translateY(28px)}
+  100%{opacity:0;transform:translateX(-50%) translateY(40px)}
 }
+/* Zone label — floats down slightly then settles */
+.activate-zone .card-trig-label{animation:zoneTrigFloat 1s ease-out forwards}
+.activate-zone .card-trig-label.persist{animation:zoneTrigFloatPersist 1s ease-out forwards}
+@keyframes zoneTrigFloat{
+  0%{opacity:1;transform:translateX(-50%) translateY(0)}
+  50%{opacity:1;transform:translateX(-50%) translateY(10px)}
+  100%{opacity:0;transform:translateX(-50%) translateY(16px)}
+}
+@keyframes zoneTrigFloatPersist{
+  0%{opacity:1;transform:translateX(-50%) translateY(0)}
+  60%{opacity:1;transform:translateX(-50%) translateY(8px)}
+  100%{opacity:.3;transform:translateX(-50%) translateY(10px)}
+}
+/* Active card pulsing outline */
+.mcard-active .gcard{border:1.5px solid rgba(255,215,0,.5);animation:activePulse 2.2s ease-in-out infinite}
+@keyframes activePulse{0%,100%{border-color:rgba(255,215,0,.3)}50%{border-color:rgba(255,215,0,.85)}}
+.mcard-active.used .gcard{border-color:rgba(120,120,120,.3);animation:none;filter:brightness(.6) saturate(.3)}
 
 .dc{width:100%;height:100%}
 .dc.dot{border-radius:50%;background:var(--dpip);width:70%;height:70%;margin:15%}
 
 /* ─── KEPT TRAY ─── */
 .kept-tray{
-  display:none;align-items:center;gap:6px;
-  min-height:32px;padding:4px 10px;flex-wrap:wrap;
+  display:none;align-items:center;gap:4px;
+  min-height:0;padding:4px 10px;flex-wrap:wrap;
   justify-content:center;flex-shrink:0;
-  position:absolute;left:0;right:0;bottom:24px;
   pointer-events:none;z-index:5;
+  margin-top:12px;
 }
 .kept-tray.has-items{display:flex}
-.kept-pts{font-family:var(--font-px);font-size:13px;color:var(--green);align-self:center;margin-right:2px}
+.kept-tray .die{width:20px!important;height:20px!important;box-shadow:none!important;border-color:rgba(80,60,40,.5)!important;opacity:.65;filter:brightness(.8)}
+.kept-tray .die::after{display:none}
+.kept-pts{font-family:var(--font-px);font-size:11px;color:var(--green);align-self:center;margin-right:4px}
 
 /* ─── STATUS STRIPS ─── */
 .status-strip{
@@ -597,14 +809,17 @@ body{
 .status-msg.active{color:var(--text);opacity:.65}
 
 /* ─── YIELD BUTTON (separate, above controls) ─── */
+/* ─── YIELD BUTTON — centered on activation area ─── */
 .yield-btn{
   display:none;border:none;cursor:pointer;background:transparent;padding:0;
-  width:clamp(160px,44vw,220px);height:clamp(60px,17vw,80px);
-  margin:0 auto 8px;position:relative;
+  position:absolute;left:20%;right:20%;height:76px;
+  bottom:calc(100% + 100px);
+  z-index:58;
+  transform:scale(1.05);
   transition:transform .06s,filter .06s;
 }
-.yield-btn:active{transform:scale(.93);filter:brightness(1.4)}
-.yield-btn .btn-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;image-rendering:auto;pointer-events:none}
+.yield-btn:active{transform:scale(.98);filter:brightness(1.4)}
+.yield-btn .btn-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;image-rendering:auto;pointer-events:none}
 
 /* ─── CONTROL BUTTONS ─── */
 .controls{
@@ -637,23 +852,6 @@ body{
 .mcard-active .gcard{animation:activeGlow 2s ease-in-out infinite;border:1px solid #ffd700}
 @keyframes activeGlow{0%,100%{box-shadow:0 0 6px 2px rgba(255,215,0,.4)}50%{box-shadow:0 0 14px 5px rgba(255,215,0,.7)}}
 .mcard-active.used .gcard{animation:none;box-shadow:none;filter:grayscale(1) brightness(.5);border-color:#555}
-.active-drop-zone{display:none}
-#activeBtn{
-  display:none;position:absolute;bottom:clamp(80px,22vw,140px);left:50%;transform:translateX(-50%);
-  font-family:var(--font-px);font-size:clamp(18px,4.5vw,24px);letter-spacing:1px;white-space:nowrap;
-  color:#fff;background:linear-gradient(135deg,#b8860b,#ffd700);
-  border:2px solid #ffd700;border-radius:6px;padding:14px 24px;cursor:pointer;
-  z-index:200;pointer-events:auto;max-width:90%;text-align:center;
-  animation:activeBtnPulse 2s ease-in-out infinite;
-  text-shadow:0 1px 2px rgba(0,0,0,.5);box-shadow:0 0 12px rgba(255,215,0,.4);
-}
-#activeBtn:active{transform:translateX(-50%) scale(.95);filter:brightness(1.2)}
-@keyframes activeBtnPulse{0%,100%{box-shadow:0 0 8px rgba(255,215,0,.4)}50%{box-shadow:0 0 20px rgba(255,215,0,.7)}}
-#activeBtn.disabled-timing{
-  background:linear-gradient(135deg,#444,#666);border-color:#666;color:#999;
-  animation:none;box-shadow:none;pointer-events:none;
-}
-
 /* ─── OVERLAYS ─── */
 #bust-ov{
   position:fixed;inset:0;z-index:9000;pointer-events:none;
@@ -951,7 +1149,7 @@ body{
 
 /* ─── LOADOUT FAB ─── */
 .loadout-fab{
-  position:fixed;bottom:130px;right:14px;z-index:80;
+  position:fixed;bottom:130px;right:14px;z-index:50;
   width:56px;height:56px;
   background:transparent;border:none;
   display:flex;align-items:center;justify-content:center;
@@ -1412,11 +1610,11 @@ body::before,body::after{display:none!important}
 /* ── Two-column layout ── */
 .lo-cols{
   display:flex;gap:0;width:100%;flex:1;min-height:0;
-  justify-content:center;overflow:hidden;
+  justify-content:center;overflow:visible;
 }
 .lo-col{
   flex:1;min-width:0;display:flex;flex-direction:column;
-  align-items:center;padding:6px 8px;gap:8px;overflow-y:auto;
+  align-items:center;padding:6px 8px;gap:8px;overflow:visible;
 }
 .lo-divider{
   width:2px;flex-shrink:0;
@@ -1518,62 +1716,6 @@ body::before,body::after{display:none!important}
   border-top:1px solid var(--ctrim2);opacity:.9;
 }
 .lo-none{font-size:7px;color:var(--textdim);letter-spacing:1px;text-align:center}
-/* ── Card Zoom Overlay (same pattern as match.html) ── */
-.lo-card-zoom{
-  position:fixed;inset:0;z-index:500;
-  background:rgba(0,0,0,0);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:16px;pointer-events:none;transition:background .35s ease;
-}
-.lo-card-zoom.open{background:rgba(0,0,0,.85);pointer-events:auto}
-.lo-cz-card{
-  width:220px;height:330px;perspective:900px;
-  transform:scale(0);transition:transform .45s cubic-bezier(.2,1.2,.3,1);
-}
-.lo-card-zoom.open .lo-cz-card{
-  transform:scale(1);animation:loCzFloat 3.5s ease-in-out infinite;
-}
-@keyframes loCzFloat{0%,100%{transform:scale(1) translateY(0)}50%{transform:scale(1) translateY(-6px)}}
-.lo-cz-wrap{width:100%;height:100%;position:relative;transform-style:preserve-3d}
-.lo-cz-wrap .gcard{
-  position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;
-  width:100%;height:100%;border-radius:6px;overflow:hidden;
-  background:linear-gradient(165deg,var(--cface2) 0%,var(--cface) 55%,var(--cface2) 100%);
-  border:3px solid var(--ctrim2);
-  box-shadow:inset 0 0 0 1px var(--ctrim),inset 0 0 0 5px var(--cface),inset 0 0 0 6px var(--ctrim2),0 5px 20px rgba(0,0,0,.85);
-  display:flex;flex-direction:column;align-items:center;
-  isolation:isolate;
-  filter:url(#pixelWobbleLite);
-}
-.lo-cz-wrap .gcard::before{
-  content:'';position:absolute;inset:0;z-index:1;pointer-events:none;
-  background:linear-gradient(118deg,transparent 38%,rgba(255,255,255,.06) 49%,rgba(255,255,255,.06) 51%,transparent 62%);
-  animation:gcSheen 6s ease-in-out infinite;
-}
-@keyframes loGcSheen{0%,100%{transform:translateX(-160%);opacity:0}12%{opacity:1}55%{transform:translateX(160%);opacity:0}}
-.lo-cz-wrap .gcard-art{display:none}
-.lo-cz-wrap .gcard-frame{position:absolute;top:8px;left:8px;right:8px;bottom:26px;border-radius:3px;pointer-events:none;z-index:1;border:1px solid var(--ctrim2);opacity:.7}
-.lo-cz-wrap .gc{position:absolute;z-index:2;pointer-events:none;width:18px;height:18px;color:var(--ctrim2);overflow:visible}
-.lo-cz-wrap .gc.tl{top:6px;left:6px}
-.lo-cz-wrap .gc.tr{top:6px;right:6px;transform:scaleX(-1)}
-.lo-cz-wrap .gc.bl{bottom:24px;left:6px;transform:scaleY(-1)}
-.lo-cz-wrap .gc.br{bottom:24px;right:6px;transform:scale(-1,-1)}
-.lo-cz-wrap .gcard-band{position:absolute;bottom:0;left:0;right:0;text-align:center;padding:5px 2px;z-index:3;background:var(--ctrim);font-size:6px;color:var(--ctrim2);letter-spacing:2px;border-top:1px solid var(--ctrim2);opacity:1}
-.lo-cz-wrap .gcard-back{
-  position:absolute;inset:0;border-radius:6px;overflow:hidden;
-  background:linear-gradient(165deg,var(--cface2) 0%,var(--cface) 55%,var(--cface2) 100%);
-  border:3px solid var(--ctrim2);
-  box-shadow:0 5px 20px rgba(0,0,0,.85);
-  display:flex;flex-direction:column;align-items:center;
-  padding:16px 12px 10px;gap:6px;
-  backface-visibility:hidden;-webkit-backface-visibility:hidden;
-  transform:rotateY(180deg);isolation:isolate;
-  filter:url(#pixelWobbleLite);
-}
-.lo-cz-wrap .gcard-back-name{font-size:22px;color:#c8845a;text-align:center;letter-spacing:0.5px;z-index:2;flex-shrink:0;font-family:'MedievalSharp',serif;margin-top:auto;margin-bottom:8px;text-shadow:0 1px 0 rgba(0,0,0,.6);line-height:1.3;padding:0 6px;word-break:break-word}
-.lo-cz-wrap .gcard-back-eff{font-size:8px;color:var(--gold);text-align:center;letter-spacing:1px;z-index:2;padding:0 8px;flex-shrink:0;margin-bottom:4px}
-.lo-cz-wrap .gcard-back-desc{font-size:9px;color:#b0a890;text-align:center;line-height:2.2;z-index:2;padding:0 14px;width:100%;overflow-y:auto;flex:1;min-height:0}
-.lo-cz-wrap .gcard-tap{font-size:10px;color:var(--ctrim2);opacity:.6;letter-spacing:2px;z-index:3;flex-shrink:0;margin-top:auto}
 /* ── Wager drop zone ── */
 .lo-wager-zone{
   width:100%;max-width:340px;flex-shrink:0;
@@ -1588,12 +1730,7 @@ body::before,body::after{display:none!important}
   border-color:var(--red);background:rgba(60,20,20,.4);
   box-shadow:0 0 12px rgba(160,80,80,.4);
 }
-.drag-clone{
-  position:fixed;z-index:9999;pointer-events:none;
-  opacity:.85;transform:scale(1.1);
-  filter:drop-shadow(0 4px 12px rgba(0,0,0,.7));
-  transition:transform .1s;
-}
+/* drag-clone removed — wager drag system deleted */
 .lo-wager-zone .lo-wager-label{
   font-size:7px;color:var(--red);letter-spacing:1px;opacity:.7;white-space:nowrap;
 }
@@ -1622,6 +1759,8 @@ body::before,body::after{display:none!important}
 }
 .lo-hand-slot:active{transform:scale(.92)}
 .lo-hand-slot.filled{border-color:transparent}
+.lo-hand-slot.hot{border-color:var(--gold)!important;background:rgba(255,215,0,.12);box-shadow:0 0 12px rgba(255,215,0,.3);border-style:solid}
+.lo-hand-slot.dragging,.lo-mini-card.dragging{opacity:.9;filter:drop-shadow(0 4px 12px rgba(0,0,0,.7));transform:scale(1.05)}
 .lo-hand-slot .lo-mini-card{width:100%;height:100%}
 /* ── Dice 3D Zoom Overlay ── */
 .dice-zoom-overlay{
@@ -1869,7 +2008,6 @@ body::before,body::after{display:none!important}
 .gcard-art{display:none}
 .gcard-cover{position:absolute;inset:0;z-index:0;display:flex;align-items:center;justify-content:center;pointer-events:none;font-size:32px;line-height:1;text-shadow:0 2px 8px rgba(0,0,0,.5);border-radius:4px}
 .inv-card-item .gcard-cover{font-size:24px}
-.cz-wrap .gcard-cover{font-size:72px}
 .gcard-frame{position:absolute;top:8px;left:8px;right:8px;bottom:26px;border-radius:3px;pointer-events:none;z-index:1;border:1px solid var(--ctrim2);opacity:.7}
 .gc{position:absolute;z-index:4;pointer-events:none;user-select:none;width:22px;height:22px;color:var(--ctrim2);overflow:visible;filter:drop-shadow(0 0 4px var(--ctrim2)) brightness(1.3)}
 .gc.tl{top:8px;left:8px}
@@ -1882,22 +2020,7 @@ body::before,body::after{display:none!important}
 .gcard-name{font-size:12px;color:var(--ctxt);text-align:center;letter-spacing:1px;line-height:1.5;z-index:3;padding:0 10px;word-break:break-word;flex-shrink:0}
 .gcard-eff{font-size:10px;color:var(--ctrim2);text-align:center;letter-spacing:.3px;line-height:1.7;z-index:3;padding:0 8px;word-break:break-word;flex:1}
 .gcard-band{position:absolute;bottom:0;left:0;right:0;text-align:center;padding:5px 2px;z-index:3;background:var(--ctrim);font-size:11px;color:var(--ctrim2);letter-spacing:2px;border-top:1px solid var(--ctrim2);opacity:.95}
-.gcard-back{
-  position:absolute;inset:0;border-radius:6px;overflow:hidden;
-  background:linear-gradient(165deg,var(--cface2) 0%,var(--cface) 55%,var(--cface2) 100%);
-  border:3px solid var(--ctrim2);
-  box-shadow:0 5px 20px rgba(0,0,0,.85);
-  display:flex;flex-direction:column;align-items:center;
-  padding:16px 12px 10px;gap:6px;
-  backface-visibility:hidden;-webkit-backface-visibility:hidden;
-  transform:rotateY(180deg);isolation:isolate;
-  filter:url(#pixelWobbleLite);
-}
-.gcard-back-frame{display:none}
-.gcard-back-icon{display:none}
-.gcard-back-name{font-size:22px;color:#c8845a;text-align:center;letter-spacing:0.5px;z-index:2;flex-shrink:0;font-family:'Jacquard 24',serif;margin-top:auto;margin-bottom:8px;filter:none!important;text-shadow:0 1px 0 rgba(0,0,0,.6);line-height:1.3;padding:0 6px;word-break:break-word}
-.gcard-back-desc{font-size:14px;color:#b0a890;text-align:center;line-height:1.8;z-index:2;padding:0 8px;width:100%;overflow-y:auto;flex:1;min-height:0}
-.gcard-tap{font-size:10px;color:var(--ctrim2);opacity:.6;letter-spacing:2px;z-index:3;flex-shrink:0;margin-top:auto}
+/* (gcard-back / gcard-tap removed — zoom overlay deleted) */
 
 /* ─── CARDS TAB ─── */
 .card-grid{
@@ -1966,88 +2089,7 @@ body::before,body::after{display:none!important}
   50%{transform:rotate(3deg)}
 }
 
-/* ─── Card zoom overlay ─── */
-.card-zoom-overlay{
-  position:fixed;inset:0;z-index:9700;
-  background:rgba(0,0,0,0);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:16px;
-  pointer-events:none;
-  transition:background .35s ease;
-}
-.card-zoom-overlay.open{background:rgba(0,0,0,.85);pointer-events:auto}
-
-.card-zoom-card{
-  width:220px;height:330px;
-  perspective:900px;
-  transform:scale(0);
-  transition:transform .45s cubic-bezier(.2,1.2,.3,1);
-}
-.card-zoom-overlay.open .card-zoom-card{
-  transform:scale(1);
-  animation:zoomFloat 3.5s ease-in-out infinite;
-}
-@keyframes zoomFloat{
-  0%,100%{transform:scale(1) translateY(0)}
-  50%{transform:scale(1) translateY(-6px)}
-}
-.cz-wrap{
-  width:100%;height:100%;position:relative;
-  transform-style:preserve-3d;
-  /* transition controlled by JS for drag */
-}
-.cz-wrap .gcard{
-  backface-visibility:hidden;-webkit-backface-visibility:hidden;
-  position:absolute;inset:0;
-}
-.cz-wrap .gcard-back{
-  position:absolute;inset:0;
-  backface-visibility:hidden;-webkit-backface-visibility:hidden;
-}
-
-/* Zoom card front overrides for larger size */
-.cz-wrap .gcard-pip{margin-top:22px}
-.cz-wrap .gcard-icon{font-size:38px}
-.cz-wrap .gcard-name{font-size:14px;padding:0 14px}
-.cz-wrap .gcard-eff{font-size:12px;padding:0 12px;line-height:1.9}
-.cz-wrap .gcard-band{font-size:10px;padding:5px 2px}
-.cz-wrap .gc{width:18px;height:18px}
-/* Zoom card back overrides */
-.cz-wrap .gcard-back-name{font-size:28px;letter-spacing:0.5px;color:#c8845a;padding:0 10px}
-.cz-wrap .gcard-back-desc{font-size:16px;line-height:1.8;padding:0 14px}
-
-/* Drag hint */
-.cz-drag-hint{
-  font-size:6px;color:var(--textdim);letter-spacing:1.5px;
-  opacity:0;transition:opacity .4s .3s;
-}
-.card-zoom-overlay.open .cz-drag-hint{opacity:.6}
-
-/* ─── BUY BUTTON (juicy, underneath card) ─── */
-.cz-buy-wrap{
-  display:flex;flex-direction:column;align-items:center;gap:6px;
-  opacity:0;transform:translateY(10px);
-  transition:opacity .35s .15s,transform .35s .15s;
-}
-.card-zoom-overlay.open .cz-buy-wrap{opacity:1;transform:translateY(0)}
-.cz-buy-btn{
-  font-family:var(--font-px);font-size:20px;letter-spacing:2px;
-  padding:16px 36px;
-  border:none;
-  background:transparent;
-  color:var(--gold);cursor:pointer;
-  transition:transform .06s,filter .08s;
-  position:relative;overflow:hidden;
-  display:flex;align-items:center;gap:12px;
-}
-.cz-buy-btn canvas{position:absolute;inset:0;image-rendering:pixelated}
-.cz-buy-btn>*{position:relative;z-index:2}
-.cz-buy-btn:active{transform:scale(.93);filter:brightness(1.3)}
-.cz-buy-btn:disabled{
-  color:var(--textdim);cursor:default;filter:none;
-}
-.cz-buy-btn .coin-icon,.dz-buy-btn .coin-icon{font-size:18px}
-.cz-owned-badge{font-size:9px;color:var(--green);letter-spacing:1.5px;margin-top:10px}
+/* (card zoom overlay removed — tooltips used instead) */
 
 /* ─── DICE TAB ─── */
 
@@ -2916,13 +2958,6 @@ body::before,body::after{display:none!important}
   </div>
 </div>
 
-<!-- CARD ZOOM OVERLAY -->
-<div class="lo-card-zoom" id="loCardZoom">
-  <div class="lo-cz-card" id="loCzCard">
-    <div class="lo-cz-wrap" id="loCzWrap"></div>
-  </div>
-</div>
-
 <!-- DICE ZOOM OVERLAY (gauntlet loadout) -->
 <div class="dice-zoom-overlay" id="loDiceZoom">
   <div class="dice-3d-wrap" id="loDiceZoomWrap">
@@ -3012,19 +3047,15 @@ body::before,body::after{display:none!important}
     </div>
   </div>
 
-  <!-- Active card drop zone -->
-  <div class="active-drop-zone" id="activeDropZone"></div>
+  <div class="dice-spacer" style="flex:1"></div>
 
   <!-- Player dice row -->
   <div class="player-dice-row" id="playerDiceRow"></div>
 
-  <!-- Kept tray -->
+  <!-- Kept tray (scoring dice this turn) -->
   <div class="kept-tray" id="keptTray"></div>
 
-  <!-- Yield button (above status text) -->
-  <button class="yield-btn" id="btnYield" style="display:none" onclick="handleYield()">
-    <img class="btn-bg" src="Match_Art/yield.png" alt="Yield">
-  </button>
+  <div class="dice-spacer" style="flex:3"></div>
 
   <!-- Status strip bottom -->
   <div class="status-strip" id="botStrip">
@@ -3033,7 +3064,12 @@ body::before,body::after{display:none!important}
 </div>
 
 <!-- PLAYER CARD BAR (fanned, tucked under controls) -->
-<div class="card-bar bot" id="playerCards"></div>
+<div class="card-bar bot" id="playerCards">
+  <div class="activate-zone" id="activateZone"><svg class="az-border" width="100%" height="100%" preserveAspectRatio="none"><rect x="1" y="1" rx="8" ry="8"></rect></svg><span class="az-label">ACTIVATE</span></div>
+  <button class="yield-btn" id="btnYield" style="display:none" onclick="handleYield()">
+    <img class="btn-bg" src="Match_Art/yield.png?v=2" alt="Yield">
+  </button>
+</div>
 
 <!-- CONTROLS -->
 <div class="controls" id="controls">
@@ -3138,14 +3174,6 @@ body::before,body::after{display:none!important}
   </div>
 </div>
 
-<!-- CARD ZOOM OVERLAY -->
-<div class="card-zoom-overlay" id="cardZoom">
-  <div class="card-zoom-card" id="czCard">
-    <div class="cz-wrap" id="czWrap"></div>
-  </div>
-  <button id="activeBtn" style="display:none" onclick="handleActivateBtn()">⚡ ACTIVATE</button>
-</div>
-
 <!-- DICE ZOOM OVERLAY -->
 <div class="dice-zoom-overlay" id="diceZoom">
   <div class="dice-3d-wrap" id="diceZoomWrap">
@@ -3184,15 +3212,6 @@ body::before,body::after{display:none!important}
     <div class="tab-panel" id="panel-dice"></div>
     <div class="tab-panel" id="panel-services"></div>
   </div>
-</div>
-
-<!-- CARD ZOOM OVERLAY (shop) -->
-<div class="card-zoom-overlay" id="shopCardZoom">
-  <div class="card-zoom-card" id="shopCzCard">
-    <div class="cz-wrap" id="shopCzWrap"></div>
-  </div>
-  <!-- drag hint removed, text is on card back -->
-  <div class="cz-buy-wrap" id="shopCzBuyWrap"></div>
 </div>
 
 <!-- DICE ZOOM OVERLAY (shop) -->
@@ -3743,10 +3762,62 @@ function gcCorners(){
 function mkChipHTML(c){
   return`<div class="cchip-inner rarity-${c.rarity}"><div class="cchip-front rarity-${c.rarity}"><div class="chip-icon">${c.icon}</div><div class="chip-gem"></div></div><div class="cchip-back rarity-${c.rarity}"><div class="gcard"><div class="gcard-frame"></div>${gcCorners()}<div class="gcard-pip"></div><div class="gcard-icon">${c.icon}</div><div class="gcard-rule"></div><div class="gcard-name">${c.name}</div><div class="gcard-eff">${c.eff}</div><div class="gcard-band">${c.rarity.toUpperCase()}</div></div></div></div>`;
 }
+/* ═══════ DRAG STATE ═══════ */
+let _dragState=null;
+let _dragCleanups=[];
+
+/* ═══════ SHARED CARD HELPERS ═══════ */
+const _tc=s=>s.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1).toLowerCase()).join(' ');
+const _abbrMap={'PTS':'Points','OPP':'Opponent','DMG':'Damage','AMT':'Amount','LVL':'Level'};
+const _sentenceCase=s=>{const out=s.split(' ').map(w=>{const u=w.toUpperCase();return _abbrMap[u]||w.toLowerCase();}).join(' ');return out.charAt(0).toUpperCase()+out.slice(1);};
+
+function mkCardTooltipHTML(card,bandOverride){
+  const band=bandOverride||_tc(card.rarity);
+  return '<div class="mcard-tooltip rarity-'+card.rarity+'">'+
+    gcCorners()+
+    '<div class="tip-band">'+band+'</div>'+
+    '<div class="tip-name">'+_tc(card.name)+'</div>'+
+    '<div class="tip-eff">'+_sentenceCase(card.eff)+'</div>'+
+  '</div>';
+}
+
+function attachTooltipTap(wrapperEl,opts){
+  opts=opts||{};
+  let _tapped=false;
+  const toggle=function(e){
+    if(_dragState&&_dragState.dragging)return;
+    if(_tapped)return;_tapped=true;setTimeout(()=>_tapped=false,400);
+    e.stopPropagation();
+    const wasPeeked=wrapperEl.classList.contains('peeked');
+    closeAllChips();
+    if(!wasPeeked){SFX.cardFlip();wrapperEl.classList.add('peeked');clampTooltip(wrapperEl);}
+  };
+  wrapperEl.addEventListener('click',toggle);
+  wrapperEl.addEventListener('touchend',function(e){e.preventDefault();toggle(e);},{passive:false});
+}
+
+function closeAllChips(){
+  /* Return any body-promoted tooltips to their original parents */
+  document.querySelectorAll('body > .mcard-tooltip').forEach(function(tip){
+    if(tip._origParent){tip._origParent.appendChild(tip);tip.style.cssText='';tip._origParent=null;}
+    else{tip.remove();}
+  });
+  document.querySelectorAll('.peeked,.cchip.open').forEach(c=>{
+    c.classList.remove('peeked');c.classList.remove('open');
+  });
+}
+
+/* Global dismiss — tap anywhere outside a card closes all tooltips */
+document.addEventListener('click',function(e){
+  if(!e.target.closest('.mcard,.shop-card,.lo-mini-card,.lo-hand-slot,.res-card,.lo-wager-slot,.cchip'))closeAllChips();
+});
+
 function buildCBar(barId,cardIds,isOpp,label){
   const bar=document.getElementById(barId);bar.querySelectorAll('.mcard,.cchip').forEach(e=>e.remove());
+  /* Clean up previous drag listeners */
+  _dragCleanups.forEach(fn=>fn());_dragCleanups=[];
   const n=cardIds.length;if(!n)return;
-  const spread=Math.min(56,220/n);/* px between card centers */
+  const spread=Math.min(56,220/n);
   const totalW=spread*(n-1);
   cardIds.forEach((id,i)=>{const c=CARDS.find(x=>x.id===id);if(!c)return;
     const isActive=c.type==='active';
@@ -3755,35 +3826,255 @@ function buildCBar(barId,cardIds,isOpp,label){
       '<div class="gcard rarity-'+c.rarity+'">'+
         '<div class="gcard-cover" style="background:'+(CARD_BG[c.id]||'#444')+'">'+c.icon+'</div>'+
         '<div class="gcard-frame"></div>'+gcCorners()+
-      '</div>'+
-      '<div class="mcard-tooltip rarity-'+c.rarity+'">'+
-        gcCorners()+
-        '<div class="tip-name">'+c.name+'</div>'+
-        '<div class="tip-eff">'+c.eff+'</div>'+
-        '<div class="tip-band">'+c.rarity.toUpperCase()+'</div>'+
-      '</div>';
+      '</div>'+mkCardTooltipHTML(c);
     /* fan positioning */
     const t=(n===1)?0:(i/(n-1))*2-1;
     const rot=(isOpp?-1:1)*t*8;
     const cx=50+(t*totalW/2)/3.75;
-    const lift=(1-t*t)*8;/* parabolic: 8px at center, 0px at edges */
+    const lift=(1-t*t)*8;
     w.style.setProperty('--rot',rot+'deg');
     w.style.setProperty('--cx',cx+'%');
     w.style.setProperty('--lift',lift+'px');
+    w.style.setProperty('--wobble-d',(i*0.7+Math.random()*0.5).toFixed(2));
     w.style.zIndex=10+i;
+    attachTooltipTap(w);
+    /* Drag handler: active player cards only */
     if(isActive&&!isOpp){
-      const tap=e=>{e.stopPropagation();openActiveCardZoom(id);};
-      w.addEventListener('click',tap);w.addEventListener('touchend',e=>{e.preventDefault();tap(e);},{passive:false});
-    }else{
-      const toggle=e=>{e.stopPropagation();SFX.cardFlip();
-        const wasPeeked=w.classList.contains('peeked');closeAllChips();
-        if(!wasPeeked){w.classList.add('peeked');}
-      };
-      w.addEventListener('click',toggle);w.addEventListener('touchend',e=>{e.preventDefault();toggle(e);},{passive:false});
+      initCardDrag(w,id);
     }
     bar.appendChild(w);});
 }
-function closeAllChips(){document.querySelectorAll('.mcard.peeked,.cchip.open').forEach(c=>{c.classList.remove('peeked');c.classList.remove('open');});}
+
+/* ═══════ TOOLTIP VIEWPORT CLAMPING ═══════ */
+function clampTooltip(mcardEl){
+  const tip=mcardEl.querySelector('.mcard-tooltip');if(!tip)return;
+  tip.style.cssText='';
+  /* If card is inside a scroll container or transformed parent, move tooltip to body
+     so it escapes overflow:auto clipping and transform containing blocks */
+  const inScroll=mcardEl.closest('.lo-content,.tab-panel,.lo-picker,.detail-sheet');
+  if(inScroll){
+    requestAnimationFrame(()=>{
+      const cardR=mcardEl.getBoundingClientRect();
+      /* Move tooltip to body so it's truly fixed-positioned */
+      tip._origParent=mcardEl;
+      document.body.appendChild(tip);
+      tip.style.position='fixed';
+      tip.style.bottom='auto';
+      tip.style.transform='none';
+      tip.style.opacity='1';tip.style.pointerEvents='auto';
+      tip.style.zIndex='9999';
+      tip.style.left='0px';tip.style.top='0px';
+      const tipW=tip.offsetWidth;
+      const tipH=tip.offsetHeight;
+      var tTop=cardR.top-tipH-8;
+      var tLeft=cardR.left+cardR.width/2-tipW/2;
+      if(tLeft<4)tLeft=4;
+      else if(tLeft+tipW>window.innerWidth-4)tLeft=window.innerWidth-4-tipW;
+      if(tTop<4) tTop=cardR.bottom+8;
+      tip.style.top=tTop+'px';
+      tip.style.left=tLeft+'px';
+    });
+  }else{
+    requestAnimationFrame(()=>{
+      const r=tip.getBoundingClientRect();
+      if(r.left<4)tip.style.marginLeft=(4-r.left)+'px';
+      else if(r.right>window.innerWidth-4)tip.style.marginLeft=(window.innerWidth-4-r.right)+'px';
+    });
+  }
+}
+
+/* ═══════ DRAG-TO-ACTIVATE SYSTEM ═══════ */
+function initCardDrag(mcardEl,cardId){
+  function onDragStart(e){
+    if(mcardEl.classList.contains('used'))return;
+    closeAllChips();
+    const touch=e.touches?e.touches[0]:e;
+    const rect=mcardEl.getBoundingClientRect();
+    _dragState={
+      el:mcardEl,cardId:cardId,
+      startX:touch.clientX,startY:touch.clientY,
+      origRect:rect,dragging:false,threshold:10,
+      origStyle:mcardEl.style.cssText
+    };
+  }
+  function onDragMove(e){
+    if(!_dragState||_dragState.el!==mcardEl)return;
+    const touch=e.touches?e.touches[0]:e;
+    const dx=touch.clientX-_dragState.startX;
+    const dy=touch.clientY-_dragState.startY;
+    if(!_dragState.dragging){
+      if(Math.abs(dx)+Math.abs(dy)<_dragState.threshold)return;
+      _dragState.dragging=true;
+      mcardEl.classList.add('dragging');
+      mcardEl.style.left=_dragState.origRect.left+'px';
+      mcardEl.style.top=_dragState.origRect.top+'px';
+      mcardEl.style.width=_dragState.origRect.width+'px';
+      mcardEl.style.height=_dragState.origRect.height+'px';
+      mcardEl.style.margin='0';
+      showActivateZone(cardId);
+    }
+    if(e.cancelable)e.preventDefault();
+    mcardEl.style.left=(_dragState.origRect.left+dx)+'px';
+    mcardEl.style.top=(_dragState.origRect.top+dy)+'px';
+    hitTestActivateZone(touch.clientX,touch.clientY);
+  }
+  function onDragEnd(e){
+    if(!_dragState||_dragState.el!==mcardEl)return;
+    if(!_dragState.dragging){_dragState=null;return;}
+    const zone=document.getElementById('activateZone');
+    /* Check if majority of the card overlaps the zone */
+    const cr=mcardEl.getBoundingClientRect();
+    const zr=zone.getBoundingClientRect();
+    const overlapL=Math.max(cr.left,zr.left),overlapR=Math.min(cr.right,zr.right);
+    const overlapT=Math.max(cr.top,zr.top),overlapB=Math.min(cr.bottom,zr.bottom);
+    const overlapArea=(overlapR>overlapL&&overlapB>overlapT)?(overlapR-overlapL)*(overlapB-overlapT):0;
+    const cardArea=cr.width*cr.height;
+    const dropInZone=overlapArea>cardArea*0.5;
+    const canUse=canActivateCard(cardId);
+    if(dropInZone&&canUse){
+      /* SUCCESS — place card in zone first, then activate (so trigger label attaches to zone) */
+      SFX.nav();
+      placeCardInZone(mcardEl,_dragState);
+      activateCard(cardId);
+      /* Update tooltip uses */
+      const tipUses=mcardEl.querySelector('.tip-uses');
+      if(tipUses){
+        const cd=CARDS.find(c=>c.id===cardId);
+        const usesLeft=G.activeCardState.usedCards[cardId]||0;
+        tipUses.textContent=usesLeft+'/'+(cd.maxUses||1)+' USES';
+      }
+    }else{
+      /* FAIL — smooth snap back to fan position */
+      snapCardBack(mcardEl,_dragState);
+    }
+    hideActivateZone();
+    _dragState=null;
+  }
+  mcardEl.addEventListener('mousedown',onDragStart);
+  mcardEl.addEventListener('touchstart',onDragStart,{passive:true});
+  const moveFn=onDragMove;const endFn=onDragEnd;
+  document.addEventListener('mousemove',moveFn);
+  document.addEventListener('touchmove',moveFn,{passive:false});
+  document.addEventListener('mouseup',endFn);
+  document.addEventListener('touchend',endFn);
+  _dragCleanups.push(()=>{
+    document.removeEventListener('mousemove',moveFn);
+    document.removeEventListener('touchmove',moveFn);
+    document.removeEventListener('mouseup',endFn);
+    document.removeEventListener('touchend',endFn);
+  });
+}
+
+function showActivateZone(cardId){
+  const zone=document.getElementById('activateZone');
+  const canUse=canActivateCard(cardId);
+  zone.classList.add('dragging-active');zone.classList.remove('hot','unavailable');
+  let label=zone.querySelector('.az-label');
+  if(!label){label=document.createElement('span');label.className='az-label';zone.prepend(label);}
+  if(canUse){label.textContent='ACTIVATE';}
+  else{zone.classList.add('unavailable');label.textContent='NOT AVAILABLE';}
+}
+function hideActivateZone(){
+  const zone=document.getElementById('activateZone');
+  zone.classList.remove('dragging-active','hot','unavailable');
+  /* Restore label text but preserve any .in-zone cards */
+  const label=zone.querySelector('.az-label');
+  if(label)label.textContent='ACTIVATE';
+}
+function hitTestActivateZone(clientX,clientY){
+  const zone=document.getElementById('activateZone');
+  if(!zone.classList.contains('dragging-active'))return;
+  if(!_dragState||!_dragState.el)return;
+  const cr=_dragState.el.getBoundingClientRect();
+  const zr=zone.getBoundingClientRect();
+  const oL=Math.max(cr.left,zr.left),oR=Math.min(cr.right,zr.right);
+  const oT=Math.max(cr.top,zr.top),oB=Math.min(cr.bottom,zr.bottom);
+  const overlap=(oR>oL&&oB>oT)?(oR-oL)*(oB-oT):0;
+  const mostly=overlap>cr.width*cr.height*0.5;
+  zone.classList.toggle('hot',mostly&&!zone.classList.contains('unavailable'));
+}
+function placeCardInZone(mcardEl,dragState){
+  const zone=document.getElementById('activateZone');
+  const zr=zone.getBoundingClientRect();
+
+  /* Calculate scale to fit card inside zone with 8px margin */
+  const margin=8;
+  const fitW=(zr.width-margin*2)/dragState.origRect.width;
+  const fitH=(zr.height-margin*2)/dragState.origRect.height;
+  const fitScale=Math.min(fitW,fitH,1);
+
+  /* First: capture current drag position */
+  const firstRect=mcardEl.getBoundingClientRect();
+
+  /* Move card into zone DOM immediately, apply in-zone class */
+  mcardEl.classList.remove('dragging','peeked');
+  mcardEl.classList.add('in-zone');
+  mcardEl.style.cssText='';
+  const cardW=dragState.origRect.width*fitScale;
+  const cardH=dragState.origRect.height*fitScale;
+  mcardEl.style.left='50%';mcardEl.style.top='50%';
+  mcardEl.style.marginLeft=(-cardW/2)+'px';
+  mcardEl.style.marginTop=(-cardH/2)+'px';
+  mcardEl.style.width=cardW+'px';
+  mcardEl.style.height=cardH+'px';
+  zone.appendChild(mcardEl);
+
+  /* Last: where the card now sits in the zone */
+  const lastRect=mcardEl.getBoundingClientRect();
+
+  /* Invert: make it appear at the dragged position */
+  const dx=firstRect.left-lastRect.left;
+  const dy=firstRect.top-lastRect.top;
+  const sx=firstRect.width/lastRect.width;
+  const sy=firstRect.height/lastRect.height;
+  mcardEl.style.transition='none';
+  mcardEl.style.transform=`translate(${dx}px,${dy}px) scale(${sx},${sy})`;
+  mcardEl.style.filter='brightness(1) sepia(0)';
+
+  /* Play: animate into zone */
+  requestAnimationFrame(()=>{
+    mcardEl.style.transition='transform .3s ease-out, filter .3s ease-out';
+    mcardEl.style.transform='rotate(0deg)';
+    mcardEl.style.filter='';
+    setTimeout(()=>{mcardEl.style.transition='';mcardEl.style.transform='';mcardEl.style.filter='';},320);
+  });
+
+  /* Fade out the label */
+  const label=zone.querySelector('.az-label');
+  if(label)label.style.opacity='0';
+}
+function snapCardBack(mcardEl,dragState){
+  /* FLIP technique: First (current drag pos), Last (fan pos), Invert, Play */
+  /* First: capture current dragged position */
+  const firstRect=mcardEl.getBoundingClientRect();
+
+  /* Last: instantly restore fan styles (no transition yet) */
+  mcardEl.classList.remove('dragging');
+  mcardEl.style.cssText=dragState.origStyle;
+
+  /* Force layout so browser knows the new position */
+  const lastRect=mcardEl.getBoundingClientRect();
+
+  /* Invert: calculate offset from last to first */
+  const dx=firstRect.left-lastRect.left;
+  const dy=firstRect.top-lastRect.top;
+  const sx=firstRect.width/lastRect.width;
+  const sy=firstRect.height/lastRect.height;
+
+  /* Apply inverse transform so card appears at dragged position */
+  mcardEl.style.transform=`translate(${dx}px,${dy}px) scale(${sx},${sy})`;
+  mcardEl.style.filter='drop-shadow(0 8px 24px rgba(0,0,0,.7)) brightness(1.1)';
+
+  /* Play: animate to identity (fan position) */
+  requestAnimationFrame(()=>{
+    mcardEl.classList.add('snap-back');
+    mcardEl.style.transform='';
+    mcardEl.style.filter='';
+    setTimeout(()=>{
+      mcardEl.classList.remove('snap-back');
+    },320);
+  });
+}
 
 /* ═══════ GAME STATE ═══════ */
 let G=null,LO=null;
@@ -3847,27 +4138,44 @@ function refreshKeptTray(){
     const lbl=document.createElement('div');lbl.className='kept-pts';lbl.textContent='+'+k.pts;t.appendChild(lbl);});
   t.classList.toggle('has-items',G.kept.length>0);
 }
-function triggerCard(cardId,msg,isPlayer){
+function triggerCard(cardId,msg,isPlayer,persist){
   const barId=isPlayer?'playerCards':'oppCards';
   const bar=document.getElementById(barId);
-  const mc=bar?bar.querySelector('.mcard[data-cid="'+cardId+'"]'):null;
+  const zone=document.getElementById('activateZone');
+  let mc=bar?bar.querySelector('.mcard[data-cid="'+cardId+'"]'):null;
+  const isInZone=mc&&mc.classList.contains('in-zone');
   SFX.cardTrigger();
-  if(mc){
+  if(mc&&!isInZone){
     mc.classList.remove('card-trigger');void mc.offsetWidth;
     mc.classList.add('card-trigger');
     setTimeout(function(){mc.classList.remove('card-trigger');},550);
   }
-  if(mc&&bar){
+  /* Clear any existing persistent label for this card */
+  document.querySelectorAll('.card-trig-label[data-cid="'+cardId+'"]').forEach(e=>e.remove());
+  /* Pick correct parent: zone if card is placed there, otherwise the bar */
+  const labelParent=(isInZone&&zone)?zone:bar;
+  if(mc&&labelParent){
     const lbl=document.createElement('div');
-    lbl.className='card-trig-label'+(isPlayer?'':' opponent');
+    lbl.className='card-trig-label'+(isPlayer?'':' opponent')+(persist?' persist':'');
+    lbl.dataset.cid=cardId;
     lbl.textContent=msg;
-    const cr=mc.getBoundingClientRect(),br=bar.getBoundingClientRect();
+    const cr=mc.getBoundingClientRect(),br=labelParent.getBoundingClientRect();
     lbl.style.left=(cr.left-br.left+cr.width/2)+'px';
-    if(isPlayer){lbl.style.top=(cr.top-br.top-10)+'px';}
-    else{lbl.style.top=(cr.bottom-br.top+4)+'px';}
-    bar.appendChild(lbl);
-    setTimeout(function(){lbl.remove();},1300);
+    if(isInZone){
+      /* Position at bottom of zone, floats down into gap between zone and cards */
+      lbl.style.top=(br.height+2)+'px';
+      lbl.style.left='50%';
+    }else if(isPlayer){
+      lbl.style.top=(cr.top-br.top-10)+'px';
+    }else{
+      lbl.style.top=(cr.bottom-br.top+4)+'px';
+    }
+    labelParent.appendChild(lbl);
+    if(!persist)setTimeout(function(){lbl.remove();},1300);
   }
+}
+function clearCardLabel(cardId){
+  document.querySelectorAll('.card-trig-label[data-cid="'+cardId+'"]').forEach(e=>e.remove());
 }
 function spawnPop(txt){
   if(txt&&txt[0]==='+')SFX.coins();
@@ -3890,7 +4198,7 @@ function toggleDie(d){if(G.phase!=='choosing'||d.committed)return;d.sel=!d.sel;d
 
 function startPTurn(){
   G.phase='idle';G.turnPts=0;G.kept=[];G.numDice=6;G.pool=[];G.turnRollCount=0;
-  if(G.activeCardState){G.activeCardState.stitchActive=false;G.activeCardState.vowActive=false;G._vowDoubleActive=false;}
+  if(G.activeCardState){G.activeCardState.stitchActive=false;G.activeCardState.vowActive=false;G._vowDoubleActive=false;clearCardLabel('mabels_stitch');clearCardLabel('aldrics_vow');}
   clearRow('playerDiceRow');clearRow('oppDiceRow');refreshKeptTray();
   setBtns(true,false);setTurnMode(false);
   /* ALDRIC: Knight's Challenge — fires once mid-match when both have some score */
@@ -3898,7 +4206,7 @@ function startPTurn(){
     G.bossState.challengeUsed=true;G.bossState.challengeActive=true;
     setStatusMsg('CHALLENGE! BANK 500+ OR LOSE 500','red');
     if(window.DLG)DLG.trigger('BOSS_ATTACK');
-  }else{setStatusMsg('YOUR TURN, ROLL TO BEGIN','active');}
+  }else{setStatusMsg('','');}
   updHUD();
 }
 
@@ -3971,7 +4279,7 @@ function afterRoll(){
   if(!G.flintlockFired&&G.pCards.includes('flintlock')&&freeV.includes(1)){G.flintlockFired=true;G.pPts+=200;triggerCard('flintlock','+200 FLINTLOCK',true);updHUD();}
   /* Aldric's Vow: double roll score if 300+, else lose turn pts */
   if(G.activeCardState&&G.activeCardState.vowActive){
-    G.activeCardState.vowActive=false;
+    G.activeCardState.vowActive=false;clearCardLabel('aldrics_vow');
     const rollScore=scoreRoll(freeV,cards,0).total||0;
     if(rollScore>=300){
       /* We don't auto-commit, just double the value of whatever they pick this roll */
@@ -4042,13 +4350,13 @@ function afterRoll(){
   }
 
   free.forEach(d=>{d.el.onclick=()=>toggleDie(d);});G.phase='choosing';
-  setBtns(false,G.kept.length>0);setStatusMsg('TAP SCORING DICE','active');
+  setBtns(false,G.kept.length>0);setStatusMsg('','');
   updHUD();
 }
 
 function refreshSelUI(){
   const selD=G.pool.filter(d=>d.sel&&!d.committed);const selV=selD.map(d=>d.val);const locked=G.kept.reduce((a,k)=>a+k.pts,0);const cards=effectiveCards();
-  if(!selV.length){G.turnPts=locked;updHUD();setBtns(false,locked>0);setStatusMsg('TAP SCORING DICE','active');G.pool.forEach(d=>{d.el.classList.remove('combo-glow');d.el.style.removeProperty('--gd');});G._comboGlow=false;return;}
+  if(!selV.length){G.turnPts=locked;updHUD();setBtns(false,locked>0);setStatusMsg('','');G.pool.forEach(d=>{d.el.classList.remove('combo-glow');d.el.style.removeProperty('--gd');});G._comboGlow=false;return;}
   let pts=scoreSelection(selV,cards,locked);
   const ok=pts>0;G.turnPts=locked+(ok?pts:0);updHUD();
   const allFreeSelected=G.pool.filter(d=>!d.committed).every(d=>d.sel);
@@ -4114,7 +4422,7 @@ function doBust(){
   }
   /* Mabel's Stitch: bank turn pts instead of losing them */
   if(G.activeCardState&&G.activeCardState.stitchActive){
-    G.activeCardState.stitchActive=false;
+    G.activeCardState.stitchActive=false;clearCardLabel('mabels_stitch');
     const saved=G.kept.reduce((a,k)=>a+k.pts,0);
     G.pool.forEach(d=>{if(d.el)d.el.classList.add('bust');});
     if(saved>0){G.pPts+=saved;spawnPop('+'+saved+' STITCHED');}
@@ -4203,7 +4511,7 @@ function showYieldButton(){
   document.getElementById('btnRoll').disabled=true;
   document.getElementById('btnBank').disabled=true;
   document.getElementById('btnYield').style.display='block';
-  setStatusMsg('YIELD OR ACTIVATE CARD','active');
+  setStatusMsg('','');
 }
 function handleYield(){
   SFX.nav();
@@ -4256,7 +4564,7 @@ function oppShouldBank(rung,oppBank,diceLeft,oppTotal,playerTotal,target){
 function runOppTurn(){
   let oppBank=0,left=6,oppRollNum=0,sootyActive=false;
   /* Whisper's Hex: reduce starting dice by 1 */
-  if(G.activeCardState&&G.activeCardState.hexActive){G.activeCardState.hexActive=false;left=5;triggerCard('whispers_hex','HEX — 5 DICE',true);}
+  if(G.activeCardState&&G.activeCardState.hexActive){G.activeCardState.hexActive=false;clearCardLabel('whispers_hex');left=5;triggerCard('whispers_hex','HEX — 5 DICE',true);}
   let crowsCtx={crowsLuck:G.pCards.includes('crows_luck'),crowsLuckUsed:false};
   G.oppTurnCount=(G.oppTurnCount||0)+1;
   clearRow('oppDiceRow');G.oppDice=[];
@@ -4492,23 +4800,20 @@ function endMatch(win){
     endT(()=>{
       // Hide gold wrap to make room for card in center
       resGoldWrap.style.display='none';
-      const bandText=isCardLost?'FORFEIT':(npcRewardCard?'NPC REWARD':c.rarity.toUpperCase());
+      const bandText=isCardLost?'FORFEIT':(npcRewardCard?'EARNED':c.rarity.toUpperCase());
+      const tooltipBand=isCardLost?'Forfeit':(npcRewardCard?'Earned':_tc(c.rarity));
       resCard.innerHTML='<div class="res-card-inner"><div class="res-card-glow"></div>'+
         '<div class="gcard rarity-'+c.rarity+'">'+
           '<div class="gcard-cover" style="background:'+(CARD_BG[c.id]||'#444')+'">'+c.icon+'</div>'+
           '<div class="gcard-frame"></div>'+gcCorners()+
           '<div class="gcard-band">'+bandText+'</div></div></div>'+
+        mkCardTooltipHTML(c,tooltipBand)+
         '<div style="text-align:center;color:'+(isCardLost?'var(--red)':'#ffd700')+';font-size:11px;margin-top:6px">'+toTitleCase(c.name)+'</div>';
       resCard.classList.add('show');
       if(isCardLost)resCard.classList.add('lost');
       SFX.coins();
-      /* Tap to zoom card in 3D */
-      const gcEl=resCard.querySelector('.gcard');
-      if(gcEl){
-        gcEl.style.cursor='pointer';
-        gcEl.addEventListener('click',function(e){e.stopPropagation();matchCardZoom(c.id);});
-        gcEl.addEventListener('touchend',function(e){e.preventDefault();e.stopPropagation();matchCardZoom(c.id);},{passive:false});
-      }
+      /* Tap to show tooltip */
+      attachTooltipTap(resCard);
       /* NPC dialogue box with portrait + parchment */
       const quoteText=npcRewardCard&&c.rewardQuote?c.rewardQuote:
         (isCardLost?'"Better luck next time, stranger."':'');
@@ -4635,6 +4940,7 @@ function toggleLoadoutPanel(){
   const pc=document.getElementById('mLoPCards');pc.innerHTML='';
   if(G&&G.pCards&&G.pCards.length){
     G.pCards.forEach((cid,i)=>{const c=CARDS.find(x=>x.id===cid);if(c)pc.innerHTML+=miniCardHTML(c,i);});
+    pc.querySelectorAll('.lo-mini-card').forEach(el=>attachTooltipTap(el));
   }
   // Opponent dice
   const od=document.getElementById('mLoODice');od.innerHTML='';
@@ -4652,6 +4958,7 @@ function toggleLoadoutPanel(){
   const oc=document.getElementById('mLoOCards');oc.innerHTML='';
   if(G&&G.oCards&&G.oCards.length){
     G.oCards.forEach((cid,i)=>{const c=CARDS.find(x=>x.id===cid);if(c)oc.innerHTML+=miniCardHTML(c,i);});
+    oc.querySelectorAll('.lo-mini-card').forEach(el=>attachTooltipTap(el));
   }
   if(bd)bd.classList.add('on');
   ov.classList.add('show');
@@ -4677,99 +4984,14 @@ function miniCardHTML(c,idx){
   const dur=(3+Math.random()*2).toFixed(1);
   const del=(Math.random()*3).toFixed(1);
   const sheenDel=(Math.random()*8).toFixed(1);
-  return '<div class="lo-mini-card rarity-'+c.rarity+'" style="--lo-dur:'+dur+'s;--lo-del:'+del+'s;cursor:pointer" onclick="matchCardZoom(\''+c.id+'\')">'+
+  return '<div class="lo-mini-card rarity-'+c.rarity+'" style="--lo-dur:'+dur+'s;--lo-del:'+del+'s;cursor:pointer">'+
     '<div class="gcard rarity-'+c.rarity+'" style="--sheen-delay:-'+sheenDel+'s">'+
       '<div class="gcard-cover" style="background:'+(CARD_BG[c.id]||'#444')+'">'+c.icon+'</div>'+
       '<div class="gcard-frame"></div>'+gcCorners()+
-    '</div></div>';
+    '</div>'+mkCardTooltipHTML(c)+'</div>';
 }
 
-/* ═══════ CARD ZOOM SYSTEM ═══════ */
-function _matchMkGCardFront(c){
-  const sd=(Math.random()*8).toFixed(1);
-  return '<div class="gcard rarity-'+c.rarity+'" style="--sheen-delay:-'+sd+'s">'+
-    '<div class="gcard-cover" style="background:'+(CARD_BG[c.id]||'#444')+'">'+c.icon+'</div>'+
-    '<div class="gcard-frame"></div>'+gcCorners()+
-    '<div class="gcard-band">'+c.rarity.toUpperCase()+'</div></div>';
-}
-function _matchMkGCardBack(c){
-  return '<div class="gcard-back rarity-'+c.rarity+'" style="background:#000;border-color:var(--ctrim2)">'+
-    '<div class="gcard-back-frame"></div>'+gcCorners()+
-    '<div class="gcard-back-name">'+toTitleCase(c.name)+'</div>'+
-    '<div class="gcard-back-desc">'+c.desc+'</div>'+
-    '<div class="gcard-tap">SWIPE TO FLIP</div></div>';
-}
-let _czCardId=null,_czRotY=0,_czDragging=false;
-function matchCardZoom(cardId){
-  SFX.cardFlip();
-  const card=CARDS.find(c=>c.id===cardId);
-  if(!card)return;
-  _czCardId=cardId;_czRotY=0;
-  const wrap=document.getElementById('czWrap');
-  wrap.innerHTML=_matchMkGCardFront(card)+_matchMkGCardBack(card);
-  wrap.style.transition='none';
-  wrap.style.transform='rotateY(0deg)';
-  requestAnimationFrame(()=>{requestAnimationFrame(()=>{
-    wrap.style.transition='transform 0.5s cubic-bezier(.25,.8,.25,1)';
-    wrap.style.transform='rotateY(180deg)';
-    _czRotY=180;
-  });});
-  document.getElementById('cardZoom').classList.add('open');
-  document.getElementById('cardZoom').onclick=(e)=>{
-    if(e.target===document.getElementById('cardZoom')&&!_czDragging) matchCloseCardZoom();
-  };
-}
-function matchCloseCardZoom(){
-  document.getElementById('cardZoom').classList.remove('open');
-  document.getElementById('activeBtn').style.display='none';
-  _czCardId=null;_activeZoomId=null;
-}
-// Card drag-to-rotate
-(function(){
-  const overlay=document.getElementById('cardZoom');
-  const czCard=document.getElementById('czCard');
-  const wrap=document.getElementById('czWrap');
-  let sx=0,dragging=false,startRot=0,lastFlipSfx=0;
-  function getX(e){return e.touches?e.touches[0].clientX:e.clientX;}
-  function onStart(e){
-    if(!overlay.classList.contains('open'))return;
-    const t=e.target;
-    if(!t.closest('.card-zoom-card'))return;
-    dragging=true;_czDragging=true;
-    sx=getX(e);startRot=_czRotY;
-    wrap.style.transition='none';
-  }
-  function onMove(e){
-    if(!dragging)return;
-    const x=getX(e);const dx=x-sx;
-    _czRotY=startRot+(dx/150)*180;
-    wrap.style.transform='rotateY('+_czRotY+'deg)';
-    const now=Date.now();
-    const norm=(((_czRotY%360)+360)%360);
-    if(now-lastFlipSfx>200&&(Math.abs(norm-90)<15||Math.abs(norm-270)<15)){
-      SFX.cardFlip();lastFlipSfx=now;
-    }
-  }
-  function onEnd(){
-    if(!dragging)return;
-    dragging=false;setTimeout(()=>{_czDragging=false;},50);
-    const norm=((_czRotY%360)+360)%360;
-    let target=norm<90||norm>=270?0:180;
-    const fullTurns=Math.round(_czRotY/360)*360;
-    _czRotY=fullTurns+target;
-    wrap.style.transition='transform .35s cubic-bezier(.25,.8,.25,1)';
-    wrap.style.transform='rotateY('+_czRotY+'deg)';
-  }
-  czCard.addEventListener('mousedown',onStart);
-  document.addEventListener('mousemove',onMove);
-  document.addEventListener('mouseup',onEnd);
-  czCard.addEventListener('touchstart',onStart,{passive:true});
-  document.addEventListener('touchmove',onMove,{passive:true});
-  document.addEventListener('touchend',onEnd,{passive:true});
-})();
-
-/* ═══════ ACTIVE CARD ZOOM + DRAG-TO-ACTIVATE ═══════ */
-let _activeZoomId=null;
+/* ═══════ ACTIVE CARD SYSTEM ═══════ */
 function canActivateCard(cardId){
   if(!G||!G.activeCardState)return false;
   const uses=G.activeCardState.usedCards[cardId];
@@ -4777,52 +4999,6 @@ function canActivateCard(cardId){
   const cd=CARDS.find(c=>c.id===cardId);if(!cd)return false;
   const timings=cd.timing.split('|');
   return timings.includes(G.phase);
-}
-function openActiveCardZoom(cardId){
-  SFX.cardFlip();
-  const card=CARDS.find(c=>c.id===cardId);if(!card)return;
-  _activeZoomId=cardId;_czCardId=cardId;_czRotY=0;
-  const wrap=document.getElementById('czWrap');
-  wrap.innerHTML=_matchMkGCardFront(card)+_matchMkGCardBack(card);
-  wrap.style.transition='none';
-  wrap.style.transform='rotateY(0deg)';
-  requestAnimationFrame(()=>{requestAnimationFrame(()=>{
-    wrap.style.transition='transform 0.5s cubic-bezier(.25,.8,.25,1)';
-    wrap.style.transform='rotateY(180deg)';_czRotY=180;
-  });});
-  const overlay=document.getElementById('cardZoom');
-  overlay.classList.add('open');
-  overlay.onclick=(e)=>{if(e.target===overlay&&!_czDragging){closeActiveZoom();}};
-  /* Show activate button if timing is right */
-  const abtn=document.getElementById('activeBtn');
-  if(canActivateCard(cardId)){
-    abtn.style.display='block';abtn.className='';
-    const cd=CARDS.find(c=>c.id===cardId);
-    abtn.textContent='⚡ ACTIVATE — '+cd.eff;
-  }else{
-    const cd=CARDS.find(c=>c.id===cardId);
-    const uses=G.activeCardState?G.activeCardState.usedCards[cardId]:0;
-    if(!uses||uses<=0){
-      abtn.style.display='block';abtn.className='disabled-timing';
-      abtn.textContent='ALREADY USED';
-    }else{
-      abtn.style.display='block';abtn.className='disabled-timing';
-      const timings=cd.timing.split('|').map(t=>t.toUpperCase()).join(' / ');
-      abtn.textContent='USE DURING: '+timings;
-    }
-  }
-}
-function closeActiveZoom(){
-  document.getElementById('cardZoom').classList.remove('open');
-  document.getElementById('activeBtn').style.display='none';
-  _activeZoomId=null;_czCardId=null;
-}
-function handleActivateBtn(){
-  SFX.nav();
-  if(_activeZoomId&&canActivateCard(_activeZoomId)){
-    activateCard(_activeZoomId);
-    closeActiveZoom();
-  }
 }
 
 function markActiveCardUsed(cardId){
@@ -4843,7 +5019,16 @@ function activateCard(cardId){
   if(!canActivateCard(cardId))return;
   markActiveCardUsed(cardId);
   const cd=CARDS.find(c=>c.id===cardId);
-  triggerCard(cardId,cd?cd.eff:'ACTIVATED',true);
+  /* Lingering effects get persistent labels */
+  const lingers=['mabels_stitch','aldrics_vow','whispers_hex'];
+  /* Full-word, title-cased label for activation */
+  const _abbr={'PTS':'Points','OPP':'Opponent','DMG':'Damage','AMT':'Amount','LVL':'Level'};
+  const effText=cd?cd.eff.split(' ').map(w=>{
+    const up=w.toUpperCase();
+    if(_abbr[up])return _abbr[up];
+    return w.charAt(0).toUpperCase()+w.slice(1).toLowerCase();
+  }).join(' '):'Activated';
+  triggerCard(cardId,effText,true,lingers.includes(cardId));
   switch(cardId){
     case 'grogs_flask': activateGrogsFlask(); break;
     case 'mabels_stitch': activateMabelsStitch(); break;
@@ -5405,7 +5590,7 @@ function loMiniCardHTML(card,isDraggable){
     '<div class="gcard rarity-'+card.rarity+'">'+
     '<div class="gcard-cover" style="background:'+((CARD_COVERS[card.id]||{}).bg||'#444')+'">'+(( CARD_COVERS[card.id]||{}).icon||'?')+'</div>'+
     '<div class="gcard-frame"></div>'+loGcCorners()+
-    '</div></div>';
+    '</div>'+mkCardTooltipHTML(card)+'</div>';
 }
 
 var _savedStatsHTML='';
@@ -5432,10 +5617,8 @@ function openLoadout(rung,done){
   _loOppCards=generateOppCards(rung);
   // Match player card slots to opponent's card count for fairness
   MAX_EQUIP=_loOppCards.length||1;
-  _loSelectedCards=isGrog?[]:(S.cards||[]).slice().sort(function(a,b){return(_rarOrd[a.rarity]||99)-(_rarOrd[b.rarity]||99)}).slice(0,MAX_EQUIP).map(function(c){return c.id});
-  // Auto-stake best cards for wager (based on wagerCount)
+  _loSelectedCards=new Array(MAX_EQUIP).fill(null);
   _loWagerCards=[];
-  if(rung.wager&&_loSelectedCards.length>0)autoStake();
   _loOppStake=rung.wager?generateOppStake(rung):null;
 
   _savedStatsHTML=document.getElementById('dStats').innerHTML;
@@ -5467,8 +5650,21 @@ function openLoadout(rung,done){
   document.getElementById('loOCardsLabel').style.display=hideCards?'none':'';
   document.getElementById('loOCards').style.display=hideCards?'none':'';
 
-  renderLoDice();renderLoHand();renderLoOppSide();renderLoOppCards();
-  if(rung.wager){renderLoWager();_initDragWager();}
+  renderLoDice();renderLoOppSide();
+  /* Render empty player slots only — opponent cards + wager come after unfold */
+  renderLoHand();
+  /* Render opp cards but keep the inner .lo-mini-card elements hidden */
+  renderLoOppCards();
+  if(rung.wager){renderLoWager();}
+  var _oppAndWagerCards=document.querySelectorAll('#loOCards .lo-mini-card, #loWagerZone .lo-mini-card');
+  _oppAndWagerCards.forEach(function(el){el.style.opacity='0';el.style.transform='scale(0)';});
+  /* After unfold midway, bounce cards in with pop animation */
+  setTimeout(function(){
+    _oppAndWagerCards.forEach(function(el){
+      el.style.opacity='';el.style.transform='';
+      el.style.animation='cardPopIn .4s ease both';
+    });
+  },190);
 
   var act=document.getElementById('loActions');act.innerHTML='';
   var backBtn=document.createElement('div');backBtn.className='btn btn-dim';
@@ -5615,39 +5811,148 @@ function renderLoDice(){
   });
 }
 
+/* ── Drag-to-unequip from filled slot ── */
+function initSlotCardDrag(slotEl,slotIdx){
+  var sx=0,sy=0,active=false,dragging=false,origRect=null,clone=null;
+  function gxy(e){var t=e.touches?e.touches[0]:e;return{x:t.clientX,y:t.clientY};}
+  function onStart(e){
+    var p=gxy(e);sx=p.x;sy=p.y;active=true;dragging=false;
+    origRect=slotEl.getBoundingClientRect();
+  }
+  function onMove(e){
+    if(!active)return;
+    var p=gxy(e);var dx=p.x-sx,dy=p.y-sy;
+    if(!dragging&&Math.abs(dx)+Math.abs(dy)<10)return;
+    if(!dragging){
+      dragging=true;closeAllChips();
+      clone=slotEl.cloneNode(true);
+      clone.style.cssText='position:fixed;z-index:9500;pointer-events:none;opacity:.85;filter:drop-shadow(0 4px 12px rgba(0,0,0,.7));'+
+        'left:'+origRect.left+'px;top:'+origRect.top+'px;width:'+origRect.width+'px;height:'+origRect.height+'px;margin:0';
+      document.body.appendChild(clone);
+      slotEl.style.opacity='.3';
+    }
+    if(e.cancelable)e.preventDefault();
+    clone.style.left=(origRect.left+dx)+'px';
+    clone.style.top=(origRect.top+dy)+'px';
+  }
+  function onEnd(){
+    if(!active){return;}
+    if(!dragging){active=false;origRect=null;return;}
+    var cr=clone.getBoundingClientRect();
+    var dist=Math.sqrt(Math.pow(cr.left-origRect.left,2)+Math.pow(cr.top-origRect.top,2));
+    clone.remove();clone=null;
+    slotEl.style.opacity='';
+    if(dist>30){
+      _loSelectedCards[slotIdx]=null;
+      if(_loRung&&_loRung.wager){autoStake();renderLoWager();}
+      renderLoHand();
+    }
+    active=false;dragging=false;origRect=null;
+  }
+  slotEl.addEventListener('touchstart',onStart,{passive:true});
+  slotEl.addEventListener('mousedown',onStart);
+  document.addEventListener('touchmove',onMove,{passive:false});
+  document.addEventListener('mousemove',onMove);
+  document.addEventListener('touchend',onEnd,{passive:true});
+  document.addEventListener('mouseup',onEnd);
+}
+
+/* ── Drag-to-equip from picker into slot ── */
+function initPickerCardDrag(cardEl,cardId){
+  var sx=0,sy=0,active=false,dragging=false,origRect=null,hotSlot=null,clone=null;
+  function gxy(e){var t=e.touches?e.touches[0]:e;return{x:t.clientX,y:t.clientY};}
+  function getOverlapSlot(cloneRect){
+    var slots=document.querySelectorAll('#loPCards .lo-hand-slot');
+    var best=null,bestArea=0;
+    slots.forEach(function(s){
+      var sr=s.getBoundingClientRect();
+      var ox=Math.max(0,Math.min(cloneRect.right,sr.right)-Math.max(cloneRect.left,sr.left));
+      var oy=Math.max(0,Math.min(cloneRect.bottom,sr.bottom)-Math.max(cloneRect.top,sr.top));
+      var area=ox*oy;
+      if(area>bestArea){bestArea=area;best=s;}
+    });
+    var cardArea=cloneRect.width*cloneRect.height;
+    return(bestArea>cardArea*0.15)?best:null;
+  }
+  function onStart(e){
+    var p=gxy(e);sx=p.x;sy=p.y;active=true;dragging=false;
+    origRect=cardEl.getBoundingClientRect();
+  }
+  function onMove(e){
+    if(!active)return;
+    var p=gxy(e);var dx=p.x-sx,dy=p.y-sy;
+    if(!dragging&&Math.abs(dx)+Math.abs(dy)<10)return;
+    if(!dragging){
+      dragging=true;closeAllChips();
+      clone=cardEl.cloneNode(true);
+      clone.style.cssText='position:fixed;z-index:9500;pointer-events:none;opacity:.9;filter:drop-shadow(0 4px 12px rgba(0,0,0,.7));'+
+        'left:'+origRect.left+'px;top:'+origRect.top+'px;width:'+origRect.width+'px;height:'+origRect.height+'px;margin:0';
+      document.body.appendChild(clone);
+      cardEl.style.opacity='.3';
+    }
+    if(e.cancelable)e.preventDefault();
+    clone.style.left=(origRect.left+dx)+'px';
+    clone.style.top=(origRect.top+dy)+'px';
+    /* Hit-test equip slots */
+    var cr=clone.getBoundingClientRect();
+    var s=getOverlapSlot(cr);
+    if(hotSlot&&hotSlot!==s)hotSlot.classList.remove('hot');
+    if(s)s.classList.add('hot');
+    hotSlot=s;
+  }
+  function onEnd(){
+    if(!active)return;
+    if(!dragging){active=false;origRect=null;return;}
+    if(clone){clone.remove();clone=null;}
+    cardEl.style.opacity='';
+    if(hotSlot){
+      hotSlot.classList.remove('hot');
+      var idx=parseInt(hotSlot.dataset.slotIdx);
+      var prev=_loSelectedCards.indexOf(cardId);
+      if(prev>=0&&prev!==idx) _loSelectedCards[prev]=null;
+      _loSelectedCards[idx]=cardId;
+      if(_loRung&&_loRung.wager){autoStake();renderLoWager();}
+      renderLoHand();
+      closePicker();
+    }
+    active=false;dragging=false;origRect=null;hotSlot=null;
+  }
+  cardEl.addEventListener('touchstart',onStart,{passive:true});
+  cardEl.addEventListener('mousedown',onStart);
+  document.addEventListener('touchmove',onMove,{passive:false});
+  document.addEventListener('mousemove',onMove);
+  document.addEventListener('touchend',onEnd,{passive:true});
+  document.addEventListener('mouseup',onEnd);
+}
+
 /* ── Your Hand (3 equip slots) ── */
 function renderLoHand(){
   var c=document.getElementById('loPCards');c.innerHTML='';
   for(var i=0;i<MAX_EQUIP;i++){
     var slot=document.createElement('div');
     slot.className='lo-hand-slot';
+    slot.dataset.slotIdx=i;
     var cardId=_loSelectedCards[i]||null;
     if(cardId){
       var card=CARDS.find(function(cd){return cd.id===cardId});
       if(card){
         slot.innerHTML=loMiniCardHTML(card,false);
         slot.classList.add('filled');
-        // Make draggable for wager if wager zone is active
-        if(_loRung&&_loRung.wager){
-          var miniCard=slot.querySelector('.lo-mini-card');
-          if(miniCard) _makeDraggable(miniCard,cardId);
-        }
+        /* Tap filled card = tooltip */
+        var miniCard=slot.querySelector('.lo-mini-card');
+        if(miniCard) attachTooltipTap(miniCard);
       }
     }else{
       slot.innerHTML='<span>EMPTY</span>';
+      /* Tap empty slot = open picker */
+      (function(idx,slotEl){
+        slotEl.addEventListener('click',function(e){
+          e.stopPropagation();
+          closeAllChips();
+          openCardPicker(idx,slotEl);
+        });
+      })(i,slot);
     }
-    (function(idx,cid,slotEl){
-      var pressTimer=null,moved=false;
-      slotEl.addEventListener('pointerdown',function(){
-        moved=false;
-        pressTimer=setTimeout(function(){pressTimer=null;if(cid)loOpenCardZoom(cid);},500);
-      });
-      slotEl.addEventListener('pointermove',function(){if(pressTimer){moved=true;clearTimeout(pressTimer);pressTimer=null;}});
-      slotEl.addEventListener('pointerup',function(){
-        if(pressTimer){clearTimeout(pressTimer);pressTimer=null;if(!moved)openCardPicker(idx,slotEl);}
-      });
-      slotEl.addEventListener('pointerleave',function(){if(pressTimer){clearTimeout(pressTimer);pressTimer=null;}});
-    })(i,cardId,slot);
     c.appendChild(slot);
   }
 }
@@ -5719,9 +6024,9 @@ function openCardPicker(slotIndex,tappedEl){
   var validCards=allCards.filter(function(oc){return !!CARDS.find(function(cd){return cd.id===oc.id})});
   var useCarousel=validCards.length>5;
   if(useCarousel){
-    picker.innerHTML='<div class="lo-picker-title">SELECT CARD</div><div class="lo-picker-grid horizontal" id="loPickerGrid"><div class="lo-picker-track" id="loPickerTrack"></div></div>';
+    picker.innerHTML='<div class="lo-picker-title">DRAG TO EQUIP</div><div class="lo-picker-grid horizontal" id="loPickerGrid"><div class="lo-picker-track" id="loPickerTrack"></div></div>';
   }else{
-    picker.innerHTML='<div class="lo-picker-title">SELECT CARD</div><div class="lo-picker-grid static" id="loPickerGrid"></div>';
+    picker.innerHTML='<div class="lo-picker-title">DRAG TO EQUIP</div><div class="lo-picker-grid static" id="loPickerGrid"></div>';
   }
   var grid=document.getElementById('loPickerGrid');
   var container=useCarousel?document.getElementById('loPickerTrack'):grid;
@@ -5736,34 +6041,14 @@ function openCardPicker(slotIndex,tappedEl){
     wrapper.innerHTML=loMiniCardHTML(card,false);
     var el=wrapper.firstChild;
     var otherIdx=_loSelectedCards.indexOf(oc.id);
-    if(otherIdx>=0&&otherIdx!==slotIndex){
-      el.style.pointerEvents='none';
+    var isEquipped=otherIdx>=0;
+    if(isEquipped){
+      el.style.opacity='.4';el.style.filter='grayscale(.6)';el.style.pointerEvents='none';
+    }else{
+      /* Tap = tooltip, drag = equip into slot */
+      attachTooltipTap(el);
+      initPickerCardDrag(el,oc.id);
     }
-    (function(cid,cardEl){
-      var pressTimer=null,moved=false;
-      cardEl.addEventListener('pointerdown',function(e){
-        e.stopPropagation();
-        moved=false;
-        pressTimer=setTimeout(function(){pressTimer=null;loOpenCardZoom(cid);},500);
-      });
-      cardEl.addEventListener('pointermove',function(){if(pressTimer){moved=true;clearTimeout(pressTimer);pressTimer=null;}});
-      cardEl.addEventListener('pointerup',function(e){
-        e.stopPropagation();e.preventDefault();
-        if(pressTimer&&!moved){
-          clearTimeout(pressTimer);pressTimer=null;
-          var prev=_loSelectedCards.indexOf(cid);
-          if(prev>=0&&prev!==slotIndex) _loSelectedCards[prev]=null;
-          _loSelectedCards[slotIndex]=cid;
-          // Re-auto-stake when cards change
-          if(_loRung&&_loRung.wager)autoStake();
-          renderLoHand();
-          if(_loRung&&_loRung.wager) renderLoWager();
-          closePicker();
-        }
-      });
-      cardEl.addEventListener('click',function(e){e.stopPropagation();e.preventDefault();});
-      cardEl.addEventListener('pointerleave',function(){if(pressTimer){clearTimeout(pressTimer);pressTimer=null;}});
-    })(oc.id,el);
     return el;
   }
   if(useCarousel){
@@ -5795,9 +6080,9 @@ function _pickerOutsideClick(e){
   if(!picker.classList.contains('open'))return;
   if(picker.contains(e.target))return;
   // Don't close picker if a zoom overlay is open on top
-  var czOpen=document.getElementById('loCardZoom').classList.contains('open');
-  var dzOpen=document.getElementById('loDiceZoom').classList.contains('open');
-  if(czOpen||dzOpen)return;
+  var dzEl=document.getElementById('loDiceZoom');
+  var dzOpen=dzEl&&dzEl.classList.contains('open');
+  if(dzOpen)return;
   e.stopPropagation();e.preventDefault();
   closePicker();
 }
@@ -5850,83 +6135,6 @@ function _setupInfiniteScroll(grid,realCount){
     else if(grid.scrollLeft>setWidth*5){
       jumping=true;grid.scrollLeft-=setWidth;jumping=false;
     }
-  });
-}
-
-/* ── Drag-and-drop wager system ── */
-var _dragClone=null,_dragCardId=null;
-function _initDragWager(){
-  var wz=document.getElementById('loWagerZone');
-  if(!wz)return;
-  // HTML5 drag events for desktop
-  wz.addEventListener('dragover',function(e){e.preventDefault();wz.classList.add('drag-over')});
-  wz.addEventListener('dragleave',function(e){
-    if(!wz.contains(e.relatedTarget))wz.classList.remove('drag-over');
-  });
-  wz.addEventListener('drop',function(e){
-    e.preventDefault();wz.classList.remove('drag-over');
-    var cid=e.dataTransfer.getData('text/plain');
-    if(cid&&_loSelectedCards.indexOf(cid)>=0){
-      _loWagerCard=cid;renderLoWager();
-    }
-  });
-}
-function _makeDraggable(el,cardId){
-  if(!cardId)return;
-  // HTML5 drag for desktop
-  el.setAttribute('draggable','true');
-  el.addEventListener('dragstart',function(e){
-    e.dataTransfer.setData('text/plain',cardId);
-    e.dataTransfer.effectAllowed='move';
-    // Custom drag image at proper card size
-    var ghost=el.cloneNode(true);
-    ghost.style.width=el.offsetWidth+'px';
-    ghost.style.height=el.offsetHeight+'px';
-    ghost.style.position='absolute';
-    ghost.style.top='-9999px';
-    ghost.style.left='-9999px';
-    document.body.appendChild(ghost);
-    e.dataTransfer.setDragImage(ghost,el.offsetWidth/2,el.offsetHeight/2);
-    setTimeout(function(){ghost.remove();},0);
-  });
-  // Touch drag for mobile
-  var startX,startY,dragging=false;
-  el.addEventListener('touchstart',function(e){
-    if(e.touches.length!==1)return;
-    _dragCardId=cardId;dragging=false;
-    startX=e.touches[0].clientX;startY=e.touches[0].clientY;
-  },{passive:true});
-  el.addEventListener('touchmove',function(e){
-    if(!_dragCardId||_dragCardId!==cardId)return;
-    var dx=e.touches[0].clientX-startX,dy=e.touches[0].clientY-startY;
-    if(!dragging&&Math.abs(dx)+Math.abs(dy)<10)return;
-    if(!dragging){
-      dragging=true;
-      _dragClone=el.cloneNode(true);
-      _dragClone.className='drag-clone';
-      _dragClone.style.width=el.offsetWidth+'px';
-      _dragClone.style.height=el.offsetHeight+'px';
-      document.body.appendChild(_dragClone);
-      var wz=document.getElementById('loWagerZone');
-      if(wz)wz.classList.add('drag-over');
-    }
-    e.preventDefault();
-    _dragClone.style.left=(e.touches[0].clientX-el.offsetWidth/2)+'px';
-    _dragClone.style.top=(e.touches[0].clientY-el.offsetHeight/2)+'px';
-  },{passive:false});
-  el.addEventListener('touchend',function(e){
-    if(!dragging||!_dragCardId||_dragCardId!==cardId){_dragCardId=null;return;}
-    var wz=document.getElementById('loWagerZone');
-    if(wz)wz.classList.remove('drag-over');
-    if(_dragClone){_dragClone.remove();_dragClone=null;}
-    // Check if touch ended over wager zone
-    var touch=e.changedTouches[0];
-    var target=document.elementFromPoint(touch.clientX,touch.clientY);
-    if(target&&(target.id==='loWagerZone'||target.closest('#loWagerZone')||target.id==='loWagerPlayer'||target.closest('.lo-wager-slot'))){
-      /* drag-to-wager no longer used — wager is auto-assigned */
-      autoStake();renderLoWager();renderLoHand();
-    }
-    _dragCardId=null;dragging=false;
   });
 }
 
@@ -6066,94 +6274,6 @@ function loCloseDiceZoom(){
 })();
 /* ═══════ CARD ZOOM SYSTEM ═══════ */
 function loToTitleCase(s){return s.replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase()})}
-var _loCzCardId=null,_loCzRotY=0,_loCzDragging=false,_loCzReady=false;
-function loMkFront(c){
-  var sd=(Math.random()*8).toFixed(1);
-  return '<div class="gcard rarity-'+c.rarity+'" style="--sheen-delay:-'+sd+'s">'+
-    '<div class="gcard-cover" style="background:'+((CARD_COVERS[c.id]||{}).bg||'#444')+'">'+(( CARD_COVERS[c.id]||{}).icon||'?')+'</div>'+
-    '<div class="gcard-frame"></div>'+loGcCorners()+
-    '<div class="gcard-band">'+c.rarity.toUpperCase()+'</div></div>';
-}
-function loMkBack(c){
-  return '<div class="gcard-back rarity-'+c.rarity+'">'+
-    '<div class="gcard-back-name">'+loToTitleCase(c.name)+'</div>'+
-    (c.eff?'<div class="gcard-back-eff">'+c.eff+'</div>':'')+
-    '<div class="gcard-back-desc">'+(c.desc||'')+'</div>'+
-    '<div class="gcard-tap">SWIPE TO FLIP</div></div>';
-}
-function loOpenCardZoom(cardId){
-  var card=CARDS.find(function(c){return c.id===cardId});
-  if(!card)return;
-  _loCzCardId=cardId;_loCzRotY=0;
-  var wrap=document.getElementById('loCzWrap');
-  wrap.innerHTML=loMkFront(card)+loMkBack(card);
-  wrap.style.transition='none';
-  wrap.style.transform='rotateY(0deg)';
-  requestAnimationFrame(function(){requestAnimationFrame(function(){
-    wrap.style.transition='transform 0.5s cubic-bezier(.4,0,.2,1)';
-    wrap.style.transform='rotateY(180deg)';
-    _loCzRotY=180;
-  })});
-  document.getElementById('loCardZoom').classList.add('open');
-  // Delay enabling close-on-tap to avoid compat mouse events from the same tap
-  _loCzReady=false;
-  setTimeout(function(){_loCzReady=true},300);
-}
-function loCloseCardZoom(){
-  document.getElementById('loCardZoom').classList.remove('open');
-  _loCzCardId=null;
-}
-// Card drag-to-rotate in zoom
-(function(){
-  function initCzDrag(){
-    var overlay=document.getElementById('loCardZoom');
-    var czCard=document.getElementById('loCzCard');
-    var wrap=document.getElementById('loCzWrap');
-    if(!overlay||!czCard||!wrap)return;
-    var sx=0,dragging=false,startRot=0;
-    function getX(e){return e.touches?e.touches[0].clientX:e.clientX;}
-    function onStart(e){
-      if(!overlay.classList.contains('open'))return;
-      var t=e.target;
-      if(!t.closest('.lo-cz-card'))return;
-      dragging=true;_loCzDragging=true;
-      sx=getX(e);startRot=_loCzRotY;
-      wrap.style.transition='none';
-    }
-    function onMove(e){
-      if(!dragging)return;
-      var x=getX(e);var dx=x-sx;
-      _loCzRotY=startRot+(dx/150)*180;
-      wrap.style.transform='rotateY('+_loCzRotY+'deg)';
-    }
-    function onEnd(){
-      if(!dragging)return;
-      dragging=false;setTimeout(function(){_loCzDragging=false},50);
-      var norm=((_loCzRotY%360)+360)%360;
-      var target=norm<90||norm>=270?0:180;
-      var fullTurns=Math.round(_loCzRotY/360)*360;
-      _loCzRotY=fullTurns+target;
-      wrap.style.transition='transform .35s cubic-bezier(.4,0,.2,1)';
-      wrap.style.transform='rotateY('+_loCzRotY+'deg)';
-    }
-    czCard.addEventListener('mousedown',onStart);
-    document.addEventListener('mousemove',onMove);
-    document.addEventListener('mouseup',onEnd);
-    czCard.addEventListener('touchstart',onStart,{passive:true});
-    document.addEventListener('touchmove',onMove,{passive:true});
-    document.addEventListener('touchend',onEnd,{passive:true});
-    // Single persistent close-on-tap handler (with timing guard)
-    overlay.addEventListener('pointerdown',function(e){
-      if(!overlay.classList.contains('open'))return;
-      if(!_loCzReady)return;
-      if(_loCzDragging)return;
-      if(e.target===overlay){e.stopPropagation();e.preventDefault();loCloseCardZoom();}
-    },true);
-  }
-  if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',initCzDrag)}
-  else{initCzDrag()}
-})()
-
 /* ── Opponent side (dice only) ── */
 function renderLoOppSide(){
   var od=document.getElementById('loODice');od.innerHTML='';
@@ -6169,22 +6289,12 @@ function renderLoOppCards(){
   (_loOppCards||[]).forEach(function(cardId){
     var card=CARDS.find(function(cd){return cd.id===cardId});
     if(!card)return;
-    var wrapper=document.createElement('div');
-    wrapper.innerHTML=loMiniCardHTML(card,false);
-    var el=wrapper.firstChild;
-    el.style.cursor='pointer';
-    // Long-press to zoom, short tap also zooms (no picking for opponent cards)
-    (function(cid,cardEl){
-      var pressTimer=null;
-      cardEl.addEventListener('pointerdown',function(){
-        pressTimer=setTimeout(function(){pressTimer=null;loOpenCardZoom(cid);},500);
-      });
-      cardEl.addEventListener('pointerup',function(){
-        if(pressTimer){clearTimeout(pressTimer);pressTimer=null;loOpenCardZoom(cid);}
-      });
-      cardEl.addEventListener('pointerleave',function(){if(pressTimer){clearTimeout(pressTimer);pressTimer=null;}});
-    })(cardId,el);
-    c.appendChild(el);
+    var slot=document.createElement('div');
+    slot.className='lo-hand-slot filled opp-slot';
+    slot.innerHTML=loMiniCardHTML(card,false);
+    var el=slot.querySelector('.lo-mini-card');
+    if(el){el.style.cursor='pointer';attachTooltipTap(el);}
+    c.appendChild(slot);
   });
   if((_loOppCards||[]).length===0){
     c.innerHTML='<span style="font-size:5px;color:var(--textdim)">NONE</span>';
@@ -6206,11 +6316,8 @@ function renderLoWager(){
       pSlot.classList.add('filled');
     }
     pSlot.style.cursor='pointer';
-    pSlot.onclick=function(){
-      SFX.nav();
-      if(_loWagerCards.length===1){loOpenCardZoom(_loWagerCards[0]);}
-      else if(_loWagerCards.length>1){loOpenCardZoom(_loWagerCards[0]);}
-    };
+    pSlot.style.position='relative';pSlot.style.overflow='visible';
+    attachTooltipTap(pSlot);
   }else{
     pSlot.innerHTML='<span style="font-size:5px">YOUR<br>CARD</span>';
     pSlot.classList.remove('filled');
@@ -6223,7 +6330,8 @@ function renderLoWager(){
       oSlot.innerHTML=loMiniCardHTML(oCard,false);
       oSlot.classList.add('filled');
       oSlot.style.cursor='pointer';
-      oSlot.onclick=function(){SFX.nav();loOpenCardZoom(_loOppStake)};
+      oSlot.style.position='relative';oSlot.style.overflow='visible';
+      attachTooltipTap(oSlot);
     }
   }else{
     oSlot.innerHTML='<span style="font-size:5px">OPP<br>CARD</span>';
@@ -6236,7 +6344,7 @@ function renderLoWager(){
 /* ── Wager Card Picker — now auto-assigned, shows info only ── */
 function openWagerPicker(){
   if(_loWagerCards.length===0)return;
-  if(_loWagerCards.length>0)loOpenCardZoom(_loWagerCards[0]);
+  /* Wager info now shown via tooltip on the wager slot */
   return;
   /* Legacy picker code below — kept for reference */
   var equipped=_loSelectedCards.filter(function(c){return !!c});
@@ -6599,16 +6707,7 @@ function mkGCardFront(c, extras=''){
   </div>`;
 }
 
-function mkGCardBack(c){
-  return `<div class="gcard-back rarity-${c.rarity}" style="background:#000;border-color:var(--ctrim2)">
-    <div class="gcard-back-frame"></div>
-    ${gcCorners()}
-    <div class="gcard-back-icon">${c.icon}</div>
-    <div class="gcard-back-name">${toTitleCase(c.name)}</div>
-    <div class="gcard-back-desc">${c.desc}</div>
-    <div class="gcard-tap">SWIPE TO FLIP</div>
-  </div>`;
-}
+/* mkGCardBack removed — zoom overlay deleted */
 
 /* ═══════════════════════════════════════
    TAB SWITCHING + INFINITE SWIPE
@@ -6757,7 +6856,9 @@ function refreshStock(){
   setTimeout(()=>{buildCardsTab();buildDiceTab();buildServicesTab()},400);
 }
 
+let _shopDragCleanups=[];
 function buildCardsTab(){
+  _shopDragCleanups.forEach(fn=>fn());_shopDragCleanups=[];
   const panel=document.getElementById('panel-cards');
   const shopCards = shopStock.map(id=>CARDS.find(c=>c.id===id)).filter(Boolean);
   const canRefresh=playerGold>=25;
@@ -6766,15 +6867,20 @@ function buildCardsTab(){
   let html=`<div style="text-align:center;margin-bottom:14px;padding:0 4px">
     <div style="font-family:'IM Fell English',serif;font-size:18px;color:var(--textdim);letter-spacing:1px;line-height:1.5;text-shadow:0 1px 0 rgba(0,0,0,.6)">\u201CWares for a ${rungLabel}-tier traveler\u201D</div>
   </div>`;
+  /* Buy zone */
+  html+=`<div class="buy-zone" id="buyZone">
+    <svg class="az-border" width="100%" height="100%" preserveAspectRatio="none"><rect x="1" y="1" rx="8" ry="8"></rect></svg>
+    <span class="bz-label">BUY</span>
+    <span class="bz-price" id="bzPrice"><span class="coin-i"></span> <span id="bzCost"></span></span>
+  </div>`;
   html+='<div class="card-grid">';
   shopCards.forEach((c,i)=>{
     const cost=CARD_PRICES[c.rarity]||65;
     const owned=ownedCards.find(o=>o.id===c.id);
     const canAfford=playerGold>=cost;
     const extras=`<div class="sc-price ${canAfford?'':'cant'}"><span class="sc-coin"><span class="coin-i"></span></span><span class="sc-cost">${cost}</span></div>${owned?'<div class="sc-owned-check">\u2713</div>':''}`;
-    html+=`
-      <div class="shop-card${owned?' owned':''} rarity-${c.rarity}" data-id="${c.id}" onclick="SFX.nav();shopCardZoom('${c.id}')">
-        ${mkGCardFront(c, extras)}
+    html+=`<div class="shop-card${owned?' owned':''} rarity-${c.rarity}" data-id="${c.id}" data-cost="${cost}">
+        ${mkGCardFront(c, extras)}${mkCardTooltipHTML(c)}
       </div>`;
   });
   html+='</div>';
@@ -6791,6 +6897,14 @@ function buildCardsTab(){
   </div>`;
   panel.innerHTML=html;
 
+  /* Attach tooltip + drag to each shop card */
+  panel.querySelectorAll('.shop-card').forEach(el=>{
+    attachTooltipTap(el);
+    const cid=el.dataset.id;
+    const cost=parseInt(el.dataset.cost)||0;
+    if(playerGold>=cost) initShopCardDrag(el,cid,cost);
+  });
+
   /* Render refresh button canvas bg */
   requestAnimationFrame(()=>{
     const btn=panel.querySelector('.refresh-btn');
@@ -6805,157 +6919,118 @@ function buildCardsTab(){
   });
 }
 
-/* ═══════════════════════════════════════
-   CARD ZOOM — fluid animation + drag-to-flip
-   ═══════════════════════════════════════ */
-/* _czCardId, _czRotY, _czDragging declared in match section */
-
-function shopCardZoom(id){
-  if(_didSwipe)return;
-  SFX.nav();
-  const card=CARDS.find(c=>c.id===id);
-  if(!card)return;
-  _czCardId=id;
-  _czRotY=0;
-
-  const wrap=document.getElementById('shopCzWrap');
-  wrap.innerHTML = mkGCardFront(card) + mkGCardBack(card);
-  wrap.style.transition='none';
-  wrap.style.transform='rotateY(0deg)';
-  // Auto-flip to show card back (description) after a short delay
-  requestAnimationFrame(()=>{
-    requestAnimationFrame(()=>{
-      wrap.style.transition='transform 0.5s cubic-bezier(.25,.8,.25,1)';
-      wrap.style.transform='rotateY(180deg)';
-      _czRotY=180;
-    });
-  });
-
-  // Build buy button
-  const cost=CARD_PRICES[card.rarity]||65;
-  const canAfford=playerGold>=cost;
-  const owned=ownedCards.find(o=>o.id===id);
-  const buyWrap=document.getElementById('shopCzBuyWrap');
-  buyWrap.innerHTML=`
-    <button class="cz-buy-btn" id="shopCzBuyBtn" ${!canAfford?'disabled':''}>
-      <canvas></canvas>
-      <span>${canAfford?'BUY \u2014':'CAN\'T AFFORD'}</span>
-      ${canAfford?'<span class="coin-icon"><span class="coin-i"></span></span><span>'+cost+'</span>':''}
-    </button>
-    ${owned?'<div class="cz-owned-badge">OWNED \u00D7'+owned.count+'</div>':''}`;
-
-  const buyBtn=document.getElementById('shopCzBuyBtn');
-  if(buyBtn){
-    // Draw pixel-panel background on button canvas
-    requestAnimationFrame(()=>{
-      const c=buyBtn.querySelector('canvas');
-      if(c){
-        c.width=buyBtn.offsetWidth;c.height=buyBtn.offsetHeight;
-        const bevelCol=canAfford?'#6a5830':'#484040';
-        const faceCol=canAfford?'#1a1408':'#181820';
-        const shadowCol=canAfford?'#0e0a04':'#0a0a10';
-        drawPixelPanel(c,bevelCol,faceCol,shadowCol,777,0.008);
-      }
-    });
-    if(canAfford) buyBtn.onclick=(e)=>{e.stopPropagation();buyCard(id,cost,e);};
-  }
-
-  document.getElementById('shopCardZoom').classList.add('open');
-
-  // Close on backdrop tap
-  document.getElementById('shopCardZoom').onclick=(e)=>{
-    if(e.target===document.getElementById('shopCardZoom') && !_czDragging){
-      shopCloseCardZoom();
-    }
-  };
-}
-
-function shopCloseCardZoom(){
-  document.getElementById('shopCardZoom').classList.remove('open');
-  _czCardId=null;
-}
-
-// Drag-to-rotate on the zoom card
-(function(){
-  const overlay=document.getElementById('shopCardZoom');
-  const czCard=document.getElementById('shopCzCard');
-  const wrap=document.getElementById('shopCzWrap');
-  let sx=0, dragging=false, startRot=0;
-
-  function getX(e){return e.touches?e.touches[0].clientX:e.clientX;}
-
+/* ═══════ SHOP DRAG-TO-BUY SYSTEM ═══════ */
+function initShopCardDrag(cardEl,cardId,cost){
+  let sx=0,sy=0,dragging=false,moved=false,origRect=null;
+  function getXY(e){return e.touches?{x:e.touches[0].clientX,y:e.touches[0].clientY}:{x:e.clientX,y:e.clientY};}
   function onStart(e){
-    if(!overlay.classList.contains('open'))return;
-    const t=e.target;
-    // Only start drag on the card area (not buy button)
-    if(t.closest('.cz-buy-btn')||t.closest('.cz-buy-wrap'))return;
-    if(!t.closest('.card-zoom-card')&&t!==overlay)return;
-    if(t===overlay)return; // backdrop
-    dragging=true;
-    _czDragging=true;
-    sx=getX(e);
-    startRot=_czRotY;
-    wrap.style.transition='none';
+    if(dragging)return;
+    const pt=getXY(e);sx=pt.x;sy=pt.y;moved=false;
+    origRect=cardEl.getBoundingClientRect();
   }
-
   function onMove(e){
-    if(!dragging)return;
-    const x=getX(e);
-    const dx=x-sx;
-    // Map drag distance to rotation: ~180deg per 150px
-    _czRotY=startRot + (dx / 150) * 180;
-    wrap.style.transform=`rotateY(${_czRotY}deg)`;
-    sfxFlipThrottle();
-  }
-
-  let _lastFlipSfx=0;
-  function sfxFlipThrottle(){
-    const now=Date.now();
-    // Play flip sound when crossing 90 or 270 degree boundaries
-    const norm=(((_czRotY%360)+360)%360);
-    if(now-_lastFlipSfx>200 && (Math.abs(norm-90)<15||Math.abs(norm-270)<15)){
-      SFX.cardFlip();_lastFlipSfx=now;
+    if(!origRect)return;
+    const pt=getXY(e);
+    const dx=pt.x-sx,dy=pt.y-sy;
+    if(!dragging){
+      if(Math.abs(dx)<10&&Math.abs(dy)<10)return;
+      dragging=true;moved=true;
+      closeAllChips();
+      cardEl.classList.add('dragging');
+      cardEl.style.left=origRect.left+'px';
+      cardEl.style.top=origRect.top+'px';
+      cardEl.style.width=origRect.width+'px';
+      cardEl.style.height=origRect.height+'px';
+      showBuyZone(cardId,cost);
+    }
+    if(e.cancelable)e.preventDefault();
+    cardEl.style.left=(origRect.left+dx)+'px';
+    cardEl.style.top=(origRect.top+dy)+'px';
+    /* hit test buy zone */
+    const zone=document.getElementById('buyZone');
+    if(zone){
+      const zr=zone.getBoundingClientRect();
+      const cr={left:origRect.left+dx,top:origRect.top+dy,width:origRect.width,height:origRect.height};
+      cr.right=cr.left+cr.width;cr.bottom=cr.top+cr.height;
+      const overlapX=Math.max(0,Math.min(cr.right,zr.right)-Math.max(cr.left,zr.left));
+      const overlapY=Math.max(0,Math.min(cr.bottom,zr.bottom)-Math.max(cr.top,zr.top));
+      const cardArea=cr.width*cr.height;
+      const overlap=overlapX*overlapY;
+      if(overlap>cardArea*0.3){
+        zone.classList.add('hot');zone.classList.remove('cant-afford');
+        if(playerGold<cost){zone.classList.add('cant-afford');zone.classList.remove('hot');}
+      }else{
+        zone.classList.remove('hot');zone.classList.remove('cant-afford');
+      }
     }
   }
-
   function onEnd(){
-    if(!dragging)return;
+    if(!origRect)return;
+    if(!dragging){origRect=null;return;}
     dragging=false;
-    setTimeout(()=>{_czDragging=false;},50);
-    // Snap to nearest face (0 or 180)
-    const norm=((_czRotY%360)+360)%360;
-    let target;
-    if(norm<90||norm>=270) target=0;
-    else target=180;
-    // Adjust to keep cumulative rotation smooth
-    const fullTurns=Math.round(_czRotY/360)*360;
-    _czRotY=fullTurns+target;
-    wrap.style.transition='transform .35s cubic-bezier(.25,.8,.25,1)';
-    wrap.style.transform=`rotateY(${_czRotY}deg)`;
+    const zone=document.getElementById('buyZone');
+    const isHot=zone&&zone.classList.contains('hot');
+    hideBuyZone();
+    if(isHot&&playerGold>=cost){
+      /* Buy the card */
+      const zr=zone.getBoundingClientRect();
+      purchaseEffect(zr.left+zr.width/2,zr.top+zr.height/2);
+      cardEl.classList.remove('dragging');
+      cardEl.style.left='';cardEl.style.top='';cardEl.style.width='';cardEl.style.height='';
+      SFX.bank();
+      playerGold-=cost;
+      const existing=ownedCards.find(o=>o.id===cardId);
+      if(existing)existing.count++;
+      else ownedCards.push({id:cardId,count:1,tarnish:0});
+      updateGoldDisplay();syncToState();
+      setTimeout(()=>buildCardsTab(),350);
+    }else{
+      /* Snap back */
+      shopSnapBack(cardEl,origRect);
+    }
+    origRect=null;
   }
-
-  czCard.addEventListener('mousedown',onStart);
+  cardEl.addEventListener('touchstart',e=>onStart(e),{passive:true});
+  document.addEventListener('touchmove',onMove,{passive:false});
+  document.addEventListener('touchend',onEnd,{passive:true});
+  cardEl.addEventListener('mousedown',onStart);
   document.addEventListener('mousemove',onMove);
   document.addEventListener('mouseup',onEnd);
-  czCard.addEventListener('touchstart',onStart,{passive:true});
-  document.addEventListener('touchmove',onMove,{passive:true});
-  document.addEventListener('touchend',onEnd,{passive:true});
-})();
-
-function buyCard(id,cost,e){
-  if(playerGold<cost){SFX.err();return;}
-  SFX.bank();
-  playerGold-=cost;
-  const existing=ownedCards.find(o=>o.id===id);
-  if(existing)existing.count++;
-  else ownedCards.push({id:id,count:1,tarnish:0});
-  updateGoldDisplay();
-  syncToState();
-  purchaseEffect(e.clientX||window.innerWidth/2, e.clientY||window.innerHeight/2);
-  setTimeout(()=>{
-    shopCloseCardZoom();
-    buildCardsTab();
-  },400);
+  /* cleanup */
+  const cleanup=()=>{
+    cardEl.removeEventListener('touchstart',onStart);
+    document.removeEventListener('touchmove',onMove);
+    document.removeEventListener('touchend',onEnd);
+    cardEl.removeEventListener('mousedown',onStart);
+    document.removeEventListener('mousemove',onMove);
+    document.removeEventListener('mouseup',onEnd);
+  };
+  _shopDragCleanups.push(cleanup);
+}
+function showBuyZone(cardId,cost){
+  const z=document.getElementById('buyZone');if(!z)return;
+  const costEl=document.getElementById('bzCost');
+  if(costEl)costEl.textContent=cost;
+  z.classList.add('dragging-active');
+  if(playerGold<cost)z.classList.add('cant-afford');
+}
+function hideBuyZone(){
+  const z=document.getElementById('buyZone');if(!z)return;
+  z.classList.remove('dragging-active','hot','cant-afford');
+}
+function shopSnapBack(cardEl,origRect){
+  const cur=cardEl.getBoundingClientRect();
+  cardEl.classList.remove('dragging');
+  cardEl.style.left='';cardEl.style.top='';cardEl.style.width='';cardEl.style.height='';
+  const final=cardEl.getBoundingClientRect();
+  const dx=cur.left-final.left,dy=cur.top-final.top;
+  cardEl.style.transform=`translate(${dx}px,${dy}px) scale(1.15)`;
+  cardEl.style.filter='drop-shadow(0 8px 24px rgba(0,0,0,.7)) brightness(1.1)';
+  cardEl.classList.add('snap-back');
+  requestAnimationFrame(()=>{requestAnimationFrame(()=>{
+    cardEl.style.transform='';cardEl.style.filter='';
+  })});
+  setTimeout(()=>{cardEl.classList.remove('snap-back')},350);
 }
 
 /* ═══════════════════════════════════════
@@ -7572,19 +7647,21 @@ function updateAudioUI(){
   if(sc)sc.classList.toggle('on',sfxOn);
 }
 function resetRun(){
+  // Close settings sheet so its backdrop doesn't intercept touches
+  closeSettings();
   var ov=document.createElement('div');
-  ov.style.cssText='position:fixed;inset:0;z-index:9800;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:20px';
+  ov.style.cssText='position:fixed;inset:0;z-index:9800;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:20px;touch-action:manipulation';
   ov.innerHTML='<div style="background:#28221c;border:2px solid #a05050;border-radius:4px;padding:22px 18px;max-width:300px;width:100%;text-align:center;font-family:var(--font-px)">'
     +'<div style="font-family:MedievalSharp,serif;font-size:20px;color:#a05050;letter-spacing:2px;margin-bottom:14px">Start Over?</div>'
-    +'<div style="font-size:8px;color:var(--textdim);line-height:2.2;margin-bottom:18px">All progress will be lost.<br>Gold, cards, dice \u2014 everything.</div>'
+    +'<div style="font-size:14px;color:var(--textdim);line-height:2.2;margin-bottom:18px">All progress will be lost.<br>Gold, cards, dice \u2014 everything.</div>'
     +'<div style="display:flex;gap:10px;justify-content:center">'
-    +'<div id="reset-yes" style="flex:1;padding:14px 6px;cursor:pointer;font-family:var(--font-px);font-size:18px;text-align:center;background:#1e1414;border:2px solid #4a3838;border-radius:3px;color:var(--red);letter-spacing:1px">CONFIRM</div>'
-    +'<div id="reset-no" style="flex:1;padding:14px 6px;cursor:pointer;font-family:var(--font-px);font-size:18px;text-align:center;background:#1a1408;border:2px solid #6a5830;border-radius:3px;color:var(--gold);letter-spacing:1px">BACK</div>'
+    +'<button id="reset-yes" style="flex:1;padding:14px 6px;cursor:pointer;font-family:var(--font-px);font-size:18px;text-align:center;background:#1e1414;border:2px solid #4a3838;border-radius:3px;color:var(--red);letter-spacing:1px;-webkit-tap-highlight-color:transparent;touch-action:manipulation">CONFIRM</button>'
+    +'<button id="reset-no" style="flex:1;padding:14px 6px;cursor:pointer;font-family:var(--font-px);font-size:18px;text-align:center;background:#1a1408;border:2px solid #6a5830;border-radius:3px;color:var(--gold);letter-spacing:1px;-webkit-tap-highlight-color:transparent;touch-action:manipulation">BACK</button>'
     +'</div></div>';
   document.body.appendChild(ov);
-  document.getElementById('reset-yes').onclick=function(){SFX.nav();localStorage.removeItem('gambit4');setTimeout(()=>showScreen('menu'),80);};
-  document.getElementById('reset-no').onclick=function(){SFX.nav();ov.remove();};
-  ov.onclick=function(e){if(e.target===ov)ov.remove();};
+  document.getElementById('reset-yes').addEventListener('click',function(e){e.stopPropagation();SFX.nav();localStorage.removeItem('gambit4');ov.remove();setTimeout(()=>showScreen('menu'),80);});
+  document.getElementById('reset-no').addEventListener('click',function(e){e.stopPropagation();SFX.nav();ov.remove();});
+  ov.addEventListener('click',function(e){if(e.target===ov)ov.remove();});
 }
 
 /* ═══════ SHOP SCREEN INIT ═══════ */
