@@ -270,6 +270,11 @@ body{
   color:var(--ctxt);text-align:center;image-rendering:auto;
   left:50%;isolation:isolate;
 }
+/* Card color tint overlay */
+.mcard-tooltip::before{
+  content:'';position:absolute;inset:0;z-index:1;pointer-events:none;
+  background:var(--cbg,transparent);opacity:.18;border-radius:4px;
+}
 .mcard-tooltip .gc{position:absolute;z-index:4;pointer-events:none;width:10px;height:10px;color:var(--ctrim2);overflow:visible;filter:drop-shadow(0 0 3px var(--ctrim2)) brightness(1.3)}
 .mcard-tooltip .gc.tl{top:3px;left:3px}
 .mcard-tooltip .gc.tr{top:3px;right:3px;transform:scaleX(-1)}
@@ -350,9 +355,10 @@ body{
 .shop-card .mcard-tooltip::after,
 .lo-mini-card .mcard-tooltip::after,
 .lo-hand-slot .mcard-tooltip::after,
-.res-card .mcard-tooltip::after{
+.res-card .mcard-tooltip::after,
+body > .mcard-tooltip::after{
   content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);
-  border:6px solid transparent;border-top-color:var(--ctrim2);
+  border:8px solid transparent;border-top-color:var(--ctrim2);
 }
 .shop-card.peeked .mcard-tooltip,
 .lo-mini-card.peeked .mcard-tooltip,
@@ -479,6 +485,10 @@ body{
 .buy-zone.cant-afford{background:rgba(160,80,80,.06);color:rgba(160,80,80,.6)}
 .buy-zone.cant-afford .az-border rect{stroke:rgba(160,80,80,.3);animation:none}
 .buy-zone.cant-afford .bz-price{display:flex;color:var(--red)}
+/* Error flash when dropped without enough gold */
+.buy-zone.error{background:rgba(160,50,50,.18);pointer-events:none}
+.buy-zone.error .az-border rect{stroke:rgba(220,80,80,.7);animation:none}
+.buy-zone.error .bz-label{color:rgba(230,100,100,.95);font-size:12px;letter-spacing:1px}
 /* Shop card dragging */
 .shop-card.dragging{
   position:fixed!important;z-index:9500!important;transition:none!important;
@@ -1475,7 +1485,12 @@ body::before,body::after{display:none!important}
 /* Shop background — just dither overlay, bg image is an <img> element */
 #screen-shop::before{
   content:'';position:fixed;inset:0;z-index:-1;
-  background:repeating-conic-gradient(rgba(20,16,10,.15) 0% 25%, transparent 0% 50%) 0 0/4px 4px;
+  background:
+    repeating-conic-gradient(rgba(20,16,10,.15) 0% 25%, transparent 0% 50%) 0 0/4px 4px,
+    linear-gradient(rgba(10,8,4,.5), rgba(10,8,4,.65)),
+    url('Environment_ART/Store2.png');
+  background-size:4px 4px,cover,cover;
+  background-position:0 0,center top,center top;
   image-rendering:pixelated;pointer-events:none;
   opacity:0;transition:opacity .3s;
 }
@@ -1488,7 +1503,7 @@ body::before,body::after{display:none!important}
 /* Gauntlet & shop: bigger title, lower z-index */
 #screen-gauntlet .top-bar{z-index:2}
 #screen-gauntlet .top-bar .title{font-size:clamp(44px,14vw,64px);margin-top:20px;padding-top:10px}
-#screen-shop .top-bar{z-index:10}
+#screen-shop .top-bar{z-index:10;height:62px;padding-bottom:18px;margin-bottom:-30px}
 #screen-shop .top-bar .title{font-size:clamp(44px,14vw,64px);margin-top:20px;padding-top:10px}
 #screen-shop .gold-pill{background:rgba(20,16,8,.85);z-index:5}
 
@@ -1829,7 +1844,7 @@ body::before,body::after{display:none!important}
   box-shadow:inset 0 0 0 1px var(--dborder),inset 0 0 0 4px var(--dface),inset 0 0 0 5px var(--dborder2),0 4px 16px rgba(0,0,0,1);
 }
 .die-tooltip::after{
-  content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);
+  content:'';position:absolute;top:100%;left:var(--arrow-left,50%);transform:translateX(-50%);
   border:6px solid transparent;border-top-color:var(--dborder2);
 }
 .die-tooltip#activeDieTooltip{opacity:1;pointer-events:auto;animation:dtGrow .25s ease-out,dtFloat 3s ease-in-out .25s infinite}
@@ -2198,7 +2213,7 @@ body::before,body::after{display:none!important}
 .tab-bar{
   display:flex;position:relative;z-index:5;flex-shrink:0;
   background:rgba(20,14,8,.95);border-bottom:1px solid rgba(200,160,80,.12);
-  margin-top:18px;
+  margin-top:30px;
 }
 .tab-btn{
   flex:1;padding:12px 0 10px;text-align:center;cursor:pointer;
@@ -2224,7 +2239,7 @@ body::before,body::after{display:none!important}
 .swipe-track.dragging{transition:none}
 .tab-panel{
   min-width:100%;height:100%;overflow-y:auto;overflow-x:hidden;
-  padding:40px 14px 100px;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
+  padding:30px 14px 100px;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
 }
 
 /* ─── RARITY CSS VARS ─── */
@@ -2271,58 +2286,70 @@ body::before,body::after{display:none!important}
 /* (gcard-back / gcard-tap removed — zoom overlay deleted) */
 
 /* ─── CARDS TAB ─── */
-.card-grid{
-  display:flex;flex-wrap:wrap;justify-content:center;
-  max-width:420px;margin:0 auto;
-  gap:0;
+/* Make panel-cards a flex column so the reroll button can float to the bottom */
+#panel-cards{display:flex;flex-direction:column}
+.card-fan{
+  position:relative;height:210px;
+  width:100%;max-width:420px;margin:48px auto 28px;
+  overflow:visible;
 }
+/* Wrapper for card + price — absolutely placed in the fan */
+.sc-wrap{
+  position:absolute;bottom:0;left:50%;
+  display:flex;flex-direction:column;align-items:center;
+  transform-origin:bottom center;
+  cursor:pointer;
+}
+/* Fan angles & z-order for 3 cards */
+.sc-wrap:nth-child(1){transform:translateX(calc(-50% - 72px)) rotate(-11deg);z-index:1}
+.sc-wrap:nth-child(2){transform:translateX(-50%) translateY(-22px);z-index:3}
+.sc-wrap:nth-child(3){transform:translateX(calc(-50% + 72px)) rotate(11deg);z-index:2}
+/* Peeked/tapped card floats above all siblings */
+.sc-wrap:has(.shop-card.peeked),.sc-wrap:has(.shop-card.tapped){z-index:10!important}
+/* Float animation stagger */
+.sc-wrap:nth-child(odd) .shop-card{animation-delay:0s;animation-duration:3.8s}
+.sc-wrap:nth-child(even) .shop-card{animation-delay:.5s;animation-duration:4.2s}
 .shop-card{
   position:relative;cursor:pointer;
   animation:cardFloat 4s ease-in-out infinite;
-  width:90px;aspect-ratio:2/3;
+  width:104px;aspect-ratio:2/3;
 }
-.shop-card:nth-child(1){margin:0 7px 12px 5px}
-.shop-card:nth-child(2){margin:0 5px 14px 9px}
-.shop-card:nth-child(3){margin:0 8px 11px 6px}
-.shop-card:nth-child(4){margin:0 6px 15px 7px}
-.shop-card:nth-child(5){margin:0 9px 12px 4px}
-.shop-card:nth-child(6){margin:0 4px 13px 10px}
-.shop-card:nth-child(7){margin:0 7px 14px 6px}
-.shop-card:nth-child(8){margin:0 6px 12px 8px}
-.shop-card:nth-child(n+9){margin:0 7px 13px 7px}
-.shop-card:nth-child(odd){animation-delay:0s;animation-duration:3.8s}
-.shop-card:nth-child(even){animation-delay:.5s;animation-duration:4.2s}
 .shop-card .gcard{cursor:pointer}
-.shop-card .gc{width:12px;height:12px}
-.shop-card .gcard-frame{top:4px;left:4px;right:4px;bottom:16px}
+.shop-card .gc{width:13px;height:13px}
+.shop-card .gcard-frame{top:4px;left:4px;right:4px;bottom:17px}
 .shop-card .gc.tl{top:4px;left:4px}
 .shop-card .gc.tr{top:4px;right:4px}
-.shop-card .gc.bl{bottom:16px;left:4px}
-.shop-card .gc.br{bottom:16px;right:4px}
-.shop-card .gcard-band{padding:3px 2px;font-size:5px;letter-spacing:1px}
+.shop-card .gc.bl{bottom:17px;left:4px}
+.shop-card .gc.br{bottom:17px;right:4px}
+.shop-card .gcard-band{padding:3px 2px;font-size:6px;letter-spacing:1px}
 .shop-card.owned .gcard{filter:url(#pixelWobbleLite) brightness(.72) saturate(.85)}
 .shop-card.owned .sc-owned-check{filter:brightness(1.4)}
 .shop-card .gcard:active{filter:url(#pixelWobbleLite) brightness(1.1)}
-/* Price badge — top left, no bg, dark outline */
-.sc-price{
-  position:absolute;top:6px;left:6px;z-index:5;
-  display:flex;align-items:center;gap:2px;
-  color:var(--gold);letter-spacing:1px;
-  pointer-events:none;filter:none!important;
+/* Tap bounce — animates inner gcard so it doesn't conflict with cardFloat on shop-card */
+@keyframes gCardBounce{
+  0%,100%{transform:scale(1)}
+  40%{transform:scale(1.06)}
+  75%{transform:scale(.97)}
 }
+.shop-card.tapped .gcard{animation:gCardBounce .25s cubic-bezier(.3,1.4,.4,1) both}
+/* Fly-in for new cards after reroll — scale up from the converged size, composing with nth-child transform */
+@keyframes scWrapEnter{
+  from{scale:.76;opacity:0}
+  to{scale:1;opacity:1}
+}
+.sc-wrap.entering{animation:scWrapEnter .4s cubic-bezier(.2,1.3,.4,1) both}
+/* Price row — below the card art */
+.sc-price-row{
+  display:flex;align-items:center;justify-content:center;gap:5px;
+  font-family:var(--font-px);font-size:16px;color:#e8b830;letter-spacing:1px;
+  margin-top:6px;pointer-events:none;
+}
+.sc-price-row.cant{color:var(--textdim)}
+.sc-price-row .coin-i{font-size:16px}
 .coin-i{display:inline-block;width:1em;height:1em;border-radius:50%;vertical-align:-1px;background:radial-gradient(circle at 38% 35%,#ffe080 0%,#d4a840 50%,#a07820 100%);border:1px solid #8a6820;box-shadow:0 0 3px rgba(200,160,60,.4),inset 0 -1px 0 rgba(0,0,0,.25);flex-shrink:0}
-.sc-price .sc-coin{font-size:14px}
-.sc-price .sc-cost{
-  font-size:10px;color:#e8b830;
-  text-shadow:
-    -1px -1px 0 rgba(0,0,0,.85),1px -1px 0 rgba(0,0,0,.85),
-    -1px 1px 0 rgba(0,0,0,.85),1px 1px 0 rgba(0,0,0,.85),
-    0 0 6px rgba(0,0,0,.6);
-}
-.sc-price.cant{color:var(--textdim)}
 /* Owned checkmark — bottom right, gauntlet style */
 .sc-owned-check{
-  position:absolute;bottom:16px;right:6px;z-index:5;
+  position:absolute;bottom:17px;right:6px;z-index:5;
   font-size:22px;color:#e8b830;
   font-family:var(--font-px);
   text-shadow:
@@ -2331,6 +2358,20 @@ body::before,body::after{display:none!important}
     0 0 6px rgba(0,0,0,.6);
   animation:checkWobble 3s ease-in-out infinite;
   pointer-events:none;
+}
+/* Parchment quote on cards tab */
+.shop-cards-quote{
+  position:relative;width:calc(100% - 56px);max-width:300px;
+  margin:0 auto 12px;padding:14px 24px;text-align:center;
+}
+.shop-cards-quote canvas{
+  position:absolute;inset:0;width:100%;height:100%;
+  image-rendering:pixelated;z-index:0;
+}
+.shop-cards-quote .scq-text{
+  position:relative;z-index:2;
+  font-family:'IM Fell English',serif;font-size:17px;
+  color:#3a2a18;letter-spacing:.5px;line-height:1.5;
 }
 @keyframes checkWobble{
   0%,100%{transform:rotate(-3deg)}
@@ -2355,7 +2396,21 @@ body::before,body::after{display:none!important}
 /* ── Dice Grid ── */
 .dice-grid{
   display:grid;grid-template-columns:repeat(3,1fr);
-  gap:18px 4px;max-width:360px;margin:0 auto;padding:10px 4px 40px;
+  gap:12px 8px;max-width:380px;margin:0 auto;padding:10px 8px 20px;
+}
+/* Parchment quote at top of dice tab */
+.shop-dice-quote{
+  position:relative;width:calc(100% - 56px);max-width:300px;
+  margin:0 auto 10px;padding:14px 24px;text-align:center;
+}
+.shop-dice-quote canvas{
+  position:absolute;inset:0;width:100%;height:100%;
+  image-rendering:pixelated;z-index:0;
+}
+.shop-dice-quote .sdq-text{
+  position:relative;z-index:2;
+  font-family:'IM Fell English',serif;font-size:17px;
+  color:#3a2a18;letter-spacing:.5px;line-height:1.5;
 }
 /* Stagger via custom prop so animation can incorporate it */
 .dice-cell:nth-child(3n+2){--stagger:10px}
@@ -2363,22 +2418,89 @@ body::before,body::after{display:none!important}
 .dice-cell{
   --stagger:0px;
   display:flex;flex-direction:column;align-items:center;
-  padding:6px 0 10px;
-  cursor:pointer;transition:opacity .2s;
+  padding:10px 6px 12px;
+  cursor:pointer;transition:border-color .2s;
   animation:diceCellFloat 3.5s ease-in-out infinite;
+  background:#1e1810;
+  border:2px solid var(--dborder);
+  border-radius:6px;
+  box-shadow:inset 0 0 0 1px var(--dborder2),0 2px 8px rgba(0,0,0,.5);
 }
 .dice-cell:nth-child(2n){animation-delay:-.8s;animation-duration:3.9s}
 .dice-cell:nth-child(3n){animation-delay:-1.6s;animation-duration:4.2s}
 .dice-cell:active{animation:none;transform:translateY(var(--stagger)) scale(.92)}
-.dice-cell.cant-afford{opacity:.35}
+.dice-cell.cant-afford{background:#141210;border-color:#4a3e2e;box-shadow:none;animation:none}
+.dice-cell.cant-afford .dice-cell-3d{filter:grayscale(.8) brightness(.4);transition:filter .3s ease}
+.dice-cell.expanded{border-color:var(--dborder2)!important;box-shadow:inset 0 0 0 1px var(--dborder2),0 0 8px var(--dglow)!important}
+.dice-cell.expanded .dice-cell-3d{filter:none!important}
 @keyframes diceCellFloat{
   0%,100%{transform:translateY(var(--stagger))}
   50%{transform:translateY(calc(var(--stagger) - 5px))}
 }
+/* Owned count badge */
+.dice-cell{position:relative}
+.dice-cell-badge{
+  position:absolute;top:4px;right:5px;z-index:2;pointer-events:none;
+  background:#162010;border:1px solid var(--green);border-radius:3px;
+  color:var(--green);font-family:var(--font-px);font-size:10px;
+  min-width:15px;height:15px;padding:0 3px;
+  display:flex;align-items:center;justify-content:center;letter-spacing:.5px;
+}
+/* Floating popup overlay */
+.dice-expand-popup{
+  position:fixed;z-index:9200;width:170px;
+  background-color:#1a1410;
+  background-image:linear-gradient(165deg,var(--dface2) 0%,var(--dface) 55%,var(--dface2) 100%);
+  border:2px solid var(--dborder2);border-radius:8px;
+  box-shadow:inset 0 0 0 1px var(--dborder),0 8px 32px rgba(0,0,0,.85);
+  padding:14px 12px 12px;text-align:center;overflow:visible;
+  animation:depGrow .18s cubic-bezier(.2,1.4,.4,1) both;
+  cursor:pointer;
+}
+@keyframes depGrow{
+  from{transform:scale(.6);opacity:0}
+  to{transform:scale(1);opacity:1}
+}
+/* Spinning die in popup */
+.dep-die-wrap{width:64px;height:64px;perspective:320px;overflow:visible;margin:0 auto 8px;position:relative}
+.dep-cube{
+  width:52px;height:52px;
+  position:absolute;left:50%;top:50%;margin-left:-26px;margin-top:-26px;
+  transform-style:preserve-3d;
+  animation:dieAutoSpin 5s linear infinite;
+}
+.dep-face{
+  position:absolute;width:52px;height:52px;
+  display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);
+  gap:2px;padding:6px;box-sizing:border-box;
+  border:2px solid var(--dborder);border-radius:4px;
+  background:var(--dface);image-rendering:pixelated;
+  box-shadow:inset 1px 1px 0 var(--dhigh),inset -1px -1px 0 var(--dface3);
+}
+.dep-face::after{
+  content:'';position:absolute;inset:0;pointer-events:none;border-radius:3px;
+  background:repeating-conic-gradient(var(--ddither) 0% 25%,transparent 0% 50%) 0 0/4px 4px;
+  image-rendering:pixelated;mix-blend-mode:overlay;
+}
+.dep-face.f-front {transform:translateZ(26px)}
+.dep-face.f-back  {transform:rotateY(180deg) translateZ(26px)}
+.dep-face.f-right {transform:rotateY(90deg) translateZ(26px)}
+.dep-face.f-left  {transform:rotateY(-90deg) translateZ(26px)}
+.dep-face.f-top   {transform:rotateX(90deg) translateZ(26px);background:var(--dface2);border-color:var(--dborder2)}
+.dep-face.f-bottom{transform:rotateX(-90deg) translateZ(26px);background:var(--dface3)}
+.dep-pip{background:var(--dpip);align-self:center;justify-self:center;border-radius:0;image-rendering:pixelated}
+.dep-pip.on {width:80%;height:80%;box-shadow:1px 1px 0 var(--dpip2)}
+.dep-pip.off{width:0;height:0}
+.dep-name{font-family:var(--font-px);font-size:14px;color:var(--dpip);letter-spacing:1.5px;margin-bottom:4px;text-shadow:0 1px 2px rgba(0,0,0,.5)}
+.dep-desc{font-family:'IM Fell English',serif;font-size:12px;color:var(--dpip2);line-height:1.35;margin-bottom:4px}
+.dep-faces{font-family:var(--font-px);font-size:10px;color:rgba(200,180,140,.65);letter-spacing:.5px}
+.dep-eff{font-family:var(--font-px);font-size:10px;color:var(--gold);letter-spacing:.5px;margin-top:2px}
+.dep-cost{font-family:var(--font-px);font-size:13px;color:#e8b830;margin-top:6px;display:flex;align-items:center;justify-content:center;gap:4px}
+.dep-cost.free{color:var(--green)}
 .dice-cell-3d{
-  width:48px;height:48px;perspective:240px;overflow:visible;
+  width:44px;height:44px;perspective:240px;overflow:visible;
   filter:url(#pixelWobbleLite) drop-shadow(0 3px 0 rgba(0,0,0,.5)) drop-shadow(0 1px 0 var(--dborder));
-  margin-bottom:8px;
+  margin-bottom:6px;
 }
 .dice-cell-cube{
   width:100%;height:100%;position:relative;
@@ -2386,7 +2508,7 @@ body::before,body::after{display:none!important}
   transform:rotateX(-22deg) rotateY(32deg);
 }
 .dice-cell-face{
-  position:absolute;width:48px;height:48px;
+  position:absolute;width:44px;height:44px;
   display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);
   gap:2px;padding:5px;box-sizing:border-box;
   border:2px solid var(--dborder);border-radius:3px;
@@ -2407,12 +2529,12 @@ body::before,body::after{display:none!important}
 .dice-cell-face.f-right,.dice-cell-face.f-left{background:var(--dface3);box-shadow:inset 1px 1px 0 var(--dface),inset -1px -1px 0 rgba(0,0,0,.3)}
 /* bottom face darkest */
 .dice-cell-face.f-bottom{background:var(--dface3);box-shadow:inset 1px 1px 0 var(--dface3),inset -1px -1px 0 rgba(0,0,0,.4)}
-.dice-cell-face.f-front {transform:translateZ(24px)}
-.dice-cell-face.f-back  {transform:rotateY(180deg) translateZ(24px)}
-.dice-cell-face.f-right {transform:rotateY(90deg) translateZ(24px)}
-.dice-cell-face.f-left  {transform:rotateY(-90deg) translateZ(24px)}
-.dice-cell-face.f-top   {transform:rotateX(90deg) translateZ(24px)}
-.dice-cell-face.f-bottom{transform:rotateX(-90deg) translateZ(24px)}
+.dice-cell-face.f-front {transform:translateZ(22px)}
+.dice-cell-face.f-back  {transform:rotateY(180deg) translateZ(22px)}
+.dice-cell-face.f-right {transform:rotateY(90deg) translateZ(22px)}
+.dice-cell-face.f-left  {transform:rotateY(-90deg) translateZ(22px)}
+.dice-cell-face.f-top   {transform:rotateX(90deg) translateZ(22px)}
+.dice-cell-face.f-bottom{transform:rotateX(-90deg) translateZ(22px)}
 
 /* Square pixel pips */
 .dice-cell-pip{background:var(--dpip);align-self:center;justify-self:center;image-rendering:pixelated;border-radius:0}
@@ -2420,13 +2542,24 @@ body::before,body::after{display:none!important}
 .dice-cell-pip.off{width:0;height:0}
 
 .dice-cell-label{
-  font-size:16px;color:var(--dborder2);letter-spacing:0.5px;text-align:center;
-  text-shadow:0 0 8px var(--dglow),0 1px 0 rgba(0,0,0,.6);
-  margin-top:6px;margin-bottom:3px;font-family:'Jacquard 24',serif;
+  font-size:14px;color:var(--dpip);letter-spacing:1.5px;text-align:center;
+  text-shadow:0 1px 2px rgba(0,0,0,.5);
+  margin-top:4px;margin-bottom:3px;font-family:var(--font-px);
 }
-.dice-cell-cost{font-size:13px;color:#e8b830;letter-spacing:1px;text-align:center;display:flex;align-items:center;justify-content:center;gap:3px}
+.dice-cell-cost{font-size:16px;color:#e8b830;letter-spacing:1px;text-align:center;display:flex;align-items:center;justify-content:center;gap:5px}
 .dice-cell-cost.free{color:var(--green)}
 .dice-cell.owned .dice-cell-label{color:var(--green)}
+/* Dice drag-to-buy */
+.dice-cell.dragging{
+  position:fixed!important;z-index:9500;pointer-events:none!important;
+  transform:scale(1.2)!important;
+  filter:drop-shadow(0 8px 24px rgba(0,0,0,.7)) brightness(1.1);
+  animation:none!important;transition:none!important;
+}
+.dice-cell.snap-back{
+  transition:transform .3s ease-out,filter .3s ease-out!important;
+  animation:none!important;
+}
 
 /* ── Dice Zoom Overlay ── */
 .dice-zoom-overlay{
@@ -2521,8 +2654,8 @@ body::before,body::after{display:none!important}
   position:relative;min-height:100%;
 }
 .innkeeper-scene{
-  position:relative;width:280px;height:280px;
-  margin-bottom:-10px;flex-shrink:0;z-index:3;
+  position:relative;width:380px;height:380px;
+  margin-top:-16px;margin-bottom:-40px;flex-shrink:0;z-index:3;
 }
 .innkeeper-img{
   width:100%;height:100%;object-fit:contain;
@@ -2532,7 +2665,7 @@ body::before,body::after{display:none!important}
 /* Speech scroll */
 .innkeeper-speech{
   position:relative;width:calc(100% - 16px);max-width:340px;
-  padding:22px 32px 16px;margin-bottom:24px;
+  padding:22px 32px 16px;margin-top:12px;margin-bottom:8px;
   animation:speechFade 1s ease forwards;
   z-index:1;
 }
@@ -2548,24 +2681,25 @@ body::before,body::after{display:none!important}
   100%{opacity:1;transform:translateY(0)}
 }
 .service-options{
-  display:flex;flex-direction:row;gap:28px;width:100%;justify-content:center;
-  margin-top:44px;
+  display:flex;flex-direction:row;gap:12px;width:100%;justify-content:center;
+  margin-top:auto;padding:0 8px 24px;
 }
 .service-box{
-  position:relative;cursor:pointer;padding:18px 32px;
-  display:inline-flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:10px;
+  position:relative;cursor:pointer;padding:18px 12px;
+  display:inline-flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:12px;
   animation:serviceFloat 4s ease-in-out infinite;
-  overflow:hidden;border-radius:6px;min-width:120px;min-height:110px;
+  overflow:hidden;border-radius:6px;min-width:0;flex:1;max-width:150px;min-height:130px;
 }
 .service-box:nth-child(1){animation-delay:0s;animation-duration:3.6s}
 .service-box:nth-child(2){animation-delay:.4s;animation-duration:4.1s}
+.service-box:nth-child(3){animation-delay:.8s;animation-duration:3.8s}
 @keyframes serviceFloat{
   0%,100%{transform:translateY(0)}
   50%{transform:translateY(-2px)}
 }
 .service-box>*{position:relative;z-index:2}
 .service-box canvas{position:absolute;inset:0;image-rendering:pixelated;z-index:1}
-.svc-icon{font-size:40px;flex-shrink:0}
+.svc-icon{font-size:52px;flex-shrink:0}
 .svc-name{font-size:16px;color:var(--gold);letter-spacing:1.5px;text-align:center}
 
 /* ─── INVENTORY BOTTOM SHEET ─── */
@@ -2588,8 +2722,8 @@ body::before,body::after{display:none!important}
   max-height:80vh;overflow-y:auto;
 }
 .inv-inner .handle{width:36px;height:3px;background:var(--textdim);margin:0 auto 12px;border-radius:2px}
-.inv-title{font-size:9px;color:var(--gold);letter-spacing:2px;text-align:center;margin-bottom:4px}
-.inv-subtitle{font-size:7px;color:var(--textdim);letter-spacing:1px;text-align:center;margin-bottom:14px}
+.inv-title{font-size:16px;color:var(--gold);letter-spacing:2px;text-align:center;margin-bottom:6px}
+.inv-subtitle{font-size:13px;color:var(--textdim);letter-spacing:1px;text-align:center;margin-bottom:16px}
 
 /* Inventory card grid */
 .inv-card-grid{
@@ -2632,10 +2766,33 @@ body::before,body::after{display:none!important}
   font-size:9px;color:var(--gold);letter-spacing:1px;white-space:nowrap;
   font-family:var(--font-px);text-align:center;
 }
+/* Dice inventory items */
+.inv-dice-item{
+  position:relative;cursor:pointer;
+  width:70px;display:flex;flex-direction:column;align-items:center;
+  padding:8px 4px 4px;border-radius:6px;
+  transition:transform .08s,box-shadow .15s;
+}
+.inv-dice-item:active{transform:scale(.92)}
+.inv-dice-item.selected{
+  transform:scale(1.08);z-index:5;
+  background:rgba(200,160,80,.12);
+  box-shadow:0 0 0 2px var(--gold),0 0 12px rgba(200,160,80,.3);
+  border-radius:6px;
+}
+.inv-dice-item.disabled{opacity:.3;pointer-events:none}
+.inv-dice-item .lo-die{
+  width:clamp(34px,9vw,42px)!important;height:clamp(34px,9vw,42px)!important;
+}
+.inv-dice-label{
+  margin-top:6px;
+  font-family:var(--font-px);font-size:9px;color:var(--dpip,var(--textdim));
+  letter-spacing:1px;text-align:center;white-space:nowrap;
+}
 /* Refresh stock button on cards page */
 .refresh-btn-wrap{
   display:flex;justify-content:center;
-  margin-top:18px;padding:0 12px 8px;
+  margin-top:auto;padding:12px 12px 20px;
 }
 .refresh-btn{
   display:inline-flex;align-items:center;justify-content:center;gap:12px;
@@ -2986,6 +3143,90 @@ body::before,body::after{display:none!important}
 .settings-actions .sbtn:active{transform:scale(.95);filter:brightness(1.15)}
 .settings-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:190;opacity:0;pointer-events:none;transition:opacity .3s}
 .settings-backdrop.on{opacity:1;pointer-events:auto}
+
+/* ════════════════════════════════════
+   GAME OVER SCREEN
+   ════════════════════════════════════ */
+#screen-gameover{
+  align-items:center;justify-content:center;
+  background:url('Environment_ART/gameover.png') center top / cover no-repeat;
+}
+#screen-gameover::before{
+  content:'';position:absolute;inset:0;z-index:0;pointer-events:none;
+  background:rgba(4,2,1,.55);
+}
+#screen-gameover .go-wrap{position:relative;z-index:1}
+.go-wrap{
+  display:flex;flex-direction:column;align-items:center;
+  justify-content:space-between;
+  width:100%;max-width:400px;padding:0 20px 48px;
+  height:100%;
+}
+.go-title-area{
+  display:flex;flex-direction:column;align-items:center;
+  justify-content:center;flex:1;gap:0;
+}
+.go-title{
+  font-family:'Uncial Antiqua',serif;font-size:clamp(56px,17vw,84px);
+  letter-spacing:5px;
+  display:flex;align-items:baseline;
+}
+.go-letter{
+  display:inline-block;color:#f0b830;
+  text-shadow:2px 0 0 #d49020,-2px 0 0 #c48018,0 2px 0 #b07018,0 -2px 0 #ffe060,
+    2px 2px 0 #a06010,3px 3px 0 #6a3a08,4px 4px 0 #2a1804;
+  -webkit-text-stroke:1px #a06818;
+  background:linear-gradient(180deg,#fff0b0 0%,#ffd040 25%,#e8a020 50%,#ffd040 75%,#fff0b0 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  filter:url(#pixelWobble) brightness(1);
+}
+.go-bottom{
+  display:flex;flex-direction:column;align-items:center;gap:24px;
+  width:100%;
+}
+.go-quote-wrap{
+  display:flex;align-items:flex-end;gap:14px;
+  width:100%;max-width:340px;
+}
+.go-portrait{
+  width:68px;height:auto;object-fit:contain;
+  image-rendering:auto;
+  filter:drop-shadow(2px 4px 0 rgba(0,0,0,.7));
+  flex-shrink:0;align-self:flex-end;
+}
+.go-speech{
+  position:relative;flex:1;min-height:84px;
+  display:flex;align-items:center;
+}
+.go-speech canvas{
+  position:absolute;inset:0;width:100%;height:100%;
+  image-rendering:pixelated;pointer-events:none;
+}
+.go-speech-text{
+  position:relative;z-index:2;
+  font-family:'IM Fell English',serif;font-size:15px;
+  color:#2a1a0a;line-height:1.55;
+  padding:12px 14px;text-align:center;width:100%;
+}
+.go-btn{
+  position:relative;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  width:100%;max-width:300px;min-height:58px;
+  padding:14px 16px;border:none;background:none;
+  overflow:hidden;border-radius:4px;
+  transition:transform .06s,filter .06s;
+}
+.go-btn canvas{
+  position:absolute;inset:0;width:100%;height:100%;
+  pointer-events:none;border-radius:4px;image-rendering:pixelated;
+}
+.go-btn-label{
+  position:relative;z-index:2;
+  font-family:var(--font-px);font-size:20px;
+  color:var(--gold);letter-spacing:2px;
+  text-shadow:1px 1px 0 rgba(0,0,0,.6);
+}
+.go-btn:active{transform:scale(.95);filter:brightness(1.2)}
 
 </style>
 </head>
@@ -3453,17 +3694,17 @@ body::before,body::after{display:none!important}
 
 <!-- TAB BAR -->
 <div class="tab-bar" id="tabBar">
-  <div class="tab-btn active" data-tab="0" onclick="SFX.nav();switchTab(0)">CARDS</div>
-  <div class="tab-btn" data-tab="1" onclick="SFX.nav();switchTab(1)">DICE</div>
-  <div class="tab-btn" data-tab="2" onclick="SFX.nav();switchTab(2)">SERVICES</div>
+  <div class="tab-btn" data-tab="0" onclick="SFX.nav();switchTab(0)">CARDS</div>
+  <div class="tab-btn active" data-tab="1" onclick="SFX.nav();switchTab(1)">SERVICES</div>
+  <div class="tab-btn" data-tab="2" onclick="SFX.nav();switchTab(2)">DICE</div>
 </div>
 
 <!-- SWIPE CONTAINER -->
 <div class="swipe-container" id="swipeContainer">
   <div class="swipe-track" id="swipeTrack">
     <div class="tab-panel" id="panel-cards"></div>
-    <div class="tab-panel" id="panel-dice"></div>
     <div class="tab-panel" id="panel-services"></div>
+    <div class="tab-panel" id="panel-dice"></div>
   </div>
 </div>
 
@@ -3503,6 +3744,33 @@ body::before,body::after{display:none!important}
   <div class="nav-btn" onclick="SFX.nav();setTimeout(()=>showScreen('gauntlet'),80)"><img class="nav-icon" src="Menu_Art/Gauntlet.png" alt="Gauntlet"><span class="nav-label">GAUNTLET</span></div>
   <div class="nav-btn" onclick="SFX.nav();setTimeout(()=>showScreen('menu'),80)"><img class="nav-icon" src="Menu_Art/Menu.png" alt="Menu"><span class="nav-label">MENU</span></div>
 </div>
+</div>
+
+<!-- SCREEN: GAME OVER -->
+<div id="screen-gameover" class="screen">
+  <div class="go-wrap">
+    <div class="go-title-area">
+      <div class="go-title">
+        <span class="go-letter">G</span><span class="go-letter">A</span><span class="go-letter">M</span><span class="go-letter">E</span>
+      </div>
+      <div class="go-title">
+        <span class="go-letter">O</span><span class="go-letter">V</span><span class="go-letter">E</span><span class="go-letter">R</span>
+      </div>
+    </div>
+    <div class="go-bottom">
+      <div class="go-quote-wrap">
+        <img class="go-portrait" src="Characters_ART/Innkeeper.png" alt="">
+        <div class="go-speech">
+          <canvas></canvas>
+          <div class="go-speech-text" id="goSpeechText"></div>
+        </div>
+      </div>
+      <div class="go-btn" id="goNewRunBtn" onclick="SFX.nav();goStartNewRun()">
+        <canvas></canvas>
+        <span class="go-btn-label">NEW RUN</span>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- SHARED SETTINGS (outside all screen divs) -->
@@ -3569,6 +3837,7 @@ function showScreen(name, data) {
     case 'gauntlet': initGauntletScreen(data); break;
     case 'match': initMatchScreen(data); break;
     case 'shop': initShopScreen(); break;
+    case 'gameover': initGameOverScreen(); break;
   }
 }
 
@@ -4345,7 +4614,9 @@ function mkCardTooltipHTML(card,bandOverride,opts){
   var rarity=card.rarity||(card.npcOnly?'npc':'tin');
   var band=bandOverride||(card.npcOnly?_tc(card.owner||'npc'):_tc(rarity));
   var flavorLine=(opts.showFlavor&&card.flavor)?'<div class="tip-flavor">'+card.flavor+'</div>':'';
-  return '<div class="mcard-tooltip rarity-'+rarity+'">'+
+  var cbg=(typeof CARD_BG!=='undefined'&&CARD_BG[card.id])||'';
+  var cbgStyle=cbg?' style="--cbg:'+cbg+'"':'';
+  return '<div class="mcard-tooltip rarity-'+rarity+'"'+cbgStyle+'>'+
     gcCorners()+
     '<div class="tip-band">'+band+'</div>'+
     '<div class="tip-name">'+_tc(card.name)+'</div>'+
@@ -4379,11 +4650,13 @@ function closeAllChips(){
   document.querySelectorAll('.peeked,.cchip.open').forEach(c=>{
     c.classList.remove('peeked');c.classList.remove('open');
   });
+  var dep=document.querySelector('.dice-expand-popup');if(dep)dep.remove();
+  document.querySelectorAll('.dice-cell.expanded').forEach(c=>c.classList.remove('expanded'));
 }
 
-/* Global dismiss — tap anywhere outside a card closes all tooltips */
+/* Global dismiss — tap anywhere outside a card/die-popup closes all tooltips */
 document.addEventListener('click',function(e){
-  if(!e.target.closest('.mcard,.shop-card,.lo-mini-card,.lo-hand-slot,.res-card,.lo-wager-slot,.cchip'))closeAllChips();
+  if(!e.target.closest('.mcard,.shop-card,.lo-mini-card,.lo-hand-slot,.res-card,.lo-wager-slot,.cchip,.dice-expand-popup'))closeAllChips();
 });
 
 function buildCBar(barId,cardIds,isOpp,label){
@@ -6386,11 +6659,16 @@ function attachDieTooltipTap(dieEl,matId){
     /* Position above the die */
     var r=dieEl.getBoundingClientRect();
     var tw=200;
-    var left=r.left+r.width/2-tw/2;
+    var dieCenterX=r.left+r.width/2;
+    var left=dieCenterX-tw/2;
     if(left<4)left=4;
     if(left+tw>window.innerWidth-4)left=window.innerWidth-4-tw;
     tip.style.left=left+'px';
     tip.style.bottom=(window.innerHeight-r.top+8)+'px';
+    /* Move arrow to point at the tapped die */
+    var arrowPct=((dieCenterX-left)/tw*100);
+    arrowPct=Math.max(10,Math.min(90,arrowPct));
+    tip.style.setProperty('--arrow-left',arrowPct+'%');
     dieEl.classList.add('peeked');
     tip._dieEl=dieEl;
   });
@@ -7449,23 +7727,48 @@ function closeLoadout(){
 function renderLoDice(){
   var c=document.getElementById('loPDice');c.innerHTML='';
   _loSelectedDice.forEach(function(mat,i){
+    var wrap=document.createElement('div');wrap.className='lo-dw dtype-'+mat;
     var die=loMkDie(5,mat);
     die.style.cursor='pointer';
     die.title=mat;
     if(_pickerSlot===i) die.classList.add('picked');
-    (function(idx,mat,dieEl){
+    (function(idx,mat,dieEl,wrapEl){
       var pressTimer=null,moved=false;
       dieEl.addEventListener('pointerdown',function(e){
         moved=false;
-        pressTimer=setTimeout(function(){pressTimer=null;loDiceZoom(mat);},500);
+        pressTimer=setTimeout(function(){
+          pressTimer=null;
+          /* Long press → show tooltip */
+          closeAllChips();
+          var old=document.getElementById('activeDieTooltip');if(old)old.remove();
+          var tmp=document.createElement('div');
+          tmp.innerHTML=buildDieTooltipHTML(mat);
+          var tip=tmp.firstChild;tip.id='activeDieTooltip';
+          var ph=tip.querySelector('.dt-3d-placeholder');
+          if(ph){ph.parentNode.replaceChild(buildMiniCube(mat),ph);}
+          document.body.appendChild(tip);
+          var r=wrapEl.getBoundingClientRect();
+          var tw=200;var dieCenterX=r.left+r.width/2;
+          var left=dieCenterX-tw/2;
+          if(left<4)left=4;
+          if(left+tw>window.innerWidth-4)left=window.innerWidth-4-tw;
+          tip.style.left=left+'px';
+          tip.style.bottom=(window.innerHeight-r.top+8)+'px';
+          var arrowPct=((dieCenterX-left)/tw*100);
+          arrowPct=Math.max(10,Math.min(90,arrowPct));
+          tip.style.setProperty('--arrow-left',arrowPct+'%');
+          wrapEl.classList.add('peeked');
+          tip._dieEl=wrapEl;
+        },500);
       });
       dieEl.addEventListener('pointermove',function(){if(pressTimer){moved=true;clearTimeout(pressTimer);pressTimer=null;}});
       dieEl.addEventListener('pointerup',function(){
         if(pressTimer){clearTimeout(pressTimer);pressTimer=null;if(!moved)openDicePicker(idx);}
       });
       dieEl.addEventListener('pointerleave',function(){if(pressTimer){clearTimeout(pressTimer);pressTimer=null;}});
-    })(i,mat,die);
-    c.appendChild(die);
+    })(i,mat,die,wrap);
+    wrap.appendChild(die);
+    c.appendChild(wrap);
   });
 }
 
@@ -7664,7 +7967,28 @@ function openDicePicker(slotIndex){
       var pressTimer=null,moved=false;
       dieEl.addEventListener('pointerdown',function(e){
         moved=false;
-        pressTimer=setTimeout(function(){pressTimer=null;loDiceZoom(mat);},500);
+        pressTimer=setTimeout(function(){
+          pressTimer=null;
+          /* Long press → show tooltip */
+          closeAllChips();
+          var old=document.getElementById('activeDieTooltip');if(old)old.remove();
+          var tmp=document.createElement('div');
+          tmp.innerHTML=buildDieTooltipHTML(mat);
+          var tip=tmp.firstChild;tip.id='activeDieTooltip';
+          var ph=tip.querySelector('.dt-3d-placeholder');
+          if(ph){ph.parentNode.replaceChild(buildMiniCube(mat),ph);}
+          document.body.appendChild(tip);
+          var r=dieEl.getBoundingClientRect();
+          var tw=200;var dieCenterX=r.left+r.width/2;
+          var left=dieCenterX-tw/2;
+          if(left<4)left=4;
+          if(left+tw>window.innerWidth-4)left=window.innerWidth-4-tw;
+          tip.style.left=left+'px';
+          tip.style.bottom=(window.innerHeight-r.top+8)+'px';
+          var arrowPct=((dieCenterX-left)/tw*100);
+          arrowPct=Math.max(10,Math.min(90,arrowPct));
+          tip.style.setProperty('--arrow-left',arrowPct+'%');
+        },500);
       });
       dieEl.addEventListener('pointermove',function(){if(pressTimer){moved=true;clearTimeout(pressTimer);pressTimer=null;}});
       dieEl.addEventListener('pointerup',function(){
@@ -7968,11 +8292,16 @@ function loToTitleCase(s){return s.replace(/_/g,' ').replace(/\b\w/g,function(c)
 /* ── Opponent side (dice only) ── */
 function renderLoOppSide(){
   var od=document.getElementById('loODice');od.innerHTML='';
-  for(var i=0;i<6;i++){
-    var die=loMkDie(5,'bone');
-    die.style.cursor='default';
-    od.appendChild(die);
-  }
+  var r=RUNGS[currentRung];
+  var oppDice=r&&r.dice?r.dice:['bone','bone','bone','bone','bone','bone'];
+  oppDice.forEach(function(mat){
+    var wrap=document.createElement('div');wrap.className='lo-dw dtype-'+mat;
+    var die=loMkDie(5,mat);
+    die.style.cursor='pointer';
+    wrap.appendChild(die);
+    attachDieTooltipTap(wrap,mat);
+    od.appendChild(wrap);
+  });
 }
 
 function renderLoOppCards(){
@@ -8156,13 +8485,7 @@ function _checkBroke(){
       ]
     });
   }else{
-    showModal({
-      portrait:GAUNTLET_PORTRAITS.innkeeper,title:'Out of Gold',
-      msg:'"Ye\'ve got nothing left, friend.<br>Best start fresh."',
-      buttons:[
-        {label:'NEW RUN',action:function(){localStorage.removeItem('gambit4');S=null;showScreen("menu");}}
-      ]
-    });
+    setTimeout(function(){showGameOver();},400);
   }
 }
 
@@ -8288,6 +8611,13 @@ const SELL_RATIO = 0.4;
 
 const SELL_FLOORS={tin:3,silver:8,gold:20};
 
+const DICE_SELL_RATIO=0.5;
+function getDiceSellPrice(dieId){
+  const d=DICE_TYPES.find(t=>t.id===dieId);
+  if(!d||d.cost===0)return 0;
+  return Math.max(10,Math.floor(d.cost*DICE_SELL_RATIO));
+}
+
 function getSellPrice(cardId){
   const card=CARDS.find(c=>c.id===cardId);
   if(!card)return 0;
@@ -8410,7 +8740,7 @@ function mkGCardFront(c, extras=''){
 /* ═══════════════════════════════════════
    TAB SWITCHING + INFINITE SWIPE
    ═══════════════════════════════════════ */
-let currentTab = 0;
+let currentTab = 1;
 const TABS = 3;
 let _didSwipe = false;
 
@@ -8431,6 +8761,7 @@ function switchTab(idx){
 
   function onMove(x,y,cancel){
     if(!moving)return;
+    if(window._shopDragging)return;          /* let shop-item drag take priority */
     if(!locked){
       const adx=Math.abs(x-sx),ady=Math.abs(y-sy);
       if(adx>8||ady>8){locked=true;isHoriz=adx>ady;}
@@ -8516,13 +8847,19 @@ function switchTab(idx){
   }
 
   // Touch events
-  el.addEventListener('touchstart',e=>{onStart(e.touches[0].clientX,e.touches[0].clientY)},{passive:true});
+  el.addEventListener('touchstart',e=>{
+    if(e.target.closest('.dice-cell'))return; /* let dice drag handle it */
+    if(e.target.closest('.shop-card'))return; /* let card drag handle it */
+    onStart(e.touches[0].clientX,e.touches[0].clientY);
+  },{passive:true});
   el.addEventListener('touchmove',e=>{onMove(e.touches[0].clientX,e.touches[0].clientY,()=>e.preventDefault())},{passive:false});
   el.addEventListener('touchend',onEnd,{passive:true});
 
   // Mouse events
   let mousePanel=null;
   el.addEventListener('mousedown',e=>{
+    if(e.target.closest('.dice-cell'))return; /* let dice drag handle it */
+    if(e.target.closest('.shop-card'))return; /* let card drag handle it */
     mousePanel=e.target.closest('.tab-panel');
     onStart(e.clientX,e.clientY);
   });
@@ -8549,9 +8886,40 @@ function refreshStock(){
   playerGold-=RESTOCK_COST;
   syncToState();
   updateGoldDisplay();
-  purchaseEffect(window.innerWidth/2,window.innerHeight/2);
   rollShopStock();
-  setTimeout(()=>{buildCardsTab();buildDiceTab();buildServicesTab()},400);
+  /* Shuffle animation on current cards before rebuild */
+  const _rPanel=document.getElementById('panel-cards');
+  const _rWraps=Array.from(_rPanel.querySelectorAll('.sc-wrap'));
+  function _doRebuild(){buildCardsTab();buildDiceTab();buildServicesTab();}
+  if(_rWraps.length){
+    /* Phase 1 — cards converge to center pile (stagger per card) */
+    _rWraps.forEach((w,i)=>{
+      setTimeout(()=>{
+        w.style.transition='transform .17s cubic-bezier(.4,0,.6,1), opacity .17s ease';
+        w.style.transform='translateX(-50%) translateY(6px) scale(.78) rotate('+([-7,0,7][i]||0)+'deg)';
+      },i*45);
+    });
+    /* Phase 2 — shuffle shake: 3 quick alternating rotations */
+    const _shakeAt=_rWraps.length*45+130;
+    [12,-12,6].forEach((rot,si)=>{
+      setTimeout(()=>{
+        _rWraps.forEach(w=>{
+          w.style.transition='transform .07s ease-in-out';
+          w.style.transform='translateX(-50%) translateY(6px) scale(.76) rotate('+rot+'deg)';
+        });
+      },_shakeAt+si*75);
+    });
+    /* Phase 3 — CSS filter flash on the fan itself (perfectly scoped to card area, no coord math) */
+    const _flashAt=_shakeAt+3*75;
+    setTimeout(()=>{
+      const _fan=_rPanel.querySelector('.card-fan');
+      if(_fan){_fan.style.transition='none';_fan.style.filter='brightness(18) saturate(0)';}
+      /* Rebuild under the flash; new cards enter from opacity:0 via entering animation */
+      setTimeout(_doRebuild,65);
+    },_flashAt);
+  } else {
+    setTimeout(_doRebuild, 400);
+  }
 }
 
 let _shopDragCleanups=[];
@@ -8562,27 +8930,32 @@ function buildCardsTab(){
   const canRefresh=playerGold>=RESTOCK_COST;
   const rungNames=['Drunkard','Peasant','Commoner','Merchant','Soldier','Knight','Noble','Bishop'];
   const rungLabel=rungNames[Math.min(7,S.currentRung||0)]||'???';
-  let html=`<div style="text-align:center;margin-bottom:14px;padding:0 4px">
-    <div style="font-family:'IM Fell English',serif;font-size:18px;color:var(--textdim);letter-spacing:1px;line-height:1.5;text-shadow:0 1px 0 rgba(0,0,0,.6)">\u201CWares for a ${rungLabel}-tier traveler\u201D</div>
+  /* Parchment quote — same style as dice tab */
+  let html=`<div class="shop-cards-quote">
+    <canvas></canvas>
+    <div class="scq-text">\u201CWares for a ${rungLabel}-tier traveler\u201D</div>
   </div>`;
-  /* Buy zone */
+  html+='<div class="card-fan">';
+  shopCards.forEach((c,i)=>{
+    const cost=CARD_PRICES[c.rarity]||65;
+    const owned=ownedCards.find(o=>o.id===c.id);
+    const canAfford=playerGold>=cost;
+    const ownedCheck=owned?'<div class="sc-owned-check">\u2713</div>':'';
+    html+=`<div class="sc-wrap">
+      <div class="shop-card${owned?' owned':''} rarity-${c.rarity}" data-id="${c.id}" data-cost="${cost}">
+        ${mkGCardFront(c,ownedCheck)}${mkCardTooltipHTML(c)}
+      </div>
+      <div class="sc-price-row${canAfford?'':' cant'}"><span class="coin-i"></span>${cost}</div>
+    </div>`;
+  });
+  html+='</div>';
+  /* Buy zone above reroll */
   html+=`<div class="buy-zone" id="buyZone">
     <svg class="az-border" width="100%" height="100%" preserveAspectRatio="none"><rect x="1" y="1" rx="8" ry="8"></rect></svg>
     <span class="bz-label">BUY</span>
     <span class="bz-price" id="bzPrice"><span class="coin-i"></span> <span id="bzCost"></span></span>
   </div>`;
-  html+='<div class="card-grid">';
-  shopCards.forEach((c,i)=>{
-    const cost=CARD_PRICES[c.rarity]||65;
-    const owned=ownedCards.find(o=>o.id===c.id);
-    const canAfford=playerGold>=cost;
-    const extras=`<div class="sc-price ${canAfford?'':'cant'}"><span class="sc-coin"><span class="coin-i"></span></span><span class="sc-cost">${cost}</span></div>${owned?'<div class="sc-owned-check">\u2713</div>':''}`;
-    html+=`<div class="shop-card${owned?' owned':''} rarity-${c.rarity}" data-id="${c.id}" data-cost="${cost}">
-        ${mkGCardFront(c, extras)}${mkCardTooltipHTML(c)}
-      </div>`;
-  });
-  html+='</div>';
-  /* Refresh stock button — full width at bottom */
+  /* Reroll button at bottom */
   html+=`<div class="refresh-btn-wrap">
     <div class="refresh-btn${canRefresh?'':' disabled'}" onclick="SFX.nav();refreshStock()">
       <canvas></canvas>
@@ -8595,12 +8968,31 @@ function buildCardsTab(){
   </div>`;
   panel.innerHTML=html;
 
+  /* Render parchment canvas */
+  requestAnimationFrame(()=>{
+    const cv=panel.querySelector('.shop-cards-quote canvas');
+    if(cv) drawPixelScroll(cv);
+  });
+
+  /* Fly-in animation for newly built cards — stagger tight so they all expand within the flash fade */
+  requestAnimationFrame(()=>{
+    panel.querySelectorAll('.sc-wrap').forEach((w,i)=>{
+      w.style.animationDelay=(i*35)+'ms';
+      w.classList.add('entering');
+    });
+  });
+
   /* Attach tooltip + drag to each shop card */
   panel.querySelectorAll('.shop-card').forEach(el=>{
     attachTooltipTap(el);
+    /* Tap bounce */
+    el.addEventListener('click',()=>{
+      el.classList.add('tapped');
+      setTimeout(()=>el.classList.remove('tapped'),350);
+    });
     const cid=el.dataset.id;
     const cost=parseInt(el.dataset.cost)||0;
-    if(playerGold>=cost) initShopCardDrag(el,cid,cost);
+    initShopCardDrag(el,cid,cost);
   });
 
   /* Render refresh button canvas bg */
@@ -8623,16 +9015,18 @@ function initShopCardDrag(cardEl,cardId,cost){
   function getXY(e){return e.touches?{x:e.touches[0].clientX,y:e.touches[0].clientY}:{x:e.clientX,y:e.clientY};}
   function onStart(e){
     if(dragging)return;
+    /* Note: no stopPropagation — iOS Safari drops touchmove from document if touchstart bubbling is stopped */
     const pt=getXY(e);sx=pt.x;sy=pt.y;moved=false;
     origRect=cardEl.getBoundingClientRect();
   }
   function onMove(e){
     if(!origRect)return;
+    if(e.cancelable)e.preventDefault();            /* block scroll + swipe immediately */
     const pt=getXY(e);
     const dx=pt.x-sx,dy=pt.y-sy;
     if(!dragging){
       if(Math.abs(dx)<10&&Math.abs(dy)<10)return;
-      dragging=true;moved=true;
+      dragging=true;moved=true;window._shopDragging=true;
       closeAllChips();
       cardEl.classList.add('dragging');
       cardEl.style.left=origRect.left+'px';
@@ -8655,17 +9049,18 @@ function initShopCardDrag(cardEl,cardId,cost){
       const cardArea=cr.width*cr.height;
       const overlap=overlapX*overlapY;
       if(overlap>cardArea*0.3){
-        zone.classList.add('hot');zone.classList.remove('cant-afford');
-        if(playerGold<cost){zone.classList.add('cant-afford');zone.classList.remove('hot');}
+        zone.classList.add('hot');
+        if(playerGold<cost)zone.classList.add('cant-afford');
+        else zone.classList.remove('cant-afford');
       }else{
-        zone.classList.remove('hot');zone.classList.remove('cant-afford');
+        zone.classList.remove('hot','cant-afford');
       }
     }
   }
   function onEnd(){
     if(!origRect)return;
     if(!dragging){origRect=null;return;}
-    dragging=false;
+    dragging=false;window._shopDragging=false;
     const zone=document.getElementById('buyZone');
     const isHot=zone&&zone.classList.contains('hot');
     hideBuyZone();
@@ -8682,13 +9077,23 @@ function initShopCardDrag(cardEl,cardId,cost){
       else ownedCards.push({id:cardId,count:1,tarnish:0});
       updateGoldDisplay();syncToState();
       setTimeout(()=>buildCardsTab(),350);
+    }else if(isHot&&playerGold<cost){
+      /* Can't afford — snap back, show error in buy zone */
+      shopSnapBack(cardEl,origRect);
+      if(zone){
+        const lbl=zone.querySelector('.bz-label');
+        const savedLabel=lbl?lbl.textContent:'BUY';
+        zone.classList.add('error');
+        if(lbl)lbl.textContent='Not enough gold';
+        setTimeout(()=>{zone.classList.remove('error');if(lbl)lbl.textContent=savedLabel;},1800);
+      }
     }else{
       /* Snap back */
       shopSnapBack(cardEl,origRect);
     }
     origRect=null;
   }
-  cardEl.addEventListener('touchstart',e=>onStart(e),{passive:true});
+  cardEl.addEventListener('touchstart',e=>onStart(e),{passive:false});
   document.addEventListener('touchmove',onMove,{passive:false});
   document.addEventListener('touchend',onEnd,{passive:true});
   document.addEventListener('touchcancel',onEnd,{passive:true});
@@ -8736,13 +9141,160 @@ function shopSnapBack(cardEl,origRect){
 /* ═══════════════════════════════════════
    DICE TAB
    ═══════════════════════════════════════ */
+function toggleDiceExpand(cell){
+  var old=document.querySelector('.dice-expand-popup');
+  if(old){old.remove();if(old._cell===cell){cell.classList.remove('expanded');return;}}
+  document.querySelectorAll('.dice-cell.expanded').forEach(function(c){c.classList.remove('expanded');});
+  var dieId=cell.dataset.dieId;
+  var cost=parseInt(cell.dataset.dieCost)||0;
+  var d=getDie(dieId);if(!d)return;
+  cell.classList.add('expanded');
+  /* Build popup */
+  var faceOrder=['f-front','f-back','f-right','f-left','f-top','f-bottom'];
+  var cubeHtml='<div class="dep-die-wrap"><div class="dep-cube">';
+  faceOrder.forEach(function(face,fi){
+    var val=d.faces?d.faces[fi]:(fi+1);
+    var layout=PIP_LAYOUTS[val];
+    cubeHtml+='<div class="dep-face '+face+'">';
+    layout.forEach(function(on){cubeHtml+='<div class="dep-pip '+(on?'on':'off')+'"></div>';});
+    cubeHtml+='</div>';
+  });
+  cubeHtml+='</div></div>';
+  var effHtml=d.effect?'<div class="dep-eff">'+_dieEffectLabel(d.effect)+'</div>':'';
+  var costHtml=cost===0?'<div class="dep-cost free">FREE</div>':'<div class="dep-cost"><span class="coin-i"></span> '+cost+'</div>';
+  var popup=document.createElement('div');
+  popup.className='dice-expand-popup dtype-'+dieId;
+  popup._cell=cell;
+  popup.innerHTML=cubeHtml+
+    '<div class="dep-name">'+toTitleCase(d.name)+'</div>'+
+    '<div class="dep-desc">'+(d.desc||'')+'</div>'+
+    '<div class="dep-faces">[ '+(d.faces||[1,2,3,4,5,6]).join(' \u00B7 ')+' ]</div>'+
+    effHtml+costHtml;
+  /* Click popup → dismiss */
+  popup.addEventListener('click',function(e){
+    e.stopPropagation();
+    popup.remove();
+    cell.classList.remove('expanded');
+  });
+  document.body.appendChild(popup);
+  /* Position: centered on cell, prefer above, clamp to viewport */
+  var r=cell.getBoundingClientRect();
+  var pw=170,ph=popup.offsetHeight||195;
+  var left=r.left+r.width/2-pw/2;
+  var top=r.top+r.height/2-ph/2; /* centered on cell */
+  /* keep in viewport */
+  if(top<60)top=60;
+  if(top+ph>window.innerHeight-16)top=window.innerHeight-16-ph;
+  if(left<8)left=8;
+  if(left+pw>window.innerWidth-8)left=window.innerWidth-8-pw;
+  popup.style.left=left+'px';
+  popup.style.top=top+'px';
+}
+let _shopDiceDragCleanups=[];
+function initShopDiceDrag(cellEl,dieId,cost){
+  let sx=0,sy=0,dragging=false,moved=false,origRect=null;
+  function gxy(e){return e.touches?{x:e.touches[0].clientX,y:e.touches[0].clientY}:{x:e.clientX,y:e.clientY};}
+  function onStart(e){
+    if(dragging)return;
+    /* Note: no stopPropagation — iOS Safari drops touchmove from document if touchstart bubbling is stopped */
+    var pt=gxy(e);sx=pt.x;sy=pt.y;moved=false;
+    origRect=cellEl.getBoundingClientRect();
+  }
+  function onMove(e){
+    if(!origRect)return;
+    if(e.cancelable)e.preventDefault();            /* block scroll + swipe immediately */
+    var pt=gxy(e);
+    var dx=pt.x-sx,dy=pt.y-sy;
+    if(!dragging){
+      if(Math.abs(dx)<10&&Math.abs(dy)<10)return;
+      dragging=true;moved=true;window._shopDragging=true;
+      closeAllChips();
+      cellEl.classList.add('dragging');
+      cellEl.style.left=origRect.left+'px';
+      cellEl.style.top=origRect.top+'px';
+      cellEl.style.width=origRect.width+'px';
+      cellEl.style.height=origRect.height+'px';
+      var dz=document.getElementById('buyZoneDice');
+      if(dz){var cv=dz.querySelector('.bz-cost-val');if(cv)cv.textContent=cost;dz.classList.add('dragging-active');if(playerGold<cost)dz.classList.add('cant-afford');}
+    }
+    cellEl.style.left=(origRect.left+dx)+'px';
+    cellEl.style.top=(origRect.top+dy)+'px';
+    /* hit test buy zone */
+    var zone=document.getElementById('buyZoneDice');
+    if(zone){
+      var zr=zone.getBoundingClientRect();
+      var cr={left:origRect.left+dx,top:origRect.top+dy,width:origRect.width,height:origRect.height};
+      cr.right=cr.left+cr.width;cr.bottom=cr.top+cr.height;
+      var overlapX=Math.max(0,Math.min(cr.right,zr.right)-Math.max(cr.left,zr.left));
+      var overlapY=Math.max(0,Math.min(cr.bottom,zr.bottom)-Math.max(cr.top,zr.top));
+      var overlap=overlapX*overlapY;
+      if(overlap>cr.width*cr.height*0.3){zone.classList.add('hot');}
+      else{zone.classList.remove('hot');}
+    }
+  }
+  function onEnd(e){
+    if(!origRect)return;
+    if(!dragging){origRect=null;return;}
+    dragging=false;window._shopDragging=false;
+    var zone=document.getElementById('buyZoneDice');
+    var isHot=zone&&zone.classList.contains('hot');
+    if(zone)zone.classList.remove('dragging-active','hot','cant-afford');
+    if(isHot&&playerGold>=cost&&cost>0){
+      cellEl.classList.remove('dragging');
+      cellEl.style.left='';cellEl.style.top='';cellEl.style.width='';cellEl.style.height='';
+      buyDie(dieId,cost,e);
+    }else if(isHot&&playerGold<cost){
+      /* Can't afford — snap back, show error in buy zone */
+      shopSnapBack(cellEl,origRect);
+      if(zone){
+        var lbl=zone.querySelector('.bz-label');
+        var savedLabel=lbl?lbl.textContent:'BUY';
+        zone.classList.add('error');
+        if(lbl)lbl.textContent='Not enough gold';
+        setTimeout(function(){
+          zone.classList.remove('error');
+          if(lbl)lbl.textContent=savedLabel;
+        },1800);
+      }
+    }else{
+      shopSnapBack(cellEl,origRect);
+    }
+    origRect=null;
+  }
+  cellEl.addEventListener('touchstart',onStart,{passive:false});
+  document.addEventListener('touchmove',onMove,{passive:false});
+  document.addEventListener('touchend',onEnd);
+  document.addEventListener('touchcancel',onEnd);
+  cellEl.addEventListener('mousedown',onStart);
+  document.addEventListener('mousemove',onMove);
+  document.addEventListener('mouseup',onEnd);
+  var cleanup=function(){
+    cellEl.removeEventListener('touchstart',onStart);
+    document.removeEventListener('touchmove',onMove);
+    document.removeEventListener('touchend',onEnd);
+    document.removeEventListener('touchcancel',onEnd);
+    cellEl.removeEventListener('mousedown',onStart);
+    document.removeEventListener('mousemove',onMove);
+    document.removeEventListener('mouseup',onEnd);
+  };
+  _shopDiceDragCleanups.push(cleanup);
+  /* Tap (no drag) → expand cell to show stats */
+  cellEl.addEventListener('click',function(e){
+    if(moved)return;
+    e.stopPropagation();
+    toggleDiceExpand(cellEl);
+  });
+}
+
 function buildDiceTab(){
+  _shopDiceDragCleanups.forEach(fn=>fn());_shopDiceDragCleanups=[];
   const panel=document.getElementById('panel-dice');
   const faceOrder=['f-front','f-back','f-right','f-left','f-top','f-bottom'];
   const diceQuotes=['\u201CPick your bones wisely, friend.\u201D','\u201CA good die makes a good gambler.\u201D','\u201CEvery die tells a different tale.\u201D'];
   const dQuote=diceQuotes[Math.floor(Math.random()*diceQuotes.length)];
-  let html=`<div style="text-align:center;margin-bottom:20px;padding:0 4px">
-    <div style="font-family:'IM Fell English',serif;font-size:18px;color:var(--textdim);letter-spacing:1px;line-height:1.5;text-shadow:0 1px 0 rgba(0,0,0,.6)">${dQuote}</div>
+  let html=`<div class="shop-dice-quote">
+    <canvas></canvas>
+    <div class="sdq-text">${dQuote}</div>
   </div>`;
   html+='<div class="dice-grid">';
   DICE_TYPES.forEach((d,i)=>{
@@ -8750,7 +9302,9 @@ function buildDiceTab(){
     const canAfford=d.cost===0||playerGold>=d.cost;
     const cls=(!canAfford&&d.cost>0)?'cant-afford':'';
     const ownCls=ownCount>0?'owned':'';
-    html+=`<div class="dice-cell dtype-${d.id} ${cls} ${ownCls}" onclick="SFX.nav();shopDiceZoom('${d.id}')">
+    const badgeHtml=ownCount>0?`<div class="dice-cell-badge">${ownCount}</div>`:'';
+    html+=`<div class="dice-cell dtype-${d.id} ${cls} ${ownCls}" data-die-id="${d.id}" data-die-cost="${d.cost}">
+      ${badgeHtml}
       <div class="dice-cell-3d"><div class="dice-cell-cube">`;
     for(let f=0;f<6;f++){
       const val=d.faces?d.faces[f]:(f+1);
@@ -8760,12 +9314,38 @@ function buildDiceTab(){
       html+=`</div>`;
     }
     html+=`</div></div>
-      <div class="dice-cell-label">${toTitleCase(d.name)}${ownCount>0?' \u00D7'+ownCount:''}</div>
+      <div class="dice-cell-label">${toTitleCase(d.name)}</div>
       <div class="dice-cell-cost ${d.cost===0?'free':''}">${d.cost===0?'FREE':'<span class="coin-i"></span> '+d.cost}</div>
     </div>`;
   });
   html+='</div>';
+  /* Buy zone at bottom */
+  html+=`<div class="buy-zone" id="buyZoneDice">
+    <svg class="az-border" width="100%" height="100%" preserveAspectRatio="none"><rect x="1" y="1" rx="8" ry="8"></rect></svg>
+    <span class="bz-label">BUY</span>
+    <span class="bz-price"><span class="coin-i"></span> <span class="bz-cost-val"></span></span>
+  </div>`;
   panel.innerHTML=html;
+  /* Render parchment scroll canvas */
+  requestAnimationFrame(()=>{
+    const cv=panel.querySelector('.shop-dice-quote canvas');
+    if(cv) drawPixelScroll(cv);
+  });
+  /* Attach drag-to-buy (all paid dice) + expand toggle (all dice) */
+  panel.querySelectorAll('.dice-cell').forEach(cell=>{
+    const dieId=cell.dataset.dieId;
+    const cost=parseInt(cell.dataset.dieCost)||0;
+    if(cost>0){
+      /* All paid dice get drag — cant-afford ones will show error on drop */
+      initShopDiceDrag(cell,dieId,cost);
+    }else{
+      /* Free die (bone) — expand on tap only, no drag needed */
+      cell.addEventListener('click',function(e){
+        e.stopPropagation();
+        toggleDiceExpand(cell);
+      });
+    }
+  });
 }
 
 /* PIP_LAYOUTS declared in match section */
@@ -8971,6 +9551,7 @@ const INNKEEPER_LINES = [
 ];
 const INNKEEPER_CLEAN_LINES=['\u201CGood as new! Almost.\u201D','\u201CThat\u2019ll shine like the day it was forged.\u201D'];
 const INNKEEPER_SELL_LINES=['\u201CPleasure doin\u2019 business.\u201D','\u201CI\u2019ll find a good home for that one.\u201D'];
+const INNKEEPER_SELL_DICE_LINES=['\u201COne less die to roll, eh?\u201D','\u201CI\u2019ll melt that down nicely.\u201D','\u201CFine craftsmanship\u2026 was.\u201D','\u201CAlways happy to lighten your pouch.\u201D'];
 let _innkeeperReactionLine=null;
 
 function buildServicesTab(){
@@ -8981,7 +9562,7 @@ function buildServicesTab(){
   let html='<div class="services-wrap">';
   html+=`
     <div class="innkeeper-scene">
-      <img class="innkeeper-img" src="Characters_ART/Innkeeper.png" alt="Innkeeper">
+      <img class="innkeeper-img" src="Characters_ART/Innkeeper.png?v=3" alt="Innkeeper">
     </div>
     <div class="innkeeper-speech" id="innkeeperSpeech">
       <canvas id="speechCanvas"></canvas>
@@ -9007,7 +9588,8 @@ function buildServicesTab(){
   const opts=document.getElementById('serviceOptions');
   const services=[
     {icon:'\u{1F9F9}',name:'REPAIR',action:()=>openInventory('clean')},
-    {icon:'<span class="coin-i" style="width:22px;height:22px"></span>',name:'SELL',action:()=>openInventory('sell')}
+    {icon:'\u{1F0CF}',name:'SELL CARD',action:()=>openInventory('sell')},
+    {icon:'\u{1F3B2}',name:'SELL DICE',action:()=>openInventory('sell_dice')}
   ];
 
   services.forEach((svc,i)=>{
@@ -9032,7 +9614,7 @@ function buildServicesTab(){
 /* ═══════════════════════════════════════
    INVENTORY BOTTOM SHEET
    ═══════════════════════════════════════ */
-let _invMode=null; // 'clean' | 'sell'
+let _invMode=null; // 'clean' | 'sell' | 'sell_dice'
 let _invSelected=null;
 
 function openInventory(mode){
@@ -9043,21 +9625,29 @@ function openInventory(mode){
   document.getElementById('invBackdrop').classList.add('on');
   document.getElementById('invSheet').classList.add('open');
 
-  /* Auto-select lowest health card */
-  requestAnimationFrame(()=>{
-    let worstTarnish=-1, worstId=null;
-    ownedCards.forEach(oc=>{
-      const validClean=(mode==='clean'&&oc.tarnish>0);
-      const validSell=(mode==='sell');
-      if((validClean||validSell)&&oc.tarnish>worstTarnish){
-        worstTarnish=oc.tarnish;worstId=oc.id;
+  if(mode==='sell_dice'){
+    /* Auto-select first sellable die */
+    requestAnimationFrame(()=>{
+      const el=document.querySelector('.inv-dice-item:not(.disabled)');
+      if(el)el.click();
+    });
+  }else{
+    /* Auto-select lowest health card */
+    requestAnimationFrame(()=>{
+      let worstTarnish=-1, worstId=null;
+      ownedCards.forEach(oc=>{
+        const validClean=(mode==='clean'&&oc.tarnish>0);
+        const validSell=(mode==='sell');
+        if((validClean||validSell)&&oc.tarnish>worstTarnish){
+          worstTarnish=oc.tarnish;worstId=oc.id;
+        }
+      });
+      if(worstId){
+        const el=document.querySelector(`.inv-card-item[data-card-id="${worstId}"]`);
+        if(el&&!el.classList.contains('disabled'))selectInvCard(worstId,el);
       }
     });
-    if(worstId){
-      const el=document.querySelector(`.inv-card-item[data-card-id="${worstId}"]`);
-      if(el&&!el.classList.contains('disabled'))selectInvCard(worstId,el);
-    }
-  });
+  }
 
   /* Render sheet canvas bg */
   requestAnimationFrame(()=>{requestAnimationFrame(()=>{
@@ -9088,13 +9678,61 @@ function buildInventoryPanel(mode){
   if(mode==='clean'){
     title.textContent='REPAIR A CARD';
     subtitle.textContent='SELECT A CARD TO REPAIR';
+  }else if(mode==='sell_dice'){
+    title.textContent='SELL A DIE';
+    subtitle.textContent='SELECT A DIE TO SELL';
   }else{
     title.textContent='SELL A CARD';
     subtitle.textContent='SELECT A CARD TO SELL';
   }
 
-  /* Build card grid */
   cardGrid.innerHTML='';
+
+  if(mode==='sell_dice'){
+    /* Build dice grid */
+    const counts={};
+    ownedDice.forEach(id=>{counts[id]=(counts[id]||0)+1;});
+    const types=Object.keys(counts);
+    types.forEach(dieId=>{
+      const d=DICE_TYPES.find(t=>t.id===dieId);
+      if(!d)return;
+      const sp=getDiceSellPrice(dieId);
+      const disabled=(sp===0||ownedDice.length<=6);
+      const item=document.createElement('div');
+      item.className='inv-dice-item dtype-'+dieId+(disabled?' disabled':'');
+      item.dataset.dieId=dieId;
+
+      /* Mini die visual */
+      const die=loMkDie(5,dieId);
+      die.style.pointerEvents='none';
+      item.appendChild(die);
+
+      /* Name + count label */
+      const label=document.createElement('div');
+      label.className='inv-dice-label';
+      label.textContent=d.name+(counts[dieId]>1?' \xD7'+counts[dieId]:'');
+      item.appendChild(label);
+
+      /* Price tag */
+      const tag=document.createElement('div');
+      tag.className='inv-price-tag';
+      if(sp>0){
+        tag.innerHTML='<span class="coin-i"></span> '+sp;
+      }else{
+        tag.style.color='var(--textdim)';
+        tag.textContent='FREE';
+      }
+      item.appendChild(tag);
+
+      if(!disabled){
+        item.onclick=()=>{SFX.nav();selectInvDie(dieId,item);};
+      }
+      cardGrid.appendChild(item);
+    });
+    return;
+  }
+
+  /* Build card grid */
   const totalCards=ownedCards.reduce((s,c)=>s+c.count,0);
   ownedCards.forEach(oc=>{
     const c=CARDS.find(x=>x.id===oc.id);
@@ -9137,6 +9775,37 @@ function buildInventoryPanel(mode){
     cardGrid.appendChild(item);
   });
 
+}
+
+function selectInvDie(dieId,el){
+  _invSelected=dieId;
+  /* Highlight */
+  document.querySelectorAll('.inv-dice-item.selected').forEach(e=>e.classList.remove('selected'));
+  el.classList.add('selected');
+
+  /* Show action bar */
+  const actionBar=document.getElementById('invActionBar');
+  actionBar.style.display='block';
+  const sp=getDiceSellPrice(dieId);
+  actionBar.innerHTML=`
+    <button class="inv-action-btn" id="invActionBtn">
+      <canvas></canvas>
+      <span>SELL \u2014</span>
+      <span class="coin-icon"><span class="coin-i"></span></span><span>${sp}</span>
+    </button>`;
+
+  /* Render button canvas */
+  const btn=document.getElementById('invActionBtn');
+  if(btn){
+    requestAnimationFrame(()=>{
+      const cv=btn.querySelector('canvas');
+      if(cv){
+        cv.width=btn.offsetWidth;cv.height=btn.offsetHeight;
+        drawPixelPanel(cv,'#6a5830','#1a1408','#0e0a04',555,0.008);
+      }
+    });
+    btn.onclick=()=>{SFX.nav();executeInvAction();};
+  }
 }
 
 function selectInvCard(cardId,el){
@@ -9216,6 +9885,18 @@ function executeInvAction(){
     syncToState();
     purchaseEffect(window.innerWidth/2,window.innerHeight/2);
     _innkeeperReactionLine=INNKEEPER_SELL_LINES[Math.floor(Math.random()*INNKEEPER_SELL_LINES.length)];
+  }else if(_invMode==='sell_dice'){
+    const sp=getDiceSellPrice(_invSelected);
+    if(sp<=0||ownedDice.length<=6){SFX.err();return;}
+    const idx=ownedDice.indexOf(_invSelected);
+    if(idx===-1){SFX.err();return;}
+    SFX.bank();
+    playerGold+=sp;
+    ownedDice.splice(idx,1);
+    updateGoldDisplay();
+    syncToState();
+    purchaseEffect(window.innerWidth/2,window.innerHeight/2);
+    _innkeeperReactionLine=INNKEEPER_SELL_DICE_LINES[Math.floor(Math.random()*INNKEEPER_SELL_DICE_LINES.length)];
   }
 
   setTimeout(()=>{
@@ -9233,6 +9914,21 @@ function executeInvAction(){
           const el=document.querySelector(`.inv-card-item[data-card-id="${worstId}"]`);
           if(el&&!el.classList.contains('disabled'))selectInvCard(worstId,el);
         }
+      });
+    }else if(_invMode==='sell_dice'){
+      /* Stay open for dice sell — rebuild, auto-select next sellable */
+      if(ownedDice.length<=6){
+        closeInventory();
+        buildServicesTab();
+        buildDiceTab();
+        return;
+      }
+      buildInventoryPanel('sell_dice');
+      buildServicesTab();
+      buildDiceTab();
+      requestAnimationFrame(()=>{
+        const el=document.querySelector('.inv-dice-item:not(.disabled)');
+        if(el)el.click();
       });
     }else{
       /* Stay open for sell too — rebuild and select next lowest health */
@@ -9267,6 +9963,7 @@ updateGoldDisplay();
 buildCardsTab();
 buildDiceTab();
 buildServicesTab();
+switchTab(1);
 
 /* ── SETTINGS ── */
 function openSettings(){
@@ -9376,7 +10073,7 @@ function initShopScreen() {
   buildCardsTab();
   buildDiceTab();
   buildServicesTab();
-  switchTab(0);
+  switchTab(1);
 }
 
 
@@ -9503,6 +10200,45 @@ window.addEventListener('DOMContentLoaded',()=>{
 });
 
 /* SFX, settings, state managed by shared sections above */
+
+/* ═══════ GAME OVER SCREEN ═══════ */
+var _goQuotes=[
+  '"Come back when ye have coin, friend!"',
+  '"The bones weren\'t kind today. They\'ll turn."',
+  '"Every legend starts with an empty purse!"',
+  '"A fine attempt! The tavern will remember ye."',
+  '"Rest up. The dice will be kinder next time."',
+];
+function initGameOverScreen(){
+  // Pick a random innkeeper quote
+  var q=_goQuotes[Math.floor(Math.random()*_goQuotes.length)];
+  document.getElementById('goSpeechText').innerHTML=q;
+  // Render pixel panels after layout
+  requestAnimationFrame(function(){requestAnimationFrame(function(){
+    // Button canvas
+    var btn=document.getElementById('goNewRunBtn');
+    if(btn){
+      var bc=btn.querySelector('canvas');
+      var br=btn.getBoundingClientRect();
+      bc.width=Math.round(br.width);bc.height=Math.round(br.height);
+      drawPixelPanel(bc,'#6a5a3a','#3a3020','#1a1208',707);
+    }
+    // Speech bubble canvas (parchment scroll)
+    var speech=document.querySelector('#screen-gameover .go-speech canvas');
+    if(speech){
+      var sr=speech.parentElement.getBoundingClientRect();
+      speech.width=Math.round(sr.width);speech.height=Math.round(sr.height);
+      drawPixelScroll(speech);
+    }
+  })});
+}
+function goStartNewRun(){
+  localStorage.removeItem('gambit4');S=null;
+  setTimeout(function(){showScreen('menu');},80);
+}
+function showGameOver(){
+  showScreen('gameover');
+}
 
 /* ═══════ MENU SCREEN INIT ═══════ */
 function initMenuScreen() {
