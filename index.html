@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="manifest.json">
@@ -422,11 +422,8 @@ body{
 .mcard.in-zone{
   position:absolute!important;
   z-index:56!important;
-  transform:rotate(0deg)!important;
-  filter:none!important;
   opacity:1!important;
   pointer-events:none!important;
-  transition:none!important;
 }
 /* In-zone card: greyed out, no emoji */
 .mcard.in-zone .mcard-tooltip{display:none!important}
@@ -831,7 +828,7 @@ body{
   min-height:28px;padding:4px 10px;flex-wrap:wrap;
   justify-content:center;flex-shrink:0;
   pointer-events:none;z-index:5;
-  margin-top:4px;
+  margin-bottom:2px;
   visibility:hidden;
 }
 .kept-tray.has-items{visibility:visible}
@@ -845,7 +842,11 @@ body{
   height:28px;overflow:hidden;flex-shrink:0;padding:0 8px;width:100%;
 }
 .player-zone{position:relative;flex-shrink:0;width:100%;display:flex;flex-direction:column;align-items:center;}
-#botStrip{position:absolute;top:100%;left:0;right:0;pointer-events:none;margin-top:6px;}
+.above-dice-info{
+  display:flex;flex-direction:column;align-items:center;width:100%;
+  min-height:58px;justify-content:flex-end;
+}
+#botStrip{position:relative;left:0;right:0;pointer-events:none;width:100%;}
 .status-msg{
   font-family:var(--font-px);
   font-size:clamp(18px,5vw,24px);text-align:center;letter-spacing:1px;
@@ -1507,6 +1508,18 @@ body::before,body::after{display:none!important}
   filter:grayscale(.9) brightness(.4);cursor:default;animation:none;
 }
 .char-card.locked:active{transform:none}
+.char-card.card-shake{animation:cardShake .35s ease-out}
+@keyframes cardShake{0%,100%{transform:translateX(0)}15%{transform:translateX(-6px)}30%{transform:translateX(5px)}45%{transform:translateX(-4px)}60%{transform:translateX(3px)}75%{transform:translateX(-1px)}}
+.cant-afford-bubble{
+  position:absolute;left:50%;bottom:calc(100% + 8px);transform:translateX(-50%);
+  background:rgba(30,18,10,.92);border:2px solid rgba(200,160,80,.3);
+  border-radius:6px;padding:6px 10px;z-index:200;pointer-events:none;
+  font-family:var(--font-px);font-size:9px;color:var(--gold);letter-spacing:1px;
+  white-space:nowrap;opacity:0;animation:bubblePop .3s ease-out forwards;
+}
+.cant-afford-bubble.fade-out{animation:bubbleFade .3s ease-in forwards}
+@keyframes bubblePop{0%{opacity:0;transform:translateX(-50%) translateY(4px) scale(.9)}100%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}}
+@keyframes bubbleFade{0%{opacity:1}100%{opacity:0}}
 
 /* Portrait overflows the top of the panel */
 .portrait-wrap{
@@ -3159,18 +3172,17 @@ body::before,body::after{display:none!important}
 
   <div class="dice-spacer" style="flex:1"></div>
 
-  <!-- Player zone wrapper — fixed layout, botStrip doesn't shift dice -->
+  <!-- Player zone wrapper — fixed layout -->
   <div class="player-zone" id="playerZone">
+    <!-- Kept tray + score ABOVE dice (fixed height to prevent shifts) -->
+    <div class="above-dice-info" id="aboveDiceInfo">
+      <div class="kept-tray" id="keptTray"></div>
+      <div class="status-strip" id="botStrip">
+        <div class="status-msg" id="statusBot"></div>
+      </div>
+    </div>
     <!-- Player dice row -->
     <div class="player-dice-row" id="playerDiceRow"></div>
-
-    <!-- Kept tray (scoring dice this turn) -->
-    <div class="kept-tray" id="keptTray"></div>
-
-    <!-- Status strip bottom — absolutely positioned, won't shift dice -->
-    <div class="status-strip" id="botStrip">
-      <div class="status-msg" id="statusBot"></div>
-    </div>
   </div>
 
   <div class="dice-spacer" style="flex:3"></div>
@@ -3232,7 +3244,7 @@ body::before,body::after{display:none!important}
     <div class="res-gold-text" id="resGoldText">+40 GOLD</div>
   </div>
   <div class="res-card" id="resCard"></div>
-  <button id="btnContinue" onclick="SFX.nav();exitMatch()">CONTINUE</button>
+  <button id="btnContinue" onclick="handleContinue()">CONTINUE</button>
 </div>
 
 <!-- QUIT CONFIRM -->
@@ -3675,6 +3687,18 @@ const SFX={
 document.addEventListener('touchstart',function _w(){SFX._get();document.removeEventListener('touchstart',_w);},{once:true});
 document.addEventListener('click',function _w2(){SFX._get();document.removeEventListener('click',_w2);},{once:true});
 
+/* Restore audio + UI state when returning from app switch */
+document.addEventListener('visibilitychange',function(){
+  if(document.hidden)return;
+  /* Resume AudioContext (iOS suspends it when backgrounded) */
+  if(SFX._ctx&&SFX._ctx.state==='suspended')SFX._ctx.resume();
+  /* If mid-match, re-render dice effects and scoring display */
+  if(_currentScreen==='match'&&typeof G!=='undefined'&&G.pool&&G.phase==='choosing'){
+    refreshSelUI();
+    drawAllMatchBtns();
+  }
+});
+
 /* ═══════ GAME CONSTANTS ═══════ */
 const TARNISH_DISABLE=3;
 const PORTRAITS={
@@ -3702,7 +3726,7 @@ const RUNGS=[
   {id:1,name:'MABEL',key:'peasant',icon:'👨‍🌾',tier:'common',target:4000,gold:35,buyIn:20,
     boss:null,bossDesc:null,
     agg:.55,cardRarity:'tin',wager:true,wagerCount:1,wagerMode:'choose',minBank:200,diceStop:2,chaotic:false,adaptive:false,
-    dice:['bone','bone','bone','bone','amber','amber'],
+    dice:['bone','bone','bone','bone','bone','amber'],
     cardPool:['the_last_stitch_npc','measure_twice','worn_thimble','the_nightshift'],cardCount:2},
   {id:2,name:'FINNICK',key:'commoner',icon:'🎭',tier:'uncommon',target:4500,gold:50,buyIn:35,
     boss:'STICKY_FINGERS',bossDesc:'Once per match, if you bank under 300, Finnick steals it.',
@@ -3743,6 +3767,7 @@ const CARDS=[
   {id:'slow_burn',name:'SLOW BURN',icon:'🕯️',rarity:'silver',eff:'+500 EVERY 3 SAFE TURNS',desc:'Every 3 turns you bank without Busting, gain 500 pts automatically.'},
   {id:'fools_gold',name:"FOOL'S GOLD",icon:'✨',rarity:'tin',eff:'+300 ON 500-MULTIPLE BANK',desc:'If you bank a multiple of 500 pts, earn a bonus 300 pts.'},
   {id:'cracked_bell',name:'CRACKED BELL',icon:'🔔',rarity:'tin',eff:'FIRST BUST = 0 LOSS',desc:'Once per match, your first Bust costs you nothing.'},
+  {id:'keen_eyes',name:'KEEN EYES',icon:'👀',rarity:'tin',eff:'BLOCKS DICE REDUCTION',desc:'Prevents opponents from reducing your dice count (blocks Pocket Sand and similar effects).'},
   {id:'millers_toll',name:"MILLER'S TOLL",icon:'⚙️',rarity:'gold',eff:'TRIPLE 2-4 +150; 1s=75',desc:'Triples of 2,3,4 +150 extra pts, but 1s only score 75.'},
   {id:'scavenger',name:'THE SCAVENGER',icon:'🦴',rarity:'silver',eff:'ONE 1 + ONE 5 = 300',desc:'Exactly one 1 and one 5 in the same throw combine for 300 pts.'},
   {id:'last_stand',name:'THE LAST STAND',icon:'🗡️',rarity:'silver',eff:'FINAL DIE 1 OR 5 = 600',desc:'If on your last die and it lands 1 or 5, it scores 600 pts.'},
@@ -3762,7 +3787,8 @@ const CARDS=[
   {id:'serpents_whisper',name:"SERPENT'S WHISPER",icon:'🐍',rarity:'silver',eff:'RIVAL MINBANK +200',desc:'Rival refuses to bank below threshold +200.'},
   {id:'cowards_bell',name:"COWARD'S BELL",icon:'🔕',rarity:'silver',eff:'RIVAL DICESTOP +1',desc:'Rival stops rolling one die sooner.'},
   {id:'tyrants_gaze',name:"TYRANT'S GAZE",icon:'👁️',rarity:'gold',eff:'RIVAL CANNOT ADAPT',desc:'Rival loses adaptive strategy ability.'},
-  /* ── ACTIVE CARDS (NPC rewards, drag-to-activate) ── */
+  /* ── ACTIVE CARDS (shop + NPC rewards, drag-to-activate) ── */
+  {id:'gamblers_eye',name:"GAMBLER'S EYE",icon:'👁️‍🗨️',rarity:'gold',type:'active',maxUses:1,timing:'choosing',eff:'KEEP ANY DICE, REROLL REST',desc:'Select ANY dice to keep (even non-scoring), reroll the rest. 1 use per match.'},
   {id:'grogs_flask',name:"GROG'S FLASK",icon:'🍺',rarity:'gold',type:'active',npc:'grog',maxUses:1,timing:'choosing',eff:'REROLL 2 NON-SCORING DICE',desc:'Reroll up to 2 non-scoring dice. Activate during dice selection.',rewardQuote:'"Here… take thish. Won it fair an\' shquare."'},
   {id:'mabels_stitch',name:"MABEL'S STITCH",icon:'🧵',rarity:'gold',type:'active',npc:'mabel',maxUses:1,timing:'idle|choosing|yielding',eff:'PROTECT TURN PTS IF BUST',desc:'Activate before rolling: if you bust this turn, bank your turn points instead of losing them.',rewardQuote:'"Take this. May it mend thy fortune."'},
   {id:'finnicks_palm',name:"FINNICK'S PALM",icon:'🤏',rarity:'gold',type:'active',npc:'finnick',maxUses:1,timing:'choosing',eff:'SWAP 1 DIE → 1 OR 5',desc:'Change one non-scoring die to a 1 or 5. Activate during dice selection.',rewardQuote:'"Not bad, mate! Keep this, yeah?"'},
@@ -3784,7 +3810,7 @@ const CARD_BG={
   thrifty_gambler:'#3A7A30',iron_crown:'#5A3A7A',jesters_mask:'#9040A0',serpents_whisper:'#307050',
   cowards_bell:'#7A6A80',tyrants_gaze:'#800020',grogs_flask:'#A06030',mabels_stitch:'#8B6080',
   finnicks_palm:'#808040',corvus_ledger:'#604020',brutus_fist:'#605040',aldrics_vow:'#506080',
-  whispers_hex:'#6030A0',ambrose_grace:'#C0A050',iron_grip:'#606A70',sleight_of_hand:'#705050',
+  whispers_hex:'#6030A0',ambrose_grace:'#C0A050',iron_grip:'#606A70',sleight_of_hand:'#705050',gamblers_eye:'#4A6A80',keen_eyes:'#5A7A60',
   /* NPC-only card backgrounds */
   her_lucky_coin:'#7A6A50',one_more_round:'#8A6030',
   the_last_stitch_npc:'#8B6080',measure_twice:'#706050',worn_thimble:'#9A7A60',the_nightshift:'#5A4A60',
@@ -3826,7 +3852,7 @@ const NPC_CARDS=[
    eff:'Swap your best die to 3 (once)',flavor:'"Weird. Could\'ve sworn that was higher. Must be the light."',
    effect:{type:'once',mechanic:'swap_best_to_3'}},
   {id:'pocket_sand',name:'POCKET SAND',icon:'✋',rarity:'npc',npcOnly:true,owner:'finnick',
-   eff:'Your first roll = 5 dice',flavor:'"Oh that one rolled off the table. Don\'t worry I\'ll— actually never mind."',
+   eff:'50% CHANCE: First roll = 5 dice',flavor:'"Oh that one rolled off the table. Don\'t worry I\'ll— actually never mind."',
    effect:{type:'passive',mechanic:'reduce_first_roll'}},
   {id:'the_skim',name:'THE SKIM',icon:'💸',rarity:'npc',npcOnly:true,owner:'finnick',
    eff:'Copies 15% of your banks',flavor:'"What? No. I\'m just holding it for you."',
@@ -4329,7 +4355,10 @@ function initCardDrag(mcardEl,cardId){
       el:mcardEl,cardId:cardId,
       startX:touch.clientX,startY:touch.clientY,
       origRect:rect,dragging:false,threshold:10,
-      origStyle:mcardEl.style.cssText
+      origStyle:mcardEl.style.cssText,
+      /* Velocity tracking for momentum */
+      lastX:touch.clientX,lastY:touch.clientY,lastT:Date.now(),
+      vx:0,vy:0
     };
   }
   function onDragMove(e){
@@ -4352,38 +4381,74 @@ function initCardDrag(mcardEl,cardId){
     mcardEl.style.left=(_dragState.origRect.left+dx)+'px';
     mcardEl.style.top=(_dragState.origRect.top+dy)+'px';
     hitTestActivateZone(touch.clientX,touch.clientY);
+    /* Track velocity (smoothed) */
+    var now=Date.now();var dt=now-_dragState.lastT;
+    if(dt>0){
+      var ivx=(touch.clientX-_dragState.lastX)/dt*1000;
+      var ivy=(touch.clientY-_dragState.lastY)/dt*1000;
+      _dragState.vx=_dragState.vx*0.4+ivx*0.6;
+      _dragState.vy=_dragState.vy*0.4+ivy*0.6;
+    }
+    _dragState.lastX=touch.clientX;_dragState.lastY=touch.clientY;_dragState.lastT=now;
   }
   function onDragEnd(e){
     if(!_dragState||_dragState.el!==mcardEl)return;
     if(!_dragState.dragging){_dragState=null;return;}
-    const zone=document.getElementById('activateZone');
-    /* Check if majority of the card overlaps the zone */
-    const cr=mcardEl.getBoundingClientRect();
-    const zr=zone.getBoundingClientRect();
-    const overlapL=Math.max(cr.left,zr.left),overlapR=Math.min(cr.right,zr.right);
-    const overlapT=Math.max(cr.top,zr.top),overlapB=Math.min(cr.bottom,zr.bottom);
-    const overlapArea=(overlapR>overlapL&&overlapB>overlapT)?(overlapR-overlapL)*(overlapB-overlapT):0;
-    const cardArea=cr.width*cr.height;
-    const dropInZone=overlapArea>cardArea*0.5;
-    const canUse=canActivateCard(cardId);
-    if(dropInZone&&canUse){
-      /* SUCCESS — place card in zone first, then activate (so trigger label attaches to zone) */
-      SFX.nav();
-      placeCardInZone(mcardEl,_dragState);
-      activateCard(cardId);
-      /* Update tooltip uses */
-      const tipUses=mcardEl.querySelector('.tip-uses');
-      if(tipUses){
-        const cd=CARDS.find(c=>c.id===cardId);
-        const usesLeft=G.activeCardState.usedCards[cardId]||0;
-        tipUses.textContent=usesLeft+'/'+(cd.maxUses||1)+' USES';
-      }
-    }else{
-      /* FAIL — smooth snap back to fan position */
-      snapCardBack(mcardEl,_dragState);
+    var savedState={el:_dragState.el,cardId:_dragState.cardId,origRect:_dragState.origRect,origStyle:_dragState.origStyle,vx:_dragState.vx,vy:_dragState.vy};
+    function tryDrop(){
+      var zone=document.getElementById('activateZone');
+      var cr=mcardEl.getBoundingClientRect();
+      var zr=zone.getBoundingClientRect();
+      var overlapL=Math.max(cr.left,zr.left),overlapR=Math.min(cr.right,zr.right);
+      var overlapT=Math.max(cr.top,zr.top),overlapB=Math.min(cr.bottom,zr.bottom);
+      var overlapArea=(overlapR>overlapL&&overlapB>overlapT)?(overlapR-overlapL)*(overlapB-overlapT):0;
+      var cardArea=cr.width*cr.height;
+      return overlapArea>cardArea*0.5;
     }
-    hideActivateZone();
-    _dragState=null;
+    var dropInZone=tryDrop();
+    var canUse=canActivateCard(cardId);
+    if(dropInZone&&canUse){
+      SFX.nav();
+      placeCardInZone(mcardEl,savedState);
+      activateCard(cardId);
+      var tipUses=mcardEl.querySelector('.tip-uses');
+      if(tipUses){var cd=CARDS.find(function(c){return c.id===cardId;});var usesLeft=G.activeCardState.usedCards[cardId]||0;tipUses.textContent=usesLeft+'/'+(cd.maxUses||1)+' USES';}
+      hideActivateZone();_dragState=null;
+    }else{
+      /* Momentum: if velocity is high enough and moving upward, coast the card */
+      var speed=Math.sqrt(savedState.vx*savedState.vx+savedState.vy*savedState.vy);
+      if(speed>200&&savedState.vy<-80){
+        /* Coast with deceleration */
+        var vx=savedState.vx,vy=savedState.vy;
+        var friction=0.92;var _momFrame=null;
+        (function coast(){
+          vx*=friction;vy*=friction;
+          var curLeft=parseFloat(mcardEl.style.left)||0;
+          var curTop=parseFloat(mcardEl.style.top)||0;
+          mcardEl.style.left=(curLeft+vx/60)+'px';
+          mcardEl.style.top=(curTop+vy/60)+'px';
+          hitTestActivateZone(curLeft+savedState.origRect.width/2+vx/60,curTop+savedState.origRect.height/2+vy/60);
+          if(tryDrop()&&canActivateCard(cardId)){
+            SFX.nav();
+            placeCardInZone(mcardEl,savedState);
+            activateCard(cardId);
+            var tipUses2=mcardEl.querySelector('.tip-uses');
+            if(tipUses2){var cd2=CARDS.find(function(c){return c.id===cardId;});var usesLeft2=G.activeCardState.usedCards[cardId]||0;tipUses2.textContent=usesLeft2+'/'+(cd2.maxUses||1)+' USES';}
+            hideActivateZone();return;
+          }
+          if(Math.abs(vx)+Math.abs(vy)>30){
+            _momFrame=requestAnimationFrame(coast);
+          }else{
+            snapCardBack(mcardEl,savedState);
+            hideActivateZone();
+          }
+        })();
+      }else{
+        snapCardBack(mcardEl,savedState);
+        hideActivateZone();
+      }
+      _dragState=null;
+    }
   }
   mcardEl.addEventListener('mousedown',onDragStart);
   mcardEl.addEventListener('touchstart',onDragStart,{passive:true});
@@ -4823,10 +4888,38 @@ function startPTurn(){
 }
 
 function handleRoll(){
+  /* Gambler's Eye special reroll */
+  if(G.phase==='gamblers_eye'&&G._gamblersEyeActive){
+    var geSelected=G.pool.filter(function(d){return d.sel&&!d.committed;});
+    var geFree=G.pool.filter(function(d){return !d.committed;});
+    if(geSelected.length===0||geSelected.length>=geFree.length)return;
+    G._gamblersEyeActive=false;G.phase='choosing';
+    /* Commit selected dice as kept (they don't score yet, just preserved) */
+    geSelected.forEach(function(d){d.committed=true;d.sel=false;if(d.el)d.el.classList.remove('selected');if(d.el)d.el.classList.add('committed');});
+    /* Reroll non-selected free dice */
+    var toReroll=geFree.filter(function(d){return !d.committed;});
+    G.numDice=toReroll.length;
+    toReroll.forEach(function(d){
+      d.val=rollFace(d.mat);d.sel=false;
+      if(d.el){d.el.classList.add('rolling');reDrawDieFace(d);
+        setTimeout(function(){d.el.classList.remove('rolling');settleDie(d.el);},300);}
+    });
+    SFX.roll();G.turnRollCount++;
+    setTimeout(function(){
+      var free2=G.pool.filter(function(d){return !d.committed;});var fv=free2.map(function(d){return d.val;});var fm=free2.map(function(d){return d.mat;});var cards=effectiveCards();
+      if(!anyScoring(fv,cards,fm)){doBust();return;}
+      free2.forEach(function(d){d.el.onclick=function(){toggleDie(d);};});
+      G.phase='choosing';refreshSelUI();
+    },500);
+    return;
+  }
   if(G.phase!=='idle'&&G.phase!=='choosing')return;
-  /* NPC pocket_sand: first roll of each turn uses 5 dice */
+  /* NPC pocket_sand: first roll of each turn uses 5 dice (50% chance, blocked by keen_eyes) */
   if(G.turnRollCount===0&&G.oCards.some(function(cid){var n=getNpcCard(cid);return n&&n.effect.mechanic==='reduce_first_roll';})){
-    G.numDice=Math.min(G.numDice,5);
+    var hasKeenEyes=G.pCards.includes('keen_eyes');
+    if(!hasKeenEyes&&Math.random()<0.5){
+      G.numDice=Math.min(G.numDice,5);
+    }
   }
   if(window.DLG&&G.turnRollCount>0){
     const uncommitted=G.pool.filter(d=>!d.committed).length;
@@ -5597,6 +5690,7 @@ function endMatch(win){
   resGoldText.textContent=goldDisplay;
 
   ov.classList.add('show');
+  _endScreenPhase='animating';
 
   // Staggered animations
   endT(()=>resTitle.classList.add('pop'),100);
@@ -5662,6 +5756,28 @@ function endMatch(win){
   const lostCard=lostStakes.length>0?CARDS.find(x=>x.id===lostStakes[0]):null;
   const showCard=revealCard||lostCard;
   const isCardLost=!!lostCard&&!revealCard;
+  // Stash data for skip function
+  _endScreenData={pFinal:G.pPts,oFinal:G.oPts,cardHTML:null,dlgHTML:null,isCardLost:isCardLost};
+  if(showCard){
+    const _c=showCard;
+    const _bandText=isCardLost?'FORFEIT':(npcRewardCard?'EARNED':_c.rarity.toUpperCase());
+    const _tooltipBand=isCardLost?'Forfeit':(npcRewardCard?'Earned':_tc(_c.rarity));
+    _endScreenData.cardHTML='<div class="res-card-inner"><div class="res-card-glow"></div>'+
+      '<div class="gcard rarity-'+_c.rarity+'">'+
+        '<div class="gcard-cover" style="background:'+(CARD_BG[_c.id]||'#444')+'">'+_c.icon+'</div>'+
+        '<div class="gcard-frame"></div>'+gcCorners()+
+        '<div class="gcard-band">'+_bandText+'</div></div></div>'+
+      mkCardTooltipHTML(_c,_tooltipBand)+
+      '<div style="text-align:center;color:'+(isCardLost?'var(--red)':'#ffd700')+';font-size:11px;margin-top:6px">'+toTitleCase(_c.name)+'</div>';
+    const _quoteText=npcRewardCard&&_c.rewardQuote?_c.rewardQuote:
+      (_c.flavor?_c.flavor:(isCardLost?'"Better luck next time, stranger."':''));
+    if(_quoteText){
+      const _pKey=G.rung.key||'drunkard';
+      const _pSrc=PORTRAITS[_pKey]||'Match_Art/drunkard_frame.png';
+      _endScreenData.dlgHTML='<div class="dlg-portrait"><img src="'+_pSrc+'" alt=""></div>'+
+        '<div class="dlg-scroll"><canvas class="res-dlg-canvas"></canvas><div class="dlg-text">'+_quoteText+'</div></div>';
+    }
+  }
   if(showCard){
     const c=showCard;
     endT(()=>{
@@ -5702,7 +5818,44 @@ function endMatch(win){
   }else{
     // No card to show — hide gold wrap after drift to clean up
     endT(()=>{resGoldWrap.style.display='none';},win?4500:4600);
+    // Rematch win: show NPC dialogue with "no card" quips
+    if(win&&isRematch){
+      endT(()=>{
+        const oppKey=G.rung.name.toUpperCase();
+        const dlgData=OPP_DIALOGUE[oppKey];
+        const lines=dlgData&&dlgData.REMATCH_WIN;
+        if(lines&&lines.length){
+          const quoteText=lines[Math.floor(Math.random()*lines.length)];
+          const portraitKey=G.rung.key||'drunkard';
+          const portraitSrc=PORTRAITS[portraitKey]||'Match_Art/drunkard_frame.png';
+          const dlgDiv=document.createElement('div');
+          dlgDiv.className='res-dlg';
+          dlgDiv.innerHTML='<div class="dlg-portrait"><img src="'+portraitSrc+'" alt=""></div>'+
+            '<div class="dlg-scroll"><canvas class="res-dlg-canvas"></canvas><div class="dlg-text">\u201c'+quoteText+'\u201d</div></div>';
+          resCard.appendChild(dlgDiv);
+          resCard.classList.add('show');
+          requestAnimationFrame(()=>{requestAnimationFrame(()=>{
+            const cv=dlgDiv.querySelector('.res-dlg-canvas');
+            if(cv)drawPixelScroll(cv);
+          });});
+        }
+      },4200);
+      // Stash for skip
+      if(_endScreenData){
+        const _oppKey=G.rung.name.toUpperCase();const _dlgData=OPP_DIALOGUE[_oppKey];const _lines=_dlgData&&_dlgData.REMATCH_WIN;
+        if(_lines&&_lines.length){
+          const _qt=_lines[Math.floor(Math.random()*_lines.length)];
+          const _pKey=G.rung.key||'drunkard';const _pSrc=PORTRAITS[_pKey]||'Match_Art/drunkard_frame.png';
+          _endScreenData.dlgHTML='<div class="dlg-portrait"><img src="'+_pSrc+'" alt=""></div>'+
+            '<div class="dlg-scroll"><canvas class="res-dlg-canvas"></canvas><div class="dlg-text">\u201c'+_qt+'\u201d</div></div>';
+          _endScreenData.isRematchWinDlg=true;
+        }
+      }
+    }
   }
+
+  // Mark end screen as ready after all animations complete
+  endT(()=>{_endScreenPhase='ready';},showCard?4800:win?5000:5100);
 
   // Continue button — visible immediately so players can skip
   // Exception: Grog (first NPC) — delay until card reveal so new players see their reward
@@ -5725,6 +5878,54 @@ function hideQuitConfirm(){document.getElementById('quit-ov').classList.remove('
 function doFlee(){
   hideQuitConfirm();
   endMatch(false);
+}
+var _endScreenPhase='ready';// 'animating' while timers run, 'ready' when done/skipped
+var _endScreenData=null;// stash card reveal info for skip
+function handleContinue(){
+  SFX.nav();
+  if(_endScreenPhase==='animating'){
+    // First tap: skip animations, show final state instantly
+    if(window._endTimers){window._endTimers.forEach(t=>clearTimeout(t));window._endTimers=[];}
+    document.querySelectorAll('.coin-burst-p').forEach(el=>el.remove());
+    const d=_endScreenData;if(d){
+      // Show final scores instantly
+      document.getElementById('resPScore').textContent=d.pFinal.toLocaleString();
+      document.getElementById('resOScore').textContent=d.oFinal.toLocaleString();
+      document.querySelector('#end-ov .res-scores').classList.add('fade-in');
+      // Hide coin, show gold text
+      var coinBig=document.getElementById('resCoinBig');
+      coinBig.className='res-coin-big';coinBig.style.opacity='0';
+      var gw=document.getElementById('resGoldWrap');
+      var gt=document.getElementById('resGoldText');
+      gt.classList.add('drift');gt.style.animation='none';gt.style.opacity='1';gt.style.transform='none';
+      // Show card if earned
+      if(d.cardHTML){
+        gw.style.display='none';
+        var rc=document.getElementById('resCard');
+        rc.innerHTML=d.cardHTML;rc.classList.add('show');
+        if(d.isCardLost)rc.classList.add('lost');
+        attachTooltipTap(rc);
+        // Show NPC dialogue on card
+        if(d.dlgHTML){
+          var dlgDiv=document.createElement('div');
+          dlgDiv.className='res-dlg';dlgDiv.innerHTML=d.dlgHTML;
+          rc.appendChild(dlgDiv);
+          requestAnimationFrame(()=>{var cv=dlgDiv.querySelector('.res-dlg-canvas');if(cv)drawPixelScroll(cv);});
+        }
+      }else if(d.dlgHTML&&d.isRematchWinDlg){
+        gw.style.display='none';
+        var rc=document.getElementById('resCard');
+        var dlgDiv=document.createElement('div');
+        dlgDiv.className='res-dlg';dlgDiv.innerHTML=d.dlgHTML;
+        rc.appendChild(dlgDiv);rc.classList.add('show');
+        requestAnimationFrame(()=>{var cv=dlgDiv.querySelector('.res-dlg-canvas');if(cv)drawPixelScroll(cv);});
+      }else{gw.style.display='none';}
+    }
+    _endScreenPhase='ready';
+    return;
+  }
+  // Second tap (or first if already ready): navigate away
+  exitMatch();
 }
 function exitMatch(){
   // Kill pending end-screen timers so no particles/SFX fire after leaving
@@ -5762,7 +5963,11 @@ const OPP_DIALOGUE={
     MATCH_CLOSE:["My quills are shweating. Can they DO that?!","Neck and neck! I need a BIG drink. Bigger. BIGGER.","This is tenshe! My stomach! Or the ale! BOTH!"],
     LOSING_BADLY:["I blame the ale. She'sh a traitor. Beautiful, but a traitor.","Rough night. Rougher than the time I fell off the roof.","I need a miracle. Or a refill. Shame thing really."],
     WINNING_BADLY:["Even pickled, Grog is MAGNIFICENT! Put me on COINS!","Drunk and GLORIUSH! My wife would be proud. Or horrified.","Nobody EXPECTSH the hedgehog! NOBODY!"],
-    OPP_WINS:["HAHA! Grog WINSH! Shtill got it! Hic!","Another round on YOU, pal! BAHAHA! I love thish game!","Grog is the CHAMPION! ...where'sh my ale? I put it somewhere.","VICTORY! Now if the room would shtop shpinning!"]
+    OPP_WINS:["HAHA! Grog WINSH! Shtill got it! Hic!","Another round on YOU, pal! BAHAHA! I love thish game!","Grog is the CHAMPION! ...where'sh my ale? I put it somewhere.","VICTORY! Now if the room would shtop shpinning!"],
+    REMATCH_START:["Back already?! Mabel mopped the floor with ya, didn't she?","Can't get enough of losing to ol' Grog, eh? Hic!","Ah, a familiar face! And a familiar LOSHER!","You again! Sheat's shtill warm from lasht time!"],
+    REMATCH_WIN:["No card for you thish time! I'm already BROKE!","Win all you want, pal. Grog'sh pocketsh are EMPTY. Hic!","Another win? Good for you. Grog'sh got nothing left but hish dignity. ...had that lasht week.","You want more?! I barely have my TROUSHERS left!"],
+    CARD_EFFECT:["Wha— what'sh happening to me?! Hic!","I feel... sshtrange. Shtrang-ER than ushual!","Something'sh off and it ISN'T the ale thish time!","Did you DO shomething?! My quills feel weird!"],
+    CANT_AFFORD:["You don't got the coin, pal! Come back when you're FLUSH! Hic!","Empty pocketsh? Even GROG can shee that!","No coin, no game! Grog'sh rules! Well, the barkeep'sh rules."]
   },
   MABEL:{
     MATCH_START:["Pull up a stool, dear. Let's see what you've got.","Half moon tonight. Good for dice, bad for slugs.","Sit down. The kettle's warm and my patience isn't.","Had a fox in my garden this morning. Didn't catch it. Never do.","Bones remind me of planting. Mostly the dirt under my nails.","Quiet night. Perfect for taking your coins."],
@@ -5784,7 +5989,11 @@ const OPP_DIALOGUE={
     MATCH_CLOSE:["Tighter than bark on an old oak tree.","Every seed matters now. Every single one.","Down to the wire. My claws are itching."],
     LOSING_BADLY:["Rough season. Haven't seen one this bad since the blight.","The frost wins sometimes. Doesn't mean I like it.","You'd think after fifty years I'd be used to losing. You'd be wrong."],
     WINNING_BADLY:["The soil rewards the patient. Always has.","Some of us were just born with green paws, dear.","Not personal. Just nature taking its course."],
-    OPP_WINS:["Harvest's in, dear. Better luck next season.","My patch, my rules. Always has been.","Back to the dirt with you. Mabel takes the pot.","Another win for the old girl. Now where's my tea."]
+    OPP_WINS:["Harvest's in, dear. Better luck next season.","My patch, my rules. Always has been.","Back to the dirt with you. Mabel takes the pot.","Another win for the old girl. Now where's my tea."],
+    REMATCH_START:["Oh, back so soon? Couldn't handle Finnick, could you.","You again! I'll put the kettle on. Same blend as last time.","Returning to old soil, are we? Familiar furrows comfort the timid.","Ran into trouble up the road, did we, dear? Mabel can tell."],
+    REMATCH_WIN:["No card this time, dear. I've given you everything I've got.","You won, yes, yes. But my pockets are bare as winter soil.","Another visit, another win. But the cupboard's empty, I'm afraid.","Win all you like. Old Mabel's got nothing left but her turnips."],
+    CARD_EFFECT:["What in the— my paws feel all tingly.","Something's wrong with the soil tonight...","I don't feel quite right. What did you DO, dear?","That's not natural. Not natural at all. *hisss*"],
+    CANT_AFFORD:["Come back when your pockets aren't empty, dear.","No coin? Even my turnips cost something.","Can't plant without seed money. Come back later, dear."]
   },
   FINNICK:{
     MATCH_START:["OI OI! You showed up! Brilliant!","Bones out! Loser buys the cheese!","The lower quarter taught me everything. Mostly running.","Just pulled a job by the docks. Don't ask. Let's GO!","You look like someone who's about to lose! No offense!","I haven't eaten since breakfast. Wait— did I have breakfast?"],
@@ -5807,7 +6016,11 @@ const OPP_DIALOGUE={
     LOSING_BADLY:["Getting walloped here. Gran would be so disappointed.","Need a miracle. Or cheese. Cheese helps with everything.","This is bad. This is really bad. I'm gonna need a bigger scarf."],
     WINNING_BADLY:["Sorry mate! Well... not THAT sorry! Little bit sorry! Not really!","BEST day! Best day since I found that cheese wheel in the alley!","This is what peak fox performance looks like!"],
     OPP_WINS:["I WON! I actually WON! Someone PINCH me!","YIP YIP YIP! Finnick takes it HOME!","Cheese and victory! Best combination in the WORLD!","Wait till Gran hears! She'll almost be proud! ALMOST!"],
-    BOSS_ATTACK:["Sticky fingers! Learned it on the streets!","YOINK! That's mine now, cheers mate!","Fox rules! Finders keepers, losers... lose! Obviously!","Quick paws! Quicker than your eyes!"]
+    BOSS_ATTACK:["Sticky fingers! Learned it on the streets!","YOINK! That's mine now, cheers mate!","Fox rules! Finders keepers, losers... lose! Obviously!","Quick paws! Quicker than your eyes!"],
+    REMATCH_START:["OI OI! You're BACK! Couldn't handle Corvus, could ya?","Return of the loser! I mean— welcome BACK, mate!","Back to the lower quarter? Don't blame ya. It's NICE down here!","Missed me already?! I get that a LOT! Actually I don't!"],
+    REMATCH_WIN:["Win all you want! I'm SKINT, mate! No cards!","You beat me again?! Impressive! But I'm BROKE! Like PROPERLY broke!","Another thrashing! Good on ya! But no card — I already gave you everything I OWN!","Brilliant play! Shame I've got nothing to give ya! Not even my scarf! DON'T ASK!"],
+    CARD_EFFECT:["What's happening?! My whiskers are tingling ALL WRONG!","Why did I do that?! I didn't WANT to do that!","Something's in my head! Get it OUT! GET IT OUT!","I feel all fuzzy inside and NOT the good kind!"],
+    CANT_AFFORD:["No coin?! Even I keep a FEW coppers stashed! Usually in cheese!","Skint, are we? Come back when you've scraped some together, yeah?","Can't play without coin, mate! Go sell something! Not cheese though!"]
   },
   CORVUS:{
     MATCH_START:["Sit. I've counted your chances already. They're not good.","I know your type. Bold early, begging later.","The ledger never lies. And neither do I. ...mostly.","Markets closed early today. You'll do for entertainment.","I can see what's in your purse from here. Disappointing.","Another gambler. At least you showed up on time."],
@@ -5830,7 +6043,11 @@ const OPP_DIALOGUE={
     LOSING_BADLY:["I'm being ROBBED. ME. The irony is not lost.","Bad quarter. Worst since the grain shortage.","Down in the ledger. Down, but not out. Never out."],
     WINNING_BADLY:["Art of the deal, friend. Watch and learn. Then weep.","Total market dominance. As the prophecy foretold. My prophecy.","Corvus always collects. Ask anyone who owes me."],
     OPP_WINS:["Payment received in full. Pleasure doing business.","The ledger balances. It always does.","Another deal closed. I love the smell of profit in the evening.","Corvus wins. As forecasted. In my ledger. Which I wrote."],
-    BOSS_ATTACK:["Tax is due. Ten percent. Non-negotiable.","The merchant always takes his cut. Read the fine print.","*scribbles in ledger* Mine now. Standard operating procedure.","A small fee for playing at my table. Very reasonable."]
+    BOSS_ATTACK:["Tax is due. Ten percent. Non-negotiable.","The merchant always takes his cut. Read the fine print.","*scribbles in ledger* Mine now. Standard operating procedure.","A small fee for playing at my table. Very reasonable."],
+    REMATCH_START:["Back for more? The interest on your losses is compounding.","A repeat customer. My favorite kind. Profitable.","Returning to the scene of your financial ruin. How sentimental.","Couldn't cut it further up the market? Noted in the ledger."],
+    REMATCH_WIN:["You won. Congratulations. But my accounts are settled — no card.","Another hollow victory. My coffers are empty and the ledger is closed.","Win all you like. I've already written off your rewards.","No card, no stock, no inventory. Just an IOU and my contempt."],
+    CARD_EFFECT:["My calculations are... wrong? That's NEVER happened before.","Something disrupted the ledger. I don't appreciate disruption.","I feel... charitable? REVOLTING. What have you DONE?","The numbers don't add up. Whose fault is this? YOURS."],
+    CANT_AFFORD:["Insufficient funds. Come back when the balance is positive.","I can see your purse from here. It's EMPTY. Goodbye.","No capital, no deal. That's basic economics, friend."]
   },
   BRUTUS:{
     MATCH_START:["Eyes forward, recruit. Sit DOWN.","I trained at the border for twelve years. You trained nowhere. Roll.","No mercy asked. None given. That's the code.","These dice have seen more battles than you've seen breakfasts.","The guard doesn't rest. Neither does Brutus.","You remind me of the new recruits. Soft. Hopeful. Wrong."],
@@ -5853,7 +6070,11 @@ const OPP_DIALOGUE={
     LOSING_BADLY:["A bulldog fights HARDEST when cornered! REMEMBER THAT!","I've bled worse at the border. This is nothing.","Down but breathing. And Brutus ALWAYS gets back up."],
     WINNING_BADLY:["Total rout! Flee while you can, recruit!","Fangs at your throat. No shame in yielding. ...some shame.","This is what twelve years at the border taught me!"],
     OPP_WINS:["VICTORY! Captain Brutus holds the field!","Stand down, recruit. The old dog wins AGAIN.","*WOOF* That's how a SOLDIER finishes the job!","The flag is planted. Brutus prevails. At ease."],
-    BOSS_ATTACK:["SHIELD BASH! Reroll THAT, recruit!","*WOOF* Knocked your scoring die loose! Discipline!","No safe ground on MY table! This is MY field!","The shield wall holds! Try AGAIN, recruit!"]
+    BOSS_ATTACK:["SHIELD BASH! Reroll THAT, recruit!","*WOOF* Knocked your scoring die loose! Discipline!","No safe ground on MY table! This is MY field!","The shield wall holds! Try AGAIN, recruit!"],
+    REMATCH_START:["Back in the barracks? Aldric send you running? Figures.","A retreating soldier returns to base. Standard protocol.","Couldn't hold the line up there, could you? DISAPPOINTING.","Returning to basic training? Wise. You clearly need it."],
+    REMATCH_WIN:["You won. But the armory is empty, recruit. No card.","Victory noted. Supplies exhausted. No equipment to spare.","Another win, another empty trophy case. The campaign fund is dry.","Good fight. But I've nothing left to give but my respect. BARELY."],
+    CARD_EFFECT:["What— my strategy is COMPROMISED! Who gave that ORDER?!","Something's wrong with my flank! Who moved my FORMATIONS?!","I didn't order that maneuver! WHO'S IN COMMAND?!","*GROWL* My battlefield instincts are... confused. UNACCEPTABLE."],
+    CANT_AFFORD:["No gold for the buy-in, recruit? Then you don't PLAY.","War costs money, soldier. Come back FUNDED.","Empty pockets don't earn a seat at this table. DISMISSED."]
   },
   ALDRIC:{
     MATCH_START:["Thy challenge is accepted, traveler!","Fangbreaker grows restless. That's my blade. She has moods.","By mine honor and freshly groomed fur — we DUEL!","I've been practicing my victory pose all morning.","The tournament grounds await! Well, this table. But SPIRITUALLY.","A worthy opponent? The poets shall decide. I'm also a poet."],
@@ -5876,7 +6097,11 @@ const OPP_DIALOGUE={
     LOSING_BADLY:["'Tis but a scratch! A very large, concerning scratch! Hm.","The darkest chapter before the GLORIOUS dawn! I hope!","Even heroes face trial! ...this is a LOT of trial though!"],
     WINNING_BADLY:["Noble training and natural talent! A devastating combination!","No shame in losing to Aldric the Gallant! I chose that name myself!","The ballad practically WRITES itself! ...I'm writing it!"],
     OPP_WINS:["The tournament is MINE! Huzzah! HUZZAH! A thousand huzzahs!","Kneel before Sir Aldric! Or don't! It's more of a SUGGESTION!","Victory! A ballad shall be written! By ME! It'll be eight stanzas MINIMUM!","The crowd ERUPTS! Or they would if there were a crowd! Imagine one!"],
-    BOSS_ATTACK:["I CHALLENGE THEE! Score 500 or face the consequences!","A knight's challenge! Prove thy METTLE or suffer mine!","Fangbreaker demands a worthy showing! Don't disappoint HER!","By mine honor — show your WORTH or lose it all!"]
+    BOSS_ATTACK:["I CHALLENGE THEE! Score 500 or face the consequences!","A knight's challenge! Prove thy METTLE or suffer mine!","Fangbreaker demands a worthy showing! Don't disappoint HER!","By mine honor — show your WORTH or lose it all!"],
+    REMATCH_START:["The wandering knight returns! Whisper frightened you off, did she?","Back from the higher courts? The air up there IS rather thin.","A rematch?! WONDERFUL! I shall compose a sequel ballad!","Returning to the jousting grounds! The poets shall call this Chapter Two!"],
+    REMATCH_WIN:["A noble victory! But alas, mine coffers are BARE! No card for thee!","The tournament purse is spent! I can only offer my applause! And a poem!","You've won, brave soul! But the prize chest is empty. The ballad must suffice!","Victory is thine! But I've nothing left to give but my undying admiration! And maybe a sandwich!"],
+    CARD_EFFECT:["By Fangbreaker! What SORCERY is this?!","My noble strategy crumbles! There is TREACHERY afoot!","I feel... unchivalrous. This isn't ME! Well, not TODAY'S me!","What dark enchantment?! Even my fur feels wrong! It was PERFECT this morning!"],
+    CANT_AFFORD:["A knight without coin is still a knight! But you can't PLAY without coin. Sorry.","The tournament has a fee, friend. Come back with GOLD! For honor!","Even chivalry has a cover charge. I don't make the rules! Well, I HELP."]
   },
   WHISPER:{
     MATCH_START:["Oh. You again. I expected someone... taller.","Pembrook is polishing the silver. You'll have to do.","I could be at the gardens right now. Instead I'm HERE. With you.","Do try not to bore me. My threshold is catastrophically low.","The royal cushion is still warm. Cherish this proximity.","I've fired servants for less entertaining performances."],
@@ -5899,7 +6124,11 @@ const OPP_DIALOGUE={
     LOSING_BADLY:["My ancestors are HISSING from their gilded tombs!","PEMBROOK! When I'm done being FURIOUS we're redecorating!","This is the worst thing that's happened to me since breakfast was LATE."],
     WINNING_BADLY:["Obviously. My breeding makes pity impossible.","Born to rule. Born to WIN. Born better, frankly.","As natural as silk on fur. Which I'm wearing. Real silk."],
     OPP_WINS:["As expected. PEMBROOK! Victory tea. The good leaves.","Breeding always prevails. How deeply embarrassing for you.","*purrrr* Acceptable outcome. Now leave my presence.","The crown wins. As it was written. By me. In gold ink."],
-    BOSS_ATTACK:["ROYAL DECREE! By my authority, ones become threes!","*hisss* A king's prerogative. Your ones are MINE.","I decree it and so it SHALL be! Learn your place!","The royal will cannot be denied! Also my fur looks EXCELLENT today!"]
+    BOSS_ATTACK:["ROYAL DECREE! By my authority, ones become threes!","*hisss* A king's prerogative. Your ones are MINE.","I decree it and so it SHALL be! Learn your place!","The royal will cannot be denied! Also my fur looks EXCELLENT today!"],
+    REMATCH_START:["Oh. You're BACK. Ambrose was too much, was he? Predictable.","Crawling back to the palace? How terribly on-brand for you.","A return visit. I'll alert Pembrook. He LOVES disappointment.","Couldn't handle the bishop? Of course not. Commoners rarely can."],
+    REMATCH_WIN:["You won. How quaint. But there are no cards to GIVE. The vault is sealed.","Congratulations on your empty victory. The royal treasury is CLOSED.","A win without a prize. How perfectly... peasant.","Enjoy your hollow triumph. My cupboards are bare and my patience is thinner."],
+    CARD_EFFECT:["What— my royal judgment is CLOUDED?! TREASON!","Something common is happening to my BRAIN! I detest this!","*hissss* My thoughts are not my OWN! PEMBROOK! PEMBROOK!","This indignity will NOT go unpunished! Once I figure out what happened!"],
+    CANT_AFFORD:["You DARE approach the crown with empty pockets? Pembrook! Remove this person!","No gold? Then you're wasting my EXTREMELY valuable time.","Come back when you can afford to be in my PRESENCE. Which is expensive."]
   },
   AMBROSE:{
     MATCH_START:["The stars foretold your arrival. Also I saw you walk in.","Blessings upon this table. Thrice blessed. Maybe four times.","The heavens whisper your fortune tonight. ...vaguely.","In nomine patris et let's get on with it, shall we?","I was deep in prayer. Well, a nap. The Lord understands.","The sacred bones await. I blessed them myself. They didn't ask."],
@@ -5922,19 +6151,26 @@ const OPP_DIALOGUE={
     LOSING_BADLY:["Deeply IRRITATING alignment of the cosmos tonight.","Should've prayed more. Or eaten less. Probably the eating.","The universe has a sense of humor. A BAD one."],
     WINNING_BADLY:["The heavens favor the pious! That's ME! Specifically me!","Truly blessed! Also experienced! Also slightly cheating! KIDDING!","Divine mandate! You can't argue with the cosmos! Well you CAN but you'll LOSE!"],
     OPP_WINS:["The stars have spoken and they said AMBROSE!","Praise be! The faithful are rewarded! As it was written! By me!","A sermon on humility, just for you. It's a LONG one. *bleats happily*","In nomine patris, the bishop takes the pot! Amen and GOODNIGHT!"],
-    BOSS_ATTACK:["A tithe unto the heavens! Ten percent! Standard!","The divine take their share, child. It's in the scripture. Somewhere.","Tithing is not optional. I checked. Well, I WROTE the rules.","The Lord's portion! Rendered unto the Lord! Who is me! In this context!"]}
+    BOSS_ATTACK:["A tithe unto the heavens! Ten percent! Standard!","The divine take their share, child. It's in the scripture. Somewhere.","Tithing is not optional. I checked. Well, I WROTE the rules.","The Lord's portion! Rendered unto the Lord! Who is me! In this context!"],
+    REMATCH_START:["The prodigal child returns! I knew you'd be back. The stars told me. Also logic.","Back from the wilderness? The flock always returns to the shepherd.","You've come full circle, child. The cosmos loves symmetry. And reruns.","Couldn't best the final trial? The heavens weep. Quietly. Into their tea."],
+    REMATCH_WIN:["Blessed victory! But the donation box is empty, child. No card.","You've won again! But the church is broke. Have you SEEN the roof?","A triumph! Sadly I've nothing left to tithe. The Lord took his share. And then some.","The heavens smile upon you! But the coffers frown. Deeply."],
+    CARD_EFFECT:["The stars are— WHAT?! My sermon notes are SCRAMBLED!","A disturbance in the divine order! Someone's been TAMPERING!","My holy intuition is... wrong? That hasn't happened since breakfast!","Something unholy this way comes! My hooves are all confused!"],
+    CANT_AFFORD:["The collection plate requires ACTUAL coins, child. Come back funded.","Even the Lord asks for a tithe. You haven't got one.","No gold? The heavens provide, but not on CREDIT. Come back later."]}
 };
 
 /* ═══════ DIALOGUE ENGINE ═══════ */
 (function(){
   const DLG={lastTime:0,cooldown:4000,hideTimer:null,active:false,oppKey:null,usedLines:{},
-    prob:{MATCH_START:1,RISKY_REROLL:.5,GREEDY_REROLL:.5,EARLY_BANK:.3,BIG_BANK:.6,PLAYER_BUST:.85,PLAYER_HOT_DICE:1,PLAYER_TRIPLE:.4,PLAYER_STRAIGHT:1,PLAYER_SIX_KIND:1,PLAYER_TAKES_LEAD:.45,PLAYER_NEAR_WIN:.7,OPP_BUST:.8,OPP_BIG_BANK:.6,OPP_TAKES_LEAD:.45,OPP_NEAR_WIN:.7,MATCH_CLOSE:.4,LOSING_BADLY:.35,WINNING_BADLY:.35,OPP_WINS:1},
+    prob:{MATCH_START:1,REMATCH_START:1,CARD_EFFECT:.8,RISKY_REROLL:.5,GREEDY_REROLL:.5,EARLY_BANK:.3,BIG_BANK:.6,PLAYER_BUST:.85,PLAYER_HOT_DICE:1,PLAYER_TRIPLE:.4,PLAYER_STRAIGHT:1,PLAYER_SIX_KIND:1,PLAYER_TAKES_LEAD:.45,PLAYER_NEAR_WIN:.7,OPP_BUST:.8,OPP_BIG_BANK:.6,OPP_TAKES_LEAD:.45,OPP_NEAR_WIN:.7,MATCH_CLOSE:.4,LOSING_BADLY:.35,WINNING_BADLY:.35,OPP_WINS:1},
     init(rungName,rungKey){this.oppKey=rungName.toUpperCase();this.portraitKey=rungKey||rungName.toLowerCase();this.lastTime=0;this.active=false;this.usedLines={};if(this.hideTimer)clearTimeout(this.hideTimer);this.hide();},
     getLine(cat){const data=OPP_DIALOGUE[this.oppKey];if(!data||!data[cat])return null;const lines=data[cat];if(!this.usedLines[cat])this.usedLines[cat]=[];
       let avail=lines.filter((_,i)=>!this.usedLines[cat].includes(i));if(!avail.length){this.usedLines[cat]=[];avail=lines;}
       const idx=Math.floor(Math.random()*avail.length);const line=avail[idx];this.usedLines[cat].push(lines.indexOf(line));return line;},
-    trigger(cat){if(!this.oppKey)return;const p=this.prob[cat]||.5;if(Math.random()>p)return;
-      const now=Date.now();if(now-this.lastTime<this.cooldown&&cat!=='MATCH_START'&&cat!=='PLAYER_SIX_KIND')return;
+    trigger(cat){if(!this.oppKey)return;
+      /* Redirect MATCH_START to REMATCH_START when replaying a beaten opponent */
+      if(cat==='MATCH_START'&&_loIsRematch){const data=OPP_DIALOGUE[this.oppKey];if(data&&data.REMATCH_START)cat='REMATCH_START';}
+      const p=this.prob[cat]||.5;if(Math.random()>p)return;
+      const now=Date.now();if(now-this.lastTime<this.cooldown&&cat!=='MATCH_START'&&cat!=='REMATCH_START'&&cat!=='PLAYER_SIX_KIND')return;
       const line=this.getLine(cat);if(!line)return;this.show(line);this.lastTime=now;},
     show(text){
       const box=document.getElementById('dlgBox'),textEl=document.getElementById('dlgText'),img=document.getElementById('dlgImg');
@@ -6099,7 +6335,10 @@ function activateCard(cardId){
     case 'whispers_hex': activateWhispersHex(); break;
     case 'ambrose_grace': activateAmbroseGrace(); break;
     case 'sleight_of_hand': activateSleightOfHand(); break;
+    case 'gamblers_eye': activateGamblersEye(); break;
   }
+  /* Trigger NPC reaction to card effect after a short delay */
+  setTimeout(function(){if(window.DLG)DLG.trigger('CARD_EFFECT');},800);
 }
 
 /* Grog's Flask: reroll up to 2 non-scoring free dice */
@@ -6200,6 +6439,42 @@ function activateSleightOfHand(){
   setStatusMsg('SLEIGHT OF HAND: '+pOld.toUpperCase()+' ↔ '+oOld.toUpperCase()+'!','gold');
   spawnPop('🃏 SWAPPED');
   SFX.commit();
+}
+
+/* Gambler's Eye: select ANY dice to keep, reroll the rest */
+function activateGamblersEye(){
+  const free=G.pool.filter(d=>!d.committed);
+  if(free.length<=1){setStatusMsg('NOT ENOUGH DICE','red');return;}
+  /* Deselect all current selections */
+  G.pool.forEach(d=>{d.sel=false;if(d.el)d.el.classList.remove('selected');});
+  _clearDieEffects();
+  /* Enter special selection mode */
+  G.phase='gamblers_eye';
+  G._gamblersEyeActive=true;
+  setStatusMsg("SELECT DICE TO KEEP, TAP ROLL",'gold');
+  setBtns(true,false);/* Enable roll, disable bank */
+  /* Override die click handlers to allow selecting ANY die */
+  free.forEach(d=>{
+    if(!d.el)return;
+    d.el.onclick=function(){
+      if(G.phase!=='gamblers_eye')return;
+      d.sel=!d.sel;d.el.classList.toggle('selected',d.sel);
+      SFX.commit();
+      /* Show count of selected */
+      var selCount=G.pool.filter(x=>x.sel&&!x.committed).length;
+      var freeCount=G.pool.filter(x=>!x.committed).length;
+      if(selCount>0&&selCount<freeCount){
+        setStatusMsg('KEEPING '+selCount+', REROLLING '+(freeCount-selCount),'gold');
+        setBtns(true,false);
+      }else if(selCount===0){
+        setStatusMsg('SELECT DICE TO KEEP','gold');
+        setBtns(false,false);
+      }else{
+        setStatusMsg('MUST LEAVE SOME TO REROLL','red');
+        setBtns(false,false);
+      }
+    };
+  });
 }
 
 /* ═══════ DICE ZOOM SYSTEM ═══════ */
@@ -6437,6 +6712,22 @@ const marginTweaks=[
 
 /* drawPixelPanel defined in match.html section */
 
+function showCantAffordBubble(rung,cardEl){
+  // Remove any existing bubble
+  var old=cardEl.querySelector('.cant-afford-bubble');if(old)old.remove();
+  var oppKey=rung.name.toUpperCase();
+  var dlgData=OPP_DIALOGUE[oppKey];
+  var lines=dlgData&&dlgData.CANT_AFFORD;
+  if(!lines||!lines.length)return;
+  var text=lines[Math.floor(Math.random()*lines.length)];
+  var bub=document.createElement('div');
+  bub.className='cant-afford-bubble';
+  bub.textContent='\u201c'+text+'\u201d';
+  cardEl.style.position='relative';
+  cardEl.appendChild(bub);
+  setTimeout(function(){bub.classList.add('fade-out');},2200);
+  setTimeout(function(){bub.remove();},2500);
+}
 function buildGrid(){
   const grid=document.getElementById('charGrid');
   grid.innerHTML='';
@@ -6488,7 +6779,16 @@ function buildGrid(){
     requestAnimationFrame(()=>{
       drawPixelPanel(canvas,bevelCol,faceCol,shadowCol,idx*7919+137,0.018);
     });
-    if(!locked&&!cantAfford)card.onclick=()=>{SFX.nav();openDetail(r,done);};
+    if(!locked&&!cantAfford){card.onclick=()=>{SFX.nav();openDetail(r,done);};}
+    else if(cantAfford){
+      card.style.pointerEvents='auto';card.style.cursor='pointer';
+      card.onclick=(function(rung,el){return function(){
+        SFX.err();
+        el.classList.remove('card-shake');void el.offsetWidth;el.classList.add('card-shake');
+        setTimeout(()=>el.classList.remove('card-shake'),400);
+        showCantAffordBubble(rung,el);
+      };})(r,card);
+    }
     grid.appendChild(card);
   });
 }
@@ -7799,7 +8099,7 @@ const SHOP_RARITY_WEIGHTS={
 };
 const CARDS_TIN=CARDS.filter(c=>c.rarity==='tin'&&c.type!=='active');
 const CARDS_SILVER=CARDS.filter(c=>c.rarity==='silver'&&c.type!=='active');
-const CARDS_GOLD=CARDS.filter(c=>c.rarity==='gold'&&c.type!=='active');
+const CARDS_GOLD=CARDS.filter(c=>c.rarity==='gold'&&(c.type!=='active'||c.id==='gamblers_eye'));
 let shopStock=null; /* array of card IDs currently offered */
 function rollShopStock(){
   const rung=Math.min(7,S.currentRung||0);
@@ -8581,7 +8881,7 @@ function buildInventoryPanel(mode){
   ownedCards.forEach(oc=>{
     const c=CARDS.find(x=>x.id===oc.id);
     if(!c)return;
-    const disabled=(mode==='clean'&&oc.tarnish===0)||(mode==='sell'&&totalCards<=1);
+    const disabled=(mode==='clean'&&oc.tarnish===0);
     const item=document.createElement('div');
     item.className='inv-card-item rarity-'+c.rarity+(disabled?' disabled':'');
     item.dataset.cardId=oc.id;
