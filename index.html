@@ -352,14 +352,15 @@ body{
   bottom:calc(100% + 4px);
   transform:translateX(-50%);transform-origin:center bottom;
 }
+/* Non-body tooltips: arrow at bottom of tooltip pointing down toward card */
 .shop-card .mcard-tooltip::after,
 .lo-mini-card .mcard-tooltip::after,
 .lo-hand-slot .mcard-tooltip::after,
-.res-card .mcard-tooltip::after,
-body > .mcard-tooltip::after{
+.res-card .mcard-tooltip::after{
   content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);
   border:8px solid transparent;border-top-color:var(--ctrim2);
 }
+/* Body-promoted tooltips use the JS .tip-arrow div (correct direction + card-aligned position) */
 .shop-card.peeked .mcard-tooltip,
 .lo-mini-card.peeked .mcard-tooltip,
 .lo-hand-slot.peeked .mcard-tooltip,
@@ -3537,7 +3538,7 @@ body::before,body::after{display:none!important}
     </div>
   </div>
 
-  <div class="dice-spacer" style="flex:1"></div>
+  <div class="dice-spacer" style="flex:0"></div>
 
   <!-- Player zone wrapper — fixed layout -->
   <div class="player-zone" id="playerZone">
@@ -3552,7 +3553,7 @@ body::before,body::after{display:none!important}
     <div class="player-dice-row" id="playerDiceRow"></div>
   </div>
 
-  <div class="dice-spacer" style="flex:3"></div>
+  <div class="dice-spacer" style="flex:5"></div>
 </div>
 
 <!-- PLAYER CARD BAR (fanned, tucked under controls) -->
@@ -4179,7 +4180,7 @@ const CARDS=[
   {id:'thrifty_gambler',name:'THRIFTY GAMBLER',icon:'💰',rarity:'gold',eff:'+20G IF BANK EXACTLY 500',desc:'Bank exactly 500 pts = +20 Gold after match.'},
   {id:'iron_crown',name:'THE IRON CROWN',icon:'⚜️',rarity:'gold',eff:'HOT DICE = +500 BONUS',desc:'Hot Dice triggers +500 pts bonus.'},
   {id:'jesters_mask',name:"JESTER'S MASK",icon:'🃏',rarity:'tin',eff:'RIVAL PLAYS CHAOTIC',desc:"Rival's aggression swings wildly each decision."},
-  {id:'serpents_whisper',name:"SERPENT'S WHISPER",icon:'🐍',rarity:'silver',eff:'RIVAL MINBANK +200',desc:'Rival refuses to bank below threshold +200.'},
+  {id:'serpents_whisper',name:"SERPENT'S WHISPER",icon:'🐍',rarity:'silver',eff:"RIVAL WON'T BANK <200",desc:'Rival keeps rolling until scoring 200+ in a turn — they refuse to bank less.'},
   {id:'cowards_bell',name:"COWARD'S BELL",icon:'🔕',rarity:'silver',eff:'RIVAL DICESTOP +1',desc:'Rival stops rolling one die sooner.'},
   {id:'tyrants_gaze',name:"TYRANT'S GAZE",icon:'👁️',rarity:'gold',eff:'RIVAL CANNOT ADAPT',desc:'Rival loses adaptive strategy ability.'},
   /* ── ACTIVE CARDS (shop + NPC rewards, drag-to-activate) ── */
@@ -4244,7 +4245,7 @@ const NPC_CARDS=[
 
   /* ── FINNICK ── */
   {id:'quick_hands',name:'QUICK HANDS',icon:'🤏',rarity:'npc',npcOnly:true,owner:'finnick',
-   eff:'Swap your best die to 3 (once)',flavor:'"Weird. Could\'ve sworn that was higher. Must be the light."',
+   eff:'YOUR HIGHEST DIE → 3',desc:'Once per match, Finnick swaps your highest-value die down to a 3.',flavor:'"Weird. Could\'ve sworn that was higher. Must be the light."',
    effect:{type:'once',mechanic:'swap_best_to_3'}},
   {id:'pocket_sand',name:'POCKET SAND',icon:'✋',rarity:'npc',npcOnly:true,owner:'finnick',
    eff:'50% CHANCE: First roll = 5 dice',flavor:'"Oh that one rolled off the table. Don\'t worry I\'ll— actually never mind."',
@@ -4644,8 +4645,11 @@ function attachTooltipTap(wrapperEl,opts){
 function closeAllChips(){
   /* Return any body-promoted tooltips to their original parents */
   document.querySelectorAll('body > .mcard-tooltip').forEach(function(tip){
-    if(tip._origParent){tip._origParent.appendChild(tip);tip.style.cssText='';tip._origParent=null;}
-    else{tip.remove();}
+    if(tip._origParent){
+      /* Remove .tip-arrow before returning — stale pixel position would conflict with CSS ::after */
+      var ta=tip.querySelector('.tip-arrow');if(ta)ta.remove();
+      tip._origParent.appendChild(tip);tip.style.cssText='';tip._origParent=null;
+    }else{tip.remove();}
   });
   var adt=document.getElementById('activeDieTooltip');if(adt)adt.remove();
   document.querySelectorAll('.peeked,.cchip.open').forEach(c=>{
@@ -6081,7 +6085,7 @@ function endMatch(win){
   resTitle.textContent=win?'VICTORY':'DEFEAT';
   resScores.classList.remove('fade-in');
   resGoldWrap.classList.remove('fade-in');
-  resGoldWrap.style.display='';
+  resGoldWrap.style.display='';resGoldWrap.style.visibility='';
   resCoinBig.className='res-coin-big';void resCoinBig.offsetWidth;
   const resCoinAmt=document.getElementById('resCoinAmt');
   const totalGold=goldEarned+thriftyBonus;
@@ -6221,8 +6225,8 @@ function endMatch(win){
       }
     },4200);
   }else{
-    // No card to show — hide gold wrap after drift to clean up
-    endT(()=>{resGoldWrap.style.display='none';},win?4500:4600);
+    // No card to show — hide gold wrap after drift (keep layout stable with visibility:hidden)
+    endT(()=>{resGoldWrap.style.visibility='hidden';},win?4500:4600);
     // Rematch win: show NPC dialogue with "no card" quips
     if(win&&isRematch){
       endT(()=>{
@@ -7528,10 +7532,12 @@ function openLoadout(rung,done){
   MAX_EQUIP=_loOppCards.length||1;
   _loSelectedCards=new Array(MAX_EQUIP).fill(null);
   _loWagerCards=[];
-  /* Auto-equip if player has exactly 1 card */
+  /* Auto-equip when owned card count fits exactly into available slots (1 card, or 2 with 2 slots, etc.) */
   if(!isGrog&&S.cards){
     var _ownedCards=S.cards.filter(function(c){return c.count>0&&CARDS.find(function(x){return x.id===c.id})});
-    if(_ownedCards.length===1){_loSelectedCards[0]=_ownedCards[0].id;}
+    if(_ownedCards.length>=1&&_ownedCards.length<=MAX_EQUIP){
+      _ownedCards.forEach(function(oc,i){_loSelectedCards[i]=oc.id;});
+    }
   }
   /* Anti-farming: rematches skip wager entirely */
   _loIsRematch=rung.id<(S.currentRung||0);
@@ -7802,10 +7808,10 @@ function initSlotCardDrag(slotEl,slotIdx){
     if(!dragging){
       dragging=true;closeAllChips();
       clone=slotEl.cloneNode(true);
-      clone.style.cssText='position:fixed;z-index:9500;pointer-events:none;opacity:.85;filter:drop-shadow(0 4px 12px rgba(0,0,0,.7));transition:none;'+
-        'left:'+origRect.left+'px;top:'+origRect.top+'px;width:'+origRect.width+'px;height:'+origRect.height+'px;margin:0;transform:scale(1.08)';
+      clone.style.cssText='position:fixed;z-index:9500;pointer-events:none;opacity:1;filter:drop-shadow(0 8px 24px rgba(0,0,0,.8)) brightness(1.1);transition:none;'+
+        'left:'+origRect.left+'px;top:'+origRect.top+'px;width:'+origRect.width+'px;height:'+origRect.height+'px;margin:0;transform:scale(1.15)';
       document.body.appendChild(clone);
-      slotEl.style.opacity='.3';
+      slotEl.style.opacity='.2';
     }
     if(e.cancelable)e.preventDefault();
     clone.style.left=(origRect.left+dx)+'px';
@@ -7883,10 +7889,10 @@ function initPickerCardDrag(cardEl,cardId){
     if(!dragging){
       dragging=true;closeAllChips();
       clone=cardEl.cloneNode(true);
-      clone.style.cssText='position:fixed;z-index:9500;pointer-events:none;opacity:.9;filter:drop-shadow(0 6px 16px rgba(0,0,0,.7));transition:none;'+
-        'left:'+origRect.left+'px;top:'+origRect.top+'px;width:'+origRect.width+'px;height:'+origRect.height+'px;margin:0;transform:scale(1.1)';
+      clone.style.cssText='position:fixed;z-index:9500;pointer-events:none;opacity:1;filter:drop-shadow(0 8px 24px rgba(0,0,0,.8)) brightness(1.1);transition:none;'+
+        'left:'+origRect.left+'px;top:'+origRect.top+'px;width:'+origRect.width+'px;height:'+origRect.height+'px;margin:0;transform:scale(1.15)';
       document.body.appendChild(clone);
-      cardEl.style.opacity='.3';
+      cardEl.style.opacity='.2';
     }
     if(e.cancelable)e.preventDefault();
     clone.style.left=(origRect.left+dx)+'px';
@@ -8179,8 +8185,8 @@ function autoStake(){
   if(mode==='all'){
     _loWagerCards=equipped.map(function(e){return e.id;});
   }else if(mode==='choose'){
-    /* Default to worst card — player can change via wager slot tap */
-    equipped.sort(function(a,b){return b.rank-a.rank;});/* worst first */
+    /* Default to best card — player can tap wager slot to change */
+    equipped.sort(function(a,b){return a.rank-b.rank;});/* best first */
     _loWagerCards=equipped.slice(0,Math.min(wagerCount,equipped.length)).map(function(e){return e.id;});
   }else{
     /* 'best' — highest rarity forced, no changing */
@@ -9042,16 +9048,15 @@ function snapCloneBack(clone,origRect,originalEl){
   clone.style.transition='none';
   clone.style.left=origRect.left+'px';clone.style.top=origRect.top+'px';
   clone.style.transform='translate('+dx+'px,'+dy+'px) scale(1.08)';
-  requestAnimationFrame(()=>requestAnimationFrame(()=>{
-    clone.style.transition='transform .32s cubic-bezier(.2,1.4,.4,1),opacity .28s ease-out';
-    clone.style.transform='translate(0,0) scale(1)';
-    clone.style.opacity='0.4';
-  }));
-  setTimeout(()=>{clone.remove();if(originalEl)originalEl.style.opacity='';},340);
+  void clone.offsetHeight; /* Force reflow — reliable on iOS Safari vs double-rAF */
+  clone.style.transition='transform .35s cubic-bezier(.2,1.4,.4,1),opacity .28s ease-out';
+  clone.style.transform='translate(0,0) scale(1)';
+  clone.style.opacity='0.4';
+  setTimeout(()=>{clone.remove();if(originalEl)originalEl.style.opacity='';},380);
 }
 
 function initShopCardDrag(cardEl,cardId,cost){
-  let sx=0,sy=0,dragging=false,moved=false,origRect=null,clone=null;
+  let sx=0,sy=0,dragging=false,moved=false,origRect=null,origNatW=0,origNatH=0,origScWrap=null,fan=null,remainWraps=[],origNextSib=null,origWrapIdx=-1;
   function getXY(e){return e.touches?{x:e.touches[0].clientX,y:e.touches[0].clientY}:{x:e.clientX,y:e.clientY};}
   function removeDocListeners(){
     document.removeEventListener('touchmove',onMove);
@@ -9068,7 +9073,7 @@ function initShopCardDrag(cardEl,cardId,cost){
     if(topEl&&!cardEl.contains(topEl))return;
     sx=pt.x;sy=pt.y;moved=false;
     origRect=cardEl.getBoundingClientRect();
-    /* Add doc listeners only for the lifetime of this drag */
+    origScWrap=cardEl.parentElement;
     document.addEventListener('touchmove',onMove,{passive:false});
     document.addEventListener('touchend',onEnd,{passive:true});
     document.addEventListener('touchcancel',onEnd,{passive:true});
@@ -9084,28 +9089,61 @@ function initShopCardDrag(cardEl,cardId,cost){
       if(Math.abs(dx)<10&&Math.abs(dy)<10)return;
       dragging=true;moved=true;window._shopDragging=true;
       closeAllChips();
-      /* Clone-based: original stays in fan, clone follows finger.
-         Clone lives in document.body — no transform-ancestor offset issues. */
-      clone=cardEl.cloneNode(true);
-      clone.style.cssText='position:fixed;z-index:9500;pointer-events:none;margin:0;transition:none;'+
-        'left:'+origRect.left+'px;top:'+origRect.top+'px;'+
-        'width:'+origRect.width+'px;height:'+origRect.height+'px;'+
+      fan=origScWrap.parentElement;
+      const allWraps=[...fan.querySelectorAll('.sc-wrap')];
+      origWrapIdx=allWraps.indexOf(origScWrap);
+      origNextSib=origScWrap.nextSibling;
+      remainWraps=allWraps.filter(w=>w!==origScWrap);
+      /* Remove .entering class and cancel all animations so CSS fan transforms are readable.
+         .entering has fill:both → its fill permanently overrides nth-child transforms with transform:none */
+      allWraps.forEach(w=>{w.classList.remove('entering');w.getAnimations().forEach(a=>a.cancel());});
+      const allPositions=allWraps.map(w=>getComputedStyle(w).transform);
+      const snapshots=remainWraps.map(w=>allPositions[allWraps.indexOf(w)]);
+      /* Capture natural card dimensions BEFORE moving to body (offsetWidth ignores ancestor rotation) */
+      origNatW=cardEl.offsetWidth; origNatH=cardEl.offsetHeight;
+      const cx=origRect.left+origRect.width/2, cy=origRect.top+origRect.height/2;
+      /* Hide price row */
+      const priceRow=origScWrap.querySelector('.sc-price-row');
+      if(priceRow)priceRow.style.display='none';
+      /* Move card to body centered at origRect center with natural dimensions */
+      cardEl.style.cssText='position:fixed;z-index:9500;pointer-events:none;margin:0;transition:none;'+
+        'left:'+(cx-origNatW/2)+'px;top:'+(cy-origNatH/2)+'px;'+
+        'width:'+origNatW+'px;height:'+origNatH+'px;'+
         'transform:scale(1.15);filter:drop-shadow(0 8px 24px rgba(0,0,0,.7)) brightness(1.1);';
-      document.body.appendChild(clone);
-      cardEl.style.opacity='0.35';
+      document.body.appendChild(cardEl);
+      /* Remove origScWrap — shifts nth-child numbers for remaining wraps */
+      origScWrap.remove();
+      const rightmost=origWrapIdx===allWraps.length-1;
+      if(rightmost){
+        /* Rightmost removed: remaining cards slide right one slot to fill the gap.
+           fill:'none' + onfinish commit avoids browser inconsistencies with fill:'forwards' reads */
+        remainWraps.forEach(w=>{
+          const wi=allWraps.indexOf(w);
+          const toPos=allPositions[wi+1];
+          const a=w.animate([{transform:allPositions[wi]},{transform:toPos}],
+            {duration:350,easing:'cubic-bezier(.2,1.3,.4,1)',fill:'none'});
+          a.onfinish=()=>{ w.style.transform=toPos; };
+        });
+      } else {
+        /* Non-rightmost: nth-child shifted, so read CSS targets after DOM change */
+        const targets=remainWraps.map(w=>{w.style.transform='';return getComputedStyle(w).transform;});
+        remainWraps.forEach((w,i)=>{
+          if(snapshots[i]===targets[i])return;
+          w.animate([{transform:snapshots[i]},{transform:targets[i]}],
+            {duration:350,easing:'cubic-bezier(.2,1.3,.4,1)',fill:'none'});
+        });
+      }
       showBuyZone(cardId,cost);
     }
-    clone.style.left=(origRect.left+dx)+'px';
-    clone.style.top=(origRect.top+dy)+'px';
-    /* Hit-test buy zone using clone's actual viewport position */
+    cardEl.style.left=(origRect.left+dx)+'px';
+    cardEl.style.top=(origRect.top+dy)+'px';
+    /* Hit-test: finger/pointer within zone + generous padding (card is tall; center-based check fails on mobile) */
     const zone=document.getElementById('buyZone');
     if(zone){
       const zr=zone.getBoundingClientRect();
-      const cr=clone.getBoundingClientRect();
-      const overlapX=Math.max(0,Math.min(cr.right,zr.right)-Math.max(cr.left,zr.left));
-      const overlapY=Math.max(0,Math.min(cr.bottom,zr.bottom)-Math.max(cr.top,zr.top));
-      const overlap=overlapX*overlapY;
-      if(overlap>cr.width*cr.height*0.5){
+      const pad=44;
+      const inZone=pt.x>=zr.left-pad&&pt.x<=zr.right+pad&&pt.y>=zr.top-pad&&pt.y<=zr.bottom+pad;
+      if(inZone){
         zone.classList.add('hot');
         if(playerGold<cost)zone.classList.add('cant-afford');
         else zone.classList.remove('cant-afford');
@@ -9114,30 +9152,93 @@ function initShopCardDrag(cardEl,cardId,cost){
       }
     }
   }
+  function snapCardBack(){
+    /* Animate remaining wraps back to their fan positions */
+    if(fan&&fan.isConnected&&remainWraps.length){
+      /* Read visual positions BEFORE canceling — fill:'forwards' WAAPI state would be lost on cancel */
+      const curSnaps=remainWraps.map(w=>{
+        const t=getComputedStyle(w).transform;
+        w.getAnimations().forEach(a=>a.cancel());
+        w.style.transform=t; /* commit so inline holds the position after cancel */
+        return t;
+      });
+      fan.insertBefore(origScWrap,origNextSib);
+      origScWrap.getAnimations().forEach(a=>a.cancel());
+      origScWrap.style.setProperty('z-index','20','important'); /* stay on top when it reappears */
+      origScWrap.style.opacity='0';
+      /* Read CSS fan targets after origScWrap re-insertion (nth-child numbers restored) */
+      const backTargets=remainWraps.map(w=>{w.style.transform='';return getComputedStyle(w).transform;});
+      remainWraps.forEach((w,i)=>{
+        if(curSnaps[i]===backTargets[i])return;
+        w.animate([{transform:curSnaps[i]},{transform:backTargets[i]}],
+          {duration:380,easing:'cubic-bezier(.2,1.3,.4,1)',fill:'none'});
+      });
+    }
+    /* WAAPI snap-back: card slides from drag position back to fan slot AND rotates into fan angle */
+    const fanAngle=origWrapIdx===0?-11:origWrapIdx===2?11:0;
+    const tgtCX=origRect.left+origRect.width/2, tgtCY=origRect.top+origRect.height/2;
+    const targetL=tgtCX-origNatW/2, targetT=tgtCY-origNatH/2;
+    const curR=cardEl.getBoundingClientRect();
+    const curCX=curR.left+curR.width/2, curCY=curR.top+curR.height/2;
+    /* Set final inline position — WAAPI fill:'backwards' applies from-keyframe immediately
+       (prevents 1-frame flash of the inline transform before WAAPI starts compositing) */
+    cardEl.style.transition='none';
+    cardEl.style.left=targetL+'px';
+    cardEl.style.top=targetT+'px';
+    cardEl.style.transform='scale(1) rotate('+fanAngle+'deg)';
+    cardEl.style.filter='none';
+    cardEl.getAnimations().forEach(a=>a.cancel());
+    const anim=cardEl.animate(
+      [{transform:'translate('+(curCX-tgtCX)+'px,'+(curCY-tgtCY)+'px) scale(1.15) rotate(0deg)'},
+       {transform:'translate(0,0) scale(1) rotate('+fanAngle+'deg)'}],
+      {duration:420,easing:'cubic-bezier(.2,1.4,.4,1)',fill:'backwards'}
+    );
+    /* onfinish: move card from body into sc-wrap synchronously — browser paints them together */
+    anim.onfinish=()=>{
+      if(!origScWrap||!origScWrap.isConnected){cardEl.style.cssText='';return;}
+      origScWrap.insertBefore(cardEl,origScWrap.firstChild);
+      cardEl.style.cssText='';
+      const pr=origScWrap.querySelector('.sc-price-row');
+      if(pr){
+        pr.style.opacity='0';
+        pr.style.display='';
+        requestAnimationFrame(()=>{
+          pr.style.transition='opacity .35s ease';
+          pr.style.opacity='1';
+          pr.addEventListener('transitionend',()=>{pr.style.transition='';pr.style.opacity='';},{once:true});
+        });
+      }
+      remainWraps.forEach(w=>w.style.transform='');
+      origScWrap.style.setProperty('z-index','20','important'); /* always settle on top */
+      origScWrap.style.transition='none';
+      origScWrap.style.opacity='1';
+    };
+  }
   function onEnd(){
     removeDocListeners();
     if(!origRect)return;
-    if(!dragging){origRect=null;if(clone){clone.remove();clone=null;}return;}
+    if(!dragging){origRect=null;return;}
     dragging=false;window._shopDragging=false;
     const zone=document.getElementById('buyZone');
     const isHot=zone&&zone.classList.contains('hot');
     hideBuyZone();
     if(isHot&&playerGold>=cost){
-      /* Buy: coins burst at zone center, rebuild tab */
+      /* Purchase — remaining wraps already animated to new positions during drag */
       const zr=zone.getBoundingClientRect();
       purchaseEffect(zr.left+zr.width/2,zr.top+zr.height/2);
-      if(clone){clone.remove();clone=null;}
-      cardEl.style.opacity='';
       SFX.bank();
+      cardEl.remove();
+      if(origScWrap)origScWrap.remove();
       playerGold-=cost;
       const existing=ownedCards.find(o=>o.id===cardId);
       if(existing)existing.count++;
       else ownedCards.push({id:cardId,count:1,tarnish:0});
+      shopStock=shopStock.filter(id=>id!==cardId);
+      S.shopStock=shopStock;
       updateGoldDisplay();syncToState();
-      setTimeout(()=>buildCardsTab(),350);
+      setTimeout(()=>buildCardsTab(),300);
     }else{
-      /* Snap back */
-      snapCloneBack(clone,origRect,cardEl);clone=null;
+      snapCardBack();
       if(isHot&&playerGold<cost&&zone){
         const lbl=zone.querySelector('.bz-label');
         const savedLabel=lbl?lbl.textContent:'BUY';
@@ -9150,7 +9251,6 @@ function initShopCardDrag(cardEl,cardId,cost){
   }
   cardEl.addEventListener('touchstart',e=>onStart(e),{passive:false});
   cardEl.addEventListener('mousedown',onStart);
-  /* cleanup: only element-level listeners (doc listeners are per-drag) */
   const cleanup=()=>{
     cardEl.removeEventListener('touchstart',onStart);
     cardEl.removeEventListener('mousedown',onStart);
@@ -9265,15 +9365,13 @@ function initShopDiceDrag(cellEl,dieId,cost){
     }
     clone.style.left=(origRect.left+dx)+'px';
     clone.style.top=(origRect.top+dy)+'px';
-    /* Hit-test buy zone using clone's actual viewport position */
+    /* Hit-test: finger within zone + padding (consistent with shop card drag) */
     var zone=document.getElementById('buyZoneDice');
     if(zone){
       var zr=zone.getBoundingClientRect();
-      var cr=clone.getBoundingClientRect();
-      var overlapX=Math.max(0,Math.min(cr.right,zr.right)-Math.max(cr.left,zr.left));
-      var overlapY=Math.max(0,Math.min(cr.bottom,zr.bottom)-Math.max(cr.top,zr.top));
-      var overlap=overlapX*overlapY;
-      if(overlap>cr.width*cr.height*0.5){
+      var pad=44;
+      var inZone=pt.x>=zr.left-pad&&pt.x<=zr.right+pad&&pt.y>=zr.top-pad&&pt.y<=zr.bottom+pad;
+      if(inZone){
         zone.classList.add('hot');
         if(playerGold<cost)zone.classList.add('cant-afford');
         else zone.classList.remove('cant-afford');
