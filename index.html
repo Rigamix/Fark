@@ -2023,6 +2023,14 @@ body::before,body::after{display:none!important}
 .lo-hand-slot.hot{border-color:var(--gold)!important;background:rgba(255,215,0,.12);box-shadow:0 0 12px rgba(255,215,0,.3);border-style:solid}
 .lo-hand-slot.dragging,.lo-mini-card.dragging{opacity:.9;filter:drop-shadow(0 4px 12px rgba(0,0,0,.7));transform:scale(1.05)}
 .lo-hand-slot .lo-mini-card,.lo-wager-slot .lo-mini-card{width:100%;height:100%}
+/* ── Tarnish pips on mini cards ── */
+.lo-mini-card .tarnish-pips{position:absolute;bottom:3px;left:0;right:0;display:flex;gap:2px;justify-content:center;z-index:10;pointer-events:none}
+.lo-mini-card .tarnish-pip{width:4px;height:4px;border-radius:50%;background:rgba(80,40,20,.35);border:1px solid rgba(100,60,30,.5)}
+.lo-mini-card .tarnish-pip.filled{background:#c43d2a;border-color:#e05030}
+.lo-mini-card.worn-card .gcard{opacity:.55;filter:grayscale(.65)}
+.lo-mini-card.worn-card::after{content:'WORN';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:7px;color:#e05030;letter-spacing:1px;font-weight:bold;text-shadow:0 1px 2px rgba(0,0,0,.9);z-index:11;pointer-events:none}
+/* ── Multi-card wager badge ── */
+.wager-extra-badge{position:absolute;bottom:2px;right:2px;background:rgba(0,0,0,.85);border:1px solid var(--gold);border-radius:3px;font-size:7px;color:var(--gold);padding:1px 3px;z-index:20;pointer-events:none}
 /* ── Dice 3D Zoom Overlay ── */
 .dice-zoom-overlay{
   position:fixed;inset:0;z-index:9700;
@@ -3436,7 +3444,7 @@ body::before,body::after{display:none!important}
       <div class="lo-wager-zone" id="loWagerZone" style="display:none">
         <div class="lo-wager-label">WAGER — YOUR BEST CARD VS THEIRS</div>
         <div class="lo-wager-vs">
-          <div class="lo-wager-slot" id="loWagerPlayer"><span style="font-size:9px">YOUR<br>CARD</span></div>
+          <div class="lo-wager-slot" id="loWagerPlayer"><span style="font-size:8px;opacity:.5;letter-spacing:.5px">STAKE</span></div>
           <div class="lo-vs-icon">VS</div>
           <div class="lo-wager-slot" id="loWagerOpp"><span style="font-size:9px">OPP<br>CARD</span></div>
         </div>
@@ -5210,7 +5218,12 @@ function flashYourTurn(){const ov=document.getElementById('turn-ov');ov.classLis
 
 /* ═══════ TURN FLOW ═══════ */
 function effectiveCards(){
-  return G.pCards;/* no caller mutates the result; skip spread copy */
+  /* Filter out worn cards (tarnish >= TARNISH_DISABLE) — they stop working until cleaned */
+  if(!S||!S.cards)return G.pCards;
+  return G.pCards.filter(function(cid){
+    var sc=S.cards.find(function(c){return c.id===cid;});
+    return !sc||(sc.tarnish||0)<TARNISH_DISABLE;
+  });
 }
 function toggleDie(d){if(G.phase!=='choosing'||d.committed)return;d.sel=!d.sel;d.el.classList.toggle('selected',d.sel);SFX.commit();refreshSelUI();}
 
@@ -7498,11 +7511,20 @@ function loGcCorners(){
   return['tl','tr','bl','br'].map(corner).join('');
 }
 function loMiniCardHTML(card,isDraggable,opts){
-  return '<div class="lo-mini-card rarity-'+card.rarity+'" data-card-id="'+card.id+'"'+(isDraggable?' draggable="true"':'')+'>'+
+  var sc=S&&S.cards&&S.cards.find(function(c){return c.id===card.id;});
+  var tarnish=sc?(sc.tarnish||0):0;
+  var worn=tarnish>=TARNISH_DISABLE;
+  var pipHtml='';
+  if(tarnish>0){
+    pipHtml='<div class="tarnish-pips">';
+    for(var t=0;t<TARNISH_DISABLE;t++){pipHtml+='<div class="tarnish-pip'+(t<tarnish?' filled':'')+'"></div>';}
+    pipHtml+='</div>';
+  }
+  return '<div class="lo-mini-card rarity-'+card.rarity+(worn?' worn-card':'')+'" data-card-id="'+card.id+'"'+(isDraggable?' draggable="true"':'')+'>'+
     '<div class="gcard rarity-'+card.rarity+'">'+
     '<div class="gcard-cover" style="background:'+((CARD_COVERS[card.id]||{}).bg||'#444')+'">'+(( CARD_COVERS[card.id]||{}).icon||'?')+'</div>'+
     '<div class="gcard-frame"></div>'+loGcCorners()+
-    '</div>'+mkCardTooltipHTML(card,null,opts)+'</div>';
+    '</div>'+pipHtml+mkCardTooltipHTML(card,null,opts)+'</div>';
 }
 
 var _savedStatsHTML='';
@@ -7533,7 +7555,7 @@ function openLoadout(rung,done){
   _loWagerCards=[];
   /* Auto-equip when owned card count fits exactly into available slots (1 card, or 2 with 2 slots, etc.) */
   if(!isGrog&&S.cards){
-    var _ownedCards=S.cards.filter(function(c){return c.count>0&&CARDS.find(function(x){return x.id===c.id})});
+    var _ownedCards=S.cards.filter(function(c){return c.count>0&&(c.tarnish||0)<TARNISH_DISABLE&&CARDS.find(function(x){return x.id===c.id})});
     if(_ownedCards.length>=1&&_ownedCards.length<=MAX_EQUIP){
       _ownedCards.forEach(function(oc,i){_loSelectedCards[i]=oc.id;});
     }
@@ -8187,8 +8209,9 @@ function autoStake(){
   var _rarOrd={gold:1,silver:2,tin:3};
   var equipped=_loSelectedCards.filter(function(c){return !!c}).map(function(cid){
     var card=CARDS.find(function(cd){return cd.id===cid});
-    return{id:cid,rank:card?(_rarOrd[card.rarity]||99):99};
-  });
+    var sc=S&&S.cards&&S.cards.find(function(c){return c.id===cid;});
+    return{id:cid,rank:card?(_rarOrd[card.rarity]||99):99,worn:sc&&(sc.tarnish||0)>=TARNISH_DISABLE};
+  }).filter(function(e){return !e.worn;});
   if(mode==='all'){
     _loWagerCards=equipped.map(function(e){return e.id;});
   }else if(mode==='choose'){
@@ -8370,7 +8393,9 @@ function renderLoWager(){
       var card=CARDS.find(function(cd){return cd.id===_loWagerCards[0]});
       if(card){pSlot.innerHTML=loMiniCardHTML(card,false);pSlot.classList.add('filled');pSlot.style.position='relative';}
     }else{
-      pSlot.innerHTML='<span style="font-size:9px;line-height:1.4;text-align:center">WAGER<br><b>'+wc+' CARDS</b></span>';
+      /* Multiple cards — show first card thumbnail with +N badge */
+      var firstCard=CARDS.find(function(cd){return cd.id===_loWagerCards[0]});
+      if(firstCard){pSlot.innerHTML=loMiniCardHTML(firstCard,false)+'<div class="wager-extra-badge">+'+(_loWagerCards.length-1)+'</div>';}
       pSlot.classList.add('filled');
     }
     pSlot.style.position='relative';pSlot.style.overflow='visible';
@@ -8384,7 +8409,7 @@ function renderLoWager(){
       attachTooltipTap(pSlot);
     }
   }else{
-    pSlot.innerHTML='<span style="font-size:9px">YOUR<br>CARD</span>';
+    pSlot.innerHTML='<span style="font-size:8px;opacity:.5;letter-spacing:.5px">STAKE</span>';
     pSlot.classList.remove('filled');
     pSlot.style.cursor='default';pSlot.onclick=null;
   }
@@ -8477,9 +8502,14 @@ function launchMatch(){
     showModal({portrait:GAUNTLET_PORTRAITS.innkeeper,title:'Not Enough Gold',msg:'Ye need <span style="color:var(--gold)">'+rung.buyIn+'</span> gold for the buy-in.<br>Ye only have <span style="color:var(--gold)">'+S.gold+'</span>.'});
     return;
   }
-  if(!_loIsRematch&&rung.wager&&_loWagerCards.length===0){
+  if(!_loIsRematch&&rung.wager&&_loWagerCards.length<(rung.wagerCount||1)){
     SFX.err();
-    showModal({portrait:GAUNTLET_PORTRAITS.innkeeper,title:'No Card to Wager',msg:'Ye need at least one card<br>to stake against this opponent!<br><span style="color:var(--textdim)">Visit the Store to buy cards.</span>'});
+    var need=rung.wagerCount||1;
+    var have=_loWagerCards.length;
+    var msg=have===0
+      ?'Ye need at least one card<br>to stake against this opponent!<br><span style="color:var(--textdim)">Visit the Store to buy cards.</span>'
+      :'This match requires <span style="color:var(--gold)">'+need+'</span> cards wagered.<br>Tap the wager slot to pick the second.';
+    showModal({portrait:GAUNTLET_PORTRAITS.innkeeper,title:'Wager Incomplete',msg:msg});
     return;
   }
   // Auto-stake is handled by autoStake() — no manual wager needed
