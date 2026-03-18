@@ -171,8 +171,6 @@ body{
   height:0;/* takes no flex space – cards overflow visually */
 }
 /* tooltip itself has z-index:9000, card bar stays at normal z */
-.bar-lbl{display:none}
-
 /* ─── MATCH CARDS (fanned hand) ─── */
 .mcard{
   width:70px;height:98px;border-radius:5px;overflow:visible;
@@ -4632,6 +4630,7 @@ function attachTooltipTap(wrapperEl,opts){
   let _tapped=false;
   const toggle=function(e){
     if(_dragState&&_dragState.dragging)return;
+    if(window._shopDragging)return; /* suppress tooltip when shop drag just ended */
     if(_tapped)return;_tapped=true;setTimeout(()=>_tapped=false,400);
     e.stopPropagation();
     const wasPeeked=wrapperEl.classList.contains('peeked');
@@ -5940,7 +5939,7 @@ function runOppTurn(){
       /* NPC reckless die penalty (Brass): busts cost NPC extra from total */
       /* (handled in NPC bust path above — no forced bust, just extra penalty on natural bust) */
       G.oppDice.filter(d=>!d.kept).forEach((d,i)=>{if(used[i]){d.kept=true;if(d.el){d.el.style.outline='2px solid var(--green)';d.el.style.outlineOffset='2px';}}});
-      if(G.pCards.includes('sooty_table')){const freeVals=fV;for(let f=2;f<=6;f++){if(freeVals.filter(v=>v===f).length>=3){sootyActive=true;break;}}}
+      if(G.pCards.includes('sooty_table')){const _sc={};fV.forEach(v=>{_sc[v]=(_sc[v]||0)+1;});if(Object.values(_sc).some(c=>c>=3))sootyActive=true;}
       oppBank+=total;setStatusMsg((G.rung?G.rung.name:'RIVAL')+' +'+total+' TOTAL: '+oppBank,'active');
       left=G.oppDice.filter(d=>!d.kept).length;
       if(left===0){left=6;setTimeout(step,1500);return;}
@@ -7644,6 +7643,7 @@ function openLoadout(rung,done){
 }
 function closeLoadout(){
   closePicker(); // Dismiss any open picker
+  _cleanupLoDrag(); // Remove any active drag listeners
   var sheet=document.getElementById('detailSheet');
   _loRung=null;
   var currentH=sheet.offsetHeight;
@@ -8098,6 +8098,7 @@ function openCardPicker(slotIndex,tappedEl){
   if(useCarousel) setTimeout(function(){_setupInfiniteScroll(grid,realCount)},50);
 }
 
+var _pickerListenerActive=false;
 function closePicker(){
   var picker=document.getElementById('loPicker');
   picker.classList.remove('open');
@@ -8105,6 +8106,7 @@ function closePicker(){
   _pickerSlot=-1;
   renderLoDice(); // remove gold outline from selected die
   document.removeEventListener('pointerdown',_pickerOutsideClick,true);
+  _pickerListenerActive=false;
 }
 function _pickerOutsideClick(e){
   var picker=document.getElementById('loPicker');
@@ -8118,7 +8120,12 @@ function _pickerOutsideClick(e){
   closePicker();
 }
 function _startPickerOutsideListener(){
-  setTimeout(function(){document.addEventListener('pointerdown',_pickerOutsideClick,true);},0);
+  if(_pickerListenerActive)return;
+  setTimeout(function(){
+    if(_pickerSlot<0)return; /* picker already closed before timeout fired */
+    _pickerListenerActive=true;
+    document.addEventListener('pointerdown',_pickerOutsideClick,true);
+  },0);
 }
 
 /* ── Position picker below a tapped element ── */
