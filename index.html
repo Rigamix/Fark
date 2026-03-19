@@ -1136,11 +1136,13 @@ body{
 }
 
 .spop{
-  position:absolute;pointer-events:none;z-index:60;
-  font-family:var(--font-px);font-size:clamp(12px,3.2vw,16px);color:var(--gold);text-shadow:1px 1px 0 #000;
-  animation:sPop .7s steps(4) forwards;
+  position:fixed;pointer-events:none;z-index:9510;white-space:nowrap;
+  font-family:var(--font-px);font-size:clamp(17px,4.8vw,23px);
+  color:var(--gold);
+  text-shadow:2px 2px 0 #000,-1px 0 0 #000,0 -1px 0 #000,1px 0 0 rgba(255,220,80,.4);
+  animation:sPop .8s steps(5) forwards;
 }
-@keyframes sPop{0%{transform:translateY(0);opacity:1}100%{transform:translateY(-40px);opacity:0}}
+@keyframes sPop{0%{transform:translateX(-50%) translateY(0);opacity:1}100%{transform:translateX(-50%) translateY(-52px);opacity:0}}
 .spop-bank{
   position:fixed;pointer-events:none;z-index:9510;white-space:nowrap;
   font-family:var(--font-px);font-size:clamp(17px,4.8vw,23px);
@@ -2745,8 +2747,8 @@ body::before,body::after{display:none!important}
   position:relative;min-height:100%;
 }
 .innkeeper-scene{
-  position:relative;width:380px;height:380px;
-  margin-top:-16px;margin-bottom:-40px;flex-shrink:0;z-index:3;
+  position:relative;width:266px;height:266px;
+  margin-top:-10px;margin-bottom:-28px;flex-shrink:0;z-index:3;
 }
 .innkeeper-img{
   width:100%;height:100%;object-fit:contain;
@@ -2755,15 +2757,15 @@ body::before,body::after{display:none!important}
 }
 /* Speech scroll */
 .innkeeper-speech{
-  position:relative;width:calc(100% - 16px);max-width:340px;
-  padding:22px 32px 16px;margin-top:12px;margin-bottom:8px;
+  position:relative;width:calc(100% - 16px);max-width:300px;
+  padding:14px 24px 12px;margin-top:8px;margin-bottom:6px;
   animation:speechFade 1s ease forwards;
   z-index:1;
 }
 .innkeeper-speech canvas{position:absolute;inset:0;image-rendering:pixelated}
 .innkeeper-speech .speech-text{
   position:relative;z-index:2;
-  font-family:'IM Fell English',serif;font-size:18px;color:#3a2a18;
+  font-family:'IM Fell English',serif;font-size:14px;color:#3a2a18;
   text-align:center;letter-spacing:1px;line-height:1.5;
   text-shadow:none;
 }
@@ -2779,7 +2781,7 @@ body::before,body::after{display:none!important}
   position:relative;cursor:pointer;padding:18px 12px;
   display:inline-flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:12px;
   animation:serviceFloat 4s ease-in-out infinite;
-  overflow:hidden;border-radius:6px;min-width:0;flex:1;max-width:150px;min-height:130px;
+  border-radius:6px;min-width:0;flex:1;max-width:150px;min-height:130px;
 }
 .service-box:nth-child(1){animation-delay:0s;animation-duration:3.6s}
 .service-box:nth-child(2){animation-delay:.4s;animation-duration:4.1s}
@@ -2788,10 +2790,9 @@ body::before,body::after{display:none!important}
   0%,100%{transform:translateY(0)}
   50%{transform:translateY(-2px)}
 }
-.service-box>*{position:relative;z-index:2}
-.service-box canvas{position:absolute;inset:0;image-rendering:pixelated;z-index:1}
-.svc-icon{font-size:52px;flex-shrink:0}
-.svc-name{font-size:16px;color:var(--gold);letter-spacing:1.5px;text-align:center}
+.service-box canvas{position:absolute;inset:0;image-rendering:pixelated;z-index:0;border-radius:6px}
+.svc-icon{position:relative;z-index:2;font-size:52px;flex-shrink:0;transform:translateZ(0)}
+.svc-name{position:relative;z-index:2;font-size:16px;color:var(--gold);letter-spacing:1.5px;text-align:center;transform:translateZ(0)}
 @media (max-height:700px){
   .innkeeper-scene{width:220px;height:220px}
   .services-wrap{min-height:0}
@@ -4831,6 +4832,7 @@ function attachTooltipTap(wrapperEl,opts){
   const toggle=function(e){
     if(_dragState&&_dragState.dragging)return;
     if(window._shopDragging)return; /* suppress tooltip when shop drag just ended */
+    if(window._loDragging)return;   /* suppress tooltip when loadout drag just ended */
     e.stopPropagation();
     const wasPeeked=wrapperEl.classList.contains('peeked');
     closeAllChips();
@@ -5424,16 +5426,17 @@ function spawnPixelSparks(el,count){
 }
 function spawnPop(txt){
   if(txt&&txt[0]==='+')SFX.coins();
-  const a=document.getElementById('diceArea');
-  const row=document.getElementById('playerDiceRow');
+  const pScoreEl=document.getElementById('pScore');
+  const diceRow=document.getElementById('playerDiceRow');
+  const diceArea=document.getElementById('diceArea');
+  const scoreRect=pScoreEl?pScoreEl.getBoundingClientRect():null;
+  const rowRect=diceRow?diceRow.getBoundingClientRect():(diceArea||document.body).getBoundingClientRect();
+  const x=scoreRect?Math.round(scoreRect.left+scoreRect.width/2):60;
+  const y=rowRect?Math.round(rowRect.top+rowRect.height/2):200;
   const d=document.createElement('div');d.className='spop';d.textContent=txt;
-  /* Position below the kept tray (or dice row if no kept) */
-  const kept=document.getElementById('keptTray');
-  const anchor=kept&&kept.children.length?kept:row;
-  const rowBot=anchor?anchor.offsetTop+anchor.offsetHeight+20:a.clientHeight*.5;
-  d.style.left=(a.clientWidth/2-40+Math.random()*40-20)+'px';
-  d.style.top=rowBot+'px';
-  a.appendChild(d);setTimeout(()=>d.remove(),750);
+  d.style.left=x+'px';
+  d.style.top=y+'px';
+  document.body.appendChild(d);setTimeout(()=>d.remove(),850);
 }
 function spawnBankPop(total){
   /* Big "+N" that flies from the dice row up to the player score in the HUD */
@@ -8273,20 +8276,22 @@ function initPickerCardDrag(cardEl,cardId){
   function gxy(e){var t=e.touches?e.touches[0]:e;return{x:t.clientX,y:t.clientY};}
   function getOverlapSlot(cloneRect){
     var slots=document.querySelectorAll('#loPCards .lo-hand-slot');
-    var best=null,bestArea=0;
+    var best=null,bestArea=0,bestDist=Infinity;
+    var cloneCx=cloneRect.left+cloneRect.width/2,cloneCy=cloneRect.top+cloneRect.height/2;
     slots.forEach(function(s){
       var sr=s.getBoundingClientRect();
       var ox=Math.max(0,Math.min(cloneRect.right,sr.right)-Math.max(cloneRect.left,sr.left));
       var oy=Math.max(0,Math.min(cloneRect.bottom,sr.bottom)-Math.max(cloneRect.top,sr.top));
       var area=ox*oy;
-      if(area>bestArea){bestArea=area;best=s;}
+      var scx=sr.left+sr.width/2,scy=sr.top+sr.height/2;
+      var dist=Math.sqrt((cloneCx-scx)*(cloneCx-scx)+(cloneCy-scy)*(cloneCy-scy));
+      if(area>bestArea||(area===bestArea&&dist<bestDist)){bestArea=area;bestDist=dist;best=s;}
     });
-    /* Require 30% overlap with the slot (slots are small, cards are bigger) */
-    var slotEl=best;
-    if(!slotEl)return null;
-    var sr=slotEl.getBoundingClientRect();
+    if(!best)return null;
+    var sr=best.getBoundingClientRect();
     var slotArea=sr.width*sr.height;
-    return(bestArea>slotArea*0.3)?best:null;
+    /* Accept if: any meaningful overlap OR clone center is within 80px of slot center */
+    return(bestArea>slotArea*0.05||bestDist<80)?best:null;
   }
   function removeDocListeners(){
     document.removeEventListener('touchmove',onMove);
@@ -8315,6 +8320,7 @@ function initPickerCardDrag(cardEl,cardId){
         'left:'+origRect.left+'px;top:'+origRect.top+'px;width:'+origRect.width+'px;height:'+origRect.height+'px;margin:0;transform:scale(1.15)';
       document.body.appendChild(clone);
       cardEl.style.opacity='.2';
+      window._loDragging=true;
     }
     if(e.cancelable)e.preventDefault();
     clone.style.left=(origRect.left+dx)+'px';
@@ -8346,6 +8352,7 @@ function initPickerCardDrag(cardEl,cardId){
       snapCloneBack(clone,origRect,cardEl);clone=null;
     }
     active=false;dragging=false;origRect=null;hotSlot=null;
+    setTimeout(function(){window._loDragging=false;},50);
   }
   cardEl.addEventListener('touchstart',onStart,{passive:false});
   cardEl.addEventListener('mousedown',onStart);
@@ -10163,8 +10170,8 @@ function buildServicesTab(){
     box.className='service-box';
     box.innerHTML=`<div class="svc-icon">${svc.icon}</div><div class="svc-name">${svc.name}</div>`;
     const cv=document.createElement('canvas');
-    cv.style.cssText='position:absolute;inset:0;image-rendering:pixelated';
-    box.appendChild(cv);
+    cv.style.cssText='position:absolute;inset:0;image-rendering:pixelated;z-index:0';
+    box.insertBefore(cv,box.firstChild);
     box.onclick=()=>{if(_didSwipe)return;SFX.nav();svc.action();};
     opts.appendChild(box);
 
