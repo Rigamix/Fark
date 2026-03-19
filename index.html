@@ -3464,7 +3464,7 @@ body::before,body::after{display:none!important}
 </div>
 <div class="grid-wrap">
   <div style="text-align:center;padding:16px 4px 10px">
-    <div style="font-family:'IM Fell English',serif;font-size:16px;color:var(--gold);letter-spacing:1px;line-height:1.5;text-shadow:0 1px 0 rgba(0,0,0,.6);opacity:.7;padding:0 2px">&ldquo;Defeat the patrons and your tab is on me!&rdquo;</div>
+    <div id="gauntletQuote" style="font-family:'IM Fell English',serif;font-size:16px;color:var(--gold);letter-spacing:1px;line-height:1.5;text-shadow:0 1px 0 rgba(0,0,0,.6);opacity:.7;padding:0 2px">&ldquo;Defeat the patrons and your tab is on me!&rdquo;</div>
   </div>
   <div class="char-grid" id="charGrid"></div>
 </div>
@@ -6670,12 +6670,13 @@ const OPP_DIALOGUE={
 };
 
 /* ═══════ TEXT JITTER (hand-made look) ═══════ */
-function jitterText(text){
+function jitterText(text,scale){
+  var s=scale||1;
   return text.replace(/\*([^*]+)\*/g,'<em>$1</em>').split(' ').map(function(word){
     var chars=word.replace(/<\/?em>/g,'\x00$&\x00').split('\x00').map(function(part){
       if(part==='<em>'||part==='</em>')return part;
       return part.split('').map(function(ch){
-        var x=(Math.random()-.5)*.7,y=(Math.random()-.5)*.9,r=(Math.random()-.5)*1.2;
+        var x=(Math.random()-.5)*.7*s,y=(Math.random()-.5)*.9*s,r=(Math.random()-.5)*1.2*s;
         return '<span style="display:inline-block;transform:translate('+x.toFixed(2)+'px,'+y.toFixed(2)+'px) rotate('+r.toFixed(2)+'deg)">'+ch+'</span>';
       }).join('');
     }).join('');
@@ -8697,6 +8698,9 @@ function showModal(opts){
 function initGauntletScreen(data) {
   _getS();
   gauntletSyncState();
+  /* Apply hand-written jitter to innkeeper quote (scale 2.2 for larger font) */
+  var gq=document.getElementById('gauntletQuote');
+  if(gq)gq.innerHTML=jitterText(gq.textContent.trim(),2.2);
   // Force-close detail/loadout panels (may still be open from before match)
   var sheet=document.getElementById('detailSheet');
   if(sheet){sheet.classList.remove('open','loadout-mode');sheet.style.height='';sheet.style.clipPath='';sheet.style.transition='';}
@@ -10486,7 +10490,7 @@ var _goQuotes=[
 function initGameOverScreen(){
   // Pick a random innkeeper quote
   var q=_goQuotes[Math.floor(Math.random()*_goQuotes.length)];
-  document.getElementById('goSpeechText').innerHTML=q;
+  document.getElementById('goSpeechText').innerHTML=jitterText(q.replace(/^"|"$/g,'').replace(/^"+|"+$/g,''),2.2);
   // Render pixel panels after layout
   requestAnimationFrame(function(){requestAnimationFrame(function(){
     // Button canvas
