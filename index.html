@@ -5320,6 +5320,7 @@ function startPTurn(){
         triggerCard(cid,npc.name+': SWAPPED '+pOld.toUpperCase()+' ↔ '+oOld.toUpperCase(),false);
         setStatusMsg(G.rung.name+' SWAPPED YOUR '+pOld.toUpperCase()+'!','red');
         spawnPop('🔄 SWAPPED');
+        setTimeout(function(){if(window.DLG)DLG.trigger('BOSS_ATTACK');},600);
       }else if(eff.mode==='downgrade_best'){
         var pBestIdx2=0;G.matchDice.forEach(function(d,i){if(dieRank(d)>dieRank(G.matchDice[pBestIdx2]))pBestIdx2=i;});
         var oldDie=G.matchDice[pBestIdx2];
@@ -5327,6 +5328,7 @@ function startPTurn(){
         triggerCard(cid,npc.name+': '+oldDie.toUpperCase()+' → BONE',false);
         setStatusMsg(G.rung.name+' DOWNGRADED YOUR '+oldDie.toUpperCase()+'!','red');
         spawnPop('📦 DOWNGRADED');
+        setTimeout(function(){if(window.DLG)DLG.trigger('BOSS_ATTACK');},600);
       }
     }
     /* steal_die: NPC takes player's best die */
@@ -5342,6 +5344,7 @@ function startPTurn(){
         triggerCard(cid,npc.name+': TOOK YOUR '+stolen.toUpperCase()+'!',false);
         setStatusMsg(G.rung.name+' SEIZED YOUR '+stolen.toUpperCase()+'!','red');
         spawnPop('👑 SEIZED');
+        setTimeout(function(){if(window.DLG)DLG.trigger('BOSS_ATTACK');},600);
       }else if(eff.mode==='take_and_use'){
         /* Remove from player, add to NPC */
         G.matchDice.splice(pBestIdx3,1);
@@ -5349,6 +5352,7 @@ function startPTurn(){
         triggerCard(cid,npc.name+': TOOK YOUR '+stolen.toUpperCase()+' AND USES IT!',false);
         setStatusMsg(G.rung.name+' CONFISCATED YOUR '+stolen.toUpperCase()+'!','red');
         spawnPop('✝️ CONFISCATED');
+        setTimeout(function(){if(window.DLG)DLG.trigger('BOSS_ATTACK');},600);
       }
     }
   });
@@ -5860,6 +5864,7 @@ function handleBank(){
       G.pPts=Math.max(0,G.pPts-npc.effect.amount);
       bonusMsg+=' -'+npc.effect.amount+' '+npc.name;
       triggerCard(cid,npc.name+' −'+npc.effect.amount,false);
+      setTimeout(function(){if(window.DLG)DLG.trigger('BOSS_ATTACK');},600);
     }
   });
 
@@ -6089,6 +6094,7 @@ function _spawnCoinParticles(coinEl,goldAmt,gravDir){
 }
 function endMatch(win){
   if(window.DLG)DLG.hide();clearRow('playerDiceRow');clearRow('oppDiceRow');
+  _dragState=null;window._shopDragging=false;/* clear any stale drag state */
   win?SFX.win():SFX.lose();S.matchCount=(S.matchCount||0)+1;
   const buyIn=(LO&&LO.buyIn)||G.rung.buyIn||0;
   /* Anti-farming: each repeat win reduces reward by 20% (stacking) */
@@ -6479,7 +6485,7 @@ const OPP_DIALOGUE={
     PLAYER_STRAIGHT:["A straight?! In all my seasons— gracious me.","Even the crows stopped squawking for that one.","I've grown prize turnips that impressed me less."],
     PLAYER_SIX_KIND:["By root and branch! ALL THE SAME?!","Sweet mother of mud. My tail won't stop twitching.","Fifty years farming and NOTHING surprised me like that."],
     PLAYER_TAKES_LEAD:["Enjoy your hill, dear. The valley always comes next.","Seasons change faster than you'd think.","Up today, frozen tomorrow. That's how it works."],
-    PLAYER_NEAR_WIN:["Already?! My paws aren't even warm yet!","Hold on now, I've still got soil under my claws.","The harvest isn't done until the last root's pulled."],
+    PLAYER_NEAR_WIN:["Already?! My paws aren't even warm yet!","Not done yet! This old patch has thorns left in it!","Harvest's not in! The stubborn roots are always the last ones!"],
     OPP_BUST:["Even good soil makes bad batches sometimes.","...I'll pretend that didn't happen, dear.","The rain washed it all away. As usual.","Hmph. The earth owes me one now.","Some seasons you just can't win. Doesn't mean you stop planting."],
     OPP_BIG_BANK:["NOW then. A harvest worth coming in for.","Patience and dirty paws. That's all you need in this life.","The good earth provides for those who wait.","That's how it's done. No rush, no fuss."],
     OPP_TAKES_LEAD:["Like the first green after a hard frost.","There we go. Natural order, dear.","Mabel always comes back. Like the weeds."],
@@ -6534,7 +6540,7 @@ const OPP_DIALOGUE={
     PLAYER_STRAIGHT:["The rarest commodity! In forty years of trade I've never—!","I KNOW the odds. I calculated the odds. You broke MY odds.","A straight. I'd kill for that return on investment."],
     PLAYER_SIX_KIND:["By every coin I've hoarded — SIX?! ALL SIX?!","CAWW! CAWW! ...I apologize. But absolutely WHAT?!","My abacus just BROKE. My mental abacus! The shame!"],
     PLAYER_TAKES_LEAD:["Markets fluctuate. So will your fortune.","Temporary gains. I've seen them evaporate overnight.","Enjoy the peak. The fall is always steeper."],
-    PLAYER_NEAR_WIN:["I refuse to be undersold by an amateur!","Slipping through my talons. I hate when that happens.","This deal isn't closed yet. Corvus ALWAYS has a counter-offer."],
+    PLAYER_NEAR_WIN:["I refuse to be undersold by an amateur!","Not yet! Corvus NEVER sells at a loss! NEVER!","This deal isn't closed yet. Corvus ALWAYS has a counter-offer."],
     OPP_BUST:["Even Corvus makes a bad trade sometimes. Rarely. But sometimes.","My beak itches. Obviously the beak's fault.","Losses get reinvested. Always.","A minor write-off. It's in the ledger. Don't look at the ledger.","Market correction. Temporary. TEMPORARY."],
     OPP_BIG_BANK:["HA! The coffers SING when Corvus rolls!","Now THAT's a return on investment.","Excellent margins. Beautiful margins. MY margins.","The books balance perfectly. As they should."],
     OPP_TAKES_LEAD:["The natural order. The crow always rises above.","Patient capital always wins. Always.","Back in profit. Where I belong."],
@@ -6916,8 +6922,11 @@ function activateCard(cardId){
     case 'sleight_of_hand': activateSleightOfHand(); break;
     case 'gamblers_eye': activateGamblersEye(); break;
   }
-  /* Trigger NPC reaction to card effect after a short delay */
-  setTimeout(function(){if(window.DLG)DLG.trigger('CARD_EFFECT');},800);
+  /* Trigger NPC reaction — only when the card actually affects the opponent */
+  const _oppAffectingCards=['whispers_hex','sleight_of_hand','jesters_mask','tyrants_gaze','plague_wind','serpents_whisper'];
+  if(_oppAffectingCards.includes(cardId)){
+    setTimeout(function(){if(window.DLG)DLG.trigger('CARD_EFFECT');},800);
+  }
 }
 
 /* Grog's Flask: reroll up to 2 non-scoring free dice */
@@ -7243,6 +7252,10 @@ function initMatchScreen(data){
   // Start match
   updHUD();setTurnMode(false);
   DLG.trigger('MATCH_START');
+  /* If player has Jester's Mask (makes NPC chaotic), trigger NPC confusion after intro */
+  if(pCards.includes('jesters_mask')){
+    setTimeout(function(){if(window.DLG)DLG.trigger('CARD_EFFECT');},3200);
+  }
   flashYourTurn();
   setTimeout(startPTurn,800);
 }
