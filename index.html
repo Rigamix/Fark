@@ -499,7 +499,7 @@ body{
   display:flex;align-items:center;justify-content:center;gap:8px;
   background:transparent;border:none;border-radius:8px;
   font-family:var(--font-px);font-size:16px;letter-spacing:3px;
-  color:rgba(180,160,130,.0);
+  color:rgba(180,160,130,.45);
   transition:background .3s,color .3s;
   pointer-events:none;flex-shrink:0;
 }
@@ -519,13 +519,14 @@ body{
 .buy-zone.dragging-active .bz-price{display:flex}
 .buy-zone.hot{background:rgba(255,215,0,.12);color:#ffd700}
 .buy-zone.hot .az-border rect{stroke:rgba(255,215,0,.7);animation:marchDash 1s linear infinite}
-.buy-zone.cant-afford{background:rgba(160,80,80,.06);color:rgba(160,80,80,.6)}
-.buy-zone.cant-afford .az-border rect{stroke:rgba(160,80,80,.3);animation:none}
+.buy-zone.cant-afford{background:rgba(160,80,80,.12)!important;color:rgba(220,80,80,.9)!important}
+.buy-zone.cant-afford .az-border rect{stroke:rgba(180,80,80,.5)!important;animation:none!important}
+.buy-zone.cant-afford .bz-label{color:rgba(220,80,80,.9)!important;font-size:16px!important;letter-spacing:1px}
 .buy-zone.cant-afford .bz-price{display:flex;color:var(--red)}
 /* Error flash when dropped without enough gold */
 .buy-zone.error{background:rgba(160,50,50,.18);pointer-events:none}
 .buy-zone.error .az-border rect{stroke:rgba(220,80,80,.7);animation:none}
-.buy-zone.error .bz-label{color:rgba(230,100,100,.95);font-size:12px;letter-spacing:1px}
+.buy-zone.error .bz-label{color:rgba(230,100,100,.95);font-size:16px;letter-spacing:1px}
 /* Shop card dragging */
 .shop-card.dragging{
   position:fixed!important;z-index:9500!important;transition:none!important;
@@ -2450,8 +2451,8 @@ body::before,body::after{display:none!important}
 }
 /* Parchment quote on cards tab */
 .shop-cards-quote{
-  position:relative;width:calc(100% - 56px);max-width:300px;
-  margin:0 auto 12px;padding:14px 24px;text-align:center;
+  position:relative;width:100%;max-width:420px;
+  margin:0 auto 12px;padding:14px 36px;text-align:center;
 }
 .shop-cards-quote canvas{
   position:absolute;inset:0;width:100%;height:100%;
@@ -2459,8 +2460,8 @@ body::before,body::after{display:none!important}
 }
 .shop-cards-quote .scq-text{
   position:relative;z-index:2;
-  font-family:'IM Fell English',serif;font-size:17px;
-  color:#3a2a18;letter-spacing:.5px;line-height:1.5;
+  font-family:'IM Fell English',serif;font-size:15px;
+  color:#3a2a18;letter-spacing:.5px;line-height:1.5;white-space:nowrap;
 }
 @keyframes checkWobble{
   0%,100%{transform:rotate(-3deg)}
@@ -2489,8 +2490,8 @@ body::before,body::after{display:none!important}
 }
 /* Parchment quote at top of dice tab */
 .shop-dice-quote{
-  position:relative;width:calc(100% - 56px);max-width:300px;
-  margin:0 auto 10px;padding:14px 24px;text-align:center;
+  position:relative;width:100%;max-width:420px;
+  margin:0 auto 10px;padding:14px 36px;text-align:center;
 }
 .shop-dice-quote canvas{
   position:absolute;inset:0;width:100%;height:100%;
@@ -2498,8 +2499,8 @@ body::before,body::after{display:none!important}
 }
 .shop-dice-quote .sdq-text{
   position:relative;z-index:2;
-  font-family:'IM Fell English',serif;font-size:17px;
-  color:#3a2a18;letter-spacing:.5px;line-height:1.5;
+  font-family:'IM Fell English',serif;font-size:15px;
+  color:#3a2a18;letter-spacing:.5px;line-height:1.5;white-space:nowrap;
 }
 /* Stagger via custom prop so animation can incorporate it */
 .dice-cell:nth-child(3n+2){--stagger:10px}
@@ -3103,7 +3104,7 @@ body::before,body::after{display:none!important}
 .menu-btn:active{transform:scale(.96)}
 .menu-btn canvas{
   position:absolute;inset:0;width:100%;height:100%;
-  pointer-events:none;border-radius:6px;
+  pointer-events:none;border-radius:6px;z-index:0;
 }
 .menu-btn .btn-icon{
   position:absolute;z-index:2;
@@ -9402,7 +9403,7 @@ function buildCardsTab(){
   /* Parchment quote — same style as dice tab */
   let html=`<div class="shop-cards-quote">
     <canvas></canvas>
-    <div class="scq-text">\u201CWares for a ${rungLabel}-tier traveler\u201D</div>
+    <div class="scq-text">${jitterText('\u201CWares for a '+rungLabel+'-tier traveler\u201D')}</div>
   </div>`;
   html+='<div class="card-fan">';
   shopCards.forEach((c,i)=>{
@@ -9582,13 +9583,8 @@ function initShopCardDrag(cardEl,cardId,cost){
       const zr=zone.getBoundingClientRect();
       const pad=44;
       const inZone=pt.x>=zr.left-pad&&pt.x<=zr.right+pad&&pt.y>=zr.top-pad&&pt.y<=zr.bottom+pad;
-      if(inZone){
-        zone.classList.add('hot');
-        if(playerGold<cost)zone.classList.add('cant-afford');
-        else zone.classList.remove('cant-afford');
-      }else{
-        zone.classList.remove('hot','cant-afford');
-      }
+      if(inZone) zone.classList.add('hot');
+      else zone.classList.remove('hot');
     }
   }
   function snapCardBack(){
@@ -9675,15 +9671,14 @@ function initShopCardDrag(cardEl,cardId,cost){
       shopStock=shopStock.filter(id=>id!==cardId);
       S.shopStock=shopStock;
       updateGoldDisplay();syncToState();
-      setTimeout(()=>buildCardsTab(),300);
+      setTimeout(()=>buildCardsTab(),420);
     }else{
       snapCardBack();
       if(isHot&&playerGold<cost&&zone){
         const lbl=zone.querySelector('.bz-label');
-        const savedLabel=lbl?lbl.textContent:'BUY';
         zone.classList.add('error');
-        if(lbl)lbl.textContent='Not enough gold';
-        setTimeout(()=>{zone.classList.remove('error');if(lbl)lbl.textContent=savedLabel;},1800);
+        if(lbl)lbl.textContent='NOT ENOUGH GOLD';
+        setTimeout(()=>{zone.classList.remove('error');if(lbl)lbl.textContent='BUY';},1800);
       }
     }
     origRect=null;
@@ -9702,11 +9697,14 @@ function showBuyZone(cardId,cost){
   const costEl=document.getElementById('bzCost');
   if(costEl)costEl.textContent=cost;
   z.classList.add('dragging-active');
-  if(playerGold<cost)z.classList.add('cant-afford');
+  const lbl=z.querySelector('.bz-label');
+  if(playerGold<cost){z.classList.add('cant-afford');if(lbl)lbl.textContent='NOT ENOUGH GOLD';}
+  else{if(lbl)lbl.textContent='BUY';}
 }
 function hideBuyZone(){
   const z=document.getElementById('buyZone');if(!z)return;
   z.classList.remove('dragging-active','hot','cant-afford');
+  const lbl=z.querySelector('.bz-label');if(lbl)lbl.textContent='BUY';
 }
 
 /* ═══════════════════════════════════════
@@ -9800,7 +9798,7 @@ function initShopDiceDrag(cellEl,dieId,cost){
       document.body.appendChild(clone);
       cellEl.style.opacity='0.35';
       var dz=document.getElementById('buyZoneDice');
-      if(dz){var cv=dz.querySelector('.bz-cost-val');if(cv)cv.textContent=cost;dz.classList.add('dragging-active');if(playerGold<cost)dz.classList.add('cant-afford');}
+      if(dz){var cv=dz.querySelector('.bz-cost-val');if(cv)cv.textContent=cost;dz.classList.add('dragging-active');var dlbl=dz.querySelector('.bz-label');if(playerGold<cost){dz.classList.add('cant-afford');if(dlbl)dlbl.textContent='NOT ENOUGH GOLD';}else{if(dlbl)dlbl.textContent='BUY';}}
     }
     clone.style.left=(origRect.left+dx)+'px';
     clone.style.top=(origRect.top+dy)+'px';
@@ -9810,11 +9808,8 @@ function initShopDiceDrag(cellEl,dieId,cost){
       var zr=zone.getBoundingClientRect();
       var pad=44;
       var inZone=pt.x>=zr.left-pad&&pt.x<=zr.right+pad&&pt.y>=zr.top-pad&&pt.y<=zr.bottom+pad;
-      if(inZone){
-        zone.classList.add('hot');
-        if(playerGold<cost)zone.classList.add('cant-afford');
-        else zone.classList.remove('cant-afford');
-      }else{zone.classList.remove('hot','cant-afford');}
+      if(inZone) zone.classList.add('hot');
+      else zone.classList.remove('hot');
     }
   }
   function onEnd(e){
@@ -9824,7 +9819,7 @@ function initShopDiceDrag(cellEl,dieId,cost){
     dragging=false;window._shopDragging=false;
     var zone=document.getElementById('buyZoneDice');
     var isHot=zone&&zone.classList.contains('hot');
-    if(zone)zone.classList.remove('dragging-active','hot','cant-afford');
+    if(zone){zone.classList.remove('dragging-active','hot','cant-afford');var lbl0=zone.querySelector('.bz-label');if(lbl0)lbl0.textContent='BUY';}
     if(isHot&&playerGold>=cost&&cost>0){
       if(clone){clone.remove();clone=null;}
       cellEl.style.opacity='';
@@ -9833,10 +9828,9 @@ function initShopDiceDrag(cellEl,dieId,cost){
       snapCloneBack(clone,origRect,cellEl);clone=null;
       if(isHot&&playerGold<cost&&zone){
         var lbl=zone.querySelector('.bz-label');
-        var savedLabel=lbl?lbl.textContent:'BUY';
         zone.classList.add('error');
-        if(lbl)lbl.textContent='Not enough gold';
-        setTimeout(function(){zone.classList.remove('error');if(lbl)lbl.textContent=savedLabel;},1800);
+        if(lbl)lbl.textContent='NOT ENOUGH GOLD';
+        setTimeout(function(){zone.classList.remove('error');if(lbl)lbl.textContent='BUY';},1800);
       }
     }
     origRect=null;
@@ -9866,7 +9860,7 @@ function buildDiceTab(){
   const dQuote=diceQuotes[Math.floor(Math.random()*diceQuotes.length)];
   let html=`<div class="shop-dice-quote">
     <canvas></canvas>
-    <div class="sdq-text">${dQuote}</div>
+    <div class="sdq-text">${jitterText(dQuote)}</div>
   </div>`;
   html+='<div class="dice-grid">';
   DICE_TYPES.forEach((d,i)=>{
