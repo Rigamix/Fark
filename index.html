@@ -120,6 +120,13 @@ body{
   border:2px solid var(--golddim);font-size:15px;color:var(--gold);
   background:rgba(20,16,8,.85);opacity:1;z-index:5;
 }
+#goldPillFloat{
+  position:fixed;right:16px;top:9px;
+  display:none;align-items:center;gap:5px;padding:5px 10px;
+  border:2px solid var(--golddim);font-size:15px;color:var(--gold);
+  background:rgba(20,16,8,.95);z-index:9650;
+  pointer-events:none;
+}
 
 /* ─── HUD BAR ─── */
 .hud{
@@ -154,7 +161,11 @@ body{
 .hud-turnnum{font-family:var(--font-px);font-size:12px;color:var(--textdim)}
 
 /* ─── SCORE ESCALATION VFX ─── */
-.hud-score.is-leading{font-size:clamp(20px,6.5vw,30px)}
+/* Scale up the leading score without affecting layout (transform doesn't cause reflow) */
+.hud-score.is-leading{transform:scale(1.22);transform-origin:center}
+/* Bake scale into the shake keyframes so it doesn't get overridden */
+.hud-score.is-leading.near-crit{animation:pxScoreShakeLead .36s steps(4,end) infinite!important}
+@keyframes pxScoreShakeLead{0%{transform:scale(1.22) translateX(-2px)}25%{transform:scale(1.22) translateX(3px)}50%{transform:scale(1.22) translateX(-3px)}75%{transform:scale(1.22) translateX(2px)}100%{transform:scale(1.22) translateX(0)}}
 /* near-warm: gentle pulsing halo */
 @keyframes pxGlowWarmP{from{text-shadow:0 0 3px rgba(220,170,50,.35),0 0 7px rgba(200,145,30,.15)}to{text-shadow:0 0 5px rgba(235,190,65,.75),0 0 11px rgba(215,165,45,.3)}}
 @keyframes pxGlowWarmO{from{text-shadow:0 0 3px rgba(185,70,60,.35),0 0 7px rgba(155,45,35,.15)}to{text-shadow:0 0 5px rgba(210,85,70,.75),0 0 11px rgba(180,55,45,.3)}}
@@ -330,6 +341,20 @@ body{
   font-family:'IM Fell English',serif;
   font-size:14px;color:var(--ctrim2);letter-spacing:.2px;line-height:1.35;
   padding:4px 10px 10px;z-index:3;position:relative;word-break:break-word;
+}
+.mcard-tooltip .tip-num{color:#e8c060;font-weight:700;font-style:normal}
+.mcard-tooltip .tip-tarnish{
+  display:flex;gap:5px;justify-content:center;
+  padding:0 10px 8px;z-index:3;position:relative;
+}
+.mcard-tooltip .tip-tarnish span{
+  width:8px;height:8px;border-radius:50%;
+  background:rgba(80,40,20,.3);border:1px solid rgba(100,60,30,.5);
+}
+.mcard-tooltip .tip-tarnish span.filled{background:#c43d2a;border-color:#e05030}
+.mcard-tooltip .tip-worn{
+  font-size:11px;color:#e84040;letter-spacing:1px;text-align:center;
+  padding:0 10px 8px;z-index:3;position:relative;
 }
 .mcard.peeked .mcard-tooltip{opacity:1;pointer-events:auto;animation:tipGrow .25s ease-out,tipFloat 3s ease-in-out .25s infinite}
 @keyframes tipFloat{
@@ -1155,8 +1180,8 @@ body{
 #end-ov{
   display:none;position:fixed;inset:0;z-index:9500;
   background:#0c0a06;
-  flex-direction:column;align-items:center;justify-content:center;gap:14px;padding-bottom:8vh;
-  padding:24px;
+  flex-direction:column;align-items:center;justify-content:flex-start;gap:12px;
+  padding:20vh 24px 24px;
   image-rendering:pixelated;
 }
 #end-ov::before{
@@ -1176,8 +1201,9 @@ body{
 .res-scores{display:flex;gap:36px;align-items:center}
 .res-num{font-size:clamp(28px,9vw,48px)}
 .res-lbl{font-family:'Enchanted Land',serif;font-size:clamp(18px,5vw,26px);color:var(--textdim);letter-spacing:2px;margin-top:4px}
-/* gold display — big coin + text */
-.res-gold-wrap{display:flex;flex-direction:column;align-items:center;gap:6px;position:relative;min-height:130px}
+/* gold display — big coin + text — absolutely positioned so it never shifts title/scores */
+.res-gold-wrap{display:flex;flex-direction:column;align-items:center;gap:6px;
+  position:absolute!important;top:35%;left:50%;transform:translateX(-50%)!important}
 .res-coin-big{
   width:90px;height:90px;border-radius:50%;position:relative;overflow:hidden;
   background:radial-gradient(circle at 38% 35%,#ffe080 0%,#d4a840 50%,#a07820 100%);
@@ -1272,24 +1298,40 @@ body{
   opacity:0;
 }
 
-#btnContinue{
-  font-family:var(--font-px);font-size:18px;letter-spacing:2px;
-  color:var(--gold);background:rgba(40,28,14,.9);
-  border:2px solid var(--gold);border-radius:4px;
-  padding:12px 32px;cursor:pointer;
-  position:absolute;bottom:28px;left:50%;transform:translateX(-50%);
-  transition:filter .15s;
+#end-btns{
+  position:absolute!important;bottom:28px;left:50%;transform:translateX(-50%);
+  display:flex;align-items:center;
 }
-#btnContinue:hover{filter:brightness(1.3)}
-#btnContinue:active{filter:brightness(1.5);transform:translateX(-50%) scale(.97)}
+#btnStore{margin-right:20px}
+#btnContinue,#btnStore{
+  position:relative;cursor:pointer;
+  font-family:var(--font-px);font-size:18px;letter-spacing:2px;
+  color:var(--gold);background:none;border:none;
+  padding:14px 28px;min-width:120px;
+  overflow:hidden;border-radius:6px;
+  text-shadow:1px 1px 0 rgba(0,0,0,.6);
+  transition:transform .06s;
+}
+#btnContinue:active,#btnStore:active{filter:brightness(1.3);transform:scale(.96)}
+#btnContinue canvas,#btnStore canvas{
+  position:absolute;inset:0;width:100%;height:100%;
+  pointer-events:none;border-radius:6px;z-index:0;image-rendering:pixelated;
+}
+#btnContinue span,#btnStore span{position:relative;z-index:1}
+#btnContinue span{color:#7ddc84}
 
 /* victory animations */
 #end-ov .res-title{opacity:0}
 .res-title.pop{animation:resPop .6s cubic-bezier(.2,.8,.35,1) forwards}
 @keyframes resPop{0%{transform:scale(0);opacity:0}70%{transform:scale(1.1);opacity:1}100%{transform:scale(1);opacity:1}}
+/* res-card: absolutely positioned so reward card appearance never shifts scores */
+#end-ov .res-card{position:absolute!important;top:38%;left:50%;transform:translateX(-50%)}
 #end-ov .res-scores,#end-ov .res-gold-wrap{opacity:0}
-.res-gold-wrap.fade-in,.res-scores.fade-in{animation:resFade .5s ease forwards}
-#btnContinue.fade-in{animation:btnFade .5s ease forwards}
+/* scores stay in flow but use normal slide-up; gold/card are absolute so need translateX preserved */
+@keyframes resFadeAbs{0%{opacity:0;transform:translateX(-50%) translateY(10px)}100%{opacity:1;transform:translateX(-50%) translateY(0)}}
+.res-gold-wrap.fade-in{animation:resFadeAbs .5s ease forwards}
+.res-scores.fade-in{animation:resFade .5s ease forwards}
+#end-btns.fade-in{animation:btnFade .5s ease forwards}
 @keyframes resFade{0%{opacity:0;transform:translateY(10px)}100%{opacity:1;transform:translateY(0)}}
 @keyframes btnFade{0%{opacity:0;transform:translateX(-50%) translateY(10px)}100%{opacity:1;transform:translateX(-50%) translateY(0)}}
 
@@ -1318,11 +1360,11 @@ body{
 @keyframes cardLoseGlowPulse{0%{opacity:.3;transform:scale(.95)}100%{opacity:.6;transform:scale(1.05)}}
 /* NPC dialogue on end screen */
 .res-dlg{display:flex;align-items:center;gap:8px;margin-top:12px;align-self:center;max-width:90vw}
-.res-dlg .dlg-portrait{width:56px;height:56px;border-radius:4px;overflow:hidden;flex-shrink:0}
+.res-dlg .dlg-portrait{width:52px;height:52px;border-radius:4px;overflow:hidden;flex-shrink:0}
 .res-dlg .dlg-portrait img{width:100%;height:100%;image-rendering:auto;display:block}
-.res-dlg .dlg-scroll{position:relative;max-width:260px;padding:8px 20px;display:flex;align-items:center}
+.res-dlg .dlg-scroll{position:relative;width:min(300px,calc(90vw - 68px));padding:8px 10px;display:flex;align-items:center}
 .res-dlg .dlg-scroll canvas{position:absolute;inset:0;width:100%;height:100%;z-index:0}
-.res-dlg .dlg-text{position:relative;z-index:1;font-family:'IM Fell English',serif;font-size:clamp(13px,3.8vw,17px);color:#4a3828;line-height:1.3;text-align:center;text-wrap:balance;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.6em}
+.res-dlg .dlg-text{position:relative;z-index:1;font-family:'IM Fell English',serif;font-size:clamp(12px,3.5vw,16px);color:#4a3828;line-height:1.3;text-align:center;text-wrap:balance}
 
 /* ─── QUIT CONFIRM ─── */
 #quit-ov{
@@ -2997,6 +3039,16 @@ body::before,body::after{display:none!important}
   30%{color:#fff;transform:scale(1.3)}
   100%{color:var(--gold);transform:scale(1)}
 }
+@keyframes goldJiggle{
+  0%,100%{transform:translateY(-50%)}
+  20%{transform:translateY(-50%) translateX(-3px)}
+  40%{transform:translateY(-50%) translateX(3px)}
+  60%{transform:translateY(-50%) translateX(-2px)}
+  80%{transform:translateY(-50%) translateX(2px)}
+}
+.gold-pill.gold-low{animation:goldJiggle .4s ease}
+.gold-pill.gold-low #gold-display{color:#e84040!important}
+#goldPillFloat.gold-low #goldDisplayFloat{color:#e84040!important}
 
 /* ── SETTINGS SHEET ── */
 .settings-sheet{position:fixed;left:0;right:0;bottom:0;transform:translateY(100%);transition:transform .3s ease;padding:0;z-index:200;overflow:visible}
@@ -3568,6 +3620,9 @@ body::before,body::after{display:none!important}
   </div>
 </div>
 
+<!-- FLOATING GOLD PILL — shown above backdrop/detail-sheet overlays -->
+<div id="goldPillFloat"><span class="coin-i"></span> <span id="goldDisplayFloat">0</span></div>
+
 <!-- DICE ZOOM OVERLAY (gauntlet loadout) -->
 <div class="dice-zoom-overlay" id="loDiceZoom">
   <div class="dice-3d-wrap" id="loDiceZoomWrap">
@@ -3730,7 +3785,10 @@ body::before,body::after{display:none!important}
     <div class="res-gold-text" id="resGoldText">+40 GOLD</div>
   </div>
   <div class="res-card" id="resCard"></div>
-  <button id="btnContinue" onclick="handleContinue()">CONTINUE</button>
+  <div id="end-btns">
+    <button id="btnStore" onclick="handleGoToStore()"><canvas id="cvBtnStore"></canvas><span>STORE</span></button>
+    <button id="btnContinue" onclick="handleContinue()"><canvas id="cvBtnContinue"></canvas><span>CONTINUE</span></button>
+  </div>
 </div>
 
 <!-- QUIT CONFIRM -->
@@ -4474,7 +4532,7 @@ const NPC_CARDS=[
    eff:'Start +500 pts',flavor:'"What I\'m owed. Not from you. From before. …Don\'t worry about it."',
    effect:{type:'start_bonus',amount:500}},
   {id:'the_audit',name:'THE AUDIT',icon:'🧮',rarity:'npc',npcOnly:true,owner:'corvus',
-   eff:'+200 when you fall behind',flavor:'"Ah. There it is. The discrepancy. I knew it."',
+   eff:'+200 when opponent is ahead',flavor:'"Ah. There it is. The discrepancy. I knew it."',
    effect:{type:'passive',mechanic:'gain_when_ahead',amount:200}},
 
   /* ── BRUTUS ── */
@@ -4818,11 +4876,26 @@ function mkCardTooltipHTML(card,bandOverride,opts){
   var flavorLine=(opts.showFlavor&&card.flavor)?'<div class="tip-flavor">'+card.flavor+'</div>':'';
   var cbg=(typeof CARD_BG!=='undefined'&&CARD_BG[card.id])||'';
   var cbgStyle=cbg?' style="--cbg:'+cbg+'"':'';
+  var effText=_sentenceCase(card.eff).replace(/(\d+)/g,'<b class="tip-num">$1</b>');
+  /* Tarnish dots for player-owned cards */
+  var tarnishLine='';
+  if(typeof S!=='undefined'&&S.cards&&!card.npcOnly){
+    var sc=S.cards.find(function(c){return c.id===card.id;});
+    if(sc&&(sc.tarnish||0)>0){
+      var t=sc.tarnish||0;
+      var dots='';
+      for(var i=0;i<TARNISH_DISABLE;i++){dots+='<span class="'+(i<t?'filled':'')+'"></span>';}
+      tarnishLine=t>=TARNISH_DISABLE
+        ?'<div class="tip-tarnish">'+dots+'</div><div class="tip-worn">WORN OUT</div>'
+        :'<div class="tip-tarnish">'+dots+'</div>';
+    }
+  }
   return '<div class="mcard-tooltip rarity-'+rarity+'"'+cbgStyle+'>'+
     gcCorners()+
     '<div class="tip-band">'+band+'</div>'+
     '<div class="tip-name">'+_tc(card.name)+'</div>'+
-    '<div class="tip-eff">'+_sentenceCase(card.eff)+'</div>'+
+    tarnishLine+
+    '<div class="tip-eff">'+effText+'</div>'+
     flavorLine+
   '</div>';
 }
@@ -4833,6 +4906,7 @@ function attachTooltipTap(wrapperEl,opts){
     if(_dragState&&_dragState.dragging)return;
     if(window._shopDragging)return; /* suppress tooltip when shop drag just ended */
     if(window._loDragging)return;   /* suppress tooltip when loadout drag just ended */
+    if(opts.excludeSelector&&e.target.closest(opts.excludeSelector))return;
     e.stopPropagation();
     const wasPeeked=wrapperEl.classList.contains('peeked');
     closeAllChips();
@@ -4843,6 +4917,8 @@ function attachTooltipTap(wrapperEl,opts){
 }
 
 function closeAllChips(){
+  /* Cancel any pending tooltip body-promotion to prevent orphaned fixed tooltips */
+  if(_clampRafId){cancelAnimationFrame(_clampRafId);_clampRafId=null;}
   /* Return any body-promoted tooltips to their original parents */
   document.querySelectorAll('body > .mcard-tooltip').forEach(function(tip){
     if(tip._origParent){
@@ -4898,14 +4974,19 @@ function buildCBar(barId,cardIds,isOpp,label){
 }
 
 /* ═══════ TOOLTIP VIEWPORT CLAMPING ═══════ */
+var _clampRafId=null;
 function clampTooltip(mcardEl){
+  /* Cancel any pending promotion from a previous call — prevents orphaned body tooltips
+     when closeAllChips() runs before the rAF fires */
+  if(_clampRafId){cancelAnimationFrame(_clampRafId);_clampRafId=null;}
   const tip=mcardEl.querySelector('.mcard-tooltip');if(!tip)return;
   tip.style.cssText='';
   /* If card is inside a scroll container or transformed parent, move tooltip to body
      so it escapes overflow:auto clipping and transform containing blocks */
   const inScroll=mcardEl.closest('.lo-content,.tab-panel,.lo-picker,.detail-sheet,.card-bar,#end-ov');
   if(inScroll){
-    requestAnimationFrame(()=>{
+    _clampRafId=requestAnimationFrame(()=>{
+      _clampRafId=null;
       const cardR=mcardEl.getBoundingClientRect();
       /* Move tooltip to body so it's truly fixed-positioned */
       tip._origParent=mcardEl;
@@ -4940,7 +5021,8 @@ function clampTooltip(mcardEl){
           :'top:100%;border-top-color:var(--ctrim2);');
     });
   }else{
-    requestAnimationFrame(()=>{
+    _clampRafId=requestAnimationFrame(()=>{
+      _clampRafId=null;
       const r=tip.getBoundingClientRect();
       if(r.left<4)tip.style.marginLeft=(4-r.left)+'px';
       else if(r.right>window.innerWidth-4)tip.style.marginLeft=(window.innerWidth-4-r.right)+'px';
@@ -6430,7 +6512,7 @@ function endMatch(win){
   const resCoinBig=document.getElementById('resCoinBig');
   const resGoldText=document.getElementById('resGoldText');
   const resCard=document.getElementById('resCard');
-  const btnCont=document.getElementById('btnContinue');
+  const btnCont=document.getElementById('end-btns');
 
   // Reset animation classes
   resTitle.className='res-title '+(win?'win':'lose');
@@ -6446,12 +6528,17 @@ function endMatch(win){
   btnCont.classList.remove('fade-in');
   resCard.classList.remove('show');resCard.innerHTML='';
   resPScore.textContent='0';resOScore.textContent='0';
-  document.getElementById('resOName').textContent=G.rung.name;
+  document.getElementById('resOName').textContent=G.rung.name.toUpperCase();
   const goldDisplay=win?'+'+totalGold+(kingsRansomMsg||'')+' GOLD':'-'+buyIn+' GOLD';
   resGoldText.textContent=goldDisplay;
 
   ov.classList.add('show');
   _endScreenPhase='animating';
+  // Draw pixel panels on end-screen buttons
+  requestAnimationFrame(()=>{
+    sizeAndDrawPanel(document.getElementById('cvBtnStore'),'#c8a050','#7a5828','#3a2810',202,0.02);
+    sizeAndDrawPanel(document.getElementById('cvBtnContinue'),'#4a9a50','#1a3818','#0c1c0a',303,0.02);
+  });
 
   // Staggered animations
   endT(()=>resTitle.classList.add('pop'),100);
@@ -6556,8 +6643,8 @@ function endMatch(win){
       resCard.classList.add('show');
       if(isCardLost)resCard.classList.add('lost');
       SFX.coins();
-      /* Tap to show tooltip */
-      attachTooltipTap(resCard);
+      /* Tap to show tooltip — exclude dialogue box from trigger area */
+      attachTooltipTap(resCard,{excludeSelector:'.res-dlg'});
       /* NPC dialogue box with portrait + parchment */
       const quoteText=npcRewardCard&&c.rewardQuote?c.rewardQuote:
         (c.flavor?c.flavor:
@@ -6650,6 +6737,16 @@ function endMatch(win){
   }
 }
 
+function handleGoToStore(){
+  SFX.nav();
+  if(window._endTimers){window._endTimers.forEach(t=>clearTimeout(t));window._endTimers=[];}
+  document.querySelectorAll('.coin-burst-p').forEach(el=>el.remove());
+  var lov=document.getElementById('mLoadout-ov');if(lov)lov.classList.remove('show');
+  var lbd=document.getElementById('mLoBackdrop');if(lbd)lbd.classList.remove('on');
+  _endScreenPhase='ready';
+  showScreen('shop');
+}
+
 /* ═══════ QUIT / FLEE ═══════ */
 function showQuitConfirm(){
   document.getElementById('quit-ov').classList.add('show');
@@ -6688,7 +6785,7 @@ function handleContinue(){
         var rc=document.getElementById('resCard');
         rc.innerHTML=d.cardHTML;rc.classList.add('show');
         if(d.isCardLost)rc.classList.add('lost');
-        attachTooltipTap(rc);
+        attachTooltipTap(rc,{excludeSelector:'.res-dlg'});
         // Show NPC dialogue on card
         if(d.dlgHTML){
           var dlgDiv=document.createElement('div');
@@ -6751,7 +6848,7 @@ const OPP_DIALOGUE={
     REMATCH_START:["Back already?! The others too rough for ya up there? Hic!","Can't get enough of losing to ol' Grog, eh? Hic!","Ah, a familiar face! And a familiar LOSHER!","You again! Sheat's shtill warm from lasht time!"],
     REMATCH_WIN:["No card for you thish time! I'm already BROKE!","Win all you want, pal. Grog'sh pocketsh are EMPTY. Hic!","Another win?! Grog'sh got nothin' left. ...maybe hish troushersh.","You want more?! I barely have my TROUSHERS left!"],
     CARD_EFFECT:["Wha— what'sh happening to me?! Hic!","I feel... sshtrange. Shtrang-ER than ushual!","Something'sh off and it ISN'T the ale thish time!","Did you DO shomething?! My quills feel weird!"],
-    PLAYER_LOSES_HINT:["Pouch lighter now, friend. Grab a card or two before ya sit back down. Hic.","Iron dice ain't just shiny, y'know. Better odds. Worth thinkin' about.","Maybe try someone easier first? Build yer deck up. Grog'll still be here."],
+    PLAYER_LOSES_HINT:["Pouch lighter now, friend. Sharper dice'd help next time. Hic.","Iron dice ain't just shiny, y'know. Better odds. Worth thinkin' about.","Maybe try someone easier first? Grog'll still be here either way."],
     CANT_AFFORD:["No coin, no game! Hic!","Empty pocketsh, pal!","Come back when you're FLUSH!"]
   },
   MABEL:{
@@ -6834,7 +6931,7 @@ const OPP_DIALOGUE={
     REMATCH_START:["Back for more? The interest on your losses is compounding.","A repeat customer. My favorite kind. Profitable.","Returning to the scene of your financial ruin. How sentimental.","Couldn't cut it further up the market? Noted in the ledger."],
     REMATCH_WIN:["You won. Congratulations. But my accounts are settled — no card.","Another hollow victory. My coffers are empty and the ledger is closed.","Win all you like. I've already written off your rewards.","No card, no stock, no inventory. Just an IOU and my contempt."],
     CARD_EFFECT:["My calculations are... wrong? That's NEVER happened before.","Something disrupted the ledger. I don't appreciate disruption.","I feel... charitable? REVOLTING. What have you DONE?","The numbers don't add up. Whose fault is this? YOURS."],
-    PLAYER_LOSES_HINT:["A poorly equipped player is just a donation with legs.","Your portfolio lacks leverage. Invest in cards. Better dice. Return when solvent.","The market rewards preparation. Visit the shop before your next attempt."],
+    PLAYER_LOSES_HINT:["A poorly equipped player is just a donation with legs.","Your portfolio lacks leverage. Better cards are an investment. Return when solvent.","The market rewards preparation. Visit the shop before your next attempt."],
     CANT_AFFORD:["Insufficient funds. Goodbye.","No capital, no deal.","Your purse is EMPTY."]
   },
   BRUTUS:{
@@ -6862,7 +6959,7 @@ const OPP_DIALOGUE={
     REMATCH_START:["Back in the barracks? The upper ranks send you running? Figures.","A retreating soldier returns to base. Standard protocol.","Couldn't hold the line up there, could you? DISAPPOINTING.","Returning to basic training? Wise. You clearly need it."],
     REMATCH_WIN:["You won. But the armory is empty, recruit. No card.","Victory noted. Supplies exhausted. Nothing to spare.","Another win, another empty trophy case. Fund is dry.","Good fight. Nothing left to give but my respect. BARELY."],
     CARD_EFFECT:["What— my strategy is COMPROMISED! Who gave that ORDER?!","Something's wrong with my flank! Who moved my FORMATIONS?!","I didn't order that maneuver! WHO'S IN COMMAND?!","*GROWL* My battlefield instincts are... confused. UNACCEPTABLE."],
-    PLAYER_LOSES_HINT:["A soldier doesn't march without supplies. Better dice, better cards — then come back.","No shame in regrouping. Restock. Return with something worth fighting with.","Back to base. Upgrade your kit, recruit. Then we settle this properly."],
+    PLAYER_LOSES_HINT:["A soldier doesn't march without supplies. Better dice — then come back.","No shame in regrouping. Restock. Return with something worth fighting with.","Back to base. Upgrade your cards, recruit. Then we settle this properly."],
     CANT_AFFORD:["No gold? DISMISSED.","Come back FUNDED, recruit.","Empty pockets? No seat."]
   },
   ALDRIC:{
@@ -6890,7 +6987,7 @@ const OPP_DIALOGUE={
     REMATCH_START:["The wandering knight returns! Whisper frightened you off, did she?","Back from the higher courts? The air up there IS rather thin.","A rematch?! WONDERFUL! I shall compose a sequel ballad!","Returning to the jousting grounds! The poets shall call this Chapter Two!"],
     REMATCH_WIN:["A noble victory! But mine coffers are BARE! No card for thee!","The tournament purse is spent! My applause is all I have!","You've won! But the prize chest is empty. The ballad must suffice!","Victory is thine! But I've nothing left! Not even a sandwich!"],
     CARD_EFFECT:["By Fangbreaker! What SORCERY is this?!","My noble strategy crumbles! There is TREACHERY afoot!","I feel... unchivalrous. This isn't ME! Well, not TODAY'S me!","What dark enchantment?! Even my fur feels wrong! It was PERFECT this morning!"],
-    PLAYER_LOSES_HINT:["Even knights need proper gear! Better cards await in the shop!","Thy dice were lacking, friend. Iron exists. Visit the stall.","A hero prepares! Better cards, better dice — then return!"],
+    PLAYER_LOSES_HINT:["Even knights need proper gear! Better cards await in the shop!","Thy dice were lacking, friend. Iron exists. Visit the stall.","A hero prepares! Equip thyself well — then return!"],
     CANT_AFFORD:["No coin? Sorry, friend!","The fee is the fee! For honor!","Come back with gold!"]
   },
   WHISPER:{
@@ -6918,7 +7015,7 @@ const OPP_DIALOGUE={
     REMATCH_START:["Oh. You're BACK. The bishop and his ilk were too much, were they? Predictable.","Crawling back to the palace? How terribly on-brand for you.","A return visit. I'll alert Pembrook. He LOVES disappointment.","Couldn't handle the bishop? Of course not. Commoners rarely can."],
     REMATCH_WIN:["You won. How quaint. But there are no cards. The vault is sealed.","Congratulations on your empty victory. The treasury is CLOSED.","A win without a prize. How perfectly... peasant.","Hollow triumph. My cupboards are bare. My patience is thinner."],
     CARD_EFFECT:["What— my royal judgment is CLOUDED?! TREASON!","Something common is happening to my BRAIN! I detest this!","*hissss* My thoughts are not my OWN! PEMBROOK! PEMBROOK!","This indignity will NOT go unpunished! Once I figure out what happened!"],
-    PLAYER_LOSES_HINT:["Your deck is embarrassing. The shop is right there.","Better cards, better dice — I use neither of yours. Obviously.","The treasury suggests: invest. Cards, dice, anything. Then return."],
+    PLAYER_LOSES_HINT:["Your deck is embarrassing. The shop is right there.","Your dice are an insult. I've seen better odds in a gutter.","The treasury suggests: invest properly. Then return."],
     CANT_AFFORD:["Empty pockets? How DARE.","You're wasting my time.","Afford me first. Leave."]
   },
   AMBROSE:{
@@ -6946,7 +7043,7 @@ const OPP_DIALOGUE={
     REMATCH_START:["The prodigal child returns! I knew you'd be back. The stars told me. Also logic.","Back from the wilderness? The flock always returns to the shepherd.","You've come full circle, child. The cosmos loves symmetry. And reruns.","Couldn't best the final trial? The heavens weep. Quietly. Into their tea."],
     REMATCH_WIN:["Blessed victory! But the donation box is empty, child. No card.","You've won again! But the church is broke. Have you SEEN the roof?","A triumph! Sadly I've nothing left to tithe. The Lord took his share. And then some.","The heavens smile upon you! But the coffers frown. Deeply."],
     CARD_EFFECT:["The stars are— WHAT?! My sermon notes are SCRAMBLED!","A disturbance in the divine order! Someone's been TAMPERING!","My holy intuition is... wrong? That hasn't happened since breakfast!","Something unholy this way comes! My hooves are all confused!"],
-    PLAYER_LOSES_HINT:["The stars suggest the shop, child. Cards, better dice. Iron, perhaps flint.","Even heaven rewards the well-equipped. The shop has tools.","Prescription: better cards, better dice. Return refreshed."],
+    PLAYER_LOSES_HINT:["The stars suggest the shop, child. New cards, perhaps. The cosmos provides.","Even heaven rewards the well-equipped. Iron dice, perhaps flint.","Prescription: better equipment. Return refreshed."],
     CANT_AFFORD:["No gold? No grace.","The Lord asks a tithe. Pay up.","Heaven provides, not on credit."]}
 };
 
@@ -7643,12 +7740,12 @@ function buildGrid(){
   grid.innerHTML='';
   [...RUNGS].reverse().forEach((r,idx)=>{
     const done=r.id<currentRung,current=r.id===currentRung,locked=r.id>currentRung;
-    const cantAfford=!locked&&!done&&playerGold<r.buyIn;
+    const cantAfford=!locked&&playerGold<r.buyIn;
     const card=document.createElement('div');
     card.className='char-card';
     if(current)card.classList.add('current');
     if(done)card.classList.add('done');
-    if(locked||cantAfford)card.classList.add('locked');
+    if((locked||cantAfford)&&!done)card.classList.add('locked');
     const tweak=marginTweaks[idx]||{mt:0,ml:0};
     card.style.marginTop=tweak.mt+'px';
     card.style.marginLeft=tweak.ml+'px';
@@ -7716,6 +7813,26 @@ function _diminishedGold(rung){
   var payout=Math.max(Math.floor((rung.gold+rung.buyIn)*Math.pow(0.8,pw)),1);
   return Math.max(payout-rung.buyIn,1);
 }
+function _syncGoldFloat(){
+  var f=document.getElementById('goldPillFloat');
+  if(!f||f.style.display==='none')return;
+  var gd=document.getElementById('goldDisplayFloat');
+  if(gd)gd.textContent=playerGold;
+  f.classList.toggle('gold-low',playerGold<10);
+}
+function showGoldFloat(){
+  var f=document.getElementById('goldPillFloat');
+  if(!f)return;
+  var gd=document.getElementById('goldDisplayFloat');
+  if(gd)gd.textContent=playerGold;
+  f.classList.toggle('gold-low',playerGold<10);
+  f.style.display='flex';
+}
+function hideGoldFloat(){
+  var f=document.getElementById('goldPillFloat');
+  if(f)f.style.display='none';
+}
+
 function openDetail(rung,done){
   // Cancel any pending render from a previous open
   if(_detailRAF){cancelAnimationFrame(_detailRAF);_detailRAF=0;}
@@ -7777,6 +7894,7 @@ function openDetail(rung,done){
   document.getElementById('backdrop').classList.add('on');
   document.getElementById('detailSheet').classList.add('open');
   _detailOpen=true;
+  showGoldFloat();
 
   // Delay canvas rendering to allow layout to settle after transition starts
   _detailRAF=requestAnimationFrame(()=>{
@@ -7856,6 +7974,7 @@ function closeDetail(){
   sheet.classList.remove('loadout-mode');
   document.getElementById('backdrop').classList.remove('on');
   _loRung=null;
+  hideGoldFloat();
 }
 
 /* DICE_TYPES defined in match.html section */
@@ -8218,6 +8337,7 @@ function initSlotCardDrag(slotEl,slotIdx){
     document.removeEventListener('mouseup',onEnd);
   }
   function onStart(e){
+    closeAllChips();
     var p=gxy(e);sx=p.x;sy=p.y;active=true;dragging=false;
     origRect=slotEl.getBoundingClientRect();
     document.addEventListener('touchmove',onMove,{passive:false});
@@ -8301,6 +8421,7 @@ function initPickerCardDrag(cardEl,cardId){
     document.removeEventListener('mouseup',onEnd);
   }
   function onStart(e){
+    closeAllChips();
     var p=gxy(e);sx=p.x;sy=p.y;active=true;dragging=false;
     origRect=cardEl.getBoundingClientRect();
     document.addEventListener('touchmove',onMove,{passive:false});
@@ -9156,6 +9277,20 @@ function updateGoldDisplay(){
   el.classList.remove('gold-counter-flash');
   void el.offsetWidth;
   el.classList.add('gold-counter-flash');
+  _syncGoldFloat();
+  const pill = el.closest('.gold-pill');
+  if(pill){
+    const wasLow = pill.classList.contains('gold-low');
+    const isLow = playerGold < 10;
+    if(isLow && !wasLow){
+      pill.classList.add('gold-low');
+      pill.style.animation='none';
+      void pill.offsetWidth;
+      pill.style.animation='';
+    } else if(!isLow){
+      pill.classList.remove('gold-low');
+    }
+  }
 }
 
 /* ═══════════════════════════════════════
