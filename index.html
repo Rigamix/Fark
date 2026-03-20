@@ -7826,11 +7826,16 @@ function showGoldFloat(){
   var gd=document.getElementById('goldDisplayFloat');
   if(gd)gd.textContent=playerGold;
   f.classList.toggle('gold-low',playerGold<10);
+  f.style.transition='none';
+  f.style.opacity='1';
   f.style.display='flex';
 }
 function hideGoldFloat(){
   var f=document.getElementById('goldPillFloat');
-  if(f)f.style.display='none';
+  if(!f)return;
+  f.style.transition='opacity .3s ease';
+  f.style.opacity='0';
+  setTimeout(function(){f.style.display='none';f.style.opacity='1';f.style.transition='none';},320);
 }
 
 function openDetail(rung,done){
@@ -9271,26 +9276,31 @@ if(S.shopStock&&Array.isArray(S.shopStock)&&S.shopStock.length===SHOP_SLOTS){sho
 else{rollShopStock();}
 
 function updateGoldDisplay(){
-  const el = document.querySelector('#screen-shop #gold-display') || document.getElementById('gold-display');
-  if(!el)return;
-  el.textContent = playerGold;
-  el.classList.remove('gold-counter-flash');
-  void el.offsetWidth;
-  el.classList.add('gold-counter-flash');
-  _syncGoldFloat();
-  const pill = el.closest('.gold-pill');
-  if(pill){
-    const wasLow = pill.classList.contains('gold-low');
-    const isLow = playerGold < 10;
-    if(isLow && !wasLow){
-      pill.classList.add('gold-low');
-      pill.style.animation='none';
-      void pill.offsetWidth;
-      pill.style.animation='';
-    } else if(!isLow){
-      pill.classList.remove('gold-low');
+  const isLow = playerGold < 10;
+  document.querySelectorAll('#gold-display').forEach(function(el){
+    el.textContent = playerGold;
+    /* Skip flash animation when low — animations override CSS color in the cascade */
+    if(!isLow){
+      el.classList.remove('gold-counter-flash');
+      void el.offsetWidth;
+      el.classList.add('gold-counter-flash');
+    } else {
+      el.classList.remove('gold-counter-flash');
     }
-  }
+    const pill = el.closest('.gold-pill');
+    if(pill){
+      const wasLow = pill.classList.contains('gold-low');
+      if(isLow && !wasLow){
+        pill.classList.add('gold-low');
+        pill.style.animation='none';
+        void pill.offsetWidth;
+        pill.style.animation='';
+      } else if(!isLow){
+        pill.classList.remove('gold-low');
+      }
+    }
+  });
+  _syncGoldFloat();
 }
 
 /* ═══════════════════════════════════════
