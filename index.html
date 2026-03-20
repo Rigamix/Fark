@@ -618,12 +618,16 @@ body{
   background:linear-gradient(118deg,transparent 38%,rgba(255,255,255,.06) 49%,rgba(255,255,255,.06) 51%,transparent 62%);
   animation:gcSheen 6s ease-in-out infinite;
 }
-@keyframes gcSheen{0%,100%{transform:translateX(-160%);opacity:0}12%{opacity:1}55%{transform:translateX(160%);opacity:0}}
+@keyframes gcSheen{0%,100%{transform:translateX(-160%);opacity:0}12%{opacity:var(--sheen-op,1)}55%{transform:translateX(160%);opacity:0}}
 .gcard-art{display:none}
 .gcard-cover{position:absolute;inset:0;z-index:0;display:flex;align-items:center;justify-content:center;pointer-events:none;font-size:32px;line-height:1;text-shadow:0 2px 8px rgba(0,0,0,.5);border-radius:4px}
 .mcard .gcard-cover{font-size:28px}
 .res-card .gcard-cover{font-size:40px}
 .cchip-back .gcard-cover{font-size:18px}
+/* ── Card aging system ── */
+.card-outer{position:relative;width:100%;height:100%;display:block}
+.age-canvas{position:absolute;inset:0;z-index:20;pointer-events:none;mix-blend-mode:overlay;width:100%;height:100%}
+.card-outer .gcard-cover{opacity:var(--cover-op,1);filter:var(--cover-filter,none)}
 .gcard-frame{position:absolute;top:8px;left:8px;right:8px;bottom:26px;border-radius:3px;pointer-events:none;z-index:1;border:1px solid var(--ctrim2);opacity:.7}
 .gc{position:absolute;z-index:4;pointer-events:none;user-select:none;width:22px;height:22px;color:var(--ctrim2);overflow:visible;filter:drop-shadow(0 0 4px var(--ctrim2)) brightness(1.3)}
 .gc.tl{top:8px;left:8px}
@@ -2413,7 +2417,7 @@ body::before,body::after{display:none!important}
   animation:gcSheen 6s ease-in-out infinite;
   animation-delay:var(--sheen-delay,0s);
 }
-@keyframes gcSheen{0%,100%{transform:translateX(-160%);opacity:0}12%{opacity:1}55%{transform:translateX(160%);opacity:0}}
+@keyframes gcSheen{0%,100%{transform:translateX(-160%);opacity:0}12%{opacity:var(--sheen-op,1)}55%{transform:translateX(160%);opacity:0}}
 .gcard-art{display:none}
 .gcard-cover{position:absolute;inset:0;z-index:0;display:flex;align-items:center;justify-content:center;pointer-events:none;font-size:32px;line-height:1;text-shadow:0 2px 8px rgba(0,0,0,.5);border-radius:4px}
 .inv-card-item .gcard-cover{font-size:24px}
@@ -3427,6 +3431,11 @@ body::before,body::after{display:none!important}
     <feTurbulence type="turbulence" baseFrequency="0.008" numOctaves="1" seed="3" result="noise"/>
     <feDisplacementMap in="SourceGraphic" in2="noise" scale="2.8" xChannelSelector="R" yChannelSelector="G"/>
   </filter>
+  <!-- emoji wobble filters: scale increases per tarnish level -->
+  <filter id="emojiWobble0"><feTurbulence type="turbulence" baseFrequency="0.025" numOctaves="2" seed="7"/><feDisplacementMap in="SourceGraphic" scale="0"/></filter>
+  <filter id="emojiWobble1"><feTurbulence type="turbulence" baseFrequency="0.025" numOctaves="2" seed="7"/><feDisplacementMap in="SourceGraphic" scale="1.8"/></filter>
+  <filter id="emojiWobble2"><feTurbulence type="turbulence" baseFrequency="0.030" numOctaves="2" seed="7"/><feDisplacementMap in="SourceGraphic" scale="3.5"/></filter>
+  <filter id="emojiWobble3"><feTurbulence type="turbulence" baseFrequency="0.035" numOctaves="2" seed="7"/><feDisplacementMap in="SourceGraphic" scale="5.5"/></filter>
 </svg>
 
 <!-- SCREEN: MENU -->
@@ -4882,6 +4891,212 @@ function gcCorners(){
   const corner=pos=>`<svg class="gc ${pos}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 22"><rect x="0" y="0" width="3" height="16" rx="1" fill="currentColor"/><rect x="0" y="0" width="16" height="3" rx="1" fill="currentColor"/><rect x="14" y="-1" width="3" height="5" rx="1" fill="currentColor"/><rect x="-1" y="14" width="5" height="3" rx="1" fill="currentColor"/><polygon points="5,1 9,5 5,9 1,5" fill="currentColor"/></svg>`;
   return['tl','tr','bl','br'].map(corner).join('');
 }
+
+/* ═══════════════════════════════════════
+   CARD AGING SYSTEM
+   Ported from card-health-prototype.html
+   ═══════════════════════════════════════ */
+const _CAG_STATES=[
+  {filter:'none',                           sheenOp:1,   coverOp:1.00, wobble:0},
+  {filter:'saturate(.78) brightness(1.05)', sheenOp:.5,  coverOp:0.85, wobble:1},
+  {filter:'saturate(.40) brightness(1.12)', sheenOp:.15, coverOp:0.65, wobble:2},
+  {filter:'saturate(.12) brightness(1.26)', sheenOp:0,   coverOp:0.50, wobble:3},
+];
+function _cagRng(seed){
+  let s=(seed^0xdeadbeef)>>>0||1;
+  return function(){s^=s<<13;s^=s>>>17;s^=s<<5;return(s>>>0)/0xffffffff;};
+}
+function _cagLerp(a,b,t){return a+(b-a)*t;}
+function _cagLerpPt(x1,y1,x2,y2,t){return[_cagLerp(x1,x2,t),_cagLerp(y1,y2,t)];}
+function _cagTornEdge(x1,y1,x2,y2,nxIn,nyIn,level,rng,scale){
+  if(level===0)return[[x1,y1],[x2,y2]];
+  const maxBite=[0,2.2,4.0,5.8][level]*scale;
+  const STEPS=60;
+  const freq1=1.5+rng()*1.5,freq2=3.0+rng()*2.0,freq3=5.5+rng()*2.5;
+  const ph1=rng()*Math.PI*2,ph2=rng()*Math.PI*2,ph3=rng()*Math.PI*2;
+  const amp1=maxBite*.55,amp2=maxBite*.30,amp3=maxBite*.20;
+  const biteCount=level<2?0:(rng()<.5?1:rng()<.4?2:0);
+  const bitePos=[];
+  for(let b=0;b<biteCount;b++)bitePos.push(.15+rng()*.70);
+  const pts=[];
+  for(let i=0;i<=STEPS;i++){
+    const t=i/STEPS;
+    const fade=Math.min(t/.08,1)*Math.min((1-t)/.08,1);
+    let off=(amp1*Math.sin(t*freq1*Math.PI*2+ph1)+amp2*Math.sin(t*freq2*Math.PI*2+ph2)+amp3*Math.sin(t*freq3*Math.PI*2+ph3))*fade;
+    off=Math.max(0,off);
+    bitePos.forEach(bp=>{const dist=Math.abs(t-bp);if(dist<.08)off=Math.max(off,maxBite*(.5+rng()*.5)*(1-dist/.08)*fade);});
+    const[bx,by]=_cagLerpPt(x1,y1,x2,y2,t);
+    pts.push([bx+nxIn*off,by+nyIn*off]);
+  }
+  return pts;
+}
+function _cagGenHoles(W,H,level,rng,scale){
+  const holes=[];if(level<2)return holes;
+  const lo=[0,0,1,2][level],hi=[0,0,2,4][level];
+  const n=lo+Math.floor(rng()*(hi-lo+1));
+  const yMin=H*.20,yMax=H*.78,xMin=12*scale,xMax=W-12*scale;
+  for(let h=0;h<n;h++){
+    const cx=xMin+rng()*(xMax-xMin),cy=yMin+rng()*(yMax-yMin);
+    const baseR=level===2?(4+rng()*5)*scale:(5+rng()*9)*scale;
+    holes.push({cx,cy,r:baseR});
+  }
+  return holes;
+}
+function _cagHolePath(holes,rng){
+  let d='';
+  holes.forEach(({cx,cy,r})=>{
+    const np=10+Math.floor(rng()*5);const pts=[];
+    for(let p=0;p<np;p++){const ang=-2*Math.PI*(p/np);pts.push([cx+Math.cos(ang)*r*(.5+rng()*.95),cy+Math.sin(ang)*r*(.5+rng()*.95)]);}
+    d+=` M ${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)} `;
+    for(let p=1;p<np;p++)d+=`L ${pts[p][0].toFixed(1)} ${pts[p][1].toFixed(1)} `;
+    d+=`L ${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)} Z`;
+  });
+  return d;
+}
+function _cagCornerRadii(level,rng){
+  const CR=6;const extra=[0,3,6,10][level];
+  return[0,1,2,3].map(()=>CR+(rng()<.45*level?rng()*extra:0));
+}
+function _cagBuildPath(W,H,level,seed){
+  const rng=_cagRng(seed);
+  const scale=W/110;
+  const[rTL,rTR,rBR,rBL]=_cagCornerRadii(level,rng);
+  const top  =_cagTornEdge(rTL,0,    W-rTR,0,    0, 1,level,rng,scale);
+  const right=_cagTornEdge(W,  rTR,  W,    H-rBR,-1,0,level,rng,scale);
+  const bot  =_cagTornEdge(W-rBR,H,  rBL,  H,    0,-1,level,rng,scale);
+  const left =_cagTornEdge(0,  H-rBL,0,    rTL,  1, 0,level,rng,scale);
+  let b=`M ${rTL} 0 `;
+  top.forEach(([x,y])=>b+=`L ${x.toFixed(1)} ${y.toFixed(1)} `);
+  b+=`Q ${W} 0 ${W} ${rTR} `;
+  right.forEach(([x,y])=>b+=`L ${x.toFixed(1)} ${y.toFixed(1)} `);
+  b+=`Q ${W} ${H} ${W-rBR} ${H} `;
+  bot.forEach(([x,y])=>b+=`L ${x.toFixed(1)} ${y.toFixed(1)} `);
+  b+=`Q 0 ${H} 0 ${H-rBL} `;
+  left.forEach(([x,y])=>b+=`L ${x.toFixed(1)} ${y.toFixed(1)} `);
+  b+=`Q 0 0 ${rTL} 0 Z`;
+  const holes=_cagGenHoles(W,H,level,rng,scale);
+  return{clipPath:b+_cagHolePath(holes,rng),borderStr:b,holes};
+}
+function _cagDrawAging(canvas,W,H,level,seed,holes,borderStr){
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+  if(level===0)return;
+  const rng=_cagRng(seed^0xcafe1234);
+  const scale=W/110;
+  const P=[225,215,195];
+  /* 1 — paper edge bleed */
+  const edgeW=[0,10,18,26][level]*scale;
+  const edgeA=[0,.26,.48,.68][level];
+  if(edgeW>0){
+    const pd=new Path2D(borderStr);
+    ctx.save();ctx.clip(pd);
+    ctx.shadowColor=`rgba(${P[0]},${P[1]},${P[2]},${edgeA*.9})`;
+    ctx.shadowBlur=edgeW*1.6;
+    ctx.strokeStyle=`rgba(${P[0]},${P[1]},${P[2]},${edgeA*.6})`;
+    ctx.lineWidth=4;ctx.stroke(pd);
+    ctx.shadowBlur=0;
+    ctx.strokeStyle=`rgba(${P[0]},${P[1]},${P[2]},${edgeA*.5})`;
+    ctx.lineWidth=edgeW*.7;ctx.stroke(pd);
+    const nW=[0,4,8,13][level];
+    for(let w=0;w<nW;w++){
+      const side=Math.floor(rng()*4);const inset=2+rng()*edgeW*1.1;
+      let wx,wy;
+      if(side===0){wx=rng()*W;wy=inset;}
+      else if(side===1){wx=W-inset;wy=rng()*H;}
+      else if(side===2){wx=rng()*W;wy=H-inset;}
+      else{wx=inset;wy=rng()*H;}
+      const wr=(3+rng()*7)*scale,wa=.10+rng()*.18;
+      const g=ctx.createRadialGradient(wx,wy,0,wx,wy,wr*1.6);
+      g.addColorStop(0,`rgba(${P[0]},${P[1]},${P[2]},${wa})`);
+      g.addColorStop(.6,`rgba(${P[0]},${P[1]},${P[2]},${wa*.4})`);
+      g.addColorStop(1,`rgba(${P[0]},${P[1]},${P[2]},0)`);
+      ctx.fillStyle=g;ctx.beginPath();
+      ctx.ellipse(wx,wy,wr*(.7+rng()*.6),wr*(.5+rng()*.8),rng()*Math.PI*2,0,Math.PI*2);ctx.fill();
+    }
+    ctx.restore();
+  }
+  /* 2 — muted stains */
+  const nS=[0,1,2,4][level];
+  for(let s=0;s<nS;s++){
+    const sx=rng()*W,sy=rng()*H,sr=(12+rng()*20)*scale,sa=.07+rng()*.09;
+    const stR=62+rng()*22,stG=82+rng()*26,stB=66+rng()*20;
+    const g=ctx.createRadialGradient(sx,sy,0,sx,sy,sr);
+    g.addColorStop(0,`rgba(${stR},${stG},${stB},${sa*1.5})`);
+    g.addColorStop(.6,`rgba(${stR},${stG},${stB},${sa})`);
+    g.addColorStop(1,`rgba(${stR},${stG},${stB},0)`);
+    ctx.fillStyle=g;ctx.beginPath();
+    ctx.ellipse(sx,sy,sr*(.7+rng()*.5),sr*(.6+rng()*.6),rng()*Math.PI*2,0,Math.PI*2);ctx.fill();
+  }
+  /* 3 — damage dots */
+  const nD=[0,10,35,65][level];
+  for(let d=0;d<nD;d++){
+    const dx=rng()*W,dy=rng()*H,dr=(.3+rng()*1.4)*scale;
+    ctx.fillStyle=rng()<.55?`rgba(28,22,14,${.16+rng()*.24})`:`rgba(${P[0]},${P[1]},${P[2]},${.10+rng()*.20})`;
+    ctx.beginPath();ctx.arc(dx,dy,dr,0,Math.PI*2);ctx.fill();
+  }
+  /* 4 — damage lines + emboss */
+  const nL=[0,4,16,28][level];
+  for(let l=0;l<nL;l++){
+    const lx=rng()*W,ly=rng()*H,len=(6+rng()*22)*scale;
+    const ang=rng()*Math.PI*2;
+    const lx2=lx+Math.cos(ang)*len,ly2=ly+Math.sin(ang)*len;
+    const mx=(lx+lx2)/2+(rng()-.5)*8*scale,my=(ly+ly2)/2+(rng()-.5)*8*scale;
+    const od=(1+rng()*1.2)*scale,ox=Math.sin(ang)*od,oy=-Math.cos(ang)*od;
+    ctx.beginPath();ctx.moveTo(lx-ox,ly-oy);ctx.quadraticCurveTo(mx-ox,my-oy,lx2-ox,ly2-oy);
+    ctx.strokeStyle=`rgba(${P[0]},${P[1]},${P[2]},${.14+rng()*.14})`;
+    ctx.lineWidth=(.6+rng()*.4)*scale;ctx.stroke();
+    ctx.beginPath();ctx.moveTo(lx,ly);ctx.quadraticCurveTo(mx,my,lx2,ly2);
+    ctx.strokeStyle=`rgba(26,20,12,${.14+rng()*.18})`;
+    ctx.lineWidth=(.6+rng()*.5)*scale;ctx.stroke();
+  }
+  /* 5 — hole fraying */
+  holes.forEach(({cx,cy,r})=>{
+    const g=ctx.createRadialGradient(cx,cy,r*.55,cx,cy,r*2.8);
+    g.addColorStop(0,`rgba(${P[0]},${P[1]},${P[2]},0)`);
+    g.addColorStop(.28,`rgba(${P[0]},${P[1]},${P[2]},.32)`);
+    g.addColorStop(.65,`rgba(${P[0]},${P[1]},${P[2]},.12)`);
+    g.addColorStop(1,`rgba(${P[0]},${P[1]},${P[2]},0)`);
+    ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(cx,cy,r*2.8,r*2.8,0,0,Math.PI*2);ctx.fill();
+  });
+}
+function applyCardAging(outerEl,tarnish,cardId){
+  if(!outerEl||tarnish<=0)return;
+  const W=outerEl.offsetWidth,H=outerEl.offsetHeight;
+  if(!W||!H)return;
+  const seed=(cardId*137+tarnish*31)^0xc0ffee;
+  const{clipPath,borderStr,holes}=_cagBuildPath(W,H,tarnish,seed);
+  outerEl.style.clipPath=`path('${clipPath}')`;
+  const gcard=outerEl.querySelector('.gcard');
+  if(gcard){
+    const st=_CAG_STATES[tarnish]||_CAG_STATES[0];
+    gcard.style.filter=`url(#pixelWobbleLite) ${st.filter}`;
+    gcard.style.setProperty('--sheen-op',st.sheenOp);
+    gcard.style.setProperty('--cover-op',st.coverOp);
+    gcard.style.setProperty('--cover-filter',st.wobble>0?`url(#emojiWobble${st.wobble})`:'none');
+  }
+  const ac=document.createElement('canvas');
+  ac.className='age-canvas';
+  ac.width=W;ac.height=H;
+  outerEl.appendChild(ac);
+  _cagDrawAging(ac,W,H,tarnish,seed,holes,borderStr);
+}
+/* Auto-apply aging when .card-outer[data-aging] elements enter the DOM */
+(function(){
+  const obs=new MutationObserver(function(mutations){
+    mutations.forEach(function(m){
+      m.addedNodes.forEach(function(node){
+        if(node.nodeType!==1)return;
+        var els=node.matches&&node.matches('.card-outer[data-aging]')?[node]:[];
+        if(!els.length)els=Array.from(node.querySelectorAll('.card-outer[data-aging]'));
+        els.forEach(function(el){
+          var t=+el.dataset.aging,cid=+el.dataset.cid;
+          if(t>0)requestAnimationFrame(function(){applyCardAging(el,t,cid);});
+        });
+      });
+    });
+  });
+  obs.observe(document.body,{childList:true,subtree:true});
+})();
 function mkChipHTML(c){
   return`<div class="cchip-inner rarity-${c.rarity}"><div class="cchip-front rarity-${c.rarity}"><div class="chip-icon">${c.icon}</div><div class="chip-gem"></div></div><div class="cchip-back rarity-${c.rarity}"><div class="gcard"><div class="gcard-frame"></div>${gcCorners()}<div class="gcard-pip"></div><div class="gcard-icon">${c.icon}</div><div class="gcard-rule"></div><div class="gcard-name">${c.name}</div><div class="gcard-eff">${c.eff}</div><div class="gcard-band">${c.rarity.toUpperCase()}</div></div></div></div>`;
 }
@@ -4976,10 +5191,13 @@ function buildCBar(barId,cardIds,isOpp,label){
   cardIds.forEach((id,i)=>{const c=CARDS.find(x=>x.id===id)||getNpcCard(id);if(!c)return;
     const isActive=c.type==='active';
     const w=document.createElement('div');w.className='mcard rarity-'+c.rarity+(isActive?' mcard-active':'');w.dataset.cid=id;
+    const _tarnish=!isOpp&&typeof S!=='undefined'&&S.cards?(function(){var sc=S.cards.find(function(x){return x.id===id;});return sc?(sc.tarnish||0):0;})():0;
     w.innerHTML=
-      '<div class="gcard rarity-'+c.rarity+'">'+
-        '<div class="gcard-cover" style="background:'+(CARD_BG[c.id]||'#444')+'">'+c.icon+'</div>'+
-        '<div class="gcard-frame"></div>'+gcCorners()+
+      '<div class="card-outer"'+(c.id!==undefined?' data-aging="'+_tarnish+'" data-cid="'+c.id+'"':'')+'>'+
+        '<div class="gcard rarity-'+c.rarity+'">'+
+          '<div class="gcard-cover" style="background:'+(CARD_BG[c.id]||'#444')+'">'+c.icon+'</div>'+
+          '<div class="gcard-frame"></div>'+gcCorners()+
+        '</div>'+
       '</div>'+mkCardTooltipHTML(c,null,null);
     /* fan positioning */
     const t=(n===1)?0:(i/(n-1))*2-1;
@@ -7263,10 +7481,13 @@ function miniCardHTML(c,idx){
   const dur=(3+Math.random()*2).toFixed(1);
   const del=(Math.random()*3).toFixed(1);
   const sheenDel=(Math.random()*8).toFixed(1);
+  const tarnish=typeof S!=='undefined'&&S.cards?(function(){var sc=S.cards.find(function(x){return x.id===c.id;});return sc?(sc.tarnish||0):0;})():0;
   return '<div class="lo-mini-card rarity-'+c.rarity+'" style="--lo-dur:'+dur+'s;--lo-del:'+del+'s;cursor:pointer">'+
-    '<div class="gcard rarity-'+c.rarity+'" style="--sheen-delay:-'+sheenDel+'s">'+
-      '<div class="gcard-cover" style="background:'+(CARD_BG[c.id]||'#444')+'">'+c.icon+'</div>'+
-      '<div class="gcard-frame"></div>'+gcCorners()+
+    '<div class="card-outer" data-aging="'+tarnish+'" data-cid="'+c.id+'">'+
+      '<div class="gcard rarity-'+c.rarity+'" style="--sheen-delay:-'+sheenDel+'s">'+
+        '<div class="gcard-cover" style="background:'+(CARD_BG[c.id]||'#444')+'">'+c.icon+'</div>'+
+        '<div class="gcard-frame"></div>'+gcCorners()+
+      '</div>'+
     '</div>'+mkCardTooltipHTML(c)+'</div>';
 }
 
@@ -8062,17 +8283,18 @@ function loGcCorners(){
 function loMiniCardHTML(card,isDraggable,opts){
   var sc=S&&S.cards&&S.cards.find(function(c){return c.id===card.id;});
   var tarnish=sc?(sc.tarnish||0):0;
-  var worn=tarnish>=TARNISH_DISABLE;
   var pipHtml='';
   if(tarnish>0){
     pipHtml='<div class="tarnish-pips">';
     for(var t=0;t<TARNISH_DISABLE;t++){pipHtml+='<div class="tarnish-pip'+(t<tarnish?' filled':'')+'"></div>';}
     pipHtml+='</div>';
   }
-  return '<div class="lo-mini-card rarity-'+card.rarity+(worn?' worn-card':'')+'" data-card-id="'+card.id+'"'+(isDraggable?' draggable="true"':'')+'>'+
-    '<div class="gcard rarity-'+card.rarity+'">'+
-    '<div class="gcard-cover" style="background:'+((CARD_COVERS[card.id]||{}).bg||'#444')+'">'+(( CARD_COVERS[card.id]||{}).icon||'?')+'</div>'+
-    '<div class="gcard-frame"></div>'+loGcCorners()+
+  return '<div class="lo-mini-card rarity-'+card.rarity+'" data-card-id="'+card.id+'"'+(isDraggable?' draggable="true"':'')+'>'+
+    '<div class="card-outer" data-aging="'+tarnish+'" data-cid="'+card.id+'">'+
+      '<div class="gcard rarity-'+card.rarity+'">'+
+        '<div class="gcard-cover" style="background:'+((CARD_COVERS[card.id]||{}).bg||'#444')+'">'+(( CARD_COVERS[card.id]||{}).icon||'?')+'</div>'+
+        '<div class="gcard-frame"></div>'+loGcCorners()+
+      '</div>'+
     '</div>'+pipHtml+mkCardTooltipHTML(card,null,opts)+'</div>';
 }
 
