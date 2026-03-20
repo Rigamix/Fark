@@ -2150,6 +2150,18 @@ body::before,body::after{display:none!important}
 .lo-hand-slot.hot{border-color:var(--gold)!important;background:rgba(255,215,0,.12);box-shadow:0 0 12px rgba(255,215,0,.3);border-style:solid}
 .lo-hand-slot.dragging,.lo-mini-card.dragging{opacity:.9;filter:drop-shadow(0 4px 12px rgba(0,0,0,.7));transform:scale(1.05)}
 .lo-hand-slot .lo-mini-card,.lo-wager-slot .lo-mini-card{width:100%;height:100%}
+/* ── Slot-card drag trash zone ── */
+#loTrashZone{
+  position:fixed;display:none;z-index:9600;
+  align-items:center;justify-content:center;gap:5px;
+  background:rgba(180,30,30,.18);
+  border:2px dashed #e84040;border-radius:8px;
+  color:#e84040;pointer-events:none;
+  transition:background .12s,transform .12s,border-color .12s;
+}
+#loTrashZone .ltz-icon{font-size:16px;line-height:1}
+#loTrashZone .ltz-label{font-family:var(--font-px);font-size:9px;letter-spacing:1px}
+#loTrashZone.hot{background:rgba(220,40,40,.42);border-color:#ff5555;transform:scale(1.07)}
 /* ── Tarnish pips on mini cards ── */
 .lo-mini-card .tarnish-pips{position:absolute;bottom:3px;left:0;right:0;display:flex;gap:2px;justify-content:center;z-index:10;pointer-events:none}
 .lo-mini-card .tarnish-pip{width:4px;height:4px;border-radius:50%;background:rgba(80,40,20,.35);border:1px solid rgba(100,60,30,.5)}
@@ -3622,6 +3634,9 @@ body::before,body::after{display:none!important}
 
 <!-- FLOATING GOLD PILL — shown above backdrop/detail-sheet overlays -->
 <div id="goldPillFloat"><span class="coin-i"></span> <span id="goldDisplayFloat">0</span></div>
+
+<!-- LOADOUT SLOT TRASH ZONE — fixed body-level so transforms in detailSheet don't affect it -->
+<div id="loTrashZone"><span class="ltz-icon">🗑</span><span class="ltz-label">REMOVE</span></div>
 
 <!-- DICE ZOOM OVERLAY (gauntlet loadout) -->
 <div class="dice-zoom-overlay" id="loDiceZoom">
@@ -8332,7 +8347,7 @@ function renderLoDice(){
 var _loDragCleanups=[];
 function _cleanupLoDrag(){_loDragCleanups.forEach(function(fn){fn();});_loDragCleanups=[];}
 function initSlotCardDrag(slotEl,slotIdx){
-  var sx=0,sy=0,active=false,dragging=false,origRect=null,clone=null;
+  var sx=0,sy=0,active=false,dragging=false,origRect=null,clone=null,hotTrash=false;
   function gxy(e){var t=e.touches?e.touches[0]:e;return{x:t.clientX,y:t.clientY};}
   function removeDocListeners(){
     document.removeEventListener('touchmove',onMove);
@@ -8341,9 +8356,33 @@ function initSlotCardDrag(slotEl,slotIdx){
     document.removeEventListener('touchcancel',onEnd);
     document.removeEventListener('mouseup',onEnd);
   }
+  function showTrash(){
+    var zone=document.getElementById('loTrashZone');
+    var pr=document.getElementById('loPCards').getBoundingClientRect();
+    var zw=120,zh=44;
+    zone.style.width=zw+'px';zone.style.height=zh+'px';
+    zone.style.left=Math.round(pr.left+pr.width/2-zw/2)+'px';
+    zone.style.top=Math.round(pr.top-zh-10)+'px';
+    zone.style.display='flex';
+  }
+  function hideTrash(){
+    var zone=document.getElementById('loTrashZone');
+    zone.classList.remove('hot');
+    zone.style.display='none';
+  }
+  function checkOverTrash(cr){
+    var zone=document.getElementById('loTrashZone');
+    if(zone.style.display==='none')return false;
+    var tr=zone.getBoundingClientRect();
+    var cx=cr.left+cr.width/2,cy=cr.top+cr.height/2;
+    var ox=Math.max(0,Math.min(cr.right,tr.right)-Math.max(cr.left,tr.left));
+    var oy=Math.max(0,Math.min(cr.bottom,tr.bottom)-Math.max(cr.top,tr.top));
+    var dist=Math.sqrt(Math.pow(cx-(tr.left+tr.width/2),2)+Math.pow(cy-(tr.top+tr.height/2),2));
+    return ox*oy>0||dist<72;
+  }
   function onStart(e){
     closeAllChips();
-    var p=gxy(e);sx=p.x;sy=p.y;active=true;dragging=false;
+    var p=gxy(e);sx=p.x;sy=p.y;active=true;dragging=false;hotTrash=false;
     origRect=slotEl.getBoundingClientRect();
     document.addEventListener('touchmove',onMove,{passive:false});
     document.addEventListener('mousemove',onMove);
@@ -8362,29 +8401,38 @@ function initSlotCardDrag(slotEl,slotIdx){
         'left:'+origRect.left+'px;top:'+origRect.top+'px;width:'+origRect.width+'px;height:'+origRect.height+'px;margin:0;transform:scale(1.15)';
       document.body.appendChild(clone);
       slotEl.style.opacity='.2';
+      window._loDragging=true;
+      showTrash();
     }
     if(e.cancelable)e.preventDefault();
     clone.style.left=(origRect.left+dx)+'px';
     clone.style.top=(origRect.top+dy)+'px';
+    /* Hit-test trash zone */
+    var cr=clone.getBoundingClientRect();
+    var over=checkOverTrash(cr);
+    if(over!==hotTrash){
+      hotTrash=over;
+      document.getElementById('loTrashZone').classList.toggle('hot',over);
+    }
   }
   function onEnd(){
     removeDocListeners();
     if(!active)return;
     if(!dragging){active=false;origRect=null;return;}
-    var cr=clone.getBoundingClientRect();
-    var dist=Math.sqrt(Math.pow(cr.left-origRect.left,2)+Math.pow(cr.top-origRect.top,2));
-    if(dist>60){
-      /* Dragged far enough → remove card from slot */
-      clone.remove();clone=null;
+    hideTrash();
+    if(hotTrash){
+      /* Dropped on trash → clear slot, re-render */
+      if(clone){clone.remove();clone=null;}
       slotEl.style.opacity='';
       _loSelectedCards[slotIdx]=null;
       if(_loRung&&_loRung.wager){autoStake();renderLoWager();}
       renderLoHand();
     }else{
-      /* Not far enough → snap clone back */
+      /* Not on trash → snap back */
       snapCloneBack(clone,origRect,slotEl);clone=null;
     }
-    active=false;dragging=false;origRect=null;
+    active=false;dragging=false;origRect=null;hotTrash=false;
+    setTimeout(function(){window._loDragging=false;},50);
   }
   slotEl.addEventListener('touchstart',onStart,{passive:false});
   slotEl.addEventListener('mousedown',onStart);
@@ -8392,6 +8440,7 @@ function initSlotCardDrag(slotEl,slotIdx){
     slotEl.removeEventListener('touchstart',onStart);
     slotEl.removeEventListener('mousedown',onStart);
     removeDocListeners();
+    hideTrash();
   });
 }
 
@@ -8503,9 +8552,10 @@ function renderLoHand(){
       if(card){
         slot.innerHTML=loMiniCardHTML(card,false);
         slot.classList.add('filled');
-        /* Tap filled card = tooltip */
+        /* Tap filled card = tooltip; drag filled card = trash-zone unequip */
         var miniCard=slot.querySelector('.lo-mini-card');
         if(miniCard) attachTooltipTap(miniCard);
+        initSlotCardDrag(slot,i);
       }
     }else{
       slot.innerHTML='<span>EMPTY</span>';
