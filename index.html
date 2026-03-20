@@ -342,7 +342,7 @@ body{
   font-size:14px;color:var(--ctrim2);letter-spacing:.2px;line-height:1.35;
   padding:4px 10px 10px;z-index:3;position:relative;word-break:break-word;
 }
-.mcard-tooltip .tip-num,.die-tooltip .tip-num{color:var(--tip-num-color,#ffd040);font-weight:700;font-style:normal;font-size:1.13em;vertical-align:baseline}
+.mcard-tooltip .tip-num,.die-tooltip .tip-num,.dz-desc .tip-num,.dz-bias .tip-num{color:var(--tip-num-color,#ffd040);font-weight:700;font-style:normal;font-size:1.13em;vertical-align:baseline}
 .mcard-tooltip .tip-tarnish{
   display:flex;gap:5px;justify-content:center;
   padding:0 10px 8px;z-index:3;position:relative;
@@ -4649,7 +4649,7 @@ const DICE_TYPES=[
    desc:'Standard faces. Reliable starter.'},
   {id:'iron',name:'IRON',icon:'⚙️',cost:100,
    faces:[1,2,4,5,5,6],effect:null,
-   desc:'No three-face — extra five. Better scoring odds than Bone.'},
+   desc:'No 3-face — extra 5. Better scoring odds than Bone.'},
   {id:'flint',name:'FLINT',icon:'🪨',cost:150,
    faces:[2,3,4,4,5,6],effect:null,
    desc:'No 1-face. Leans toward 4s and upper numbers.'},
@@ -4675,8 +4675,18 @@ const DICE_TYPES=[
   {id:'crystal',name:'CRYSTAL',icon:'💎',cost:750,
    faces:[1,1,2,3,5,5],
    effect:{type:'scoring_boost',mechanic:'single1_bonus',amount:50},
-   desc:'1s score 150. Two 1-faces, two 5-faces, no 4 or 6.'},
+   desc:'1s score 150. 2x 1-face, 2x 5-face, no 4 or 6.'},
 ];
+/* Convert spelled-out small numbers to digits for consistent tooltip display */
+function _numWords(s){
+  return String(s)
+    .replace(/\bzero\b/gi,'0').replace(/\bone\b/gi,'1').replace(/\btwo\b/gi,'2')
+    .replace(/\bthree\b/gi,'3').replace(/\bfour\b/gi,'4').replace(/\bfive\b/gi,'5')
+    .replace(/\bsix\b/gi,'6').replace(/\bseven\b/gi,'7').replace(/\beight\b/gi,'8')
+    .replace(/\bnine\b/gi,'9').replace(/\bten\b/gi,'10');
+}
+/* Wrap numbers with tip-num span — apply _numWords first then bold the digits */
+function _wnHtml(s){return _numWords(s).replace(/(\d+)/g,'<b class="tip-num">$1</b>');}
 function _dieEffectLabel(eff){
   if(!eff)return'';
   switch(eff.mechanic){
@@ -4891,7 +4901,7 @@ function mkCardTooltipHTML(card,bandOverride,opts){
   var flavorLine=(opts.showFlavor&&card.flavor)?'<div class="tip-flavor">'+card.flavor+'</div>':'';
   var cbg=(typeof CARD_BG!=='undefined'&&CARD_BG[card.id])||'';
   var cbgStyle=cbg?' style="--cbg:'+cbg+'"':'';
-  var effText=_sentenceCase(card.eff).replace(/(\d+)/g,'<b class="tip-num">$1</b>');
+  var effText=_wnHtml(_sentenceCase(card.eff));
   /* Tarnish dots for player-owned cards */
   var tarnishLine='';
   if(typeof S!=='undefined'&&S.cards&&!card.npcOnly){
@@ -7132,14 +7142,13 @@ function buildMiniCube(matId){
 
 function buildDieTooltipHTML(matId){
   var dice=getDie(matId);if(!dice)return '';
-  var wn=function(s){return String(s).replace(/(\d+)/g,'<b class="tip-num">$1</b>');};
   var effHtml='';
-  if(dice.effect){effHtml='<div class="dt-eff">'+wn(_dieEffectLabel(dice.effect))+'</div>';}
-  var facesHtml=dice.faces.map(function(f){return wn(f);}).join(' · ');
+  if(dice.effect){effHtml='<div class="dt-eff">'+_wnHtml(_dieEffectLabel(dice.effect))+'</div>';}
+  var facesHtml=dice.faces.map(function(f){return '<b class="tip-num">'+f+'</b>';}).join(' · ');
   return '<div class="die-tooltip dtype-'+matId+'">'+
     '<div class="dt-name">'+toTitleCase(dice.name)+'</div>'+
     '<div class="dt-3d-placeholder" data-mat="'+matId+'"></div>'+
-    '<div class="dt-desc">'+wn(dice.desc)+'</div>'+
+    '<div class="dt-desc">'+_wnHtml(dice.desc)+'</div>'+
     '<div class="dt-faces">[ '+facesHtml+' ]</div>'+
     effHtml+'</div>';
 }
@@ -7536,8 +7545,8 @@ function matchDiceZoom(id){
     cube.appendChild(face);
   }
   document.getElementById('dzName').textContent=toTitleCase(dice.name);
-  document.getElementById('dzDesc').textContent=dice.desc;
-  document.getElementById('dzBias').textContent='Faces: ['+dice.faces.join(', ')+']'+(dice.effect?' · '+_dieEffectLabel(dice.effect):'');
+  document.getElementById('dzDesc').innerHTML=_wnHtml(dice.desc);
+  document.getElementById('dzBias').innerHTML='Faces: ['+dice.faces.map(function(f){return '<b class="tip-num">'+f+'</b>';}).join(', ')+']'+(dice.effect?' · '+_wnHtml(_dieEffectLabel(dice.effect)):'');
   requestAnimationFrame(()=>{
     const infoEl=document.getElementById('dzInfoPanel');
     const cv=document.getElementById('dzPanelBg');
@@ -8879,8 +8888,8 @@ function loDiceZoom(id){
     cube.appendChild(face);
   }
   document.getElementById('loDzName').textContent=loToTitleCase(dice.name);
-  document.getElementById('loDzDesc').textContent=dice.desc;
-  document.getElementById('loDzBias').textContent='Faces: ['+dice.faces.join(', ')+']'+(dice.effect?' · '+_dieEffectLabel(dice.effect):'');
+  document.getElementById('loDzDesc').innerHTML=_wnHtml(dice.desc);
+  document.getElementById('loDzBias').innerHTML='Faces: ['+dice.faces.map(function(f){return '<b class="tip-num">'+f+'</b>';}).join(', ')+']'+(dice.effect?' · '+_wnHtml(_dieEffectLabel(dice.effect)):'');
   requestAnimationFrame(function(){
     var infoEl=document.getElementById('loDzInfoPanel');
     var cv=document.getElementById('loDzPanelBg');
@@ -10202,8 +10211,8 @@ function shopDiceZoom(id){
 
   /* Name + Desc */
   document.getElementById('shopDzName').textContent=toTitleCase(dice.name);
-  document.getElementById('shopDzDesc').textContent=dice.desc;
-  document.getElementById('shopDzBias').textContent='FACES: ['+dice.faces.join(', ')+']'+(dice.effect?' · '+_dieEffectLabel(dice.effect):'');
+  document.getElementById('shopDzDesc').innerHTML=_wnHtml(dice.desc);
+  document.getElementById('shopDzBias').innerHTML='FACES: ['+dice.faces.map(function(f){return '<b class="tip-num">'+f+'</b>';}).join(', ')+']'+(dice.effect?' · '+_wnHtml(_dieEffectLabel(dice.effect)):'');
 
   const ownCount=ownedDice.filter(x=>x===id).length;
   const canAfford=dice.cost===0||playerGold>=dice.cost;
