@@ -1326,13 +1326,13 @@ body{
 @keyframes resPop{0%{transform:scale(0);opacity:0}70%{transform:scale(1.1);opacity:1}100%{transform:scale(1);opacity:1}}
 /* res-card: absolutely positioned so reward card appearance never shifts scores */
 #end-ov .res-card{position:absolute!important;top:38%;left:50%;transform:translateX(-50%)}
+/* res-scores: absolutely positioned so title pop animation (scale) can't cause iOS Safari flex reflow */
+#end-ov .res-scores{position:absolute!important;top:calc(20vh + clamp(48px,14.4vw,78px));left:50%;transform:translateX(-50%)!important}
 #end-ov .res-scores,#end-ov .res-gold-wrap{opacity:0}
-/* scores stay in flow but use normal slide-up; gold/card are absolute so need translateX preserved */
+/* all absolute elements use resFadeAbs to preserve translateX(-50%) during slide-up */
 @keyframes resFadeAbs{0%{opacity:0;transform:translateX(-50%) translateY(10px)}100%{opacity:1;transform:translateX(-50%) translateY(0)}}
-.res-gold-wrap.fade-in{animation:resFadeAbs .5s ease forwards}
-.res-scores.fade-in{animation:resFade .5s ease forwards}
+.res-gold-wrap.fade-in,.res-scores.fade-in{animation:resFadeAbs .5s ease forwards}
 #end-btns.fade-in{animation:btnFade .5s ease forwards}
-@keyframes resFade{0%{opacity:0;transform:translateY(10px)}100%{opacity:1;transform:translateY(0)}}
 @keyframes btnFade{0%{opacity:0;transform:translateX(-50%) translateY(10px)}100%{opacity:1;transform:translateX(-50%) translateY(0)}}
 
 /* card reveal */
@@ -4922,6 +4922,7 @@ function attachTooltipTap(wrapperEl,opts){
     if(window._shopDragging)return; /* suppress tooltip when shop drag just ended */
     if(window._loDragging)return;   /* suppress tooltip when loadout drag just ended */
     if(opts.excludeSelector&&e.target.closest(opts.excludeSelector))return;
+    if(opts.requireSelector&&!e.target.closest(opts.requireSelector))return;
     e.stopPropagation();
     const wasPeeked=wrapperEl.classList.contains('peeked');
     closeAllChips();
@@ -6659,7 +6660,7 @@ function endMatch(win){
       if(isCardLost)resCard.classList.add('lost');
       SFX.coins();
       /* Tap to show tooltip — exclude dialogue box from trigger area */
-      attachTooltipTap(resCard,{excludeSelector:'.res-dlg'});
+      attachTooltipTap(resCard,{excludeSelector:'.res-dlg',requireSelector:'.gcard'});
       /* NPC dialogue box with portrait + parchment */
       const quoteText=npcRewardCard&&c.rewardQuote?c.rewardQuote:
         (c.flavor?c.flavor:
@@ -6800,7 +6801,7 @@ function handleContinue(){
         var rc=document.getElementById('resCard');
         rc.innerHTML=d.cardHTML;rc.classList.add('show');
         if(d.isCardLost)rc.classList.add('lost');
-        attachTooltipTap(rc,{excludeSelector:'.res-dlg'});
+        attachTooltipTap(rc,{excludeSelector:'.res-dlg',requireSelector:'.gcard'});
         // Show NPC dialogue on card
         if(d.dlgHTML){
           var dlgDiv=document.createElement('div');
