@@ -120,6 +120,15 @@ body{
   border:2px solid var(--golddim);font-size:15px;color:var(--gold);
   background:rgba(20,16,8,.85);opacity:1;z-index:5;
 }
+.renown-bar{
+  position:absolute;left:16px;top:50%;transform:translateY(-50%);
+  display:flex;align-items:center;gap:4px;padding:4px 8px;
+  font-size:12px;color:#c8a050;letter-spacing:.5px;
+  background:rgba(20,16,8,.7);border:1px solid rgba(200,160,80,.3);
+  z-index:5;
+}
+.renown-icon{font-size:11px}
+.renown-next{font-size:10px;color:var(--textdim);margin-left:2px}
 #goldPillFloat{
   position:fixed;right:16px;top:9px;
   display:none;align-items:center;gap:5px;padding:5px 10px;
@@ -3603,6 +3612,7 @@ body::before,body::after{display:none!important}
 <div class="top-bar">
   <div class="title"><span class="letter">F</span><span class="letter">a</span><span class="letter">r</span><span class="letter">K</span><span class="letter">!</span></div>
   <div class="gold-pill"><span class="coin-i"></span> <span id="gold-display">320</span></div>
+  <div class="renown-bar" id="renownBar"><span class="renown-icon">⭐</span> <span id="renownDisplay">0</span> <span class="renown-next" id="renownNext"></span></div>
 </div>
 <div class="grid-wrap">
   <div style="text-align:center;padding:16px 4px 10px">
@@ -4042,10 +4052,41 @@ function _getS(){
     if(!S.npcWonCards)S.npcWonCards={};
     if(S.matchCount===undefined)S.matchCount=0;
     if(!S.diceVersion)S.diceVersion=1;
+    /* ── Engagement Overhaul state fields ── */
+    if(!S.npcBounty)S.npcBounty={};
+    if(!S.npcState)S.npcState={};
+    if(S.debt===undefined)S.debt=0;
+    if(S.lossStreak===undefined)S.lossStreak=0;
+    if(S.renown===undefined)S.renown=0;
+    if(!S.renownPerks)S.renownPerks={};
+    if(!S.shards)S.shards={};
   }
   return S;
 }
 function save(){try{localStorage.setItem('gambit4',JSON.stringify(S));}catch(e){/* storage full or unavailable */}}
+
+/* ── Renown Perks ── */
+const RENOWN_PERKS=[
+  {threshold:25, key:'freeRestock',  label:'Tavern Regular',      desc:'1 free shop restock'},
+  {threshold:50, key:'extraSlot',    label:'Card Collector',       desc:'4th card equip slot'},
+  {threshold:100,key:'shopDiscount', label:"Veteran's Discount",   desc:'Shop prices -15%'},
+  {threshold:150,key:'forgeDiscount',label:"Blacksmith's Friend",  desc:'Forge & dice costs -20%'},
+  {threshold:200,key:'bountyBoost',  label:'Known Gambler',        desc:'All bounties start +10g'},
+  {threshold:300,key:'legend',       label:'Legend',                desc:'Legendary title'},
+];
+function _checkRenownPerks(){
+  if(!S.renownPerks)S.renownPerks={};
+  RENOWN_PERKS.forEach(function(p){if((S.renown||0)>=p.threshold&&!S.renownPerks[p.key])S.renownPerks[p.key]=true;});
+}
+function _updateRenownUI(){
+  _checkRenownPerks();
+  var rd=document.getElementById('renownDisplay');if(rd)rd.textContent=S.renown||0;
+  var rn=document.getElementById('renownNext');
+  if(rn){
+    var next=RENOWN_PERKS.find(function(p){return(S.renown||0)<p.threshold;});
+    rn.textContent=next?('→ '+next.threshold+' '+next.label):'MAX';
+  }
+}
 
 /* ── Mid-match save / resume ── */
 function saveMatchState(){
@@ -4392,7 +4433,7 @@ document.addEventListener('visibilitychange',function(){
 });
 
 /* ═══════ GAME CONSTANTS ═══════ */
-const TARNISH_DISABLE=3;
+const TARNISH_DISABLE=999;/* cosmetic only — cards never disable from tarnish */
 const PORTRAITS={
   drunkard:'Match_Art/drunkard_frame.png',peasant:'Match_Art/peasant_frame.png',
   commoner:'Match_Art/commoner_frame.png',merchant:'Match_Art/merchant_frame.png',
@@ -5137,11 +5178,9 @@ function mkCardTooltipHTML(card,bandOverride,opts){
     var sc=S.cards.find(function(c){return c.id===card.id;});
     if(sc&&(sc.tarnish||0)>0){
       var t=sc.tarnish||0;
-      var dots='';
-      for(var i=0;i<TARNISH_DISABLE;i++){dots+='<span class="'+(i<t?'filled':'')+'"></span>';}
-      tarnishLine=t>=TARNISH_DISABLE
-        ?'<div class="tip-tarnish">'+dots+'</div><div class="tip-worn">WORN OUT</div>'
-        :'<div class="tip-tarnish">'+dots+'</div>';
+      var dots='';var maxDots=Math.max(t,3);
+      for(var i=0;i<maxDots;i++){dots+='<span class="'+(i<t?'filled':'')+'"></span>';}
+      tarnishLine='<div class="tip-tarnish">'+dots+'</div>';
     }
   }
   return '<div class="mcard-tooltip rarity-'+rarity+'"'+cbgStyle+'>'+
@@ -6752,15 +6791,47 @@ function endMatch(win){
   _dragState=null;window._shopDragging=false;/* clear any stale drag state */
   win?SFX.win():SFX.lose();S.matchCount=(S.matchCount||0)+1;
   const buyIn=(LO&&LO.buyIn)||G.rung.buyIn||0;
-  /* Anti-farming: each repeat win reduces reward by 20% (stacking) */
+  const _freeEntry=(!win&&S.lossStreak>=3);/* loss streak protection: free buy-in */
+  const _effectiveBuyIn=_freeEntry?0:buyIn;
   if(!S.rungWins)S.rungWins={};
   const isRematch=G.rung.id<(S.currentRung||0);
   const priorWins=S.rungWins[G.rung.id]||0;
-  let goldEarned=win?G.rung.gold+buyIn:0;let kingsRansomMsg='';
-  if(win&&priorWins>0){const dimFactor=Math.pow(0.8,priorWins);goldEarned=Math.max(Math.floor(goldEarned*dimFactor),1);}
-  if(win&&G.pCards.includes('kings_ransom')&&(G.pPts-G.oPts)>=5000){goldEarned*=3;kingsRansomMsg=" 👑 KING'S RANSOM x3";}
+  const rungKey=G.rung.key||'';
+  /* ── Gold calculation — Engagement Overhaul ── */
+  let goldEarned=0;let kingsRansomMsg='';let bountyPaid=0;let refundMsg='';
+  if(win){
+    /* Base reward: full on first win, flat 40% on rematches (no exponential decay) */
+    const baseReward=G.rung.gold+buyIn;
+    goldEarned=priorWins>0?Math.max(Math.floor(baseReward*0.4),1):baseReward;
+    /* King's Ransom card bonus */
+    if(G.pCards.includes('kings_ransom')&&(G.pPts-G.oPts)>=5000){goldEarned*=3;kingsRansomMsg=" 👑 KING'S RANSOM x3";}
+    /* Bounty payout — accumulated from prior losses to this NPC */
+    if(rungKey&&S.npcBounty&&S.npcBounty[rungKey]>0){bountyPaid=S.npcBounty[rungKey];S.npcBounty[rungKey]=0;}
+  }else{
+    /* Graduated loss refund based on score proximity */
+    const scoreRatio=G.target>0?G.pPts/G.target:0;
+    let refund=0;
+    if(scoreRatio>=0.70){refund=Math.floor(_effectiveBuyIn*0.5);refundMsg=' (close match)';}
+    else if(scoreRatio>=0.50){refund=Math.floor(_effectiveBuyIn*0.3);refundMsg=' (decent effort)';}
+    const actualLoss=_effectiveBuyIn-refund;
+    goldEarned=-actualLoss;
+    /* Bounty accumulation on loss */
+    if(rungKey){if(!S.npcBounty)S.npcBounty={};S.npcBounty[rungKey]=Math.min((S.npcBounty[rungKey]||0)+Math.floor(buyIn*0.5),buyIn*3);}
+  }
+  /* Minimum 5g "spectator tips" on every match */
+  const spectatorTips=5;
   const thriftyBonus=(win&&G.thriftyBonus)?G.thriftyBonus:0;
-  if(win){S.gold+=goldEarned+thriftyBonus;}else{S.gold=Math.max(0,S.gold-buyIn);}
+  /* Apply gold */
+  if(win){
+    let totalGold=goldEarned+thriftyBonus+bountyPaid+spectatorTips;
+    /* Debt skim: 20% of earnings go to repaying innkeeper loan */
+    if(S.debt>0){const skim=Math.floor(totalGold*0.2);const repay=Math.min(skim,S.debt);S.debt-=repay;totalGold-=repay;}
+    S.gold+=totalGold;
+  }else{
+    S.gold=Math.max(0,S.gold+goldEarned+spectatorTips);
+  }
+  /* Loss streak tracking */
+  if(win){S.lossStreak=0;}else{S.lossStreak=(S.lossStreak||0)+1;}
   if(win){S.wins++;S.rungWins[G.rung.id]=(S.rungWins[G.rung.id]||0)+1;if(G.rung.id>=S.currentRung){S.currentRung=G.rung.id+1;}}
   // Save tarnish of wagered cards before removal (for end screen aging display)
   const _lostCardTarnish={};
@@ -6772,7 +6843,7 @@ function endMatch(win){
   if(LO&&LO.effectiveWager&&!isRematch){
     const stakes=Array.isArray(G.pStake)?G.pStake:(G.pStake?[G.pStake]:[]);
     if(win){
-      stakes.forEach(cid=>{const sc=S.cards.find(c=>c.id===cid);if(sc)sc.tarnish=(sc.tarnish||0)+1;});
+      /* Tarnish no longer increments — cosmetic wear only */
       if(G.oStake){const existing=S.cards.find(c=>c.id===G.oStake);if(existing)existing.count++;else S.cards.push({id:G.oStake,count:1,tarnish:0});}
     }else{
       stakes.forEach(cid=>{const sc=S.cards.find(c=>c.id===cid);if(sc){sc.count--;if(sc.count<=0)S.cards=S.cards.filter(c=>c.id!==cid);}});
@@ -6799,8 +6870,29 @@ function endMatch(win){
   /* Auto-refresh shop stock after every match */
   if(typeof rollShopStock==='function')rollShopStock();
   save();
+  /* ── Renown — permanent progression ── */
+  var _renownGain=win?(10+G.rung.id*5):(3+G.rung.id*2);
+  /* Bonus: close match within 10% of target */
+  if(Math.abs(G.pPts-G.oPts)<G.target*0.1)_renownGain+=5;
+  /* Bonus: comeback win (opponent was ahead at some point) */
+  if(win&&G._opponentLedAtMidpoint)_renownGain+=10;
+  S.renown=(S.renown||0)+_renownGain;
+  /* ── NPC State update ── */
+  if(rungKey){
+    if(!S.npcState)S.npcState={};
+    if(!S.npcState[rungKey])S.npcState[rungKey]={wins:0,losses:0,streak:0,lastResult:null,mood:'neutral',tier:0};
+    var _ns=S.npcState[rungKey];
+    if(win){_ns.wins++;_ns.streak=Math.max(1,(_ns.streak>0?_ns.streak:0)+1);_ns.lastResult='win';
+      var margin=G.pPts-G.oPts;if(margin>(_ns.biggestWin||0))_ns.biggestWin=margin;
+      _ns.tier=_ns.wins>=5?3:_ns.wins>=3?2:_ns.wins>=1?1:0;
+    }else{_ns.losses++;_ns.streak=Math.min(-1,(_ns.streak<0?_ns.streak:0)-1);_ns.lastResult='loss';
+      var lossMargin=G.oPts-G.pPts;if(lossMargin<(_ns.closestLoss===undefined?9999:_ns.closestLoss))_ns.closestLoss=lossMargin;
+    }
+  }
+  /* ── Card XP for equipped cards ── */
+  if(G.pCards&&G.pCards.length){G.pCards.forEach(function(cid){var sc=S.cards.find(function(c){return c.id===cid;});if(sc){sc.xp=(sc.xp||0)+1;}});}
   // Store result for gauntlet to read
-  G._lastGoldEarned=win?goldEarned+thriftyBonus:-buyIn;
+  G._lastGoldEarned=win?goldEarned+thriftyBonus+bountyPaid+spectatorTips:goldEarned+spectatorTips;
   // Cancel any pending end-screen timers from previous calls
   if(window._endTimers){window._endTimers.forEach(t=>clearTimeout(t));}
   window._endTimers=[];
@@ -6826,15 +6918,21 @@ function endMatch(win){
   resGoldWrap.style.display='';resGoldWrap.style.visibility='';
   resCoinBig.className='res-coin-big';void resCoinBig.offsetWidth;
   const resCoinAmt=document.getElementById('resCoinAmt');
-  const totalGold=goldEarned+thriftyBonus;
-  resCoinAmt.textContent=win?'+'+totalGold:'-'+buyIn;
+  const _displayGold=win?goldEarned+thriftyBonus+bountyPaid+spectatorTips:goldEarned+spectatorTips;
+  resCoinAmt.textContent=(_displayGold>=0?'+':'')+_displayGold;
   resGoldText.className='res-gold-text';
   btnCont.classList.remove('fade-in');
   resCard.classList.remove('show');resCard.innerHTML='';
   var _resDlgEl=document.getElementById('resDlg');if(_resDlgEl){_resDlgEl.classList.remove('show');_resDlgEl.innerHTML='';}
   resPScore.textContent='0';resOScore.textContent='0';
   document.getElementById('resOName').textContent=G.rung.name.toUpperCase();
-  const goldDisplay=win?'+'+totalGold+(kingsRansomMsg||'')+' GOLD':'-'+buyIn+' GOLD';
+  let goldDisplay;
+  if(win){
+    goldDisplay='+'+_displayGold+(kingsRansomMsg||'')+(bountyPaid?' +'+bountyPaid+' BOUNTY':'')+' GOLD';
+  }else{
+    const lossAmt=Math.abs(goldEarned);
+    goldDisplay=lossAmt>0?'-'+lossAmt+refundMsg+' GOLD':'+'+spectatorTips+' GOLD (tips)';
+  }
   resGoldText.textContent=goldDisplay;
 
   ov.classList.add('show');
@@ -8361,7 +8459,7 @@ function loMiniCardHTML(card,isDraggable,opts){
   var pipHtml='';
   if(tarnish>0){
     pipHtml='<div class="tarnish-pips">';
-    for(var t=0;t<TARNISH_DISABLE;t++){pipHtml+='<div class="tarnish-pip'+(t<tarnish?' filled':'')+'"></div>';}
+    var _maxPips=Math.max(tarnish,3);for(var t=0;t<_maxPips;t++){pipHtml+='<div class="tarnish-pip'+(t<tarnish?' filled':'')+'"></div>';}
     pipHtml+='</div>';
   }
   return '<div class="lo-mini-card rarity-'+card.rarity+'" data-card-id="'+card.id+'"'+(isDraggable?' draggable="true"':'')+'>'+
@@ -8401,8 +8499,8 @@ function openLoadout(rung,done){
   var _rarOrd={gold:1,silver:2,tin:3};
   var isGrog=rung.id===0||rung.key==='drunkard';
   _loOppCards=generateOppCards(rung);
-  // Match player card slots to opponent's card count for fairness
-  MAX_EQUIP=_loOppCards.length||1;
+  // Player always gets 3 card slots (4 with renown perk)
+  MAX_EQUIP=(S.renownPerks&&S.renownPerks.extraSlot)?4:3;
   _loSelectedCards=new Array(MAX_EQUIP).fill(null);
   _loWagerCards=[];
   /* Auto-equip when owned card count fits exactly into available slots (1 card, or 2 with 2 slots, etc.) */
@@ -9501,6 +9599,7 @@ function initGauntletScreen(data) {
 
   var gd = document.querySelector('#screen-gauntlet #gold-display');
   if(gd) gd.textContent = S.gold;
+  _updateRenownUI();
 
   if(data && data.matchResult) {
     _pendingResult = data.matchResult;
