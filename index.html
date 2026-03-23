@@ -1362,8 +1362,10 @@ body{
 .res-card.lost .res-card-glow{background:radial-gradient(circle,rgba(180,40,40,.25) 0%,transparent 70%);animation:cardLoseGlowPulse 1.5s ease-in-out infinite alternate}
 @keyframes cardLoseGrey{0%{transform:rotateY(180deg) scale(.6);opacity:0;filter:none}40%{transform:rotateY(360deg) scale(1.05);opacity:1;filter:none}100%{transform:rotateY(360deg) scale(.95);opacity:.8;filter:grayscale(1) brightness(.45)}}
 @keyframes cardLoseGlowPulse{0%{opacity:.3;transform:scale(.95)}100%{opacity:.6;transform:scale(1.05)}}
-/* NPC dialogue on end screen */
-.res-dlg{display:flex;align-items:center;gap:8px;margin-top:12px;align-self:center;max-width:90vw;width:min(380px,90vw)}
+/* NPC dialogue on end screen — stable container, never shifts */
+#end-ov #resDlg{position:absolute;top:calc(38% + 170px);left:50%;transform:translateX(-50%);width:min(380px,90vw);display:none}
+#end-ov #resDlg.show{display:block}
+.res-dlg{display:flex;align-items:center;gap:8px;margin-top:0;align-self:center;max-width:90vw;width:min(380px,90vw)}
 .res-dlg .dlg-portrait{width:52px;height:52px;border-radius:4px;overflow:hidden;flex-shrink:0}
 .res-dlg .dlg-portrait img{width:100%;height:100%;image-rendering:auto;display:block}
 .res-dlg .dlg-scroll{position:relative;flex:1;min-width:0;padding:18px 14px;display:flex;align-items:center;min-height:64px}
@@ -1915,6 +1917,13 @@ body::before,body::after{display:none!important}
   .activate-zone{bottom:calc(100% + 60px)}
   .match-btn-yield{bottom:calc(100% + 60px)}
   #diceArea{--sp-before:0;--sp-after:5}
+  /* Prevent NPC dialogue from overlapping opponent dice row */
+  .opp-dice-row{height:50px;padding:2px 0}
+  .opp-dice-row .die{width:40px;height:40px}
+  .dlg-box{height:68px;padding:2px 0}
+  .dlg-portrait{width:52px;height:52px}
+  /* End screen dialogue stable position on small phones */
+  #end-ov #resDlg{top:calc(38% + 155px)}
 }
 /* ── Two-column layout ── */
 .lo-cols{
@@ -2136,6 +2145,9 @@ body::before,body::after{display:none!important}
   background:rgba(20,8,8,.4);transition:border-color .2s;
 }
 .lo-wager-zone .lo-wager-slot.filled{border-color:transparent;border-width:0;padding:0}
+.lo-wager-zone .lo-wager-slot.multi{width:auto;aspect-ratio:unset;border:1px dashed var(--reddim) !important;border-width:1px !important;padding:3px;gap:3px;flex-direction:row}
+.lo-wager-zone .lo-wager-slot.multi .wager-card-wrap{width:44px;flex-shrink:0;aspect-ratio:2/3;position:relative;overflow:visible}
+.lo-wager-zone .lo-wager-slot.multi .wager-card-wrap .lo-mini-card{width:100%;height:100%}
 .lo-wager-zone .lo-vs-icon{
   font-family:'MedievalSharp',serif;font-size:14px;color:var(--textdim);opacity:.6;
 }
@@ -3809,6 +3821,7 @@ body::before,body::after{display:none!important}
     <div class="res-gold-text" id="resGoldText">+40 GOLD</div>
   </div>
   <div class="res-card" id="resCard"></div>
+  <div id="resDlg"></div>
   <div id="end-btns">
     <button id="btnStore" onclick="handleGoToStore()"><canvas id="cvBtnStore"></canvas><span>STORE</span></button>
     <button id="btnContinue" onclick="handleContinue()"><canvas id="cvBtnContinue"></canvas><span>CONTINUE</span></button>
@@ -4026,6 +4039,7 @@ function _getS(){
     if(!S.settings)S.settings={diceStyle:'2d'};
     if(!S.ownedDice)S.ownedDice=[...(S.dice||['bone','bone','bone','bone','bone','bone'])];
     if(!S.npcRewards)S.npcRewards={};
+    if(!S.npcWonCards)S.npcWonCards={};
     if(S.matchCount===undefined)S.matchCount=0;
     if(!S.diceVersion)S.diceVersion=1;
   }
@@ -4564,8 +4578,8 @@ const NPC_CARDS=[
    eff:"Can't bust first 2 turns",flavor:'"I\'ve stood in worse. Much worse. This is just dice."',
    effect:{type:'passive',mechanic:'bust_immune_turns',turns:2}},
   {id:'iron_gate_npc',name:'IRON GATE',icon:'⛓️',rarity:'npc',npcOnly:true,owner:'brutus',
-   eff:'Reroll your scoring die (×2)',flavor:'"No. Try again."',
-   effect:{type:'on_player_roll',mechanic:'reroll_scoring',uses:2}},
+   eff:'Cancels your bank if under 200 (once)',desc:'Once per match, if you try to bank with fewer than 200 points, Brutus cancels your bank entirely. You gain nothing and your turn ends.',flavor:'"No. Try again."',
+   effect:{type:'on_player_bank',mechanic:'block_low_bank',threshold:200}},
   {id:'campaign_veteran',name:'CAMPAIGN VETERAN',icon:'⚔️',rarity:'npc',npcOnly:true,owner:'brutus',
    eff:'Start +800 pts',flavor:'"You learn a few things. Twenty years of things."',
    effect:{type:'start_bonus',amount:800}},
@@ -5116,7 +5130,7 @@ function mkCardTooltipHTML(card,bandOverride,opts){
   var flavorLine=(opts.showFlavor&&card.flavor)?'<div class="tip-flavor">'+card.flavor+'</div>':'';
   var cbg=(typeof CARD_BG!=='undefined'&&CARD_BG[card.id])||'';
   var cbgStyle=cbg?' style="--cbg:'+cbg+'"':'';
-  var effText=_wnHtml(_sentenceCase(card.eff));
+  var effText=_wnHtml(card.desc||_sentenceCase(card.eff));
   /* Tarnish dots for player-owned cards */
   var tarnishLine='';
   if(typeof S!=='undefined'&&S.cards&&!card.npcOnly){
@@ -5717,9 +5731,26 @@ function triggerCard(cardId,msg,isPlayer,persist){
     labelParent.appendChild(lbl);
     if(!persist)setTimeout(function(){lbl.remove();},1800);
   }
+  // Grey out NPC card if now exhausted
+  if(!isPlayer)setTimeout(_updateNpcCardVisuals,800);
 }
 function clearCardLabel(cardId){
   document.querySelectorAll('.card-trig-label[data-cid="'+cardId+'"]').forEach(e=>e.remove());
+}
+function _updateNpcCardVisuals(){
+  if(!G||!G.oCards)return;
+  var bar=document.getElementById('oppCards');if(!bar)return;
+  G.oCards.forEach(function(cid){
+    var mc=bar.querySelector('.mcard[data-cid="'+cid+'"]');if(!mc)return;
+    var npc=getNpcCard(cid);if(!npc)return;
+    var eff=npc.effect||{};
+    var usedVal=G.npcCardState.usedOnce[cid];
+    var isExhausted=false;
+    if(eff.type==='start_bonus')isExhausted=true;
+    else if(typeof usedVal==='boolean')isExhausted=usedVal;
+    else if(typeof usedVal==='number'&&typeof eff.uses==='number')isExhausted=usedVal>=eff.uses;
+    mc.classList.toggle('used',isExhausted);
+  });
 }
 function spawnPixelSparks(el,count){
   if(!el||!count)return;
@@ -5897,6 +5928,7 @@ function startPTurn(){
       G.npcCardState.usedOnce[cid]=true;G.npcCardState.challengeActive=true;
       G.npcCardState.challengeThreshold=npc.effect.threshold;G.npcCardState.challengePenalty=npc.effect.penalty;
       setStatusMsg(npc.name+'! BANK '+npc.effect.threshold+'+ OR LOSE '+npc.effect.penalty,'red');
+      _updateNpcCardVisuals();
     }
   });
   /* ── NPC dice swap/steal cards ── */
@@ -6325,20 +6357,21 @@ function doBust(){
     G.npcCardState.challengeActive=false;
     G.pPts=Math.max(0,G.pPts-G.npcCardState.challengePenalty);
   }
-  /* NPC card bust effects */
+  /* NPC card bust effects — apply score changes now, queue trigger animations */
   G.npcCardState.playerBustCount++;
+  var _pendingBustTriggers=[];
   G.oCards.forEach(function(cid){
     var npc=getNpcCard(cid);if(!npc)return;var eff=npc.effect;
     /* the_nightshift: Mabel gains pts when player busts */
     if(eff.type==='on_player_bust'&&eff.mechanic==='gain_pts'){
       G.oPts+=eff.amount;
-      triggerCard(cid,npc.name+' +'+eff.amount,false);
+      _pendingBustTriggers.push({cid:cid,msg:npc.name+' +'+eff.amount});
     }
     /* judgment_npc: if player busts N times, penalty */
     if(eff.type==='on_player_bust'&&eff.mechanic==='punish_busts'&&G.npcCardState.playerBustCount>=eff.threshold&&!G.npcCardState.usedOnce[cid]){
       G.npcCardState.usedOnce[cid]=true;
       G.pPts=Math.max(0,G.pPts-eff.penalty);
-      triggerCard(cid,npc.name+' −'+eff.penalty+'!',false);
+      _pendingBustTriggers.push({cid:cid,msg:npc.name+' −'+eff.penalty+'!'});
     }
   });
   /* Reckless die penalty (Brass): each brass die in loadout adds penalty on bust */
@@ -6351,7 +6384,6 @@ function doBust(){
     if(recklessPenalty>0&&G.pPts>0){
       G.pPts=Math.max(0,G.pPts-recklessPenalty);
       spawnPop('−'+recklessPenalty+' BRASS');
-      updHUD();
     }
   }
   G.safeTurnStreak=0;G.turnPts=0;G.kept=[];updHUD();refreshKeptTray();
@@ -6361,6 +6393,9 @@ function doBust(){
     _bustImpact();
     if(window.DLG)DLG.trigger('PLAYER_BUST');
     setStatusMsg('BUST','red');
+    /* Fire NPC card animations AFTER bust overlay appears */
+    _pendingBustTriggers.forEach(function(p){triggerCard(p.cid,p.msg,false);});
+    if(_pendingBustTriggers.length)updHUD();
     setTimeout(()=>document.getElementById('bust-ov').classList.remove('flash'),880);
     setTimeout(()=>{clearRow('playerDiceRow');G.pool=[];endPTurn();},1100);
   },500);
@@ -6383,7 +6418,7 @@ function handleBank(){
   if(G.pCards.includes('thrifty_gambler')&&total===500){G.thriftyBonus=(G.thriftyBonus||0)+20;bonusMsg+=' +20G THRIFTY';triggerCard('thrifty_gambler','+20G',true);}
   G.safeTurnStreak=(G.safeTurnStreak||0)+1;
   if(G.pCards.includes('slow_burn')&&G.safeTurnStreak%3===0){total+=500;bonusMsg+=' +500 SLOW BURN';triggerCard('slow_burn','+500',true);}
-  if(G.pCards.includes('rusty_spur'))G.spurActive=true;
+  if(G.pCards.includes('rusty_spur')){G.spurActive=true;triggerCard('rusty_spur','SPUR ACTIVE',true);}
   if(G.pCards.includes('fools_gold')&&total>0&&total%500===0){total+=300;bonusMsg+=" +300 FOOL'S GOLD";triggerCard('fools_gold','+300',true);}
   /* Corvus's Ledger: +50% on next bank after activation */
   if(G.activeCardState&&G.activeCardState.ledgerActive){
@@ -6443,9 +6478,20 @@ function handleBank(){
     if(eff.type==='once'&&eff.mechanic==='steal_low_bank'&&!G.npcCardState.usedOnce[cid]&&total<eff.threshold){
       G.npcCardState.usedOnce[cid]=true;G.oPts+=total;
       bonusMsg+=' STOLEN! '+npc.name;setStatusMsg(npc.name+' — '+G.rung.name+' STOLE '+total+'!','red');
+      triggerCard(cid,npc.name+' STOLE '+total+'!',false);
       spawnPop('STOLEN!');
       G.turnPts=0;G.kept=[];G.numDice=6;updHUD();refreshKeptTray();clearRow('playerDiceRow');G.pool=[];setBtns(false,false);
       if(G.oPts>=G.target){setTimeout(function(){endMatch(false)},700);return;}
+      G.npcCardState.firstBankDone=true;
+      setTimeout(endPTurn,1200);return;
+    }
+    /* Block low bank (iron_gate_npc) */
+    if(eff.type==='on_player_bank'&&eff.mechanic==='block_low_bank'&&!G.npcCardState.usedOnce[cid]&&total<eff.threshold){
+      G.npcCardState.usedOnce[cid]=true;
+      setStatusMsg(npc.name+' — BANK BLOCKED! UNDER '+eff.threshold,'red');
+      triggerCard(cid,npc.name+' BLOCKED!',false);
+      spawnPop('⛓️ BLOCKED');
+      G.turnPts=0;G.kept=[];G.numDice=6;updHUD();refreshKeptTray();clearRow('playerDiceRow');G.pool=[];setBtns(false,false);
       G.npcCardState.firstBankDone=true;
       setTimeout(endPTurn,1200);return;
     }
@@ -6570,7 +6616,9 @@ function runOppTurn(){
       G.oppDice.forEach(d=>{if(d.el)settleDie(d.el);});
       const fV=G.oppDice.filter(d=>!d.kept).map(d=>d.val);
       const fMats=G.oppDice.filter(d=>!d.kept).map(d=>d.mat);
+      const _prevCrowsUsed=crowsCtx.crowsLuckUsed;
       const{total,used,context:newCtx}=scoreRoll(fV,G.oCards,oppBank,crowsCtx,fMats);crowsCtx=newCtx||crowsCtx;
+      if(!_prevCrowsUsed&&crowsCtx.crowsLuckUsed)triggerCard('crows_luck',"CROW'S LUCK — STRAIGHT BLOCKED",true);
       if(total===0){
         /* NPC silver die shield: cancel bust */
         if(G.dieShieldsOpp>0){
@@ -6615,7 +6663,7 @@ function runOppTurn(){
       /* NPC reckless die penalty (Brass): busts cost NPC extra from total */
       /* (handled in NPC bust path above — no forced bust, just extra penalty on natural bust) */
       G.oppDice.filter(d=>!d.kept).forEach((d,i)=>{if(used[i]){d.kept=true;if(d.el){d.el.style.outline='2px solid var(--green)';d.el.style.outlineOffset='2px';}}});
-      if(G.pCards.includes('sooty_table')){const _sc={};fV.forEach(v=>{_sc[v]=(_sc[v]||0)+1;});if(Object.values(_sc).some(c=>c>=3))sootyActive=true;}
+      if(G.pCards.includes('sooty_table')){const _sc={};fV.forEach(v=>{_sc[v]=(_sc[v]||0)+1;});if(Object.values(_sc).some(c=>c>=3)){sootyActive=true;triggerCard('sooty_table','NO 1s NEXT ROLL',true);}}
       oppBank+=total;setStatusMsg((G.rung?G.rung.name:'RIVAL')+' +'+total+' TOTAL: '+oppBank,'active');
       left=G.oppDice.filter(d=>!d.kept).length;
       if(left===0){left=6;setTimeout(step,1500);return;}
@@ -6714,6 +6762,12 @@ function endMatch(win){
   const thriftyBonus=(win&&G.thriftyBonus)?G.thriftyBonus:0;
   if(win){S.gold+=goldEarned+thriftyBonus;}else{S.gold=Math.max(0,S.gold-buyIn);}
   if(win){S.wins++;S.rungWins[G.rung.id]=(S.rungWins[G.rung.id]||0)+1;if(G.rung.id>=S.currentRung){S.currentRung=G.rung.id+1;}}
+  // Save tarnish of wagered cards before removal (for end screen aging display)
+  const _lostCardTarnish={};
+  if(LO&&LO.effectiveWager&&!isRematch&&!win){
+    const _lsStakes=Array.isArray(G.pStake)?G.pStake:(G.pStake?[G.pStake]:[]);
+    _lsStakes.forEach(cid=>{const sc=S.cards.find(c=>c.id===cid);if(sc)_lostCardTarnish[cid]=sc.tarnish||0;});
+  }
   // Wager handling — pStake is now an array of card IDs (skip on rematches)
   if(LO&&LO.effectiveWager&&!isRematch){
     const stakes=Array.isArray(G.pStake)?G.pStake:(G.pStake?[G.pStake]:[]);
@@ -6722,6 +6776,12 @@ function endMatch(win){
       if(G.oStake){const existing=S.cards.find(c=>c.id===G.oStake);if(existing)existing.count++;else S.cards.push({id:G.oStake,count:1,tarnish:0});}
     }else{
       stakes.forEach(cid=>{const sc=S.cards.find(c=>c.id===cid);if(sc){sc.count--;if(sc.count<=0)S.cards=S.cards.filter(c=>c.id!==cid);}});
+      /* Store cards NPC won — they may appear in future rematches */
+      if(G.rung.key){
+        if(!S.npcWonCards)S.npcWonCards={};
+        if(!S.npcWonCards[G.rung.key])S.npcWonCards[G.rung.key]=[];
+        stakes.forEach(cid=>{if(!S.npcWonCards[G.rung.key].includes(cid))S.npcWonCards[G.rung.key].push(cid);});
+      }
     }
   }
   /* NPC reward: first win grants active card */
@@ -6771,6 +6831,7 @@ function endMatch(win){
   resGoldText.className='res-gold-text';
   btnCont.classList.remove('fade-in');
   resCard.classList.remove('show');resCard.innerHTML='';
+  var _resDlgEl=document.getElementById('resDlg');if(_resDlgEl){_resDlgEl.classList.remove('show');_resDlgEl.innerHTML='';}
   resPScore.textContent='0';resOScore.textContent='0';
   document.getElementById('resOName').textContent=G.rung.name.toUpperCase();
   const goldDisplay=win?'+'+totalGold+(kingsRansomMsg||'')+' GOLD':'-'+buyIn+' GOLD';
@@ -6854,11 +6915,13 @@ function endMatch(win){
     const _c=showCard;
     const _bandText=isCardLost?'FORFEIT':(npcRewardCard?'EARNED':_c.rarity.toUpperCase());
     const _tooltipBand=isCardLost?'Forfeit':(npcRewardCard?'Earned':_tc(_c.rarity));
+    const _aTarnish=isCardLost?(_lostCardTarnish[_c.id]||0):0;
     _endScreenData.cardHTML='<div class="res-card-inner"><div class="res-card-glow"></div>'+
+      '<div class="card-outer" data-aging="'+_aTarnish+'" data-cid="'+_c.id+'">'+
       '<div class="gcard rarity-'+_c.rarity+'">'+
         '<div class="gcard-cover" style="background:'+(CARD_BG[_c.id]||'#444')+'">'+_c.icon+'</div>'+
         '<div class="gcard-frame"></div>'+gcCorners()+
-        '<div class="gcard-band">'+_bandText+'</div></div></div>'+
+        '<div class="gcard-band">'+_bandText+'</div></div></div></div>'+
       mkCardTooltipHTML(_c,_tooltipBand)+
       '<div style="text-align:center;color:'+(isCardLost?'var(--red)':'#ffd700')+';font-size:11px;margin-top:6px">'+toTitleCase(_c.name)+'</div>';
     const _quoteText=npcRewardCard&&_c.rewardQuote?_c.rewardQuote:
@@ -6877,11 +6940,13 @@ function endMatch(win){
       resGoldWrap.style.display='none';
       const bandText=isCardLost?'FORFEIT':(npcRewardCard?'EARNED':c.rarity.toUpperCase());
       const tooltipBand=isCardLost?'Forfeit':(npcRewardCard?'Earned':_tc(c.rarity));
+      const _rTarnish=isCardLost?(_lostCardTarnish[c.id]||0):0;
       resCard.innerHTML='<div class="res-card-inner"><div class="res-card-glow"></div>'+
+        '<div class="card-outer" data-aging="'+_rTarnish+'" data-cid="'+c.id+'">'+
         '<div class="gcard rarity-'+c.rarity+'">'+
           '<div class="gcard-cover" style="background:'+(CARD_BG[c.id]||'#444')+'">'+c.icon+'</div>'+
           '<div class="gcard-frame"></div>'+gcCorners()+
-          '<div class="gcard-band">'+bandText+'</div></div></div>'+
+          '<div class="gcard-band">'+bandText+'</div></div></div></div>'+
         mkCardTooltipHTML(c,tooltipBand)+
         '<div style="text-align:center;color:'+(isCardLost?'var(--red)':'#ffd700')+';font-size:11px;margin-top:6px">'+toTitleCase(c.name)+'</div>';
       resCard.classList.add('show');
@@ -6900,7 +6965,8 @@ function endMatch(win){
         dlgDiv.className='res-dlg';
         dlgDiv.innerHTML='<div class="dlg-portrait"><img src="'+portraitSrc+'" alt=""></div>'+
           '<div class="dlg-scroll"><canvas class="res-dlg-canvas"></canvas><div class="dlg-text">'+jitterText(quoteText)+'</div></div>';
-        resCard.appendChild(dlgDiv);
+        const _rde=document.getElementById('resDlg');
+        if(_rde){_rde.innerHTML='';_rde.appendChild(dlgDiv);_rde.classList.add('show');}
         requestAnimationFrame(()=>{requestAnimationFrame(()=>{
           const cv=dlgDiv.querySelector('.res-dlg-canvas');
           if(cv)drawPixelScroll(cv);
@@ -6924,8 +6990,8 @@ function endMatch(win){
           dlgDiv.className='res-dlg';
           dlgDiv.innerHTML='<div class="dlg-portrait"><img src="'+portraitSrc+'" alt=""></div>'+
             '<div class="dlg-scroll"><canvas class="res-dlg-canvas"></canvas><div class="dlg-text">'+jitterText('\u201c'+quoteText+'\u201d')+'</div></div>';
-          resCard.appendChild(dlgDiv);
-          resCard.classList.add('show');
+          const _rde=document.getElementById('resDlg');
+          if(_rde){_rde.innerHTML='';_rde.appendChild(dlgDiv);_rde.classList.add('show');}
           requestAnimationFrame(()=>{requestAnimationFrame(()=>{
             const cv=dlgDiv.querySelector('.res-dlg-canvas');
             if(cv)drawPixelScroll(cv);
@@ -6947,8 +7013,8 @@ function endMatch(win){
           dlgDiv.className='res-dlg';
           dlgDiv.innerHTML='<div class="dlg-portrait"><img src="'+portraitSrc+'" alt=""></div>'+
             '<div class="dlg-scroll"><canvas class="res-dlg-canvas"></canvas><div class="dlg-text">'+jitterText('\u201c'+quoteText+'\u201d')+'</div></div>';
-          resCard.appendChild(dlgDiv);
-          resCard.classList.add('show');
+          const _rde=document.getElementById('resDlg');
+          if(_rde){_rde.innerHTML='';_rde.appendChild(dlgDiv);_rde.classList.add('show');}
           requestAnimationFrame(()=>{requestAnimationFrame(()=>{
             const cv=dlgDiv.querySelector('.res-dlg-canvas');
             if(cv)drawPixelScroll(cv);
@@ -7030,19 +7096,20 @@ function handleContinue(){
         rc.innerHTML=d.cardHTML;rc.classList.add('show');
         if(d.isCardLost)rc.classList.add('lost');
         attachTooltipTap(rc,{excludeSelector:'.res-dlg',requireSelector:'.gcard'});
-        // Show NPC dialogue on card
+        // Show NPC dialogue in stable container
         if(d.dlgHTML){
           var dlgDiv=document.createElement('div');
           dlgDiv.className='res-dlg';dlgDiv.innerHTML=d.dlgHTML;
-          rc.appendChild(dlgDiv);
+          var _rde=document.getElementById('resDlg');
+          if(_rde){_rde.innerHTML='';_rde.appendChild(dlgDiv);_rde.classList.add('show');}
           requestAnimationFrame(()=>{var cv=dlgDiv.querySelector('.res-dlg-canvas');if(cv)drawPixelScroll(cv);});
         }
       }else if(d.dlgHTML&&d.isRematchWinDlg){
         gw.style.display='none';
-        var rc=document.getElementById('resCard');
         var dlgDiv=document.createElement('div');
         dlgDiv.className='res-dlg';dlgDiv.innerHTML=d.dlgHTML;
-        rc.appendChild(dlgDiv);rc.classList.add('show');
+        var _rde=document.getElementById('resDlg');
+        if(_rde){_rde.innerHTML='';_rde.appendChild(dlgDiv);_rde.classList.add('show');}
         requestAnimationFrame(()=>{var cv=dlgDiv.querySelector('.res-dlg-canvas');if(cv)drawPixelScroll(cv);});
       }else{gw.style.display='none';}
     }
@@ -7060,6 +7127,9 @@ function exitMatch(){
   // Close loadout panel if open
   var lov=document.getElementById('mLoadout-ov');if(lov)lov.classList.remove('show');
   var lbd=document.getElementById('mLoBackdrop');if(lbd)lbd.classList.remove('on');
+  // Hide gold float (may be lingering from match loadout) and sync playerGold
+  hideGoldFloat();
+  playerGold=S.gold||0;
   try{
     var result={win:G.pPts>=G.target,pScore:G.pPts,oScore:G.oPts,goldEarned:G._lastGoldEarned||0,rungId:G.rung.id};
     showScreen('gauntlet',{matchResult:result});
@@ -7565,7 +7635,7 @@ function activateGrogsFlask(){
   const nonScoring=[];
   free.forEach((d,i)=>{if(d.val!==1&&d.val!==5)nonScoring.push(d);});
   const toReroll=nonScoring.slice(0,2);
-  if(!toReroll.length)return;
+  if(!toReroll.length){setStatusMsg("NO NON-SCORING DICE TO REROLL",'red');return;}
   toReroll.forEach(d=>{
     d.val=rollFace(d.mat);
     if(d.el){d.el.classList.add('card-reroll');reDrawDieFace(d);
@@ -7868,6 +7938,7 @@ function initMatchScreen(data){
   // Build card bars
   buildCBar('oppCards',G.oCards,true,rung.name);
   buildCBar('playerCards',G.pCards,false,'YOU');
+  _updateNpcCardVisuals();
   // Init dialogue
   DLG.init(rung.name,rung.key);
   // Draw UI canvases
@@ -8250,6 +8321,10 @@ function generateOppCards(rung){
   if(!rung.cardPool||!rung.cardPool.length)return[];
   if(rung.cardChance!==undefined&&Math.random()>rung.cardChance)return[];
   var pool=[].concat(rung.cardPool);
+  /* Include player cards the NPC has won in previous matches */
+  if(S&&S.npcWonCards&&rung.key&&S.npcWonCards[rung.key]){
+    S.npcWonCards[rung.key].forEach(function(cid){if(!pool.includes(cid))pool.push(cid);});
+  }
   var n=rung.cardCount||1;
   /* Shuffle and pick n */
   for(var i=pool.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=pool[i];pool[i]=pool[j];pool[j]=t;}
@@ -9210,10 +9285,13 @@ function renderLoWager(){
       var card=CARDS.find(function(cd){return cd.id===_loWagerCards[0]});
       if(card){pSlot.innerHTML=loMiniCardHTML(card,false);pSlot.classList.add('filled');pSlot.style.position='relative';}
     }else{
-      /* Multiple cards — show first card thumbnail with +N badge */
-      var firstCard=CARDS.find(function(cd){return cd.id===_loWagerCards[0]});
-      if(firstCard){pSlot.innerHTML=loMiniCardHTML(firstCard,false)+'<div class="wager-extra-badge">+'+(_loWagerCards.length-1)+'</div>';}
-      pSlot.classList.add('filled');
+      /* Multiple cards — show each card as its own slot */
+      var cardsHTML=_loWagerCards.map(function(cid){
+        var c=CARDS.find(function(cd){return cd.id===cid;});
+        return c?'<div class="wager-card-wrap">'+loMiniCardHTML(c,false)+'</div>':'';
+      }).join('');
+      pSlot.innerHTML=cardsHTML;
+      pSlot.classList.add('filled','multi');
     }
     pSlot.style.position='relative';pSlot.style.overflow='visible';
     if(mode==='choose'){
@@ -9227,7 +9305,7 @@ function renderLoWager(){
     }
   }else{
     pSlot.innerHTML='<span style="font-size:8px;opacity:.5;letter-spacing:.5px">STAKE</span>';
-    pSlot.classList.remove('filled');
+    pSlot.classList.remove('filled','multi');
     pSlot.style.cursor='default';pSlot.onclick=null;
   }
   // Opponent wager slot — tap to zoom
