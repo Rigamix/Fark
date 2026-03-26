@@ -1726,38 +1726,6 @@ body::before,body::after{display:none!important}
   flex:1;overflow-y:auto;overflow-x:hidden;
   padding:14px 10px 110px;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
 }
-/* ── TIER SCREEN ── */
-.tier-wrap{position:relative;z-index:1;flex:1;display:flex;flex-direction:column;align-items:center;padding:16px 12px 100px;gap:16px}
-.tier-header{text-align:center;width:100%}
-.tier-name{font-family:var(--font-px);font-size:22px;color:var(--gold);letter-spacing:3px;text-shadow:0 2px 0 rgba(0,0,0,.5)}
-.tier-progress{margin-top:8px}
-.tier-progress-bar{width:80%;max-width:260px;height:10px;margin:0 auto;background:rgba(30,26,18,.8);border:2px solid rgba(200,160,80,.25);border-radius:5px;overflow:hidden}
-.tier-progress-fill{height:100%;background:linear-gradient(90deg,#8a6a30,#c8a050);border-radius:3px;transition:width .4s ease}
-.tier-progress-text{font-family:var(--font-px);font-size:12px;color:var(--textdim);margin-top:4px;letter-spacing:1px}
-.tier-boss-preview{text-align:center;padding:8px 0}
-.tier-boss-name{font-family:var(--font-px);font-size:14px;color:var(--red,#c05050);margin-top:4px;letter-spacing:2px}
-.tier-matches{display:flex;gap:10px;width:100%;max-width:340px}
-.tier-match-btn{
-  flex:1;position:relative;padding:14px 8px;text-align:center;cursor:pointer;
-  background:linear-gradient(180deg,rgba(40,36,28,.9),rgba(20,18,12,.95));
-  border:2px solid rgba(200,160,80,.2);border-radius:8px;
-  transition:transform .06s,border-color .2s;
-}
-.tier-match-btn:active{transform:scale(.95)}
-.tier-match-btn.handicap{border-color:rgba(180,120,40,.35)}
-.tier-match-btn.boss{border-color:rgba(200,60,60,.4);background:linear-gradient(180deg,rgba(60,20,20,.9),rgba(30,10,10,.95))}
-.tmb-label{font-family:var(--font-px);font-size:10px;color:var(--gold);letter-spacing:1px}
-.tmb-pts{font-family:var(--font-px);font-size:14px;color:#e8b830;margin-top:4px}
-.tier-boss-btn-wrap{width:100%;max-width:340px}
-.tier-loadout{width:100%;max-width:340px;text-align:center;margin-top:8px}
-.tier-lo-label{font-family:var(--font-px);font-size:9px;color:var(--textdim);letter-spacing:2px;margin-bottom:6px}
-.tier-lo-cards{display:flex;gap:6px;justify-content:center;margin-bottom:8px}
-.tier-lo-card{width:36px;height:48px;display:flex;align-items:center;justify-content:center;font-size:20px;
-  background:rgba(30,26,18,.7);border:1px solid rgba(200,160,80,.15);border-radius:4px}
-.tier-lo-card.empty{font-size:12px;color:var(--textdim);opacity:.4}
-.tier-lo-card.boss{border-color:rgba(200,60,60,.3)}
-.tier-lo-dice{display:flex;gap:4px;justify-content:center}
-.tier-lo-die{width:24px;height:24px;border-radius:3px;border:1px solid rgba(200,160,80,.15)}
 .char-grid{
   display:grid;grid-template-columns:repeat(2,1fr);
   gap:20px 12px;max-width:420px;margin:0 auto;
@@ -3895,46 +3863,82 @@ body::before,body::after{display:none!important}
 <div id="screen-gauntlet" class="screen">
 <div class="top-bar">
   <div class="title"><span class="letter">F</span><span class="letter">a</span><span class="letter">r</span><span class="letter">K</span><span class="letter">!</span></div>
-  <div class="renown-bar" id="renownBar" style="cursor:pointer"><span class="renown-icon">⭐</span> <span id="renownDisplay">0</span></div>
+  <div class="gold-pill"><span class="coin-i"></span> <span id="gold-display">320</span></div>
+  <div class="renown-bar" id="renownBar" onclick="showRenownInfo()" style="cursor:pointer"><span class="renown-icon">⭐</span> <span id="renownDisplay">0</span> <span class="renown-next" id="renownNext"></span></div>
+</div>
+<div class="grid-wrap">
+  <div style="text-align:center;padding:16px 4px 10px">
+    <div id="gauntletQuote" style="font-family:'IM Fell English',serif;font-size:16px;color:var(--gold);letter-spacing:1px;line-height:1.5;text-shadow:0 1px 0 rgba(0,0,0,.6);opacity:.7;padding:0 12px;text-wrap:balance">&ldquo;Defeat the patrons and your tab is on me!&rdquo;</div>
+  </div>
+  <div class="char-grid" id="charGrid"></div>
+</div>
+<div class="backdrop" id="backdrop" onclick="closeDetail()"></div>
+<div class="detail-sheet" id="detailSheet">
+  <canvas class="detail-canvas" id="detailCanvas"></canvas>
+  <div class="detail-portrait" id="dPortrait"></div>
+  <div class="detail-inner">
+    <div class="handle"></div>
+    <div class="detail-header"><div class="detail-info"><div class="d-vs" id="dVs">VS</div><div class="d-name" id="dName"></div><div class="d-tier" id="dTier"></div></div></div>
+    <div class="detail-stats" id="dStats"></div>
+    <div class="detail-edict" id="dEdict" style="display:none"></div>
+    <div class="detail-actions" id="dActions"></div>
+    <!-- LOADOUT CONTENT (revealed when .loadout-mode is added) -->
+    <div class="lo-content" id="loContent">
+      <div class="lo-cols">
+        <div class="lo-col">
+          <div class="lo-col-hdr you">YOU</div>
+          <div class="lo-section-label">DICE</div>
+          <div class="lo-dice-row" id="loPDice"></div>
+          <div class="lo-section-label" id="loPCardsLabel">CARDS</div>
+          <div class="lo-cards-row" id="loPCards"></div>
+        </div>
+        <div class="lo-divider"></div>
+        <div class="lo-col">
+          <div class="lo-col-hdr opp" id="loOppHdr">OPPONENT</div>
+          <div class="lo-section-label">DICE</div>
+          <div class="lo-dice-row" id="loODice"></div>
+          <div class="lo-section-label" id="loOCardsLabel">CARDS</div>
+          <div class="lo-cards-row" id="loOCards"></div>
+        </div>
+      </div>
+      <div class="lo-wager-zone" id="loWagerZone" style="display:none">
+        <div class="lo-wager-label">WAGER — YOUR BEST CARD VS THEIRS</div>
+        <div class="lo-wager-vs">
+          <div class="lo-wager-slot" id="loWagerPlayer"><span style="font-size:8px;opacity:.5;letter-spacing:.5px">STAKE</span></div>
+          <div class="lo-vs-icon">VS</div>
+          <div class="lo-wager-slot" id="loWagerOpp"><span style="font-size:9px">OPP<br>CARD</span></div>
+        </div>
+      </div>
+      <div class="lo-actions" id="loActions"></div>
+    </div>
+    <div class="lo-picker" id="loPicker"></div>
+  </div>
 </div>
 
-<!-- TIER SCREEN -->
-<div class="tier-wrap" id="tierWrap">
-  <div class="tier-header">
-    <div class="tier-name" id="tierName">THE DREG</div>
-    <div class="tier-progress" id="tierProgress">
-      <div class="tier-progress-bar"><div class="tier-progress-fill" id="tierFill"></div></div>
-      <div class="tier-progress-text" id="tierProgressText">0 / 2</div>
-    </div>
+<!-- FLOATING GOLD PILL — shown above backdrop/detail-sheet overlays -->
+<div id="goldPillFloat"><span class="coin-i"></span> <span id="goldDisplayFloat">0</span></div>
+
+<!-- LOADOUT SLOT TRASH ZONE — fixed body-level so transforms in detailSheet don't affect it -->
+<div id="loTrashZone"><span class="ltz-icon">🗑</span><span class="ltz-label">REMOVE</span></div>
+
+<!-- DICE ZOOM OVERLAY (gauntlet loadout) -->
+<div class="dice-zoom-overlay" id="loDiceZoom">
+  <div class="dice-3d-wrap" id="loDiceZoomWrap">
+    <div class="dice-3d-cube" id="loDiceCube"></div>
   </div>
-  <div class="tier-boss-preview" id="tierBossPreview">
-    <div class="tier-boss-portrait" id="tierBossPortrait"></div>
-    <div class="tier-boss-name" id="tierBossName"></div>
-  </div>
-  <div class="tier-matches" id="tierMatches">
-    <div class="tier-match-btn" id="tierStandard" onclick="launchPatronMatch(false)">
-      <div class="tmb-label">STANDARD MATCH</div>
-      <div class="tmb-pts">★</div>
-    </div>
-    <div class="tier-match-btn handicap" id="tierHandicap" style="display:none">
-      <div class="tmb-label" id="handicapLabel">HANDICAP</div>
-      <div class="tmb-pts">★★</div>
-    </div>
-  </div>
-  <div class="tier-boss-btn-wrap" id="tierBossWrap" style="display:none">
-    <div class="tier-match-btn boss" id="tierBossBtn" onclick="launchBossMatch()">
-      <div class="tmb-label">CHALLENGE BOSS</div>
-    </div>
-  </div>
-  <div class="tier-loadout" id="tierLoadout">
-    <div class="tier-lo-label">YOUR LOADOUT</div>
-    <div class="tier-lo-cards" id="tierLoCards"></div>
-    <div class="tier-lo-dice" id="tierLoDice"></div>
+  <div class="dice-zoom-info" id="loDzInfoPanel">
+    <canvas class="dz-panel-bg" id="loDzPanelBg"></canvas>
+    <div class="dz-name" id="loDzName"></div>
+    <div class="dz-desc" id="loDzDesc"></div>
+    <div class="dz-bias" id="loDzBias"></div>
   </div>
 </div>
+
+<!-- Settings uses shared settings outside screen divs -->
 
 <div class="bottom-nav">
   <div class="nav-btn" onclick="SFX.nav();openSettings()"><img class="nav-icon" src="Menu_Art/Settings.png" alt="Settings"><span class="nav-label">SETTINGS</span></div>
+  <div class="nav-btn" onclick="SFX.nav();setTimeout(()=>showScreen('shop'),80)"><img class="nav-icon" src="Menu_Art/Shop.png" alt="Store"><span class="nav-label">STORE</span></div>
   <div class="nav-btn" onclick="SFX.nav();setTimeout(()=>showScreen('menu'),80)"><img class="nav-icon" src="Menu_Art/Menu.png" alt="Menu"><span class="nav-label">MENU</span></div>
 </div>
 </div>
@@ -4295,28 +4299,31 @@ body::before,body::after{display:none!important}
 
 /* ═══════ SHARED STATE MANAGEMENT ═══════ */
 let S = null;
-var _boneDice=['bone','bone','bone','bone','bone','bone'];
-function _freshRun(){
-  return{tier:0,points:0,cards:[null,null,null],dice:[..._boneDice],bossesBeaten:[],diceRerolls:1,handicapOffer:null,inGauntlet:false,gauntletIndex:0};
-}
 function _getS(){
   if(!S){
     try{S=JSON.parse(localStorage.getItem('gambit4'))}catch(e){}
-    /* Detect old save format → force fresh start */
-    if(!S||S.gold!==undefined||!S.run){
-      S={run:_freshRun(),settings:{diceStyle:'2d'},seenTips:{},bestTier:0,totalRuns:0,totalWins:0,renown:0};
-    }
+    if(!S)S={gold:100,wins:0,currentRung:0,matchCount:0,dice:['bone','bone','bone','bone','bone','bone'],ownedDice:['bone','bone','bone','bone','bone','bone'],cards:[],tarnish:{},seenTips:{},settings:{diceStyle:'2d'},npcRewards:{},rungWins:{},shopStock:null};
     if(!S.settings)S.settings={diceStyle:'2d'};
-    if(!S.run)S.run=_freshRun();
+    if(!S.ownedDice)S.ownedDice=[...(S.dice||['bone','bone','bone','bone','bone','bone'])];
+    if(!S.npcRewards)S.npcRewards={};
+    if(!S.npcWonCards)S.npcWonCards={};
+    if(S.matchCount===undefined)S.matchCount=0;
+    if(!S.diceVersion)S.diceVersion=1;
+    /* ── Engagement Overhaul state fields ── */
+    if(!S.npcBounty)S.npcBounty={};
+    if(!S.npcState)S.npcState={};
+    if(S.debt===undefined)S.debt=0;
+    if(S.lossStreak===undefined)S.lossStreak=0;/* deprecated — per-NPC via npcState.streak */
+    /* Backward-compat: ensure new fields on all npcState entries */
+    if(S.npcState){Object.keys(S.npcState).forEach(function(k){var ns=S.npcState[k];if(ns.rematchStreak===undefined)ns.rematchStreak=0;if(ns.carryover===undefined)ns.carryover=0;});}
+    if(!S.pawnShop)S.pawnShop=[];
     if(S.renown===undefined)S.renown=0;
-    if(S.bestTier===undefined)S.bestTier=0;
-    if(S.totalRuns===undefined)S.totalRuns=0;
-    if(S.totalWins===undefined)S.totalWins=0;
+    if(!S.renownPerks)S.renownPerks={};
+    if(!S.shards)S.shards={};
   }
   return S;
 }
 function save(){try{localStorage.setItem('gambit4',JSON.stringify(S));}catch(e){/* storage full or unavailable */}}
-function startNewRun(){S.run=_freshRun();S.totalRuns++;save();}
 
 /* ── Renown Perks ── */
 const RENOWN_PERKS=[
@@ -4858,80 +4865,6 @@ const RUNGS=[
     dice:['crystal','crystal','amber','amber','jade','silver'],
     cardPool:['communion_wine','the_collection_plate','blessed_dice','the_sermon','judgment_npc','never_saw_a_robe','blessed_confiscation'],cardCount:4},
 ];
-
-/* ═══════ TIER SYSTEM ═══════ */
-const TIERS=[
-  {id:0,name:'THE DREG',pointsNeeded:2,
-    boss:RUNGS[0],/* Grog */
-    patronStats:{targetMin:2000,targetMax:3000,aggMin:.40,aggMax:.52,dicePool:['bone'],minBank:0,diceStop:3},
-    draftPool:['tin'],
-    diceWeights:{bone:6}},
-  {id:1,name:'THE HEARTH',pointsNeeded:3,
-    boss:RUNGS[1],/* Mabel */
-    patronStats:{targetMin:2500,targetMax:3500,aggMin:.45,aggMax:.55,dicePool:['bone','iron'],minBank:100,diceStop:2},
-    draftPool:['tin'],
-    diceWeights:{bone:4,iron:2}},
-  {id:2,name:'THE PIT',pointsNeeded:3,
-    boss:RUNGS[2],/* Finnick */
-    patronStats:{targetMin:3000,targetMax:4500,aggMin:.48,aggMax:.58,dicePool:['bone','iron','lead'],minBank:150,diceStop:2},
-    draftPool:['tin','silver'],
-    diceWeights:{bone:3,iron:2,lead:1}},
-  {id:3,name:'THE LEDGER',pointsNeeded:4,
-    boss:RUNGS[3],/* Corvus */
-    patronStats:{targetMin:4000,targetMax:5500,aggMin:.50,aggMax:.60,dicePool:['iron','lead','flint'],minBank:200,diceStop:2},
-    draftPool:['silver'],
-    diceWeights:{iron:2,lead:2,flint:1,amber:1}},
-  {id:4,name:'THE FORGE',pointsNeeded:4,
-    boss:RUNGS[4],/* Brutus */
-    patronStats:{targetMin:5000,targetMax:6500,aggMin:.55,aggMax:.65,dicePool:['lead','flint','amber'],minBank:250,diceStop:2},
-    draftPool:['silver','gold'],
-    diceWeights:{lead:1,amber:2,jade:2,brass:1}},
-  {id:5,name:'THE COURT',pointsNeeded:5,
-    boss:RUNGS[5],/* Aldric */
-    patronStats:{targetMin:5500,targetMax:7000,aggMin:.58,aggMax:.70,dicePool:['flint','amber','jade'],minBank:300,diceStop:1},
-    draftPool:['silver','gold'],
-    diceWeights:{amber:2,jade:2,brass:1,silver:1}},
-  {id:6,name:'THE PARLOUR',pointsNeeded:5,
-    boss:RUNGS[6],/* Whisper */
-    patronStats:{targetMin:6500,targetMax:8000,aggMin:.62,aggMax:.75,dicePool:['amber','jade','brass'],minBank:350,diceStop:1},
-    draftPool:['gold'],
-    diceWeights:{jade:2,brass:2,silver:1,crystal:1}},
-  {id:7,name:'THE SANCTUM',pointsNeeded:6,
-    boss:RUNGS[7],/* Ambrose */
-    patronStats:{targetMin:7500,targetMax:9000,aggMin:.68,aggMax:.80,dicePool:['jade','brass','silver','crystal'],minBank:300,diceStop:1},
-    draftPool:['gold'],
-    diceWeights:{brass:2,silver:2,crystal:2}}
-];
-
-/* Generate a faceless patron for a given tier */
-function generatePatron(tierIndex){
-  var t=TIERS[tierIndex];if(!t)t=TIERS[0];
-  var ps=t.patronStats;
-  var target=ps.targetMin+Math.floor(Math.random()*(ps.targetMax-ps.targetMin));
-  var agg=ps.aggMin+Math.random()*(ps.aggMax-ps.aggMin);
-  var dice=[];for(var i=0;i<6;i++)dice.push(ps.dicePool[Math.floor(Math.random()*ps.dicePool.length)]);
-  return{
-    id:-1,name:'PATRON',key:'patron',icon:'',tier:t.name,
-    target:target,gold:0,buyIn:0,
-    boss:null,bossDesc:null,
-    agg:agg,cardRarity:null,wager:false,wagerCount:0,wagerMode:'none',
-    minBank:ps.minBank||0,diceStop:ps.diceStop||2,
-    chaotic:Math.random()<0.08,adaptive:tierIndex>=2,
-    dice:dice,cardPool:[],cardCount:0,cardChance:0
-  };
-}
-
-/* Generate a random dice loadout weighted by tier */
-function generateDiceLoadout(tierIndex){
-  var t=TIERS[tierIndex];if(!t)t=TIERS[0];
-  var w=t.diceWeights;
-  var pool=[];
-  Object.keys(w).forEach(function(mat){for(var i=0;i<w[mat];i++)pool.push(mat);});
-  var dice=[];
-  for(var i=0;i<6;i++)dice.push(pool[Math.floor(Math.random()*pool.length)]);
-  return dice;
-}
-
 const CARDS=[
   {id:'flintlock',name:'THE FLINTLOCK',icon:'🔫',rarity:'silver',eff:'+200 ON FIRST 1 (ONCE)',desc:'Once per match: the first time a 1 scores on your roll, gain +200 bonus points.'},
   {id:'copper_pincher',name:'COPPER PINCHER',icon:'🪙',rarity:'tin',eff:'5s = 75 PTS',desc:'Each 5 you score is worth 75 points instead of the usual 50.'},
@@ -6069,17 +6002,16 @@ function snapCardBack(mcardEl,dragState){
 let G=null,LO=null;
 function newG(rung,pCards,oCards,pStake,oStake){
   /* Count shield dice in player loadout */
-  var _playerDice=(S.run&&S.run.dice)||S.dice||_boneDice;
-  const _pShields=(function(){let c=0;_playerDice.forEach(function(m){var dt=getDie(m);if(dt&&dt.effect&&dt.effect.mechanic==='shield')c++;});return c;})();
+  const _pShields=(function(){let c=0;(S.dice||[]).forEach(function(m){var dt=getDie(m);if(dt&&dt.effect&&dt.effect.mechanic==='shield')c++;});return c;})();
   /* Count shield dice in NPC loadout */
   const _oShields=(function(){let c=0;((rung&&rung.dice)||[]).forEach(function(m){var dt=getDie(m);if(dt&&dt.effect&&dt.effect.mechanic==='shield')c++;});return c;})();
   return{rung,pCards,oCards,pStake,oStake,pPts:0,oPts:0,target:rung.target,
     turnPts:0,numDice:6,phase:'idle',turnNum:1,pool:[],kept:[],oppDice:[],
     martyrUsed:false,crackedBellUsed:false,flintlockFired:false,safeTurnStreak:0,turnRollCount:0,oppTurnCount:0,
     dieShieldsPlayer:_pShields,dieShieldsOpp:_oShields,
-    matchDice:[..._playerDice],
-    matchOppDice:[...((rung&&rung.dice)||_boneDice)],
-    originalPlayerDice:[..._playerDice],
+    matchDice:[...(S.dice||['bone','bone','bone','bone','bone','bone'])],
+    matchOppDice:[...((rung&&rung.dice)||['bone','bone','bone','bone','bone','bone'])],
+    originalPlayerDice:[...(S.dice||['bone','bone','bone','bone','bone','bone'])],
     _lastBankAmount:0,lastBankDiceCount:0,spurActive:false,thriftyBonus:0,
     activeCardState:{usedCards:{},stitchActive:false,vowActive:false,hexActive:false},
     crowsLuckCtx:{crowsLuck:oCards.includes('crows_luck'),crowsLuckUsed:false},
@@ -7336,51 +7268,462 @@ function _spawnCoinParticles(coinEl,goldAmt,gravDir){
   }
 }
 function endMatch(win){
-  /* Clear mid-match save */
+  /* Clear mid-match save — match is over */
   if(S&&S.pendingMatch){delete S.pendingMatch;save();}
   if(window.DLG)DLG.hide();clearRow('playerDiceRow');clearRow('oppDiceRow');
-  _dragState=null;
+  _dragState=null;window._shopDragging=false;/* clear any stale drag state */
   win?SFX.win():SFX.lose();
+  if(!G._practice)S.matchCount=(S.matchCount||0)+1;
+  /* NPC living inventory — off-screen card acquisition */
+  if(!G._practice){
+    RUNGS.forEach(function(r){
+      if(!r.cardPool||!r.cardPool.length||r.id===G.rung.id)return;
+      if(Math.random()>0.08)return;/* 8% chance per NPC per match */
+      var tierCards=CARDS.filter(function(c){return !c.npcOnly&&!c.type&&c.rarity===(r.cardRarity||'tin');});
+      if(!tierCards.length)return;
+      var pick=tierCards[Math.floor(Math.random()*tierCards.length)];
+      if(!S.npcWonCards)S.npcWonCards={};
+      if(!S.npcWonCards[r.key])S.npcWonCards[r.key]=[];
+      if(!S.npcWonCards[r.key].includes(pick.id)&&S.npcWonCards[r.key].length<3){
+        S.npcWonCards[r.key].push(pick.id);
+      }
+    });
+  }
+  /* ── Practice mode early return — no gold, no wager, no progression ── */
+  if(G._practice){
+    var _practRenown=win?3:2;
+    S.renown=(S.renown||0)+_practRenown;save();
+    if(window._endTimers){window._endTimers.forEach(function(t){clearTimeout(t);});}window._endTimers=[];
+    var _pOv=document.getElementById('end-ov');
+    _pOv.classList.remove('show');
+    document.getElementById('resTitle').textContent='PRACTICE '+(win?'WIN':'LOSS');
+    document.getElementById('resTitle').className='res-title '+(win?'win':'lose');
+    var _pScP=document.getElementById('resPScore');
+    var _pScO=document.getElementById('resOScore');
+    if(_pScP)_pScP.textContent=G.pPts.toLocaleString();
+    if(_pScO)_pScO.textContent=G.oPts.toLocaleString();
+    document.getElementById('resOName').textContent=G.rung.name.toUpperCase();
+    var _pGold=document.getElementById('resGoldText');
+    if(_pGold)_pGold.textContent='+'+_practRenown+' RENOWN (practice)';
+    var _pGoldW=document.getElementById('resGoldWrap');if(_pGoldW)_pGoldW.style.display='flex';
+    var _pResCard=document.getElementById('resCard');if(_pResCard){_pResCard.innerHTML='';_pResCard.className='res-card';}
+    var _pResDlg=document.getElementById('resDlg');if(_pResDlg){_pResDlg.classList.remove('show');_pResDlg.innerHTML='';}
+    _pOv.classList.add('show');
+    _updateRenownUI();
+    return;
+  }
+  const buyIn=(LO&&LO.buyIn!==undefined&&LO.buyIn!==null)?LO.buyIn:getDiscountedBuyIn(G.rung);
+  const fullBuyIn=G.rung.buyIn||0;/* full price for reward calc */
+  const _effectiveBuyIn=buyIn;
+  if(!S.rungWins)S.rungWins={};
+  const isRematch=G.rung.id<(S.currentRung||0);
+  const priorWins=S.rungWins[G.rung.id]||0;
+  const rungKey=G.rung.key||'';
+  /* ── Gold calculation — Engagement Overhaul ── */
+  let goldEarned=0;let kingsRansomMsg='';let bountyPaid=0;let refundMsg='';
+  if(win){
+    /* Base reward: full on first win, tier-scaled + streak on rematches */
+    const baseReward=G.rung.gold+fullBuyIn;
+    if(priorWins>0){
+      var _rmBase=G.rung.id>=4?0.60:G.rung.id>=2?0.55:0.50;
+      var _nsRM=rungKey&&S.npcState&&S.npcState[rungKey]?S.npcState[rungKey]:null;
+      var _rmStreak=_nsRM?Math.min(_nsRM.rematchStreak||0,3):0;
+      var _rmMult=_rmBase+_rmStreak*0.15;
+      goldEarned=Math.max(Math.floor(baseReward*_rmMult),1);
+      G._rmStreakUsed=_rmStreak;/* stash for end screen display */
+    }else{goldEarned=baseReward;}
+    /* King's Ransom card bonus */
+    if(G.pCards.includes('kings_ransom')&&(G.pPts-G.oPts)>=5000){goldEarned*=3;kingsRansomMsg=" 👑 KING'S RANSOM x3";}
+    /* Beggar's Bowl — +10g on every win */
+    if(G.pCards.includes('beggars_bowl'))goldEarned+=10;
+    /* Bounty payout — accumulated from prior losses to this NPC */
+    if(rungKey&&S.npcBounty&&S.npcBounty[rungKey]>0){bountyPaid=S.npcBounty[rungKey];S.npcBounty[rungKey]=0;}
+    /* First match free bonus: +50% gold on win */
+    if(G._firstMatchFree){goldEarned=Math.floor(goldEarned*1.5);}
+  }else{
+    /* Graduated loss refund based on score proximity */
+    const scoreRatio=G.target>0?G.pPts/G.target:0;
+    let refund=0;
+    if(scoreRatio>=0.70){refund=Math.floor(_effectiveBuyIn*0.5);refundMsg=' (close match)';}
+    else if(scoreRatio>=0.50){refund=Math.floor(_effectiveBuyIn*0.3);refundMsg=' (decent effort)';}
+    const actualLoss=_effectiveBuyIn-refund;
+    goldEarned=-actualLoss;
+    /* Bounty accumulation on loss */
+    if(rungKey){if(!S.npcBounty)S.npcBounty={};S.npcBounty[rungKey]=Math.min((S.npcBounty[rungKey]||0)+Math.floor(buyIn*0.5),buyIn*3);}
+  }
+  /* Minimum 5g "spectator tips" on every match */
+  const spectatorTips=5;
+  const thriftyBonus=(win&&G.thriftyBonus)?G.thriftyBonus:0;
+  /* Apply gold */
+  if(win){
+    let totalGold=goldEarned+thriftyBonus+bountyPaid+spectatorTips;
+    /* Debt skim: 20% of earnings go to repaying innkeeper loan */
+    if(S.debt>0){const skim=Math.floor(totalGold*0.2);const repay=Math.min(skim,S.debt);S.debt-=repay;totalGold-=repay;}
+    S.gold+=totalGold;
+  }else{
+    S.gold=Math.max(0,S.gold+goldEarned+spectatorTips);
+  }
+  /* Loss streak tracking — now per-NPC via npcState.streak (see NPC State block below) */
+  if(win){S.wins++;S.rungWins[G.rung.id]=(S.rungWins[G.rung.id]||0)+1;if(G.rung.id>=S.currentRung){S.currentRung=G.rung.id+1;}}
+  // Save tarnish of wagered cards before removal (for end screen aging display)
+  const _lostCardTarnish={};
+  if(LO&&LO.effectiveWager&&!isRematch&&!win){
+    const _lsStakes=Array.isArray(G.pStake)?G.pStake:(G.pStake?[G.pStake]:[]);
+    _lsStakes.forEach(cid=>{const sc=S.cards.find(c=>c.id===cid);if(sc)_lostCardTarnish[cid]=sc.tarnish||0;});
+  }
+  // Wager handling — pStake is now an array of card IDs (skip on rematches)
+  if(LO&&LO.effectiveWager&&!isRematch){
+    const stakes=Array.isArray(G.pStake)?G.pStake:(G.pStake?[G.pStake]:[]);
+    if(win){
+      /* Tarnish no longer increments — cosmetic wear only */
+      if(G.oStake){const existing=S.cards.find(c=>c.id===G.oStake);if(existing)existing.count++;else S.cards.push({id:G.oStake,count:1,tarnish:0});}
+    }else{
+      stakes.forEach(cid=>{const sc=S.cards.find(c=>c.id===cid);if(sc){sc.count--;if(sc.count<=0)S.cards=S.cards.filter(c=>c.id!==cid);}});
+      /* Store cards NPC won — they may appear in future rematches */
+      if(G.rung.key){
+        if(!S.npcWonCards)S.npcWonCards={};
+        if(!S.npcWonCards[G.rung.key])S.npcWonCards[G.rung.key]=[];
+        stakes.forEach(cid=>{if(!S.npcWonCards[G.rung.key].includes(cid))S.npcWonCards[G.rung.key].push(cid);});
+      }
+      /* Pawn shop — lost cards can be bought back */
+      if(!S.pawnShop)S.pawnShop=[];
+      stakes.forEach(function(cid){
+        var cd=CARDS.find(function(c){return c.id===cid;});
+        if(cd){
+          var basePrice=CARD_PRICES[cd.rarity]||65;
+          var pawnPrice=Math.floor(basePrice*0.6);
+          if(!S.pawnShop.find(function(p){return p.id===cid;})){
+            S.pawnShop.push({id:cid,price:pawnPrice,expiresAt:(S.matchCount||0)+5});
+          }
+        }
+      });
+    }
+  }
+  /* NPC reward: first win grants active card */
+  let npcRewardCard=null;
+  if(win&&G.rung.key&&!S.npcRewards[G.rung.key]){
+    const npcName=G.rung.name.toLowerCase();
+    const reward=CARDS.find(c=>c.type==='active'&&c.npc===npcName);
+    if(reward){
+      S.npcRewards[G.rung.key]=reward.id;
+      const existing=S.cards.find(c=>c.id===reward.id);
+      if(existing)existing.count++;else S.cards.push({id:reward.id,count:1,tarnish:0});
+      npcRewardCard=reward;
+    }
+  }
+  /* Auto-refresh shop stock after every match */
+  if(typeof rollShopStock==='function')rollShopStock();
+  /* Prune expired pawn shop entries */
+  if(S.pawnShop&&S.pawnShop.length){S.pawnShop=S.pawnShop.filter(function(p){return p.expiresAt>(S.matchCount||0);});}
+  /* ── Renown — permanent progression ── */
+  var _oldTier=_getCurrentTier();
+  var _renownGain=win?(10+G.rung.id*5):(3+G.rung.id*2);
+  /* Bonus: close match within 10% of target */
+  if(Math.abs(G.pPts-G.oPts)<G.target*0.1)_renownGain+=5;
+  /* Bonus: comeback win (opponent was ahead at some point) */
+  if(win&&G._opponentLedAtMidpoint)_renownGain+=10;
+  /* doubleDown perk: 2x renown on win streaks */
+  if(S.renownPerks&&S.renownPerks.doubleDown&&win&&rungKey&&S.npcState&&S.npcState[rungKey]&&S.npcState[rungKey].streak>1)_renownGain*=2;
+  S.renown=(S.renown||0)+_renownGain;
+  _checkRenownPerks();
+  var _newTier=_getCurrentTier();
+  var _pendingLevelUp=(_newTier&&(!_oldTier||_newTier.threshold>_oldTier.threshold))?_newTier:null;
+  _pendingRenownLevelUp=_pendingLevelUp;
+  /* ── NPC State update ── */
+  if(rungKey){
+    if(!S.npcState)S.npcState={};
+    if(!S.npcState[rungKey])S.npcState[rungKey]={wins:0,losses:0,streak:0,lastResult:null,mood:'neutral',tier:0,rematchStreak:0,carryover:0};
+    var _ns=S.npcState[rungKey];
+    if(win){_ns.wins++;_ns.streak=Math.max(1,(_ns.streak>0?_ns.streak:0)+1);_ns.lastResult='win';
+      var margin=G.pPts-G.oPts;if(margin>(_ns.biggestWin||0))_ns.biggestWin=margin;
+      _ns.tier=_ns.wins>=5?3:_ns.wins>=3?2:_ns.wins>=1?1:0;
+      _ns.carryover=0;/* clear carryover on win */
+    }else{_ns.losses++;_ns.streak=Math.min(-1,(_ns.streak<0?_ns.streak:0)-1);_ns.lastResult='loss';
+      var lossMargin=G.oPts-G.pPts;if(lossMargin<(_ns.closestLoss===undefined?9999:_ns.closestLoss))_ns.closestLoss=lossMargin;
+      /* Score carryover on close loss — 20% of score if reached 70%+ of target */
+      var _scoreRatio=G.target>0?G.pPts/G.target:0;
+      _ns.carryover=_scoreRatio>=0.70?Math.floor(G.pPts*0.20):0;
+    }
+    /* Rematch streak tracking */
+    if(isRematch){
+      if(win){_ns.rematchStreak=(_ns.rematchStreak||0)+1;}
+      else{_ns.rematchStreak=0;}
+    }
+  }
+  /* ── Card XP for equipped cards ── */
+  if(G.pCards&&G.pCards.length){G.pCards.forEach(function(cid){var sc=S.cards.find(function(c){return c.id===cid;});if(sc){sc.xp=(sc.xp||0)+1;}});}
+  /* ── SAVE all state: gold, renown, perks, NPC state, cards ── */
+  save();
+  // Store result for gauntlet to read
+  G._lastGoldEarned=win?goldEarned+thriftyBonus+bountyPaid+spectatorTips:goldEarned+spectatorTips;
+  // Cancel any pending end-screen timers from previous calls
+  if(window._endTimers){window._endTimers.forEach(t=>clearTimeout(t));}
+  window._endTimers=[];
+  function endT(fn,ms){const t=setTimeout(fn,ms);window._endTimers.push(t);return t;}
 
-  var isBoss=!!G._isBoss;
-  var isGauntlet=!!G._isGauntlet;
-  var isHandicap=!!G._handicap;
-  var pointsEarned=win?(isHandicap?2:1):0;
+  // Show end overlay
+  const ov=document.getElementById('end-ov');
+  const resTitle=document.getElementById('resTitle');
+  const resScores=document.querySelector('#end-ov .res-scores');
+  const resPScore=document.getElementById('resPScore');
+  const resOScore=document.getElementById('resOScore');
+  const resGoldWrap=document.getElementById('resGoldWrap');
+  const resCoinBig=document.getElementById('resCoinBig');
+  const resGoldText=document.getElementById('resGoldText');
+  const resCard=document.getElementById('resCard');
+  const btnCont=document.getElementById('end-btns');
 
-  /* Show simplified end overlay */
-  var ov=document.getElementById('end-ov');
-  var resTitle=document.getElementById('resTitle');
+  // Reset animation classes
   resTitle.className='res-title '+(win?'win':'lose');
   resTitle.textContent=win?'VICTORY':'DEFEAT';
-  var resPScore=document.getElementById('resPScore');
-  var resOScore=document.getElementById('resOScore');
-  if(resPScore)resPScore.textContent=G.pPts.toLocaleString();
-  if(resOScore)resOScore.textContent=G.oPts.toLocaleString();
-  var resOName=document.getElementById('resOName');
-  if(resOName)resOName.textContent=G.rung.name.toUpperCase();
-  /* Color: winner gold, loser red */
-  var pWon=G.pPts>=G.oPts;
-  if(resPScore)resPScore.style.color=pWon?'var(--gold)':'#c05050';
-  if(resOScore)resOScore.style.color=pWon?'#c05050':'var(--gold)';
-  /* Hide gold/card sections — not used in tier mode */
-  var resGoldWrap=document.getElementById('resGoldWrap');if(resGoldWrap)resGoldWrap.style.display='none';
-  var resCard=document.getElementById('resCard');if(resCard){resCard.innerHTML='';resCard.className='res-card';}
-  var resDlg=document.getElementById('resDlg');if(resDlg){resDlg.classList.remove('show');resDlg.innerHTML='';}
-  /* Show points earned */
-  var resGoldText=document.getElementById('resGoldText');
-  if(resGoldText&&win&&!isBoss){resGoldWrap.style.display='flex';resGoldText.textContent='+'+(isHandicap?'2':'1')+' POINT'+(pointsEarned>1?'S':'');}
-  if(resGoldText&&win&&isBoss){resGoldWrap.style.display='flex';resGoldText.textContent='BOSS DEFEATED!';}
-  /* Show overlay */
-  var resScores=document.querySelector('#end-ov .res-scores');if(resScores)resScores.classList.add('fade-in');
-  ov.classList.add('show');
-  _endScreenPhase='ready';
-  _endScreenData=null;
+  resScores.classList.remove('fade-in');
+  resGoldWrap.classList.remove('fade-in');
+  resGoldWrap.style.display='';resGoldWrap.style.visibility='';
+  resCoinBig.className='res-coin-big';void resCoinBig.offsetWidth;
+  const resCoinAmt=document.getElementById('resCoinAmt');
+  const _displayGold=win?goldEarned+thriftyBonus+bountyPaid+spectatorTips:goldEarned+spectatorTips;
+  resCoinAmt.textContent=(_displayGold>=0?'+':'')+_displayGold;
+  resGoldText.className='res-gold-text';
+  btnCont.classList.remove('fade-in');
+  resCard.classList.remove('show','lost');resCard.innerHTML='';
+  var _resDlgEl=document.getElementById('resDlg');if(_resDlgEl){_resDlgEl.classList.remove('show');_resDlgEl.innerHTML='';}
+  resPScore.textContent='0';resOScore.textContent='0';
+  /* Winning score = gold, losing score = red */
+  resPScore.className='res-num hud-score '+(win?'p':'o');
+  resOScore.className='res-num hud-score '+(win?'o':'p');
+  document.getElementById('resOName').textContent=G.rung.name.toUpperCase();
+  /* Build structured gold display */
+  var _goldHtml='';
+  /* Gold amount shown on coin — text only for bonuses/modifiers */
+  if(win){
+    var _bonusParts=[];
+    if(kingsRansomMsg)_bonusParts.push('<span class="rgt-bonus rgt-special">KING\'S RANSOM x3</span>');
+    if(bountyPaid)_bonusParts.push('<span class="rgt-bonus rgt-bounty">+'+bountyPaid+' BOUNTY</span>');
+    if(isRematch&&G._rmStreakUsed>=2)_bonusParts.push('<span class="rgt-bonus rgt-streak">STREAK x'+G._rmStreakUsed+'</span>');
+    if(G._firstMatchFree)_bonusParts.push('<span class="rgt-bonus rgt-welcome">WELCOME +50%</span>');
+    if(_bonusParts.length)_goldHtml=_bonusParts.join(' <span style="opacity:.3">\u2022</span> ');
+  }else{
+    const lossAmt=Math.abs(goldEarned);
+    if(lossAmt>0&&refundMsg){
+      _goldHtml='<span class="rgt-bonus rgt-refund">'+refundMsg.trim()+'</span>';
+    }
+    var _coEarned=rungKey&&S.npcState&&S.npcState[rungKey]?S.npcState[rungKey].carryover||0:0;
+    if(_coEarned>0)_goldHtml+=(_goldHtml?'<br>':'')+'<span class="rgt-bonus rgt-headstart">\u26A1 +'+_coEarned+' HEAD START next match</span>';
+  }
+  resGoldText.innerHTML=_goldHtml;
 
-  /* Store navigation data for handleContinue */
-  G._endRoute={win:win,isBoss:isBoss,isGauntlet:isGauntlet,pointsEarned:pointsEarned};
-  save();
+  ov.classList.add('show');
+  _endScreenPhase='animating';
+  // Draw pixel panels on end-screen buttons
+  requestAnimationFrame(()=>{
+    sizeAndDrawPanel(document.getElementById('cvBtnStore'),'#c8a050','#7a5828','#3a2810',202,0.02);
+    sizeAndDrawPanel(document.getElementById('cvBtnContinue'),'#4a9a50','#1a3818','#0c1c0a',303,0.02);
+  });
+
+  // Staggered animations
+  endT(()=>resTitle.classList.add('pop'),100);
+
+  // Score count-up
+  endT(()=>{
+    resScores.classList.add('fade-in');
+    const pFinal=G.pPts,oFinal=G.oPts;
+    const steps=30,interval=33;
+    let step=0;
+    const cid=setInterval(()=>{
+      step++;const t=step/steps;
+      resPScore.textContent=Math.round(pFinal*t).toLocaleString();
+      resOScore.textContent=Math.round(oFinal*t).toLocaleString();
+      if(step>=steps){clearInterval(cid);
+        resPScore.textContent=pFinal.toLocaleString();
+        resOScore.textContent=oFinal.toLocaleString();}
+    },interval);
+  },500);
+
+  // Gold: big coin spins in
+  endT(()=>{
+    resGoldWrap.classList.add('fade-in');
+    resCoinBig.classList.add('spin');
+    SFX.coinLand();
+  },1400);
+
+  // Sheen sweep across coin after spin settles
+  endT(()=>{
+    resCoinBig.classList.add('sheen');
+    SFX.coins();
+  },2300);
+
+  // Win: charge → explode outward, gravity down | Lose: drain → shrink-burst, coins float up
+  if(win){
+    // Coin charges up — shake + brighten + scale
+    endT(()=>{resCoinBig.classList.add('charge');},3000);
+    // Explode into mini coins — firework style
+    endT(()=>{
+      resCoinBig.classList.remove('charge');void resCoinBig.offsetWidth;
+      resCoinBig.classList.add('burst');
+      SFX.coinExplode();
+      _spawnCoinParticles(resCoinBig,totalGold,1);// gravity down
+    },3700);
+  }else{
+    // Coin drains — shrinks + darkens
+    endT(()=>{resCoinBig.classList.add('drain');},3000);
+    // Shrink-burst into coins that float upward
+    endT(()=>{
+      resCoinBig.classList.remove('drain');void resCoinBig.offsetWidth;
+      resCoinBig.classList.add('drain-burst');
+      SFX.coinExplode();
+      _spawnCoinParticles(resCoinBig,buyIn,-1);// gravity up (to NPC)
+    },3800);
+  }
+
+  // Gold text fades in after explosion, drifts up and fades out
+  endT(()=>{resGoldText.classList.add('drift');},win?3900:4000);
+
+  // Card reveal (won via wager/NPC reward, OR lost via wager)
+  const revealCard=npcRewardCard||(win&&G.oStake?(CARDS.find(x=>x.id===G.oStake)||getNpcCard(G.oStake)):null);
+  const lostStakes=(!win&&LO&&LO.effectiveWager)?(Array.isArray(G.pStake)?G.pStake:(G.pStake?[G.pStake]:[])):[];
+  const lostCard=lostStakes.length>0?CARDS.find(x=>x.id===lostStakes[0]):null;
+  const showCard=revealCard||lostCard;
+  const isCardLost=!!lostCard&&!revealCard;
+  // Stash data for skip function
+  _endScreenData={pFinal:G.pPts,oFinal:G.oPts,cardHTML:null,dlgHTML:null,isCardLost:isCardLost};
+  if(showCard){
+    const _c=showCard;
+    const _bandText=isCardLost?'FORFEIT':(npcRewardCard?'EARNED':_c.rarity.toUpperCase());
+    const _tooltipBand=isCardLost?'Forfeit':(npcRewardCard?'Earned':_tc(_c.rarity));
+    const _aTarnish=isCardLost?(_lostCardTarnish[_c.id]||0):0;
+    _endScreenData.cardHTML='<div class="res-card-inner">'+
+      '<div style="text-align:center;color:'+(isCardLost?'var(--red)':'#ffd700')+';font-size:clamp(14px,4.2vw,20px);margin-bottom:8px;letter-spacing:2px;white-space:nowrap">'+toTitleCase(_c.name)+'</div>'+
+      '<div class="res-card-glow"></div>'+
+      '<div class="card-outer" data-aging="'+_aTarnish+'" data-cid="'+_c.id+'">'+
+      '<div class="gcard rarity-'+_c.rarity+'">'+
+        '<div class="gcard-cover" style="background:'+(CARD_BG[_c.id]||'#444')+'">'+_c.icon+'</div>'+
+        '<div class="gcard-frame"></div>'+gcCorners()+
+        '<div class="gcard-band">'+_bandText+'</div></div></div></div>'+
+      mkCardTooltipHTML(_c,_tooltipBand);
+    const _quoteText=npcRewardCard&&_c.rewardQuote?_c.rewardQuote:
+      (_c.flavor?_c.flavor:(isCardLost?'"Better luck next time, stranger."':''));
+    if(_quoteText){
+      const _pKey=G.rung.key||'drunkard';
+      const _pSrc=PORTRAITS[_pKey]||'Match_Art/drunkard_frame.png';
+      _endScreenData.dlgHTML='<div class="dlg-portrait"><img src="'+_pSrc+'" alt=""></div>'+
+        '<div class="dlg-scroll"><canvas class="res-dlg-canvas"></canvas><div class="dlg-text">'+jitterText(_quoteText)+'</div></div>';
+    }
+  }
+  if(showCard){
+    const c=showCard;
+    endT(()=>{
+      // Hide gold wrap to make room for card in center
+      resGoldWrap.style.display='none';
+      const bandText=isCardLost?'FORFEIT':(npcRewardCard?'EARNED':c.rarity.toUpperCase());
+      const tooltipBand=isCardLost?'Forfeit':(npcRewardCard?'Earned':_tc(c.rarity));
+      const _rTarnish=isCardLost?(_lostCardTarnish[c.id]||0):0;
+      resCard.innerHTML='<div class="res-card-inner">'+
+        '<div style="text-align:center;color:'+(isCardLost?'var(--red)':'#ffd700')+';font-size:clamp(14px,4.2vw,20px);margin-bottom:8px;letter-spacing:2px;white-space:nowrap">'+toTitleCase(c.name)+'</div>'+
+        '<div class="res-card-glow"></div>'+
+        '<div class="card-outer" data-aging="'+_rTarnish+'" data-cid="'+c.id+'">'+
+        '<div class="gcard rarity-'+c.rarity+'">'+
+          '<div class="gcard-cover" style="background:'+(CARD_BG[c.id]||'#444')+'">'+c.icon+'</div>'+
+          '<div class="gcard-frame"></div>'+gcCorners()+
+          '<div class="gcard-band">'+bandText+'</div></div></div></div>'+
+        mkCardTooltipHTML(c,tooltipBand);
+      resCard.classList.add('show');
+      if(isCardLost)resCard.classList.add('lost');
+      SFX.coins();
+      /* Tap to show tooltip — exclude dialogue box from trigger area */
+      attachTooltipTap(resCard,{excludeSelector:'.res-dlg'});
+      /* NPC dialogue box with portrait + parchment */
+      const quoteText=npcRewardCard&&c.rewardQuote?c.rewardQuote:
+        (c.flavor?c.flavor:
+        (isCardLost?'"Better luck next time, stranger."':''));
+      if(quoteText){
+        const portraitKey=G.rung.key||'drunkard';
+        const portraitSrc=PORTRAITS[portraitKey]||'Match_Art/drunkard_frame.png';
+        const dlgDiv=document.createElement('div');
+        dlgDiv.className='res-dlg';
+        dlgDiv.innerHTML='<div class="dlg-portrait"><img src="'+portraitSrc+'" alt=""></div>'+
+          '<div class="dlg-scroll"><canvas class="res-dlg-canvas"></canvas><div class="dlg-text">'+jitterText(quoteText)+'</div></div>';
+        const _rde=document.getElementById('resDlg');
+        if(_rde){_rde.innerHTML='';_rde.appendChild(dlgDiv);_rde.classList.add('show');}
+        requestAnimationFrame(()=>{requestAnimationFrame(()=>{
+          const cv=dlgDiv.querySelector('.res-dlg-canvas');
+          if(cv)drawPixelScroll(cv);
+        });});
+      }
+    },4200);
+  }else{
+    // No card to show — hide gold wrap after drift (keep layout stable with visibility:hidden)
+    endT(()=>{resGoldWrap.style.visibility='hidden';},win?4500:4600);
+    // Loss hint: show NPC "buy better gear" quip
+    if(!win){
+      endT(()=>{
+        const oppKey=G.rung.name.toUpperCase();
+        const dlgData=OPP_DIALOGUE[oppKey];
+        const lines=dlgData&&dlgData.PLAYER_LOSES_HINT;
+        if(lines&&lines.length){
+          const quoteText=lines[Math.floor(Math.random()*lines.length)];
+          const portraitKey=G.rung.key||'drunkard';
+          const portraitSrc=PORTRAITS[portraitKey]||'Match_Art/drunkard_frame.png';
+          const dlgDiv=document.createElement('div');
+          dlgDiv.className='res-dlg';
+          dlgDiv.innerHTML='<div class="dlg-portrait"><img src="'+portraitSrc+'" alt=""></div>'+
+            '<div class="dlg-scroll"><canvas class="res-dlg-canvas"></canvas><div class="dlg-text">'+jitterText('\u201c'+quoteText+'\u201d')+'</div></div>';
+          const _rde=document.getElementById('resDlg');
+          if(_rde){_rde.innerHTML='';_rde.appendChild(dlgDiv);_rde.classList.add('show');}
+          requestAnimationFrame(()=>{requestAnimationFrame(()=>{
+            const cv=dlgDiv.querySelector('.res-dlg-canvas');
+            if(cv)drawPixelScroll(cv);
+          });});
+        }
+      },4200);
+    }
+    // Rematch win: show NPC dialogue with "no card" quips
+    if(win&&isRematch){
+      endT(()=>{
+        const oppKey=G.rung.name.toUpperCase();
+        const dlgData=OPP_DIALOGUE[oppKey];
+        const lines=dlgData&&dlgData.REMATCH_WIN;
+        if(lines&&lines.length){
+          const quoteText=lines[Math.floor(Math.random()*lines.length)];
+          const portraitKey=G.rung.key||'drunkard';
+          const portraitSrc=PORTRAITS[portraitKey]||'Match_Art/drunkard_frame.png';
+          const dlgDiv=document.createElement('div');
+          dlgDiv.className='res-dlg';
+          dlgDiv.innerHTML='<div class="dlg-portrait"><img src="'+portraitSrc+'" alt=""></div>'+
+            '<div class="dlg-scroll"><canvas class="res-dlg-canvas"></canvas><div class="dlg-text">'+jitterText('\u201c'+quoteText+'\u201d')+'</div></div>';
+          const _rde=document.getElementById('resDlg');
+          if(_rde){_rde.innerHTML='';_rde.appendChild(dlgDiv);_rde.classList.add('show');}
+          requestAnimationFrame(()=>{requestAnimationFrame(()=>{
+            const cv=dlgDiv.querySelector('.res-dlg-canvas');
+            if(cv)drawPixelScroll(cv);
+          });});
+        }
+      },4200);
+      // Stash for skip
+      if(_endScreenData){
+        const _oppKey=G.rung.name.toUpperCase();const _dlgData=OPP_DIALOGUE[_oppKey];const _lines=_dlgData&&_dlgData.REMATCH_WIN;
+        if(_lines&&_lines.length){
+          const _qt=_lines[Math.floor(Math.random()*_lines.length)];
+          const _pKey=G.rung.key||'drunkard';const _pSrc=PORTRAITS[_pKey]||'Match_Art/drunkard_frame.png';
+          _endScreenData.dlgHTML='<div class="dlg-portrait"><img src="'+_pSrc+'" alt=""></div>'+
+            '<div class="dlg-scroll"><canvas class="res-dlg-canvas"></canvas><div class="dlg-text">'+jitterText('\u201c'+_qt+'\u201d')+'</div></div>';
+          _endScreenData.isRematchWinDlg=true;
+        }
+      }
+    }
+  }
+
+  // Mark end screen as ready after all animations complete
+  endT(()=>{_endScreenPhase='ready';},showCard?4800:win?5000:5100);
+
+  // Continue button — visible immediately so players can skip
+  // Exception: Grog (first NPC) — delay until card reveal so new players see their reward
+  const isGrog=G.rung.key==='drunkard';
+  if(isGrog&&win&&revealCard){
+    btnCont.style.opacity='0';btnCont.style.pointerEvents='none';
+    endT(()=>{btnCont.style.opacity='1';btnCont.style.pointerEvents='auto';},5000);
+  }
 }
-/* OLD endMatch code deleted — see gambit_pre_restructure_backup.html */
+
 function handleGoToStore(){
   SFX.nav();
   if(window._endTimers){window._endTimers.forEach(t=>clearTimeout(t));window._endTimers=[];}
@@ -7463,55 +7806,28 @@ function handleContinue(){
   exitMatch();
 }
 function exitMatch(){
+  // Kill pending end-screen timers so no particles/SFX fire after leaving
   if(window._endTimers){window._endTimers.forEach(t=>clearTimeout(t));window._endTimers=[];}
+  // Remove any lingering coin particles
   document.querySelectorAll('.coin-burst-p').forEach(el=>el.remove());
+  // Close loadout panel if open
   var lov=document.getElementById('mLoadout-ov');if(lov)lov.classList.remove('show');
   var lbd=document.getElementById('mLoBackdrop');if(lbd)lbd.classList.remove('on');
-  if(typeof hideGoldFloat==='function')hideGoldFloat();
-
-  /* Route based on match result stored in G._endRoute */
-  var route=G&&G._endRoute?G._endRoute:{};
-  _getS();
-
-  if(route.win&&route.isBoss&&!route.isGauntlet){
-    /* Boss win — advance tier, go to boss reward screen (Phase 3) */
-    S.run.bossesBeaten.push(S.run.tier);
-    S.run.points=0;
-    S.run.tier=Math.min(S.run.tier+1,TIERS.length-1);
-    S.run.diceRerolls=Math.max(1,Math.min(3,1+Math.floor((S.renown||0)/50)));
-    if(S.run.tier>S.bestTier)S.bestTier=S.run.tier;
-    save();
-    /* TODO Phase 3: showScreen('bossreward',...) — for now go to tier screen */
-    showScreen('gauntlet');
-  }else if(route.win&&!route.isBoss){
-    /* Patron win — award points, go to card draft (Phase 3) */
-    S.run.points+=route.pointsEarned||1;
-    save();
-    /* TODO Phase 3: showScreen('draft',...) — for now go to tier screen */
-    showScreen('gauntlet');
-  }else if(!route.win&&route.isBoss&&!route.isGauntlet){
-    /* Boss loss — start The Gauntlet (Phase 5) */
-    S.run.inGauntlet=true;
-    S.run.gauntletIndex=0;
-    save();
-    /* TODO Phase 5: startGauntletSequence() — for now go to tier screen */
-    showScreen('gauntlet');
-  }else if(!route.win&&route.isGauntlet){
-    /* Gauntlet loss — run over */
-    startNewRun();
-    showScreen('gauntlet');
-  }else if(route.win&&route.isGauntlet){
-    /* Gauntlet win — next boss in sequence or back to tier */
-    S.run.gauntletIndex++;
-    if(S.run.gauntletIndex>=S.run.bossesBeaten.length){
-      S.run.inGauntlet=false;S.run.gauntletIndex=0;S.run.points=0;
-    }
-    save();
-    showScreen('gauntlet');
-  }else{
-    /* Patron loss or fallback — back to tier */
-    showScreen('gauntlet');
+  // Hide gold float (may be lingering from match loadout) and sync playerGold
+  hideGoldFloat();
+  playerGold=S.gold||0;
+  /* Check for pending renown level-up */
+  if(_pendingRenownLevelUp){
+    var _lvlPerk=_pendingRenownLevelUp;
+    /* Hide end overlay first */
+    var endOv=document.getElementById('end-ov');if(endOv)endOv.classList.remove('show');
+    showRenownLevelUp(_lvlPerk);
+    return;/* dismissRenownLevelUp() will call exitMatch again with _pendingRenownLevelUp=null */
   }
+  try{
+    var result={win:G.pPts>=G.target,pScore:G.pPts,oScore:G.oPts,goldEarned:G._lastGoldEarned||0,rungId:G.rung.id};
+    showScreen('gauntlet',{matchResult:result});
+  }catch(e){showScreen('gauntlet');}
 }
 
 /* ═══════ DIALOGUE DATA ═══════ */
@@ -8307,8 +8623,7 @@ function initMatchScreen(data){
     params={rungId:0,pCards:[],oCards:[],pStake:[],oStake:null,buyIn:10,effectiveWager:false};
   }
   LO=params;
-  /* Accept either a direct rung object or a rungId lookup */
-  const rung=params.rung?{...params.rung}:{...RUNGS[params.rungId||0]};
+  const rung={...RUNGS[params.rungId||0]};
   // Apply card effects to rung
   const pCards=params.pCards||[];
   if(pCards.includes('plague_wind'))rung.agg=Math.max(0.1,rung.agg-0.25);
@@ -8320,9 +8635,6 @@ function initMatchScreen(data){
   G=newG(rung,pCards,params.oCards||[],params.pStake,params.oStake);
   G._firstMatchFree=!!params._firstMatchFree;
   G._practice=!!params._practice;
-  G._isBoss=!!params.isBoss;
-  G._isGauntlet=!!params.isGauntlet;
-  G._handicap=params.handicap||null;
   /* Init active card uses */
   pCards.forEach(cid=>{const cd=CARDS.find(c=>c.id===cid);if(cd&&cd.type==='active')G.activeCardState.usedCards[cid]=cd.maxUses;});
   if(pCards.includes('blood_debt'))G.pPts=-200;
@@ -8362,14 +8674,8 @@ function initMatchScreen(data){
     if(rd.dlgFlags){var f=rd.dlgFlags;G._dlgPLead=f.pLead;G._dlgOLead=f.oLead;G._dlgPNear=f.pNear;G._dlgONear=f.oNear;G._dlgClose=f.close;G._dlgLoseBad=f.loseBad;G._dlgWinBad=f.winBad;}
   }
 
-  /* Apply handicap modifiers */
-  if(G._handicap==='short_handed'){G.numDice=4;G.matchDice=G.matchDice.slice(0,4);G.originalPlayerDice=G.originalPlayerDice.slice(0,4);}
-  if(G._handicap==='high_target'){G.target=Math.floor(G.target*1.5);}
-  if(G._handicap==='loaded_deck'&&G.oCards.length>0){/* opponent gets extra card — handled by adding to oCards before newG */}
-
   // Update gold display
-  var _goldEl=document.getElementById('goldAmt');
-  if(_goldEl)_goldEl.textContent=S.run?'—':(S.gold||0);
+  document.getElementById('goldAmt').textContent=S.gold;
   // Update HUD
   document.getElementById('targetScore').textContent=G.target.toLocaleString();
   const oppEl=document.getElementById('oppName');
@@ -10138,112 +10444,8 @@ function showModal(opts){
 /* resetRun defined in menu section */
 
 /* ═══════ GAUNTLET SCREEN INIT ═══════ */
-/* ═══════ TIER SCREEN (replaces gauntlet) ═══════ */
-function initTierScreen(data){
-  _getS();
-  var endOv=document.getElementById('end-ov');if(endOv)endOv.classList.remove('show');
-  var tier=TIERS[S.run.tier]||TIERS[0];
-  /* Update header */
-  var tn=document.getElementById('tierName');if(tn)tn.textContent=tier.name;
-  var tp=document.getElementById('tierProgressText');if(tp)tp.textContent=S.run.points+' / '+tier.pointsNeeded;
-  var tf=document.getElementById('tierFill');if(tf)tf.style.width=Math.min(100,Math.round(S.run.points/tier.pointsNeeded*100))+'%';
-  /* Boss preview */
-  var bp=document.getElementById('tierBossPortrait');
-  var bn=document.getElementById('tierBossName');
-  if(bp){
-    var portrait=GAUNTLET_PORTRAITS[tier.boss.key]||'';
-    bp.innerHTML=portrait?'<img src="'+portrait+'" alt="'+tier.boss.name+'" style="width:80px;height:80px;object-fit:contain;filter:drop-shadow(0 3px 0 rgba(0,0,0,.5))">':'';
-  }
-  if(bn)bn.textContent=tier.boss.name;
-  /* Boss button — enabled when enough points */
-  var bw=document.getElementById('tierBossWrap');
-  var bb=document.getElementById('tierBossBtn');
-  if(bw)bw.style.display=S.run.points>=tier.pointsNeeded?'':'none';
-  /* Handicap offer — random each visit */
-  var hb=document.getElementById('tierHandicap');
-  var hl=document.getElementById('handicapLabel');
-  if(typeof HANDICAPS!=='undefined'&&HANDICAPS.length){
-    var h=HANDICAPS[Math.floor(Math.random()*HANDICAPS.length)];
-    S.run.handicapOffer=h.id;save();
-    if(hb)hb.style.display='';
-    if(hl)hl.textContent=h.icon+' '+h.name;
-    if(hb)hb.onclick=function(){launchPatronMatch(true);};
-  }
-  /* Loadout preview */
-  _renderTierLoadout();
-  /* Renown */
-  var rd=document.getElementById('renownDisplay');if(rd)rd.textContent=S.renown||0;
-}
-
-function _renderTierLoadout(){
-  var lc=document.getElementById('tierLoCards');
-  var ld=document.getElementById('tierLoDice');
-  if(lc){
-    var html='';
-    S.run.cards.forEach(function(cid,i){
-      if(cid){
-        var cd=CARDS.find(function(c){return c.id===cid;})||getNpcCard(cid);
-        html+='<div class="tier-lo-card'+(i===2?' boss':'')+'">'+(cd?cd.icon:'?')+'</div>';
-      }else{
-        html+='<div class="tier-lo-card empty'+(i===2?' boss':'')+'">—</div>';
-      }
-    });
-    lc.innerHTML=html;
-  }
-  if(ld){
-    var dhtml='';
-    S.run.dice.forEach(function(mat){
-      dhtml+='<div class="tier-lo-die dtype-'+mat+'"></div>';
-    });
-    ld.innerHTML=dhtml;
-  }
-}
-
-function launchPatronMatch(isHandicap){
-  _getS();
-  var tier=TIERS[S.run.tier]||TIERS[0];
-  var patron=generatePatron(S.run.tier);
-  var pCards=(S.run.cards||[]).filter(function(c){return !!c;});
-  var handicap=isHandicap?S.run.handicapOffer:null;
-  /* Apply no_cards handicap */
-  if(handicap==='no_cards')pCards=[];
-  SFX.nav();
-  setTimeout(function(){
-    showScreen('match',{
-      rung:patron,
-      pCards:pCards,
-      oCards:[],
-      pStake:[],oStake:null,buyIn:0,effectiveWager:false,
-      isBoss:false,isGauntlet:false,
-      handicap:handicap
-    });
-  },80);
-}
-
-function launchBossMatch(){
-  _getS();
-  var tier=TIERS[S.run.tier]||TIERS[0];
-  var boss=tier.boss;
-  var pCards=(S.run.cards||[]).filter(function(c){return !!c;});
-  var oCards=generateOppCards(boss);
-  SFX.nav();
-  setTimeout(function(){
-    showScreen('match',{
-      rung:boss,
-      pCards:pCards,
-      oCards:oCards,
-      pStake:[],oStake:null,buyIn:0,effectiveWager:false,
-      isBoss:true,isGauntlet:false
-    });
-  },80);
-}
-
-/* Legacy bridge — gauntlet screen now calls tier screen */
 function initGauntletScreen(data) {
   _getS();
-  initTierScreen(data);
-  return;
-  /* === OLD GAUNTLET CODE BELOW (kept temporarily) === */
   gauntletSyncState();
   // Force-close detail/loadout panels (may still be open from before match)
   var sheet=document.getElementById('detailSheet');
