@@ -4978,6 +4978,14 @@ const TIERS=[
     diceWeights:{brass:2,silver:2,crystal:2}}
 ];
 
+/* ── Handicap match modifiers ── */
+const HANDICAPS=[
+  {id:'short_handed',name:'SHORT-HANDED',desc:'Play with 4 dice',icon:'🎲'},
+  {id:'no_cards',name:'NO CARDS',desc:'No equipped cards',icon:'🚫'},
+  {id:'high_target',name:'HIGH TARGET',desc:'Target score +50%',icon:'📈'},
+  {id:'loaded_deck',name:'LOADED DECK',desc:'Patron gets 2 cards',icon:'🃏'}
+];
+
 /* Generate a faceless patron for a given tier */
 function generatePatron(tierIndex){
   var t=TIERS[tierIndex];if(!t)t=TIERS[0];
@@ -7570,24 +7578,21 @@ function exitMatch(){
     save();
     showScreen('draft',{tierIndex:S.run.tier});
   }else if(!route.win&&route.isBoss&&!route.isGauntlet){
-    /* Boss loss — start The Gauntlet (Phase 5) */
+    /* Boss loss — start The Gauntlet */
     S.run.inGauntlet=true;
     S.run.gauntletIndex=0;
     save();
-    /* TODO Phase 5: startGauntletSequence() — for now go to tier screen */
-    showScreen('gauntlet');
+    startGauntletSequence();
   }else if(!route.win&&route.isGauntlet){
     /* Gauntlet loss — run over */
+    S.renown=(S.renown||0)+S.run.tier*5;/* Award renown based on progress */
     startNewRun();
-    showScreen('gauntlet');
+    showScreen('gameover');
   }else if(route.win&&route.isGauntlet){
     /* Gauntlet win — next boss in sequence or back to tier */
     S.run.gauntletIndex++;
-    if(S.run.gauntletIndex>=S.run.bossesBeaten.length){
-      S.run.inGauntlet=false;S.run.gauntletIndex=0;S.run.points=0;
-    }
     save();
-    showScreen('gauntlet');
+    startGauntletSequence();/* chains to next boss or returns to tier */
   }else{
     /* Patron loss or fallback — back to tier */
     showScreen('gauntlet');
@@ -10218,6 +10223,30 @@ function showModal(opts){
 /* resetRun defined in menu section */
 
 /* ═══════ GAUNTLET SCREEN INIT ═══════ */
+/* ═══════ THE GAUNTLET (boss loss recovery) ═══════ */
+function startGauntletSequence(){
+  _getS();
+  if(!S.run.inGauntlet){showScreen('gauntlet');return;}
+  var bossIdx=S.run.gauntletIndex;
+  if(bossIdx>=S.run.bossesBeaten.length){
+    /* Won all gauntlet fights — back to tier, points reset */
+    S.run.inGauntlet=false;S.run.gauntletIndex=0;S.run.points=0;
+    save();
+    showScreen('gauntlet');
+    return;
+  }
+  var tierIdx=S.run.bossesBeaten[bossIdx];
+  var boss=TIERS[tierIdx].boss;
+  var pCards=(S.run.cards||[]).filter(function(c){return !!c;});
+  var oCards=generateOppCards(boss);
+  SFX.nav();
+  showScreen('match',{
+    rung:boss,pCards:pCards,oCards:oCards,
+    pStake:[],oStake:null,buyIn:0,effectiveWager:false,
+    isBoss:true,isGauntlet:true
+  });
+}
+
 /* ═══════ CARD DRAFT SCREEN ═══════ */
 var _draftCards=[];/* 3 offered cards */
 var _draftSelected=null;/* selected card id */
@@ -10432,6 +10461,10 @@ function rewardContinue(){
 function initTierScreen(data){
   _getS();
   var endOv=document.getElementById('end-ov');if(endOv)endOv.classList.remove('show');
+  /* If gauntlet in progress, route directly to next fight */
+  if(S.run.inGauntlet){startGauntletSequence();return;}
+  /* If run complete (tier >= TIERS.length), show victory */
+  if(S.run.tier>=TIERS.length){showScreen('gameover');return;}
   var tier=TIERS[S.run.tier]||TIERS[0];
   /* Update header */
   var tn=document.getElementById('tierName');if(tn)tn.textContent=tier.name;
@@ -10495,14 +10528,26 @@ function launchPatronMatch(isHandicap){
   var patron=generatePatron(S.run.tier);
   var pCards=(S.run.cards||[]).filter(function(c){return !!c;});
   var handicap=isHandicap?S.run.handicapOffer:null;
-  /* Apply no_cards handicap */
+  /* Apply handicap modifiers at launch */
   if(handicap==='no_cards')pCards=[];
+  var oCards=[];
+  if(handicap==='loaded_deck'){
+    /* Give patron 2 random NPC cards from bosses at or below current tier */
+    var _npcPool=[];
+    for(var ti=0;ti<=S.run.tier&&ti<TIERS.length;ti++){
+      var b=TIERS[ti].boss;if(b&&b.cardPool)b.cardPool.forEach(function(cid){if(!_npcPool.includes(cid))_npcPool.push(cid);});
+    }
+    for(var pi=_npcPool.length-1;pi>0;pi--){var pj=Math.floor(Math.random()*(pi+1));var pt=_npcPool[pi];_npcPool[pi]=_npcPool[pj];_npcPool[pj]=pt;}
+    oCards=_npcPool.slice(0,2);
+  }
+  if(handicap==='high_target')patron.target=Math.floor(patron.target*1.5);
+  if(handicap==='short_handed'){/* applied in initMatchScreen via G._handicap */}
   SFX.nav();
   setTimeout(function(){
     showScreen('match',{
       rung:patron,
       pCards:pCards,
-      oCards:[],
+      oCards:oCards,
       pStake:[],oStake:null,buyIn:0,effectiveWager:false,
       isBoss:false,isGauntlet:false,
       handicap:handicap
@@ -11863,8 +11908,9 @@ function initGameOverScreen(){
   })});
 }
 function goStartNewRun(){
-  localStorage.removeItem('gambit4');S=null;
-  setTimeout(function(){showScreen('menu');},80);
+  _getS();
+  startNewRun();
+  setTimeout(function(){showScreen('gauntlet');},80);
 }
 function showGameOver(){
   showScreen('gameover');
