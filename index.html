@@ -972,7 +972,7 @@ body{
 }
 .match-btn{
   position:relative;overflow:hidden;cursor:pointer;border:none;
-  background:#2a2418;border:2px solid rgba(200,160,80,.25);touch-action:none;
+  background:transparent;touch-action:none;
   display:flex;align-items:center;justify-content:center;
   transition:box-shadow .06s ease,filter .06s ease;
   padding-bottom:4px; /* space for pixel shadow in canvas */
@@ -8435,13 +8435,16 @@ function initMatchScreen(data){
   if(G.activeSynergies.includes('npc_trophy')){G.pPts+=300;G._npcTrophyApplied=true;}
   // Init dialogue
   DLG.init(rung.name,rung.key);
-  // Draw UI canvases — use timeout to ensure layout is fully settled
-  setTimeout(function(){
+  // Draw UI canvases — retry until buttons have layout dimensions
+  function _drawMatchUI(){
+    var roll=document.getElementById('btnRoll');
+    if(!roll||roll.offsetWidth<2){setTimeout(_drawMatchUI,100);return;}
     sizeAndDrawPanel(document.getElementById('cvStay'),'#3a5a40','#142018','#0a1208',404,0.02);
     sizeAndDrawPanel(document.getElementById('cvFlee'),'#6a3838','#2a1818','#180a0a',505,0.02);
     const dlgC=document.getElementById('dlgCanvas');if(dlgC)drawPixelScroll(dlgC);
     drawAllMatchBtns();
-  },150);
+  }
+  setTimeout(_drawMatchUI,50);
   // Clean up any stale state from previous match
   document.getElementById('end-ov').classList.remove('show');
   document.getElementById('bust-ov').classList.remove('flash');
