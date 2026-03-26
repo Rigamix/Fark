@@ -7458,9 +7458,13 @@ function exitMatch(){
   var lov=document.getElementById('mLoadout-ov');if(lov)lov.classList.remove('show');
   var lbd=document.getElementById('mLoBackdrop');if(lbd)lbd.classList.remove('on');
   if(typeof hideGoldFloat==='function')hideGoldFloat();
+  /* Clear stale match state to prevent bleed into next match */
+  if(S&&S.pendingMatch){delete S.pendingMatch;save();}
+  var _endRoute=G&&G._endRoute?{...G._endRoute}:{};
+  G=null;/* Critical: prevent stale G from persisting */
 
-  /* Route based on match result stored in G._endRoute */
-  var route=G&&G._endRoute?G._endRoute:{};
+  /* Route based on match result (captured before G=null) */
+  var route=_endRoute;
   _getS();
 
   if(route.win&&route.isBoss&&!route.isGauntlet){
@@ -8378,13 +8382,13 @@ function initMatchScreen(data){
   if(G.activeSynergies.includes('npc_trophy')){G.pPts+=300;G._npcTrophyApplied=true;}
   // Init dialogue
   DLG.init(rung.name,rung.key);
-  // Draw UI canvases
-  requestAnimationFrame(()=>{
+  // Draw UI canvases — double rAF to ensure layout is settled
+  requestAnimationFrame(()=>{requestAnimationFrame(()=>{
     sizeAndDrawPanel(document.getElementById('cvStay'),'#3a5a40','#142018','#0a1208',404,0.02);
     sizeAndDrawPanel(document.getElementById('cvFlee'),'#6a3838','#2a1818','#180a0a',505,0.02);
     const dlgC=document.getElementById('dlgCanvas');if(dlgC)drawPixelScroll(dlgC);
     drawAllMatchBtns();
-  });
+  });});
   // Clean up any stale state from previous match
   document.getElementById('end-ov').classList.remove('show');
   document.getElementById('bust-ov').classList.remove('flash');
