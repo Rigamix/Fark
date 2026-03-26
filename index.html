@@ -8435,16 +8435,24 @@ function initMatchScreen(data){
   if(G.activeSynergies.includes('npc_trophy')){G.pPts+=300;G._npcTrophyApplied=true;}
   // Init dialogue
   DLG.init(rung.name,rung.key);
-  // Draw UI canvases — draw immediately + retry for safety
+  // Draw UI canvases — use ResizeObserver for reliable button rendering
   function _drawMatchUI(){
     sizeAndDrawPanel(document.getElementById('cvStay'),'#3a5a40','#142018','#0a1208',404,0.02);
     sizeAndDrawPanel(document.getElementById('cvFlee'),'#6a3838','#2a1818','#180a0a',505,0.02);
     var dlgC=document.getElementById('dlgCanvas');if(dlgC)drawPixelScroll(dlgC);
     drawAllMatchBtns();
   }
-  _drawMatchUI();/* immediate attempt */
-  requestAnimationFrame(function(){requestAnimationFrame(_drawMatchUI);});/* after paint */
-  setTimeout(_drawMatchUI,200);/* insurance */
+  /* Use ResizeObserver to draw buttons when they first get dimensions */
+  var _rollBtn=document.getElementById('btnRoll');
+  if(_rollBtn&&typeof ResizeObserver!=='undefined'){
+    var _ro=new ResizeObserver(function(entries){
+      for(var e of entries){if(e.contentRect.width>2){_drawMatchUI();_ro.disconnect();break;}}
+    });
+    _ro.observe(_rollBtn);
+  }
+  /* Fallback for browsers without ResizeObserver */
+  setTimeout(_drawMatchUI,300);
+  setTimeout(_drawMatchUI,800);
   // Clean up any stale state from previous match
   document.getElementById('end-ov').classList.remove('show');
   document.getElementById('bust-ov').classList.remove('flash');
