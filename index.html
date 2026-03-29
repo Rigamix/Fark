@@ -4931,7 +4931,7 @@ const RUNGS=[
     boss:null,bossDesc:null,
     agg:.55,cardRarity:null,wager:false,wagerCount:0,wagerMode:'none',minBank:0,diceStop:2,chaotic:true,adaptive:false,
     dice:['bone','bone','bone','bone','bone','bone'],
-    cardPool:[],cardCount:0,cardChance:0},
+    cardPool:['her_lucky_coin','one_more_round'],cardCount:1,cardChance:1},
   {id:1,name:'MABEL',key:'peasant',icon:'👨‍🌾',tier:'regular',target:4000,gold:35,buyIn:20,
     boss:null,bossDesc:null,
     agg:.55,cardRarity:'tin',wager:true,wagerCount:1,wagerMode:'best',minBank:200,diceStop:2,chaotic:false,adaptive:false,
@@ -5028,6 +5028,18 @@ function generatePatron(tierIndex){
   var target=Math.round((ps.targetMin+Math.floor(Math.random()*(ps.targetMax-ps.targetMin)))/100)*100;
   var agg=ps.aggMin+Math.random()*(ps.aggMax-ps.aggMin);
   var dice=[];for(var i=0;i<6;i++)dice.push(ps.dicePool[Math.floor(Math.random()*ps.dicePool.length)]);
+  /* Patron cards scale by tier: 0=none, 1=1 card, 2+=2 cards */
+  var pCardCount=tierIndex>=2?2:tierIndex>=1?1:0;
+  var pCardPool=[];
+  if(pCardCount>0){
+    /* Build pool from bosses at or below current tier */
+    for(var bi=0;bi<=tierIndex&&bi<TIERS.length;bi++){
+      var boss=TIERS[bi].boss;
+      if(boss&&boss.cardPool)boss.cardPool.forEach(function(cid){if(!pCardPool.includes(cid))pCardPool.push(cid);});
+    }
+    /* Shuffle */
+    for(var si=pCardPool.length-1;si>0;si--){var sj=Math.floor(Math.random()*(si+1));var st=pCardPool[si];pCardPool[si]=pCardPool[sj];pCardPool[sj]=st;}
+  }
   return{
     id:-1,name:'PATRON',key:'patron',icon:'',tier:t.name,
     target:target,gold:0,buyIn:0,
@@ -5035,7 +5047,7 @@ function generatePatron(tierIndex){
     agg:agg,cardRarity:null,wager:false,wagerCount:0,wagerMode:'none',
     minBank:ps.minBank||0,diceStop:ps.diceStop||2,
     chaotic:Math.random()<0.08,adaptive:tierIndex>=2,
-    dice:dice,cardPool:[],cardCount:0,cardChance:0
+    dice:dice,cardPool:pCardPool,cardCount:pCardCount,cardChance:1
   };
 }
 
@@ -5129,8 +5141,8 @@ const NPC_CARDS=[
    eff:'Start +200 pts',desc:'Grog starts the match with 200 bonus points.',
    effect:{type:'start_bonus',amount:200}},
   {id:'one_more_round',name:'ONE MORE ROUND',icon:'🍺',rarity:'npc',npcOnly:true,owner:'grog',
-   eff:'30% bust survival (once)',desc:'Once per match, Grog has a 30% chance to survive a bust and keep rolling.',
-   effect:{type:'once',mechanic:'bust_survive',chance:0.3}},
+   eff:'Bust survival (once)',desc:'Once per match, Grog survives a bust and keeps rolling. His turn points are halved but not lost.',
+   effect:{type:'once',mechanic:'bust_survive',chance:1.0}},
 
   /* ── MABEL ── */
   {id:'the_last_stitch_npc',name:'THE LAST STITCH',icon:'🧵',rarity:'npc',npcOnly:true,owner:'mabel',
@@ -5386,18 +5398,20 @@ function scoreRoll(vals,cards,locked,context,dieMats){
   const hasSet=faces=>{const pool=eVals.filter((_,i)=>!used[i]);let wilds=pool.filter(v=>v===-1).length;const nonWild=pool.filter(v=>v!==-1);return faces.every(f=>{const j=nonWild.indexOf(f);if(j>=0){nonWild.splice(j,1);return true;}if(wilds>0){wilds--;return true;}return false;});};
   const markSet=faces=>{const todo=[...faces];for(let i=0;i<n&&todo.length;i++)if(!used[i]){const j=todo.indexOf(eVals[i]);if(j>=0){used[i]=true;todo.splice(j,1);}else if(eVals[i]===-1&&todo.length){used[i]=true;effects.push({idx:i,type:'wild_triple',face:vals[i]});todo.splice(0,1);}}};
 
+  /* ── Straights first (highest priority — worth more than scavenger) ── */
+  let straightFound=false;
+  if(n>=6&&hasSet([1,2,3,4,5,6])){
+    if(context.crowsLuck&&!context.crowsLuckUsed){context.crowsLuckUsed=true;pts+=SCORING_BASE.straight5high;markSet([2,3,4,5,6]);}
+    else{pts+=SCORING_BASE.straight6;used.fill(true);}
+    straightFound=true;
+  }
+  if(!straightFound&&hasSet([2,3,4,5,6])){pts+=SCORING_BASE.straight5high;markSet([2,3,4,5,6]);straightFound=true;}
+  if(!straightFound&&hasSet([1,2,3,4,5])){pts+=SCORING_BASE.straight5low;markSet([1,2,3,4,5]);straightFound=true;}
+  /* ── Scavenger (only if no straight consumed the 1+5) ── */
   let scavengerFired=false;
-  if(scavenger&&!context._scavengerBlocked){
+  if(!straightFound&&scavenger&&!context._scavengerBlocked){
     const ones=vals.filter(v=>v===1).length,fives=vals.filter(v=>v===5).length;
     if(ones===1&&fives===1){pts+=SCORING_BASE.scavengerBonus;mark(1,1);mark(5,1);scavengerFired=true;}
-  }
-  if(!scavengerFired){
-    if(n>=6&&hasSet([1,2,3,4,5,6])){
-      if(context.crowsLuck&&!context.crowsLuckUsed){context.crowsLuckUsed=true;pts+=SCORING_BASE.straight5high;markSet([2,3,4,5,6]);return{total:pts,used,context,effects};}
-      pts+=SCORING_BASE.straight6;used.fill(true);return{total:pts,used,context,effects};
-    }
-    if(hasSet([2,3,4,5,6])){pts+=SCORING_BASE.straight5high;markSet([2,3,4,5,6]);}
-    else if(hasSet([1,2,3,4,5])){pts+=SCORING_BASE.straight5low;markSet([1,2,3,4,5]);}
   }
 
   /* ── Triples (with wild support) ── */
@@ -7313,6 +7327,8 @@ function runOppTurn(){
           if(eff.mechanic==='bust_immune_turns'&&G.npcCardState.oppTurnCount<eff.turns){bustSaved=true;}
           if(eff.mechanic==='bust_survive'&&!G.npcCardState.usedOnce[cid]&&Math.random()<eff.chance){
             G.npcCardState.usedOnce[cid]=true;bustSaved=true;
+            /* Halve accumulated turn points as cost of survival */
+            G.turnPts=Math.floor(G.turnPts/2);
           }
         });
         /* NPC bust → bank half (the_last_stitch_npc) */
@@ -9455,15 +9471,17 @@ function launchPatronMatch(isHandicap){
   var handicap=isHandicap?S.run.handicapOffer:null;
   /* Apply handicap modifiers at launch */
   if(handicap==='no_cards')pCards=[];
-  var oCards=[];
+  /* Patron cards from tier scaling */
+  var oCards=generateOppCards(patron);
   if(handicap==='loaded_deck'){
-    /* Give patron 2 random NPC cards from bosses at or below current tier */
+    /* Add 2 extra NPC cards from bosses at or below current tier (cap total at 3) */
     var _npcPool=[];
     for(var ti=0;ti<=S.run.tier&&ti<TIERS.length;ti++){
-      var b=TIERS[ti].boss;if(b&&b.cardPool)b.cardPool.forEach(function(cid){if(!_npcPool.includes(cid))_npcPool.push(cid);});
+      var b=TIERS[ti].boss;if(b&&b.cardPool)b.cardPool.forEach(function(cid){if(!_npcPool.includes(cid)&&!oCards.includes(cid))_npcPool.push(cid);});
     }
     for(var pi=_npcPool.length-1;pi>0;pi--){var pj=Math.floor(Math.random()*(pi+1));var pt=_npcPool[pi];_npcPool[pi]=_npcPool[pj];_npcPool[pj]=pt;}
-    oCards=_npcPool.slice(0,2);
+    var extra=_npcPool.slice(0,Math.max(0,3-oCards.length));
+    oCards=oCards.concat(extra);
   }
   if(handicap==='high_target')patron.target=Math.floor(patron.target*1.5);
   if(handicap==='short_handed'){/* applied in initMatchScreen via G._handicap */}
