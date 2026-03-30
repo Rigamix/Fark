@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html><head><title>Gambit Balance Sim</title>
+<style>body{background:#111;color:#ddd;font-family:'Courier New',monospace;font-size:13px;padding:20px}
+pre{white-space:pre-wrap;line-height:1.4}
+#status{color:#ff0;font-size:16px;margin-bottom:10px}
+</style></head><body>
+<div id="status">Running simulation...</div>
+<pre id="out"></pre>
+<script src="sim_balance.js"></script>
+<script>
+// sim_balance.js uses console.log — capture it
+(function(){
+  const out=document.getElementById('out');
+  const status=document.getElementById('status');
+  const lines=[];
+  const origLog=console.log;
+  console.log=function(){
+    const msg=[...arguments].map(a=>typeof a==='string'?a:JSON.stringify(a)).join(' ');
+    lines.push(msg);
+  };
+  // Re-run the sim by re-evaluating — but sim_balance.js already ran on load
+  // So we just display what was captured. But console.log was overridden AFTER.
+  // Need to re-run. Let's just inline-eval the script again.
+
+  // Actually sim_balance.js already executed before our override.
+  // Let's fetch and re-eval it.
+  fetch('sim_balance.js').then(r=>r.text()).then(code=>{
+    lines.length=0;
+    try{
+      eval(code);
+    }catch(e){
+      lines.push('ERROR: '+e.message+'\n'+e.stack);
+    }
+    out.textContent=lines.join('\n');
+    status.textContent='Simulation complete! ('+lines.length+' lines)';
+    // Also copy to clipboard
+    origLog('Sim output:\n'+lines.join('\n'));
+  });
+})();
+</script>
+</body></html>
