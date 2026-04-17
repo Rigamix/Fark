@@ -154,6 +154,9 @@ body{
   image-rendering:pixelated;
 }
 .hud-block{display:flex;flex-direction:column;align-items:center;gap:5px;flex:1}
+/* Player and opponent HUD blocks are full-size tap targets for the bank summary */
+.hud-block.tap-p,.hud-block.tap-o{cursor:pointer;padding:4px 2px;border-radius:4px;transition:background .12s}
+.hud-block.tap-p:active,.hud-block.tap-o:active{background:rgba(200,160,80,.12)}
 .hud-lbl{font-family:'Enchanted Land',serif;font-size:16px;color:var(--textdim);letter-spacing:1.5px}
 #oppName{position:relative}
 #skillIcon{position:absolute;right:100%;margin-right:2px;top:50%;transform:translateY(-50%)}
@@ -792,6 +795,7 @@ body{
 .die.committed{opacity:.38;cursor:default}
 .die.committed:active{transform:none}
 .die.rolling{animation:dRoll .4s linear infinite;cursor:default;box-shadow:none;transition:none;border-color:var(--dborder)}
+/* Jade wild face: leave completely blank (no pips, no marker). */
 @keyframes dRoll{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 .die.bust{animation:dBust .38s steps(3)}
 @keyframes dBust{0%,100%{transform:none}33%{transform:translate(-4px,3px)}66%{transform:translate(4px,-3px)}}
@@ -964,16 +968,11 @@ body{
   100%{opacity:.3;transform:translateX(-50%) translateY(10px)}
 }
 /* ─── PER-CARD ACTIVE INDICATORS ─── */
-/* Themed border from custom prop; subtle dither overlay on card-outer::after */
-.mcard-active .gcard{border:3px solid var(--card-accent,rgba(255,215,0,.9));box-shadow:0 0 12px 2px var(--card-accent,rgba(255,215,0,.5)),0 0 24px 4px var(--card-accent,rgba(255,215,0,.2)),inset 0 0 10px var(--card-accent,rgba(255,215,0,.2))}
-.mcard-active .card-outer::after{
-  content:'';position:absolute;inset:-4px;z-index:10;pointer-events:none;border-radius:8px;
-  border:2.5px solid var(--card-accent,rgba(255,215,0,.7));
-  animation:activeCardPulse 1.6s ease-in-out infinite;
-}
-@keyframes activeCardPulse{0%,100%{opacity:.6;box-shadow:0 0 10px 2px var(--card-accent,rgba(255,215,0,.4))}50%{opacity:1;box-shadow:0 0 22px 4px var(--card-accent,rgba(255,215,0,.7))}}
+/* Active cards share the same 2px border thickness as NPC cards — just recolored
+   with the per-card accent. The sheen animation (gcard::before) is already
+   always-on and makes them read as special. No big halo, no pulse ring. */
+.mcard-active .gcard{border:2px solid var(--card-accent,rgba(255,215,0,.9));box-shadow:inset 0 0 0 1px var(--ctrim),inset 0 0 0 5px var(--cface),inset 0 0 0 6px var(--card-accent,rgba(255,215,0,.9)),0 5px 20px rgba(0,0,0,.85)}
 .mcard-active.used .gcard{border-color:rgba(120,120,120,.3);filter:brightness(.6) saturate(.3)}
-.mcard-active.used .card-outer::after{display:none}
 /* — Frozen Die: ice — */
 .mcard-active[data-cid="frozen_die"]{--card-accent:rgba(100,180,220,.8);--card-dither:rgba(100,180,255,.09)}
 /* — Double Down: amber — */
@@ -990,8 +989,6 @@ body{
 .mcard-active[data-cid="all_in"]{--card-accent:rgba(180,140,60,.8);--card-dither:rgba(180,140,60,.08)}
 /* — Old Bones: bone — */
 .mcard-active[data-cid="old_bones"]{--card-accent:rgba(168,152,130,.8);--card-dither:rgba(168,152,130,.08)}
-/* — Phoenix Ash: warm gold — */
-.mcard-active[data-cid="phoenix_ash"]{--card-accent:rgba(220,160,40,.8);--card-dither:rgba(220,160,40,.08)}
 /* — Gambler's Eye: mystic teal — */
 .mcard-active[data-cid="gamblers_eye"]{--card-accent:rgba(80,200,180,.8);--card-dither:rgba(80,200,180,.09)}
 /* — Grog's Flask: warm amber — */
@@ -1595,6 +1592,62 @@ body{
 .rnk-perk-label{font-size:14px;color:var(--gold);letter-spacing:1px}
 .rnk-perk-desc{font-family:'IM Fell English',serif;font-size:13px;color:var(--textdim);line-height:1.3;margin-top:2px}
 .rnk-perk-threshold{font-size:12px;color:var(--textdim);flex-shrink:0;letter-spacing:.5px}
+
+/* ─── BANK SUMMARY (tap-score popover) ─── */
+/* Invisible overlay to catch outside-taps; panel is anchored to the HUD score */
+.bank-summary-ov{display:none;position:fixed;inset:0;z-index:9600;background:transparent;pointer-events:auto}
+.bank-summary-ov.show{display:block}
+.bank-summary-panel{
+  position:absolute;top:132px;
+  width:max-content;min-width:180px;max-width:74vw;max-height:62vh;
+  image-rendering:pixelated;
+  animation:bsIn .16s cubic-bezier(.2,.8,.35,1);
+  /* Scale the whole popover up 20% without changing internal layout */
+  transform:scale(1.2);
+}
+.bank-summary-panel.side-p{left:10px;transform-origin:top left}
+.bank-summary-panel.side-o{right:10px;transform-origin:top right}
+.bank-summary-bg{
+  position:absolute;inset:0;pointer-events:none;
+  image-rendering:pixelated;-ms-interpolation-mode:nearest-neighbor;
+}
+.bank-summary-inner{
+  position:relative;z-index:2;
+  padding:14px 14px 12px;
+  display:flex;flex-direction:column;gap:6px;max-height:inherit;
+  font-family:var(--font-px);color:var(--text);
+}
+/* Caret that anchors the panel to the score label */
+.bank-summary-panel::before{
+  content:'';position:absolute;top:-10px;width:0;height:0;z-index:3;
+  border-left:9px solid transparent;border-right:9px solid transparent;
+  border-bottom:11px solid #4a3a24;
+  filter:drop-shadow(0 -1px 0 #120a06);
+}
+.bank-summary-panel.side-p::before{left:30px}
+.bank-summary-panel.side-o::before{right:30px}
+/* Keep animation transform-free so the panel's scale(1.2) isn't clobbered mid-animation */
+@keyframes bsIn{from{opacity:0}to{opacity:1}}
+.bank-summary-list{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:5px}
+.bank-summary-empty{text-align:center;color:var(--textdim);font-size:11px;padding:14px 0;letter-spacing:1px}
+.bs-row-item{
+  display:grid;grid-template-columns:auto auto auto 1fr;align-items:center;gap:8px;
+  background:rgba(0,0,0,.35);border:1px solid rgba(200,160,80,.2);border-radius:3px;
+  padding:5px 6px;
+}
+.bs-turn{color:var(--textdim);font-size:10px;letter-spacing:1px;min-width:22px;font-weight:bold}
+/* Force dice into rows of 3 so >3 dice always wrap (keeps panel width tight) */
+.bs-dice{display:grid;grid-template-columns:repeat(3,auto);gap:2px;justify-content:start;align-items:center}
+.bs-mini-die{image-rendering:pixelated;flex-shrink:0;display:block}
+/* Match the HUD score font/style at the top of the match screen */
+.bs-pts{color:var(--gold);font-family:var(--font-px);font-size:13px;text-align:left;text-shadow:0 0 8px rgba(200,160,80,.35);white-space:nowrap}
+.bs-bonus{grid-column:1/-1;color:var(--textdim);font-size:9px;letter-spacing:.5px;margin-top:2px;line-height:1.2}
+.bank-summary-total{
+  display:flex;justify-content:space-between;align-items:center;gap:8px;
+  padding:5px 4px 1px;margin-top:4px;border-top:1px solid rgba(200,160,80,.35);
+  color:var(--gold);font-family:var(--font-px);font-size:11px;letter-spacing:1px;
+  text-shadow:0 0 6px rgba(200,160,80,.3);
+}
 
 /* ─── QUIT CONFIRM ─── */
 #quit-ov{
@@ -4098,36 +4151,35 @@ body::before,body::after{display:none!important}
 
 /* ── Bounty Board: bounty strip ── */
 .bounty-strip{
-  display:flex;flex-direction:column;align-items:center;gap:3px;
-  padding:4px 0 6px;
-  font-family:var(--font-px);color:rgba(200,160,80,.55);
-  text-align:center;letter-spacing:1px;
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  padding:3px 8px 4px;
+  font-family:var(--font-px);color:rgba(200,160,80,.85);
+  text-align:center;letter-spacing:1px;flex-wrap:wrap;
+  background:transparent;border:0;box-shadow:none;
+  position:relative;z-index:25;
+  /* Soft halo so the text reads even when card-fan animations pass behind */
+  text-shadow:0 0 4px rgba(0,0,0,.85),0 1px 2px rgba(0,0,0,.9);
 }
-.bounty-strip .bs-title{
-  font-size:13px;color:rgba(200,160,80,.5);letter-spacing:2px;
-}
-.bs-row{
-  display:flex;align-items:center;gap:6px;justify-content:center;flex-wrap:wrap;
-}
+.bounty-strip .bs-title{display:none}
+.bs-row{display:contents}
 .bounty-pill{
-  display:flex;align-items:center;gap:4px;
-  font-size:12px;color:rgba(200,180,140,.75);
+  display:inline-flex;align-items:center;gap:3px;
+  font-size:10px;color:rgba(200,180,140,.75);
   white-space:nowrap;
 }
 .bounty-pill.claimed{
-  color:rgba(160,200,80,.8);text-decoration:line-through;opacity:.5;
+  color:rgba(160,200,80,.8);text-decoration:line-through;opacity:.55;
 }
 .bounty-pill.claimed .bp-reward{color:#a0c850;text-decoration:none}
-.bp-icon{font-size:13px}
-.bp-reward{font-weight:bold;color:#c0a050;font-size:12px;margin-left:2px}
-.bp-sep{color:rgba(200,160,80,.25);font-size:10px}
+.bp-icon{font-size:11px}
+/* Fixed-width reward slot so claiming (✓) doesn't jitter the row width */
+.bp-reward{font-weight:bold;color:#c0a050;font-size:10px;margin-left:2px;min-width:34px;display:inline-block;text-align:left}
+.bp-sep{color:rgba(200,160,80,.22);font-size:9px}
 @media (max-height:700px){
-  .bounty-strip{padding:0;gap:0}
-  .bounty-strip .bs-title{font-size:8px;margin-bottom:0;line-height:1.1}
-  .bs-row{flex-wrap:wrap;gap:2px;padding:0 6px}
-  .bounty-pill{font-size:8px}
-  .bp-icon{font-size:9px}
-  .bp-reward{font-size:8px}
+  .bounty-strip{padding:2px 6px 2px;gap:8px}
+  .bounty-pill{font-size:9px}
+  .bp-icon{font-size:10px}
+  .bp-reward{font-size:9px;min-width:28px}
   .bp-sep{font-size:8px}
 }
 
@@ -4460,7 +4512,7 @@ body::before,body::after{display:none!important}
 
 <!-- HUD -->
 <div class="hud" id="hud">
-  <div class="hud-block">
+  <div class="hud-block tap-p" onclick="showBankSummary('p')" title="Tap for bank history">
     <div class="hud-lbl">YOU</div>
     <div class="hud-score p" id="pScore">0</div>
     <div class="prog"><div class="prog-fill p" id="pProg" style="width:0%"></div></div>
@@ -4471,8 +4523,8 @@ body::before,body::after{display:none!important}
     <div class="hud-turn-pts" id="turnPts" style="display:none"></div>
     <div class="hud-turnnum" id="turnNum">TURN 1</div>
   </div>
-  <div class="hud-block">
-    <div class="hud-lbl" id="oppName">DRUNKARD <span id="skillIcon" style="display:none;cursor:pointer;color:var(--red);font-size:11px" onclick="toggleLoadoutPanel()" title="Skill active">&#9889;</span></div>
+  <div class="hud-block tap-o" onclick="showBankSummary('o')" title="Tap for rival bank history">
+    <div class="hud-lbl" id="oppName">DRUNKARD <span id="skillIcon" style="display:none;cursor:pointer;color:var(--red);font-size:11px" onclick="event.stopPropagation();toggleLoadoutPanel()" title="Skill active">&#9889;</span></div>
     <div class="hud-score o" id="oScore">0</div>
     <div class="prog"><div class="prog-fill o" id="oProg" style="width:0%"></div></div>
   </div>
@@ -4591,6 +4643,16 @@ body::before,body::after{display:none!important}
 </div>
 
 <!-- QUIT CONFIRM -->
+<!-- Bank summary: tap your score (or opponent's) to see every bank this match -->
+<div id="bank-summary-ov" class="bank-summary-ov" onclick="if(event.target===this)hideBankSummary()">
+  <div class="bank-summary-panel" id="bankSummaryPanel">
+    <canvas class="bank-summary-bg" id="bankSummaryCanvas"></canvas>
+    <div class="bank-summary-inner">
+      <div class="bank-summary-list" id="bankSummaryList"></div>
+    </div>
+  </div>
+</div>
+
 <div id="quit-ov">
   <div class="quit-title">Flee?</div>
   <div class="quit-sub">You will lose your buy-in and the match will count as a loss.</div>
@@ -4768,6 +4830,9 @@ function _getS(){
     if(S.run.gold===undefined)S.run.gold=100;
     if(!S.run.diceStock)S.run.diceStock=null;
     if(!S.run.cardTarnish)S.run.cardTarnish={};
+    /* Drop any equipped cards that no longer exist in the catalog (e.g. removed in an update) */
+    var _removedCards=['tyrants_gaze','the_hare','phoenix_ash'];
+    if(Array.isArray(S.run.cards))S.run.cards=S.run.cards.map(function(cid){return cid&&_removedCards.indexOf(cid)===-1?cid:null;});
   }
   return S;
 }
@@ -5387,14 +5452,14 @@ const HANDICAPS=[
   {id:'mirror_match', name:'MIRROR MATCH',  desc:'Play with the opponent\'s loadout',icon:'🪞',color:'#80a0d0', minTier:3},
 ];
 const BOUNTY_POOL=[
-  {id:'triple_any',     desc:'Score a triple',          reward:250, icon:'🎯'},
-  {id:'bank_600plus',   desc:'Bank 600+ in one turn',   reward:200, icon:'💰'},
-  {id:'bank_under_300', desc:'Bank under 300',          reward:300, icon:'🤏'},
-  {id:'use_all_dice',   desc:'Score with all 6 dice',   reward:400, icon:'✨'},
-  {id:'three_banks',    desc:'Bank 3 turns in a row',   reward:350, icon:'🔗'},
-  {id:'first_blood',    desc:'Bank first',              reward:150, icon:'🩸'},
-  {id:'come_from_behind',desc:'Bank while 500+ behind', reward:300, icon:'🔄'},
-  {id:'hot_dice_bank',  desc:'Score Hot Dice',          reward:250, icon:'🎲'},
+  {id:'triple_any',     desc:'Score a triple',          reward:400, icon:'🎯'},
+  {id:'bank_600plus',   desc:'Bank 600+ in one turn',   reward:300, icon:'💰'},
+  {id:'bank_under_300', desc:'Bank under 300',          reward:450, icon:'🤏'},
+  {id:'use_all_dice',   desc:'Score with all 6 dice',   reward:600, icon:'✨'},
+  {id:'three_banks',    desc:'Bank 3 turns in a row',   reward:550, icon:'🔗'},
+  {id:'first_blood',    desc:'Bank first',              reward:250, icon:'🩸'},
+  {id:'come_from_behind',desc:'Bank while 500+ behind', reward:450, icon:'🔄'},
+  {id:'hot_dice_bank',  desc:'Score Hot Dice',          reward:400, icon:'🎲'},
 ];
 
 /* ── Handicap helper functions ── */
@@ -5537,15 +5602,12 @@ function _initHandicapHUD(){
     else ms.appendChild(badge);
   }
   if(G._handicap==='bounty_board'){
-    /* Bounty strip — above player dice, like Rising Stakes badge */
+    /* Bounty strip — sits directly under the HUD (score bar), no box */
     var strip=document.createElement('div');strip.id='bountyStrip';strip.className='bounty-strip';
-    var aboveDice=document.getElementById('aboveDiceInfo');
-    if(aboveDice)aboveDice.insertBefore(strip,aboveDice.firstChild);
+    var hud=document.getElementById('hud');
+    if(hud&&hud.parentNode)hud.parentNode.insertBefore(strip,hud.nextSibling);
     else ms.appendChild(strip);
     _updateBountyHUD();
-    /* Reduce bottom spacer so bounty content doesn't push dice into card area */
-    var _da=document.getElementById('diceArea');
-    if(_da){if(window.innerHeight<=700){_da.style.setProperty('--sp-before','1');_da.style.setProperty('--sp-after','7');}else{_da.style.setProperty('--sp-before','1');_da.style.setProperty('--sp-after','3');}}
   }
   if(G._handicap==='mirror_match'){
     /* Mirror badge below HUD */
@@ -5602,23 +5664,23 @@ function generateDiceLoadout(tierIndex){
 }
 
 const CARDS=[
-  {id:'flintlock',name:'THE FLINTLOCK',icon:'🔫',rarity:'silver',eff:'+100 ON FIRST 1 (ONCE)',desc:'Once per match: the first time a 1 scores on your roll, gain +100 bonus points.'},
-  {id:'copper_pincher',name:'COPPER PINCHER',icon:'🪙',rarity:'tin',eff:'1s=125, 5s=75 PTS',desc:'Singles are worth more: 1s score 125 (not 100), 5s score 75 (not 50). No straights or triples.'},
-  {id:'half_measure',name:'HALF MEASURE',icon:'⚖️',rarity:'tin',eff:'+200 FOR 3-DICE BANK',desc:'Bank by committing exactly 3 dice and earn a flat +200 bonus.'},
+  {id:'flintlock',name:'THE FLINTLOCK',icon:'🔫',rarity:'silver',eff:'+200 ON FIRST 1 (ONCE)',desc:'Once per match: the first time a 1 scores on your roll, gain +200 bonus points.'},
+  {id:'copper_pincher',name:'COPPER PINCHER',icon:'🪙',rarity:'tin',eff:'1s=125, 5s=75 PTS',desc:'Singles are worth more: 1s score 125 (not 100), 5s score 75 (not 50).'},
+  {id:'half_measure',name:'HALF MEASURE',icon:'⚖️',rarity:'tin',eff:'+200 FOR 3-DICE BANK',desc:'Bank by committing exactly three dice and earn a flat +200 bonus.'},
   {id:'the_hearth',name:'THE HEARTH',icon:'🔥',rarity:'tin',eff:'+100 FOR FIRST-ROLL BANK',desc:'Bank on your very first roll of a turn to earn +100 extra points.'},
-  {id:'slow_burn',name:'SLOW BURN',icon:'🕯️',rarity:'tin',eff:'+300 EVERY 3 SAFE TURNS',desc:'Every 3 turns you bank safely without busting, automatically gain 300 points.'},
+  {id:'slow_burn',name:'SLOW BURN',icon:'🕯️',rarity:'tin',eff:'+300 EVERY 3 SAFE TURNS',desc:'Every three turns you bank safely without busting, automatically gain 300 points.'},
   {id:'fools_gold',name:"FOOL'S GOLD",icon:'✨',rarity:'tin',eff:'+300 ON 500-MULTIPLE BANK',desc:'Bank a score that is exactly a multiple of 500 (500, 1000…) to earn +300 bonus.'},
   {id:'cracked_bell',name:'CRACKED BELL',icon:'🔔',rarity:'tin',eff:'FIRST BUST = 0 LOSS',desc:'Once per match, your first bust is free — your turn points are lost but the turn continues.'},
-  {id:'keen_eyes',name:'KEEN EYES',icon:'👀',rarity:'tin',eff:'BLOCKS DICE REDUCTION',desc:'Blocks any opponent effect that would reduce your dice count this match.'},
+  {id:'keen_eyes',name:'KEEN EYES',icon:'👀',rarity:'tin',eff:'BLOCKS POCKET SAND',desc:"Blocks the opponent's Pocket Sand — they can't shave a die from your first roll."},
   {id:'millers_toll',name:"MILLER'S TOLL",icon:'⚙️',rarity:'gold',eff:'TRIPLE 2-4 +150; 1s=75',desc:'Triples of 2, 3, or 4 score +150 extra — but each 1 you roll is only worth 75 points instead of 100.'},
   {id:'scavenger',name:'THE SCAVENGER',icon:'🦴',rarity:'silver',eff:'ONE 1 + ONE 5 = 300',desc:'Roll exactly one 1 and one 5 in the same throw to score a combined 300 points.'},
   {id:'last_stand',name:'THE LAST STAND',icon:'🗡️',rarity:'silver',eff:'FINAL DIE 1 OR 5 = 600',desc:'If your very last die (with nothing left to keep) lands on 1 or 5, it scores 600 points.'},
   {id:'rusty_spur',name:'RUSTY SPUR',icon:'🐎',rarity:'silver',eff:'+BIAS AFTER BANK',desc:'After each bank, your next roll is slightly biased toward 1s and 5s.'},
   {id:'martyr',name:'THE MARTYR',icon:'⛪',rarity:'silver',eff:'SKIP 1 BUST',desc:'Once per match, survive a bust — your turn keeps going with the remaining dice.'},
-  {id:'blood_debt',name:'BLOOD DEBT',icon:'🩸',rarity:'gold',eff:'-200 START; +250 PER OPP BUST',desc:'You start -200 points. Each time the opponent busts, you gain 250 points. Bust them twice to break even.'},
+  {id:'blood_debt',name:'BLOOD DEBT',icon:'🩸',rarity:'gold',eff:'-100 START; +400 PER OPP BUST',desc:'You start -100 points. Each time the opponent busts, you gain 400 points.'},
   {id:'leaky_cup',name:'LEAKY CUP',icon:'🥛',rarity:'gold',eff:"RIVAL 5 DICE EVERY 4TH TURN",desc:"Every fourth turn the opponent takes, they start with only 5 dice on their first roll."},
-  {id:'crows_luck',name:"CROW'S LUCK",icon:'🐦',rarity:'gold',eff:'RIVAL FULL STRAIGHT → HIGH',desc:"Once per match, converts the opponent's Full Straight (1500 pts) into a High Straight (750) instead."},
-  {id:'taxing_breath',name:'TAXING BREATH',icon:'💨',rarity:'gold',eff:'STEAL 50 ON RIVAL BANK',desc:'Each time the opponent banks any points, steal 50 of those points for yourself.'},
+  {id:'crows_luck',name:"CROW'S LUCK",icon:'🐦',rarity:'gold',eff:'DOWNGRADE RIVAL STRAIGHTS (2x)',desc:"Twice per match, downgrades any straight the opponent rolls by one tier: Full (1500) → High (750), High (750) → Low (500), Low (500) → nothing."},
+  {id:'taxing_breath',name:'TAXING BREATH',icon:'💨',rarity:'gold',eff:'STEAL 100 ON RIVAL BANK',desc:'Each time the opponent banks any points, steal 100 of those points for yourself.'},
   {id:'thieves_luck',name:"THIEF'S LUCK",icon:'🎭',rarity:'gold',eff:'STEAL RIVAL BANK <200',desc:"When the opponent banks less than 200 points in a turn, those points transfer to you instead."},
   {id:'plague_wind',name:'PLAGUE WIND',icon:'🌬️',rarity:'gold',eff:'RIVAL AGG -25%',desc:"Reduces the opponent's tendency to keep re-rolling aggressively — they play safer."},
   {id:'kings_ransom',name:"KING'S RANSOM",icon:'👑',rarity:'gold',eff:'WIN BY 3000+ = +1000 PTS',desc:'If you are ahead by 3,000 or more points, gain an instant 1,000 bonus points when you bank.'},
@@ -5627,17 +5689,16 @@ const CARDS=[
   {id:'iron_crown',name:'THE IRON CROWN',icon:'⚜️',rarity:'gold',eff:'HOT DICE = +500 BONUS',desc:'Each time you achieve a Hot Dice (all dice score), gain +500 bonus on top of the standard reward.'},
   {id:'jesters_mask',name:"JESTER'S MASK",icon:'🃏',rarity:'tin',eff:'RIVAL PLAYS CHAOTIC',desc:"The opponent's behaviour becomes chaotic — they may roll recklessly or bank unexpectedly."},
   {id:'serpents_whisper',name:"SERPENT'S WHISPER",icon:'🐍',rarity:'silver',eff:"RIVAL CAN'T BANK LOW",desc:"Raises the opponent's minimum banking threshold by 300 — they must keep rolling until they hit it or bust."},
-  {id:'cowards_bell',name:"COWARD'S BELL",icon:'🔕',rarity:'silver',eff:'RIVAL DICESTOP +1',desc:'The opponent must commit one extra die per roll — they lose one chance to keep rolling each turn.'},
-  {id:'tyrants_gaze',name:"TYRANT'S GAZE",icon:'👁️',rarity:'gold',eff:'RIVAL CANNOT ADAPT',desc:'The opponent cannot read or adapt to your play style — they keep their default strategy all match.'},
+  {id:'cowards_bell',name:"COWARD'S BELL",icon:'🔕',rarity:'silver',eff:'RIVAL DICESTOP +1',desc:'The opponent must commit one extra die per roll — they lose one chance to keep rolling each turn.',playerDesc:'Every bank you make loses ten percent to the bell.'},
   /* ── ACTIVE CARDS (shop + NPC rewards, drag-to-activate) ── */
   {id:'gamblers_eye',name:"GAMBLER'S EYE",icon:'👁️‍🗨️',rarity:'gold',type:'active',maxUses:1,timing:'choosing',eff:'KEEP ANY DICE, REROLL REST',desc:'Choose any dice to keep — scoring or not — then reroll everything else. One use per match.'},
-  {id:'grogs_flask',name:"GROG'S FLASK",icon:'🍺',rarity:'gold',type:'active',npc:'grog',maxUses:1,timing:'choosing',eff:'REROLL 2 NON-SCORING DICE',desc:'During dice selection, pick up to 2 dice that aren\'t scoring and reroll them. One use per match.',rewardQuote:'"Here… take thish. Won it fair an\' shquare."'},
+  {id:'grogs_flask',name:"GROG'S FLASK",icon:'🍺',rarity:'gold',type:'active',npc:'grog',maxUses:1,timing:'choosing',eff:'REROLL 2 NON-SCORING DICE',desc:'During dice selection, pick up to two dice that aren\'t scoring and reroll them. One use per match.',rewardQuote:'"Here… take thish. Won it fair an\' shquare."'},
   {id:'mabels_stitch',name:"MABEL'S STITCH",icon:'🧵',rarity:'gold',type:'active',npc:'mabel',maxUses:1,timing:'idle|choosing|yielding',eff:'PROTECT TURN PTS IF BUST',desc:'Activate before rolling: if you bust this turn, you bank your accumulated points rather than losing them. One use.',rewardQuote:'"Take this. May it mend thy fortune."'},
   {id:'finnicks_palm',name:"FINNICK'S PALM",icon:'🤏',rarity:'gold',type:'active',npc:'finnick',maxUses:1,timing:'choosing',eff:'SWAP 1 DIE → 1 OR 5',desc:'During dice selection, flip one non-scoring die to a 1 or 5. One use per match.',rewardQuote:'"Not bad, mate! Keep this, yeah?"'},
-  {id:'corvus_ledger',name:"CORVUS'S LEDGER",icon:'📒',rarity:'gold',type:'active',npc:'corvus',maxUses:1,timing:'idle|choosing|yielding',eff:'NEXT BANK +50%',desc:'Activate at any point during your turn — your next bank is worth 50% extra points. One use per match.',rewardQuote:'"Take the ledger. Consider it… a dividend."'},
+  {id:'corvus_ledger',name:"CORVUS'S LEDGER",icon:'📒',rarity:'gold',type:'active',npc:'corvus',maxUses:1,timing:'idle|choosing|yielding',eff:'NEXT BANK +75%',desc:'Activate at any point during your turn — your next bank is worth 75% extra points. One use per match.',rewardQuote:'"Take the ledger. Consider it… a dividend."'},
   {id:'brutus_fist',name:"BRUTUS'S FIST",icon:'👊',rarity:'gold',type:'active',npc:'brutus',maxUses:1,timing:'choosing',eff:'FORCE 1 DIE → 1',desc:'During dice selection, force one non-scoring die to show a 1 (worth 100 pts). One use per match.',rewardQuote:'"Iron in thy bones. Take this, soldier."'},
   {id:'aldrics_vow',name:"ALDRIC'S VOW",icon:'⚔️',rarity:'gold',type:'active',npc:'aldric',maxUses:1,timing:'idle',eff:'DOUBLE OR NOTHING',desc:'Your next roll: score 300+ and it doubles; score less and you lose your accumulated turn points. One use.',rewardQuote:'"Thou hast proven worthy. Bear this vow."'},
-  {id:'whispers_hex',name:"WHISPER'S HEX",icon:'🔮',rarity:'gold',type:'active',npc:'whisper',maxUses:1,timing:'yielding',eff:'OPP −1 DIE NEXT TURN',desc:'Activate while yielding your turn — the opponent starts their next turn with only 5 dice. One use.',rewardQuote:'"This hex is yours. Use it wisely."'},
+  {id:'whispers_hex',name:"WHISPER'S HEX",icon:'🔮',rarity:'gold',type:'active',npc:'whisper',maxUses:1,timing:'yielding',eff:'OPP −1 DIE NEXT TURN',desc:'Activate while yielding your turn — the opponent starts their next turn with only five dice. One use.',rewardQuote:'"This hex is yours. Use it wisely."'},
   {id:'ambrose_grace',name:"AMBROSE'S GRACE",icon:'✝️',rarity:'gold',type:'active',npc:'ambrose',maxUses:1,timing:'choosing',eff:'2 BLANKS → 5s',desc:'During dice selection, convert up to 2 non-scoring dice into 5s (50 pts each). One use per match.',rewardQuote:'"The heavens smiled upon thee. Accept this grace."'},
   /* ── DICE PROTECTION / SWAP ── */
   {id:'iron_grip',name:'IRON GRIP',icon:'🔒',rarity:'silver',eff:'DICE CAN\'T BE SWAPPED',desc:'Prevents any opponent effect from swapping, stealing, or downgrading your dice this match.'},
@@ -5645,7 +5706,7 @@ const CARDS=[
   /* ── NEW CARDS — Synergy Enablers ── */
   {id:'beggars_bowl',name:"BEGGAR'S BOWL",icon:'🥣',rarity:'tin',eff:'+150 ON FIRST BANK',desc:'Your very first bank each match gains an extra 150 bonus points.'},
   {id:'loose_thread',name:'LOOSE THREAD',icon:'🧶',rarity:'tin',eff:'+400 AFTER DOUBLE BUST',desc:'If you bust twice in a row, gain 400 points automatically.'},
-  {id:'the_whetstone',name:'THE WHETSTONE',icon:'🪨',rarity:'silver',eff:'FIRST 3 ROLLS +50',desc:'Your first 3 rolls each turn score 50 extra points on top of their normal value.'},
+  {id:'the_whetstone',name:'THE WHETSTONE',icon:'🪨',rarity:'silver',eff:'FIRST 3 ROLLS +75',desc:'Your first three rolls each turn score 75 extra points on top of their normal value.'},
   {id:'snake_oil',name:'SNAKE OIL',icon:'🐍',rarity:'silver',eff:'RIVAL TRIPLE → NEXT HALF',desc:'Once per match, when the opponent rolls a triple, their very next roll scores half points.'},
   {id:'fortunes_wheel',name:"FORTUNE'S WHEEL",icon:'☸️',rarity:'gold',eff:'EVERY 5TH BANK DOUBLED',desc:'Every 5th time you bank points in a match, that bank is doubled.'},
   /* ── NEW CARDS — Dice-Focused Simple Cards ── */
@@ -5654,12 +5715,11 @@ const CARDS=[
   {id:'greedy_hands',name:'GREEDY HANDS',icon:'🤑',rarity:'tin',eff:'BANKS UNDER 250 DOUBLED',desc:'Banks under 250 points are doubled.'},
   {id:'the_grudge',name:'THE GRUDGE',icon:'😤',rarity:'silver',eff:'+50 PER OPP BANK (MAX +250)',desc:'Each time the opponent banks, your next bank gains +50 (stacks up to +250).'},
   {id:'lucky_seven',name:'LUCKY SEVEN',icon:'🍀',rarity:'tin',eff:'NON-SCORING DICE = 7 → +200',desc:'If your non-scoring dice total exactly 7, gain +200 bonus points.'},
-  {id:'the_hare',name:'THE HARE',icon:'🐇',rarity:'silver',eff:'FIRST-ROLL BANK → +100',desc:'Bank on your very first roll of a turn to earn +100 bonus.'},
   {id:'cold_shoulder',name:'COLD SHOULDER',icon:'🥶',rarity:'tin',eff:'OPP ONCE-CARDS DELAYED 2 TURNS',desc:"Opponent's once-per-match cards take 2 extra turns before they can activate."},
   {id:'warm_hands',name:'WARM HANDS',icon:'🔥',rarity:'silver',eff:'DICE EFFECTS EXTEND 3 ROLLS',desc:'Dice-manipulation card effects (Gambler\'s Thumb, Hot Streak, Ghost) that normally trigger on your first roll also trigger on rolls 2 and 3.'},
   {id:'gamblers_thumb',name:"GAMBLER'S THUMB",icon:'👍',rarity:'silver',eff:'FIRST ROLL: 75% 1 BLANK → 5',desc:'On your first roll each turn, 75% chance one random non-scoring die flips to a 5.'},
   {id:'chain_lightning',name:'CHAIN LIGHTNING',icon:'⚡',rarity:'silver',eff:'+50 PER CONSECUTIVE SCORING ROLL',desc:'Each consecutive scoring roll in a turn adds a stacking +50 bonus when you bank.'},
-  {id:'hot_streak',name:'HOT STREAK',icon:'🔥',rarity:'silver',eff:'3 SAFE TURNS → NEXT DIE = 1',desc:'Bank 3 turns without busting and your next roll has 1 die guaranteed as a 1.'},
+  {id:'hot_streak',name:'HOT STREAK',icon:'🔥',rarity:'silver',eff:'3 SAFE TURNS → NEXT DIE = 1',desc:'Bank three turns without busting and your next roll has one die guaranteed as a 1.'},
   {id:'underdog',name:'THE UNDERDOG',icon:'🐕',rarity:'silver',eff:'BEHIND 1000+ → BANKS +200',desc:'While behind by 1000+ points, all your banks gain +200.'},
   {id:'twin_dice',name:'TWIN DICE',icon:'🎯',rarity:'silver',eff:'PAIR OF 1s = 300',desc:'A pair of 1s scores 300 points instead of the usual 200.'},
   {id:'sawdust',name:'SAWDUST IN THE CUP',icon:'🪵',rarity:'silver',eff:'OPP FIRST ROLL: 2 DICE DAMPENED',desc:"On the opponent's first roll each turn, 2 dice can't land on 1 or 5."},
@@ -5668,11 +5728,10 @@ const CARDS=[
   {id:'tavern_cheer',name:'TAVERN CHEER',icon:'🍻',rarity:'gold',eff:'FULL STRAIGHT +750 BONUS',desc:'Rolling a full straight (1-2-3-4-5-6) scores an extra +750 bonus.'},
   {id:'last_call',name:'LAST CALL',icon:'🔔',rarity:'gold',eff:'WINNING BANK +50%',desc:'If your bank would win the match, it gains +50% bonus.'},
   {id:'old_bones',name:'OLD BONES',icon:'💀',rarity:'gold',type:'active',maxUses:1,timing:'choosing',eff:'ALL BLANKS → 1s',desc:'Once per match: all non-scoring dice become 1s. Use during dice selection.'},
-  {id:'phoenix_ash',name:'PHOENIX ASH',icon:'🔥',rarity:'gold',type:'active',maxUses:1,timing:'idle|choosing|yielding',eff:'BUST → BANK INSTEAD',desc:'Once per match: if you bust this turn, bank your turn points instead of losing them.'},
   /* ── BATCH 2 — Remaining Cards ── */
   /* Tin */
   {id:'drunkards_prayer',name:"DRUNKARD'S PRAYER",icon:'🍷',rarity:'tin',eff:'30% BUST → +100',desc:'When you bust, 30% chance to gain 100 points instead of losing everything.'},
-  {id:'the_jinx',name:'THE JINX',icon:'🧿',rarity:'tin',eff:'OPP 5 DICE EVERY 2ND TURN',desc:'Every other opponent turn, they start with only 5 dice instead of 6.'},
+  {id:'the_jinx',name:'THE JINX',icon:'🧿',rarity:'tin',eff:'OPP 5 DICE EVERY 2ND TURN',desc:'Every other opponent turn, they start with only five dice instead of six.'},
   {id:'thick_skin',name:'THICK SKIN',icon:'🛡️',rarity:'tin',eff:'1ST BUST: KEEP HALF',desc:'Your first bust each match: bank half your accumulated turn points instead of losing them.'},
   {id:'blood_tithe',name:'BLOOD TITHE',icon:'🩸',rarity:'tin',eff:'-50/TURN, 1s = 150',desc:'Each turn costs 50 pts from your total, but single 1s score 150 instead of 100.'},
   /* Silver */
@@ -5681,13 +5740,13 @@ const CARDS=[
   {id:'double_down',name:'DOUBLE DOWN',icon:'✌️',rarity:'silver',type:'active',maxUses:1,timing:'choosing',eff:'2× PTS, REROLL ALL 6',desc:'Double your current turn points, but all kept dice are released and you must roll all 6. One use per match.'},
   {id:'slippery_table',name:'SLIPPERY TABLE',icon:'💦',rarity:'silver',eff:'15% OPP DIE SLIPS BACK',desc:'15% chance each opponent turn: one of their kept scoring dice slips back and must be rerolled.'},
   {id:'high_roller',name:'HIGH ROLLER',icon:'🎰',rarity:'silver',eff:'BANK 800+ → +200',desc:'When you bank 800 or more points in a single turn, gain a +200 bonus.'},
-  {id:'the_fence',name:'THE FENCE',icon:'🏚️',rarity:'silver',eff:'DISRUPTION CARDS +25%',desc:'Boosts your disruption cards (Sawdust, Short Pour, Jinx, Slippery Table) by 25% — they hit the opponent harder.'},
+  {id:'the_fence',name:'THE FENCE',icon:'🏚️',rarity:'silver',eff:'DISRUPTION CARDS +25%',desc:'Boosts your disruption cards (Sawdust, Short Pour, Slippery Table) by 25% — they hit the opponent harder.'},
   {id:'the_alchemist',name:'THE ALCHEMIST',icon:'⚗️',rarity:'silver',eff:'3+ TIN → TIN EFFECTS ×2',desc:'If you have 3 or more tin-rarity cards equipped, all tin card effects are doubled.'},
   {id:'twin_flames',name:'TWIN FLAMES',icon:'🔥',rarity:'silver',eff:'2 DIFF TRIPLES → +750',desc:'If you score 2 different triples in a single turn, gain +750 bonus when you bank.'},
   /* Gold */
   {id:'broken_lantern',name:'BROKEN LANTERN',icon:'🏮',rarity:'gold',type:'active',maxUses:1,timing:'yielding',eff:'OPP PLAYS BLIND 1 TURN',desc:'Opponent\'s next turn: their dice faces are hidden until committed. One use per match.'},
   {id:'wild_die',name:'THE WILD DIE',icon:'🃏',rarity:'gold',type:'active',maxUses:1,timing:'choosing',eff:'PICK ANY DIE FACE',desc:'Choose any face value (1-6) for one non-scoring die. One use per match.'},
-  {id:'second_wind',name:'SECOND WIND',icon:'💨',rarity:'gold',type:'active',maxUses:1,timing:'idle|choosing|yielding',eff:'BUST → 3-DICE MINI TURN',desc:'If you bust this turn, immediately roll 3 dice for a rescue attempt. Score = banked. One use per match.'},
+  {id:'second_wind',name:'SECOND WIND',icon:'💨',rarity:'gold',type:'active',maxUses:1,timing:'idle|choosing|yielding',eff:'BUST → 3-DICE MINI TURN',desc:'If you bust this turn, immediately roll three dice for a rescue attempt. Score = banked. One use per match.'},
   {id:'the_brewer',name:'THE BREWER',icon:'🍺',rarity:'gold',eff:'ACTIVE CARDS +1 USE',desc:'All your active cards get one extra use this match.'},
   {id:'dead_mans_hand',name:"DEAD MAN'S HAND",icon:'🃏',rarity:'gold',eff:'ONCE-PER-MATCH → TWICE',desc:'Your once-per-match card effects can trigger twice instead of once.'},
   {id:'the_pyre',name:'THE PYRE',icon:'🔥',rarity:'gold',type:'active',maxUses:1,timing:'choosing',eff:'BURN CARD → +500 BANK',desc:'Permanently disable one of your equipped cards this match to add +500 to your current bank. One use.'},
@@ -5701,13 +5760,13 @@ const CARD_BG={
   blood_debt:'#6B1010',leaky_cup:'#4A7A7A',crows_luck:'#2C2C3E',taxing_breath:'#5080A0',
   thieves_luck:'#7A2050',plague_wind:'#2E5030',kings_ransom:'#B8860B',sooty_table:'#2A2A30',
   thrifty_gambler:'#3A7A30',iron_crown:'#5A3A7A',jesters_mask:'#9040A0',serpents_whisper:'#307050',
-  cowards_bell:'#7A6A80',tyrants_gaze:'#800020',grogs_flask:'#A06030',mabels_stitch:'#8B6080',
+  cowards_bell:'#7A6A80',grogs_flask:'#A06030',mabels_stitch:'#8B6080',
   finnicks_palm:'#808040',corvus_ledger:'#604020',brutus_fist:'#605040',aldrics_vow:'#506080',
   whispers_hex:'#6030A0',ambrose_grace:'#C0A050',iron_grip:'#606A70',sleight_of_hand:'#705050',gamblers_eye:'#4A6A80',keen_eyes:'#5A7A60',
   beggars_bowl:'#8A7560',loose_thread:'#9A6040',the_whetstone:'#6A7080',snake_oil:'#405A30',fortunes_wheel:'#7A5A20',
-  loaded_die:'#6A4A70',gamblers_ghost:'#5A5A70',greedy_hands:'#8A7A30',the_grudge:'#7A3030',lucky_seven:'#3A7A50',the_hare:'#7A6A40',cold_shoulder:'#4A6A8A',
+  loaded_die:'#6A4A70',gamblers_ghost:'#5A5A70',greedy_hands:'#8A7A30',the_grudge:'#7A3030',lucky_seven:'#3A7A50',cold_shoulder:'#4A6A8A',
   warm_hands:'#8A4A30',gamblers_thumb:'#6A6A40',chain_lightning:'#4A5A8A',hot_streak:'#8A3A20',underdog:'#5A6A50',twin_dice:'#6A5A80',sawdust:'#7A6A50',short_pour:'#6A5A40',
-  the_collector:'#6A4A60',tavern_cheer:'#7A5A30',last_call:'#5A4A60',old_bones:'#4A4A50',phoenix_ash:'#8A4A40',
+  the_collector:'#6A4A60',tavern_cheer:'#7A5A30',last_call:'#5A4A60',old_bones:'#4A4A50',
   drunkards_prayer:'#7A4A50',the_jinx:'#4A5A6A',thick_skin:'#6A6A5A',blood_tithe:'#8A2A30',
   the_echo:'#5A6A7A',frozen_die:'#3A6A8A',double_down:'#7A5A30',slippery_table:'#4A7A6A',high_roller:'#8A6A20',the_fence:'#5A4A3A',the_alchemist:'#6A5A2A',twin_flames:'#8A4A20',
   broken_lantern:'#3A3A3A',wild_die:'#6A3A7A',second_wind:'#4A6A5A',the_brewer:'#7A5A20',dead_mans_hand:'#4A4A5A',the_pyre:'#9A3A20',all_in:'#5A3A6A',
@@ -5755,17 +5814,18 @@ const NPC_CARDS=[
 
   /* ── FINNICK ── */
   {id:'quick_hands',name:'QUICK HANDS',icon:'🤏',rarity:'npc',npcOnly:true,owner:'finnick',
+   type:'active',maxUses:1,timing:'yielding',
    eff:'YOUR HIGHEST DIE → 3',desc:'Once per match, Finnick swaps your highest-value die down to a 3.',
-   playerDesc:"Once per match, swap the opponent's highest-value die down to a 3.",
+   playerDesc:"Activate while yielding: on the opponent's next scoring roll, swap their highest-value die down to a 3.",
    effect:{type:'once',mechanic:'swap_best_to_3'}},
   {id:'pocket_sand',name:'POCKET SAND',icon:'✋',rarity:'npc',npcOnly:true,owner:'finnick',
-   eff:'50% CHANCE: First roll = 5 dice',desc:'50% chance each turn that your first roll only uses 5 dice instead of 6.',
-   playerDesc:"50% chance each turn that the opponent's first roll only uses 5 dice instead of 6.",
+   eff:'50% CHANCE: First roll = 5 dice',desc:'Fifty percent chance each turn that your first roll only uses five dice instead of six.',
+   playerDesc:"Fifty percent chance each turn that the opponent's first roll only uses five dice instead of six.",
    effect:{type:'passive',mechanic:'reduce_first_roll'}},
   {id:'the_skim',name:'THE SKIM',icon:'💸',rarity:'npc',npcOnly:true,owner:'finnick',
-   eff:'Takes 15% of your banks',desc:'Every time you bank, Finnick takes 15% of your banked points for himself.',
-   playerDesc:'Every time the opponent banks, you take 15% of their banked points.',
-   effect:{type:'on_player_bank',mechanic:'steal_pct',pct:0.15}},
+   eff:'Takes 10% of your banks',desc:'Every time you bank, Finnick takes 10% of your banked points for himself.',
+   playerDesc:'Every time the opponent banks, you take 10% of their banked points.',
+   effect:{type:'on_player_bank',mechanic:'steal_pct',pct:0.10}},
   {id:'beginners_luck',name:"BEGINNER'S LUCK",icon:'🍀',rarity:'npc',npcOnly:true,owner:'finnick',
    eff:'Start +250 pts',desc:"Finnick starts the match with 250 bonus points.",
    playerDesc:'You start the match with 250 bonus points.',
@@ -5777,9 +5837,9 @@ const NPC_CARDS=[
 
   /* ── CORVUS ── */
   {id:'the_ledger_npc',name:'THE LEDGER',icon:'📒',rarity:'npc',npcOnly:true,owner:'corvus',
-   eff:'10% of your banks → Corvus',desc:'Every time you bank, Corvus takes 10% of your banked points.',
-   playerDesc:'Every time the opponent banks, you take 10% of their banked points.',
-   effect:{type:'on_player_bank',mechanic:'steal_pct',pct:0.10}},
+   eff:'12% of your banks → Corvus',desc:'Every time you bank, Corvus takes 12% of your banked points.',
+   playerDesc:'Every time the opponent banks, you take 12% of their banked points.',
+   effect:{type:'on_player_bank',mechanic:'steal_pct',pct:0.12}},
   {id:'interest_due',name:'INTEREST DUE',icon:'📊',rarity:'npc',npcOnly:true,owner:'corvus',
    eff:'Every 3rd turn, −150 from you',desc:'Every 3rd turn you take, Corvus drains 150 points from your score.',
    playerDesc:'Every 3rd turn the opponent takes, you drain 150 points from their score.',
@@ -5799,8 +5859,8 @@ const NPC_CARDS=[
 
   /* ── BRUTUS ── */
   {id:'hold_the_line',name:'HOLD THE LINE',icon:'🛡️',rarity:'npc',npcOnly:true,owner:'brutus',
-   eff:"Can't bust first 2 turns",desc:"Brutus cannot bust during his first 2 turns of the match.",
-   playerDesc:'You cannot bust during your first 2 turns of the match.',
+   eff:"Can't bust first 2 turns",desc:"Brutus cannot bust during his first two turns of the match.",
+   playerDesc:'You cannot bust during your first two turns of the match.',
    effect:{type:'passive',mechanic:'bust_immune_turns',turns:2}},
   {id:'iron_gate_npc',name:'IRON GATE',icon:'⛓️',rarity:'npc',npcOnly:true,owner:'brutus',
    eff:'Cancels your bank if under 200 (once)',desc:'Once per match, if you try to bank with fewer than 200 points, Brutus cancels your bank entirely. You gain nothing and your turn ends.',
@@ -5847,16 +5907,17 @@ const NPC_CARDS=[
    playerDesc:'You start the match with 1,200 bonus points.',
    effect:{type:'start_bonus',amount:1200}},
   {id:'crown_authority',name:'CROWN AUTHORITY',icon:'🦁',rarity:'npc',npcOnly:true,owner:'whisper',
+   type:'active',maxUses:1,timing:'yielding',
    eff:'Reroll ALL your kept dice (once)',desc:'Once per match, Whisper forces you to reroll every die you selected — scoring or not.',
-   playerDesc:'Once per match, you force the opponent to reroll every die they selected — scoring or not.',
+   playerDesc:'Activate while yielding: the opponent must reroll every die they selected on their next turn — scoring or not.',
    effect:{type:'once',mechanic:'reroll_all_kept'}},
   {id:'the_quiet_decree',name:'THE QUIET DECREE',icon:'📣',rarity:'npc',npcOnly:true,owner:'whisper',
-   eff:'15% of your banks → Whisper',desc:'Every time you bank, Whisper takes 15% of your banked points.',
-   playerDesc:'Every time the opponent banks, you take 15% of their banked points.',
-   effect:{type:'on_player_bank',mechanic:'steal_pct',pct:0.15}},
+   eff:'18% of your banks → Whisper',desc:'Every time you bank, Whisper takes 18% of your banked points.',
+   playerDesc:'Every time the opponent banks, you take 18% of their banked points.',
+   effect:{type:'on_player_bank',mechanic:'steal_pct',pct:0.18}},
   {id:'sundays_rest',name:"SUNDAY'S REST",icon:'☀️',rarity:'npc',npcOnly:true,owner:'whisper',
-   eff:"Can't bust first 3 turns",desc:"Whisper cannot bust during the first 3 turns of the match.",
-   playerDesc:'You cannot bust during the first 3 turns of the match.',
+   eff:"Can't bust first 3 turns",desc:"Whisper cannot bust during the first three turns of the match.",
+   playerDesc:'You cannot bust during the first three turns of the match.',
    effect:{type:'passive',mechanic:'bust_immune_turns',turns:3}},
   {id:'old_roads',name:'OLD ROADS',icon:'🗺️',rarity:'npc',npcOnly:true,owner:'whisper',
    eff:'Cards hidden until triggered',desc:"Whisper's cards are hidden until they activate — you won't know what's coming.",
@@ -5869,12 +5930,13 @@ const NPC_CARDS=[
    playerDesc:'You start the match with 1,500 bonus points.',
    effect:{type:'start_bonus',amount:1500}},
   {id:'the_collection_plate',name:'THE COLLECTION PLATE',icon:'🍽️',rarity:'npc',npcOnly:true,owner:'ambrose',
-   eff:'10% of your banks → Ambrose',desc:'Every time you bank, Ambrose takes 10% of your banked points.',
-   playerDesc:'Every time the opponent banks, you take 10% of their banked points.',
-   effect:{type:'on_player_bank',mechanic:'steal_pct',pct:0.10}},
+   eff:'20% of your banks → Ambrose',desc:'Every time you bank, Ambrose takes 20% of your banked points.',
+   playerDesc:'Every time the opponent banks, you take 20% of their banked points.',
+   effect:{type:'on_player_bank',mechanic:'steal_pct',pct:0.20}},
   {id:'blessed_dice',name:'BLESSED DICE',icon:'✨',rarity:'npc',npcOnly:true,owner:'ambrose',
+   type:'active',maxUses:1,timing:'yielding',
    eff:'Reroll ALL your kept dice (once)',desc:'Once per match, Ambrose forces you to reroll every die you selected — scoring or not.',
-   playerDesc:'Once per match, you force the opponent to reroll every die they selected — scoring or not.',
+   playerDesc:'Activate while yielding: the opponent must reroll every die they selected on their next turn — scoring or not.',
    effect:{type:'once',mechanic:'reroll_all_kept'}},
   {id:'the_sermon',name:'THE SERMON',icon:'📖',rarity:'npc',npcOnly:true,owner:'ambrose',
    eff:'Every 4th turn, cards blocked',desc:'Every 4th turn you take, all your equipped cards are blocked and cannot activate.',
@@ -5891,20 +5953,24 @@ const NPC_CARDS=[
 
   /* ── DICE SWAP/STEAL CARDS ── */
   {id:'sticky_fingers_die',name:'STICKY FINGERS',icon:'🤙',rarity:'npc',npcOnly:true,owner:'finnick',
+   type:'active',maxUses:1,timing:'idle',
    eff:'Swaps your best die for his worst (once)',desc:'Once per match, Finnick swaps your highest-quality die with his lowest-quality one.',
-   playerDesc:"Once per match, you swap the opponent's highest-quality die with your lowest-quality one.",
+   playerDesc:"Activate before rolling: swap the opponent's highest-quality die with your lowest-quality one for the rest of the match.",
    effect:{type:'once',mechanic:'swap_die',mode:'best_for_worst'}},
   {id:'collateral_die',name:'COLLATERAL',icon:'📦',rarity:'npc',npcOnly:true,owner:'corvus',
+   type:'active',maxUses:1,timing:'idle',
    eff:'Downgrades your best die (once)',desc:'Once per match, Corvus downgrades your highest-quality die to a weaker type.',
-   playerDesc:"Once per match, you downgrade the opponent's highest-quality die to a weaker type.",
+   playerDesc:"Activate before rolling: downgrade the opponent's highest-quality die to bone for the rest of the match.",
    effect:{type:'once',mechanic:'swap_die',mode:'downgrade_best'}},
   {id:'royal_seizure',name:'ROYAL SEIZURE',icon:'👑',rarity:'npc',npcOnly:true,owner:'whisper',
-   eff:'Takes your best die — you play with 5 (once)',desc:'Once per match, Whisper confiscates your best die — you play the rest of the match with only 5 dice.',
-   playerDesc:"Once per match, you confiscate the opponent's best die — they play the rest of the match with only 5 dice.",
+   type:'active',maxUses:1,timing:'idle',
+   eff:'Takes your best die — you play with 5 (once)',desc:'Once per match, Whisper confiscates your best die — you play the rest of the match with only five dice.',
+   playerDesc:"Activate before rolling: confiscate the opponent's best die — they play the rest of the match with only five dice.",
    effect:{type:'once',mechanic:'steal_die',mode:'take_best'}},
   {id:'blessed_confiscation',name:'BLESSED CONFISCATION',icon:'✝️',rarity:'npc',npcOnly:true,owner:'ambrose',
+   type:'active',maxUses:1,timing:'idle',
    eff:'Takes your best die and uses it (once)',desc:'Once per match, Ambrose confiscates your best die and adds it to his own dice pool.',
-   playerDesc:"Once per match, you confiscate the opponent's best die and add it to your own dice pool.",
+   playerDesc:"Activate before rolling: confiscate the opponent's best die and add it to your own dice pool.",
    effect:{type:'once',mechanic:'steal_die',mode:'take_and_use'}}
 ];
 /* Fast card lookup maps */
@@ -5949,14 +6015,10 @@ const DICE_TYPES=[
    effect:{type:'scoring_boost',mechanic:'single1_bonus',amount:50},
    desc:'1s score 150. 2x 1-face, 2x 5-face, no 4 or 6.'},
 ];
-/* Convert spelled-out small numbers to digits for consistent tooltip display */
-function _numWords(s){
-  return String(s)
-    .replace(/\bzero\b/gi,'0').replace(/\bone\b/gi,'1').replace(/\btwo\b/gi,'2')
-    .replace(/\bthree\b/gi,'3').replace(/\bfour\b/gi,'4').replace(/\bfive\b/gi,'5')
-    .replace(/\bsix\b/gi,'6').replace(/\bseven\b/gi,'7').replace(/\beight\b/gi,'8')
-    .replace(/\bnine\b/gi,'9').replace(/\bten\b/gi,'10');
-}
+/* Tooltip number style: numerals are reserved for die faces (1–6) and point values.
+   Counts like "one use", "two dice", "three turns" should stay as words.
+   Pass-through helper kept for backward compatibility. */
+function _numWords(s){return String(s);}
 /* Wrap numbers with tip-num span, and gameplay keywords with tip-kw span */
 var _MECHANIC_KEYWORDS=/\b(bust|busts|bank|banks|banking|banked|roll|rolls|rolling|reroll|rerolls|score|scores|scoring|scored|steal|steals|stealing|stolen|swap|swaps|swapping|block|blocks|blocking|blocked|reduce|reduces|halved|halves|double|doubles|bonus|shield|shielded|protect|protects|immune|cancel|cancels|downgrade|downgrading|downgraded|upgrade|upgrading|equip|wager|wagered|lose|lost|win|wins|winning|free|extra|commit|committed|hot dice|straight)\b/gi;
 function _wnHtml(s){
@@ -6030,8 +6092,15 @@ function scoreRoll(vals,cards,locked,context,dieMats){
 
   /* ── Straights first (highest priority — worth more than scavenger) ── */
   let straightFound=false;
+  /* Crow's Luck: each stored use downgrades the opponent's straight by one tier */
+  var _crowsCanFire=context.crowsLuck&&(context.crowsLuckRemaining===undefined?!context.crowsLuckUsed:context.crowsLuckRemaining>0);
+  function _consumeCrows(){
+    if(context.crowsLuckRemaining===undefined)context.crowsLuckUsed=true;
+    else context.crowsLuckRemaining=Math.max(0,context.crowsLuckRemaining-1);
+    context.crowsLuckFiredThisRoll=true;
+  }
   if(n>=6&&hasSet([1,2,3,4,5,6])){
-    if(context.crowsLuck&&!context.crowsLuckUsed){context.crowsLuckUsed=true;pts+=SCORING_BASE.straight5high;markSet([2,3,4,5,6]);}
+    if(_crowsCanFire){_consumeCrows();pts+=SCORING_BASE.straight5high;markSet([2,3,4,5,6]);}
     else{
       var _straightBase=SCORING_BASE.straight6;
       /* Tavern Cheer: full straight +750 bonus */
@@ -6040,8 +6109,15 @@ function scoreRoll(vals,cards,locked,context,dieMats){
     }
     straightFound=true;
   }
-  if(!straightFound&&hasSet([2,3,4,5,6])){pts+=SCORING_BASE.straight5high;markSet([2,3,4,5,6]);straightFound=true;}
-  if(!straightFound&&hasSet([1,2,3,4,5])){pts+=SCORING_BASE.straight5low;markSet([1,2,3,4,5]);straightFound=true;}
+  if(!straightFound&&hasSet([2,3,4,5,6])){
+    if(_crowsCanFire){_consumeCrows();pts+=SCORING_BASE.straight5low;markSet([2,3,4,5,6]);/* high→low value, still consumes the 5 dice */}
+    else{pts+=SCORING_BASE.straight5high;markSet([2,3,4,5,6]);}
+    straightFound=true;
+  }
+  if(!straightFound&&hasSet([1,2,3,4,5])){
+    if(_crowsCanFire){_consumeCrows();/* low straight fully negated — dice not consumed so they bust or score singles */}
+    else{pts+=SCORING_BASE.straight5low;markSet([1,2,3,4,5]);straightFound=true;}
+  }
   /* ── Scavenger (only if no straight consumed the 1+5) ── */
   let scavengerFired=false;
   if(!straightFound&&scavenger&&!context._scavengerBlocked){
@@ -6125,6 +6201,14 @@ function rollFace(mat){
   const faces=dt.faces||[1,2,3,4,5,6];
   return faces[Math.floor(Math.random()*faces.length)];
 }
+function rollFaceExclude(mat,exclude){
+  /* Reroll that's guaranteed to differ from `exclude` — used by active cards
+     (Grog's Flask, Gambler's Eye) so a reroll always looks like a reroll. */
+  const dt=getDie(mat);
+  const faces=(dt.faces||[1,2,3,4,5,6]).filter(f=>f!==exclude);
+  if(!faces.length)return rollFace(mat);/* fallback if die has only one face */
+  return faces[Math.floor(Math.random()*faces.length)];
+}
 function rollFaceSpur(mat){
   /* Spur: bias toward 1s and 5s by adding extra copies to the pool */
   const dt=getDie(mat);
@@ -6142,7 +6226,10 @@ function rollFaceSpur(mat){
 function mkDie(val,mat,sizeClass){
   const div=document.createElement('div');
   div.className='die dtype-'+(mat||'bone')+(sizeClass?' '+sizeClass:'');
-  const dotCells=FACE_DOTS[val]||FACE_DOTS[1];
+  /* Jade 6 is a wildcard — render as a blank face so it visually reads as "any value" */
+  const isWildJade=(mat==='jade'&&val===6);
+  if(isWildJade)div.classList.add('die-wild');
+  const dotCells=isWildJade?[]:(FACE_DOTS[val]||FACE_DOTS[1]);
   for(let i=0;i<49;i++){
     const cell=document.createElement('div');
     cell.className=dotCells.includes(i)?'dc dot':'dc';
@@ -6456,7 +6543,10 @@ function buildCBar(barId,cardIds,isOpp,label){
   const spread=Math.min(56,220/n);
   const totalW=spread*(n-1);
   cardIds.forEach((id,i)=>{const c=CARDS.find(x=>x.id===id)||getNpcCard(id);if(!c)return;
-    const isActive=c.type==='active';
+    /* Only mark as 'active' (gold glow + drag handle) on the player side — the NPC
+       can't manually activate, so on the opp bar the card should render as a normal
+       static card (matters for mirror_match where player's actives swap to NPC). */
+    const isActive=c.type==='active'&&!isOpp;
     const _mRar=c.npc?'boss-'+c.npc:(c.npcOnly&&c.owner?'boss-'+c.owner:(c.npcOnly?'npc':c.rarity));
     const w=document.createElement('div');w.className='mcard rarity-'+_mRar+(isActive?' mcard-active':'');w.dataset.cid=id;
     const _tarnish=!isOpp&&typeof S!=='undefined'&&S.run?(function(){
@@ -6618,7 +6708,7 @@ function initCardDrag(mcardEl,cardId){
       placeCardInZone(mcardEl,savedState);
       activateCard(cardId);
       var tipUses=mcardEl.querySelector('.tip-uses');
-      if(tipUses){var cd=CARDS.find(function(c){return c.id===cardId;});var usesLeft=G.activeCardState.usedCards[cardId]||0;tipUses.textContent=usesLeft+'/'+(cd.maxUses||1)+' USES';}
+      if(tipUses){var cd=CARDS.find(function(c){return c.id===cardId;})||NPC_CARDS_MAP[cardId];var usesLeft=G.activeCardState.usedCards[cardId]||0;tipUses.textContent=usesLeft+'/'+(cd.maxUses||1)+' USES';}
       hideActivateZone();window._dragEndedAt=Date.now();_dragState=null;
     }else{
       /* Momentum: if velocity is high enough and moving upward, coast the card */
@@ -6639,7 +6729,7 @@ function initCardDrag(mcardEl,cardId){
             placeCardInZone(mcardEl,savedState);
             activateCard(cardId);
             var tipUses2=mcardEl.querySelector('.tip-uses');
-            if(tipUses2){var cd2=CARDS.find(function(c){return c.id===cardId;});var usesLeft2=G.activeCardState.usedCards[cardId]||0;tipUses2.textContent=usesLeft2+'/'+(cd2.maxUses||1)+' USES';}
+            if(tipUses2){var cd2=CARDS.find(function(c){return c.id===cardId;})||NPC_CARDS_MAP[cardId];var usesLeft2=G.activeCardState.usedCards[cardId]||0;tipUses2.textContent=usesLeft2+'/'+(cd2.maxUses||1)+' USES';}
             hideActivateZone();return;
           }
           if(Math.abs(vx)+Math.abs(vy)>30){
@@ -6820,8 +6910,8 @@ function newG(rung,pCards,oCards,pStake,oStake){
     _ghostDieNext:false,_chainCount:0,_hotStreakReady:false,_grudgeStack:0,_warmHandsActive:false,_scoringTypes:{},
     _echoArmed:false,_echoReady:false,_frozenDie:null,_lanternActive:false,_thickSkinUsed:false,_alchemistActive:false,_fenceActive:false,
     _brewerBoosts:null,_deadManBoosts:null,
-    activeCardState:{usedCards:{},stitchActive:false,vowActive:false,hexActive:false,phoenixActive:false,secondWindActive:false,allInActive:false,pyreBonus:0},
-    crowsLuckCtx:{crowsLuck:oCards.includes('crows_luck'),crowsLuckUsed:false},
+    activeCardState:{usedCards:{},stitchActive:false,vowActive:false,hexActive:false,secondWindActive:false,allInActive:false,pyreBonus:0},
+    crowsLuckCtx:{crowsLuck:oCards.includes('crows_luck'),crowsLuckRemaining:oCards.includes('crows_luck')?2:0,crowsLuckFiredThisRoll:false},
     /* Boss attack state */
     bossState:{
       stickyFingersUsed:false,    /* FINNICK: once per match steal */
@@ -6840,7 +6930,8 @@ function newG(rung,pCards,oCards,pStake,oStake){
       firstBankDone:false,        /* for fine_print, measure_twice */
       challengeActive:false,      /* for steady_hands / the_verdict_npc */
       challengeThreshold:0,
-      challengePenalty:0
+      challengePenalty:0,
+      npcActiveUses:{}            /* remaining uses for NPC-side active cards (mirror match) */
     }};
 }
 
@@ -7313,11 +7404,13 @@ function toggleDie(d){
 
 function startPTurn(){
   G.phase='idle';G.turnPts=0;G.kept=[];G.numDice=G.matchDice?G.matchDice.length:6;G.pool=[];G.turnRollCount=0;G._slowHandUsedThisTurn=false;G._warmHandsActive=false;G._lastHotDice=false;
+  /* NPC-armed Whisper's Hex: reduce player's dice count this turn */
+  if(G._npcHexArmed){G._npcHexArmed=false;G.numDice=Math.max(3,G.numDice-1);triggerCard('whispers_hex',G.rung.name+" HEX — YOU HAVE "+G.numDice+" DICE",false);}
   /* Sudden Death: update display round at start of player turn (after NPC finishes) */
   if(G._handicap==='sudden_death')G._sdDisplayRound=G.turnNum;
   G._echoArmed=false;G._echoReady=false;
   var _ecRst=document.querySelector('.mcard[data-cid="the_echo"]');if(_ecRst)_ecRst.classList.remove('echo-armed');
-  if(G.activeCardState){G.activeCardState.stitchActive=false;G.activeCardState.vowActive=false;G._vowDoubleActive=false;G.activeCardState.ledgerActive=false;G.activeCardState.phoenixActive=false;G.activeCardState.secondWindActive=false;G.activeCardState.allInActive=false;G.activeCardState.pyreBonus=0;clearCardLabel('mabels_stitch');clearCardLabel('aldrics_vow');clearCardLabel('corvus_ledger');clearCardLabel('phoenix_ash');clearCardLabel('second_wind');clearCardLabel('all_in');}
+  if(G.activeCardState){G.activeCardState.stitchActive=false;G.activeCardState.vowActive=false;G._vowDoubleActive=false;G.activeCardState.ledgerActive=false;G.activeCardState.secondWindActive=false;G.activeCardState.allInActive=false;G.activeCardState.pyreBonus=0;clearCardLabel('mabels_stitch');clearCardLabel('aldrics_vow');clearCardLabel('corvus_ledger');clearCardLabel('second_wind');clearCardLabel('all_in');}
   /* Frozen Die: restore locked die into the pool on turn start */
   if(G._frozenDie){
     /* Reduce numDice by 1 since one is pre-placed */
@@ -7418,7 +7511,7 @@ function handleRoll(){
     var toReroll=geFree.filter(function(d){return !d.committed;});
     G.numDice=toReroll.length;
     toReroll.forEach(function(d){
-      d.val=rollFace(d.mat);d.sel=false;
+      d.val=rollFaceExclude(d.mat,d.val);d.sel=false;
       if(d.el){d.el.classList.add('card-reroll');reDrawDieFace(d);
         setTimeout(function(){d.el.classList.remove('card-reroll');d.el.classList.add('card-reroll-settle');settleDie(d.el);
           setTimeout(function(){d.el.classList.remove('card-reroll-settle');},400);},400);}
@@ -7528,8 +7621,8 @@ function handleRoll(){
 }
 
 function afterRoll(){
-  G.turnRollCount++;const free=G.pool.filter(d=>!d.committed);const freeV=free.map(d=>d.val);const freeMats=free.map(d=>d.mat);const cards=effectiveCards();
-  if(!G.flintlockFired&&G.pCards.includes('flintlock')&&freeV.includes(1)){G.flintlockFired=true;G.pPts+=100;triggerCard('flintlock','+100 FLINTLOCK',true);updHUD();}
+  G.turnRollCount++;const free=G.pool.filter(d=>!d.committed);let freeV=free.map(d=>d.val);const freeMats=free.map(d=>d.mat);const cards=effectiveCards();
+  if(!G.flintlockFired&&G.pCards.includes('flintlock')&&freeV.includes(1)){G.flintlockFired=true;G.pPts+=200;triggerCard('flintlock','+200 FLINTLOCK',true);updHUD();}
   /* Warm Hands: extend dice-manipulation effects to rolls 2 & 3 */
   var _warmRollLimit=G.pCards.includes('warm_hands')?3:1;
   /* Loaded Die: 50% chance force one random die to face 1 (first roll only) */
@@ -7605,6 +7698,9 @@ function afterRoll(){
       setStatusMsg('VOW FAILED — LOST '+lost+' TURN PTS','red');triggerCard('aldrics_vow','VOW FAILED',true);
     }
   }
+  /* Re-read freeV — Loaded Die / Gambler's Ghost / Gambler's Thumb / Hot Streak above
+     mutate d.val in place, so the snapshot taken at function entry would be stale. */
+  freeV=free.map(d=>d.val);
   if(!anyScoring(freeV,cards,freeMats)){
     if(!G.martyrUsed&&G.pCards.includes('martyr')){G.martyrUsed=true;
       free.forEach(d=>{if(d.el){d.el.classList.add('bust');setTimeout(()=>d.el.remove(),380);}});
@@ -7807,6 +7903,8 @@ function refreshSelUI(){
 }
 
 function doBust(){
+  /* Rusty Spur: bias was earned by banking — a bust resets it so the bias doesn't carry past failure */
+  if(G.spurActive){G.spurActive=false;}
   /* Silver die shield: cancel bust once per shield die in loadout */
   if(G.dieShieldsPlayer>0){
     G.dieShieldsPlayer--;
@@ -7864,18 +7962,6 @@ function doBust(){
     G.pool.forEach(d=>{if(d.el)d.el.classList.add('bust');});
     spawnPop('+'+_dpBonus+' PRAYER');triggerCard('drunkards_prayer','+'+_dpBonus,true);
     setStatusMsg("DRUNKARD'S PRAYER! +"+_dpBonus,'gold');
-    G.safeTurnStreak=0;G.turnPts=0;G.kept=[];updHUD();refreshKeptTray();setBtns(false,false);
-    setTimeout(()=>{clearRow('playerDiceRow');G.pool=[];endPTurn();},1200);
-    return;
-  }
-  /* Phoenix Ash: bust → bank turn pts instead (one-shot active card) */
-  if(G.activeCardState&&G.activeCardState.phoenixActive){
-    G.activeCardState.phoenixActive=false;clearCardLabel('phoenix_ash');
-    const _paSaved=G.kept.reduce((a,k)=>a+k.pts,0);
-    G.pool.forEach(d=>{if(d.el)d.el.classList.add('bust');});
-    if(_paSaved>0){G.pPts+=_paSaved;spawnPop('+'+_paSaved+' PHOENIX');}
-    triggerCard('phoenix_ash','PHOENIX SAVED +'+_paSaved,true);
-    setStatusMsg('BUST — PHOENIX ASH SAVED '+_paSaved+'!','gold');
     G.safeTurnStreak=0;G.turnPts=0;G.kept=[];updHUD();refreshKeptTray();setBtns(false,false);
     setTimeout(()=>{clearRow('playerDiceRow');G.pool=[];endPTurn();},1200);
     return;
@@ -7992,19 +8078,17 @@ function handleBank(){
   if(G.pCards.includes('rusty_spur')){G.spurActive=true;triggerCard('rusty_spur','SPUR ACTIVE',true);}
   if(G.pCards.includes('fools_gold')&&total>0&&total%500===0){total+=300;bonusMsg+=" +300 FOOL'S GOLD";triggerCard('fools_gold','+300',true);}
   /* The Whetstone: first 3 rolls each turn score +50 extra */
-  if(G.pCards.includes('the_whetstone')){var _wsRolls=Math.min(G.turnRollCount||1,3);var _wsBonus=_wsRolls*50;total+=_wsBonus;bonusMsg+=' +'+_wsBonus+' WHETSTONE';triggerCard('the_whetstone','+'+_wsBonus,true);}
+  if(G.pCards.includes('the_whetstone')){var _wsRolls=Math.min(G.turnRollCount||1,3);var _wsBonus=_wsRolls*75;total+=_wsBonus;bonusMsg+=' +'+_wsBonus+' WHETSTONE';triggerCard('the_whetstone','+'+_wsBonus,true);}
   /* Fortune's Wheel: every 5th bank is doubled */
   if(G.pCards.includes('fortunes_wheel')){G._bankCount=(G._bankCount||0)+1;if(G._bankCount%5===0){total*=2;bonusMsg+=' x2 FORTUNE';triggerCard('fortunes_wheel','x2 BANK!',true);}}
-  /* Corvus's Ledger: +50% on next bank after activation */
+  /* Corvus's Ledger: +75% on next bank after activation */
   if(G.activeCardState&&G.activeCardState.ledgerActive){
-    var ledgerBonus=Math.floor(total*0.5);total+=ledgerBonus;
+    var ledgerBonus=Math.floor(total*0.75);total+=ledgerBonus;
     bonusMsg+=' +'+ledgerBonus+' LEDGER';triggerCard('corvus_ledger','+'+ledgerBonus,true);
     G.activeCardState.ledgerActive=false;clearCardLabel('corvus_ledger');
   }
   /* Greedy Hands: banks under 250 are doubled */
   if(G.pCards.includes('greedy_hands')&&total<250){total*=2;bonusMsg+=' x2 GREEDY';triggerCard('greedy_hands','x2 BANK!',true);}
-  /* The Hare: bank on first roll → +100 */
-  if(G.pCards.includes('the_hare')&&_effectiveRollCount===1){total+=100;bonusMsg+=' +100 HARE';triggerCard('the_hare','+100',true);}
   /* Underdog: behind by 1000+ → +200 */
   if(G.pCards.includes('underdog')&&(G.oPts-G.pPts)>=1000){total+=200;bonusMsg+=' +200 UNDERDOG';triggerCard('underdog','+200',true);}
   /* Chain Lightning: add stacking bonus from consecutive scoring rolls */
@@ -8171,9 +8255,20 @@ function handleBank(){
     });
   }
 
+  /* NPC-owned Coward's Bell: the player loses 10% of each bank (symmetric to
+     the player-owned version that raises NPC diceStop). Mirror-match relies on
+     this to make the effect bidirectional. */
+  if(G.oCards.includes('cowards_bell')){
+    var _cbCut=Math.ceil(total*0.10);
+    if(_cbCut>0){total-=_cbCut;bonusMsg+=' -'+_cbCut+" COWARD'S BELL";triggerCard('cowards_bell','-'+_cbCut,false);}
+  }
   const msg='BANKED '+total.toLocaleString()+(bonusMsg||'');setStatusMsg(msg,'gold');
   G._lastBankForDlg=total;
   _bankCelebrate(total);
+  /* Record for tap-score summary — snapshot dice before G.kept is cleared */
+  if(!G.pBankHistory)G.pBankHistory=[];
+  G.pBankHistory.push({pts:total,turn:G.turnNum,bonus:(bonusMsg||'').trim(),
+    dice:G.kept.map(function(k){return {vals:[].concat(k.vals),mat:k.mat,pts:k.pts};})});
   G.pPts+=total;G._lastBankAmount=total;spawnBankPop(total);G.turnPts=0;G.kept=[];G.numDice=6;
   updHUD();refreshKeptTray();clearRow('playerDiceRow');G.pool=[];setBtns(false,false);
   if(G.pPts>=G.target){setTimeout(()=>endMatch(true),700);return;}
@@ -8311,7 +8406,7 @@ function runOppTurn(){
   if(G.rung._jinx&&G.oppTurnCount%2===0){left=5;triggerCard('the_jinx','JINX — 5 DICE',true);}
   /* Whisper's Hex: reduce starting dice by 1 (stacks with jinx) */
   if(G.activeCardState&&G.activeCardState.hexActive){G.activeCardState.hexActive=false;clearCardLabel('whispers_hex');left=Math.max(left-1,3);triggerCard('whispers_hex','HEX — '+left+' DICE',true);}
-  let crowsCtx={crowsLuck:G.pCards.includes('crows_luck'),crowsLuckUsed:false};
+  let crowsCtx={crowsLuck:G.pCards.includes('crows_luck'),crowsLuckRemaining:G.pCards.includes('crows_luck')?2:0,crowsLuckFiredThisRoll:false};
   G.oppTurnCount=(G.oppTurnCount||0)+1;
   /* Synergy: The Sting — opponent loses 100 every 4th turn */
   if(G.activeSynergies&&G.activeSynergies.includes('dirty_pair')&&G.oppTurnCount%4===0){G.oPts=Math.max(0,G.oPts-100);spawnPop('-100 \uD83D\uDC1D');}
@@ -8342,16 +8437,68 @@ function runOppTurn(){
       G.oppDice.forEach(d=>{if(d.el){settleDie(d.el);if(G._lanternActive)d.el.classList.add('die-blind');}});
       const fV=G.oppDice.filter(d=>!d.kept).map(d=>d.val);
       const fMats=G.oppDice.filter(d=>!d.kept).map(d=>d.mat);
-      const _prevCrowsUsed=crowsCtx.crowsLuckUsed;
+      crowsCtx.crowsLuckFiredThisRoll=false;
       var{total,used,context:newCtx}=scoreRoll(fV,G.oCards,oppBank,crowsCtx,fMats);crowsCtx=newCtx||crowsCtx;
-      if(!_prevCrowsUsed&&crowsCtx.crowsLuckUsed)triggerCard('crows_luck',"CROW'S LUCK — STRAIGHT BLOCKED",true);
+      if(crowsCtx.crowsLuckFiredThisRoll)triggerCard('crows_luck',"CROW'S LUCK — STRAIGHT DOWNGRADED",true);
       /* Snake Oil: zero out this roll's score */
       if(G._snakeOilActive){G._snakeOilActive=false;total=Math.floor(total/2);setStatusMsg('SNAKE OIL — SCORE HALVED!','gold');}
+      /* ── NPC bust-prevention via active cards (mirror-match loadouts) ──
+         If the roll would score 0, try converting blanks to scorers before resolving the bust. */
+      if(total===0){
+        var _npcFree=G.oppDice.filter(function(d){return !d.kept;});
+        var _npcBlanks=_npcFree.filter(function(d){return d.val!==1&&d.val!==5;});
+        if(_npcBlanks.length>0){
+          var _rescued=false;var _rescueCid=null;var _rescueLabel='';
+          /* old_bones: all blanks → 1s (biggest swing) */
+          if(!_rescued&&npcHasActive('old_bones')){
+            _npcBlanks.forEach(function(d){d.val=1;reDrawDieFace(d);if(d.el)spawnPixelSparks(d.el,3);});
+            _rescueCid='old_bones';_rescueLabel='OLD BONES — BLANKS → 1s';_rescued=true;
+          }
+          /* ambrose_grace: up to 2 blanks → 5s */
+          else if(!_rescued&&npcHasActive('ambrose_grace')){
+            _npcBlanks.slice(0,2).forEach(function(d){d.val=5;reDrawDieFace(d);if(d.el)spawnPixelSparks(d.el,3);});
+            _rescueCid='ambrose_grace';_rescueLabel='AMBROSE GRACE — BLANKS → 5s';_rescued=true;
+          }
+          /* wild_die: pick best face (1) for one blank */
+          else if(!_rescued&&npcHasActive('wild_die')){
+            _npcBlanks[0].val=1;reDrawDieFace(_npcBlanks[0]);if(_npcBlanks[0].el)spawnPixelSparks(_npcBlanks[0].el,3);
+            _rescueCid='wild_die';_rescueLabel='WILD DIE → 1';_rescued=true;
+          }
+          /* brutus_fist: force one blank to 1 */
+          else if(!_rescued&&npcHasActive('brutus_fist')){
+            _npcBlanks[0].val=1;reDrawDieFace(_npcBlanks[0]);if(_npcBlanks[0].el)spawnPixelSparks(_npcBlanks[0].el,3);
+            _rescueCid='brutus_fist';_rescueLabel="BRUTUS'S FIST → 1";_rescued=true;
+          }
+          /* finnicks_palm: flip one blank to 1 or 5 */
+          else if(!_rescued&&npcHasActive('finnicks_palm')){
+            _npcBlanks[0].val=Math.random()<0.5?1:5;reDrawDieFace(_npcBlanks[0]);if(_npcBlanks[0].el)spawnPixelSparks(_npcBlanks[0].el,3);
+            _rescueCid='finnicks_palm';_rescueLabel="FINNICK'S PALM → 1/5";_rescued=true;
+          }
+          /* grogs_flask: reroll up to 2 blanks */
+          else if(!_rescued&&npcHasActive('grogs_flask')&&_npcBlanks.length>=2){
+            _npcBlanks.slice(0,2).forEach(function(d){d.val=rollFaceExclude(d.mat,d.val);reDrawDieFace(d);if(d.el)spawnPixelSparks(d.el,3);});
+            _rescueCid='grogs_flask';_rescueLabel="GROG'S FLASK — REROLLED";_rescued=true;
+          }
+          if(_rescued){
+            npcUseActive(_rescueCid);
+            triggerCard(_rescueCid,_rescueLabel,false);
+            setStatusMsg(G.rung.name+': '+_rescueLabel,'gold');
+            /* Rescore with mutated dice */
+            var _resFV=G.oppDice.filter(function(d){return !d.kept;}).map(function(d){return d.val;});
+            var _resFM=G.oppDice.filter(function(d){return !d.kept;}).map(function(d){return d.mat;});
+            var _resR=scoreRoll(_resFV,G.oCards,oppBank,crowsCtx,_resFM);
+            total=_resR.total;used=_resR.used;
+          }
+        }
+      }
       if(total===0){
         /* NPC silver die shield: cancel bust */
         if(G.dieShieldsOpp>0){
           G.dieShieldsOpp--;
-          setStatusMsg(G.rung.name+' SHIELD — BUST BLOCKED!','red');
+          setStatusMsg('🛡️ SILVER SHIELD — '+G.rung.name+" DIDN'T BUST",'red');
+          spawnPop('🛡️ SHIELD');
+          /* Flash the silver dice in the opp's pool so the effect is visually clear */
+          if(G.oppDice){G.oppDice.forEach(function(d){if(d.mat==='silver'&&d.el){d.el.classList.add('eff-glow-blue');setTimeout(function(){if(d.el)d.el.classList.remove('eff-glow-blue');},900);}});}
           setTimeout(function(){clearRow('oppDiceRow');G.oppDice=[];step();},900);return;
         }
         /* NPC bust immunity (hold_the_line, sundays_rest, one_more_round) */
@@ -8379,12 +8526,32 @@ function runOppTurn(){
           }
         });
         if(bustBankHalf)return;
+        /* Player active cards ending up in NPC hand (via mirror_match) — auto-trigger
+           the ones that don't need timing choices. Mabel's Stitch: banks turn pts on bust. */
+        if(!bustSaved&&G.oCards.includes('mabels_stitch')&&!G.npcCardState.usedOnce['mabels_stitch']&&oppBank>0){
+          G.npcCardState.usedOnce['mabels_stitch']=true;bustBankHalf=true;
+          setStatusMsg("MABEL'S STITCH — "+G.rung.name+' SAVES '+oppBank,'red');
+          triggerCard('mabels_stitch','STITCH +'+oppBank,false);
+          setTimeout(function(){clearRow('oppDiceRow');finOpp(oppBank);},900);
+        }
+        if(bustBankHalf)return;
         if(bustSaved){
           setStatusMsg(G.rung.name+' SURVIVES BUST!','red');
           setTimeout(function(){clearRow('oppDiceRow');G.oppDice=[];step();},900);return;
         }
+        /* NPC Second Wind: bust rescue — roll 3 dice, whatever scores is banked */
+        if(npcHasActive('second_wind')){
+          npcUseActive('second_wind');
+          triggerCard('second_wind',G.rung.name+' SECOND WIND!',false);
+          setStatusMsg(G.rung.name+' — SECOND WIND! ROLLING 3 DICE','red');
+          var _swRoll=[],_swMats=[];
+          for(var _swi=0;_swi<3;_swi++){var _swM=(G.matchOppDice&&G.matchOppDice[_swi])||'bone';_swRoll.push(rollFace(_swM));_swMats.push(_swM);}
+          var _swR=scoreRoll(_swRoll,G.oCards,0,{crowsLuck:false,crowsLuckRemaining:0},_swMats);
+          var _swPts=_swR.total||0;
+          setTimeout(function(){clearRow('oppDiceRow');finOpp(_swPts);},900);return;
+        }
         if(G.pCards.includes('thieves_luck')&&oppBank>0&&oppBank<200){G.pPts+=oppBank;triggerCard('thieves_luck','STEAL +'+oppBank,true);}
-        if(G.pCards.includes('blood_debt')){G.pPts+=250;triggerCard('blood_debt','+250 BLOOD DEBT',true);updHUD();}
+        if(G.pCards.includes('blood_debt')){G.pPts+=400;triggerCard('blood_debt','+400 BLOOD DEBT',true);updHUD();}
         /* ── Handicap: Rising Stakes — opponent streak reset on bust ── */
         if(G._handicap==='rising_stakes'){G._rsOppStreak=0;G._rsOppMultiplier=1.0;}
         if(G._handicap==='bounty_board')G._bountyOppBankStreak=0;
@@ -8396,7 +8563,36 @@ function runOppTurn(){
       }
       /* NPC reckless die penalty (Brass): busts cost NPC extra from total */
       /* (handled in NPC bust path above — no forced bust, just extra penalty on natural bust) */
+      /* Player-armed Quick Hands: swap opp's highest scoring die down to a 3 */
+      if(G._playerQuickHandsArmed){
+        G._playerQuickHandsArmed=false;
+        var _qhScoring=G.oppDice.filter(function(d){return !d.kept&&(d.val===1||d.val===5);});
+        if(_qhScoring.length>0){
+          var _qhVic=_qhScoring.sort(function(a,b){return(a.val===1?100:50)-(b.val===1?100:50);}).pop();
+          _qhVic.val=3;reDrawDieFace(_qhVic);
+          triggerCard('quick_hands','QUICK HANDS → 3',true);
+          setStatusMsg("QUICK HANDS — "+G.rung.name+"'S DIE → 3",'gold');
+          /* Recompute scoring after swap */
+          var _qhFV=G.oppDice.filter(function(d){return !d.kept;}).map(function(d){return d.val;});
+          var _qhFM=G.oppDice.filter(function(d){return !d.kept;}).map(function(d){return d.mat;});
+          var _qhR=scoreRoll(_qhFV,G.oCards,oppBank,crowsCtx,_qhFM);
+          total=_qhR.total;used=_qhR.used;
+        }
+      }
       G.oppDice.filter(d=>!d.kept).forEach((d,i)=>{if(used[i]){d.kept=true;if(d.el){d.el.style.outline='2px solid var(--green)';d.el.style.outlineOffset='2px';}}});
+      /* Player-armed Crown Authority / Blessed Dice: force NPC reroll of all kept dice */
+      if(G._playerRerollKeptArmed){
+        var _rkCardId=G._playerRerollKeptArmed;G._playerRerollKeptArmed=null;
+        var _rkAnyKept=G.oppDice.some(function(d){return d.kept;});
+        if(_rkAnyKept){
+          G.oppDice.forEach(function(d){
+            if(d.kept){d.kept=false;if(d.el){d.el.style.outline='';d.el.style.outlineOffset='';}}
+          });
+          total=0;
+          triggerCard(_rkCardId,'KEPT DICE REROLLED!',true);
+          setStatusMsg((_rkCardId==='crown_authority'?'CROWN AUTHORITY':'BLESSED DICE')+' — '+G.rung.name+"'S KEPT DICE REROLLED!",'gold');
+        }
+      }
       /* ── NPC strategic dice keeping ──
          Like a human player, the NPC sometimes keeps fewer scoring dice
          to reroll more for better combos (triples, straights).
@@ -8415,12 +8611,19 @@ function runOppTurn(){
       /* Only consider releasing if we'd gain meaningful reroll dice (want 4+ total unkept) */
       if(_optionalSingles.length>0&&_skKept.length>1){
         var _wantUnkept=4;/* ideal minimum unkept dice for good combo odds */
+        var _minUsefulReroll=4;/* fewer than 4 reroll dice rarely forms a new triple — don't discard guaranteed points */
         var _currentUnkept=_skUnkept.length;
         var _deficit=_wantUnkept-_currentUnkept;/* how many more unkept dice we want */
         if(_deficit>0){
           /* Sort: release 5s first (50 pts), then 1s (100 pts) — sacrifice cheapest first */
           _optionalSingles.sort(function(a,b){return a.val===5?-1:b.val===5?1:0;});
           var _canRelease=Math.min(_optionalSingles.length,_skKept.length-1,_deficit);
+          /* Gate: released-plus-current must reach the useful-reroll floor, otherwise there's
+             no combo to reach for and we'd just be discarding guaranteed points. */
+          if(_currentUnkept+_canRelease<_minUsefulReroll)_canRelease=0;
+          /* Gate: don't release when the keep-everything path would trigger hot dice
+             (all 6 dice scored). Hot dice is always the stronger play. */
+          if(_skKept.length===G.oppDice.length&&_skUnkept.length===0)_canRelease=0;
           /* Release chance: base 50%, scales with aggression.
              Coward's Bell (higher diceStop) makes NPC more cautious = less releasing.
              Low bank = more willing to gamble, high bank = keep what you have. */
@@ -8431,7 +8634,7 @@ function runOppTurn(){
           /* High bank discourages releasing (already have good points) */
           if(oppBank>400)_releaseBase-=0.15;
           else if(oppBank>200)_releaseBase-=0.08;
-          if(_releaseBase>0){
+          if(_releaseBase>0&&_canRelease>0){
             for(var _ri2=0;_ri2<_canRelease;_ri2++){
               if(Math.random()<_releaseBase){
                 var _rd=_optionalSingles[_ri2];
@@ -8481,6 +8684,13 @@ function runOppTurn(){
         G._silverTongueUsed=true;pts=Math.floor(pts/2);spawnPop('\uD83D\uDDE3 HALVED!');
         setStatusMsg('SILVER TONGUE — bank halved!','gold');
       }
+      /* NPC Corvus's Ledger: activate for +75% on large banks */
+      if(npcHasActive('corvus_ledger')&&pts>=400){
+        npcUseActive('corvus_ledger');
+        var _npcLedgerBonus=Math.floor(pts*0.75);pts+=_npcLedgerBonus;
+        triggerCard('corvus_ledger','+'+_npcLedgerBonus+' LEDGER',false);
+        setStatusMsg(G.rung.name+": CORVUS'S LEDGER +"+_npcLedgerBonus,'red');
+      }
       /* NPC on-bank bonuses */
       G.oCards.forEach(function(cid){
         var npc=getNpcCard(cid);if(!npc)return;var eff=npc.effect;
@@ -8500,15 +8710,66 @@ function runOppTurn(){
       if(G.rung._shortPour){var _spPct=G._fenceActive?0.125:0.10;var _spCut=Math.ceil(pts*_spPct);pts-=_spCut;triggerCard('short_pour','-'+_spCut+' SHORT POUR',true);}
       /* The Grudge: increment player's grudge stack when opponent banks */
       if(G.pCards.includes('the_grudge')){G._grudgeStack=Math.min((G._grudgeStack||0)+50,250);}
-      if(G.pCards.includes('taxing_breath')&&pts>=50){pts-=50;G.pPts+=50;triggerCard('taxing_breath','+50 TAX',true);}
+      if(G.pCards.includes('taxing_breath')&&pts>=100){pts-=100;G.pPts+=100;triggerCard('taxing_breath','+100 TAX',true);}
       /* ── Handicap: Rising Stakes — opponent streak multiplier ── */
       if(G._handicap==='rising_stakes'){
         G._rsOppStreak=(G._rsOppStreak||0)+1;
         G._rsOppMultiplier=1+(G._rsOppStreak-1)*0.5;
         if(G._rsOppMultiplier>1){pts=Math.floor(pts*G._rsOppMultiplier);}
       }
+      /* ── Player-owned NPC cards that trigger on opp bank (Group A mirror) ── */
+      G.npcCardState.playerOnce=G.npcCardState.playerOnce||{};
+      G.pCards.forEach(function(cid){
+        var npc=getNpcCard(cid);if(!npc)return;var eff=npc.effect;
+        /* Percentage steal from opp's bank */
+        if(eff.type==='on_player_bank'&&eff.mechanic==='steal_pct'&&pts>0){
+          var steal=Math.ceil(pts*eff.pct);pts-=steal;G.pPts+=steal;
+          triggerCard(cid,npc.name+' +'+steal,true);
+        }
+        /* Steal opp's low bank entirely (the_lords_seal) */
+        if(eff.type==='once'&&eff.mechanic==='steal_low_bank'&&!G.npcCardState.playerOnce[cid]&&pts>0&&pts<eff.threshold){
+          G.npcCardState.playerOnce[cid]=true;
+          G.pPts+=pts;pts=0;
+          triggerCard(cid,npc.name+' STOLE!',true);spawnPop('STOLEN!');
+        }
+        /* Block opp's low bank (iron_gate_npc) */
+        if(eff.type==='on_player_bank'&&eff.mechanic==='block_low_bank'&&!G.npcCardState.playerOnce[cid]&&pts>0&&pts<eff.threshold){
+          G.npcCardState.playerOnce[cid]=true;pts=0;
+          triggerCard(cid,npc.name+' BLOCKED!',true);spawnPop('⛓️ BLOCKED');
+        }
+        /* Challenge opp: if their bank is below threshold, they lose penalty (steady_hands / the_verdict_npc) */
+        if(eff.type==='once'&&eff.mechanic==='challenge'&&!G.npcCardState.playerOnce[cid]&&G.oppTurnCount>=2&&pts>0&&Math.random()<0.4){
+          G.npcCardState.playerOnce[cid]=true;
+          if(pts<eff.threshold){
+            var penalty=Math.min(eff.penalty,G.oPts+pts);
+            pts=Math.max(0,pts-penalty);G.oPts=Math.max(0,G.oPts-Math.max(0,penalty-(eff.penalty-penalty)));
+            triggerCard(cid,npc.name+' −'+eff.penalty,true);
+            setStatusMsg(npc.name+' — '+G.rung.name+' LOST '+eff.penalty+'!','gold');
+          }else{triggerCard(cid,npc.name+' MET',true);}
+        }
+        /* Halve first bank (fine_print) */
+        if(eff.type==='on_player_bank'&&eff.mechanic==='halve_first_bank'&&!G.npcCardState.playerOnce[cid]&&pts>0){
+          G.npcCardState.playerOnce[cid]=true;
+          var half=Math.floor(pts/2);pts-=half;
+          triggerCard(cid,npc.name+' −'+half,true);
+        }
+      });
+      /* Record NPC bank for opp-score-tap summary (before G.oppDice is cleared) */
+      if(!G.oBankHistory)G.oBankHistory=[];
+      if(pts>0){
+        G.oBankHistory.push({pts:pts,turn:G.oppTurnCount,bonus:'',
+          dice:(G.oppDice||[]).filter(function(d){return d.kept;}).map(function(d){return {vals:[d.val],mat:d.mat||'bone',pts:0};})});
+      }
       if(G.pCards.includes('thieves_luck')&&pts>0&&pts<250){G.pPts+=pts;triggerCard('thieves_luck','STOLE '+pts.toLocaleString(),true);}
       else{G.oPts+=pts;setStatusMsg((G.rung?G.rung.name:'RIVAL')+' BANKED '+pts.toLocaleString(),'active');if(window.DLG&&pts>=600)DLG.trigger('OPP_BIG_BANK');}}
+    /* Player-owned periodic_drain (interest_due mirror) — drains opp every Nth opp turn */
+    G.pCards.forEach(function(cid){
+      var npc=getNpcCard(cid);if(!npc)return;
+      if(npc.effect.mechanic==='periodic_drain'&&G.npcCardState.oppTurnCount>0&&G.npcCardState.oppTurnCount%npc.effect.interval===0){
+        G.oPts=Math.max(0,G.oPts-npc.effect.amount);
+        triggerCard(cid,npc.name+' −'+npc.effect.amount,true);
+      }
+    });
     updHUD();
     /* Broken Lantern: reveal dice faces with flip animation before clearing */
     if(G._lanternActive){
@@ -8529,7 +8790,38 @@ function runOppTurn(){
     if(G._handicap==='sudden_death'&&G.turnNum>G._suddenDeathTurns){
       setTimeout(()=>endMatch(G.pPts>=G.oPts),700);return;
     }
+    /* ── NPC end-of-turn disruption via active cards ── */
+    _npcEndOfTurnActives();
     flashYourTurn();setTimeout(()=>{setTurnMode(false);startPTurn();},800);
+  }
+}
+
+/* Called at end of NPC turn: activate any disruption actives the NPC holds.
+   Only fires when NPC is behind or in a contested position (don't waste uses when ahead by a lot). */
+function _npcEndOfTurnActives(){
+  if(!G||!G.oCards||!G.oCards.length)return;
+  var gap=(G.pPts||0)-(G.oPts||0);/* positive = player ahead */
+  var contested=gap>-800;/* don't bother when crushing */
+  if(!contested)return;
+  /* Whisper's Hex — reduce player's next-turn dice count */
+  if(npcHasActive('whispers_hex')){
+    npcUseActive('whispers_hex');G._npcHexArmed=true;
+    triggerCard('whispers_hex',G.rung.name+" CASTS HEX",false);
+    setStatusMsg(G.rung.name+" — HEX CAST ON YOU",'red');
+    return;/* don't stack multiple disruptions in one turn */
+  }
+  /* Sleight of Hand — swap NPC's worst die for player's best */
+  if(npcHasActive('sleight_of_hand')&&G.matchDice&&G.matchOppDice){
+    var oWorstIdx=0;G.matchOppDice.forEach(function(d,i){if(dieRank(d)<dieRank(G.matchOppDice[oWorstIdx]))oWorstIdx=i;});
+    var pBestIdx=0;G.matchDice.forEach(function(d,i){if(dieRank(d)>dieRank(G.matchDice[pBestIdx]))pBestIdx=i;});
+    if(dieRank(G.matchDice[pBestIdx])>dieRank(G.matchOppDice[oWorstIdx])){
+      npcUseActive('sleight_of_hand');
+      var pOld=G.matchDice[pBestIdx],oOld=G.matchOppDice[oWorstIdx];
+      G.matchDice[pBestIdx]=oOld;G.matchOppDice[oWorstIdx]=pOld;
+      triggerCard('sleight_of_hand',G.rung.name+' SLEIGHT',false);
+      setStatusMsg(G.rung.name+' STOLE YOUR '+pOld.toUpperCase()+' FOR '+oOld.toUpperCase(),'red');
+      return;
+    }
   }
 }
 
@@ -8770,12 +9062,12 @@ function endMatch(win){
     var pool=[];
     var _owned=S.run.cards.filter(Boolean);
     /* Primary: current tier's draft pool */
-    tier.draftPool.forEach(function(rar){CARDS.forEach(function(c){if(c.rarity===rar&&!c.npcOnly&&!c.type&&_owned.indexOf(c.id)===-1)pool.push(c);});});
+    tier.draftPool.forEach(function(rar){CARDS.forEach(function(c){if(c.rarity===rar&&!c.npcOnly&&!c.npc&&_owned.indexOf(c.id)===-1)pool.push(c);});});
     /* 20% chance to include cards from next tier up */
     var _nextT=TIERS[S.run.tier+1];
-    if(_nextT&&_nextT.draftPool){_nextT.draftPool.forEach(function(rar){CARDS.forEach(function(c){if(c.rarity===rar&&!c.npcOnly&&!c.type&&_owned.indexOf(c.id)===-1&&pool.indexOf(c)===-1&&Math.random()<0.20)pool.push(c);});});}
+    if(_nextT&&_nextT.draftPool){_nextT.draftPool.forEach(function(rar){CARDS.forEach(function(c){if(c.rarity===rar&&!c.npcOnly&&!c.npc&&_owned.indexOf(c.id)===-1&&pool.indexOf(c)===-1&&Math.random()<0.20)pool.push(c);});});}
     /* On tier 2+, 10% chance to include cards from one tier down */
-    if(S.run.tier>=2){var _prevT=TIERS[S.run.tier-1];if(_prevT&&_prevT.draftPool){_prevT.draftPool.forEach(function(rar){CARDS.forEach(function(c){if(c.rarity===rar&&!c.npcOnly&&!c.type&&_owned.indexOf(c.id)===-1&&pool.indexOf(c)===-1&&Math.random()<0.10)pool.push(c);});});}}
+    if(S.run.tier>=2){var _prevT=TIERS[S.run.tier-1];if(_prevT&&_prevT.draftPool){_prevT.draftPool.forEach(function(rar){CARDS.forEach(function(c){if(c.rarity===rar&&!c.npcOnly&&!c.npc&&_owned.indexOf(c.id)===-1&&pool.indexOf(c)===-1&&Math.random()<0.10)pool.push(c);});});}}
     for(var di=pool.length-1;di>0;di--){var dj=Math.floor(Math.random()*(di+1));var dt=pool[di];pool[di]=pool[dj];pool[dj]=dt;}
     _draftCards=pool.slice(0,3);
     _draftSelected=null;_draftTargetSlot=-1;
@@ -8893,6 +9185,63 @@ function endMatch(win){
   save();
 }
 /* OLD endMatch code deleted — see gambit_pre_restructure_backup.html */
+/* ═══════ BANK SUMMARY (tap-score popover) ═══════ */
+/* Mini SVG die in the same pip style as the rules page (dark face, gold stroke, cream pips) */
+function _bsMiniDie(val,mat){
+  /* Jade 6 is the wild face — render blank (matches in-game behaviour) */
+  var isWild=(mat==='jade'&&val===6);
+  var pips={1:[[8.9,8.9]],2:[[3,3],[14.8,14.8]],3:[[3,3],[8.9,8.9],[14.8,14.8]],
+    4:[[3,3],[14.8,3],[3,14.8],[14.8,14.8]],5:[[3,3],[14.8,3],[8.9,8.9],[3,14.8],[14.8,14.8]],
+    6:[[3,3],[14.8,3],[3,8.9],[14.8,8.9],[3,14.8],[14.8,14.8]]};
+  var dots=isWild?[]:(pips[val]||pips[1]);
+  var svg='<svg class="bs-mini-die" width="17" height="17" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">';
+  svg+='<rect width="20" height="20" rx="3" fill="#2a2010" stroke="#c8a020" stroke-width="1.5"/>';
+  dots.forEach(function(p){svg+='<rect x="'+p[0]+'" y="'+p[1]+'" width="2.2" height="2.2" rx="1" fill="#e8d8a0"/>';});
+  svg+='</svg>';
+  return svg;
+}
+function showBankSummary(side){
+  side=side||'p';/* 'p' = player (left-anchored), 'o' = opponent (right-anchored) */
+  if(!G)return;
+  var list=document.getElementById('bankSummaryList');
+  var panel=document.getElementById('bankSummaryPanel');
+  if(!list||!panel)return;
+  var banks=(side==='o'?G.oBankHistory:G.pBankHistory)||[];
+  panel.classList.remove('side-p','side-o');panel.classList.add('side-'+side);
+  var html='';
+  if(!banks.length){html='<div class="bank-summary-empty">NO BANKS YET</div>';}
+  else{
+    banks.forEach(function(b){
+      var diceHtml='';
+      (b.dice||[]).forEach(function(k){
+        (k.vals||[]).forEach(function(v){diceHtml+=_bsMiniDie(v,k.mat||'bone');});
+      });
+      html+='<div class="bs-row-item">';
+      html+='<span class="bs-turn">T'+(b.turn||'?')+'</span>';
+      html+='<span class="bs-dice">'+(diceHtml||'<span style="opacity:.4">—</span>')+'</span>';
+      html+='<span class="bs-pts">+'+(b.pts||0).toLocaleString()+'</span>';
+      if(b.bonus)html+='<span class="bs-bonus">'+b.bonus+'</span>';
+      html+='</div>';
+    });
+    var total=banks.reduce(function(a,b){return a+(b.pts||0);},0);
+    html+='<div class="bank-summary-total"><span>TOTAL</span><span>+'+total.toLocaleString()+'</span></div>';
+  }
+  list.innerHTML=html;
+  document.getElementById('bank-summary-ov').classList.add('show');
+  /* Redraw the pixel-panel canvas backdrop now that the panel has been shown and sized */
+  requestAnimationFrame(function(){
+    var cv=document.getElementById('bankSummaryCanvas');
+    if(cv&&panel){
+      cv.width=panel.offsetWidth;cv.height=panel.offsetHeight;
+      cv.style.width='100%';cv.style.height='100%';
+      drawPixelPanel(cv,'#4a3a24','#2a1e14','#120a06',side==='o'?818:414,0.022);
+    }
+  });
+  SFX.nav();
+}
+function hideBankSummary(){
+  document.getElementById('bank-summary-ov').classList.remove('show');
+}
 /* ═══════ QUIT / FLEE ═══════ */
 function showQuitConfirm(){
   var qs=document.querySelector('#quit-ov .quit-sub');
@@ -9485,7 +9834,8 @@ function canActivateCard(cardId){
   if(!G||!G.activeCardState)return false;
   const uses=G.activeCardState.usedCards[cardId];
   if(!uses||uses<=0)return false;
-  const cd=CARDS.find(c=>c.id===cardId);if(!cd)return false;
+  const cd=CARDS.find(c=>c.id===cardId)||NPC_CARDS_MAP[cardId];
+  if(!cd||!cd.timing)return false;
   const timings=cd.timing.split('|');
   if(!timings.includes(G.phase))return false;
   /* NPC card blocks: the_sermon (every Nth turn), point_of_order (every 2nd turn) */
@@ -9507,7 +9857,9 @@ function markActiveCardUsed(cardId){
 /* Helper: redraw die face dots from d.val */
 function reDrawDieFace(d){
   if(!d.el)return;
-  const dots=d.el.children;const newDots=FACE_DOTS[d.val]||FACE_DOTS[1];
+  const isWildJade=(d.mat==='jade'&&d.val===6);
+  d.el.classList.toggle('die-wild',isWildJade);
+  const dots=d.el.children;const newDots=isWildJade?[]:(FACE_DOTS[d.val]||FACE_DOTS[1]);
   for(let i=0;i<49;i++){if(!dots[i])continue;dots[i].className=newDots.includes(i)?'dc dot':'dc';}
 }
 
@@ -9515,9 +9867,9 @@ function reDrawDieFace(d){
 function activateCard(cardId){
   if(!canActivateCard(cardId))return;
   markActiveCardUsed(cardId);
-  const cd=CARDS.find(c=>c.id===cardId);
+  const cd=CARDS.find(c=>c.id===cardId)||NPC_CARDS_MAP[cardId];
   /* Lingering effects get persistent labels */
-  const lingers=['mabels_stitch','aldrics_vow','whispers_hex','corvus_ledger','phoenix_ash','second_wind','all_in','broken_lantern'];
+  const lingers=['mabels_stitch','aldrics_vow','whispers_hex','corvus_ledger','second_wind','all_in','broken_lantern'];
   /* Full-word, title-cased label for activation */
   const _abbr={'PTS':'Points','OPP':'Opponent','DMG':'Damage','AMT':'Amount','LVL':'Level'};
   const effText=cd?cd.eff.split(' ').map(w=>{
@@ -9538,7 +9890,6 @@ function activateCard(cardId){
     case 'sleight_of_hand': activateSleightOfHand(); break;
     case 'gamblers_eye': activateGamblersEye(); break;
     case 'old_bones': activateOldBones(); break;
-    case 'phoenix_ash': activatePhoenixAsh(); break;
     case 'frozen_die': activateFrozenDie(); break;
     case 'double_down': activateDoubleDown(); break;
     case 'broken_lantern': activateBrokenLantern(); break;
@@ -9546,9 +9897,16 @@ function activateCard(cardId){
     case 'second_wind': activateSecondWind(); break;
     case 'the_pyre': activateThePyre(); break;
     case 'all_in': activateAllIn(); break;
+    case 'sticky_fingers_die': activateStickyFingersPlayer(); break;
+    case 'collateral_die': activateCollateralPlayer(); break;
+    case 'royal_seizure': activateRoyalSeizurePlayer(); break;
+    case 'blessed_confiscation': activateBlessedConfiscationPlayer(); break;
+    case 'quick_hands': activateQuickHandsPlayer(); break;
+    case 'crown_authority': activateCrownAuthorityPlayer(); break;
+    case 'blessed_dice': activateBlessedDicePlayer(); break;
   }
   /* Trigger NPC reaction — only when the card actually affects the opponent */
-  const _oppAffectingCards=['whispers_hex','sleight_of_hand','jesters_mask','plague_wind','serpents_whisper','broken_lantern'];
+  const _oppAffectingCards=['whispers_hex','sleight_of_hand','jesters_mask','plague_wind','serpents_whisper','broken_lantern','sticky_fingers_die','collateral_die','royal_seizure','blessed_confiscation','quick_hands','crown_authority','blessed_dice'];
   if(_oppAffectingCards.includes(cardId)){
     setTimeout(function(){if(window.DLG)DLG.trigger('CARD_EFFECT');},800);
   }
@@ -9565,7 +9923,7 @@ function activateGrogsFlask(){
   const toReroll=nonScoring.slice(0,2);
   if(!toReroll.length){setStatusMsg("NO NON-SCORING DICE TO REROLL",'red');return;}
   toReroll.forEach(d=>{
-    d.val=rollFace(d.mat);
+    d.val=rollFaceExclude(d.mat,d.val);
     if(d.el){d.el.classList.add('card-reroll');reDrawDieFace(d);
       setTimeout(()=>{d.el.classList.remove('card-reroll');d.el.classList.add('card-reroll-settle');settleDie(d.el);
         setTimeout(()=>{d.el.classList.remove('card-reroll-settle');},400);},400);}
@@ -9600,7 +9958,7 @@ function activateFinnicksPalm(){
 /* Corvus's Ledger: next bank +50% (lingering flag) */
 function activateCorvusLedger(){
   G.activeCardState.ledgerActive=true;
-  setStatusMsg("LEDGER ACTIVE — NEXT BANK +50%",'gold');
+  setStatusMsg("LEDGER ACTIVE — NEXT BANK +75%",'gold');
 }
 
 /* Brutus's Fist: force one non-1 die → 1 */
@@ -9704,12 +10062,6 @@ function activateOldBones(){
   /* Re-enable selection on new 1s */
   free.forEach(d=>{d.el.onclick=()=>toggleDie(d);});
   updHUD();
-}
-/* Phoenix Ash: protect turn pts on bust (lingering effect) */
-function activatePhoenixAsh(){
-  if(!G.activeCardState)return;
-  G.activeCardState.phoenixActive=true;
-  setStatusMsg('PHOENIX ASH — BUST PROTECTION ON','gold');
 }
 
 /* Frozen Die: lock one selected scoring die across turns */
@@ -9837,6 +10189,84 @@ function activateAllIn(){
   if(!G.activeCardState)return;
   G.activeCardState.allInActive=true;
   setStatusMsg('ALL IN — NEXT BANK DOUBLED (OR -500)','gold');
+}
+
+/* ═══════ NPC-SIDE ACTIVE CARD HELPERS (mirror match + future boss actives)
+   AI triggers player-style active cards from G.oCards when the situation favors them. */
+function npcHasActive(cid){
+  if(!G||!G.oCards.includes(cid))return false;
+  var uses=G.npcCardState&&G.npcCardState.npcActiveUses?G.npcCardState.npcActiveUses[cid]:0;
+  return(uses||0)>0;
+}
+function npcUseActive(cid){
+  if(!G.npcCardState.npcActiveUses)G.npcCardState.npcActiveUses={};
+  G.npcCardState.npcActiveUses[cid]=Math.max(0,(G.npcCardState.npcActiveUses[cid]||0)-1);
+  /* Visual: dim the card in the opp bar */
+  var chip=document.querySelector('#oppCards .mcard[data-cid="'+cid+'"]');
+  if(chip&&G.npcCardState.npcActiveUses[cid]<=0)chip.classList.add('used');
+}
+
+/* ═══════ PLAYER-SIDE NPC-CARD ACTIVATORS
+   These are NPC cards that landed in the player's hand (via boss reward or mirror
+   match). When the player activates, they target the opponent symmetrically. */
+
+/* Sticky Fingers: swap opp's best-quality die with player's worst-quality die */
+function activateStickyFingersPlayer(){
+  if(!G||!G.matchDice||!G.matchOppDice)return;
+  var pWorstIdx=0;G.matchDice.forEach(function(d,i){if(dieRank(d)<dieRank(G.matchDice[pWorstIdx]))pWorstIdx=i;});
+  var oBestIdx=0;G.matchOppDice.forEach(function(d,i){if(dieRank(d)>dieRank(G.matchOppDice[oBestIdx]))oBestIdx=i;});
+  var pOld=G.matchDice[pWorstIdx],oOld=G.matchOppDice[oBestIdx];
+  G.matchDice[pWorstIdx]=oOld;G.matchOppDice[oBestIdx]=pOld;
+  setStatusMsg('STICKY FINGERS: '+pOld.toUpperCase()+' ↔ '+oOld.toUpperCase(),'gold');
+  spawnPop('🤙 SWAPPED');SFX.commit();
+}
+
+/* Collateral: downgrade opp's best-quality die to bone */
+function activateCollateralPlayer(){
+  if(!G||!G.matchOppDice)return;
+  var oBestIdx=0;G.matchOppDice.forEach(function(d,i){if(dieRank(d)>dieRank(G.matchOppDice[oBestIdx]))oBestIdx=i;});
+  var oldDie=G.matchOppDice[oBestIdx];
+  if(oldDie==='bone'){setStatusMsg('ALREADY BONE — NO EFFECT','red');return;}
+  G.matchOppDice[oBestIdx]='bone';
+  setStatusMsg('COLLATERAL: '+oldDie.toUpperCase()+' → BONE','gold');
+  spawnPop('📦 DOWNGRADED');SFX.commit();
+}
+
+/* Royal Seizure: remove opp's best die — they play rest of match with one fewer */
+function activateRoyalSeizurePlayer(){
+  if(!G||!G.matchOppDice||G.matchOppDice.length<=3)return;
+  var oBestIdx=0;G.matchOppDice.forEach(function(d,i){if(dieRank(d)>dieRank(G.matchOppDice[oBestIdx]))oBestIdx=i;});
+  var stolen=G.matchOppDice[oBestIdx];
+  G.matchOppDice.splice(oBestIdx,1);
+  setStatusMsg('ROYAL SEIZURE: TOOK '+stolen.toUpperCase(),'gold');
+  spawnPop('👑 SEIZED');SFX.commit();
+}
+
+/* Blessed Confiscation: take opp's best die and add it to player's pool */
+function activateBlessedConfiscationPlayer(){
+  if(!G||!G.matchOppDice||G.matchOppDice.length<=3)return;
+  var oBestIdx=0;G.matchOppDice.forEach(function(d,i){if(dieRank(d)>dieRank(G.matchOppDice[oBestIdx]))oBestIdx=i;});
+  var stolen=G.matchOppDice[oBestIdx];
+  G.matchOppDice.splice(oBestIdx,1);
+  G.matchDice.push(stolen);
+  setStatusMsg('BLESSED CONFISCATION: TOOK '+stolen.toUpperCase(),'gold');
+  spawnPop('✝️ CONFISCATED');SFX.commit();
+}
+
+/* Quick Hands: arm a flag — on opp's next scoring roll, swap their highest die → 3 */
+function activateQuickHandsPlayer(){
+  G._playerQuickHandsArmed=true;
+  setStatusMsg("QUICK HANDS ARMED — OPP'S NEXT BEST DIE → 3",'gold');
+}
+
+/* Crown Authority / Blessed Dice: arm flag — opp's next turn, force reroll all kept */
+function activateCrownAuthorityPlayer(){
+  G._playerRerollKeptArmed='crown_authority';
+  setStatusMsg("CROWN AUTHORITY ARMED — OPP'S NEXT KEPT DICE REROLLED",'gold');
+}
+function activateBlessedDicePlayer(){
+  G._playerRerollKeptArmed='blessed_dice';
+  setStatusMsg("BLESSED DICE ARMED — OPP'S NEXT KEPT DICE REROLLED",'gold');
 }
 
 /* ═══════ DICE ZOOM SYSTEM ═══════ */
@@ -9993,7 +10423,7 @@ function initMatchScreen(data){
   /* The Brewer: +1 maxUses to all active cards */
   if(pCards.includes('the_brewer')){
     pCards.forEach(function(cid){
-      var c=CARDS.find(function(x){return x.id===cid;});
+      var c=CARDS.find(function(x){return x.id===cid;})||NPC_CARDS_MAP[cid];
       if(c&&c.type==='active'&&cid!=='the_brewer'){
         if(!G._brewerBoosts)G._brewerBoosts={};
         G._brewerBoosts[cid]=1;/* track extra use */
@@ -10003,8 +10433,8 @@ function initMatchScreen(data){
   /* Dead Man's Hand: once-per-match cards can trigger twice */
   if(pCards.includes('dead_mans_hand')){
     pCards.forEach(function(cid){
-      var c=CARDS.find(function(x){return x.id===cid;});
-      if(c&&c.type==='active'&&c.maxUses===1&&cid!=='dead_mans_hand'){
+      var c=CARDS.find(function(x){return x.id===cid;})||NPC_CARDS_MAP[cid];
+      if(c&&c.type==='active'&&(c.maxUses||1)===1&&cid!=='dead_mans_hand'){
         if(!G._deadManBoosts)G._deadManBoosts={};
         G._deadManBoosts[cid]=1;/* track extra use */
       }
@@ -10016,12 +10446,17 @@ function initMatchScreen(data){
   G._isGauntlet=!!params.isGauntlet;
   G._handicap=params.handicap||null;
   /* Init active card uses */
-  pCards.forEach(cid=>{const cd=CARDS.find(c=>c.id===cid);if(cd&&cd.type==='active')G.activeCardState.usedCards[cid]=cd.maxUses;});
+  pCards.forEach(cid=>{const cd=CARDS.find(c=>c.id===cid)||NPC_CARDS_MAP[cid];if(cd&&cd.type==='active')G.activeCardState.usedCards[cid]=cd.maxUses||1;});
+  /* Init NPC-side active uses so mirror-match (and future boss loadouts) can wield them */
+  (params.oCards||[]).forEach(function(cid){
+    var cd=CARDS.find(function(c){return c.id===cid;})||NPC_CARDS_MAP[cid];
+    if(cd&&cd.type==='active')G.npcCardState.npcActiveUses[cid]=cd.maxUses||1;
+  });
   /* The Brewer: +1 use to all active cards */
   if(G._brewerBoosts){for(var _bk in G._brewerBoosts){if(G.activeCardState.usedCards[_bk]!==undefined)G.activeCardState.usedCards[_bk]+=1;}}
   /* Dead Man's Hand: once-per-match cards get +1 use */
   if(G._deadManBoosts){for(var _dk in G._deadManBoosts){if(G.activeCardState.usedCards[_dk]!==undefined)G.activeCardState.usedCards[_dk]+=1;}}
-  if(pCards.includes('blood_debt'))G.pPts=-200;
+  if(pCards.includes('blood_debt'))G.pPts=-100;
   /* Apply score carryover from close loss vs same NPC — AFTER blood_debt so it stacks */
   var _coKey=rung.key||'';
   if(_coKey&&S.npcState&&S.npcState[_coKey]&&S.npcState[_coKey].carryover>0){
@@ -10030,10 +10465,13 @@ function initMatchScreen(data){
     S.npcState[_coKey].carryover=0;save();
   }
 
+  /* Reset bank-summary history for a fresh match */
+  G.pBankHistory=[];G.oBankHistory=[];
   /* Apply NPC card start bonuses & passive setup */
+  G._pendingStartBonuses=[];
   G.oCards.forEach(function(cid){
     var npc=getNpcCard(cid);if(!npc)return;
-    if(npc.effect.type==='start_bonus')G.oPts+=npc.effect.amount;
+    if(npc.effect.type==='start_bonus'){G.oPts+=npc.effect.amount;G._pendingStartBonuses.push({cid:cid,name:npc.name,amount:npc.effect.amount,opp:true});}
     /* immune_modifiers: undo player modifier cards */
     if(npc.effect.mechanic==='immune_modifiers'){
       rung.agg=RUNGS[rung.id].agg;rung.chaotic=RUNGS[rung.id].chaotic;
@@ -10044,7 +10482,7 @@ function initMatchScreen(data){
   /* Apply player-owned NPC card start bonuses (e.g. Campaign Veteran) */
   pCards.forEach(function(cid){
     var npc=getNpcCard(cid);if(!npc||!npc.effect)return;
-    if(npc.effect.type==='start_bonus')G.pPts+=npc.effect.amount;
+    if(npc.effect.type==='start_bonus'){G.pPts+=npc.effect.amount;G._pendingStartBonuses.push({cid:cid,name:npc.name,amount:npc.effect.amount,opp:false});}
   });
   /* ── Resume: overwrite fresh G with saved mid-match state ── */
   if(params._resumeData){
@@ -10079,7 +10517,7 @@ function initMatchScreen(data){
     /* Pick 3 random bounties */
     var _bp=[...BOUNTY_POOL];
     for(var bi=_bp.length-1;bi>0;bi--){var bj=Math.floor(Math.random()*(bi+1));var bt=_bp[bi];_bp[bi]=_bp[bj];_bp[bj]=bt;}
-    G._bounties=_bp.slice(0,3).map(function(b){return{id:b.id,desc:b.desc,reward:b.reward,icon:b.icon,claimed:false};});
+    G._bounties=_bp.slice(0,2).map(function(b){return{id:b.id,desc:b.desc,reward:b.reward,icon:b.icon,claimed:false};});
     G._bountyBankStreak=0;
   }
   if(G._handicap==='mirror_match'){
@@ -10125,7 +10563,20 @@ function initMatchScreen(data){
   /* Fallback for browsers without ResizeObserver */
   setTimeout(_drawMatchUI,300);
   setTimeout(_drawMatchUI,800);
+  /* Surface start-bonus cards so the opening score isn't a mystery */
+  if(G._pendingStartBonuses&&G._pendingStartBonuses.length){
+    var _sb=G._pendingStartBonuses;G._pendingStartBonuses=[];
+    _sb.forEach(function(b,i){setTimeout(function(){
+      triggerCard(b.cid,'+'+b.amount,!b.opp,true);
+      if(b.opp){setStatusMsg(b.name+' — PATRON +'+b.amount,'red');}
+      else{setStatusMsg(b.name+' — YOU +'+b.amount,'green');spawnPop('+'+b.amount);}
+    },1400+i*900);});
+  }
   // Clean up any stale state from previous match
+  /* Clear status bars (top/bot) so leftover messages like "BANKED X" don't bleed into the next match */
+  ['statusTop','statusBot'].forEach(function(id){var el=document.getElementById(id);if(el){el.textContent='';el.className='status-msg';}});
+  /* Clear any lingering pop-up bubbles from previous match */
+  document.querySelectorAll('.spop,.spop-bank,.die-eff-pop,.pop-anchor').forEach(function(el){el.remove();});
   document.getElementById('end-ov').classList.remove('show');
   document.getElementById('bust-ov').classList.remove('flash');
   var _bv=document.getElementById('bustVignette');if(_bv){_bv.classList.remove('flash');_bv.style.opacity='0';}
@@ -10282,12 +10733,6 @@ function hideGoldFloat(){
 
 
 /* ═══════ OPPONENT CARD GENERATION ═══════ */
-const RUNG_CARD_RARITY=[null,'tin','tin','silver','silver','gold','gold','gold'];
-const CARDS_BY_RARITY={
-  tin:['flintlock','copper_pincher','half_measure','the_hearth','slow_burn','fools_gold','cracked_bell','jesters_mask'],
-  silver:['millers_toll','scavenger','last_stand','rusty_spur','martyr','blood_debt','serpents_whisper','cowards_bell'],
-  gold:['leaky_cup','crows_luck','taxing_breath','thieves_luck','plague_wind','kings_ransom','sooty_table','thrifty_gambler','iron_crown']
-};
 function generateOppCards(rung,playerCardCount){
   /* Pool-based: each NPC draws from their own card pool */
   if(!rung.cardPool||!rung.cardPool.length)return[];
@@ -10833,7 +11278,7 @@ function initDraftScreen(data){
   /* Build card pool from tier's draft rarities */
   var pool=[];
   tier.draftPool.forEach(function(rar){
-    CARDS.forEach(function(c){if(c.rarity===rar&&!c.npcOnly&&!c.type)pool.push(c);});
+    CARDS.forEach(function(c){if(c.rarity===rar&&!c.npcOnly&&!c.npc)pool.push(c);});
   });
   /* Shuffle and pick 3 */
   for(var i=pool.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=pool[i];pool[i]=pool[j];pool[j]=t;}

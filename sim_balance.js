@@ -507,7 +507,7 @@ function simMatch(rung,playerCards,playerDice,skill){
     if(!lanternUsed&&has('broken_lantern')&&turnNum>=3){lanternUsed=true;lanternThisTurn=true;}
 
     if(cardMods.leakyCup&&turnNum%4===0&&turnNum>0)oppDiceLeft=5;
-    if(has('the_jinx')&&turnNum%3===0){let red=1;if(fenceActive)red=1;oppDiceLeft=Math.max(3,oppDiceLeft-red);}
+    if(has('the_jinx')&&turnNum%2===0){let red=1;if(fenceActive)red=1;oppDiceLeft=Math.max(3,oppDiceLeft-red);}
 
     while(true){
       oppRolls++;
