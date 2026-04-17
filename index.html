@@ -515,6 +515,8 @@ body{
 /* In-zone card: greyed out, no emoji */
 .mcard.in-zone .mcard-tooltip{display:none!important}
 .mcard.in-zone .gcard{filter:brightness(.55) saturate(.3) grayscale(.4)!important}
+/* Kill only the outer drop shadow on in-zone cards; keep the pixel-frame insets. */
+.mcard-active.in-zone .gcard{box-shadow:inset 0 0 0 1px var(--ctrim),inset 0 0 0 5px var(--cface),inset 0 0 0 6px var(--card-accent,rgba(255,215,0,.9))}
 .mcard.in-zone .gcard-cover{font-size:0!important}/* hide emoji */
 .mcard.in-zone .gcard-frame{opacity:.3!important}
 .mcard.in-zone .gc{opacity:.2!important}
@@ -883,6 +885,18 @@ body{
 /* ─── FROZEN DIE: ice glow ─── */
 .die.die-frozen{box-shadow:0 0 14px 4px rgba(100,180,255,.5),0 0 4px rgba(60,140,220,.3)!important;border-color:rgba(100,180,255,.7)!important;position:relative}
 .die.die-frozen::before{content:'❄';position:absolute;top:-6px;right:-4px;font-size:10px;z-index:2;filter:drop-shadow(0 0 3px rgba(100,180,255,.8))}
+/* After Frozen Die is activated on the currently-selected die, swap its selection outline
+   from gold to blue so the player sees which die was saved. */
+.die.die-frozen-mark.selected{box-shadow:0 0 8px rgba(100,180,255,.45)}
+.die.die-frozen-mark.selected::before{border-color:rgba(100,180,255,.85)}
+/* Re-entry animation on next turn: blue outline grows and fades while die remains fully interactive */
+.die.die-frozen-entry{animation:diceFrozenEntry 1.2s ease-out}
+@keyframes diceFrozenEntry{
+  0%{outline:0 solid rgba(100,180,255,.8);box-shadow:0 0 0 0 rgba(100,180,255,0);transform:scale(.6);opacity:0}
+  20%{transform:scale(1.08);opacity:1;outline:3px solid rgba(140,200,255,.9);box-shadow:0 0 20px 6px rgba(100,180,255,.6)}
+  60%{transform:scale(1);outline:3px solid rgba(120,190,255,.5);box-shadow:0 0 12px 3px rgba(100,180,255,.3)}
+  100%{transform:scale(1);outline:0 solid rgba(100,180,255,0);box-shadow:0 0 0 0 rgba(100,180,255,0)}
+}
 /* ─── WILD DIE PICKER ─── */
 .wild-die-picker{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9600;background:rgba(20,20,35,.97);border:2px solid rgba(140,100,220,.6);border-radius:14px;padding:16px 20px;display:flex;flex-direction:column;align-items:center;gap:10px;box-shadow:0 0 30px rgba(100,60,200,.4)}
 .wild-die-picker h3{margin:0;color:#d4c4f0;font-size:14px;text-transform:uppercase;letter-spacing:1px}
@@ -972,7 +986,9 @@ body{
    with the per-card accent. The sheen animation (gcard::before) is already
    always-on and makes them read as special. No big halo, no pulse ring. */
 .mcard-active .gcard{border:2px solid var(--card-accent,rgba(255,215,0,.9));box-shadow:inset 0 0 0 1px var(--ctrim),inset 0 0 0 5px var(--cface),inset 0 0 0 6px var(--card-accent,rgba(255,215,0,.9)),0 5px 20px rgba(0,0,0,.85)}
-.mcard-active.used .gcard{border-color:rgba(120,120,120,.3);filter:brightness(.6) saturate(.3)}
+/* No visual greying in the hand bar. Greying only happens when the card is in the
+   activation zone (see .mcard.in-zone rules). The .used class stays on the element
+   for JS tracking (it disables drag) but doesn't change how the card looks in-hand. */
 /* — Frozen Die: ice — */
 .mcard-active[data-cid="frozen_die"]{--card-accent:rgba(100,180,220,.8);--card-dither:rgba(100,180,255,.09)}
 /* — Double Down: amber — */
@@ -5707,6 +5723,7 @@ const CARDS=[
   {id:'beggars_bowl',name:"BEGGAR'S BOWL",icon:'🥣',rarity:'tin',eff:'+150 ON FIRST BANK',desc:'Your very first bank each match gains an extra 150 bonus points.'},
   {id:'loose_thread',name:'LOOSE THREAD',icon:'🧶',rarity:'tin',eff:'+400 AFTER DOUBLE BUST',desc:'If you bust twice in a row, gain 400 points automatically.'},
   {id:'the_whetstone',name:'THE WHETSTONE',icon:'🪨',rarity:'silver',eff:'FIRST 3 ROLLS +75',desc:'Your first three rolls each turn score 75 extra points on top of their normal value.'},
+  {id:'the_ladder',name:'THE LADDER',icon:'🪜',rarity:'silver',eff:'PARTIAL STRAIGHTS SCORE',desc:'Three consecutive dice in a single roll score 150 points. Four consecutive score 300 points. Only triggers when a full, high, or low straight did not.'},
   {id:'snake_oil',name:'SNAKE OIL',icon:'🐍',rarity:'silver',eff:'RIVAL TRIPLE → NEXT HALF',desc:'Once per match, when the opponent rolls a triple, their very next roll scores half points.'},
   {id:'fortunes_wheel',name:"FORTUNE'S WHEEL",icon:'☸️',rarity:'gold',eff:'EVERY 5TH BANK DOUBLED',desc:'Every 5th time you bank points in a match, that bank is doubled.'},
   /* ── NEW CARDS — Dice-Focused Simple Cards ── */
@@ -5736,7 +5753,7 @@ const CARDS=[
   {id:'blood_tithe',name:'BLOOD TITHE',icon:'🩸',rarity:'tin',eff:'-50/TURN, 1s = 150',desc:'Each turn costs 50 pts from your total, but single 1s score 150 instead of 100.'},
   /* Silver */
   {id:'the_echo',name:'THE ECHO',icon:'🔊',rarity:'silver',eff:'SCORE → NEXT ROLL +35%',desc:'After a scoring roll, your next roll in the same turn gets a +35% score bonus.'},
-  {id:'frozen_die',name:'FROZEN DIE',icon:'🧊',rarity:'silver',type:'active',maxUses:2,timing:'choosing',eff:'LOCK 1 DIE ACROSS TURNS',desc:'Lock one selected scoring die — it stays between turns and doesn\'t reset. Clears on bust. Two uses per match.'},
+  {id:'frozen_die',name:'FROZEN DIE',icon:'🧊',rarity:'silver',type:'active',maxUses:2,timing:'choosing',eff:'SAVE A DIE FOR NEXT TURN',desc:"Save one selected scoring die. It reappears on your next turn pre-placed — still selectable, so you can score it alone or fold it into a triple. Clears on bust. Two uses per match."},
   {id:'double_down',name:'DOUBLE DOWN',icon:'✌️',rarity:'silver',type:'active',maxUses:1,timing:'choosing',eff:'2× PTS, REROLL ALL 6',desc:'Double your current turn points, but all kept dice are released and you must roll all 6. One use per match.'},
   {id:'slippery_table',name:'SLIPPERY TABLE',icon:'💦',rarity:'silver',eff:'15% OPP DIE SLIPS BACK',desc:'15% chance each opponent turn: one of their kept scoring dice slips back and must be rerolled.'},
   {id:'high_roller',name:'HIGH ROLLER',icon:'🎰',rarity:'silver',eff:'BANK 800+ → +200',desc:'When you bank 800 or more points in a single turn, gain a +200 bonus.'},
@@ -5763,7 +5780,7 @@ const CARD_BG={
   cowards_bell:'#7A6A80',grogs_flask:'#A06030',mabels_stitch:'#8B6080',
   finnicks_palm:'#808040',corvus_ledger:'#604020',brutus_fist:'#605040',aldrics_vow:'#506080',
   whispers_hex:'#6030A0',ambrose_grace:'#C0A050',iron_grip:'#606A70',sleight_of_hand:'#705050',gamblers_eye:'#4A6A80',keen_eyes:'#5A7A60',
-  beggars_bowl:'#8A7560',loose_thread:'#9A6040',the_whetstone:'#6A7080',snake_oil:'#405A30',fortunes_wheel:'#7A5A20',
+  beggars_bowl:'#8A7560',loose_thread:'#9A6040',the_whetstone:'#6A7080',the_ladder:'#7A5A3A',snake_oil:'#405A30',fortunes_wheel:'#7A5A20',
   loaded_die:'#6A4A70',gamblers_ghost:'#5A5A70',greedy_hands:'#8A7A30',the_grudge:'#7A3030',lucky_seven:'#3A7A50',cold_shoulder:'#4A6A8A',
   warm_hands:'#8A4A30',gamblers_thumb:'#6A6A40',chain_lightning:'#4A5A8A',hot_streak:'#8A3A20',underdog:'#5A6A50',twin_dice:'#6A5A80',sawdust:'#7A6A50',short_pour:'#6A5A40',
   the_collector:'#6A4A60',tavern_cheer:'#7A5A30',last_call:'#5A4A60',old_bones:'#4A4A50',
@@ -6117,6 +6134,18 @@ function scoreRoll(vals,cards,locked,context,dieMats){
   if(!straightFound&&hasSet([1,2,3,4,5])){
     if(_crowsCanFire){_consumeCrows();/* low straight fully negated — dice not consumed so they bust or score singles */}
     else{pts+=SCORING_BASE.straight5low;markSet([1,2,3,4,5]);straightFound=true;}
+  }
+  /* ── The Ladder: partial straights (only if no 5/6-long straight fired) ── */
+  if(!straightFound&&cards.includes('the_ladder')){
+    var _ladderRuns=[[1,2,3,4],[2,3,4,5],[3,4,5,6],[1,2,3],[2,3,4],[3,4,5],[4,5,6]];
+    for(var _li=0;_li<_ladderRuns.length;_li++){
+      var _run=_ladderRuns[_li];
+      if(hasSet(_run)){
+        pts+=(_run.length===4?300:150);
+        markSet(_run);
+        break;/* one ladder run per roll */
+      }
+    }
   }
   /* ── Scavenger (only if no straight consumed the 1+5) ── */
   let scavengerFired=false;
@@ -7606,16 +7635,16 @@ function handleRoll(){
   for(let i=0;i<needNew;i++){const mat=G.matchDice[(G.pool.length+i)%G.matchDice.length]||'bone';const val=useSpur?rollFaceSpur(mat):rollFace(mat);
     const el=mkDie(val,mat);el.classList.add('rolling');row.appendChild(el);newEntries.push({val,mat,sel:false,committed:false,el});}
   G.pool=[...G.pool,...newEntries];
-  /* Frozen Die: inject locked die into pool on first roll */
+  /* Frozen Die: pre-place the saved die on the table as a regular selectable die.
+     No auto-commit, no auto-score — the player chooses how to use it (single score,
+     fold into a triple, etc.). A brief blue-outline fade-in marks it as the saved die. */
   if(G._frozenDieRestore&&G._frozenDie&&G.turnRollCount===0){
     G._frozenDieRestore=false;
     var _fdVal=G._frozenDie.val,_fdMat=G._frozenDie.mat;
-    var _fdEl=mkDie(_fdVal,_fdMat);_fdEl.classList.add('die-frozen','committed');row.appendChild(_fdEl);
-    var _fdEntry={val:_fdVal,mat:_fdMat,sel:true,committed:true,el:_fdEl};
+    G._frozenDie=null;/* consume — it only pre-places once */
+    var _fdEl=mkDie(_fdVal,_fdMat);_fdEl.classList.add('die-frozen-entry');row.appendChild(_fdEl);
+    var _fdEntry={val:_fdVal,mat:_fdMat,sel:false,committed:false,el:_fdEl};
     G.pool.push(_fdEntry);
-    G.kept.push({vals:[_fdVal],mat:_fdMat,pts:_fdVal===1?100:(_fdVal===5?50:0)});
-    G.turnPts=G.kept.reduce(function(a,k){return a+k.pts;},0);
-    refreshKeptTray();updHUD();
   }
   setTimeout(()=>{G.pool.forEach(d=>{if(!d.committed){settleDie(d.el);d.el.onclick=()=>toggleDie(d);d.el.style.cursor='pointer';}});afterRoll();},480);
 }
@@ -8356,7 +8385,18 @@ function endPTurn(){
      The check lives in finOpp() after opponent banks/busts. */
   setBtns(false,false);updHUD();refreshKeptTray();setTurnMode(true);
   setStatusMsg((G&&G.rung?G.rung.name:'RIVAL')+"'S TURN...",'active');
+  /* Keep the frozen die visible during the NPC's turn so the player sees
+     what they saved. Cleared when the next player turn starts. */
+  _showPersistentFrozenDie();
   setTimeout(runOppTurn,1050);
+}
+function _showPersistentFrozenDie(){
+  if(!G||!G._frozenDie)return;
+  var row=document.getElementById('playerDiceRow');if(!row)return;
+  if(row.querySelector('.die.die-frozen'))return;/* already placed */
+  var el=mkDie(G._frozenDie.val,G._frozenDie.mat);
+  el.classList.add('die-frozen');
+  row.appendChild(el);
 }
 
 /* ═══════ OPPONENT AI ═══════ */
@@ -10064,7 +10104,7 @@ function activateOldBones(){
   updHUD();
 }
 
-/* Frozen Die: lock one selected scoring die across turns */
+/* Frozen Die: snapshot one selected scoring die so it reappears on next turn. */
 function activateFrozenDie(){
   const selDice=G.pool.filter(d=>d.sel&&!d.committed);
   if(!selDice.length){setStatusMsg('SELECT A SCORING DIE FIRST','red');
@@ -10072,11 +10112,13 @@ function activateFrozenDie(){
     G.activeCardState.usedCards['frozen_die']=(G.activeCardState.usedCards['frozen_die']||0)+1;
     var _chip=document.querySelector('.mcard-active[data-cid="frozen_die"]');if(_chip)_chip.classList.remove('used');
     return;}
-  /* Lock the first selected die */
-  var lockDie=selDice[0];
-  G._frozenDie={val:lockDie.val,mat:lockDie.mat};
-  lockDie.el.classList.add('die-frozen');
-  setStatusMsg('DIE FROZEN ('+lockDie.val+') — PERSISTS NEXT TURN','gold');
+  /* Store the first selected die's value + material for restoration next turn.
+     The die itself stays fully interactive for the current turn — no visual lock. */
+  var savedDie=selDice[0];
+  G._frozenDie={val:savedDie.val,mat:savedDie.mat};
+  /* Swap the selection outline from gold to blue so the saved die is visually distinct */
+  if(savedDie.el)savedDie.el.classList.add('die-frozen-mark');
+  setStatusMsg('SAVED A '+savedDie.val+' — IT RETURNS NEXT TURN','gold');
 }
 
 /* Double Down: double turn pts, release all kept, must roll 6 */
