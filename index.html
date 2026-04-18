@@ -12027,12 +12027,40 @@ function updateDiceStyleUI(style){
     if(note)note.textContent='PHYSICS OFF \u2014 CLASSIC GRID DICE';
   }
 }
+var BG_MUSIC=null;
+function _ensureBgMusic(){
+  if(BG_MUSIC)return BG_MUSIC;
+  var a=document.getElementById('bgMusic');
+  if(!a){
+    a=document.createElement('audio');
+    a.id='bgMusic';
+    a.src='Audio/Tavern_pixel.mp3';
+    a.loop=true;
+    a.preload='auto';
+    a.style.display='none';
+    document.body.appendChild(a);
+  }
+  a.volume=0.22;
+  BG_MUSIC=a;
+  return a;
+}
+function _bgMusicSync(){
+  var a=_ensureBgMusic();
+  var on=!S||!S.settings||S.settings.music!==false;
+  if(on){
+    var p=a.play();
+    if(p&&p.catch)p.catch(function(){});
+  }else{
+    a.pause();
+  }
+}
 function toggleAudio(type){
   if(!S.settings)S.settings={};
   if(type==='music'){S.settings.music=!(S.settings.music!==false);}
   else{S.settings.sfx=!(S.settings.sfx!==false);}
   save();
   updateAudioUI();
+  if(type==='music')_bgMusicSync();
 }
 function updateAudioUI(){
   const musicOn=!S.settings||S.settings.music!==false;
@@ -12042,6 +12070,29 @@ function updateAudioUI(){
   if(mc)mc.classList.toggle('on',musicOn);
   if(sc)sc.classList.toggle('on',sfxOn);
 }
+// Browsers block autoplay until first user gesture. Try on the first
+// touch/click anywhere — once it succeeds, listeners self-remove.
+(function(){
+  function _kick(){
+    try{
+      var s=null;try{s=JSON.parse(localStorage.getItem('gambit4'));}catch(e){}
+      var on=!s||!s.settings||s.settings.music!==false;
+      if(on){
+        var a=_ensureBgMusic();
+        var p=a.play();
+        if(p&&p.then)p.then(function(){_off();}).catch(function(){});
+      }
+    }catch(e){}
+  }
+  function _off(){
+    document.removeEventListener('touchstart',_kick,true);
+    document.removeEventListener('click',_kick,true);
+    document.removeEventListener('keydown',_kick,true);
+  }
+  document.addEventListener('touchstart',_kick,true);
+  document.addEventListener('click',_kick,true);
+  document.addEventListener('keydown',_kick,true);
+})();
 function resetRun(){
   // Close settings sheet so its backdrop doesn't intercept touches
   closeSettings();
@@ -12245,5 +12296,6 @@ document.addEventListener('DOMContentLoaded', function(){
 if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
 
 </script>
+<audio id="bgMusic" src="Audio/Tavern_pixel.mp3" loop preload="auto" style="display:none"></audio>
 </body>
 </html>
