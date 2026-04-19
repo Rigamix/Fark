@@ -6685,10 +6685,16 @@ function _cagGenHoles(W,H,level,rng,scale){
   const holes=[];if(level<3)return holes;
   const lo=[0,0,0,1][level],hi=[0,0,0,2][level];
   const n=lo+Math.floor(rng()*(hi-lo+1));
-  const yMin=H*.20,yMax=H*.78,xMin=12*scale,xMax=W-12*scale;
+  /* Holes pinned to the perimeter — never in the middle of the card. */
   for(let h=0;h<n;h++){
-    const cx=xMin+rng()*(xMax-xMin),cy=yMin+rng()*(yMax-yMin);
-    const baseR=(3+rng()*4)*scale;
+    const edge=Math.floor(rng()*4);/* 0=top 1=right 2=bottom 3=left */
+    const margin=8*scale;
+    let cx,cy;
+    if(edge===0){cx=margin+rng()*(W-margin*2); cy=margin*0.4+rng()*H*0.16;}
+    else if(edge===1){cx=W-margin*0.4-rng()*W*0.14; cy=margin+rng()*(H-margin*2);}
+    else if(edge===2){cx=margin+rng()*(W-margin*2); cy=H-margin*0.4-rng()*H*0.16;}
+    else{cx=margin*0.4+rng()*W*0.14; cy=margin+rng()*(H-margin*2);}
+    const baseR=(2.5+rng()*3)*scale;
     holes.push({cx,cy,r:baseR});
   }
   return holes;
@@ -6790,11 +6796,18 @@ function _cagDrawAging(canvas,W,H,level,seed,holes,borderStr){
     ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(cx,cy,r*2.8,r*2.8,0,0,Math.PI*2);ctx.fill();
   });
 }
+function _cardIdHash(cid){
+  if(typeof cid==='number'&&!isNaN(cid))return cid|0;
+  var s=String(cid||'');
+  var h=5381;
+  for(var i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0;
+  return h;
+}
 function applyCardAging(outerEl,tarnish,cardId){
   if(!outerEl||tarnish<=0)return;
   const W=outerEl.offsetWidth,H=outerEl.offsetHeight;
   if(!W||!H)return;
-  const seed=(cardId*137+tarnish*31)^0xc0ffee;
+  const seed=(_cardIdHash(cardId)*137+tarnish*31)^0xc0ffee;
   const{clipPath,borderStr,holes}=_cagBuildPath(W,H,tarnish,seed);
   outerEl.style.clipPath=`path('${clipPath}')`;
   const gcard=outerEl.querySelector('.gcard');
@@ -6811,18 +6824,27 @@ function applyCardAging(outerEl,tarnish,cardId){
   outerEl.appendChild(ac);
   _cagDrawAging(ac,W,H,tarnish,seed,holes,borderStr);
 }
-/* Auto-apply aging when .card-outer[data-aging] elements enter the DOM */
+/* Auto-apply aging to .card-outer elements as they enter the DOM.
+   Boss cards (cards with an npc owner) always render at level 3 — they have
+   "history" baked into their look. Other cards use whatever data-aging is set. */
 (function(){
+  const BOSS_AGING_LEVEL=3;
+  function _processEl(el){
+    var cid=el.dataset.cid;
+    var t=+el.dataset.aging||0;
+    if(cid && typeof getCard==='function'){
+      var c=getCard(cid);
+      if(c && c.npc) t=Math.max(t,BOSS_AGING_LEVEL);
+    }
+    if(t>0)requestAnimationFrame(function(){applyCardAging(el,t,cid);});
+  }
   const obs=new MutationObserver(function(mutations){
     mutations.forEach(function(m){
       m.addedNodes.forEach(function(node){
         if(node.nodeType!==1)return;
-        var els=node.matches&&node.matches('.card-outer[data-aging]')?[node]:[];
-        if(!els.length)els=Array.from(node.querySelectorAll('.card-outer[data-aging]'));
-        els.forEach(function(el){
-          var t=+el.dataset.aging,cid=+el.dataset.cid;
-          if(t>0)requestAnimationFrame(function(){applyCardAging(el,t,cid);});
-        });
+        var els=node.matches&&node.matches('.card-outer')?[node]:[];
+        if(!els.length)els=Array.from(node.querySelectorAll('.card-outer'));
+        els.forEach(_processEl);
       });
     });
   });
@@ -9961,12 +9983,8 @@ function exitMatch(){
     S.run.points=Math.max(0,S.run.points-_ptLoss);
     var _bld=route._bossLossData;
     if(_bld&&_bld.lostCardId){
-      /* Increment tarnish for boss cards */
-      var _ltC=getCard(_bld.lostCardId);
-      if(_ltC&&_ltC.npc){
-        if(!S.run.cardTarnish)S.run.cardTarnish={};
-        S.run.cardTarnish[_bld.lostCardId]=(S.run.cardTarnish[_bld.lostCardId]||0)+1;
-      }
+      /* Tarnish progression removed — boss cards have a unified always-on
+         aged look applied by the MutationObserver. */
       S.run.cards[_bld.lostSlotIdx]=null;
     }
     save();
@@ -11529,12 +11547,10 @@ function _draftPlaceCard(cardId,slotIdx,srcEl){
     _ungreyOfferedCards();
   }
   _getS();S.run.cards[slotIdx]=cardId;
-  /* Track tarnish for boss cards */
+  /* Boss cards always render with the unified aged look (no per-equip
+     tarnish progression — kept the cardTarnish state for save compat
+     but stop incrementing it). */
   var _tC=CARDS.find(function(c){return c.id===cardId;})||getNpcCard(cardId);
-  if(_tC&&_tC.npc){
-    if(!S.run.cardTarnish)S.run.cardTarnish={};
-    S.run.cardTarnish[cardId]=(S.run.cardTarnish[cardId]||0)+1;
-  }
   save();
   var cd=_tC;
   if(!cd)return false;
