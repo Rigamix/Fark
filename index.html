@@ -12032,7 +12032,13 @@ function updateDiceStyleUI(style){
     if(note)note.textContent='PHYSICS OFF \u2014 CLASSIC GRID DICE';
   }
 }
+// Mobile browsers (iOS especially) ignore <audio>.volume — it's pinned
+// to system media volume. Routing through Web Audio API + GainNode gives
+// us actual volume control on every platform.
 var BG_MUSIC=null;
+var BG_GAIN=null;
+var BG_CTX=null;
+var BG_VOLUME=0.08;
 function _ensureBgMusic(){
   if(BG_MUSIC)return BG_MUSIC;
   var a=document.getElementById('bgMusic');
@@ -12042,17 +12048,43 @@ function _ensureBgMusic(){
     a.src='Audio/Tavern_pixel.mp3';
     a.loop=true;
     a.preload='auto';
+    a.crossOrigin='anonymous';
     a.style.display='none';
     document.body.appendChild(a);
   }
-  a.volume=0.045;
+  // Fallback for browsers that honor <audio>.volume
+  a.volume=BG_VOLUME;
   BG_MUSIC=a;
   return a;
+}
+function _ensureBgGain(){
+  if(BG_GAIN)return BG_GAIN;
+  try{
+    var AC=window.AudioContext||window.webkitAudioContext;
+    if(!AC)return null;
+    BG_CTX=new AC();
+    var a=_ensureBgMusic();
+    var src=BG_CTX.createMediaElementSource(a);
+    BG_GAIN=BG_CTX.createGain();
+    BG_GAIN.gain.value=BG_VOLUME;
+    src.connect(BG_GAIN);
+    BG_GAIN.connect(BG_CTX.destination);
+  }catch(e){
+    // Some browsers throw if createMediaElementSource is called twice on
+    // the same element, or if WebAudio is unavailable. Fall back to
+    // <audio>.volume — already set in _ensureBgMusic.
+    BG_GAIN=null;
+  }
+  return BG_GAIN;
 }
 function _bgMusicSync(){
   var a=_ensureBgMusic();
   var on=!S||!S.settings||S.settings.music!==false;
   if(on){
+    _ensureBgGain();
+    if(BG_CTX&&BG_CTX.state==='suspended'){
+      try{BG_CTX.resume();}catch(e){}
+    }
     var p=a.play();
     if(p&&p.catch)p.catch(function(){});
   }else{
@@ -12075,8 +12107,8 @@ function updateAudioUI(){
   if(mc)mc.classList.toggle('on',musicOn);
   if(sc)sc.classList.toggle('on',sfxOn);
 }
-// Browsers block autoplay until first user gesture. Try on the first
-// touch/click anywhere — once it succeeds, listeners self-remove.
+// Browsers block autoplay until first user gesture. iOS additionally
+// requires AudioContext creation/resume to happen inside that gesture.
 (function(){
   function _kick(){
     try{
@@ -12084,6 +12116,10 @@ function updateAudioUI(){
       var on=!s||!s.settings||s.settings.music!==false;
       if(on){
         var a=_ensureBgMusic();
+        _ensureBgGain();
+        if(BG_CTX&&BG_CTX.state==='suspended'){
+          try{BG_CTX.resume();}catch(e){}
+        }
         var p=a.play();
         if(p&&p.then)p.then(function(){_off();}).catch(function(){});
       }
