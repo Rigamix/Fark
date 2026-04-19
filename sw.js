@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gambit-v3';
+const CACHE_NAME = 'gambit-v4';
 const ASSETS = [
   './',
   './index.html',
@@ -32,6 +32,7 @@ const ASSETS = [
   './Match_Art/Loadout.png',
   './Match_Art/merchant_frame.png',
   './Match_Art/noble_frame.png',
+  './Match_Art/patron_frame.png',
   './Match_Art/peasant_frame.png',
   './Match_Art/roll.png',
   './Match_Art/soldier_frame.png',
