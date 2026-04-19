@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gambit-v7';
+const CACHE_NAME = 'gambit-v8';
 const ASSETS = [
   './',
   './index.html',
@@ -66,8 +66,13 @@ self.addEventListener('activate', e => {
   );
 });
 
-// Fetch: network first, cache fallback (so updates always show)
+// Fetch: network first, cache fallback (so updates always show).
+// EXCEPTION: don't intercept media files. iOS Safari uses HTTP range
+// requests for <audio>/<video>; our SW returns the full response which
+// iOS rejects, silently breaking audio playback. Letting these requests
+// fall through to the network preserves native range handling.
 self.addEventListener('fetch', e => {
+  if(/\.(mp3|m4a|ogg|wav|mp4|webm)$/i.test(e.request.url)) return;
   e.respondWith(
     fetch(e.request)
       .then(response => {
