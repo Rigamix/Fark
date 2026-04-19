@@ -5142,7 +5142,7 @@ function saveMatchState(){
     pPts:G.pPts,oPts:G.oPts,target:G.target,turnNum:G.turnNum,numDice:G.numDice,
     matchDice:[...G.matchDice],matchOppDice:[...G.matchOppDice],
     originalPlayerDice:[...G.originalPlayerDice],
-    thriftyBonus:G.thriftyBonus||0,spurActive:G.spurActive||false,
+    thriftyBonus:G.thriftyBonus||0,spurActive:G.spurActive||0,
     martyrUsed:G.martyrUsed||false,
     flintlockFired:G.flintlockFired||false,safeTurnStreak:G.safeTurnStreak||0,
     dieShieldsPlayer:G.dieShieldsPlayer,dieShieldsOpp:G.dieShieldsOpp,
@@ -5843,7 +5843,7 @@ const CARDS=[
   {id:'millers_toll',name:"MILLER'S TOLL",icon:'⚙️',rarity:'gold',eff:'TRIPLE 2-4 +150; 1s=75',desc:'Triples of 2, 3, or 4 score +150 extra — but each 1 you roll is only worth 75 points instead of 100.',arch:'collector',dep:true},
   {id:'scavenger',name:'THE SCAVENGER',icon:'🦴',rarity:'silver',eff:'ONE 1 + ONE 5 = 300',desc:'Roll exactly one 1 and one 5 in the same throw to score a combined 300 points.',arch:'collector',dep:true},
   {id:'last_stand',name:'THE LAST STAND',icon:'🗡️',rarity:'silver',eff:'FINAL DIE 1 OR 5 = 600',desc:'If your very last die (with nothing left to keep) lands on 1 or 5, it scores 600 points.',arch:'brinksman'},
-  {id:'rusty_spur',name:'RUSTY SPUR',icon:'🐎',rarity:'silver',eff:'AFTER BANK: +1/5 ROLL BIAS',desc:'After each bank, your next roll is slightly biased toward 1s and 5s.',arch:'sharp'},
+  {id:'rusty_spur',name:'RUSTY SPUR',icon:'🐎',rarity:'silver',eff:'BANK: +1 SPUR CHARGE (MAX 3)',desc:'Each bank adds a Spur charge (max 3). Each roll consumes one charge to bias toward 1s and 5s. Charges clear on bust.',arch:'sharp'},
   {id:'martyr',name:'THE MARTYR',icon:'⛪',rarity:'silver',eff:'SKIP 1 BUST',desc:'Once per match, survive a bust — your turn keeps going with the remaining dice.',arch:'brinksman'},
   {id:'blood_debt',name:'BLOOD DEBT',icon:'🩸',rarity:'gold',eff:'-100 START; +400 PER OPP BUST',desc:'You start -100 points. Each time the opponent busts, you gain 400 points.',arch:'hoarder',dep:true},
   {id:'leaky_cup',name:'LEAKY CUP',icon:'🥛',rarity:'gold',eff:"RIVAL 5 DICE EVERY 4TH TURN",desc:"Every fourth turn the opponent takes, they start with only 5 dice on their first roll.",arch:'saboteur'},
@@ -5880,6 +5880,7 @@ const CARDS=[
   {id:'tavern_tales',name:'TAVERN TALES',icon:'🎭',rarity:'gold',eff:'3+ COLLECTOR: TRIPLES +25%, STRAIGHTS +50%',desc:'If you have 3 or more Collector cards equipped, all triples score +25% and all straights score +50%.',arch:'collector'},
   {id:'bad_reputation',name:'BAD REPUTATION',icon:'😈',rarity:'gold',eff:'3+ SABOTEUR: OPP\'S 1ST BANK HALVED',desc:"If you have 3 or more Saboteur cards equipped, the opponent's first bank each match is halved.",arch:'saboteur'},
   {id:'bar_brawl',name:'BAR BRAWL',icon:'🥊',rarity:'gold',eff:'OPP BUST: +250, +50 EACH NEXT',desc:'Each time the opponent busts, gain +250 immediately, growing by +50 per bust this match (1st = +250, 2nd = +300, 3rd = +350…).',arch:'saboteur'},
+  {id:'loaded_deck',name:'LOADED DECK',icon:'♠️',rarity:'gold',eff:'3+ SHARP: AUTO-FLIP EFFECTS HIT +1 DIE',desc:'If you have 3 or more Sharp cards equipped, your automatic dice-flip effects (Loaded Die, Gambler\'s Thumb) affect 2 dice instead of 1.',arch:'sharp'},
   {id:'beggars_bowl',name:"BEGGAR'S BOWL",icon:'🥣',rarity:'tin',eff:'+150 ON FIRST BANK',desc:'Your very first bank each match gains an extra 150 bonus points.',arch:'safeBanker'},
   {id:'loose_thread',name:'LOOSE THREAD',icon:'🧶',rarity:'tin',eff:'+400 AFTER DOUBLE BUST',desc:'If you bust twice in a row, gain 400 points automatically.',arch:'brinksman',dep:true},
   {id:'the_whetstone',name:'THE WHETSTONE',icon:'🪨',rarity:'silver',eff:'FIRST 3 ROLLS +75',desc:'Your first three rolls each turn score 75 extra points on top of their normal value.',arch:'brinksman'},
@@ -7099,7 +7100,7 @@ function newG(rung,pCards,oCards,pStake,oStake){
     matchDice:[..._playerDice],
     matchOppDice:[...((rung&&rung.dice)||_boneDice)],
     originalPlayerDice:[..._playerDice],
-    _lastBankAmount:0,lastBankDiceCount:0,spurActive:false,thriftyBonus:0,
+    _lastBankAmount:0,lastBankDiceCount:0,spurActive:0,thriftyBonus:0,
     _ghostDieNext:false,_chainCount:0,_hotStreakReady:false,_grudgeStack:0,_warmHandsActive:false,_scoringTypes:{},
     _echoArmed:false,_echoReady:false,_frozenDie:null,_lanternActive:false,_thickSkinUsed:false,_alchemistActive:false,_fenceActive:false,
     _brewerBoosts:null,_deadManBoosts:null,
@@ -7766,7 +7767,7 @@ function handleRoll(){
       var _icBonus=500+(G._ironCrownHits-1)*250;
       G.pPts+=_icBonus;triggerCard('iron_crown','+'+_icBonus+' IRON CROWN',true);updHUD();
     }
-    const hotSpur=G.spurActive;G.spurActive=false;
+    const hotSpur=!!G.spurActive;if(typeof G.spurActive==='number'&&G.spurActive>0)G.spurActive--;else G.spurActive=0;
     setTimeout(()=>{
       setStatusMsg('ROLLING...','active');const row=document.getElementById('playerDiceRow');
       var hotN=G.numDice||6;
@@ -7778,7 +7779,7 @@ function handleRoll(){
     return;
   }
   G.phase='rolling';setBtns(false,false);setStatusMsg('ROLLING...','active');
-  const useSpur=G.spurActive;G.spurActive=false;
+  const useSpur=!!G.spurActive;if(typeof G.spurActive==='number'&&G.spurActive>0)G.spurActive--;else G.spurActive=0;
   const row=document.getElementById('playerDiceRow');
   /* Cancel any stale Web Animations on dice (prevents invisible dice after bust) */
   row.querySelectorAll('.die').forEach(el=>{el.getAnimations().forEach(a=>a.cancel());el.style.transform='';el.style.opacity='';el.style.animation='';el.classList.remove('scatter','bust');});
@@ -7827,14 +7828,17 @@ function afterRoll(){
   if(!G.flintlockFired&&G.pCards.includes('flintlock')&&freeV.includes(1)){G.flintlockFired=true;G.pPts+=200;triggerCard('flintlock','+200 FLINTLOCK',true);updHUD();}
   /* Warm Hands: extend dice-manipulation effects to rolls 2 & 3 */
   var _warmRollLimit=G.pCards.includes('warm_hands')?3:1;
-  /* Loaded Die: 50% chance force one random die to face 1 (first roll only) */
+  /* Loaded Die: 40% chance force one random die to face 1 (first roll only).
+     Loaded Deck (3+ Sharp): hits 2 dice instead of 1. */
   if(G.pCards.includes('loaded_die')&&G.turnRollCount===1&&Math.random()<0.4&&free.length>0){
-    var _ldCandidates=free.filter(function(d){return d.val!==1;});
-    if(_ldCandidates.length>0){
+    var _ldHits=(G.pCards.includes('loaded_deck')&&_archCount('sharp')>=3)?2:1;
+    for(var _ldI=0;_ldI<_ldHits;_ldI++){
+      var _ldCandidates=free.filter(function(d){return d.val!==1;});
+      if(_ldCandidates.length===0)break;
       var _ldVic=_ldCandidates[Math.floor(Math.random()*_ldCandidates.length)];
       _ldVic.val=1;reDrawDieFace(_ldVic);
       if(_ldVic.el){_ldVic.el.classList.add('eff-glow-gold');spawnPixelSparks(_ldVic.el,4);setTimeout(function(){if(_ldVic.el)_ldVic.el.classList.remove('eff-glow-gold');},700);}
-      triggerCard('loaded_die','LOADED!',true);
+      triggerCard('loaded_die',_ldHits>1?'LOADED ×'+(_ldI+1)+'!':'LOADED!',true);
     }
   }
   /* Gambler's Ghost: after bust, next turn one die starts as 1 */
@@ -7848,14 +7852,17 @@ function afterRoll(){
       triggerCard('gamblers_ghost','GHOST 1!',true);
     }
   }
-  /* Gambler's Thumb: first roll each turn, flip one non-scoring die to 5 (extended by Warm Hands) */
+  /* Gambler's Thumb: first roll each turn, flip one non-scoring die to 5 (extended by Warm Hands).
+     Loaded Deck (3+ Sharp): hits 2 dice instead of 1. */
   if(G.pCards.includes('gamblers_thumb')&&G.turnRollCount<=1&&Math.random()<0.75){
-    var _gtBlanks=free.filter(function(d){return d.val!==1&&d.val!==5;});
-    if(_gtBlanks.length>0){
+    var _gtHits=(G.pCards.includes('loaded_deck')&&_archCount('sharp')>=3)?2:1;
+    for(var _gtI=0;_gtI<_gtHits;_gtI++){
+      var _gtBlanks=free.filter(function(d){return d.val!==1&&d.val!==5;});
+      if(_gtBlanks.length===0)break;
       var _gtVic=_gtBlanks[Math.floor(Math.random()*_gtBlanks.length)];
       _gtVic.val=5;reDrawDieFace(_gtVic);
       if(_gtVic.el){_gtVic.el.classList.add('eff-glow-green');spawnPixelSparks(_gtVic.el,4);setTimeout(function(){if(_gtVic.el)_gtVic.el.classList.remove('eff-glow-green');},700);}
-      triggerCard('gamblers_thumb','THUMB → 5!',true);
+      triggerCard('gamblers_thumb',_gtHits>1?'THUMB ×'+(_gtI+1)+' → 5!':'THUMB → 5!',true);
     }
   }
   /* Hot Streak: after 3 safe banks, force one die to 1 */
@@ -8129,7 +8136,7 @@ function _tryBustSave(free){
 
 function doBust(){
   /* Rusty Spur: bias was earned by banking — a bust resets it so the bias doesn't carry past failure */
-  if(G.spurActive){G.spurActive=false;}
+  if(G.spurActive){G.spurActive=0;}
   /* Silver die shield: cancel bust once per shield die in loadout */
   if(G.dieShieldsPlayer>0){
     G.dieShieldsPlayer--;
@@ -8270,7 +8277,10 @@ function handleBank(){
   if(G.pCards.includes('kings_ransom')&&(G.pPts+total-G.oPts)>=3000){total+=1000;bonusMsg+=' +1000 RANSOM';triggerCard('kings_ransom','+1000',true);}
   G.safeTurnStreak=(G.safeTurnStreak||0)+1;
   if(G.pCards.includes('slow_burn')&&G.safeTurnStreak%3===0){total+=300;bonusMsg+=' +300 SLOW BURN';triggerCard('slow_burn','+300',true);}
-  if(G.pCards.includes('rusty_spur')){G.spurActive=true;triggerCard('rusty_spur','SPUR ACTIVE',true);}
+  if(G.pCards.includes('rusty_spur')){
+    G.spurActive=Math.min(3,(typeof G.spurActive==='number'?G.spurActive:0)+1);
+    triggerCard('rusty_spur','SPUR +1 ('+G.spurActive+'/3)',true);
+  }
   if(G.pCards.includes('fools_gold')&&total>0&&total%500===0){total+=300;bonusMsg+=" +300 FOOL'S GOLD";triggerCard('fools_gold','+300',true);}
   /* The Whetstone: first 3 rolls each turn score +50 extra */
   if(G.pCards.includes('the_whetstone')){var _wsRolls=Math.min(G.turnRollCount||1,3);var _wsBonus=_wsRolls*75;total+=_wsBonus;bonusMsg+=' +'+_wsBonus+' WHETSTONE';triggerCard('the_whetstone','+'+_wsBonus,true);}
@@ -10742,7 +10752,7 @@ function initMatchScreen(data){
     G.pPts=rd.pPts;G.oPts=rd.oPts;G.turnNum=rd.turnNum;G.numDice=rd.numDice;
     G.matchDice=[...rd.matchDice];G.matchOppDice=[...rd.matchOppDice];
     G.originalPlayerDice=[...rd.originalPlayerDice];
-    G.thriftyBonus=rd.thriftyBonus||0;G.spurActive=rd.spurActive||false;
+    G.thriftyBonus=rd.thriftyBonus||0;G.spurActive=(typeof rd.spurActive==='number'?rd.spurActive:(rd.spurActive?1:0));
     G.martyrUsed=rd.martyrUsed||false;
     G.flintlockFired=rd.flintlockFired||false;G.safeTurnStreak=rd.safeTurnStreak||0;
     G.dieShieldsPlayer=rd.dieShieldsPlayer;G.dieShieldsOpp=rd.dieShieldsOpp;
