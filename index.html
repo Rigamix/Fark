@@ -5084,15 +5084,19 @@ function _getS(){
     if(Array.isArray(S.run.cards))S.run.cards=S.run.cards.map(function(cid){return cid&&_removedCards.indexOf(cid)===-1?cid:null;});
     /* Boss-slot migration: pad to 5 slots ([0..2] regular, [3] boss, [4] 2nd boss
        — last unlocked via renown perk). Move any boss card from legacy slot 2
-       into slot 3. */
+       into slot 3. CARDS_MAP may still be in TDZ on the very first _getS call
+       (script-init order) — try/catch defers the migration to a later call
+       once CARDS_MAP exists. */
     if(Array.isArray(S.run.cards)){
       while(S.run.cards.length<5)S.run.cards.push(null);
-      var _c2=S.run.cards[2];
-      var _cd2=_c2?(CARDS_MAP[_c2]||null):null;
-      if(_cd2&&_cd2.npc&&!S.run.cards[3]){
-        S.run.cards[3]=_c2;
-        S.run.cards[2]=null;
-      }
+      try{
+        var _c2=S.run.cards[2];
+        var _cd2=_c2?(CARDS_MAP[_c2]||null):null;
+        if(_cd2&&_cd2.npc&&!S.run.cards[3]){
+          S.run.cards[3]=_c2;
+          S.run.cards[2]=null;
+        }
+      }catch(e){/* CARDS_MAP not yet initialized; will migrate on next call */}
     }
     /* Migrate stale boss-inventory state (from a removed earlier design) */
     if(S.run.bossInventory)delete S.run.bossInventory;
@@ -13083,16 +13087,31 @@ function initMenuScreen() {
   // Update gold display
   var mg = document.getElementById('menuGold');
   if(mg) mg.textContent = S.run?S.run.gold:0;
-  // Re-render canvases after layout settles
+  /* Re-render canvases after layout settles. Belt-and-suspenders:
+     two RAFs (immediately after layout) AND a setTimeout fallback in
+     case the RAFs fired before final layout (web-font load can defer
+     button sizing on first paint). initButtons itself self-retries on
+     0×0 measurements but only handles the "rect has no size" case —
+     this catches the "rect already had size when the RAF fired but
+     was the wrong size" case where retry doesn't trigger. */
   requestAnimationFrame(function(){requestAnimationFrame(function(){
     if(typeof initButtons === 'function') initButtons();
   })});
+  setTimeout(function(){if(typeof initButtons === 'function') initButtons();},250);
 }
 
 /* ═══════ BOOTSTRAP ═══════ */
 document.addEventListener('DOMContentLoaded', function(){
   _getS();
-  showScreen('menu');
+  try{showScreen('menu');}catch(e){console.error('showScreen failed:',e);}
+  /* Brute-force fallback — if initMenuScreen's double-RAF + setTimeout
+     chain didn't fire (which has been observed in the wild on certain
+     mobile browsers), force initButtons manually. */
+  setTimeout(function(){
+    if(typeof initButtons==='function' && document.querySelector('#screen-menu.active')){
+      try{initButtons();}catch(e){console.error('initButtons fallback:',e);}
+    }
+  },350);
 });
 if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
 
