@@ -5650,7 +5650,14 @@ var DICE_STORE=[
   {mat:'crystal',price:700, stock:1, label:'Crystal'},
 ];
 function _initDiceStock(){var s={};DICE_STORE.forEach(function(d){s[d.mat]=d.stock;});return s;}
-function _dicePrice(mat){var d=DICE_STORE.find(function(x){return x.mat===mat;});return d?d.price:0;}
+function _dicePrice(mat){
+  var d=DICE_STORE.find(function(x){return x.mat===mat;});
+  if(!d)return 0;
+  /* Renown perk: Respected → 15% off all shop prices */
+  var p=d.price;
+  if(S&&S.renownPerks&&S.renownPerks.shopDiscount)p=Math.max(1,Math.ceil(p*0.85));
+  return p;
+}
 
 /* ═══════ TIER SYSTEM ═══════ */
 const TIERS=[
@@ -9609,7 +9616,9 @@ function endMatch(win){
     /* On tier 2+, 10% chance to include cards from one tier down */
     if(S.run.tier>=2){var _prevT=TIERS[S.run.tier-1];if(_prevT&&_prevT.draftPool){_prevT.draftPool.forEach(function(rar){CARDS.forEach(function(c){if(c.rarity===rar&&!c.npcOnly&&!c.npc&&!c.dep&&_owned.indexOf(c.id)===-1&&pool.indexOf(c)===-1&&Math.random()<0.10)pool.push(c);});});}}
     for(var di=pool.length-1;di>0;di--){var dj=Math.floor(Math.random()*(di+1));var dt=pool[di];pool[di]=pool[dj];pool[dj]=dt;}
-    _draftCards=pool.slice(0,3);
+    /* Renown perk: Honored guest → 4 draft offers instead of 3 */
+    var _draftN=(S&&S.renownPerks&&S.renownPerks.extraDraft)?4:3;
+    _draftCards=pool.slice(0,_draftN);
     _draftSelected=null;_draftTargetSlot=-1;
     _draftPickedCardId=null;_draftPickedSlotIdx=-1;_draftPickedEl=null;
     /* Build inline draft HTML in resCard */
@@ -11599,8 +11608,14 @@ function initShopScreen(){
   save();
   var host=document.getElementById('shopBody');
   if(!host)return;
+  /* Renown perk: Regular at the bar → one free restock per session.
+     S.run._restockUsed tracks whether it's been used this run. */
+  var _hasRestock=S&&S.renownPerks&&S.renownPerks.freeRestock&&!S.run._restockUsed;
   var html='<div class="dice-store-wrap">';
   html+='<div class="dice-store-grid" id="dsGrid"></div>';
+  if(_hasRestock){
+    html+='<div class="restock-row" style="padding:18px 16px 0"><button class="restock-btn" id="freeRestockBtn" onclick="useFreeRestock()"><canvas></canvas><span class="btn-inner">⭐ FREE RESTOCK</span></button></div>';
+  }
   html+='<div class="end-draft-label shop-your-dice" style="margin-top:14px;letter-spacing:3px">YOUR DICE</div>';
   html+='<div class="ds-loadout" id="dsLoadout"></div>';
   html+='</div>';
@@ -11610,6 +11625,27 @@ function initShopScreen(){
   if(topAmt)topAmt.textContent=(S.run.gold||0);
   _renderDiceStore();
   _renderDiceStoreLoadout();
+  /* Render restock button canvas if present */
+  if(_hasRestock){
+    requestAnimationFrame(function(){
+      var btn=document.getElementById('freeRestockBtn');
+      if(btn){var cv=btn.querySelector('canvas');
+        if(cv){cv.width=btn.offsetWidth;cv.height=btn.offsetHeight;cv.style.width='100%';cv.style.height='100%';
+          drawPixelPanel(cv,'#5a4a30','#2e2418','#161008',7733,0.012);}}
+    });
+  }
+}
+
+/* Free Restock perk handler: refills dice stock once per run */
+function useFreeRestock(){
+  _getS();
+  if(!S.renownPerks||!S.renownPerks.freeRestock||S.run._restockUsed)return;
+  S.run.diceStock=_initDiceStock();
+  S.run._restockUsed=true;
+  save();
+  SFX.coins?SFX.coins():SFX.nav();
+  /* Re-render the shop to refresh stock + remove the button */
+  initShopScreen();
 }
 
 /* Inline dice STORE for boss wins — buy dice with gold */
@@ -11659,9 +11695,10 @@ function _renderDiceStore(){
     var left=stock[d.mat]!==undefined?stock[d.mat]:d.stock;
     var item=document.createElement('div');
     item.className='dice-store-item';
-    item.dataset.mat=d.mat;item.dataset.price=d.price;
+    var _dPrice=_dicePrice(d.mat);
+    item.dataset.mat=d.mat;item.dataset.price=_dPrice;
     if(left<=0)item.classList.add('sold-out');
-    else if(gold<d.price)item.classList.add('too-expensive');
+    else if(gold<_dPrice)item.classList.add('too-expensive');
     /* Stable face per material so the dice don't flicker on every re-render (e.g. after a purchase) */
     if(!_dsFaceCache)_dsFaceCache={};
     if(_dsFaceCache[d.mat]===undefined)_dsFaceCache[d.mat]=[1,2,3,4,5,6][Math.floor(Math.random()*6)];
@@ -11680,13 +11717,13 @@ function _renderDiceStore(){
     item.appendChild(dieWrap);
     var matL=document.createElement('div');matL.className='ds-mat';matL.textContent=d.label;
     item.appendChild(matL);
-    var priceL=document.createElement('div');priceL.className='ds-price';priceL.textContent=d.price+'g';
+    var priceL=document.createElement('div');priceL.className='ds-price';priceL.textContent=_dPrice+'g';
     item.appendChild(priceL);
     /* Attach tooltip for all dice */
     attachDieTooltipTap(item,d.mat);
     /* Attach drag handler for purchasable dice */
-    if(left>0&&gold>=d.price){
-      _initDiceDrag(item,d.mat,d.price);
+    if(left>0&&gold>=_dPrice){
+      _initDiceDrag(item,d.mat,_dPrice);
     }
     grid.appendChild(item);
   });
