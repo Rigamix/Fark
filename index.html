@@ -5874,6 +5874,10 @@ const CARDS=[
   {id:'aldrics_banner',name:"ALDRIC'S BANNER",icon:'🛡️',rarity:'gold',npc:'aldric',eff:'EACH UNIQUE COMBO TYPE: +150 ALL FUTURE BANKS',desc:"Each unique combo type you score this match (triple, straight, Hot Dice) permanently adds +150 to every subsequent bank.",rewardQuote:'"The banner remembers every blow struck beneath it."',arch:'collector'},
   {id:'finnicks_trick',name:"FINNICK'S TRICK",icon:'🎩',rarity:'gold',npc:'finnick',eff:'FIRST ROLL EACH TURN: 1 DIE = 1 OR 5',desc:"Each turn's very first roll: one random non-scoring die is automatically converted to a 1 or 5 (whichever scores higher).",rewardQuote:'"Watch this hand, mate. Now watch the other one."',arch:'sharp'},
   {id:'ambrose_chalice',name:"AMBROSE'S CHALICE",icon:'🏆',rarity:'gold',npc:'ambrose',eff:'PURE-ARCH LOADOUT: +500 EVERY BANK',desc:"If your 3 regular loadout slots are all the same archetype (excluding your boss card), every bank gains +500 bonus. Reward for committing fully.",rewardQuote:'"Dedication is its own grace. Drink deep."',arch:'utility'},
+  /* ── Phase 6 fun cards (passive flavor pieces) ── */
+  {id:'bakers_dozen',name:"BAKER'S DOZEN",icon:'🍞',rarity:'gold',eff:'13TH BANK: +1300',desc:'Your 13th bank of the match earns a one-time +1300 bonus. A reward for the long haul.',arch:'safeBanker'},
+  {id:'the_heir',name:'THE HEIR',icon:'🪙',rarity:'silver',eff:'AFTER TURN 6: BANKS +50/TURN (STACKS)',desc:'Starting on turn 7, each subsequent turn adds +50 to every bank you make for the rest of the match (turn 7 = +50, turn 8 = +100, turn 9 = +150…).',arch:'hoarder'},
+  {id:'rats_in_cellar',name:'RATS IN THE CELLAR',icon:'🐀',rarity:'silver',eff:'OPP BUST: -200 FROM THEIR SCORE',desc:"Each time the opponent busts, they lose an additional 200 points from their total score. The rats are in the walls.",arch:'saboteur'},
   /* ── DICE PROTECTION / SWAP ── */
   {id:'iron_grip',name:'IRON GRIP',icon:'🔒',rarity:'silver',eff:'DICE CAN\'T BE SWAPPED',desc:'Prevents any opponent effect from swapping, stealing, or downgrading your dice this match.',arch:'utility'},
   {id:'sleight_of_hand',name:'SLEIGHT OF HAND',icon:'🃏',rarity:'gold',type:'active',maxUses:1,timing:'idle',eff:'SWAP ONE DIE WITH OPP',desc:'Before rolling, swap one of your dice with one of the opponent\'s — you choose which dice to exchange.',arch:'sharp',dep:true},
@@ -8372,6 +8376,16 @@ function handleBank(){
     if(G._cbInterest>0){total+=G._cbInterest;bonusMsg+=' +'+G._cbInterest+' BOOK';triggerCard('corvus_book','+'+G._cbInterest,true);}
     G._cbInterest+=(total>=1000?50:25);
   }
+  /* Baker's Dozen: 13th bank of the match earns +1300 (once) */
+  if(G.pCards.includes('bakers_dozen')){
+    G._bdBanks=(G._bdBanks||0)+1;
+    if(G._bdBanks===13){total+=1300;bonusMsg+=' +1300 BAKER\'S DOZEN';triggerCard('bakers_dozen','+1300 BAKER!',true);}
+  }
+  /* The Heir: turn 7+, each turn adds +50 to every bank (cumulative) */
+  if(G.pCards.includes('the_heir')&&G.turnNum&&G.turnNum>6){
+    var _hrBonus=(G.turnNum-6)*50;
+    total+=_hrBonus;bonusMsg+=' +'+_hrBonus+' HEIR';triggerCard('the_heir','+'+_hrBonus,true);
+  }
   /* Ambrose's Chalice: if 3 regular slots are same archetype, +500 every bank */
   if(G.pCards.includes('ambrose_chalice')){
     /* Check the 3 regular cards (not the boss card) — same archetype + no nulls */
@@ -8892,6 +8906,11 @@ function runOppTurn(){
           G._bbHits=(G._bbHits||0)+1;
           var _bbBonus=250+(G._bbHits-1)*50;
           G.pPts+=_bbBonus;triggerCard('bar_brawl','+'+_bbBonus+' BAR BRAWL',true);updHUD();
+        }
+        /* Rats in the Cellar: opp loses 200 from their total score per bust */
+        if(G.pCards.includes('rats_in_cellar')){
+          var _rcLoss=Math.min(200,G.oPts);
+          if(_rcLoss>0){G.oPts-=_rcLoss;triggerCard('rats_in_cellar','RATS −'+_rcLoss,true);updHUD();}
         }
         /* ── Handicap: Rising Stakes — opponent streak reset on bust ── */
         if(G._handicap==='rising_stakes'){G._rsOppStreak=0;G._rsOppMultiplier=1.0;}
