@@ -1462,6 +1462,26 @@ body{
 .rgt-bonus{font-size:clamp(11px,3vw,15px);letter-spacing:1.5px;opacity:.8}
 .rgt-bounty{color:#60d060}
 .rgt-streak{color:#f0a030}
+/* End-of-match feats display — shows newly-earned feats with renown awarded */
+.res-feats{
+  margin:14px auto 4px;max-width:340px;width:90%;
+  display:flex;flex-direction:column;gap:6px;
+  font-family:var(--font-px);font-size:11px;letter-spacing:1px;
+  text-align:center;
+  opacity:0;transition:opacity .5s ease;
+}
+.res-feats.show{opacity:1}
+.res-feat-row{
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  padding:6px 10px;
+  background:rgba(40,32,18,.55);border:1px solid rgba(220,170,60,.3);border-radius:4px;
+  animation:featSlideIn .4s ease-out backwards;
+}
+@keyframes featSlideIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.res-feat-star{color:#dca84a;font-size:14px;line-height:1}
+.res-feat-label{color:#dca84a;flex-grow:0}
+.res-feat-desc{color:var(--textdim);font-size:10px;flex-grow:1;text-align:left}
+.res-feat-renown{color:#dca84a;font-weight:bold;white-space:nowrap}
 .rgt-welcome{color:#80c8ff}
 .rgt-special{color:#ffd700}
 .rgt-refund{color:rgba(255,200,140,.7)}
@@ -1845,11 +1865,22 @@ body{
   text-transform:uppercase;
 }
 .lo-gold-corner{
-  position:absolute;top:12px;left:16px;z-index:3;
+  position:absolute;top:12px;right:16px;z-index:3;
   display:flex;align-items:center;gap:6px;
   font-family:var(--font-px);font-size:clamp(20px,5.5vw,26px);color:var(--gold);letter-spacing:1px;
   line-height:1;
   text-shadow:1px 1px 0 rgba(0,0,0,.6);
+}
+.lo-renown-corner{
+  position:absolute;top:12px;left:16px;z-index:3;
+  display:flex;align-items:center;gap:6px;
+  font-family:var(--font-px);font-size:clamp(20px,5.5vw,26px);color:#dca84a;letter-spacing:1px;
+  line-height:1;
+  text-shadow:1px 1px 0 rgba(0,0,0,.6);
+  cursor:pointer;
+}
+.lo-renown-corner .renown-star{
+  font-size:1em;line-height:1;display:inline-block;
 }
 .coin-i{display:inline-block;width:1em;height:1em;border-radius:50%;vertical-align:-1px;background:radial-gradient(circle at 38% 35%,#ffe080 0%,#d4a840 50%,#a07820 100%);border:1.5px solid #8a6820;box-shadow:inset 0 -1px 0 rgba(0,0,0,.3),inset 0 1px 0 rgba(255,240,180,.35);flex-shrink:0;image-rendering:pixelated}
 .lo-gold-corner #loGold{display:inline-block;vertical-align:middle;position:relative;top:2px}
@@ -4538,6 +4569,7 @@ body::before,body::after{display:none!important}
 <!-- TIER SCREEN -->
 <div class="tier-wrap" id="tierWrap">
   <div id="tierGoldPill" style="position:absolute;top:8px;right:12px;z-index:10;font-family:var(--font-px);font-size:11px;color:var(--gold);letter-spacing:1px;display:flex;align-items:center;gap:4px"><span class="coin-i" style="width:14px;height:14px;display:inline-block"></span><span id="tierGold">0g</span></div>
+  <div id="tierRenownPill" onclick="SFX.nav();showRenownInfo()" style="position:absolute;top:8px;left:12px;z-index:10;font-family:var(--font-px);font-size:11px;color:#dca84a;letter-spacing:1px;display:flex;align-items:center;gap:4px;cursor:pointer;padding:2px 4px;border-radius:3px"><span style="font-size:14px;line-height:1">⭐</span><span id="tierRenown">0</span></div>
   <div class="tier-boss-preview" id="tierBossPreview">
     <div class="tier-boss-top">
       <div class="tier-progress" id="tierProgress">
@@ -4779,6 +4811,7 @@ body::before,body::after{display:none!important}
     <div class="res-coin-big" id="resCoinBig"><span class="res-coin-amt" id="resCoinAmt"></span><div class="res-coin-sheen"></div></div>
     <div class="res-gold-text" id="resGoldText">+40 GOLD</div>
   </div>
+  <div class="res-feats" id="resFeats" style="display:none"></div>
   <div class="res-card" id="resCard"></div>
   <div id="resDlg"></div>
   <div id="end-btns">
@@ -4824,6 +4857,7 @@ body::before,body::after{display:none!important}
   <div class="lo-portrait"><img src="Match_Art/Loadout.png" alt="Pouch"></div>
   <div class="lo-inner">
     <div class="handle"></div>
+    <div class="lo-renown-corner" onclick="SFX.nav();showRenownInfo()"><span class="renown-star">⭐</span> <span id="mLoRenown">0</span></div>
     <div class="lo-gold-corner"><span class="coin-i" style="width:18px;height:18px"></span> <span id="mLoGold">0</span></div>
     <div class="lo-title" style="margin-top:40px">MATCH LOADOUT</div>
     <div class="lo-cols">
@@ -5005,26 +5039,75 @@ function _getS(){
   return S;
 }
 function save(){try{localStorage.setItem('gambit4',JSON.stringify(S));}catch(e){/* storage full or unavailable */}}
-function startNewRun(){S.run=_freshRun();S.totalRuns++;save();}
+function startNewRun(){
+  S.run=_freshRun();
+  /* Renown perk: Known Face → +50 starting gold */
+  if(S.renownPerks&&S.renownPerks.startGold)S.run.gold=(S.run.gold||0)+50;
+  S.totalRuns++;
+  save();
+}
 
-/* ── Renown Perks ── */
+/* ── Feats (renown sources — once per run each) ────────────────────────
+   Evaluated at end of each WIN. Each feat checks G + match summary and
+   awards a fixed renown amount the first time it's earned in a run. */
+const FEATS=[
+  {id:'crushing_win',   label:'Crushing Win',     desc:'Beat opponent by 1000+ points',  renown:5,
+    check:function(G){return (G.pPts||0)-(G.oPts||0)>=1000;}},
+  {id:'lightning_round',label:'Lightning Round',  desc:'Win in 3 banks or fewer',        renown:5,
+    check:function(G){return (G._featBanks||0)<=3;}},
+  {id:'big_turn',       label:'Big Turn',         desc:'Score 3000+ in a single turn',   renown:10,
+    check:function(G){return (G._featMaxBank||0)>=3000;}},
+  {id:'no_busts',       label:'Untouchable',      desc:'Win the match without busting',  renown:10,
+    check:function(G){return (G._featBusts||0)===0;}},
+  {id:'no_actives',     label:'Pure Bones',       desc:'Win without using any active cards', renown:10,
+    check:function(G){return !(G._featActivesUsed);}},
+  {id:'full_straight',  label:'Straight Flush',   desc:'Roll a full straight (1-6)',     renown:5,
+    check:function(G){return !!G._featFullStraight;}},
+  {id:'hot_storm',      label:'Hot Storm',        desc:'Trigger Hot Dice 3+ times in one match', renown:10,
+    check:function(G){return (G._featHotDiceCount||0)>=3;}},
+  {id:'boss_slayer',    label:'Boss Slayer',      desc:'Beat a boss without losing any cards', renown:15,
+    check:function(G){return G._isBoss && !(G._bossLossData);}},
+];
+
+/* ── Renown Perks (curated, threshold-based unlocks — never spent) ── */
 const RENOWN_PERKS=[
-  {threshold:10, key:'firstTimer',   label:'Newcomer',    desc:'Shop restocks cost 5 Gold less'},
-  {threshold:25, key:'freeRestock',  label:'Regular',     desc:'One free shop restock every session'},
-  {threshold:40, key:'toughSkin',    label:'Scrapper',    desc:'Keep 10% of your turn points on your first bust each match'},
-  {threshold:50, key:'extraSlot',    label:'Known',       desc:'Equip a 4th card in your loadout'},
-  {threshold:75, key:'betterOdds',   label:'Seasoned',    desc:'The shop offers 4 cards for sale instead of 3'},
-  {threshold:100,key:'shopDiscount', label:'Respected',   desc:'All shop prices reduced by 15%'},
-  {threshold:130,key:'diceSlot',     label:'Veteran',     desc:'Bring a 7th die into your loadout'},
-  {threshold:150,key:'forgeDiscount',label:'Renowned',    desc:'All dice cost 20% less to buy'},
-  {threshold:180,key:'doubleDown',   label:'Feared',      desc:'Win streaks earn double renown'},
-  {threshold:200,key:'bountyBoost',  label:'Legendary',   desc:'All bounties start with an extra 10 Gold'},
-  {threshold:250,key:'masterHand',   label:'Master',      desc:'Equip a 5th card in your loadout'},
-  {threshold:300,key:'legend',       label:'Mythic',      desc:'Earn the Mythic title and golden card borders'},
+  {threshold:25, key:'startGold',    label:'Known Face',     desc:'Begin every run with +50 starting gold'},
+  {threshold:50, key:'freeRestock',  label:'Regular at the bar', desc:'One free shop restock per session'},
+  {threshold:100,key:'shopDiscount', label:'Respected',      desc:'All shop prices reduced by 15%'},
+  {threshold:150,key:'extraDraft',   label:'Honored guest',  desc:'Card drafts offer 4 cards instead of 3'},
+  {threshold:200,key:'secondBoss',   label:'Lord of Dice',   desc:'Unlock a 5th loadout slot — a second boss-card slot'},
+  {threshold:300,key:'legend',       label:'Legend',         desc:'Title screen flourish and golden card frames'},
 ];
 function _checkRenownPerks(){
   if(!S.renownPerks)S.renownPerks={};
   RENOWN_PERKS.forEach(function(p){if((S.renown||0)>=p.threshold&&!S.renownPerks[p.key])S.renownPerks[p.key]=true;});
+}
+/* Award renown for a single feat — returns true if newly awarded */
+function awardRenown(amount, label){
+  if(!amount||amount<=0)return false;
+  S.renown=(S.renown||0)+amount;
+  _checkRenownPerks();
+  return true;
+}
+/* Evaluate all feats against current G state. Returns the list of feats
+   newly earned this match (already deduped against S.run.feats). Awards
+   their renown and persists. Each feat = once per RUN, not per match. */
+function evaluateFeats(){
+  if(!G||!S)return [];
+  if(!S.run.feats)S.run.feats={};
+  var earned=[];
+  FEATS.forEach(function(f){
+    if(S.run.feats[f.id])return;
+    try{
+      if(f.check(G)){
+        S.run.feats[f.id]=true;
+        S.renown=(S.renown||0)+f.renown;
+        earned.push(f);
+      }
+    }catch(e){/* feat check threw — skip silently */}
+  });
+  if(earned.length){_checkRenownPerks();save();}
+  return earned;
 }
 function _getCurrentTier(renown){
   var r=renown||S.renown||0;
@@ -6302,6 +6385,8 @@ function scoreRoll(vals,cards,locked,context,dieMats){
     context.crowsLuckFiredThisRoll=true;
   }
   if(n>=6&&hasSet([1,2,3,4,5,6])){
+    /* Feat tracking — full straight rolled (regardless of who's scoring) */
+    if(typeof G!=='undefined'&&G&&cards===G.pCards)G._featFullStraight=true;
     if(_crowsCanFire){_consumeCrows();pts+=SCORING_BASE.straight5high;markSet([2,3,4,5,6]);}
     else{
       var _straightBase=SCORING_BASE.straight6;
@@ -7129,6 +7214,8 @@ function newG(rung,pCards,oCards,pStake,oStake){
     _ghostDieNext:false,_chainCount:0,_hotStreakReady:false,_grudgeStack:0,_warmHandsActive:false,_scoringTypes:{},
     _echoArmed:false,_echoReady:false,_frozenDie:null,_lanternActive:false,_thickSkinUsed:false,_alchemistActive:false,_fenceActive:false,
     _brewerBoosts:null,_deadManBoosts:null,
+    /* Feat tracking — counters reset per match, evaluated at endMatch(win) */
+    _featBanks:0,_featBusts:0,_featMaxBank:0,_featActivesUsed:false,_featFullStraight:false,_featHotDiceCount:0,
     activeCardState:{usedCards:{},stitchActive:false,vowActive:false,hexActive:false,secondWindActive:false,allInActive:false,pyreBonus:0},
     crowsLuckCtx:{crowsLuck:oCards.includes('crows_luck'),crowsLuckRemaining:oCards.includes('crows_luck')?2:0,crowsLuckFiredThisRoll:false},
     /* Boss attack state */
@@ -7796,6 +7883,7 @@ function handleRoll(){
   if(G.pool.filter(d=>!d.committed).length===0&&G.pool.length>0){
     G.pool=[];clearRow('playerDiceRow');G.numDice=G.matchDice?G.matchDice.length:6;G.phase='rolling';
     G._lastHotDice=true;
+    G._featHotDiceCount=(G._featHotDiceCount||0)+1;
     setBtns(false,false);setStatusMsg('🔥 HOT DICE','gold');SFX.hotDice();showHot();
     var _hotBonus=250;
     /* Synergy: High Roller — Hot Dice bonus doubled */
@@ -8197,6 +8285,8 @@ function _tryBustSave(free){
 }
 
 function doBust(){
+  /* Feat tracking: count player busts for "Untouchable" feat */
+  G._featBusts=(G._featBusts||0)+1;
   /* Rusty Spur: bias was earned by banking — a bust resets it so the bias doesn't carry past failure */
   if(G.spurActive){G.spurActive=0;}
   /* Silver die shield: cancel bust once per shield die in loadout */
@@ -8650,6 +8740,9 @@ function handleBank(){
   G.pBankHistory.push({pts:total,turn:G.turnNum,bonus:(bonusMsg||'').trim(),
     dice:G.kept.map(function(k){return {vals:[].concat(k.vals),mat:k.mat,pts:k.pts};})});
   G.pPts+=total;G._lastBankAmount=total;spawnBankPop(total);G.turnPts=0;G.kept=[];G.numDice=6;
+  /* Feat tracking */
+  G._featBanks=(G._featBanks||0)+1;
+  if(total>(G._featMaxBank||0))G._featMaxBank=total;
   updHUD();refreshKeptTray();clearRow('playerDiceRow');G.pool=[];setBtns(false,false);
   if(G.pPts>=G.target){setTimeout(()=>endMatch(true),700);return;}
   if(G.oPts>=G.target){setTimeout(()=>endMatch(false),700);return;}
@@ -9316,6 +9409,7 @@ function endMatch(win){
   }
   var resGoldText=document.getElementById('resGoldText');if(resGoldText)resGoldText.textContent='';
   var resCard=document.getElementById('resCard');if(resCard){resCard.innerHTML='';resCard.className='res-card';}
+  var resFeats=document.getElementById('resFeats');if(resFeats){resFeats.innerHTML='';resFeats.classList.remove('show');resFeats.style.display='none';}
   var resDlg=document.getElementById('resDlg');if(resDlg){resDlg.classList.remove('show');resDlg.innerHTML='';}
   var endBtns=document.getElementById('end-btns');
   if(endBtns)endBtns.style.display='none';
@@ -9405,6 +9499,29 @@ function endMatch(win){
     setTimeout(function(){
       allCoins.forEach(function(c){c.classList.add('drain-burst');});
     },2200);
+  }
+
+  /* Feats: only fire on win — evaluates once, awards renown, displays under coins */
+  if(win){
+    var _featsEarned=evaluateFeats();
+    if(_featsEarned.length>0){
+      setTimeout(function(){
+        var rf=document.getElementById('resFeats');
+        if(!rf)return;
+        var html='';
+        _featsEarned.forEach(function(f,i){
+          html+='<div class="res-feat-row" style="animation-delay:'+(i*0.15)+'s">';
+          html+='<span class="res-feat-star">⭐</span>';
+          html+='<span class="res-feat-label">'+f.label+'</span>';
+          html+='<span class="res-feat-desc">'+f.desc+'</span>';
+          html+='<span class="res-feat-renown">+'+f.renown+'</span>';
+          html+='</div>';
+        });
+        rf.innerHTML=html;
+        rf.style.display='flex';
+        requestAnimationFrame(function(){rf.classList.add('show');});
+      },2000);
+    }
   }
 
   /* 5. Prepare boss-loss card/dialogue data (before delay, while G is still available) */
@@ -10169,6 +10286,8 @@ function toggleLoadoutPanel(){
   if(ov.classList.contains('show')){ov.classList.remove('show');if(bd)bd.classList.remove('on');return;}
   // Gold
   document.getElementById('mLoGold').textContent=S&&S.run?S.run.gold:0;
+  var _mLoRenownEl=document.getElementById('mLoRenown');
+  if(_mLoRenownEl)_mLoRenownEl.textContent=S?(S.renown||0):0;
   // Boss power
   if(G&&G.rung&&G.rung.boss){
     document.getElementById('mLoDecree').style.display='block';
@@ -10288,6 +10407,8 @@ function reDrawDieFace(d){
 function activateCard(cardId){
   if(!canActivateCard(cardId))return;
   markActiveCardUsed(cardId);
+  /* Feat tracking: any active-card use disqualifies "Pure Bones" */
+  if(G)G._featActivesUsed=true;
   const cd=CARDS.find(c=>c.id===cardId)||NPC_CARDS_MAP[cardId];
   /* Lingering effects get persistent labels */
   const lingers=['mabels_stitch','aldrics_vow','whispers_hex','corvus_ledger','second_wind','all_in','broken_lantern'];
@@ -12008,6 +12129,9 @@ function initTierScreen(data){
   /* Update gold display */
   var _tierGoldEl=document.getElementById('tierGold');
   if(_tierGoldEl)_tierGoldEl.textContent=(S.run.gold||0)+'g';
+  /* Update renown display */
+  var _tierRenownEl=document.getElementById('tierRenown');
+  if(_tierRenownEl)_tierRenownEl.textContent=(S.renown||0);
   /* Update header */
   var tn=document.getElementById('tierName');if(tn)tn.textContent=tier.name;
   /* Render coin slots */
