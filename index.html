@@ -2199,6 +2199,16 @@ body::before,body::after{display:none!important}
 .end-draft-skip:active{transform:scale(.96);filter:brightness(1.3)}
 .end-draft-skip canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;border-radius:6px;z-index:0;image-rendering:pixelated}
 .end-draft-skip span{position:relative;z-index:1}
+/* Reshuffle button (renown perk: Regular at the bar) */
+.end-draft-reshuffle{
+  position:relative;margin:0 auto 8px;display:block;
+  cursor:pointer;border-radius:5px;
+  font-family:var(--font-px);font-size:13px;color:#dca84a;letter-spacing:2px;
+  padding:8px 22px;
+  background:rgba(60,46,22,.5);border:1px solid rgba(220,170,60,.45);
+  text-shadow:1px 1px 0 rgba(0,0,0,.6);transition:transform .06s,filter .06s;
+}
+.end-draft-reshuffle:active{transform:scale(.96);filter:brightness(1.25)}
 /* ── DRAFT SCREEN ── */
 .draft-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:20px 12px;gap:16px}
 .draft-title{font-family:var(--font-px);font-size:18px;color:var(--gold);letter-spacing:2px;text-shadow:0 2px 0 rgba(0,0,0,.5)}
@@ -5077,6 +5087,8 @@ function startNewRun(){
   S.run=_freshRun();
   /* Renown perk: Known Face → +50 starting gold */
   if(S.renownPerks&&S.renownPerks.startGold)S.run.gold=(S.run.gold||0)+50;
+  /* Renown perk: Legend → arm a boss-signature draft on first tier visit */
+  if(S.renownPerks&&S.renownPerks.legend)S.run._legendDraftPending=true;
   S.totalRuns++;
   save();
 }
@@ -5106,11 +5118,11 @@ const FEATS=[
 /* ── Renown Perks (curated, threshold-based unlocks — never spent) ── */
 const RENOWN_PERKS=[
   {threshold:25, key:'startGold',    label:'Known Face',     desc:'Begin every run with +50 starting gold'},
-  {threshold:50, key:'freeRestock',  label:'Regular at the bar', desc:'One free shop restock per session'},
+  {threshold:50, key:'freeRestock',  label:'Regular at the bar', desc:'Reshuffle the post-match card draft once per run'},
   {threshold:100,key:'shopDiscount', label:'Respected',      desc:'All shop prices reduced by 15%'},
   {threshold:150,key:'extraDraft',   label:'Honored guest',  desc:'Card drafts offer 4 cards instead of 3'},
   {threshold:200,key:'secondBoss',   label:'Lord of Dice',   desc:'Unlock a 5th loadout slot — a second boss-card slot'},
-  {threshold:300,key:'legend',       label:'Legend',         desc:'Title screen flourish and golden card frames'},
+  {threshold:300,key:'legend',       label:'Legend',         desc:'Begin every run with a free boss-signature draft (pick 1 of 3) — title shimmer too'},
 ];
 function _checkRenownPerks(){
   if(!S.renownPerks)S.renownPerks={};
@@ -5119,6 +5131,19 @@ function _checkRenownPerks(){
   if(typeof document!=='undefined'){
     document.body.classList.toggle('legend',!!S.renownPerks.legend);
   }
+}
+/* Returns an ordered list of rank suffixes for dialogue lookup —
+   highest unlocked rank first. Empty list = below the first threshold. */
+function _getRankTags(){
+  if(!S||!S.renown||S.renown<25)return [];
+  var t=[];
+  if(S.renown>=300)t.push('_LEGEND');
+  if(S.renown>=200)t.push('_LORD');
+  if(S.renown>=150)t.push('_HONORED');
+  if(S.renown>=100)t.push('_RESPECTED');
+  if(S.renown>=50)t.push('_REGULAR');
+  if(S.renown>=25)t.push('_KNOWN');
+  return t;
 }
 /* Award renown for a single feat — returns true if newly awarded */
 function awardRenown(amount, label){
@@ -9642,20 +9667,7 @@ function endMatch(win){
   if(win&&!isBoss){
     _draftBossMode=false;
     _getS();
-    var tier=TIERS[S.run.tier]||TIERS[0];
-    var pool=[];
-    var _owned=S.run.cards.filter(Boolean);
-    /* Primary: current tier's draft pool */
-    tier.draftPool.forEach(function(rar){CARDS.forEach(function(c){if(c.rarity===rar&&!c.npcOnly&&!c.npc&&!c.dep&&_owned.indexOf(c.id)===-1)pool.push(c);});});
-    /* 20% chance to include cards from next tier up */
-    var _nextT=TIERS[S.run.tier+1];
-    if(_nextT&&_nextT.draftPool){_nextT.draftPool.forEach(function(rar){CARDS.forEach(function(c){if(c.rarity===rar&&!c.npcOnly&&!c.npc&&!c.dep&&_owned.indexOf(c.id)===-1&&pool.indexOf(c)===-1&&Math.random()<0.20)pool.push(c);});});}
-    /* On tier 2+, 10% chance to include cards from one tier down */
-    if(S.run.tier>=2){var _prevT=TIERS[S.run.tier-1];if(_prevT&&_prevT.draftPool){_prevT.draftPool.forEach(function(rar){CARDS.forEach(function(c){if(c.rarity===rar&&!c.npcOnly&&!c.npc&&!c.dep&&_owned.indexOf(c.id)===-1&&pool.indexOf(c)===-1&&Math.random()<0.10)pool.push(c);});});}}
-    for(var di=pool.length-1;di>0;di--){var dj=Math.floor(Math.random()*(di+1));var dt=pool[di];pool[di]=pool[dj];pool[dj]=dt;}
-    /* Renown perk: Honored guest → 4 draft offers instead of 3 */
-    var _draftN=(S&&S.renownPerks&&S.renownPerks.extraDraft)?4:3;
-    _draftCards=pool.slice(0,_draftN);
+    _draftCards=_buildDraftPool();
     _draftSelected=null;_draftTargetSlot=-1;
     _draftPickedCardId=null;_draftPickedSlotIdx=-1;_draftPickedEl=null;
     /* Build inline draft HTML in resCard */
@@ -9673,6 +9685,10 @@ function endMatch(win){
     });
     draftHtml+='</div>';
     draftHtml+='<div class="end-draft-slots" id="endDraftSlots"></div>';
+    /* Renown perk: Regular at the bar → reshuffle the offered cards once per run */
+    if(S.renownPerks&&S.renownPerks.freeRestock&&!S.run._restockUsed){
+      draftHtml+='<div class="end-draft-reshuffle" id="endDraftReshuffleBtn" onclick="reshuffleDraft()"><span>⭐ RESHUFFLE</span></div>';
+    }
     draftHtml+='<div class="end-draft-skip" id="endDraftSkipBtn" onclick="SFX.nav();_endDraftSkip()"><canvas></canvas><span>SKIP</span></div>';
     draftHtml+='</div>';
     if(resCard){resCard.innerHTML=draftHtml;resCard.classList.add('show');}
@@ -9967,6 +9983,9 @@ function exitMatch(){
 const OPP_DIALOGUE={
   GROG:{
     MATCH_START:["Sit. The bones ain't rolled themselves yet, more's the pity.","I'd warn ye to mind yer purse, but I won't remember ye took it.","Pour, throw, drink. That's the order, yae?"],
+    MATCH_START_KNOWN:["Hoy, you again. Sit, sit. Bones still cold, mind.","Greta said yer face turned up. Put coin down."],
+    MATCH_START_RESPECTED:["The drinkers nudge each other when ye walk in now. I noticed.","Heard yer name in two taverns this week. Sit."],
+    MATCH_START_LEGEND:["Hells. Heard ye were comin'. Cleared the table meself.","They told me it'd be you. I poured two cups. Drink."],
     RISKY_REROLL:["Now there's a man with no roof to lose.","Bold as a bald arse in a draft.","Drunk-brave. My favourite kind."],
     GREEDY_REROLL:["Greed's a heavier coat than wool, friend.","I've watched bigger men chase smaller bones into the gutter.","Push it. The bones love a fool."],
     EARLY_BANK:["Quit already? Yer ma must've raised a barkeep.","Safe, sober, and dull. The unholy three.","Coward's pour, that one."],
@@ -9997,6 +10016,8 @@ const OPP_DIALOGUE={
   },
   MABEL:{
     MATCH_START:["Sit down, sprout. I've to be in the field by dawn.","Buried me husband, three hens, and a good hound. Yer turn.","Kettle's near boil. Make it quick, lose yer coin."],
+    MATCH_START_RESPECTED:["Still got coin, then? Town's been talking.","Quick now, sprout. Even busy folk hear stories."],
+    MATCH_START_LEGEND:["The miller asked after ye. So did the priest. Sit. Quick."],
     RISKY_REROLL:["Bold. Like a hare in a fox's wedding.","Push it then. Stupid grows quick if ye water it.","Pluck like that buried me husband, mind."],
     GREEDY_REROLL:["Greed starves a family. I've watched it.","Careful, sprout. Heavy coats drown ye in summer.","One more, then? That's how the cellar empties."],
     EARLY_BANK:["Stoppin' already? Ye'd not survive a hard winter.","Modest. Plain bread, no jam.","Safe and small. The cellar way."],
@@ -10027,6 +10048,8 @@ const OPP_DIALOGUE={
   },
   FINNICK:{
     MATCH_START:["Sit down, friend. Pockets out, palms up. Just kiddin'. Mostly.","Gran needs shoes, and yer purse looks heavy. Let's see.","Make it quick, yae? Watch's already changed twice."],
+    MATCH_START_RESPECTED:["Heard yer name in three alleys this week. Sit.","Some folk pay me to point ye out. I didn't take it. Yet."],
+    MATCH_START_LEGEND:["The whole quarter knows yer face, friend. Even the rats step aside.","I tried t' tell gran a story 'bout ye. She'd already heard it."],
     RISKY_REROLL:["Yae? Bold. I'll be liftin' that move later, no charge to ye.","Mental, friend. Properly. I love it.","Pluck like that gets a man pinched. Or rich. Or both."],
     GREEDY_REROLL:["Eyes wider'n yer belly, friend. I've seen that look hang men.","Hold on now — that's the greed what cost me a good coat.","Push it. Push it twice. See what falls out."],
     EARLY_BANK:["That's it? Even gran shoves harder.","Soft. Boring. Yer leavin' coppers on the table.","Coward's pour. Won't get ye fed in the lower quarter."],
@@ -10058,6 +10081,8 @@ const OPP_DIALOGUE={
   },
   CORVUS:{
     MATCH_START:["Sit. Show me yer coin. I'll have an estimate by the second roll.","I've seen merchants ruin themselves at this table. Continue.","The ledger's open. So is the door, should ye lose yer nerve."],
+    MATCH_START_RESPECTED:["Yer credit at me window improved last quarter. Noted.","I'd extend ye terms. Reputable patrons get the better rate."],
+    MATCH_START_LEGEND:["A line of merchants asked after yer business this morning. I told them nothing. Yet.","Yer name moves coin in three counties. I keep the books on it."],
     RISKY_REROLL:["Spending what ye don't yet own. The classic ruin.","A man hanged for less than that throw last spring.","Bold. The ledger likes bold men, briefly."],
     GREEDY_REROLL:["Interest comes due, friend. Always.","Greed's a noose ye knot yerself. I've watched it.","One more, then? Yer making me richer with every breath."],
     EARLY_BANK:["A pittance. Coward's logic.","Copper safe in a copper purse. Tidy. Beneath ye.","Banked early. Ye'll die owning a stool and a cat."],
@@ -10089,6 +10114,8 @@ const OPP_DIALOGUE={
   },
   BRUTUS:{
     MATCH_START:["Sit. Roll. Quieter work than burying the dead.","I fought twelve years on the border. Yer dice'll bore me.","Eyes forward, recruit. These bones've seen worse than ye."],
+    MATCH_START_RESPECTED:["I asked the camp about ye. They knew the name.","Old soldiers take the long view. I've taken yers."],
+    MATCH_START_LEGEND:["Two of mine men recognized ye on the way in. They saluted.","I've fought beside men with smaller reputations than yers. Sit."],
     RISKY_REROLL:["Charge the wall, then. Guts, I'll grant ye that.","Stupid brave. The kind that makes for short songs.","Bold. I've buried men just like ye."],
     GREEDY_REROLL:["Overextended. Yer flank's open and ye don't know it.","Pulled back from a push like that at the Daughters' War. Lived.","Past the treeline. Pull back, fool, before the bones bite."],
     EARLY_BANK:["Diggin' a trench already? That's not a soldier's pour.","Safe. Won't win wars from a hole.","Retreatin' before ye've drawn blood. Tsk."],
@@ -10120,6 +10147,8 @@ const OPP_DIALOGUE={
   },
   ALDRIC:{
     MATCH_START:["Sit, sir, sit. A duel — my life is dreadfully dull otherwise.","Fangbreaker hath waited long for sport. Speak yer terms.","Challenge accepted, by mine honor. Roll, and roll well."],
+    MATCH_START_RESPECTED:["A worthy opponent at last. The hall is dull without thy kind.","Mine page kept yer last result in the ledger. Promising."],
+    MATCH_START_LEGEND:["I've heard yer sagas sung — twice, by different bards. They differ on the verses.","To play thee is an honor I shall remember in mine winter years."],
     RISKY_REROLL:["Valorous. The bards shall hear of it. Should ye live.","Bold as a charging knight. Most of whom die in song.","Pluck like that earned me last squire a fine epitaph."],
     GREEDY_REROLL:["Hubris. The slayer of kings and fools both.","Even noble steeds know when to halt. Ye, apparently, do not.","One pace too far, sir. Ballads end thus."],
     EARLY_BANK:["Safe? Where is the romance, sir? Where is the verse?","Ye are ruining the ballad. Try harder.","A safe pour. Saved for old age, perhaps."],
@@ -10151,6 +10180,8 @@ const OPP_DIALOGUE={
   },
   WHISPER:{
     MATCH_START:["Sit, do. The cushion's warm — Pembrook polished it for the last challenger.","I used to tax peasants like ye. Now I play with them. So civilised.","One moment. Pembrook, the gloves. Now, then. Roll."],
+    MATCH_START_RESPECTED:["Pembrook, the second cushion. The good one. Yes — that one.","I'm told ye're worth my time. A rare compliment. Begin."],
+    MATCH_START_LEGEND:["Pembrook nearly fainted when I told him you were coming. Don't disappoint him.","I had a dress made for this game. Pembrook insisted. Roll, dear."],
     RISKY_REROLL:["Uncouth. Such pluck belongs in a ditch.","Like a moth at a candle. Lovely, briefly.","Fools and their coin part with such grace, don't they."],
     GREEDY_REROLL:["Grasping. Ye smell faintly of desperation.","Greed is for those not born with enough.","Reaching for the crown with muddy fingers. How quaint."],
     EARLY_BANK:["A pittance. How perfectly common.","Timid. Do stay in yer lane, dear.","Predictably small. How very... ye."],
@@ -10182,6 +10213,8 @@ const OPP_DIALOGUE={
   },
   AMBROSE:{
     MATCH_START:["Sit, child. The Allgod helps those who tithe to me.","Let us pray for thy purse. The roof of mine cathedral leaks.","The stars foretold yer arrival. They are seldom wrong, regrettably for ye."],
+    MATCH_START_RESPECTED:["Yer name passed me lips at the last sermon. Don't ask in what context.","I've prayed for thee. Or against thee — the words are similar."],
+    MATCH_START_LEGEND:["I've taken yer name from me prayers. The Allgod no longer answers when I mention it.","The acolytes whisper of thee. I tell them ye're mortal. We shall see."],
     RISKY_REROLL:["Faith is a virtue, child. Stupidity is a choice.","The heavens watch ye make poor decisions. They are amused.","Such pluck. The Allgod loves the bold and buries them quickly."],
     GREEDY_REROLL:["Gluttony, child. Leave somewhat for the collection plate.","Ye test the Allgod's patience, and mine.","Greed is the second sin. Pride first. Ye shall reach pride next throw, no doubt."],
     EARLY_BANK:["Blessed are the timid, for they shall inherit small tithes.","Modest, child. The heavens yawn at ye.","A small offering. The Allgod notes it without enthusiasm."],
@@ -10233,7 +10266,13 @@ function jitterText(text,scale){
   const DLG={lastTime:0,cooldown:4000,hideTimer:null,active:false,oppKey:null,usedLines:{},
     prob:{MATCH_START:1,REMATCH_START:1,CARD_EFFECT:.8,RISKY_REROLL:.5,GREEDY_REROLL:.5,EARLY_BANK:.3,BIG_BANK:.6,PLAYER_BUST:.85,PLAYER_HOT_DICE:1,PLAYER_TRIPLE:.4,PLAYER_STRAIGHT:1,PLAYER_SIX_KIND:1,PLAYER_TAKES_LEAD:.45,PLAYER_NEAR_WIN:.7,OPP_BUST:.8,OPP_BIG_BANK:.6,OPP_TAKES_LEAD:.45,OPP_NEAR_WIN:.7,MATCH_CLOSE:.4,LOSING_BADLY:.35,WINNING_BADLY:.35,OPP_WINS:1},
     init(rungName,rungKey){this.oppKey=rungName.toUpperCase();this.portraitKey=rungKey||rungName.toLowerCase();this.lastTime=0;this.active=false;this.usedLines={};if(this.hideTimer)clearTimeout(this.hideTimer);this.hide();},
-    getLine(cat){const data=OPP_DIALOGUE[this.oppKey];if(!data||!data[cat])return null;const lines=data[cat];if(!this.usedLines[cat])this.usedLines[cat]=[];
+    getLine(cat){const data=OPP_DIALOGUE[this.oppKey];if(!data)return null;
+      /* Rank-aware dialogue: try suffixed variants from highest unlocked rank down.
+         e.g. MATCH_START_LEGEND > MATCH_START_LORD > … > MATCH_START. */
+      const tags=(typeof _getRankTags==='function')?_getRankTags():[];
+      for(let ti=0;ti<tags.length;ti++){const keyed=cat+tags[ti];if(data[keyed]&&data[keyed].length){cat=keyed;break;}}
+      if(!data[cat])return null;
+      const lines=data[cat];if(!this.usedLines[cat])this.usedLines[cat]=[];
       let avail=lines.filter((_,i)=>!this.usedLines[cat].includes(i));if(!avail.length){this.usedLines[cat]=[];avail=lines;}
       const idx=Math.floor(Math.random()*avail.length);const line=avail[idx];this.usedLines[cat].push(lines.indexOf(line));return line;},
     trigger(cat){if(!this.oppKey)return;
@@ -11635,6 +11674,56 @@ function _initSlotUndoDrag(slotEl,slotIdx){
 function _endDraftSkip(){
   _endDraftDone();
 }
+
+/* Build the post-match card-draft offer pool. Pulls from current tier's
+   draft rarities, with a chance of next/prev tier sprinkled in. Honored
+   guest perk bumps the slice from 3 → 4. */
+function _buildDraftPool(){
+  _getS();
+  var tier=TIERS[S.run.tier]||TIERS[0];
+  var pool=[];
+  var _owned=S.run.cards.filter(Boolean);
+  tier.draftPool.forEach(function(rar){CARDS.forEach(function(c){if(c.rarity===rar&&!c.npcOnly&&!c.npc&&!c.dep&&_owned.indexOf(c.id)===-1)pool.push(c);});});
+  var _nextT=TIERS[S.run.tier+1];
+  if(_nextT&&_nextT.draftPool){_nextT.draftPool.forEach(function(rar){CARDS.forEach(function(c){if(c.rarity===rar&&!c.npcOnly&&!c.npc&&!c.dep&&_owned.indexOf(c.id)===-1&&pool.indexOf(c)===-1&&Math.random()<0.20)pool.push(c);});});}
+  if(S.run.tier>=2){var _prevT=TIERS[S.run.tier-1];if(_prevT&&_prevT.draftPool){_prevT.draftPool.forEach(function(rar){CARDS.forEach(function(c){if(c.rarity===rar&&!c.npcOnly&&!c.npc&&!c.dep&&_owned.indexOf(c.id)===-1&&pool.indexOf(c)===-1&&Math.random()<0.10)pool.push(c);});});}}
+  for(var di=pool.length-1;di>0;di--){var dj=Math.floor(Math.random()*(di+1));var dt=pool[di];pool[di]=pool[dj];pool[dj]=dt;}
+  var _draftN=(S&&S.renownPerks&&S.renownPerks.extraDraft)?4:3;
+  return pool.slice(0,_draftN);
+}
+
+/* Free Restock perk handler — reshuffle the offered cards once per run */
+function reshuffleDraft(){
+  _getS();
+  if(!S.renownPerks||!S.renownPerks.freeRestock||S.run._restockUsed)return;
+  S.run._restockUsed=true;
+  save();
+  /* Regenerate offer */
+  _draftCards=_buildDraftPool();
+  /* Re-render the offered cards in place — keep the slots/skip button intact */
+  var draftCardsRow=document.querySelector('.end-draft .end-draft-cards');
+  if(!draftCardsRow)return;
+  var html='';
+  _draftCards.forEach(function(card){
+    var sd=(Math.random()*8).toFixed(1);
+    html+='<div class="draft-card-wrap" data-card-id="'+card.id+'">';
+    html+='<div class="gcard rarity-'+card.rarity+'" style="--sheen-delay:-'+sd+'s">';
+    html+='<div class="gcard-cover" style="background:'+(CARD_BG[card.id]||'#444')+'">'+card.icon+'</div>';
+    html+='<div class="gcard-frame"></div>'+gcCorners()+'</div>';
+    html+=mkCardTooltipHTML(card,null,{showFlavor:false,asPlayer:true});
+    html+='</div>';
+  });
+  draftCardsRow.innerHTML=html;
+  /* Re-attach drag + tooltip handlers */
+  draftCardsRow.querySelectorAll('.draft-card-wrap').forEach(function(el){
+    attachTooltipTap(el);
+    _initEndDraftDrag(el,el.dataset.cardId);
+  });
+  /* Hide the reshuffle button now that it's used */
+  var rb=document.getElementById('endDraftReshuffleBtn');
+  if(rb)rb.style.display='none';
+  SFX.coins?SFX.coins():SFX.nav();
+}
 function _endDraftDone(){
   _draftDragState=null;
   _draftDragging=false;
@@ -11655,14 +11744,8 @@ function initShopScreen(){
   save();
   var host=document.getElementById('shopBody');
   if(!host)return;
-  /* Renown perk: Regular at the bar → one free restock per session.
-     S.run._restockUsed tracks whether it's been used this run. */
-  var _hasRestock=S&&S.renownPerks&&S.renownPerks.freeRestock&&!S.run._restockUsed;
   var html='<div class="dice-store-wrap">';
   html+='<div class="dice-store-grid" id="dsGrid"></div>';
-  if(_hasRestock){
-    html+='<div class="restock-row" style="padding:18px 16px 0"><button class="restock-btn" id="freeRestockBtn" onclick="useFreeRestock()"><canvas></canvas><span class="btn-inner">⭐ FREE RESTOCK</span></button></div>';
-  }
   html+='<div class="end-draft-label shop-your-dice" style="margin-top:14px;letter-spacing:3px">YOUR DICE</div>';
   html+='<div class="ds-loadout" id="dsLoadout"></div>';
   html+='</div>';
@@ -11672,27 +11755,6 @@ function initShopScreen(){
   if(topAmt)topAmt.textContent=(S.run.gold||0);
   _renderDiceStore();
   _renderDiceStoreLoadout();
-  /* Render restock button canvas if present */
-  if(_hasRestock){
-    requestAnimationFrame(function(){
-      var btn=document.getElementById('freeRestockBtn');
-      if(btn){var cv=btn.querySelector('canvas');
-        if(cv){cv.width=btn.offsetWidth;cv.height=btn.offsetHeight;cv.style.width='100%';cv.style.height='100%';
-          drawPixelPanel(cv,'#5a4a30','#2e2418','#161008',7733,0.012);}}
-    });
-  }
-}
-
-/* Free Restock perk handler: refills dice stock once per run */
-function useFreeRestock(){
-  _getS();
-  if(!S.renownPerks||!S.renownPerks.freeRestock||S.run._restockUsed)return;
-  S.run.diceStock=_initDiceStock();
-  S.run._restockUsed=true;
-  save();
-  SFX.coins?SFX.coins():SFX.nav();
-  /* Re-render the shop to refresh stock + remove the button */
-  initShopScreen();
 }
 
 /* Inline dice STORE for boss wins — buy dice with gold */
@@ -12207,10 +12269,62 @@ function rewardContinue(){
   showScreen('gauntlet');
 }
 
+/* Legend renown draft — show 3 random boss signatures, player picks one
+   to equip in the boss slot at run start. */
+function _showLegendDraft(){
+  _getS();
+  /* Build pool: all player-equippable cards with an npc field (boss signatures) */
+  var pool=[];
+  CARDS.forEach(function(c){if(c.npc&&!c.dep&&!c.npcOnly)pool.push(c);});
+  for(var i=pool.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=pool[i];pool[i]=pool[j];pool[j]=t;}
+  var offer=pool.slice(0,3);
+  if(!offer.length){
+    /* No boss cards somehow — just clear the flag and continue */
+    delete S.run._legendDraftPending;save();
+    return false;
+  }
+  var ov=document.createElement('div');
+  ov.id='legendDraftOv';
+  ov.style.cssText='position:fixed;inset:0;z-index:9900;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;padding:20px;touch-action:manipulation';
+  var title='<div style="font-family:MedievalSharp,serif;font-size:24px;color:#dca84a;letter-spacing:3px;text-align:center;margin-bottom:6px;text-shadow:0 2px 0 rgba(0,0,0,.6)">A LEGEND ARRIVES</div>';
+  var sub='<div style="font-family:var(--font-px);font-size:11px;color:var(--textdim);letter-spacing:1.5px;text-align:center;margin-bottom:18px;line-height:1.5">Even before sitting down, your name carries weight.<br>Choose a signature card to begin this run with.</div>';
+  var cardsHtml='<div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:18px">';
+  offer.forEach(function(cd){
+    var rar=cd.npc?'boss-'+cd.npc:cd.rarity;
+    cardsHtml+='<div class="legend-pick-card" data-cid="'+cd.id+'" style="width:clamp(80px,24vw,110px);cursor:pointer;transition:transform .15s">';
+    cardsHtml+='<div class="gcard rarity-'+rar+'" style="aspect-ratio:2/3">';
+    cardsHtml+='<div class="gcard-cover" style="background:'+(CARD_BG[cd.id]||'#600')+';font-size:28px;display:flex;align-items:center;justify-content:center">'+cd.icon+'</div>';
+    cardsHtml+='<div class="gcard-frame"></div>'+gcCorners()+'</div>';
+    cardsHtml+='<div style="font-family:var(--font-px);font-size:10px;color:#dca84a;text-align:center;margin-top:6px;letter-spacing:1px">'+cd.name+'</div>';
+    cardsHtml+='<div style="font-family:var(--font-px);font-size:9px;color:var(--textdim);text-align:center;margin-top:2px;letter-spacing:.5px">'+(cd.eff||'')+'</div>';
+    cardsHtml+='</div>';
+  });
+  cardsHtml+='</div>';
+  ov.innerHTML='<div style="background:#28221c;border:2px solid #6a5430;border-radius:6px;padding:24px 18px;max-width:420px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.7)">'+title+sub+cardsHtml+'</div>';
+  document.body.appendChild(ov);
+  ov.querySelectorAll('.legend-pick-card').forEach(function(el){
+    el.addEventListener('click',function(){
+      SFX.nav();
+      var pickedId=el.dataset.cid;
+      _getS();
+      S.run.cards[3]=pickedId;
+      delete S.run._legendDraftPending;
+      save();
+      ov.remove();
+      initTierScreen({});
+    });
+  });
+  return true;
+}
+
 /* ═══════ TIER SCREEN (replaces gauntlet) ═══════ */
 function initTierScreen(data){
   _getS();
   var endOv=document.getElementById('end-ov');if(endOv)endOv.classList.remove('show');
+  /* Legend renown perk: present a boss-signature draft at run start */
+  if(S.run._legendDraftPending){
+    if(_showLegendDraft())return;
+  }
   /* If gauntlet in progress, route directly to next fight */
   if(S.run.inGauntlet){startGauntletSequence();return;}
   /* If run complete (tier >= TIERS.length), show victory */
