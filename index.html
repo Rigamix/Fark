@@ -2107,6 +2107,12 @@ body::before,body::after{display:none!important}
 .tier-loadout .tier-lo-wrap:nth-child(2):nth-last-child(3){transform:rotate(-3deg) translateY(-2px);z-index:1}
 .tier-loadout .tier-lo-wrap:nth-child(3):nth-last-child(2){transform:rotate(3deg) translateY(-2px);z-index:2}
 .tier-loadout .tier-lo-wrap:nth-child(4):nth-last-child(1){transform:rotate(9deg) translateY(5px);z-index:3}
+/* 5-card layout (Lord of Dice unlocked — second boss slot): wider fan */
+.tier-loadout .tier-lo-wrap:nth-child(1):nth-last-child(5){transform:rotate(-12deg) translateY(7px)}
+.tier-loadout .tier-lo-wrap:nth-child(2):nth-last-child(4){transform:rotate(-6deg) translateY(1px);z-index:1}
+.tier-loadout .tier-lo-wrap:nth-child(3):nth-last-child(3){transform:rotate(0deg) translateY(-3px);z-index:2}
+.tier-loadout .tier-lo-wrap:nth-child(4):nth-last-child(2){transform:rotate(6deg) translateY(1px);z-index:3}
+.tier-loadout .tier-lo-wrap:nth-child(5):nth-last-child(1){transform:rotate(12deg) translateY(7px);z-index:4}
 .tier-lo-card{
   width:100%;aspect-ratio:2/3;position:relative;
   background:rgba(30,26,18,.8);border:2px solid rgba(200,160,80,.2);border-radius:5px;
@@ -2121,6 +2127,11 @@ body::before,body::after{display:none!important}
 .tier-loadout .tier-lo-wrap:nth-child(2):nth-last-child(3) .mcard-tooltip{transform:translateX(-50%) rotate(3deg)}
 .tier-loadout .tier-lo-wrap:nth-child(3):nth-last-child(2) .mcard-tooltip{transform:translateX(-50%) rotate(-3deg)}
 .tier-loadout .tier-lo-wrap:nth-child(4):nth-last-child(1) .mcard-tooltip{transform:translateX(-50%) rotate(-9deg)}
+/* 5-card layout */
+.tier-loadout .tier-lo-wrap:nth-child(1):nth-last-child(5) .mcard-tooltip{transform:translateX(-50%) rotate(12deg)}
+.tier-loadout .tier-lo-wrap:nth-child(2):nth-last-child(4) .mcard-tooltip{transform:translateX(-50%) rotate(6deg)}
+.tier-loadout .tier-lo-wrap:nth-child(4):nth-last-child(2) .mcard-tooltip{transform:translateX(-50%) rotate(-6deg)}
+.tier-loadout .tier-lo-wrap:nth-child(5):nth-last-child(1) .mcard-tooltip{transform:translateX(-50%) rotate(-12deg)}
 .tier-lo-wrap.peeked .mcard-tooltip{opacity:1;pointer-events:auto;animation:tipGrow .25s ease-out}
 .tier-lo-die .die-tooltip{opacity:0;pointer-events:none;transition:opacity .2s}
 .tier-lo-die.peeked .die-tooltip{opacity:1;pointer-events:auto;animation:tipGrow .25s ease-out}
@@ -4993,16 +5004,24 @@ var _boneDice=['bone','bone','bone','bone','bone','bone'];
 /* Regular loadout slots unlock progressively across tiers — early game
    the player runs a tighter hand, more slots open up as they climb.
    Slot 3 (boss) is always available so signatures equip the moment
-   they're earned. Tweak these thresholds to retune the curve. */
-var SLOT_UNLOCK_TIER=[3,1,0,0];/* slot 0..3 → tier index needed (0-indexed) */
+   they're earned. Slot 4 (second boss) is renown-gated, not tier-gated.
+   Tweak these thresholds to retune the curve. */
+var SLOT_UNLOCK_TIER=[3,1,0,0,99];/* slot 0..4 → tier index needed (slot 4 disabled by default) */
 function _isSlotUnlocked(idx){
   if(idx<0||idx>=SLOT_UNLOCK_TIER.length)return true;
+  /* Slot 4: gated on Lord of Dice renown perk, not tier */
+  if(idx===4)return !!(S&&S.renownPerks&&S.renownPerks.secondBoss);
   return (S&&S.run&&(S.run.tier||0)>=SLOT_UNLOCK_TIER[idx]);
 }
+/* Number of loadout slots to render — 4 by default, 5 if Lord of Dice unlocked */
+function _loadoutSlotCount(){
+  return (S&&S.renownPerks&&S.renownPerks.secondBoss)?5:4;
+}
 function _freshRun(){
-  /* cards: 4 slots — [0..2] regular (progressively unlocked, see SLOT_UNLOCK_TIER),
-     [3] boss-only signature (always available). */
-  return{tier:0,points:0,cards:[null,null,null,null],dice:[..._boneDice],bossesBeaten:[],diceRerolls:1,handicapOffer:null,inGauntlet:false,gauntletIndex:0,gold:100,diceStock:null,cardTarnish:{}};
+  /* cards: 5 slots — [0..2] regular (progressively unlocked, see SLOT_UNLOCK_TIER),
+     [3] boss-only signature (always available), [4] second boss slot (locked
+     unless S.renownPerks.secondBoss is unlocked at 200 renown). */
+  return{tier:0,points:0,cards:[null,null,null,null,null],dice:[..._boneDice],bossesBeaten:[],diceRerolls:1,handicapOffer:null,inGauntlet:false,gauntletIndex:0,gold:100,diceStock:null,cardTarnish:{}};
 }
 function _getS(){
   if(!S){
@@ -5023,10 +5042,11 @@ function _getS(){
     /* Drop any equipped cards that no longer exist in the catalog (e.g. removed in an update) */
     var _removedCards=['tyrants_gaze','the_hare','phoenix_ash','cracked_bell','drunkards_prayer','the_ledger_npc','the_collection_plate'];
     if(Array.isArray(S.run.cards))S.run.cards=S.run.cards.map(function(cid){return cid&&_removedCards.indexOf(cid)===-1?cid:null;});
-    /* Boss-slot migration: pad to 4 slots and move any boss card sitting in
-       slot 2 (legacy boss-slot index) into slot 3 (new boss-only slot). */
+    /* Boss-slot migration: pad to 5 slots ([0..2] regular, [3] boss, [4] 2nd boss
+       — last unlocked via renown perk). Move any boss card from legacy slot 2
+       into slot 3. */
     if(Array.isArray(S.run.cards)){
-      while(S.run.cards.length<4)S.run.cards.push(null);
+      while(S.run.cards.length<5)S.run.cards.push(null);
       var _c2=S.run.cards[2];
       var _cd2=_c2?(CARDS_MAP[_c2]||null):null;
       if(_cd2&&_cd2.npc&&!S.run.cards[3]){
@@ -11380,7 +11400,7 @@ function _draftFindDropSlot(x,y){
     var slot=hit.closest('.draft-slot');
     if(slot&&slot.closest('#endDraftSlots')){
       var idx=parseInt(slot.dataset.slotIdx);
-      /* Boss draft only accepts slot 3; regular draft only accepts 0/1/2.
+      /* Boss draft only accepts boss slots (3 or 4); regular draft only accepts 0/1/2.
          Locked slots (haven't reached their unlock tier yet) are also rejected. */
       if(!_isSlotUnlocked(idx))return null;
       if(!(_draftBossMode?idx<3:idx>=3))return{el:slot,idx:idx};
@@ -11420,7 +11440,7 @@ function _draftPlaceCard(cardId,slotIdx,srcEl){
   save();
   var cd=_tC;
   if(!cd)return false;
-  s.className='draft-slot filled'+(slotIdx===3?' boss':'');
+  s.className='draft-slot filled'+(slotIdx>=3?' boss':'');
   var _slotRar=cd.npc?'boss-'+cd.npc:(cd.npcOnly&&cd.owner?'boss-'+cd.owner:(cd.npcOnly?'npc':cd.rarity));
   s.innerHTML='<div class="gcard rarity-'+_slotRar+'" style="position:absolute;inset:0;width:100%;height:100%;border-radius:4px"><div class="gcard-cover" style="background:'+(CARD_BG[cardId]||'#444')+'">'+cd.icon+'</div><div class="gcard-frame"></div>'+gcCorners()+'</div>';
   /* Replace wrapper to clear any stale listeners */
@@ -11566,7 +11586,7 @@ function _initSlotUndoDrag(slotEl,slotIdx){
 
       /* Undo: clear the slot, restore the offered card */
       _getS();S.run.cards[slotIdx]=null;save();
-      slotEl.className='draft-slot'+(slotIdx===3?' boss':'');
+      slotEl.className='draft-slot'+(slotIdx>=3?' boss':'');
       slotEl.innerHTML='';slotEl.style.opacity='';
       if(_draftPickedEl){
         _draftPickedEl.style.visibility='';_draftPickedEl.style.pointerEvents='';_draftPickedEl.style.opacity='';
@@ -11849,14 +11869,14 @@ function _renderEndDraftSlots(){
   var row=document.getElementById('endDraftSlots');if(!row)return;
   row.innerHTML='';
   _getS();
-  for(var i=0;i<4;i++){
+  for(var i=0;i<_loadoutSlotCount();i++){
     var cid=S.run.cards[i];
     /* Wrapper for slot + tooltip (tooltip as sibling, not child of slot) */
     var wrap=document.createElement('div');
     wrap.style.cssText='position:relative;width:clamp(60px,18vw,80px)';
     var slot=document.createElement('div');
     var _lockCls=(!cid&&!_isSlotUnlocked(i))?' locked':'';
-    slot.className='draft-slot'+(cid?' filled':'')+(i===3?' boss':'')+_lockCls;
+    slot.className='draft-slot'+(cid?' filled':'')+(i>=3?' boss':'')+_lockCls;
     slot.dataset.slotIdx=i;
     if(cid){
       var cd=CARDS.find(function(c){return c.id===cid;})||getNpcCard(cid);
@@ -11995,12 +12015,12 @@ function draftSkip(){
 function _renderDraftSlots(){
   var row=document.getElementById('draftSlotRow');
   row.innerHTML='';
-  for(var i=0;i<4;i++){
+  for(var i=0;i<_loadoutSlotCount();i++){
     var cid=S.run.cards[i];
     var slot=document.createElement('div');
     var _slotLocked=!cid&&!_isSlotUnlocked(i);
     var _lockCls=_slotLocked?' locked':'';
-    slot.className='draft-slot'+(cid?' filled':'')+(i===3?' boss':'')+_lockCls;
+    slot.className='draft-slot'+(cid?' filled':'')+(i>=3?' boss':'')+_lockCls;
     if(cid){
       var cd=CARDS.find(function(c){return c.id===cid;})||getNpcCard(cid);
       slot.textContent=cd?cd.icon:'?';
@@ -12089,8 +12109,13 @@ function _rewardSelectCard(cardId){
   document.querySelectorAll('.reward-card-wrap').forEach(function(el){
     el.classList.toggle('selected',el.dataset.cardId===cardId);
   });
-  /* Boss slot is always available — signatures equip immediately on win */
-  S.run.cards[3]=cardId;
+  /* Boss slot is always available — signatures equip immediately on win.
+     If the 5th slot is unlocked AND slot 3 is filled, place in slot 4. */
+  if(S.run.cards[3]&&_isSlotUnlocked(4)){
+    S.run.cards[4]=cardId;
+  }else{
+    S.run.cards[3]=cardId;
+  }
   save();
   /* Show dice section */
   setTimeout(function(){
@@ -12272,17 +12297,17 @@ function _renderTierLoadout(){
         var cd=CARDS.find(function(c){return c.id===cid;})||getNpcCard(cid);
         if(cd){
           var _tRar=cd.npc?'boss-'+cd.npc:(cd.npcOnly&&cd.owner?'boss-'+cd.owner:(cd.npcOnly?'npc':cd.rarity));
-          html+='<div class="tier-lo-card'+(i===3?' boss':'')+'">';
+          html+='<div class="tier-lo-card'+(i>=3?' boss':'')+'">';
           html+='<div class="gcard rarity-'+_tRar+'" style="position:absolute;inset:0;width:100%;height:100%;border-radius:4px">';
           html+='<div class="gcard-cover" style="background:'+(CARD_BG[cid]||'#444')+'">'+cd.icon+'</div>';
           html+='<div class="gcard-frame"></div>'+gcCorners()+'</div></div>';
           html+=mkCardTooltipHTML(cd,null,{showFlavor:false});
         }else{
-          html+='<div class="tier-lo-card'+(i===3?' boss':'')+'"></div>';
+          html+='<div class="tier-lo-card'+(i>=3?' boss':'')+'"></div>';
         }
       }else{
         var _lockCls=_isSlotUnlocked(i)?'':' locked';
-        html+='<div class="tier-lo-card empty'+(i===3?' boss':'')+_lockCls+'"></div>';
+        html+='<div class="tier-lo-card empty'+(i>=3?' boss':'')+_lockCls+'"></div>';
       }
       html+='</div>';
     });
