@@ -2658,6 +2658,12 @@ body::before,body::after{display:none!important}
   content:'';position:absolute;top:100%;left:var(--arrow-left,50%);transform:translateX(-50%);
   border:6px solid transparent;border-top-color:var(--dborder2);
 }
+/* Flip-down variant: tooltip sits below the die, arrow points up */
+.die-tooltip.flip-down{transform-origin:center top;}
+.die-tooltip.flip-down::after{
+  top:auto;bottom:100%;
+  border-top-color:transparent;border-bottom-color:var(--dborder2);
+}
 .die-tooltip#activeDieTooltip{opacity:1;pointer-events:auto;animation:dtGrow .25s ease-out,dtFloat 3s ease-in-out .25s infinite}
 @keyframes dtGrow{
   0%{transform:scale(.3);opacity:0}
@@ -10308,7 +10314,17 @@ function attachDieTooltipTap(dieEl,matId){
     if(left<4)left=4;
     if(left+tw>window.innerWidth-4)left=window.innerWidth-4-tw;
     tip.style.left=left+'px';
-    tip.style.bottom=(window.innerHeight-r.top+8)+'px';
+    /* Default: tooltip above the die. If that would clip the viewport top
+       (e.g. shop's top row being covered by the title bar), flip it below. */
+    var th=tip.getBoundingClientRect().height||140;
+    var topClearance=60;/* leave room below the title bar */
+    if(r.top - th - 8 < topClearance){
+      tip.classList.add('flip-down');
+      tip.style.bottom='';
+      tip.style.top=(r.bottom+8)+'px';
+    }else{
+      tip.style.bottom=(window.innerHeight-r.top+8)+'px';
+    }
     var arrowPct=((dieCenterX-left)/tw*100);
     arrowPct=Math.max(10,Math.min(90,arrowPct));
     tip.style.setProperty('--arrow-left',arrowPct+'%');
