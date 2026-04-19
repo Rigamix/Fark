@@ -2096,6 +2096,11 @@ body::before,body::after{display:none!important}
 .tier-lo-card.empty{border-style:dashed;border-color:rgba(140,130,110,.25);background:#1e1a12}
 .tier-lo-card.boss{border-color:rgba(220,170,60,.55);background:rgba(80,64,30,.3)}
 .tier-lo-card.boss.empty{border-style:dashed;border-color:rgba(220,170,60,.45);background:rgba(80,64,30,.18)}
+.tier-lo-card.boss.empty.locked{border-color:rgba(120,100,60,.3);background:rgba(40,32,18,.45);position:relative}
+.tier-lo-card.boss.empty.locked::after{content:'\1F512';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:rgba(180,150,80,.5);font-size:14px}
+.draft-slot.boss.locked{border-color:rgba(120,100,60,.35);background:rgba(40,32,18,.35);color:rgba(180,150,80,.45)}
+.end-draft-slots .draft-slot.boss.locked{border-color:rgba(120,100,60,.4);background:rgba(40,32,18,.35)}
+.end-draft-slots .draft-slot.boss.locked::after{content:'\1F512';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:rgba(180,150,80,.5);font-size:18px;pointer-events:none}
 .tier-lo-card .gcard{position:absolute;inset:0;width:100%;height:100%;border-radius:4px;border-width:2px}
 .tier-lo-card .gcard-cover{font-size:16px}
 .tier-lo-card .gcard-frame{display:none}
@@ -4949,9 +4954,14 @@ body::before,body::after{display:none!important}
 /* ═══════ SHARED STATE MANAGEMENT ═══════ */
 let S = null;
 var _boneDice=['bone','bone','bone','bone','bone','bone'];
+/* Tier index at which the boss-only loadout slot opens up. Boss signatures
+   earned before this go into S.run.bossInventory and the player picks one
+   at unlock. */
+var BOSS_SLOT_UNLOCK_TIER=2;
 function _freshRun(){
-  /* cards: 4 slots — [0..2] regular, [3] boss-only signature */
-  return{tier:0,points:0,cards:[null,null,null,null],dice:[..._boneDice],bossesBeaten:[],diceRerolls:1,handicapOffer:null,inGauntlet:false,gauntletIndex:0,gold:100,diceStock:null,cardTarnish:{}};
+  /* cards: 4 slots — [0..2] regular, [3] boss-only signature.
+     bossInventory: signatures earned before slot 3 unlocks (see BOSS_SLOT_UNLOCK_TIER). */
+  return{tier:0,points:0,cards:[null,null,null,null],dice:[..._boneDice],bossesBeaten:[],bossInventory:[],diceRerolls:1,handicapOffer:null,inGauntlet:false,gauntletIndex:0,gold:100,diceStock:null,cardTarnish:{}};
 }
 function _getS(){
   if(!S){
@@ -4983,6 +4993,8 @@ function _getS(){
         S.run.cards[2]=null;
       }
     }
+    /* Boss inventory: signatures earned before the slot unlocks */
+    if(!Array.isArray(S.run.bossInventory))S.run.bossInventory=[];
   }
   return S;
 }
@@ -10962,14 +10974,18 @@ function _draftFindDropSlot(x,y){
     var slot=hit.closest('.draft-slot');
     if(slot&&slot.closest('#endDraftSlots')){
       var idx=parseInt(slot.dataset.slotIdx);
-      /* Boss draft only accepts slot 3; regular draft only accepts 0/1/2 */
-      if(!(_draftBossMode?idx<3:idx>=3))return{el:slot,idx:idx};
+      /* Boss draft only accepts slot 3; regular draft only accepts 0/1/2.
+         Slot 3 is also rejected when the boss slot is still locked. */
+      var _locked=(idx===3&&(S&&S.run&&(S.run.tier||0)<BOSS_SLOT_UNLOCK_TIER));
+      if(!_locked && !(_draftBossMode?idx<3:idx>=3))return{el:slot,idx:idx};
     }
   }
   /* Fallback: generous rect check (±25px tolerance) */
   var best=null;
+  var _bossLocked=S&&S.run&&(S.run.tier||0)<BOSS_SLOT_UNLOCK_TIER;
   document.querySelectorAll('#endDraftSlots .draft-slot').forEach(function(s){
     var idx=parseInt(s.dataset.slotIdx);
+    if(idx===3&&_bossLocked)return;
     if(_draftBossMode?idx<3:idx>=3)return;
     var r=s.getBoundingClientRect();
     if(x>=r.left-25&&x<=r.right+25&&y>=r.top-25&&y<=r.bottom+25)best={el:s,idx:idx};
@@ -11400,13 +11416,15 @@ function _renderEndDraftSlots(){
   var row=document.getElementById('endDraftSlots');if(!row)return;
   row.innerHTML='';
   _getS();
+  var _bossLocked=(S.run.tier||0)<BOSS_SLOT_UNLOCK_TIER;
   for(var i=0;i<4;i++){
     var cid=S.run.cards[i];
     /* Wrapper for slot + tooltip (tooltip as sibling, not child of slot) */
     var wrap=document.createElement('div');
     wrap.style.cssText='position:relative;width:clamp(60px,18vw,80px)';
     var slot=document.createElement('div');
-    slot.className='draft-slot'+(cid?' filled':'')+(i===3?' boss':'');
+    var _lockCls=(i===3&&_bossLocked&&!cid)?' locked':'';
+    slot.className='draft-slot'+(cid?' filled':'')+(i===3?' boss':'')+_lockCls;
     slot.dataset.slotIdx=i;
     if(cid){
       var cd=CARDS.find(function(c){return c.id===cid;})||getNpcCard(cid);
@@ -11543,15 +11561,17 @@ function draftSkip(){
 function _renderDraftSlots(){
   var row=document.getElementById('draftSlotRow');
   row.innerHTML='';
+  var _bossLocked=(S.run.tier||0)<BOSS_SLOT_UNLOCK_TIER;
   for(var i=0;i<4;i++){
     var cid=S.run.cards[i];
     var slot=document.createElement('div');
-    slot.className='draft-slot'+(cid?' filled':'')+(i===3?' boss':'');
+    var _lockCls=(i===3&&_bossLocked&&!cid)?' locked':'';
+    slot.className='draft-slot'+(cid?' filled':'')+(i===3?' boss':'')+_lockCls;
     if(cid){
       var cd=CARDS.find(function(c){return c.id===cid;})||getNpcCard(cid);
       slot.textContent=cd?cd.icon:'?';
     }else{
-      slot.textContent=i===3?'⚔':'—';
+      slot.textContent=(i===3&&_bossLocked)?'🔒':(i===3?'⚔':'—');
     }
     if(i<3&&_draftSelected&&cid){
       /* Tappable to replace */
@@ -11635,8 +11655,15 @@ function _rewardSelectCard(cardId){
   document.querySelectorAll('.reward-card-wrap').forEach(function(el){
     el.classList.toggle('selected',el.dataset.cardId===cardId);
   });
-  /* Place in boss slot (index 3) */
-  S.run.cards[3]=cardId;
+  /* If the boss slot is still locked (early tiers), the signature goes to
+     bossInventory and the player will pick from it at unlock. Otherwise
+     drop it straight into slot 3. */
+  if((S.run.tier||0)<BOSS_SLOT_UNLOCK_TIER){
+    if(!Array.isArray(S.run.bossInventory))S.run.bossInventory=[];
+    if(S.run.bossInventory.indexOf(cardId)===-1)S.run.bossInventory.push(cardId);
+  }else{
+    S.run.cards[3]=cardId;
+  }
   save();
   /* Show dice section */
   setTimeout(function(){
@@ -11701,10 +11728,62 @@ function rewardContinue(){
   showScreen('gauntlet');
 }
 
+/* ═══════ BOSS-SLOT UNLOCK MODAL ═══════ */
+function _showBossSlotUnlock(){
+  _getS();
+  var inv=(S.run.bossInventory||[]).slice();
+  if(!inv.length){return;}
+  var existing=document.getElementById('bossUnlockOv');
+  if(existing)existing.remove();
+  var ov=document.createElement('div');
+  ov.id='bossUnlockOv';
+  ov.style.cssText='position:fixed;inset:0;z-index:9900;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;padding:20px;touch-action:manipulation';
+  var title='<div style="font-family:MedievalSharp,serif;font-size:22px;color:#dca84a;letter-spacing:3px;text-align:center;margin-bottom:6px;text-shadow:0 2px 0 rgba(0,0,0,.6)">A SEAT AT THE TABLE</div>';
+  var sub='<div style="font-family:var(--font-px);font-size:11px;color:var(--textdim);letter-spacing:1.5px;text-align:center;margin-bottom:18px;line-height:1.5">You\u2019ve earned a place among the gamblers worth fearing.<br>Choose a signature to carry into the rest of your run.</div>';
+  var cardsHtml='<div id="bossUnlockCards" style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:18px">';
+  inv.forEach(function(cid){
+    var cd=getCard(cid);if(!cd)return;
+    var rar=cd.npc?'boss-'+cd.npc:(cd.npcOnly&&cd.owner?'boss-'+cd.owner:(cd.npcOnly?'npc':cd.rarity));
+    cardsHtml+='<div class="boss-unlock-card" data-cid="'+cid+'" style="width:clamp(80px,24vw,110px);cursor:pointer;transition:transform .15s">';
+    cardsHtml+='<div class="gcard rarity-'+rar+'" style="aspect-ratio:2/3">';
+    cardsHtml+='<div class="gcard-cover" style="background:'+(CARD_BG[cid]||'#600')+';font-size:28px;display:flex;align-items:center;justify-content:center">'+cd.icon+'</div>';
+    cardsHtml+='<div class="gcard-frame"></div>'+gcCorners()+'</div>';
+    cardsHtml+='<div style="font-family:var(--font-px);font-size:10px;color:#dca84a;text-align:center;margin-top:6px;letter-spacing:1px">'+cd.name+'</div>';
+    cardsHtml+='<div style="font-family:var(--font-px);font-size:9px;color:var(--textdim);text-align:center;margin-top:2px;letter-spacing:.5px">'+(cd.eff||'')+'</div>';
+    cardsHtml+='</div>';
+  });
+  cardsHtml+='</div>';
+  ov.innerHTML='<div style="background:#28221c;border:2px solid #6a5430;border-radius:6px;padding:24px 18px;max-width:380px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.7)">'+title+sub+cardsHtml+'</div>';
+  document.body.appendChild(ov);
+  ov.querySelectorAll('.boss-unlock-card').forEach(function(el){
+    el.addEventListener('click',function(){
+      SFX.nav();
+      var pickedId=el.dataset.cid;
+      _getS();
+      S.run.cards[3]=pickedId;
+      /* Remove the picked card from inventory; keep the others for future swaps */
+      S.run.bossInventory=(S.run.bossInventory||[]).filter(function(c){return c!==pickedId;});
+      save();
+      ov.remove();
+      /* Re-enter tier screen now that slot 3 is filled */
+      initTierScreen({});
+    });
+  });
+}
+
 /* ═══════ TIER SCREEN (replaces gauntlet) ═══════ */
 function initTierScreen(data){
   _getS();
   var endOv=document.getElementById('end-ov');if(endOv)endOv.classList.remove('show');
+  /* Boss-slot unlock prompt: show once per tier-screen visit if the slot
+     just opened (or is open and still empty) and the player has earned
+     signatures held in inventory. */
+  if((S.run.tier||0)>=BOSS_SLOT_UNLOCK_TIER &&
+     Array.isArray(S.run.bossInventory) && S.run.bossInventory.length>0 &&
+     !S.run.cards[3]){
+    _showBossSlotUnlock();
+    return;
+  }
   /* If gauntlet in progress, route directly to next fight */
   if(S.run.inGauntlet){startGauntletSequence();return;}
   /* If run complete (tier >= TIERS.length), show victory */
@@ -11807,6 +11886,7 @@ function initTierScreen(data){
 function _renderTierLoadout(){
   var lc=document.getElementById('tierLoCards');
   var ld=document.getElementById('tierLoDice');
+  var _bossLocked=(S.run.tier||0)<BOSS_SLOT_UNLOCK_TIER;
   if(lc){
     var html='';
     S.run.cards.forEach(function(cid,i){
@@ -11824,7 +11904,8 @@ function _renderTierLoadout(){
           html+='<div class="tier-lo-card'+(i===3?' boss':'')+'"></div>';
         }
       }else{
-        html+='<div class="tier-lo-card empty'+(i===3?' boss':'')+'"></div>';
+        var _lockCls=(i===3&&_bossLocked)?' locked':'';
+        html+='<div class="tier-lo-card empty'+(i===3?' boss':'')+_lockCls+'"></div>';
       }
       html+='</div>';
     });
