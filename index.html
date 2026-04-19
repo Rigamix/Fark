@@ -6939,7 +6939,7 @@ function _cardIdHash(cid){
   for(var i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0;
   return h;
 }
-function applyCardAging(outerEl,tarnish,cardId,isBoss){
+function applyCardAging(outerEl,tarnish,cardId){
   if(!outerEl||tarnish<=0)return;
   const W=outerEl.offsetWidth,H=outerEl.offsetHeight;
   if(!W||!H)return;
@@ -6949,21 +6949,13 @@ function applyCardAging(outerEl,tarnish,cardId,isBoss){
   const gcard=outerEl.querySelector('.gcard');
   if(gcard){
     const st=_CAG_STATES[tarnish]||_CAG_STATES[0];
-    /* Boss cards keep their full accent color (e.g. Grog's gold) — skip the
-       desaturating filter and full-cover-opacity dim, but still get the
-       sheen reduction + emoji wobble that sells the "weathered" look.
-       Edge holes + canvas grunge are drawn below regardless. */
-    if(isBoss){
-      gcard.style.filter='none';
-      gcard.style.setProperty('--sheen-op',st.sheenOp);
-      gcard.style.setProperty('--cover-op',1);
-      gcard.style.setProperty('--cover-filter',st.wobble>0?`url(#emojiWobble${st.wobble})`:'none');
-    }else{
-      gcard.style.filter=st.filter||'none';
-      gcard.style.setProperty('--sheen-op',st.sheenOp);
-      gcard.style.setProperty('--cover-op',st.coverOp);
-      gcard.style.setProperty('--cover-filter',st.wobble>0?`url(#emojiWobble${st.wobble})`:'none');
-    }
+    /* Aging is only ever applied to boss cards now — keep the full accent
+       color (no desat filter, no icon dim). The worn look comes from
+       reduced sheen, emoji wobble, edge holes and canvas grunge. */
+    gcard.style.filter='none';
+    gcard.style.setProperty('--sheen-op',st.sheenOp);
+    gcard.style.setProperty('--cover-op',1);
+    gcard.style.setProperty('--cover-filter',st.wobble>0?`url(#emojiWobble${st.wobble})`:'none');
   }
   const ac=document.createElement('canvas');
   ac.className='age-canvas';
@@ -6979,12 +6971,11 @@ function applyCardAging(outerEl,tarnish,cardId,isBoss){
   function _processEl(el){
     var cid=el.dataset.cid;
     var t=+el.dataset.aging||0;
-    var isBoss=false;
     if(cid && typeof getCard==='function'){
       var c=getCard(cid);
-      if(c && c.npc){t=Math.max(t,BOSS_AGING_LEVEL);isBoss=true;}
+      if(c && c.npc) t=Math.max(t,BOSS_AGING_LEVEL);
     }
-    if(t>0)requestAnimationFrame(function(){applyCardAging(el,t,cid,isBoss);});
+    if(t>0)requestAnimationFrame(function(){applyCardAging(el,t,cid);});
   }
   const obs=new MutationObserver(function(mutations){
     mutations.forEach(function(m){
