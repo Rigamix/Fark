@@ -5878,6 +5878,8 @@ const CARDS=[
   {id:'iron_stomach',name:'IRON STOMACH',icon:'🤢',rarity:'silver',eff:'+1 BUST SURVIVED PER BRINKSMAN CARD',desc:'For each Brinksman card you have equipped (this one included), gain one extra bust-survival per match. Stacks with The Martyr.',arch:'brinksman'},
   {id:'stakes_rising',name:'STAKES RISING',icon:'📈',rarity:'silver',eff:'BANK 500+ → NEXT TURN STARTS +100',desc:'Each turn you bank 500 or more, your next turn starts with +100 turn points already on the table.',arch:'brinksman'},
   {id:'tavern_tales',name:'TAVERN TALES',icon:'🎭',rarity:'gold',eff:'3+ COLLECTOR: TRIPLES +25%, STRAIGHTS +50%',desc:'If you have 3 or more Collector cards equipped, all triples score +25% and all straights score +50%.',arch:'collector'},
+  {id:'bad_reputation',name:'BAD REPUTATION',icon:'😈',rarity:'gold',eff:'3+ SABOTEUR: OPP\'S 1ST BANK HALVED',desc:"If you have 3 or more Saboteur cards equipped, the opponent's first bank each match is halved.",arch:'saboteur'},
+  {id:'bar_brawl',name:'BAR BRAWL',icon:'🥊',rarity:'gold',eff:'OPP BUST: +250, +50 EACH NEXT',desc:'Each time the opponent busts, gain +250 immediately, growing by +50 per bust this match (1st = +250, 2nd = +300, 3rd = +350…).',arch:'saboteur'},
   {id:'beggars_bowl',name:"BEGGAR'S BOWL",icon:'🥣',rarity:'tin',eff:'+150 ON FIRST BANK',desc:'Your very first bank each match gains an extra 150 bonus points.',arch:'safeBanker'},
   {id:'loose_thread',name:'LOOSE THREAD',icon:'🧶',rarity:'tin',eff:'+400 AFTER DOUBLE BUST',desc:'If you bust twice in a row, gain 400 points automatically.',arch:'brinksman',dep:true},
   {id:'the_whetstone',name:'THE WHETSTONE',icon:'🪨',rarity:'silver',eff:'FIRST 3 ROLLS +75',desc:'Your first three rolls each turn score 75 extra points on top of their normal value.',arch:'brinksman'},
@@ -8778,6 +8780,12 @@ function runOppTurn(){
         }
         if(G.pCards.includes('thieves_luck')&&oppBank>0&&oppBank<200){G.pPts+=oppBank;triggerCard('thieves_luck','STEAL +'+oppBank,true);}
         if(G.pCards.includes('blood_debt')){G.pPts+=400;triggerCard('blood_debt','+400 BLOOD DEBT',true);updHUD();}
+        /* Bar Brawl: each opp bust = +250, growing by +50 per prior bust this match */
+        if(G.pCards.includes('bar_brawl')){
+          G._bbHits=(G._bbHits||0)+1;
+          var _bbBonus=250+(G._bbHits-1)*50;
+          G.pPts+=_bbBonus;triggerCard('bar_brawl','+'+_bbBonus+' BAR BRAWL',true);updHUD();
+        }
         /* ── Handicap: Rising Stakes — opponent streak reset on bust ── */
         if(G._handicap==='rising_stakes'){G._rsOppStreak=0;G._rsOppMultiplier=1.0;}
         if(G._handicap==='bounty_board')G._bountyOppBankStreak=0;
@@ -8934,6 +8942,12 @@ function runOppTurn(){
       });
       /* Short Pour: opponent banks are worth 10% less (fence: 12.5%) */
       if(G.rung._shortPour){var _spPct=G._fenceActive?0.125:0.10;var _spCut=Math.ceil(pts*_spPct);pts-=_spCut;triggerCard('short_pour','-'+_spCut+' SHORT POUR',true);}
+      /* Bad Reputation: 3+ Saboteur → opp's first bank halved */
+      if(G.pCards.includes('bad_reputation')&&!G._badRepUsed&&_archCount('saboteur')>=3){
+        G._badRepUsed=true;
+        var _brHalf=Math.floor(pts/2);pts-=_brHalf;
+        triggerCard('bad_reputation','BAD REP −'+_brHalf,true);
+      }
       /* The Grudge: increment player's grudge stack when opponent banks */
       if(G.pCards.includes('the_grudge')){G._grudgeStack=Math.min((G._grudgeStack||0)+50,250);}
       if(G.pCards.includes('taxing_breath')&&pts>=100){pts-=100;G.pPts+=100;triggerCard('taxing_breath','+100 TAX',true);}
