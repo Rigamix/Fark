@@ -5875,6 +5875,8 @@ const CARDS=[
   /* Archetype enablers (Phase 4 — reward committing to one archetype) */
   {id:'tab_at_bar',name:'TAB AT THE BAR',icon:'📋',rarity:'silver',eff:'+25/BANK PER SAFE-BANKER CARD',desc:'For each Safe-Banker card you have equipped (this one included), every bank gains +25.',arch:'safeBanker'},
   {id:'last_orders',name:'LAST ORDERS',icon:'🍻',rarity:'gold',eff:'3+ SAFE-BANKER: EVERY 3RD BANK ×2',desc:'If you have 3 or more Safe-Banker cards equipped: every third bank you make is doubled.',arch:'safeBanker'},
+  {id:'iron_stomach',name:'IRON STOMACH',icon:'🤢',rarity:'silver',eff:'+1 BUST SURVIVED PER BRINKSMAN CARD',desc:'For each Brinksman card you have equipped (this one included), gain one extra bust-survival per match. Stacks with The Martyr.',arch:'brinksman'},
+  {id:'stakes_rising',name:'STAKES RISING',icon:'📈',rarity:'silver',eff:'BANK 500+ → NEXT TURN STARTS +100',desc:'Each turn you bank 500 or more, your next turn starts with +100 turn points already on the table.',arch:'brinksman'},
   {id:'beggars_bowl',name:"BEGGAR'S BOWL",icon:'🥣',rarity:'tin',eff:'+150 ON FIRST BANK',desc:'Your very first bank each match gains an extra 150 bonus points.',arch:'safeBanker'},
   {id:'loose_thread',name:'LOOSE THREAD',icon:'🧶',rarity:'tin',eff:'+400 AFTER DOUBLE BUST',desc:'If you bust twice in a row, gain 400 points automatically.',arch:'brinksman',dep:true},
   {id:'the_whetstone',name:'THE WHETSTONE',icon:'🪨',rarity:'silver',eff:'FIRST 3 ROLLS +75',desc:'Your first three rolls each turn score 75 extra points on top of their normal value.',arch:'brinksman'},
@@ -7589,6 +7591,12 @@ function toggleDie(d){
 
 function startPTurn(){
   G.phase='idle';G.turnPts=0;G.kept=[];G.numDice=G.matchDice?G.matchDice.length:6;G.pool=[];G.turnRollCount=0;G._slowHandUsedThisTurn=false;G._warmHandsActive=false;G._lastHotDice=false;
+  /* Stakes Rising: previous turn banked 500+ → start with +100 turn pts */
+  if(G._stakesRisingNext&&G.pCards.includes('stakes_rising')){
+    G._stakesRisingNext=false;
+    G.turnPts=100;
+    triggerCard('stakes_rising','+100 START',true);
+  }
   /* NPC-armed Whisper's Hex: reduce player's dice count this turn */
   if(G._npcHexArmed){G._npcHexArmed=false;G.numDice=Math.max(3,G.numDice-1);triggerCard('whispers_hex',G.rung.name+" HEX — YOU HAVE "+G.numDice+" DICE",false);}
   /* Sudden Death: update display round at start of player turn (after NPC finishes) */
@@ -7887,9 +7895,7 @@ function afterRoll(){
      mutate d.val in place, so the snapshot taken at function entry would be stale. */
   freeV=free.map(d=>d.val);
   if(!anyScoring(freeV,cards,freeMats)){
-    if(!G.martyrUsed&&G.pCards.includes('martyr')){G.martyrUsed=true;
-      free.forEach(d=>{if(d.el){d.el.classList.add('bust');setTimeout(()=>d.el.remove(),380);}});
-      G.pool=G.pool.filter(d=>d.committed);G.phase='idle';triggerCard('martyr','MARTYR — SAVED!',true);_updatePlayerCardVisuals();setTimeout(handleRoll,1700);return;}
+    if(_tryBustSave(free))return;
     doBust();return;
   }
   if(G.pCards.includes('last_stand')&&free.length===1&&(freeV[0]===1||freeV[0]===5)){
@@ -7919,12 +7925,8 @@ function afterRoll(){
       // Re-check scoring after bash
       const freeV2=free.map(d=>d.val);
       if(!anyScoring(freeV2,cards,freeMats)){
-        var _martyrWillSave=!G.martyrUsed&&G.pCards.includes('martyr');
-        setTimeout(()=>{
-          if(!G.martyrUsed&&G.pCards.includes('martyr')){G.martyrUsed=true;
-            free.forEach(d=>{if(d.el){d.el.classList.add('bust');setTimeout(()=>d.el.remove(),380);}});
-            G.pool=G.pool.filter(d=>d.committed);G.phase='idle';triggerCard('martyr','MARTYR — SAVED!',true);_updatePlayerCardVisuals();setTimeout(handleRoll,1700);return;}
-          if(!_martyrWillSave)doBust();},500);return;
+        setTimeout(()=>{if(!_tryBustSave(free))doBust();},500);
+        return;
       }
     }
   }
@@ -8085,6 +8087,35 @@ function refreshSelUI(){
       });
     }
   }else if(!isPerfect){G._perfFired=false;}
+}
+
+/* Bust-save handler: try Martyr (1-time) then Iron Stomach (Brinksman-archetype
+   stack). Returns true if a save fired. Both saves wipe the dice in front of
+   the player, keep the kept tray, and re-enter the roll phase. */
+function _tryBustSave(free){
+  function _runSave(label,text){
+    free.forEach(d=>{if(d.el){d.el.classList.add('bust');setTimeout(()=>{if(d.el)d.el.remove();},380);}});
+    G.pool=G.pool.filter(d=>d.committed);G.phase='idle';
+    triggerCard(label,text,true);
+    _updatePlayerCardVisuals();
+    setTimeout(handleRoll,1700);
+  }
+  if(!G.martyrUsed&&G.pCards.includes('martyr')){
+    G.martyrUsed=true;
+    _runSave('martyr','MARTYR — SAVED!');
+    return true;
+  }
+  if(G.pCards.includes('iron_stomach')){
+    var _isMax=_archCount('brinksman');
+    G._isUsed=G._isUsed||0;
+    if(G._isUsed<_isMax){
+      G._isUsed++;
+      var _left=_isMax-G._isUsed;
+      _runSave('iron_stomach','IRON STOMACH'+(_left>0?' ('+_left+' LEFT)':''));
+      return true;
+    }
+  }
+  return false;
 }
 
 function doBust(){
@@ -8253,6 +8284,10 @@ function handleBank(){
   if(G.pCards.includes('last_orders')&&_archCount('safeBanker')>=3){
     G._loBankCount=(G._loBankCount||0)+1;
     if(G._loBankCount%3===0){total*=2;bonusMsg+=' ×2 LAST ORDERS';triggerCard('last_orders','×2 BANK!',true);}
+  }
+  /* Stakes Rising: bank 500+ → arm bonus for next turn */
+  if(G.pCards.includes('stakes_rising')&&total>=500){
+    G._stakesRisingNext=true;
   }
   /* Underdog: behind by 1000+ → +200 */
   if(G.pCards.includes('underdog')&&(G.oPts-G.pPts)>=1000){total+=200;bonusMsg+=' +200 UNDERDOG';triggerCard('underdog','+200',true);}
