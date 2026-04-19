@@ -5881,6 +5881,10 @@ const CARDS=[
   {id:'bad_reputation',name:'BAD REPUTATION',icon:'😈',rarity:'gold',eff:'3+ SABOTEUR: OPP\'S 1ST BANK HALVED',desc:"If you have 3 or more Saboteur cards equipped, the opponent's first bank each match is halved.",arch:'saboteur'},
   {id:'bar_brawl',name:'BAR BRAWL',icon:'🥊',rarity:'gold',eff:'OPP BUST: +250, +50 EACH NEXT',desc:'Each time the opponent busts, gain +250 immediately, growing by +50 per bust this match (1st = +250, 2nd = +300, 3rd = +350…).',arch:'saboteur'},
   {id:'loaded_deck',name:'LOADED DECK',icon:'♠️',rarity:'gold',eff:'3+ SHARP: AUTO-FLIP EFFECTS HIT +1 DIE',desc:'If you have 3 or more Sharp cards equipped, your automatic dice-flip effects (Loaded Die, Gambler\'s Thumb) affect 2 dice instead of 1.',arch:'sharp'},
+  {id:'coin_jar',name:'COIN JAR',icon:'🏺',rarity:'silver',eff:'EVERY 3RD BANK: +200, GROWING',desc:'Every 3rd bank you make in a match earns a stacking bonus: +200, +400, +600, etc.',arch:'hoarder'},
+  {id:'the_estate',name:'THE ESTATE',icon:'🏛️',rarity:'silver',eff:'BANK +50, GROWS +50 EACH TIME',desc:'Your first bank gains +50. Each subsequent bank gains +50 more than the last (1st = +50, 2nd = +100, 3rd = +150…).',arch:'hoarder'},
+  {id:'compound_interest',name:'COMPOUND INTEREST',icon:'💹',rarity:'gold',eff:'BANK GROWS +5% MULT (CAP +50%)',desc:'Each bank permanently increases your bank multiplier by 5% (caps at +50%). The bonus applies to the current bank before incrementing.',arch:'hoarder'},
+  {id:'the_ledger',name:'THE LEDGER',icon:'📒',rarity:'gold',eff:'EACH BANK +25 TO PERMANENT BONUS',desc:'Each bank adds +25 to a running total. That total is added to every future bank this match.',arch:'hoarder'},
   {id:'beggars_bowl',name:"BEGGAR'S BOWL",icon:'🥣',rarity:'tin',eff:'+150 ON FIRST BANK',desc:'Your very first bank each match gains an extra 150 bonus points.',arch:'safeBanker'},
   {id:'loose_thread',name:'LOOSE THREAD',icon:'🧶',rarity:'tin',eff:'+400 AFTER DOUBLE BUST',desc:'If you bust twice in a row, gain 400 points automatically.',arch:'brinksman',dep:true},
   {id:'the_whetstone',name:'THE WHETSTONE',icon:'🪨',rarity:'silver',eff:'FIRST 3 ROLLS +75',desc:'Your first three rolls each turn score 75 extra points on top of their normal value.',arch:'brinksman'},
@@ -8307,6 +8311,35 @@ function handleBank(){
   /* Stakes Rising: bank 500+ → arm bonus for next turn */
   if(G.pCards.includes('stakes_rising')&&total>=500){
     G._stakesRisingNext=true;
+  }
+  /* The Ledger: persistent stack added to every bank, grows +25 per bank */
+  if(G.pCards.includes('the_ledger')){
+    G._ledgerStack=G._ledgerStack||0;
+    if(G._ledgerStack>0){total+=G._ledgerStack;bonusMsg+=' +'+G._ledgerStack+' LEDGER';triggerCard('the_ledger','+'+G._ledgerStack,true);}
+    G._ledgerStack+=25;
+  }
+  /* Compound Interest: bank grows multiplier by +5% per bank, capped at 50% */
+  if(G.pCards.includes('compound_interest')){
+    G._ciMult=G._ciMult||0;
+    if(G._ciMult>0){
+      var _ciBonus=Math.floor(total*G._ciMult);
+      if(_ciBonus>0){total+=_ciBonus;bonusMsg+=' +'+_ciBonus+' COMPOUND';triggerCard('compound_interest','+'+_ciBonus+' ('+(G._ciMult*100|0)+'%)',true);}
+    }
+    G._ciMult=Math.min(0.5,G._ciMult+0.05);
+  }
+  /* The Estate: linear scaling — 1st bank +50, 2nd +100, 3rd +150… */
+  if(G.pCards.includes('the_estate')){
+    G._estateBanks=(G._estateBanks||0)+1;
+    var _esBonus=G._estateBanks*50;
+    total+=_esBonus;bonusMsg+=' +'+_esBonus+' ESTATE';triggerCard('the_estate','+'+_esBonus,true);
+  }
+  /* Coin Jar: every 3rd bank earns stacking bonus 200/400/600… */
+  if(G.pCards.includes('coin_jar')){
+    G._coinJarBanks=(G._coinJarBanks||0)+1;
+    if(G._coinJarBanks%3===0){
+      var _cjBonus=200*(G._coinJarBanks/3);
+      total+=_cjBonus;bonusMsg+=' +'+_cjBonus+' COIN JAR';triggerCard('coin_jar','+'+_cjBonus,true);
+    }
   }
   /* Underdog: behind by 1000+ → +200 */
   if(G.pCards.includes('underdog')&&(G.oPts-G.pPts)>=1000){total+=200;bonusMsg+=' +200 UNDERDOG';triggerCard('underdog','+200',true);}
