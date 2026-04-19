@@ -5854,7 +5854,7 @@ const CARDS=[
   {id:'kings_ransom',name:"KING'S RANSOM",icon:'👑',rarity:'gold',eff:'WIN BY 3000+ = +1000 PTS',desc:'If you are ahead by 3,000 or more points, gain an instant 1,000 bonus points when you bank.',arch:'hoarder'},
   {id:'sooty_table',name:'SOOTY TABLE',icon:'🖤',rarity:'gold',eff:'RIVAL THREE-OF-KIND → NO 1s',desc:"After the opponent rolls three-of-a-kind, their very next roll cannot produce any 1s.",arch:'saboteur'},
   {id:'thrifty_gambler',name:'THRIFTY GAMBLER',icon:'💰',rarity:'gold',eff:'+150 ON BANK 400-600',desc:'Whenever you bank between 400 and 600 points in a single turn, gain an extra 150 bonus.',arch:'safeBanker',dep:true},
-  {id:'iron_crown',name:'THE IRON CROWN',icon:'⚜️',rarity:'gold',eff:'HOT DICE = +500 BONUS',desc:'Each time you achieve a Hot Dice (all dice score), gain +500 bonus on top of the standard reward.',arch:'collector'},
+  {id:'iron_crown',name:'THE IRON CROWN',icon:'⚜️',rarity:'gold',eff:'HOT DICE: +500, EACH +250 BIGGER',desc:'First Hot Dice each match gives +500 bonus. Each subsequent Hot Dice gives +250 more than the previous one (2nd = +750, 3rd = +1000, …).',arch:'collector'},
   {id:'jesters_mask',name:"JESTER'S MASK",icon:'🃏',rarity:'tin',eff:'RIVAL PLAYS CHAOTIC',desc:"The opponent's behaviour becomes chaotic — they may roll recklessly or bank unexpectedly.",arch:'saboteur',dep:true},
   {id:'serpents_whisper',name:"SERPENT'S WHISPER",icon:'🐍',rarity:'silver',eff:"RIVAL MIN BANK +300",desc:"Raises the opponent's minimum banking threshold by 300 — they must keep rolling until they hit it or bust.",arch:'saboteur',dep:true},
   {id:'cowards_bell',name:"COWARD'S BELL",icon:'🔕',rarity:'silver',eff:'RIVAL: -1 REROLL/TURN',desc:'The opponent must commit one extra die per roll — they lose one chance to keep rolling each turn.',playerDesc:'Every bank you make loses ten percent to the bell.',arch:'saboteur'},
@@ -5877,6 +5877,7 @@ const CARDS=[
   {id:'last_orders',name:'LAST ORDERS',icon:'🍻',rarity:'gold',eff:'3+ SAFE-BANKER: EVERY 3RD BANK ×2',desc:'If you have 3 or more Safe-Banker cards equipped: every third bank you make is doubled.',arch:'safeBanker'},
   {id:'iron_stomach',name:'IRON STOMACH',icon:'🤢',rarity:'silver',eff:'+1 BUST SURVIVED PER BRINKSMAN CARD',desc:'For each Brinksman card you have equipped (this one included), gain one extra bust-survival per match. Stacks with The Martyr.',arch:'brinksman'},
   {id:'stakes_rising',name:'STAKES RISING',icon:'📈',rarity:'silver',eff:'BANK 500+ → NEXT TURN STARTS +100',desc:'Each turn you bank 500 or more, your next turn starts with +100 turn points already on the table.',arch:'brinksman'},
+  {id:'tavern_tales',name:'TAVERN TALES',icon:'🎭',rarity:'gold',eff:'3+ COLLECTOR: TRIPLES +25%, STRAIGHTS +50%',desc:'If you have 3 or more Collector cards equipped, all triples score +25% and all straights score +50%.',arch:'collector'},
   {id:'beggars_bowl',name:"BEGGAR'S BOWL",icon:'🥣',rarity:'tin',eff:'+150 ON FIRST BANK',desc:'Your very first bank each match gains an extra 150 bonus points.',arch:'safeBanker'},
   {id:'loose_thread',name:'LOOSE THREAD',icon:'🧶',rarity:'tin',eff:'+400 AFTER DOUBLE BUST',desc:'If you bust twice in a row, gain 400 points automatically.',arch:'brinksman',dep:true},
   {id:'the_whetstone',name:'THE WHETSTONE',icon:'🪨',rarity:'silver',eff:'FIRST 3 ROLLS +75',desc:'Your first three rolls each turn score 75 extra points on top of their normal value.',arch:'brinksman'},
@@ -6143,15 +6144,13 @@ const CARDS_MAP={};CARDS.forEach(function(c){CARDS_MAP[c.id]=c;});
 const NPC_CARDS_MAP={};NPC_CARDS.forEach(function(c){NPC_CARDS_MAP[c.id]=c;});
 function getCard(id){return CARDS_MAP[id]||NPC_CARDS_MAP[id]||null;}
 /* ── Archetype helpers — used by enabler/scaler cards ── */
-function _archCount(arch){
-  if(!G||!G.pCards)return 0;
+function _archCountIn(cards,arch){
   var n=0;
-  for(var i=0;i<G.pCards.length;i++){
-    var c=getCard(G.pCards[i]);
-    if(c&&c.arch===arch)n++;
-  }
+  if(!cards)return 0;
+  for(var i=0;i<cards.length;i++){var c=getCard(cards[i]);if(c&&c.arch===arch)n++;}
   return n;
 }
+function _archCount(arch){return G&&G.pCards?_archCountIn(G.pCards,arch):0;}
 function _hasArchSet(arch){return _archCount(arch)>=3;}
 function getNpcCard(id){return NPC_CARDS_MAP[id]||null;}
 
@@ -6246,6 +6245,8 @@ function scoreRoll(vals,cards,locked,context,dieMats){
   const n=vals.length,used=new Array(n).fill(false);let pts=0;
   const effects=[];/* track die effect activations for visual feedback */
   const copperPincher=cards.includes('copper_pincher'),millersToll=cards.includes('millers_toll'),scavenger=cards.includes('scavenger'),noSingles=cards.includes('_nosingles'),triplesPenalty=cards.includes('_triplepenalty'),bloodTithe=cards.includes('blood_tithe');
+  /* Tavern Tales: 3+ Collector cards equipped boosts triples / straights */
+  const _tavernTales=cards.includes('tavern_tales')&&_archCountIn(cards,'collector')>=3;
 
   /* Helper: get die effect for index i */
   const dieEff=i=>{if(!dieMats||!dieMats[i])return null;const dt=getDie(dieMats[i]);return dt&&dt.effect?dt.effect:null;};
@@ -6281,18 +6282,19 @@ function scoreRoll(vals,cards,locked,context,dieMats){
       var _straightBase=SCORING_BASE.straight6;
       /* Tavern Cheer: full straight +750 bonus */
       if(cards.includes('tavern_cheer')){_straightBase+=750;}
+      if(_tavernTales)_straightBase=Math.floor(_straightBase*1.5);
       pts+=_straightBase;used.fill(true);
     }
     straightFound=true;
   }
   if(!straightFound&&hasSet([2,3,4,5,6])){
-    if(_crowsCanFire){_consumeCrows();pts+=SCORING_BASE.straight5low;markSet([2,3,4,5,6]);/* high→low value, still consumes the 5 dice */}
-    else{pts+=SCORING_BASE.straight5high;markSet([2,3,4,5,6]);}
+    if(_crowsCanFire){_consumeCrows();pts+=Math.floor(SCORING_BASE.straight5low*(_tavernTales?1.5:1));markSet([2,3,4,5,6]);/* high→low value, still consumes the 5 dice */}
+    else{pts+=Math.floor(SCORING_BASE.straight5high*(_tavernTales?1.5:1));markSet([2,3,4,5,6]);}
     straightFound=true;
   }
   if(!straightFound&&hasSet([1,2,3,4,5])){
     if(_crowsCanFire){_consumeCrows();/* low straight fully negated — dice not consumed so they bust or score singles */}
-    else{pts+=SCORING_BASE.straight5low;markSet([1,2,3,4,5]);straightFound=true;}
+    else{pts+=Math.floor(SCORING_BASE.straight5low*(_tavernTales?1.5:1));markSet([1,2,3,4,5]);straightFound=true;}
   }
   /* ── The Ladder: partial straights (only if no 5/6-long straight fired) ── */
   if(!straightFound&&cards.includes('the_ladder')){
@@ -6335,6 +6337,7 @@ function scoreRoll(vals,cards,locked,context,dieMats){
         }
         if(amberBonus>0){base+=amberBonus;effects.push({type:'triple_bonus',face:f,bonus:amberBonus,idx:amberIdx});}
       }
+      if(_tavernTales)base=Math.floor(base*1.25);
       pts+=base;mark(f,realC);if(wildsNeeded>0)markWild(wildsNeeded);
       _triplesFired.push(f);
     }
@@ -7756,7 +7759,11 @@ function handleRoll(){
     /* Synergy: High Roller — Hot Dice bonus doubled */
     if(G.activeSynergies&&G.activeSynergies.includes('score_mates'))_hotBonus*=2;
     G.pPts+=_hotBonus;spawnPop('+'+_hotBonus+' 🔥');updHUD();
-    if(G.pCards.includes('iron_crown')){G.pPts+=500;triggerCard('iron_crown','+500 IRON CROWN',true);updHUD();}
+    if(G.pCards.includes('iron_crown')){
+      G._ironCrownHits=(G._ironCrownHits||0)+1;
+      var _icBonus=500+(G._ironCrownHits-1)*250;
+      G.pPts+=_icBonus;triggerCard('iron_crown','+'+_icBonus+' IRON CROWN',true);updHUD();
+    }
     const hotSpur=G.spurActive;G.spurActive=false;
     setTimeout(()=>{
       setStatusMsg('ROLLING...','active');const row=document.getElementById('playerDiceRow');
