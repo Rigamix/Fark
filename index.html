@@ -5872,6 +5872,9 @@ const CARDS=[
   {id:'iron_grip',name:'IRON GRIP',icon:'🔒',rarity:'silver',eff:'DICE CAN\'T BE SWAPPED',desc:'Prevents any opponent effect from swapping, stealing, or downgrading your dice this match.',arch:'utility'},
   {id:'sleight_of_hand',name:'SLEIGHT OF HAND',icon:'🃏',rarity:'gold',type:'active',maxUses:1,timing:'idle',eff:'SWAP ONE DIE WITH OPP',desc:'Before rolling, swap one of your dice with one of the opponent\'s — you choose which dice to exchange.',arch:'sharp',dep:true},
   /* ── NEW CARDS — Synergy Enablers ── */
+  /* Archetype enablers (Phase 4 — reward committing to one archetype) */
+  {id:'tab_at_bar',name:'TAB AT THE BAR',icon:'📋',rarity:'silver',eff:'+25/BANK PER SAFE-BANKER CARD',desc:'For each Safe-Banker card you have equipped (this one included), every bank gains +25.',arch:'safeBanker'},
+  {id:'last_orders',name:'LAST ORDERS',icon:'🍻',rarity:'gold',eff:'3+ SAFE-BANKER: EVERY 3RD BANK ×2',desc:'If you have 3 or more Safe-Banker cards equipped: every third bank you make is doubled.',arch:'safeBanker'},
   {id:'beggars_bowl',name:"BEGGAR'S BOWL",icon:'🥣',rarity:'tin',eff:'+150 ON FIRST BANK',desc:'Your very first bank each match gains an extra 150 bonus points.',arch:'safeBanker'},
   {id:'loose_thread',name:'LOOSE THREAD',icon:'🧶',rarity:'tin',eff:'+400 AFTER DOUBLE BUST',desc:'If you bust twice in a row, gain 400 points automatically.',arch:'brinksman',dep:true},
   {id:'the_whetstone',name:'THE WHETSTONE',icon:'🪨',rarity:'silver',eff:'FIRST 3 ROLLS +75',desc:'Your first three rolls each turn score 75 extra points on top of their normal value.',arch:'brinksman'},
@@ -6137,6 +6140,17 @@ const NPC_CARDS=[
 const CARDS_MAP={};CARDS.forEach(function(c){CARDS_MAP[c.id]=c;});
 const NPC_CARDS_MAP={};NPC_CARDS.forEach(function(c){NPC_CARDS_MAP[c.id]=c;});
 function getCard(id){return CARDS_MAP[id]||NPC_CARDS_MAP[id]||null;}
+/* ── Archetype helpers — used by enabler/scaler cards ── */
+function _archCount(arch){
+  if(!G||!G.pCards)return 0;
+  var n=0;
+  for(var i=0;i<G.pCards.length;i++){
+    var c=getCard(G.pCards[i]);
+    if(c&&c.arch===arch)n++;
+  }
+  return n;
+}
+function _hasArchSet(arch){return _archCount(arch)>=3;}
 function getNpcCard(id){return NPC_CARDS_MAP[id]||null;}
 
 /* Build CARD_COVERS from CARD_BG+CARDS for gauntlet compatibility */
@@ -8230,6 +8244,16 @@ function handleBank(){
   }
   /* Greedy Hands: banks under 250 are doubled */
   if(G.pCards.includes('greedy_hands')&&total<250){total*=2;bonusMsg+=' x2 GREEDY';triggerCard('greedy_hands','x2 BANK!',true);}
+  /* Tab at the Bar: +25 per Safe-Banker card equipped (this one counts itself) */
+  if(G.pCards.includes('tab_at_bar')){
+    var _tabBonus=_archCount('safeBanker')*25;
+    if(_tabBonus>0){total+=_tabBonus;bonusMsg+=' +'+_tabBonus+' TAB';triggerCard('tab_at_bar','+'+_tabBonus,true);}
+  }
+  /* Last Orders: 3+ Safe-Banker → every 3rd bank doubled */
+  if(G.pCards.includes('last_orders')&&_archCount('safeBanker')>=3){
+    G._loBankCount=(G._loBankCount||0)+1;
+    if(G._loBankCount%3===0){total*=2;bonusMsg+=' ×2 LAST ORDERS';triggerCard('last_orders','×2 BANK!',true);}
+  }
   /* Underdog: behind by 1000+ → +200 */
   if(G.pCards.includes('underdog')&&(G.oPts-G.pPts)>=1000){total+=200;bonusMsg+=' +200 UNDERDOG';triggerCard('underdog','+200',true);}
   /* Chain Lightning: add stacking bonus from consecutive scoring rolls */
