@@ -5872,6 +5872,8 @@ const CARDS=[
   {id:'mabels_ward',name:"MABEL'S WARD",icon:'🪡',rarity:'gold',npc:'mabel',eff:'EVERY BANK +75; 5TH BANK +400',desc:"Mabel's careful threading: every bank you make gains +75 bonus. Your 5th, 10th, 15th… bank gains +400 instead.",rewardQuote:'"This thread holds firm. Take it, dear."',arch:'safeBanker'},
   {id:'corvus_book',name:"CORVUS'S BOOK",icon:'📖',rarity:'gold',npc:'corvus',eff:'EACH BANK +25 INTEREST (PERMANENT)',desc:"Each bank adds +25 to a running interest line that applies to every future bank this match. Banks of 1000+ add +50 instead.",rewardQuote:'"Compounding. The lender\'s purest art."',arch:'hoarder'},
   {id:'aldrics_banner',name:"ALDRIC'S BANNER",icon:'🛡️',rarity:'gold',npc:'aldric',eff:'EACH UNIQUE COMBO TYPE: +150 ALL FUTURE BANKS',desc:"Each unique combo type you score this match (triple, straight, Hot Dice) permanently adds +150 to every subsequent bank.",rewardQuote:'"The banner remembers every blow struck beneath it."',arch:'collector'},
+  {id:'finnicks_trick',name:"FINNICK'S TRICK",icon:'🎩',rarity:'gold',npc:'finnick',eff:'FIRST ROLL EACH TURN: 1 DIE = 1 OR 5',desc:"Each turn's very first roll: one random non-scoring die is automatically converted to a 1 or 5 (whichever scores higher).",rewardQuote:'"Watch this hand, mate. Now watch the other one."',arch:'sharp'},
+  {id:'ambrose_chalice',name:"AMBROSE'S CHALICE",icon:'🏆',rarity:'gold',npc:'ambrose',eff:'PURE-ARCH LOADOUT: +500 EVERY BANK',desc:"If your 3 regular loadout slots are all the same archetype (excluding your boss card), every bank gains +500 bonus. Reward for committing fully.",rewardQuote:'"Dedication is its own grace. Drink deep."',arch:'utility'},
   /* ── DICE PROTECTION / SWAP ── */
   {id:'iron_grip',name:'IRON GRIP',icon:'🔒',rarity:'silver',eff:'DICE CAN\'T BE SWAPPED',desc:'Prevents any opponent effect from swapping, stealing, or downgrading your dice this match.',arch:'utility'},
   {id:'sleight_of_hand',name:'SLEIGHT OF HAND',icon:'🃏',rarity:'gold',type:'active',maxUses:1,timing:'idle',eff:'SWAP ONE DIE WITH OPP',desc:'Before rolling, swap one of your dice with one of the opponent\'s — you choose which dice to exchange.',arch:'sharp',dep:true},
@@ -7836,6 +7838,17 @@ function afterRoll(){
   if(!G.flintlockFired&&G.pCards.includes('flintlock')&&freeV.includes(1)){G.flintlockFired=true;G.pPts+=200;triggerCard('flintlock','+200 FLINTLOCK',true);updHUD();}
   /* Warm Hands: extend dice-manipulation effects to rolls 2 & 3 */
   var _warmRollLimit=G.pCards.includes('warm_hands')?3:1;
+  /* Finnick's Trick (boss passive): first roll each turn — guarantee one
+     non-scoring die becomes a 5 (1 if no blanks). Always fires on roll 1. */
+  if(G.pCards.includes('finnicks_trick')&&G.turnRollCount===1&&free.length>0){
+    var _ftBlanks=free.filter(function(d){return d.val!==1&&d.val!==5;});
+    if(_ftBlanks.length>0){
+      var _ftVic=_ftBlanks[Math.floor(Math.random()*_ftBlanks.length)];
+      _ftVic.val=5;reDrawDieFace(_ftVic);
+      if(_ftVic.el){_ftVic.el.classList.add('eff-glow-gold');spawnPixelSparks(_ftVic.el,4);setTimeout(function(){if(_ftVic.el)_ftVic.el.classList.remove('eff-glow-gold');},700);}
+      triggerCard('finnicks_trick','TRICK → 5!',true);
+    }
+  }
   /* Loaded Die: 40% chance force one random die to face 1 (first roll only).
      Loaded Deck (3+ Sharp): hits 2 dice instead of 1. */
   if(G.pCards.includes('loaded_die')&&G.turnRollCount===1&&Math.random()<0.4&&free.length>0){
@@ -8358,6 +8371,20 @@ function handleBank(){
     G._cbInterest=G._cbInterest||0;
     if(G._cbInterest>0){total+=G._cbInterest;bonusMsg+=' +'+G._cbInterest+' BOOK';triggerCard('corvus_book','+'+G._cbInterest,true);}
     G._cbInterest+=(total>=1000?50:25);
+  }
+  /* Ambrose's Chalice: if 3 regular slots are same archetype, +500 every bank */
+  if(G.pCards.includes('ambrose_chalice')){
+    /* Check the 3 regular cards (not the boss card) — same archetype + no nulls */
+    var _acRegular=[];
+    if(S&&S.run&&S.run.cards){
+      for(var _aci=0;_aci<3;_aci++){
+        var _accid=S.run.cards[_aci];
+        if(_accid){var _acc=getCard(_accid);if(_acc&&_acc.arch)_acRegular.push(_acc.arch);}
+      }
+    }
+    if(_acRegular.length===3&&_acRegular[0]===_acRegular[1]&&_acRegular[1]===_acRegular[2]){
+      total+=500;bonusMsg+=' +500 CHALICE';triggerCard('ambrose_chalice','+500 PURE',true);
+    }
   }
   /* Aldric's Banner: each unique combo type ever scored adds +150 to every bank */
   if(G.pCards.includes('aldrics_banner')){
