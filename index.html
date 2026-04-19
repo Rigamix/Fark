@@ -2084,8 +2084,8 @@ body::before,body::after{display:none!important}
 .tier-lo-die .die-tooltip{opacity:0;pointer-events:none;transition:opacity .2s}
 .tier-lo-die.peeked .die-tooltip{opacity:1;pointer-events:auto;animation:tipGrow .25s ease-out}
 .tier-lo-card.empty{border-style:dashed;border-color:rgba(140,130,110,.25);background:#1e1a12}
-.tier-lo-card.boss{border-color:rgba(200,160,60,.35);background:rgba(80,64,30,.3)}
-.tier-lo-card.boss.empty{border-style:dashed;border-color:rgba(200,160,60,.2);background:rgba(80,64,30,.15)}
+.tier-lo-card.boss{border-color:rgba(220,170,60,.55);background:rgba(80,64,30,.3)}
+.tier-lo-card.boss.empty{border-style:dashed;border-color:rgba(220,170,60,.45);background:rgba(80,64,30,.18)}
 .tier-lo-card .gcard{position:absolute;inset:0;width:100%;height:100%;border-radius:4px;border-width:2px}
 .tier-lo-card .gcard-cover{font-size:16px}
 .tier-lo-card .gcard-frame{display:none}
@@ -2121,8 +2121,8 @@ body::before,body::after{display:none!important}
   transition:border-color .2s,box-shadow .2s;
 }
 .end-draft-slots .draft-slot.boss{
-  border-color:rgba(200,160,60,.35);
-  background:rgba(80,64,30,.3);
+  border-color:rgba(220,170,60,.65);
+  background:rgba(80,64,30,.35);
 }
 .end-draft-slots .draft-slot.filled{border-style:solid;border-color:rgba(200,160,80,.4);touch-action:none}
 .end-draft-slots .draft-slot.drop-hover{border-color:rgba(200,160,80,.7);box-shadow:0 0 12px rgba(200,160,80,.3);background:rgba(80,64,30,.5)}
@@ -2157,7 +2157,7 @@ body::before,body::after{display:none!important}
   background:rgba(30,26,18,.6);border:2px dashed rgba(200,160,80,.15);border-radius:5px;cursor:pointer;
   font-size:18px;transition:border-color .2s}
 .draft-slot.filled{border-style:solid;border-color:rgba(200,160,80,.3)}
-.draft-slot.boss{border-color:rgba(200,60,60,.3)}
+.draft-slot.boss{border-color:rgba(220,170,60,.55)}
 .draft-slot.target{border-color:var(--gold)!important;box-shadow:0 0 8px rgba(200,160,80,.3)}
 .draft-actions{display:flex;gap:12px;margin-top:12px}
 .draft-skip-btn{padding:10px 30px}
@@ -4940,7 +4940,8 @@ body::before,body::after{display:none!important}
 let S = null;
 var _boneDice=['bone','bone','bone','bone','bone','bone'];
 function _freshRun(){
-  return{tier:0,points:0,cards:[null,null,null],dice:[..._boneDice],bossesBeaten:[],diceRerolls:1,handicapOffer:null,inGauntlet:false,gauntletIndex:0,gold:100,diceStock:null,cardTarnish:{}};
+  /* cards: 4 slots — [0..2] regular, [3] boss-only signature */
+  return{tier:0,points:0,cards:[null,null,null,null],dice:[..._boneDice],bossesBeaten:[],diceRerolls:1,handicapOffer:null,inGauntlet:false,gauntletIndex:0,gold:100,diceStock:null,cardTarnish:{}};
 }
 function _getS(){
   if(!S){
@@ -4961,6 +4962,17 @@ function _getS(){
     /* Drop any equipped cards that no longer exist in the catalog (e.g. removed in an update) */
     var _removedCards=['tyrants_gaze','the_hare','phoenix_ash','cracked_bell','drunkards_prayer','the_ledger_npc','the_collection_plate'];
     if(Array.isArray(S.run.cards))S.run.cards=S.run.cards.map(function(cid){return cid&&_removedCards.indexOf(cid)===-1?cid:null;});
+    /* Boss-slot migration: pad to 4 slots and move any boss card sitting in
+       slot 2 (legacy boss-slot index) into slot 3 (new boss-only slot). */
+    if(Array.isArray(S.run.cards)){
+      while(S.run.cards.length<4)S.run.cards.push(null);
+      var _c2=S.run.cards[2];
+      var _cd2=_c2?(CARDS_MAP[_c2]||null):null;
+      if(_cd2&&_cd2.npc&&!S.run.cards[3]){
+        S.run.cards[3]=_c2;
+        S.run.cards[2]=null;
+      }
+    }
   }
   return S;
 }
@@ -10940,14 +10952,15 @@ function _draftFindDropSlot(x,y){
     var slot=hit.closest('.draft-slot');
     if(slot&&slot.closest('#endDraftSlots')){
       var idx=parseInt(slot.dataset.slotIdx);
-      if(!(_draftBossMode?idx<2:idx>=2))return{el:slot,idx:idx};
+      /* Boss draft only accepts slot 3; regular draft only accepts 0/1/2 */
+      if(!(_draftBossMode?idx<3:idx>=3))return{el:slot,idx:idx};
     }
   }
   /* Fallback: generous rect check (±25px tolerance) */
   var best=null;
   document.querySelectorAll('#endDraftSlots .draft-slot').forEach(function(s){
     var idx=parseInt(s.dataset.slotIdx);
-    if(_draftBossMode?idx<2:idx>=2)return;
+    if(_draftBossMode?idx<3:idx>=3)return;
     var r=s.getBoundingClientRect();
     if(x>=r.left-25&&x<=r.right+25&&y>=r.top-25&&y<=r.bottom+25)best={el:s,idx:idx};
   });
@@ -10976,7 +10989,7 @@ function _draftPlaceCard(cardId,slotIdx,srcEl){
   save();
   var cd=_tC;
   if(!cd)return false;
-  s.className='draft-slot filled'+(slotIdx===2?' boss':'');
+  s.className='draft-slot filled'+(slotIdx===3?' boss':'');
   var _slotRar=cd.npc?'boss-'+cd.npc:(cd.npcOnly&&cd.owner?'boss-'+cd.owner:(cd.npcOnly?'npc':cd.rarity));
   s.innerHTML='<div class="gcard rarity-'+_slotRar+'" style="position:absolute;inset:0;width:100%;height:100%;border-radius:4px"><div class="gcard-cover" style="background:'+(CARD_BG[cardId]||'#444')+'">'+cd.icon+'</div><div class="gcard-frame"></div>'+gcCorners()+'</div>';
   /* Replace wrapper to clear any stale listeners */
@@ -11122,7 +11135,7 @@ function _initSlotUndoDrag(slotEl,slotIdx){
 
       /* Undo: clear the slot, restore the offered card */
       _getS();S.run.cards[slotIdx]=null;save();
-      slotEl.className='draft-slot'+(slotIdx===2?' boss':'');
+      slotEl.className='draft-slot'+(slotIdx===3?' boss':'');
       slotEl.innerHTML='';slotEl.style.opacity='';
       if(_draftPickedEl){
         _draftPickedEl.style.visibility='';_draftPickedEl.style.pointerEvents='';_draftPickedEl.style.opacity='';
@@ -11377,13 +11390,13 @@ function _renderEndDraftSlots(){
   var row=document.getElementById('endDraftSlots');if(!row)return;
   row.innerHTML='';
   _getS();
-  for(var i=0;i<3;i++){
+  for(var i=0;i<4;i++){
     var cid=S.run.cards[i];
     /* Wrapper for slot + tooltip (tooltip as sibling, not child of slot) */
     var wrap=document.createElement('div');
     wrap.style.cssText='position:relative;width:clamp(60px,18vw,80px)';
     var slot=document.createElement('div');
-    slot.className='draft-slot'+(cid?' filled':'')+(i===2?' boss':'');
+    slot.className='draft-slot'+(cid?' filled':'')+(i===3?' boss':'');
     slot.dataset.slotIdx=i;
     if(cid){
       var cd=CARDS.find(function(c){return c.id===cid;})||getNpcCard(cid);
@@ -11486,9 +11499,9 @@ function _draftSelectCard(cardId){
   document.querySelectorAll('.draft-card-wrap').forEach(function(el){
     el.classList.toggle('selected',el.dataset.cardId===cardId);
   });
-  /* Check if there's an empty standard slot */
+  /* Check if there's an empty standard slot (slots 0/1/2; slot 3 is boss-only) */
   var emptySlot=-1;
-  for(var i=0;i<2;i++){if(!S.run.cards[i]){emptySlot=i;break;}}
+  for(var i=0;i<3;i++){if(!S.run.cards[i]){emptySlot=i;break;}}
   if(emptySlot>=0){
     /* Auto-place in empty slot */
     S.run.cards[emptySlot]=cardId;
@@ -11497,7 +11510,7 @@ function _draftSelectCard(cardId){
     /* Brief delay then continue */
     setTimeout(function(){showScreen('gauntlet');},600);
   }else{
-    /* Both slots full — player must pick which to replace */
+    /* All standard slots full — player must pick which to replace */
     _draftTargetSlot=-1;
     _renderDraftSlots();
     document.getElementById('draftSubtitle').textContent='Tap a slot to replace, or skip.';
@@ -11505,7 +11518,7 @@ function _draftSelectCard(cardId){
 }
 
 function _draftReplaceSlot(slotIdx){
-  if(!_draftSelected||slotIdx<0||slotIdx>1)return;
+  if(!_draftSelected||slotIdx<0||slotIdx>2)return;
   S.run.cards[slotIdx]=_draftSelected;
   save();
   _renderDraftSlots();
@@ -11520,17 +11533,17 @@ function draftSkip(){
 function _renderDraftSlots(){
   var row=document.getElementById('draftSlotRow');
   row.innerHTML='';
-  for(var i=0;i<3;i++){
+  for(var i=0;i<4;i++){
     var cid=S.run.cards[i];
     var slot=document.createElement('div');
-    slot.className='draft-slot'+(cid?' filled':'')+(i===2?' boss':'');
+    slot.className='draft-slot'+(cid?' filled':'')+(i===3?' boss':'');
     if(cid){
       var cd=CARDS.find(function(c){return c.id===cid;})||getNpcCard(cid);
       slot.textContent=cd?cd.icon:'?';
     }else{
-      slot.textContent=i===2?'⚔':'—';
+      slot.textContent=i===3?'⚔':'—';
     }
-    if(i<2&&_draftSelected&&cid){
+    if(i<3&&_draftSelected&&cid){
       /* Tappable to replace */
       slot.style.cursor='pointer';
       (function(idx){slot.addEventListener('click',function(){_draftReplaceSlot(idx);});})(i);
@@ -11612,8 +11625,8 @@ function _rewardSelectCard(cardId){
   document.querySelectorAll('.reward-card-wrap').forEach(function(el){
     el.classList.toggle('selected',el.dataset.cardId===cardId);
   });
-  /* Place in boss slot */
-  S.run.cards[2]=cardId;
+  /* Place in boss slot (index 3) */
+  S.run.cards[3]=cardId;
   save();
   /* Show dice section */
   setTimeout(function(){
@@ -11792,16 +11805,16 @@ function _renderTierLoadout(){
         var cd=CARDS.find(function(c){return c.id===cid;})||getNpcCard(cid);
         if(cd){
           var _tRar=cd.npc?'boss-'+cd.npc:(cd.npcOnly&&cd.owner?'boss-'+cd.owner:(cd.npcOnly?'npc':cd.rarity));
-          html+='<div class="tier-lo-card'+(i===2?' boss':'')+'">';
+          html+='<div class="tier-lo-card'+(i===3?' boss':'')+'">';
           html+='<div class="gcard rarity-'+_tRar+'" style="position:absolute;inset:0;width:100%;height:100%;border-radius:4px">';
           html+='<div class="gcard-cover" style="background:'+(CARD_BG[cid]||'#444')+'">'+cd.icon+'</div>';
           html+='<div class="gcard-frame"></div>'+gcCorners()+'</div></div>';
           html+=mkCardTooltipHTML(cd,null,{showFlavor:false});
         }else{
-          html+='<div class="tier-lo-card'+(i===2?' boss':'')+'"></div>';
+          html+='<div class="tier-lo-card'+(i===3?' boss':'')+'"></div>';
         }
       }else{
-        html+='<div class="tier-lo-card empty'+(i===2?' boss':'')+'"></div>';
+        html+='<div class="tier-lo-card empty'+(i===3?' boss':'')+'"></div>';
       }
       html+='</div>';
     });
