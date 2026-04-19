@@ -4829,8 +4829,8 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
 
 <!-- DEBUG -->
 <div style="position:fixed;top:6px;right:6px;z-index:9999;display:flex;gap:4px">
-  <button onclick="(function(){if(G){G._featBanks=G._featBanks||2;G._featMaxBank=G._featMaxBank||1200;}endMatch(true);})()" style="padding:4px 8px;font-size:10px;background:#2a2;color:#fff;border:none;border-radius:4px;cursor:pointer;opacity:.7">DBG WIN</button>
-  <button onclick="endMatch(false)" style="padding:4px 8px;font-size:10px;background:#a22;color:#fff;border:none;border-radius:4px;cursor:pointer;opacity:.7">DBG LOSE</button>
+  <button onclick="dbgWin()" style="padding:4px 8px;font-size:10px;background:#2a2;color:#fff;border:none;border-radius:4px;cursor:pointer;opacity:.7">DBG WIN</button>
+  <button onclick="dbgLose()" style="padding:4px 8px;font-size:10px;background:#a22;color:#fff;border:none;border-radius:4px;cursor:pointer;opacity:.7">DBG LOSE</button>
 </div>
 
 <!-- OVERLAYS -->
@@ -5102,6 +5102,39 @@ function startNewRun(){
   if(S.renownPerks&&S.renownPerks.legend)S.run._legendDraftPending=true;
   S.totalRuns++;
   save();
+}
+
+/* ── DEBUG HELPERS ── triggered by the DBG WIN / DBG LOSE buttons.
+   Build a minimal G state so endMatch + evaluateFeats run end-to-end
+   even when there's no real match in progress (e.g. testing from menu). */
+function dbgWin(){
+  _getS();
+  if(S.run){S.run.feats={};/* clear earned-feats so they fire fresh */}
+  G={
+    rung:{name:'PATRON',key:'patron',target:1500,boss:null,gold:0},
+    pPts:1800, oPts:500,
+    pCards:[], oCards:[],
+    matchDice:['bone','bone','bone','bone','bone','bone'],
+    matchOppDice:['bone','bone','bone','bone','bone','bone'],
+    target:1500,turnNum:3,
+    _featBanks:2,_featBusts:0,_featMaxBank:1200,
+    _featActivesUsed:false,_featFullStraight:false,_featHotDiceCount:0,
+    _isBoss:false,_isGauntlet:false,
+  };
+  endMatch(true);
+}
+function dbgLose(){
+  _getS();
+  if(!G){G={
+    rung:{name:'PATRON',key:'patron',target:1500,boss:null,gold:0},
+    pPts:300,oPts:1500,
+    pCards:[],oCards:[],
+    matchDice:['bone','bone','bone','bone','bone','bone'],
+    matchOppDice:['bone','bone','bone','bone','bone','bone'],
+    target:1500,
+    _isBoss:false,_isGauntlet:false,
+  };}
+  endMatch(false);
 }
 
 /* ── Feats (renown sources — once per run each) ────────────────────────
