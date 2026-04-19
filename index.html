@@ -1496,7 +1496,11 @@ body:has(#end-ov.show) #dbgButtons{display:none !important}
 .res-feat-desc{font-family:'IM Fell English',serif;color:var(--textdim);font-size:14px;line-height:1.2;flex-grow:1;text-align:left;letter-spacing:0;word-spacing:1px}
 /* Small phones: shrink the feats panel so it doesn't push the cards off-screen */
 @media (max-width: 380px){
-  #end-ov .res-feats{font-size:11px;gap:0}
+  #end-ov .res-feats{
+    font-size:11px;gap:0;
+    /* Tight gap from scores → feats on small phones (was +36px on big) */
+    top:calc(5vh + clamp(36px,11vw,60px) + clamp(28px,9vw,48px) + clamp(18px,5vw,26px) + 12px);
+  }
   .res-feat-row{padding:3px 4px;line-height:1.1}
   .res-feat-star{font-size:11px}
   .res-feat-label{font-size:11px}
@@ -1996,7 +2000,9 @@ body::before,body::after{display:none!important}
 }
 #screen-gauntlet.active::after{opacity:1}
 /* Match background */
-#screen-match .top-bar .title{visibility:hidden}
+/* Title was hidden previously; the bar itself + its pixel-gradient ::after
+   added ~66px of dead space at the top of the match screen, so hide it all. */
+#screen-match .top-bar{display:none}
 #screen-match::before{
   content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;
   background-image:url('Environment_ART/match.png');
@@ -2036,6 +2042,15 @@ body::before,body::after{display:none!important}
   image-rendering:pixelated;
 }
 #screen-gauntlet .top-bar .title{font-size:clamp(44px,14vw,64px);margin-top:6px;padding-top:0}
+/* The default .top-bar .title .letter rule uses a thin 1px stroke + tight shadow
+   tuned for the 28-40px match top-bar. At the gauntlet's 44-64px size that
+   looks washed out (just a soft glow with no crisp edges). Restore the
+   menu-style 2px stroke + bigger drop-shadow so the sheen reads properly. */
+#screen-gauntlet .top-bar .title .letter{
+  text-shadow:2px 0 0 #d49020,-2px 0 0 #c48018,0 2px 0 #b07018,0 -2px 0 #ffe060,
+    2px 2px 0 #a06010,3px 3px 0 #6a3a08,4px 4px 0 #2a1804;
+  -webkit-text-stroke:2px #a06818;
+}
 
 .char-card{transition:transform .06s ease,filter .06s ease}
 .char-card:active{transform:scale(.93);filter:brightness(1.3)}
@@ -2186,20 +2201,44 @@ body::before,body::after{display:none!important}
 .tier-boss-loadout .tier-lo-die .die.sm{width:32px!important;height:32px!important;box-shadow:1px 1px 0 rgba(0,0,0,.45)!important;grid-template-columns:repeat(7,4px)!important;grid-template-rows:repeat(7,4px)!important}
 .tier-boss-loadout .tier-lo-die .die.sm .dc{width:4px!important;height:4px!important;margin:0!important}
 .tier-boss-loadout .tier-lo-die .die.sm .dc.dot{background:var(--dpip);width:2px!important;height:2px!important;margin:1px!important;border-radius:0}
+/* Small phones: shrink player loadout dice and lift the whole tier-wrap
+   so the STANDARD / LAST CALL buttons aren't cropped behind the bottom-nav */
+@media (max-width: 380px){
+  .tier-wrap{padding:56px 16px 100px}
+  /* Shave the dice grid so 3 columns + gaps fit comfortably without
+     clipping the right edge. 38px cells = 7×5px-ish inner cells. */
+  .tier-lo-dice{grid-template-columns:repeat(3,38px);gap:3px}
+  .tier-lo-die .die.sm{width:38px!important;height:38px!important;
+    grid-template-columns:repeat(7,5px)!important;grid-template-rows:repeat(7,5px)!important}
+  .tier-lo-die .die.sm .dc{width:5px!important;height:5px!important}
+  .tier-lo-die .die.sm .dc.dot{width:3px!important;height:3px!important}
+  /* Tighten the wrap, kill the margin-top:auto gaps, zero out the bottom
+     margins on the button rows, and shrink the buttons themselves so the
+     STANDARD / LAST CALL buttons aren't cropped behind the bottom-nav. */
+  .tier-wrap{padding:48px 16px calc(64px + env(safe-area-inset-bottom,0px))}
+  .tier-boss-preview{margin-top:0}
+  .tier-match-header{margin-top:0}
+  .tier-boss-btn-wrap{margin-top:0;margin-bottom:0}
+  .tier-matches{margin-bottom:0}
+  .tier-match-btn{padding:6px 10px 4px}
+  .tmb-pts{margin-top:0;font-size:16px}
+}
 /* ── END-SCREEN INLINE DRAFT ── */
 .end-draft{text-align:center;padding:8px 0}
 .end-draft-label{font-family:var(--font-px);font-size:14px;color:#9a9088;letter-spacing:2px;margin-top:8px;margin-bottom:6px;text-align:center}
 /* Spacer above the offered cards — keeps the previous breathing room
    now that CHOOSE A CARD label has moved below the cards */
 .end-draft-spacer{height:32px}
-/* Small phones: no spacer, smaller cards */
+/* Small phones: no spacer, smaller cards, tighter slots + skip so the
+   SKIP/CONTINUE button stays visible (even with the reshuffle icon present) */
 @media (max-width: 380px){
-  .end-draft-spacer{height:8px}
+  .end-draft-spacer{height:6px}
   .end-draft-cards .draft-card-wrap{width:clamp(56px,18vw,72px)}
-  .end-draft-cards{margin-bottom:4px}
-  .end-draft-label{font-size:11px;margin-top:4px;margin-bottom:2px}
-  .end-draft-reshuffle{font-size:28px;width:24px;height:24px;margin:2px auto 0}
-  .end-draft-slots{margin-top:14px}
+  .end-draft-cards{margin-bottom:2px}
+  .end-draft-label{font-size:11px;margin-top:2px;margin-bottom:0}
+  .end-draft-reshuffle{font-size:28px;width:24px;height:24px;margin:0 auto}
+  .end-draft-slots{margin-top:10px;margin-bottom:6px}
+  .end-draft-skip{padding:8px 36px;font-size:15px;min-width:130px}
 }
 .end-draft-cards{display:flex;gap:10px;justify-content:center;margin-bottom:8px}
 .end-draft-cards .draft-card-wrap{width:clamp(64px,20vw,90px);touch-action:none;user-select:none;-webkit-user-select:none}
@@ -9743,14 +9782,18 @@ function endMatch(win){
       rf.style.display='flex';
       requestAnimationFrame(function(){
         rf.classList.add('show');
-        /* Push res-card down to sit below the feats panel.
-           Caps at 44% so we don't push too far on very tall screens
-           with few feats; floors at the feats bottom on small screens. */
+        /* Position res-card. Big screens: keep the original 0.44 floor + 18px
+           gap (the layout was perfect there). Small phones: tighten the floor
+           and gap so the SKIP button isn't cropped, especially with the
+           reshuffle icon present. */
         var rcEl=document.getElementById('resCard');
         if(rcEl){
           var rfRect=rf.getBoundingClientRect();
-          var minTopPx=rfRect.bottom+18;
-          var defaultTopPct=0.44*window.innerHeight;
+          var isSmall=window.innerWidth<=380;
+          var gap=isSmall?6:18;
+          var floorPct=isSmall?0.36:0.44;
+          var minTopPx=rfRect.bottom+gap;
+          var defaultTopPct=floorPct*window.innerHeight;
           rcEl.style.top=Math.max(minTopPx,defaultTopPct)+'px';
         }
       });
