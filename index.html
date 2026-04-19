@@ -2176,7 +2176,10 @@ body::before,body::after{display:none!important}
 .tier-boss-loadout .tier-lo-die .die.sm .dc.dot{background:var(--dpip);width:2px!important;height:2px!important;margin:1px!important;border-radius:0}
 /* ── END-SCREEN INLINE DRAFT ── */
 .end-draft{text-align:center;padding:8px 0}
-.end-draft-label{font-family:var(--font-px);font-size:14px;color:var(--gold);letter-spacing:2px;margin-top:6px;margin-bottom:12px}
+.end-draft-label{font-family:var(--font-px);font-size:14px;color:var(--gold);letter-spacing:2px;margin-top:8px;margin-bottom:6px;text-align:center}
+/* Spacer above the offered cards — keeps the previous breathing room
+   now that CHOOSE A CARD label has moved below the cards */
+.end-draft-spacer{height:32px}
 .end-draft-cards{display:flex;gap:10px;justify-content:center;margin-bottom:8px}
 .end-draft-cards .draft-card-wrap{width:clamp(64px,20vw,90px);touch-action:none;user-select:none;-webkit-user-select:none}
 .end-draft-cards .draft-card-wrap{aspect-ratio:2/3;overflow:visible}
@@ -9742,7 +9745,9 @@ function endMatch(win){
     _draftPickedCardId=null;_draftPickedSlotIdx=-1;_draftPickedEl=null;
     /* Build inline draft HTML in resCard */
     var draftHtml='<div class="end-draft">';
-    draftHtml+='<div class="end-draft-label">CHOOSE A CARD</div>';
+    /* Spacer keeps the layout breathing room above the cards (the
+       CHOOSE A CARD prompt now lives BELOW the cards). */
+    draftHtml+='<div class="end-draft-spacer"></div>';
     draftHtml+='<div class="end-draft-cards">';
     _draftCards.forEach(function(card){
       var sd=(Math.random()*8).toFixed(1);
@@ -9754,7 +9759,8 @@ function endMatch(win){
       draftHtml+='</div>';
     });
     draftHtml+='</div>';
-    /* Renown perk: Regular at the bar → reshuffle icon directly under the offered cards */
+    draftHtml+='<div class="end-draft-label">CHOOSE A CARD</div>';
+    /* Renown perk: Regular at the bar → reshuffle icon directly under the label */
     if(S.renownPerks&&S.renownPerks.freeRestock&&!S.run._restockUsed){
       draftHtml+='<div class="end-draft-reshuffle" id="endDraftReshuffleBtn" onclick="reshuffleDraft()" title="Reshuffle (renown)"><span>↻</span></div>';
     }
@@ -12051,11 +12057,15 @@ function _renderEndDraftSlots(){
   var row=document.getElementById('endDraftSlots');if(!row)return;
   row.innerHTML='';
   _getS();
-  for(var i=0;i<_loadoutSlotCount();i++){
+  /* When 5 slots are unlocked the row has to fit a wider grid in the
+     same horizontal space — scale each slot down. */
+  var _slotN=_loadoutSlotCount();
+  var _slotW=_slotN>=5?'clamp(46px,14vw,62px)':'clamp(60px,18vw,80px)';
+  for(var i=0;i<_slotN;i++){
     var cid=S.run.cards[i];
     /* Wrapper for slot + tooltip (tooltip as sibling, not child of slot) */
     var wrap=document.createElement('div');
-    wrap.style.cssText='position:relative;width:clamp(60px,18vw,80px)';
+    wrap.style.cssText='position:relative;width:'+_slotW;
     var slot=document.createElement('div');
     var _lockCls=(!cid&&!_isSlotUnlocked(i))?' locked':'';
     slot.className='draft-slot'+(cid?' filled':'')+(i>=3?' boss':'')+_lockCls;
