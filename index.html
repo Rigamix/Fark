@@ -12925,36 +12925,51 @@ function _ensureBgMusic(){
   BG_MUSIC=a;
   return a;
 }
-function _ensureBgGain(){
-  if(BG_GAIN)return BG_GAIN;
+// Build the AudioContext only — DON'T connect mediaElementSource yet.
+// On iOS, once an <audio> is wired to a suspended context, .play()
+// becomes silent. We connect the source AFTER play() succeeds.
+function _ensureBgCtx(){
+  if(BG_CTX)return BG_CTX;
   try{
     var AC=window.AudioContext||window.webkitAudioContext;
     if(!AC)return null;
     BG_CTX=new AC();
+  }catch(e){BG_CTX=null;}
+  return BG_CTX;
+}
+// Connect the audio element to the gain node — only safe to call once
+// the audio is actually playing (otherwise iOS routes through a
+// suspended context and goes silent).
+function _attachBgGain(){
+  if(BG_GAIN||!BG_CTX)return BG_GAIN;
+  try{
     var a=_ensureBgMusic();
     var src=BG_CTX.createMediaElementSource(a);
     BG_GAIN=BG_CTX.createGain();
     BG_GAIN.gain.value=BG_VOLUME;
     src.connect(BG_GAIN);
     BG_GAIN.connect(BG_CTX.destination);
-  }catch(e){
-    // Some browsers throw if createMediaElementSource is called twice on
-    // the same element, or if WebAudio is unavailable. Fall back to
-    // <audio>.volume — already set in _ensureBgMusic.
-    BG_GAIN=null;
-  }
+  }catch(e){BG_GAIN=null;}
   return BG_GAIN;
 }
 function _bgMusicSync(){
   var a=_ensureBgMusic();
   var on=!S||!S.settings||S.settings.music!==false;
   if(on){
-    _ensureBgGain();
+    /* Pre-create context within this user-gesture call so iOS unlocks it. */
+    _ensureBgCtx();
     if(BG_CTX&&BG_CTX.state==='suspended'){
       try{BG_CTX.resume();}catch(e){}
     }
     var p=a.play();
-    if(p&&p.catch)p.catch(function(){});
+    if(p&&p.then){
+      p.then(function(){
+        /* Audio is playing — now safe to wire up Web Audio for volume. */
+        _attachBgGain();
+      }).catch(function(){});
+    }else{
+      _attachBgGain();
+    }
   }else{
     a.pause();
   }
@@ -12976,20 +12991,32 @@ function updateAudioUI(){
   if(sc)sc.classList.toggle('on',sfxOn);
 }
 // Browsers block autoplay until first user gesture. iOS additionally
-// requires AudioContext creation/resume to happen inside that gesture.
+// requires AudioContext creation/resume to happen inside that gesture
+// AND won't let <audio>.play() succeed if the element is already wired
+// to a suspended Web Audio context. Strategy: on every gesture until
+// success, (1) create + resume the context, (2) call play() on the
+// raw <audio> (no mediaElementSource yet), (3) once play resolves,
+// attach the gain node. Listeners stay attached until play succeeds.
 (function(){
   function _kick(){
     try{
       var s=null;try{s=JSON.parse(localStorage.getItem('gambit4'));}catch(e){}
       var on=!s||!s.settings||s.settings.music!==false;
-      if(on){
-        var a=_ensureBgMusic();
-        _ensureBgGain();
-        if(BG_CTX&&BG_CTX.state==='suspended'){
-          try{BG_CTX.resume();}catch(e){}
-        }
-        var p=a.play();
-        if(p&&p.then)p.then(function(){_off();}).catch(function(){});
+      if(!on)return;
+      var a=_ensureBgMusic();
+      _ensureBgCtx();
+      if(BG_CTX&&BG_CTX.state==='suspended'){
+        try{BG_CTX.resume();}catch(e){}
+      }
+      var p=a.play();
+      if(p&&p.then){
+        p.then(function(){
+          _attachBgGain();
+          _off();
+        }).catch(function(){});
+      }else{
+        _attachBgGain();
+        _off();
       }
     }catch(e){}
   }
