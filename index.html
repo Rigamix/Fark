@@ -13023,7 +13023,27 @@ document.addEventListener('DOMContentLoaded', function(){
   _getS();
   showScreen('menu');
 });
-if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+/* Service worker: register, then aggressively pull updates so a new sw.js
+   takes effect on the very next reload. Without this, browsers happily run
+   the old SW for hours/days even though sw.js on the server has changed —
+   that's what was leaving mobile clients stranded on the v3 cache. */
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js').then(function(reg){
+    /* Check for an updated SW on every page load */
+    try{reg.update();}catch(e){}
+    /* When a new SW finishes installing, reload so it claims us */
+    reg.addEventListener('updatefound',function(){
+      var nw=reg.installing;
+      if(!nw)return;
+      nw.addEventListener('statechange',function(){
+        if(nw.state==='installed' && navigator.serviceWorker.controller){
+          /* New SW ready — reload once to pick up fresh bundle */
+          window.location.reload();
+        }
+      });
+    });
+  }).catch(function(){});
+}
 
 </script>
 <audio id="bgMusic" src="Audio/Tavern_pixel.mp3" loop preload="auto" style="display:none"></audio>
