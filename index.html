@@ -5868,6 +5868,10 @@ const CARDS=[
   {id:'aldrics_vow',name:"ALDRIC'S VOW",icon:'⚔️',rarity:'gold',type:'active',npc:'aldric',maxUses:1,timing:'idle',eff:'DOUBLE OR NOTHING',desc:'Your next roll: score 300+ and it doubles; score less and you lose your accumulated turn points. One use.',rewardQuote:'"Thou hast proven worthy. Bear this vow."',arch:'brinksman'},
   {id:'whispers_hex',name:"WHISPER'S HEX",icon:'🔮',rarity:'gold',type:'active',npc:'whisper',maxUses:1,timing:'yielding',eff:'OPP −1 DIE NEXT TURN',desc:'Activate while yielding your turn — the opponent starts their next turn with only five dice. One use.',rewardQuote:'"This hex is yours. Use it wisely."',arch:'saboteur'},
   {id:'ambrose_grace',name:"AMBROSE'S GRACE",icon:'✝️',rarity:'gold',type:'active',npc:'ambrose',maxUses:1,timing:'choosing',eff:'2 BLANKS → 5s',desc:'During dice selection, convert up to 2 non-scoring dice into 5s (50 pts each). One use per match.',rewardQuote:'"The heavens smiled upon thee. Accept this grace."',arch:'sharp'},
+  /* ── Boss SIGNATURE passives (Phase 5) — alternative to one-use actives ── */
+  {id:'mabels_ward',name:"MABEL'S WARD",icon:'🪡',rarity:'gold',npc:'mabel',eff:'EVERY BANK +75; 5TH BANK +400',desc:"Mabel's careful threading: every bank you make gains +75 bonus. Your 5th, 10th, 15th… bank gains +400 instead.",rewardQuote:'"This thread holds firm. Take it, dear."',arch:'safeBanker'},
+  {id:'corvus_book',name:"CORVUS'S BOOK",icon:'📖',rarity:'gold',npc:'corvus',eff:'EACH BANK +25 INTEREST (PERMANENT)',desc:"Each bank adds +25 to a running interest line that applies to every future bank this match. Banks of 1000+ add +50 instead.",rewardQuote:'"Compounding. The lender\'s purest art."',arch:'hoarder'},
+  {id:'aldrics_banner',name:"ALDRIC'S BANNER",icon:'🛡️',rarity:'gold',npc:'aldric',eff:'EACH UNIQUE COMBO TYPE: +150 ALL FUTURE BANKS',desc:"Each unique combo type you score this match (triple, straight, Hot Dice) permanently adds +150 to every subsequent bank.",rewardQuote:'"The banner remembers every blow struck beneath it."',arch:'collector'},
   /* ── DICE PROTECTION / SWAP ── */
   {id:'iron_grip',name:'IRON GRIP',icon:'🔒',rarity:'silver',eff:'DICE CAN\'T BE SWAPPED',desc:'Prevents any opponent effect from swapping, stealing, or downgrading your dice this match.',arch:'utility'},
   {id:'sleight_of_hand',name:'SLEIGHT OF HAND',icon:'🃏',rarity:'gold',type:'active',maxUses:1,timing:'idle',eff:'SWAP ONE DIE WITH OPP',desc:'Before rolling, swap one of your dice with one of the opponent\'s — you choose which dice to exchange.',arch:'sharp',dep:true},
@@ -5875,7 +5879,7 @@ const CARDS=[
   /* Archetype enablers (Phase 4 — reward committing to one archetype) */
   {id:'tab_at_bar',name:'TAB AT THE BAR',icon:'📋',rarity:'silver',eff:'+25/BANK PER SAFE-BANKER CARD',desc:'For each Safe-Banker card you have equipped (this one included), every bank gains +25.',arch:'safeBanker'},
   {id:'last_orders',name:'LAST ORDERS',icon:'🍻',rarity:'gold',eff:'3+ SAFE-BANKER: EVERY 3RD BANK ×2',desc:'If you have 3 or more Safe-Banker cards equipped: every third bank you make is doubled.',arch:'safeBanker'},
-  {id:'iron_stomach',name:'IRON STOMACH',icon:'🤢',rarity:'silver',eff:'+1 BUST SURVIVED PER BRINKSMAN CARD',desc:'For each Brinksman card you have equipped (this one included), gain one extra bust-survival per match. Stacks with The Martyr.',arch:'brinksman'},
+  {id:'iron_stomach',name:'IRON STOMACH',icon:'🤢',rarity:'silver',eff:'+1 BUST SURVIVED PER BRINKSMAN (MAX 2)',desc:'For each Brinksman card you have equipped (this one included), gain one extra bust-survival per match — capped at 2. Stacks with The Martyr.',arch:'brinksman'},
   {id:'stakes_rising',name:'STAKES RISING',icon:'📈',rarity:'silver',eff:'BANK 500+ → NEXT TURN STARTS +100',desc:'Each turn you bank 500 or more, your next turn starts with +100 turn points already on the table.',arch:'brinksman'},
   {id:'tavern_tales',name:'TAVERN TALES',icon:'🎭',rarity:'gold',eff:'3+ COLLECTOR: TRIPLES +25%, STRAIGHTS +50%',desc:'If you have 3 or more Collector cards equipped, all triples score +25% and all straights score +50%.',arch:'collector'},
   {id:'bad_reputation',name:'BAD REPUTATION',icon:'😈',rarity:'gold',eff:'3+ SABOTEUR: OPP\'S 1ST BANK HALVED',desc:"If you have 3 or more Saboteur cards equipped, the opponent's first bank each match is halved.",arch:'saboteur'},
@@ -8126,7 +8130,8 @@ function _tryBustSave(free){
     return true;
   }
   if(G.pCards.includes('iron_stomach')){
-    var _isMax=_archCount('brinksman');
+    /* Cap at 2 charges total — sim showed 4× Brinksman → near-zero busts (too strong) */
+    var _isMax=Math.min(2,_archCount('brinksman'));
     G._isUsed=G._isUsed||0;
     if(G._isUsed<_isMax){
       G._isUsed++;
@@ -8339,6 +8344,38 @@ function handleBank(){
     if(G._coinJarBanks%3===0){
       var _cjBonus=200*(G._coinJarBanks/3);
       total+=_cjBonus;bonusMsg+=' +'+_cjBonus+' COIN JAR';triggerCard('coin_jar','+'+_cjBonus,true);
+    }
+  }
+  /* ── Boss SIGNATURE passives (Phase 5) ── */
+  /* Mabel's Ward: +75 every bank, +400 on every 5th bank */
+  if(G.pCards.includes('mabels_ward')){
+    G._wardBanks=(G._wardBanks||0)+1;
+    var _mwBonus=(G._wardBanks%5===0)?400:75;
+    total+=_mwBonus;bonusMsg+=' +'+_mwBonus+' WARD';triggerCard('mabels_ward','+'+_mwBonus,true);
+  }
+  /* Corvus's Book: each bank adds +25 (or +50 if bank>=1000) to permanent interest */
+  if(G.pCards.includes('corvus_book')){
+    G._cbInterest=G._cbInterest||0;
+    if(G._cbInterest>0){total+=G._cbInterest;bonusMsg+=' +'+G._cbInterest+' BOOK';triggerCard('corvus_book','+'+G._cbInterest,true);}
+    G._cbInterest+=(total>=1000?50:25);
+  }
+  /* Aldric's Banner: each unique combo type ever scored adds +150 to every bank */
+  if(G.pCards.includes('aldrics_banner')){
+    G._abTypes=G._abTypes||{};
+    if(G.kept){
+      G.kept.forEach(function(k){
+        if(k.vals.length>=3){
+          var _allSame=true;for(var _avi=1;_avi<k.vals.length;_avi++)if(k.vals[_avi]!==k.vals[0]){_allSame=false;break;}
+          if(_allSame)G._abTypes.triple=true;
+          else if(k.vals.length>=5)G._abTypes.straight=true;
+        }
+      });
+    }
+    if(G._lastHotDice)G._abTypes.hotdice=true;
+    var _abN=Object.keys(G._abTypes).length;
+    if(_abN>0){
+      var _abBonus=_abN*150;
+      total+=_abBonus;bonusMsg+=' +'+_abBonus+' BANNER';triggerCard('aldrics_banner','+'+_abBonus+' ('+_abN+' TYPES)',true);
     }
   }
   /* Underdog: behind by 1000+ → +200 */
@@ -9415,7 +9452,7 @@ function endMatch(win){
     var _ownedB=S.run.cards.filter(Boolean);
     if(_bossRung.cardPool&&_bossRung.cardPool.length)_bossRung.cardPool.forEach(function(cid){if(_ownedB.indexOf(cid)===-1){var cd=getNpcCard(cid);if(cd)_allBC.push(cd);}});
     NPC_CARDS.forEach(function(c){if(c.owner===_bossName&&_ownedB.indexOf(c.id)===-1&&!_allBC.find(function(x){return x.id===c.id;}))_allBC.push(c);});
-    CARDS.forEach(function(c){if(c.npc===_bossName&&c.type==='active'&&_ownedB.indexOf(c.id)===-1&&!_allBC.find(function(x){return x.id===c.id;}))_allBC.push(c);});
+    CARDS.forEach(function(c){if(c.npc===_bossName&&_ownedB.indexOf(c.id)===-1&&!_allBC.find(function(x){return x.id===c.id;}))_allBC.push(c);});
     /* Shuffle and pick up to 3 */
     for(var bi=_allBC.length-1;bi>0;bi--){var bj=Math.floor(Math.random()*(bi+1));var bt=_allBC[bi];_allBC[bi]=_allBC[bj];_allBC[bj]=bt;}
     var _bossDraftCards=_allBC.slice(0,3);
@@ -11736,7 +11773,7 @@ function initBossRewardScreen(data){
   /* From NPC_CARDS by owner */
   NPC_CARDS.forEach(function(c){if(c.owner===_bossName&&!_allBossCards.find(function(x){return x.id===c.id;}))_allBossCards.push(c);});
   /* Also check for active player cards tagged to this NPC */
-  CARDS.forEach(function(c){if(c.npc===_bossName&&c.type==='active'&&!_allBossCards.find(function(x){return x.id===c.id;}))_allBossCards.push(c);});
+  CARDS.forEach(function(c){if(c.npc===_bossName&&!_allBossCards.find(function(x){return x.id===c.id;}))_allBossCards.push(c);});
   /* Guarantee the active player card appears in the 3 offered */
   var _activeCard=_allBossCards.find(function(c){return c.type==='active';});
   var _otherCards=_allBossCards.filter(function(c){return c!==_activeCard;});
