@@ -1384,9 +1384,12 @@ body{
   display:none;position:fixed;inset:0;z-index:9500;
   background:#0c0a06;
   flex-direction:column;align-items:center;justify-content:flex-start;gap:12px;
-  padding:14vh 24px 16px;
+  padding:4vh 24px 12px;
   image-rendering:pixelated;
 }
+/* Hide debug buttons whenever the win/lose overlay is showing.
+   !important needed to beat the inline display:flex on #dbgButtons. */
+body:has(#end-ov.show) #dbgButtons{display:none !important}
 #end-ov::before{
   content:'';position:absolute;inset:0;pointer-events:none;z-index:0;
   background:repeating-linear-gradient(
@@ -1469,7 +1472,7 @@ body{
    into flow and dropping it 100px below where the calc'd top expected. */
 #end-ov .res-feats{
   position:absolute;
-  top:calc(12vh + clamp(36px,11vw,60px) + clamp(28px,9vw,48px) + clamp(18px,5vw,26px) + 48px);
+  top:calc(5vh + clamp(36px,11vw,60px) + clamp(28px,9vw,48px) + clamp(18px,5vw,26px) + 36px);
   left:50%;transform:translateX(-50%);
   width:94%;max-width:400px;
   display:flex;flex-direction:column;gap:0;
@@ -1491,6 +1494,15 @@ body{
 .res-feat-star{color:#dca84a;font-size:14px;line-height:1}
 .res-feat-label{color:#dca84a;flex-grow:0;font-size:13px}
 .res-feat-desc{font-family:'IM Fell English',serif;color:var(--textdim);font-size:14px;line-height:1.2;flex-grow:1;text-align:left;letter-spacing:0;word-spacing:1px}
+/* Small phones: shrink the feats panel so it doesn't push the cards off-screen */
+@media (max-width: 380px){
+  #end-ov .res-feats{font-size:11px;gap:0}
+  .res-feat-row{padding:3px 4px;line-height:1.1}
+  .res-feat-star{font-size:11px}
+  .res-feat-label{font-size:11px}
+  .res-feat-desc{font-size:12px;line-height:1.05}
+  .res-feat-renown{font-size:11px}
+}
 .res-feat-renown{color:#dca84a;font-weight:bold;white-space:nowrap;font-size:13px}
 .rgt-welcome{color:#80c8ff}
 .rgt-special{color:#ffd700}
@@ -1559,14 +1571,14 @@ body{
 
 /* victory animations */
 #end-ov .res-title{position:absolute;top:32%;left:50%;transform:translateX(-50%);white-space:nowrap;transition:top .6s ease}
-#end-ov .res-title.lifted{top:10vh}
+#end-ov .res-title.lifted{top:4vh}
 @keyframes resPop{0%{transform:translateX(-50%) scale(0);opacity:0}70%{transform:translateX(-50%) scale(1.1);opacity:1}100%{transform:translateX(-50%) scale(1);opacity:1}}
 /* res-card: absolutely positioned so reward card appearance never shifts scores.
    Top tuned so 4 compact feat rows above land just before the cards. */
 #end-ov .res-card{position:absolute!important;top:44%;left:50%;transform:translateX(-50%);width:94%;overflow:visible}
 /* res-scores: absolutely positioned — starts centered, transitions up */
 #end-ov .res-scores{position:absolute!important;top:calc(32% + clamp(48px,14.4vw,78px) + 8px);left:50%;transform:translateX(-50%)!important;transition:top .6s ease}
-#end-ov .res-scores.lifted{top:calc(12vh + clamp(48px,14.4vw,78px))}
+#end-ov .res-scores.lifted{top:calc(5vh + clamp(36px,11vw,60px))}
 #end-ov .res-scores,#end-ov .res-gold-wrap{opacity:0}
 @keyframes resFadeAbs{0%{opacity:0;transform:translateX(-50%) translateY(10px)}100%{opacity:1;transform:translateX(-50%) translateY(0)}}
 .res-gold-wrap.fade-in,.res-scores.fade-in{animation:resFadeAbs .5s ease forwards}
@@ -2180,6 +2192,15 @@ body::before,body::after{display:none!important}
 /* Spacer above the offered cards — keeps the previous breathing room
    now that CHOOSE A CARD label has moved below the cards */
 .end-draft-spacer{height:32px}
+/* Small phones: no spacer, smaller cards */
+@media (max-width: 380px){
+  .end-draft-spacer{height:8px}
+  .end-draft-cards .draft-card-wrap{width:clamp(56px,18vw,72px)}
+  .end-draft-cards{margin-bottom:4px}
+  .end-draft-label{font-size:11px;margin-top:4px;margin-bottom:2px}
+  .end-draft-reshuffle{font-size:28px;width:24px;height:24px;margin:2px auto 0}
+  .end-draft-slots{margin-top:14px}
+}
 .end-draft-cards{display:flex;gap:10px;justify-content:center;margin-bottom:8px}
 .end-draft-cards .draft-card-wrap{width:clamp(64px,20vw,90px);touch-action:none;user-select:none;-webkit-user-select:none}
 .end-draft-cards .draft-card-wrap{aspect-ratio:2/3;overflow:visible}
@@ -4834,8 +4855,8 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
   </div>
 </div>
 
-<!-- DEBUG -->
-<div style="position:fixed;top:6px;right:6px;z-index:9999;display:flex;gap:4px">
+<!-- DEBUG: visible during play, auto-hidden once the end overlay is showing -->
+<div id="dbgButtons" style="position:fixed;top:6px;right:6px;z-index:9999;display:flex;gap:4px">
   <button onclick="dbgWin()" style="padding:4px 8px;font-size:10px;background:#2a2;color:#fff;border:none;border-radius:4px;cursor:pointer;opacity:.7">DBG WIN</button>
   <button onclick="dbgLose()" style="padding:4px 8px;font-size:10px;background:#a22;color:#fff;border:none;border-radius:4px;cursor:pointer;opacity:.7">DBG LOSE</button>
 </div>
@@ -9720,7 +9741,19 @@ function endMatch(win){
       });
       rf.innerHTML=fhtml;
       rf.style.display='flex';
-      requestAnimationFrame(function(){rf.classList.add('show');});
+      requestAnimationFrame(function(){
+        rf.classList.add('show');
+        /* Push res-card down to sit below the feats panel.
+           Caps at 44% so we don't push too far on very tall screens
+           with few feats; floors at the feats bottom on small screens. */
+        var rcEl=document.getElementById('resCard');
+        if(rcEl){
+          var rfRect=rf.getBoundingClientRect();
+          var minTopPx=rfRect.bottom+18;
+          var defaultTopPct=0.44*window.innerHeight;
+          rcEl.style.top=Math.max(minTopPx,defaultTopPct)+'px';
+        }
+      });
     }
   }
 
