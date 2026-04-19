@@ -1464,26 +1464,31 @@ body{
 .rgt-bonus{font-size:clamp(11px,3vw,15px);letter-spacing:1.5px;opacity:.8}
 .rgt-bounty{color:#60d060}
 .rgt-streak{color:#f0a030}
-/* End-of-match feats display — shows newly-earned feats with renown awarded */
+/* End-of-match feats display — shows newly-earned feats with renown awarded.
+   Absolutely positioned in the same vertical slot the coins occupy so the
+   feats fade in exactly where the coins faded out — between scores above
+   and the card draft below. */
 .res-feats{
-  margin:14px auto 4px;max-width:340px;width:90%;
-  display:flex;flex-direction:column;gap:6px;
-  font-family:var(--font-px);font-size:11px;letter-spacing:1px;
+  position:absolute;top:22%;left:50%;transform:translateX(-50%);
+  width:92%;max-width:380px;
+  display:flex;flex-direction:column;gap:5px;
+  font-family:var(--font-px);font-size:13px;letter-spacing:1px;
   text-align:center;
   opacity:0;transition:opacity .5s ease;
+  z-index:5;
 }
 .res-feats.show{opacity:1}
 .res-feat-row{
-  display:flex;align-items:center;justify-content:center;gap:8px;
-  padding:6px 10px;
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  padding:8px 12px;
   background:rgba(40,32,18,.55);border:1px solid rgba(220,170,60,.3);border-radius:4px;
   animation:featSlideIn .4s ease-out backwards;
 }
 @keyframes featSlideIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-.res-feat-star{color:#dca84a;font-size:14px;line-height:1}
-.res-feat-label{color:#dca84a;flex-grow:0}
-.res-feat-desc{color:var(--textdim);font-size:10px;flex-grow:1;text-align:left}
-.res-feat-renown{color:#dca84a;font-weight:bold;white-space:nowrap}
+.res-feat-star{color:#dca84a;font-size:16px;line-height:1}
+.res-feat-label{color:#dca84a;flex-grow:0;font-size:13px}
+.res-feat-desc{color:var(--textdim);font-size:11px;flex-grow:1;text-align:left}
+.res-feat-renown{color:#dca84a;font-weight:bold;white-space:nowrap;font-size:13px}
 .rgt-welcome{color:#80c8ff}
 .rgt-special{color:#ffd700}
 .rgt-refund{color:rgba(255,200,140,.7)}
@@ -1553,8 +1558,10 @@ body{
 #end-ov .res-title{position:absolute;top:32%;left:50%;transform:translateX(-50%);white-space:nowrap;transition:top .6s ease}
 #end-ov .res-title.lifted{top:10vh}
 @keyframes resPop{0%{transform:translateX(-50%) scale(0);opacity:0}70%{transform:translateX(-50%) scale(1.1);opacity:1}100%{transform:translateX(-50%) scale(1);opacity:1}}
-/* res-card: absolutely positioned so reward card appearance never shifts scores */
-#end-ov .res-card{position:absolute!important;top:28%;left:50%;transform:translateX(-50%);width:90%;overflow:visible}
+/* res-card: absolutely positioned so reward card appearance never shifts scores.
+   Sits below the feats panel (which lives at ~30% top and can stretch to
+   ~5 rows × 44px ≈ 220px before hitting the cards). */
+#end-ov .res-card{position:absolute!important;top:58%;left:50%;transform:translateX(-50%);width:90%;overflow:visible}
 /* res-scores: absolutely positioned — starts centered, transitions up */
 #end-ov .res-scores{position:absolute!important;top:calc(32% + clamp(48px,14.4vw,78px) + 8px);left:50%;transform:translateX(-50%)!important;transition:top .6s ease}
 #end-ov .res-scores.lifted{top:calc(12vh + clamp(48px,14.4vw,78px))}
@@ -9596,28 +9603,9 @@ function endMatch(win){
     },2200);
   }
 
-  /* Feats: only fire on win — evaluates once, awards renown, displays under coins */
-  if(win){
-    var _featsEarned=evaluateFeats();
-    if(_featsEarned.length>0){
-      setTimeout(function(){
-        var rf=document.getElementById('resFeats');
-        if(!rf)return;
-        var html='';
-        _featsEarned.forEach(function(f,i){
-          html+='<div class="res-feat-row" style="animation-delay:'+(i*0.15)+'s">';
-          html+='<span class="res-feat-star">⭐</span>';
-          html+='<span class="res-feat-label">'+f.label+'</span>';
-          html+='<span class="res-feat-desc">'+f.desc+'</span>';
-          html+='<span class="res-feat-renown">+'+f.renown+'</span>';
-          html+='</div>';
-        });
-        rf.innerHTML=html;
-        rf.style.display='flex';
-        requestAnimationFrame(function(){rf.classList.add('show');});
-      },2000);
-    }
-  }
+  /* Feats: evaluate now (writes renown to S), reveal later in the post-coin
+     setTimeout block so feats fade in exactly where coins faded out. */
+  var _featsEarned=win?evaluateFeats():[];
 
   /* 5. Prepare boss-loss card/dialogue data (before delay, while G is still available) */
   var _bossLossData=null;
@@ -9670,6 +9658,25 @@ function endMatch(win){
   /* Hide coin after animation */
   if(resCoinBig){resCoinBig.style.transition='opacity .3s';resCoinBig.style.opacity='0';}
   if(resGoldWrap)resGoldWrap.style.display='none';
+
+  /* Feats reveal — slot in where the coins just were */
+  if(win && _featsEarned && _featsEarned.length>0){
+    var rf=document.getElementById('resFeats');
+    if(rf){
+      var fhtml='';
+      _featsEarned.forEach(function(f,i){
+        fhtml+='<div class="res-feat-row" style="animation-delay:'+(i*0.15)+'s">';
+        fhtml+='<span class="res-feat-star">⭐</span>';
+        fhtml+='<span class="res-feat-label">'+f.label+'</span>';
+        fhtml+='<span class="res-feat-desc">'+f.desc+'</span>';
+        fhtml+='<span class="res-feat-renown">+'+f.renown+'</span>';
+        fhtml+='</div>';
+      });
+      rf.innerHTML=fhtml;
+      rf.style.display='flex';
+      requestAnimationFrame(function(){rf.classList.add('show');});
+    }
+  }
 
   /* Boss loss: show card greying + dialogue inside end screen */
   if(!win&&isBoss&&_bossLossData){
