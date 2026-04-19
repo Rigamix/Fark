@@ -5878,6 +5878,12 @@ const CARDS=[
   {id:'bakers_dozen',name:"BAKER'S DOZEN",icon:'🍞',rarity:'gold',eff:'13TH BANK: +1300',desc:'Your 13th bank of the match earns a one-time +1300 bonus. A reward for the long haul.',arch:'safeBanker'},
   {id:'the_heir',name:'THE HEIR',icon:'🪙',rarity:'silver',eff:'AFTER TURN 6: BANKS +50/TURN (STACKS)',desc:'Starting on turn 7, each subsequent turn adds +50 to every bank you make for the rest of the match (turn 7 = +50, turn 8 = +100, turn 9 = +150…).',arch:'hoarder'},
   {id:'rats_in_cellar',name:'RATS IN THE CELLAR',icon:'🐀',rarity:'silver',eff:'OPP BUST: -200 FROM THEIR SCORE',desc:"Each time the opponent busts, they lose an additional 200 points from their total score. The rats are in the walls.",arch:'saboteur'},
+  /* Boss signatures (Phase 5c — Brutus, Whisper) */
+  {id:'brutus_grit',name:"BRUTUS'S GRIT",icon:'⛓️',rarity:'gold',npc:'brutus',eff:'NO BUST UNDER 500; BANKS 500+ +25%',desc:"While your turn points are below 500, busts don't end your turn — your dice refresh and you roll again (3 saves per match). Every bank of 500+ gains an additional +25%.",rewardQuote:'"Stand longer than they expect, and they\'ll never expect again."',arch:'brinksman'},
+  {id:'whispers_veil',name:"WHISPER'S VEIL",icon:'🕯️',rarity:'gold',npc:'whisper',eff:'OPP PLAYS WITH 5 DICE ALL MATCH',desc:"The opponent's first roll each turn uses only 5 dice instead of 6. A permanent diminishment they cannot escape.",rewardQuote:'"Six was always too generous, dear."',arch:'saboteur'},
+  /* Phase 6b — fun active cards */
+  {id:'seven_dice',name:'SEVEN DICE',icon:'🎲',rarity:'gold',type:'active',maxUses:1,timing:'idle',eff:'NEXT ROLL: 7 DICE INSTEAD OF 6',desc:"Activate before your next roll: throw 7 dice instead of 6. Keep up to 6 scoring dice as normal.",arch:'sharp'},
+  {id:'loan',name:'THE LOAN',icon:'💰',rarity:'gold',type:'active',maxUses:1,timing:'idle',eff:'+800 NOW; −200/TURN FOR 5 TURNS',desc:"Take a loan: gain 800 points immediately. The innkeeper docks 200 from your total at the start of each of your next 5 turns.",arch:'hoarder'},
   /* ── DICE PROTECTION / SWAP ── */
   {id:'iron_grip',name:'IRON GRIP',icon:'🔒',rarity:'silver',eff:'DICE CAN\'T BE SWAPPED',desc:'Prevents any opponent effect from swapping, stealing, or downgrading your dice this match.',arch:'utility'},
   {id:'sleight_of_hand',name:'SLEIGHT OF HAND',icon:'🃏',rarity:'gold',type:'active',maxUses:1,timing:'idle',eff:'SWAP ONE DIE WITH OPP',desc:'Before rolling, swap one of your dice with one of the opponent\'s — you choose which dice to exchange.',arch:'sharp',dep:true},
@@ -7617,6 +7623,14 @@ function startPTurn(){
     G.turnPts=100;
     triggerCard('stakes_rising','+100 START',true);
   }
+  /* Loan repayment: dock 200 from total at the start of each of the next 5 turns */
+  if(G._loanRemaining&&G._loanRemaining>0){
+    var _lnPay=Math.min(200,G.pPts);
+    G.pPts=Math.max(0,G.pPts-200);
+    G._loanRemaining--;
+    triggerCard('loan','LOAN −'+_lnPay+' ('+G._loanRemaining+' LEFT)',true);
+    updHUD();
+  }
   /* NPC-armed Whisper's Hex: reduce player's dice count this turn */
   if(G._npcHexArmed){G._npcHexArmed=false;G.numDice=Math.max(3,G.numDice-1);triggerCard('whispers_hex',G.rung.name+" HEX — YOU HAVE "+G.numDice+" DICE",false);}
   /* Sudden Death: update display round at start of player turn (after NPC finishes) */
@@ -7739,6 +7753,12 @@ function handleRoll(){
     return;
   }
   if(G.phase!=='idle'&&G.phase!=='choosing')return;
+  /* Seven Dice (active): bump dice count by 1 for this roll only */
+  if(G._sevenDiceArmed){
+    G._sevenDiceArmed=false;
+    G.numDice=Math.min(G.numDice+1,7);
+    triggerCard('seven_dice','SEVEN DICE!',true);
+  }
   /* NPC pocket_sand: first roll of each turn uses 5 dice (50% chance, blocked by keen_eyes) */
   if(G.turnRollCount===0&&G.oCards.some(function(cid){var n=getNpcCard(cid);return n&&n.effect.mechanic==='reduce_first_roll';})){
     var hasKeenEyes=G.pCards.includes('keen_eyes');
@@ -8141,6 +8161,16 @@ function _tryBustSave(free){
     _updatePlayerCardVisuals();
     setTimeout(handleRoll,1700);
   }
+  /* Brutus's Grit (boss passive): cannot bust below 500 turn pts. Capped at 3 saves
+     per match to prevent degenerate looping on cold dice. */
+  if(G.pCards.includes('brutus_grit')&&(G.turnPts||0)<500){
+    G._gritUses=G._gritUses||0;
+    if(G._gritUses<3){
+      G._gritUses++;
+      _runSave('brutus_grit','GRIT — STILL STANDING ('+(3-G._gritUses)+')');
+      return true;
+    }
+  }
   if(!G.martyrUsed&&G.pCards.includes('martyr')){
     G.martyrUsed=true;
     _runSave('martyr','MARTYR — SAVED!');
@@ -8380,6 +8410,11 @@ function handleBank(){
   if(G.pCards.includes('bakers_dozen')){
     G._bdBanks=(G._bdBanks||0)+1;
     if(G._bdBanks===13){total+=1300;bonusMsg+=' +1300 BAKER\'S DOZEN';triggerCard('bakers_dozen','+1300 BAKER!',true);}
+  }
+  /* Brutus's Grit: banks of 500+ gain +25% bonus */
+  if(G.pCards.includes('brutus_grit')&&total>=500){
+    var _bgBonus=Math.floor(total*0.25);
+    total+=_bgBonus;bonusMsg+=' +'+_bgBonus+' GRIT';triggerCard('brutus_grit','+'+_bgBonus,true);
   }
   /* The Heir: turn 7+, each turn adds +50 to every bank (cumulative) */
   if(G.pCards.includes('the_heir')&&G.turnNum&&G.turnNum>6){
@@ -8753,6 +8788,8 @@ function runOppTurn(){
   let oppBank=0,left=6,oppRollNum=0,sootyActive=false;
   /* The Jinx: opponent permanently starts with 5 dice */
   if(G.rung._jinx&&G.oppTurnCount%2===0){left=5;triggerCard('the_jinx','JINX — 5 DICE',true);}
+  /* Whisper's Veil (boss passive): opp permanently rolls 5 dice all match */
+  if(G.pCards.includes('whispers_veil')){left=Math.min(left,5);}
   /* Whisper's Hex: reduce starting dice by 1 (stacks with jinx) */
   if(G.activeCardState&&G.activeCardState.hexActive){G.activeCardState.hexActive=false;clearCardLabel('whispers_hex');left=Math.max(left-1,3);triggerCard('whispers_hex','HEX — '+left+' DICE',true);}
   let crowsCtx={crowsLuck:G.pCards.includes('crows_luck'),crowsLuckRemaining:G.pCards.includes('crows_luck')?2:0,crowsLuckFiredThisRoll:false};
@@ -10273,6 +10310,8 @@ function activateCard(cardId){
     case 'second_wind': activateSecondWind(); break;
     case 'the_pyre': activateThePyre(); break;
     case 'all_in': activateAllIn(); break;
+    case 'seven_dice': activateSevenDice(); break;
+    case 'loan': activateLoan(); break;
     case 'sticky_fingers_die': activateStickyFingersPlayer(); break;
     case 'collateral_die': activateCollateralPlayer(); break;
     case 'royal_seizure': activateRoyalSeizurePlayer(); break;
@@ -10567,6 +10606,22 @@ function activateAllIn(){
   if(!G.activeCardState)return;
   G.activeCardState.allInActive=true;
   setStatusMsg('ALL IN — NEXT BANK DOUBLED (OR -500)','gold');
+}
+
+/* Seven Dice: arm a flag — next roll uses +1 die */
+function activateSevenDice(){
+  G._sevenDiceArmed=true;
+  setStatusMsg('SEVEN DICE — NEXT ROLL HAS 7','gold');
+  triggerCard('seven_dice','ARMED',true);
+}
+
+/* Loan: take the money now, pay it off in installments */
+function activateLoan(){
+  G.pPts+=800;
+  G._loanRemaining=5;
+  updHUD();
+  setStatusMsg('LOAN — +800 NOW, −200/TURN FOR 5 TURNS','gold');
+  triggerCard('loan','+800 LOAN',true);
 }
 
 /* ═══════ NPC-SIDE ACTIVE CARD HELPERS (mirror match + future boss actives)
