@@ -8166,21 +8166,31 @@ function handleRoll(){
         dots[i].className=newDots.includes(i)?'dc dot':'dc';
         dots[i].style.transition='';dots[i].style.opacity='';}},100);
     },100);});
+  /* Frozen Die: pre-build the saved die so it occupies one of the new
+     dice slots at its original position, instead of being appended at
+     the end of the row. */
+  var _doFrozen=G._frozenDieRestore&&G._frozenDie&&G.turnRollCount===0;
+  var _fdEntry=null;
+  if(_doFrozen){
+    G._frozenDieRestore=false;
+    var _fdEl=mkDie(G._frozenDie.val,G._frozenDie.mat);
+    _fdEl.classList.add('die-frozen-entry');
+    _fdEntry={val:G._frozenDie.val,mat:G._frozenDie.mat,sel:false,committed:false,el:_fdEl,_frozenSlot:true};
+    /* Reduce the count of fresh dice by 1 — the frozen die takes one slot */
+    if(needNew>0)needNew--;
+  }
   const newEntries=[];
   for(let i=0;i<needNew;i++){const mat=G.matchDice[(G.pool.length+i)%G.matchDice.length]||'bone';const val=useSpur?rollFaceSpur(mat):rollFace(mat);
     const el=mkDie(val,mat);el.classList.add('rolling');row.appendChild(el);newEntries.push({val,mat,sel:false,committed:false,el});}
-  G.pool=[...G.pool,...newEntries];
-  /* Frozen Die: pre-place the saved die on the table as a regular selectable die.
-     No auto-commit, no auto-score — the player chooses how to use it (single score,
-     fold into a triple, etc.). A brief blue-outline fade-in marks it as the saved die. */
-  if(G._frozenDieRestore&&G._frozenDie&&G.turnRollCount===0){
-    G._frozenDieRestore=false;
-    var _fdVal=G._frozenDie.val,_fdMat=G._frozenDie.mat;
-    G._frozenDie=null;/* consume — it only pre-places once */
-    var _fdEl=mkDie(_fdVal,_fdMat);_fdEl.classList.add('die-frozen-entry');row.appendChild(_fdEl);
-    var _fdEntry={val:_fdVal,mat:_fdMat,sel:false,committed:false,el:_fdEl};
-    G.pool.push(_fdEntry);
+  /* Insert the frozen die at its saved index — clamp to the row bounds */
+  if(_fdEntry){
+    var _fdPos=Math.min(Math.max(0,G._frozenDie.pos|0),newEntries.length);
+    newEntries.splice(_fdPos,0,_fdEntry);
+    var _refNode=row.children[_fdPos]||null;
+    row.insertBefore(_fdEntry.el,_refNode);
+    G._frozenDie=null;/* consume — only pre-places once */
   }
+  G.pool=[...G.pool,...newEntries];
   setTimeout(()=>{G.pool.forEach(d=>{if(!d.committed){settleDie(d.el);d.el.onclick=()=>toggleDie(d);d.el.style.cursor='pointer';}});afterRoll();},480);
 }
 
@@ -10937,9 +10947,11 @@ function activateFrozenDie(){
     var _chip=document.querySelector('.mcard-active[data-cid="frozen_die"]');if(_chip)_chip.classList.remove('used');
     return;}
   /* Store the first selected die's value + material for restoration next turn.
-     The die itself stays fully interactive for the current turn — no visual lock. */
+     Also remember its index in the pool so the die comes back in the same
+     visual position instead of being appended at the end of the row. */
   var savedDie=selDice[0];
-  G._frozenDie={val:savedDie.val,mat:savedDie.mat};
+  var _fdPos=G.pool.indexOf(savedDie);
+  G._frozenDie={val:savedDie.val,mat:savedDie.mat,pos:_fdPos>=0?_fdPos:0};
   /* Swap the selection outline from gold to blue so the saved die is visually distinct */
   if(savedDie.el)savedDie.el.classList.add('die-frozen-mark');
   setStatusMsg('SAVED A '+savedDie.val+' — IT RETURNS NEXT TURN','gold');
