@@ -5301,33 +5301,53 @@ function startNewRun(){
 /* ── DEBUG HELPERS ── triggered by the DBG WIN / DBG LOSE buttons.
    Build a minimal G state so endMatch + evaluateFeats run end-to-end
    even when there's no real match in progress (e.g. testing from menu). */
+/* Debug win/lose triggers — if a real match is in progress, forge a
+   win/loss using THAT match's state (so isBoss, isHandicap, rung gold,
+   loaded cards, etc. all carry through for an accurate preview).
+   If there's no active match, fall back to a generic patron stub. */
 function dbgWin(){
   _getS();
-  if(S.run){S.run.feats={};/* clear earned-feats so they fire fresh */}
-  G={
-    rung:{name:'PATRON',key:'patron',target:1500,boss:null,gold:0},
-    pPts:1800, oPts:500,
-    pCards:[], oCards:[],
-    matchDice:['bone','bone','bone','bone','bone','bone'],
-    matchOppDice:['bone','bone','bone','bone','bone','bone'],
-    target:1500,turnNum:3,
-    _featBanks:2,_featBusts:0,_featMaxBank:1200,
-    _featActivesUsed:false,_featFullStraight:false,_featHotDiceCount:0,
-    _isBoss:false,_isGauntlet:false,
-  };
+  if(S.run)S.run.feats={};/* clear earned-feats so they fire fresh */
+  if(G&&G.rung){
+    /* Real match in progress — force a win by making player score clear the target */
+    G.pPts=Math.max(G.pPts,(G.target||G.rung.target||1500)+100);
+    G.oPts=Math.max(0,G.pPts-1100);/* loose win margin so Crushing Win may fire */
+    /* Reasonable feat-tracking defaults so SOME feats can fire */
+    if(typeof G._featBanks==='undefined')G._featBanks=2;
+    if(typeof G._featBusts==='undefined')G._featBusts=0;
+    if(typeof G._featMaxBank==='undefined')G._featMaxBank=1200;
+  }else{
+    G={
+      rung:{name:'PATRON',key:'patron',target:1500,boss:null,gold:0},
+      pPts:1800, oPts:500,
+      pCards:[], oCards:[],
+      matchDice:['bone','bone','bone','bone','bone','bone'],
+      matchOppDice:['bone','bone','bone','bone','bone','bone'],
+      target:1500,turnNum:3,
+      _featBanks:2,_featBusts:0,_featMaxBank:1200,
+      _featActivesUsed:false,_featFullStraight:false,_featHotDiceCount:0,
+      _isBoss:false,_isGauntlet:false,
+    };
+  }
   endMatch(true);
 }
 function dbgLose(){
   _getS();
-  if(!G){G={
-    rung:{name:'PATRON',key:'patron',target:1500,boss:null,gold:0},
-    pPts:300,oPts:1500,
-    pCards:[],oCards:[],
-    matchDice:['bone','bone','bone','bone','bone','bone'],
-    matchOppDice:['bone','bone','bone','bone','bone','bone'],
-    target:1500,
-    _isBoss:false,_isGauntlet:false,
-  };}
+  if(G&&G.rung){
+    /* Real match in progress — force a loss by giving the opponent the win */
+    G.oPts=Math.max(G.oPts,(G.target||G.rung.target||1500)+100);
+    G.pPts=Math.min(G.pPts,300);
+  }else{
+    G={
+      rung:{name:'PATRON',key:'patron',target:1500,boss:null,gold:0},
+      pPts:300,oPts:1500,
+      pCards:[],oCards:[],
+      matchDice:['bone','bone','bone','bone','bone','bone'],
+      matchOppDice:['bone','bone','bone','bone','bone','bone'],
+      target:1500,
+      _isBoss:false,_isGauntlet:false,
+    };
+  }
   endMatch(false);
 }
 
@@ -9978,11 +9998,21 @@ function endMatch(win){
     }
   }
 
-  /* Boss loss: show card greying + dialogue inside end screen */
+  /* Boss loss: show card greying + dialogue inside end screen.
+     No feats panel on loss, so pull the lost card UP closer to the
+     scores instead of leaving it at the default 44% top. */
   if(!win&&isBoss&&_bossLossData){
     if(resCard&&_bossLossData.cardHTML){
       resCard.innerHTML=_bossLossData.cardHTML;
       resCard.classList.add('show','lost');
+      /* Position lost card right below the scores — scores.bottom + ~28px */
+      requestAnimationFrame(function(){
+        var scoresEl=document.querySelector('#end-ov .res-scores');
+        if(scoresEl){
+          var sb=scoresEl.getBoundingClientRect().bottom;
+          if(sb>0)resCard.style.top=(sb+28)+'px';
+        }
+      });
       SFX.lose();
     }
     if(_bossLossData.dlgHTML){
