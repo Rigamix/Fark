@@ -1475,11 +1475,19 @@ body:has(#mLoadout-ov.show) #dbgButtons{display:flex !important}
 .res-coin-big.burst{animation:coinBurst .25s ease-out forwards}
 @keyframes coinBurst{0%{transform:scale(1.18);opacity:1}100%{transform:scale(2);opacity:0}}
 .res-gold-text{
-  font-size:clamp(16px,4.5vw,26px);color:var(--gold);letter-spacing:1px;
-  text-shadow:0 0 8px rgba(200,160,60,.4);margin-top:10px;
+  font-family:var(--font-px);
+  font-size:clamp(20px,6vw,32px);color:var(--gold);letter-spacing:2px;
+  text-shadow:0 2px 0 rgba(0,0,0,.6),0 0 10px rgba(255,200,80,.55);
+  margin-top:10px;
   word-break:break-word;text-wrap:balance;max-width:90vw;
   line-height:1.6;text-align:center;
+  opacity:0;transform:scale(.7);
+  transition:opacity .2s ease-out,transform .25s cubic-bezier(.2,1.3,.5,1);
 }
+.res-gold-text.show{opacity:1;transform:scale(1)}
+.res-gold-text.pop{animation:goldTextPop .3s cubic-bezier(.2,1.8,.4,1) forwards}
+@keyframes goldTextPop{0%{transform:scale(1)}50%{transform:scale(1.25)}100%{transform:scale(1)}}
+.res-gold-text.fade-out{opacity:0;transform:scale(.85);transition:opacity .3s,transform .3s}
 .rgt-gold{color:var(--gold);font-size:clamp(18px,5vw,28px)}
 .rgt-loss{color:#e05040;font-size:clamp(18px,5vw,28px)}
 .rgt-bonus{font-size:clamp(11px,3vw,15px);letter-spacing:1.5px;opacity:.8}
@@ -1530,14 +1538,18 @@ body:has(#mLoadout-ov.show) #dbgButtons{display:flex !important}
    Same vertical footprint as ~1 feat row so the res-card placement still works. */
 .res-no-feat{
   font-family:'IM Fell English',serif;
-  color:rgba(180,170,150,.55);
-  font-size:14px;line-height:1.3;
+  color:rgba(180,170,150,.7);
+  font-size:18px;line-height:1.35;
   font-style:italic;
   text-align:center;
-  padding:10px 6px;
+  padding:10px 12px;
   letter-spacing:0;word-spacing:1px;
+  /* Let the browser balance line wrapping so single orphan words at the
+     end don't sit alone on their own line. */
+  text-wrap:balance;
+  max-width:300px;margin:0 auto;
 }
-@media (max-width: 380px){.res-no-feat{font-size:12px;padding:6px 4px}}
+@media (max-width: 380px){.res-no-feat{font-size:15px;padding:8px 8px;max-width:260px}}
 .rgt-welcome{color:#80c8ff}
 .rgt-special{color:#ffd700}
 .rgt-refund{color:rgba(255,200,140,.7)}
@@ -4955,8 +4967,8 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
     </div>
   </div>
   <div class="res-gold-wrap" id="resGoldWrap">
-    <div class="res-coin-big" id="resCoinBig"><span class="res-coin-amt" id="resCoinAmt"></span><div class="res-coin-sheen"></div></div>
-    <div class="res-gold-text" id="resGoldText">+40 GOLD</div>
+    <div class="res-coin-big" id="resCoinBig"><div class="res-coin-sheen"></div></div>
+    <div class="res-gold-text" id="resGoldText"></div>
   </div>
   <div class="res-feats" id="resFeats" style="display:none"></div>
   <div class="res-card" id="resCard"></div>
@@ -9715,8 +9727,15 @@ function endMatch(win){
   if(resOScore)resOScore.style.color=pWon?'#c05050':'var(--gold)';
   /* Hide sections until animated in */
   var resGoldWrap=document.getElementById('resGoldWrap');if(resGoldWrap){resGoldWrap.style.display='none';resGoldWrap.classList.remove('fade-in');resGoldWrap.style.flexDirection='';resGoldWrap.style.gap='';
-    /* Remove extra cloned coins from previous match */
+    /* Remove extra cloned coins from previous match, and any leftover coin-row wrapper */
     resGoldWrap.querySelectorAll('.res-coin-big:not(#resCoinBig)').forEach(function(c){c.remove();});
+    var _oldRow=resGoldWrap.querySelector('.res-coin-row');
+    if(_oldRow){
+      /* Move the anchor coin back to resGoldWrap directly before removing the row */
+      var _anchorCoin=document.getElementById('resCoinBig');
+      if(_anchorCoin)resGoldWrap.insertBefore(_anchorCoin,_oldRow);
+      _oldRow.remove();
+    }
   }
   var resGoldText=document.getElementById('resGoldText');if(resGoldText)resGoldText.textContent='';
   var resCard=document.getElementById('resCard');if(resCard){resCard.innerHTML='';resCard.className='res-card';}
@@ -9727,8 +9746,31 @@ function endMatch(win){
   /* Coin element */
   var resCoinBig=document.getElementById('resCoinBig');
   if(resCoinBig){resCoinBig.className='res-coin-big';resCoinBig.style.opacity='0';}
-  var resCoinAmt=ov.querySelector('.res-coin-amt');
-  if(resCoinAmt)resCoinAmt.textContent='';
+  /* Gold-text reset — will be animated in below with a count-up */
+  if(resGoldText){resGoldText.className='res-gold-text';resGoldText.textContent='';}
+  /* Animate a numeric count-up from 0 → final, updating at ~60fps.
+     Adds a "pop" bounce when it lands so the final number feels earned. */
+  function _tweenGold(target,duration){
+    if(!resGoldText||!target||target<=0)return;
+    resGoldText.textContent='+0g';
+    resGoldText.classList.add('show');
+    var start=performance.now();
+    function step(now){
+      var t=Math.min(1,(now-start)/duration);
+      /* Ease-out so the count slows dramatically near the end */
+      var eased=1-Math.pow(1-t,2.4);
+      var cur=Math.floor(eased*target);
+      resGoldText.textContent='+'+cur+'g';
+      if(t<1){requestAnimationFrame(step);}
+      else{
+        resGoldText.textContent='+'+target+'g';
+        /* Pop bounce on land */
+        resGoldText.classList.remove('pop');void resGoldText.offsetWidth;
+        resGoldText.classList.add('pop');
+      }
+    }
+    requestAnimationFrame(step);
+  }
 
   /* ── Animation sequence ── */
   ov.classList.add('show');
@@ -9746,13 +9788,23 @@ function endMatch(win){
   /* 3. Coin animation — multiple coins for multi-point wins */
   /* Set up coin container for multiple coins */
   if(resGoldWrap&&pointsEarned>1){
-    resGoldWrap.style.flexDirection='row';resGoldWrap.style.gap='0';
+    /* Multi-coin layout: coins in a row, the gold text sits below the row.
+       Wrap coins in a flex row but keep res-gold-text as a block beneath. */
+    resGoldWrap.style.flexDirection='column';resGoldWrap.style.gap='6px';
+    /* Find or create a coin row container */
+    var _coinRow=resGoldWrap.querySelector('.res-coin-row');
+    if(!_coinRow){
+      _coinRow=document.createElement('div');
+      _coinRow.className='res-coin-row';
+      _coinRow.style.cssText='display:flex;flex-direction:row;gap:0;justify-content:center';
+      resGoldWrap.insertBefore(_coinRow,resGoldText);
+      _coinRow.appendChild(resCoinBig);
+    }
     for(var ci=1;ci<pointsEarned;ci++){
       var extraCoin=resCoinBig.cloneNode(true);
       extraCoin.id='';extraCoin.className='res-coin-big';extraCoin.style.opacity='0';
       extraCoin.style.marginLeft='-30px';
-      extraCoin.querySelector('.res-coin-amt').textContent='';
-      resGoldWrap.appendChild(extraCoin);
+      _coinRow.appendChild(extraCoin);
     }
   }
   var allCoins=resGoldWrap?resGoldWrap.querySelectorAll('.res-coin-big'):[];
@@ -9765,16 +9817,17 @@ function endMatch(win){
     _getS();S.run.gold=(S.run.gold||0)+_patronGold;save();
   }
   if(win&&!isBoss){
-    /* Patron win: coins spin in golden with stagger */
+    /* Patron win: coins spin in golden with stagger, gold number
+       counts up below the coins (synchronized start). */
     setTimeout(function(){
       if(resGoldWrap){resGoldWrap.style.display='flex';resGoldWrap.classList.add('fade-in');}
       allCoins.forEach(function(c,i){
         setTimeout(function(){c.style.opacity='1';c.classList.add('spin');},i*200);
       });
-      /* Show gold amount on the first coin */
-      var _amt=resGoldWrap?resGoldWrap.querySelector('.res-coin-amt'):null;
-      if(_amt&&_patronGold>0)_amt.textContent='+'+_patronGold+'g';
       if(typeof SFX!=='undefined'&&SFX.coins)SFX.coins();
+      /* Start the count-up right as coins begin — lands on final value
+         just as the coins finish spinning/charging. */
+      if(_patronGold>0)setTimeout(function(){_tweenGold(_patronGold,600);},150);
     },900);
     setTimeout(function(){
       allCoins.forEach(function(c){c.classList.add('charge');c.classList.add('sheen');});
@@ -9789,10 +9842,9 @@ function endMatch(win){
     setTimeout(function(){
       if(resGoldWrap){resGoldWrap.style.display='flex';resGoldWrap.classList.add('fade-in');}
       allCoins.forEach(function(c){c.style.opacity='1';c.classList.add('spin');});
-      /* Show gold amount text */
-      var _amt=resGoldWrap?resGoldWrap.querySelector('.res-coin-amt'):null;
-      if(_amt)_amt.textContent='+'+_bossGold+'g';
       if(typeof SFX!=='undefined'&&SFX.coins)SFX.coins();
+      /* Count up the bigger boss gold reward, slightly longer duration */
+      if(_bossGold>0)setTimeout(function(){_tweenGold(_bossGold,800);},150);
     },900);
     setTimeout(function(){
       allCoins.forEach(function(c){c.classList.add('charge');c.classList.add('sheen');});
@@ -9864,9 +9916,11 @@ function endMatch(win){
 
   /* Delayed content — appears after animation sequence */
   setTimeout(function(){
-  /* Hide coin after animation */
+  /* Hide coin + gold text in sync */
   if(resCoinBig){resCoinBig.style.transition='opacity .3s';resCoinBig.style.opacity='0';}
-  if(resGoldWrap)resGoldWrap.style.display='none';
+  if(resGoldText)resGoldText.classList.add('fade-out');
+  /* Fully remove the wrap after the fade so layout doesn't hold space */
+  setTimeout(function(){if(resGoldWrap)resGoldWrap.style.display='none';},320);
 
   /* Feats reveal — slot in where the coins just were */
   if(win){
