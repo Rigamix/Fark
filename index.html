@@ -12955,6 +12955,16 @@ function _attachBgGain(){
   }catch(e){BG_GAIN=null;}
   return BG_GAIN;
 }
+/* Apply the muted-state without ever calling pause() — pause/play race
+   conditions on iOS were causing the "music bugs out when turning off"
+   issue (the play promise would resolve after pause, leaving audio in a
+   glitched state). Instead we keep the element playing and toggle
+   audio.muted + gain.value for instant, race-free silence. */
+function _bgApplyMute(muted){
+  var a=BG_MUSIC;
+  if(a)a.muted=!!muted;
+  if(BG_GAIN){try{BG_GAIN.gain.value=muted?0:BG_VOLUME;}catch(e){}}
+}
 function _bgMusicSync(){
   var a=_ensureBgMusic();
   var on=!S||!S.settings||S.settings.music!==false;
@@ -12964,17 +12974,26 @@ function _bgMusicSync(){
     if(BG_CTX&&BG_CTX.state==='suspended'){
       try{BG_CTX.resume();}catch(e){}
     }
+    a.muted=false;
+    /* If already playing, just unmute via gain — no need to call play() again. */
+    if(!a.paused){
+      _bgApplyMute(false);
+      return;
+    }
     var p=a.play();
     if(p&&p.then){
       p.then(function(){
-        /* Audio is playing — now safe to wire up Web Audio for volume. */
         _attachBgGain();
+        _bgApplyMute(false);
       }).catch(function(){});
     }else{
       _attachBgGain();
+      _bgApplyMute(false);
     }
   }else{
-    a.pause();
+    /* Mute instead of pause — race-free, no glitch. The element keeps
+       looping silently in the background. */
+    _bgApplyMute(true);
   }
 }
 function toggleAudio(type){
