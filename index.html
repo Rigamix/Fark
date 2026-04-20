@@ -198,6 +198,14 @@ body{
 .score-bank-pop{animation:pxScorePop .22s steps(3,end) forwards}
 @keyframes pxDiePop{0%{transform:translateY(-5px) scale(1.1)}33%{transform:translateY(-3px) scale(1.05)}66%{transform:translateY(-1px) scale(1.02)}100%{transform:translateY(0) scale(1)}}
 .die-sel-pop{animation:pxDiePop .2s steps(3,end) forwards}
+/* Subtle bounce for any die tap (both select + deselect) so non-scoring
+   taps still feel responsive. Separate from pxDiePop which also fires
+   sparks + sound for scoring selections. */
+@keyframes pxDieTap{0%{transform:scale(.92)}50%{transform:scale(1.04)}100%{transform:scale(1)}}
+.die-tap-pop{animation:pxDieTap .14s ease-out forwards}
+/* Freeze: chunky shake so the player feels the action land */
+@keyframes pxDieFreeze{0%{transform:translateX(0) scale(1)}15%{transform:translateX(-3px) scale(1.08)}30%{transform:translateX(3px) scale(1.08)}45%{transform:translateX(-2px) scale(1.06)}60%{transform:translateX(2px) scale(1.04)}80%{transform:translateX(-1px) scale(1.02)}100%{transform:translateX(0) scale(1)}}
+.die-freeze-shake{animation:pxDieFreeze .45s ease-out forwards}
 .px-spark{position:fixed;width:4px;height:4px;pointer-events:none;z-index:9501;image-rendering:pixelated;background:var(--gold)}
 #matchVignette{position:fixed;inset:0;pointer-events:none;z-index:14;opacity:0;background:repeating-conic-gradient(rgba(180,30,30,.28) 0% 25%,transparent 0% 50%) 0 0/4px 4px;-webkit-mask-image:radial-gradient(ellipse 80% 70% at 50% 50%,transparent 50%,black 100%);mask-image:radial-gradient(ellipse 80% 70% at 50% 50%,transparent 50%,black 100%);image-rendering:pixelated}
 @keyframes pxVigPulse{0%{opacity:.55}100%{opacity:.9}}
@@ -7927,10 +7935,19 @@ function effectiveCards(){
     return !sc||(sc.tarnish||0)<TARNISH_DISABLE;
   });
 }
+/* Haptic helper — navigator.vibrate works on Android; iOS ignores it
+   silently (no error, no effect). Wrap in try/catch for older browsers. */
+function _haptic(ms){try{if(navigator.vibrate)navigator.vibrate(ms);}catch(e){}}
+
 function toggleDie(d){
   if(G.phase!=='choosing'||d.committed)return;
   d.sel=!d.sel;
   d.el.classList.toggle('selected',d.sel);
+  /* Every tap: subtle bounce + short haptic so the die always feels responsive */
+  d.el.classList.remove('die-tap-pop');void d.el.offsetWidth;
+  d.el.classList.add('die-tap-pop');
+  d.el.addEventListener('animationend',function(){d.el.classList.remove('die-tap-pop');},{once:true});
+  _haptic(8);
   if(d.sel){
     /* Check if the current selection actually scores before any VFX */
     var selD=G.pool.filter(function(x){return x.sel&&!x.committed;});
@@ -7940,7 +7957,7 @@ function toggleDie(d){
     if(pts>0){
       /* count: committed tray dice + currently selected */
       var n=(G.kept?G.kept.length:0)+selD.length;
-      /* pixel pop */
+      /* pixel pop — overrides the subtle tap bounce */
       d.el.classList.remove('die-sel-pop');void d.el.offsetWidth;
       d.el.classList.add('die-sel-pop');
       d.el.addEventListener('animationend',function(){d.el.classList.remove('die-sel-pop');},{once:true});
@@ -7948,6 +7965,8 @@ function toggleDie(d){
       var sparks=n<=1?0:n<=2?4:n<=3?6:8;
       if(sparks>0)spawnPixelSparks(d.el,sparks);
       SFX.commitAt(n);
+      /* Stronger haptic for scoring selections */
+      _haptic(16);
     }else{
       SFX.commit();
     }
@@ -10776,6 +10795,9 @@ function activateCard(cardId){
   markActiveCardUsed(cardId);
   /* Feat tracking: any active-card use disqualifies "Pure Bones" */
   if(G)G._featActivesUsed=true;
+  /* Haptic: any active-card activation gets a solid bump so the player
+     feels the effect landing (rerolls, freezes, transforms, etc.). */
+  _haptic(18);
   const cd=CARDS.find(c=>c.id===cardId)||NPC_CARDS_MAP[cardId];
   /* Lingering effects get persistent labels */
   const lingers=['mabels_stitch','aldrics_vow','whispers_hex','corvus_ledger','second_wind','all_in','broken_lantern'];
@@ -10989,8 +11011,17 @@ function activateFrozenDie(){
   var savedDie=selDice[0];
   var _fdPos=G.pool.indexOf(savedDie);
   G._frozenDie={val:savedDie.val,mat:savedDie.mat,pos:_fdPos>=0?_fdPos:0};
-  /* Swap the selection outline from gold to blue so the saved die is visually distinct */
-  if(savedDie.el)savedDie.el.classList.add('die-frozen-mark');
+  /* Swap the selection outline from gold to blue so the saved die is
+     visually distinct, and add a chunky shake + strong haptic so the
+     freeze action lands physically. */
+  if(savedDie.el){
+    savedDie.el.classList.add('die-frozen-mark');
+    savedDie.el.classList.remove('die-freeze-shake');void savedDie.el.offsetWidth;
+    savedDie.el.classList.add('die-freeze-shake');
+    savedDie.el.addEventListener('animationend',function(){savedDie.el&&savedDie.el.classList.remove('die-freeze-shake');},{once:true});
+    spawnPixelSparks(savedDie.el,6);
+  }
+  _haptic([25,30,25]);/* pattern: buzz-pause-buzz for "click" feel */
   setStatusMsg('SAVED A '+savedDie.val+' — IT RETURNS NEXT TURN','gold');
 }
 
