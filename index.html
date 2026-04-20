@@ -5874,32 +5874,32 @@ const RUNGS=[
     dice:['bone','bone','bone','bone','bone','amber'],
     cardPool:['the_last_stitch_npc','measure_twice','worn_thimble','the_nightshift'],cardCount:2},
   {id:2,name:'FINNICK',key:'commoner',icon:'🎭',tier:'known',target:4500,gold:50,buyIn:35,
-    boss:'STICKY_FINGERS',bossDesc:'Once per match, if you bank under 300, Finnick steals it.',
+    boss:null,bossDesc:null,
     agg:.58,cardRarity:'tin',wager:true,wagerCount:1,wagerMode:'best',minBank:250,diceStop:2,chaotic:false,adaptive:true,
     dice:['bone','bone','bone','bone','lead','lead'],
     cardPool:['quick_hands','pocket_sand','the_skim','beginners_luck','the_lords_seal','sticky_fingers_die'],cardCount:2},
   {id:3,name:'CORVUS',key:'merchant',icon:'💼',tier:'known',target:5000,gold:70,buyIn:50,
-    boss:'MERCHANTS_TAX',bossDesc:'Every time you bank, Corvus pockets 10% for himself.',
+    boss:null,bossDesc:null,
     agg:.52,cardRarity:'silver',wager:true,wagerCount:1,wagerMode:'best',minBank:150,diceStop:2,chaotic:false,adaptive:true,
     dice:['bone','iron','iron','flint','flint','lead'],
     cardPool:['interest_due','fine_print','severance_npc','the_audit','collateral_die'],cardCount:2},
   {id:4,name:'BRUTUS',key:'soldier',icon:'⚔️',tier:'respected',target:5500,gold:95,buyIn:70,
-    boss:'SHIELD_BASH',bossDesc:'Twice per match, after you roll, Brutus forces one scoring die to reroll.',
+    boss:null,bossDesc:null,
     agg:.65,cardRarity:'silver',wager:true,wagerCount:1,wagerMode:'best',minBank:300,diceStop:2,chaotic:false,adaptive:true,
     dice:['bone','bone','lead','lead','silver','silver'],
     cardPool:['hold_the_line','iron_gate_npc','campaign_veteran','steady_hands','old_partners_badge'],cardCount:3},
   {id:5,name:'ALDRIC',key:'knight',icon:'🛡️',tier:'respected',target:6500,gold:125,buyIn:100,
-    boss:'KNIGHTS_CHALLENGE',bossDesc:'Once per match, you must score 500+ on your next turn or lose 500 from your total.',
+    boss:null,bossDesc:null,
     agg:.70,cardRarity:'gold',wager:true,wagerCount:2,wagerMode:'best',minBank:350,diceStop:1,chaotic:false,adaptive:true,
     dice:['bone','amber','amber','amber','jade','jade'],
     cardPool:['the_verdict_npc','point_of_order','fathers_die','the_oath_npc','family_crest'],cardCount:3},
   {id:6,name:'WHISPER',key:'noble',icon:'👑',tier:'renowned',target:7500,gold:165,buyIn:140,
-    boss:'ROYAL_DECREE',bossDesc:'Twice per match, all your 1s become 3s for one roll.',
+    boss:null,bossDesc:null,
     agg:.75,cardRarity:'gold',wager:true,wagerCount:2,wagerMode:'best',minBank:400,diceStop:1,chaotic:false,adaptive:true,
     dice:['lead','amber','jade','jade','brass','crystal'],
     cardPool:['the_royal_purse','crown_authority','the_quiet_decree','sundays_rest','old_roads','royal_seizure'],cardCount:4},
   {id:7,name:'AMBROSE',key:'bishop',icon:'✝️',tier:'renowned',target:9000,gold:225,buyIn:200,
-    boss:'DIVINE_TITHE',bossDesc:'10% of every bank you make goes to Ambrose instead.',
+    boss:null,bossDesc:null,
     agg:.80,cardRarity:'gold',wager:true,wagerCount:3,wagerMode:'all',minBank:250,diceStop:1,chaotic:false,adaptive:true,
     dice:['crystal','crystal','amber','amber','jade','silver'],
     cardPool:['communion_wine','blessed_dice','the_sermon','judgment_npc','never_saw_a_robe','blessed_confiscation'],cardCount:4},
@@ -7527,14 +7527,9 @@ function newG(rung,pCards,oCards,pStake,oStake){
     _featBanks:0,_featBusts:0,_featMaxBank:0,_featActivesUsed:false,_featFullStraight:false,_featHotDiceCount:0,
     activeCardState:{usedCards:{},stitchActive:false,vowActive:false,hexActive:false,secondWindActive:false,allInActive:false,pyreBonus:0},
     crowsLuckCtx:{crowsLuck:oCards.includes('crows_luck'),crowsLuckRemaining:oCards.includes('crows_luck')?2:0,crowsLuckFiredThisRoll:false},
-    /* Boss attack state */
+    /* Boss edict system removed — kept empty bossState object to avoid breaking
+       any legacy save-state payloads that reference it. */
     bossState:{
-      stickyFingersUsed:false,    /* FINNICK: once per match steal */
-      shieldBashCount:0,          /* BRUTUS: 2 uses max */
-      challengeActive:false,      /* ALDRIC: active challenge flag */
-      challengeUsed:false,        /* ALDRIC: once per match */
-      royalDecreeCount:0,         /* WHISPER: 2 uses max */
-      royalDecreeActive:false     /* WHISPER: active this roll */
     },
     /* NPC card effect state */
     npcCardState:{
@@ -8059,12 +8054,7 @@ function startPTurn(){
   clearRow('playerDiceRow');clearRow('oppDiceRow');refreshKeptTray();
   setBtns(true,false);setTurnMode(false);
   G.npcCardState.playerTurnCount++;
-  /* ALDRIC: Knight's Challenge — fires once mid-match when both have some score */
-  if(G.rung.boss==='KNIGHTS_CHALLENGE'&&!G.bossState.challengeUsed&&G.turnNum>=3&&G.pPts>=500&&Math.random()<0.4){
-    G.bossState.challengeUsed=true;G.bossState.challengeActive=true;
-    setStatusMsg('CHALLENGE! BANK 500+ OR LOSE 500','red');
-    if(window.DLG)DLG.trigger('BOSS_ATTACK');
-  }else{setStatusMsg('','');}
+  setStatusMsg('','');
   /* NPC card challenges (steady_hands, the_verdict_npc) — fire once mid-match */
   G.oCards.forEach(function(cid){
     var npc=getNpcCard(cid);if(!npc)return;
@@ -8395,50 +8385,8 @@ function afterRoll(){
     G.kept.push({vals:[freeV[0]],mat:d.mat,pts:600});G.turnPts=G.kept.reduce((a,k)=>a+k.pts,0);refreshKeptTray();updHUD();
     triggerCard('last_stand','LAST STAND! 600',true);setBtns(false,true);return;
   }
-  /* ── BOSS ATTACKS AFTER ROLL ── */
-  const boss=G.rung.boss;
-  // BRUTUS: Shield Bash — reroll one scoring die (twice per match)
-  if(boss==='SHIELD_BASH'&&G.bossState.shieldBashCount<2&&free.length>1){
-    const scoring=free.filter(d=>d.val===1||d.val===5);
-    if(scoring.length>0){
-      G.bossState.shieldBashCount++;
-      const victim=scoring[Math.floor(Math.random()*scoring.length)];
-      const oldVal=victim.val;
-      let newVal=rollFace(victim.mat);let _sbGuard=20;while((newVal===1||newVal===5)&&_sbGuard-->0)newVal=rollFace(victim.mat);
-      victim.val=newVal;
-      if(victim.el){victim.el.classList.add('bust');
-        setTimeout(()=>{victim.el.classList.remove('bust');
-          const dots=victim.el.children;const newDots=FACE_DOTS[newVal]||FACE_DOTS[1];
-          for(let i=0;i<49;i++){if(!dots[i])continue;dots[i].className=newDots.includes(i)?'dc dot':'dc';}
-        },300);}
-      setStatusMsg('SHIELD BASH! '+oldVal+'→'+newVal,'red');
-      flashEdict('🛡️');
-      if(window.DLG)DLG.trigger('BOSS_ATTACK');
-      // Re-check scoring after bash
-      const freeV2=free.map(d=>d.val);
-      if(!anyScoring(freeV2,cards,freeMats)){
-        setTimeout(()=>{if(!_tryBustSave(free))doBust();},500);
-        return;
-      }
-    }
-  }
-  // WHISPER: Royal Decree — turn 1s into 3s (twice per match)
-  if(boss==='ROYAL_DECREE'&&G.bossState.royalDecreeCount<2){
-    const ones=free.filter(d=>d.val===1);
-    if(ones.length>0){
-      G.bossState.royalDecreeCount++;
-      ones.forEach(d=>{d.val=3;
-        if(d.el){const dots=d.el.children;const newDots=FACE_DOTS[3]||FACE_DOTS[1];
-          for(let i=0;i<49;i++){if(!dots[i])continue;dots[i].className=newDots.includes(i)?'dc dot':'dc';}}});
-      setStatusMsg('ROYAL DECREE! 1s → 3s','red');
-      if(window.DLG)DLG.trigger('BOSS_ATTACK');
-      // Re-check scoring
-      const freeV2=free.map(d=>d.val);
-      if(!anyScoring(freeV2,cards,freeMats)){
-        setTimeout(()=>{doBust();},500);return;
-      }
-    }
-  }
+  /* ── Boss edicts removed — patron "edict" system simplified away.
+     NPC card effects below handle all opponent-side disruption now. ── */
 
   /* ── NPC CARD EFFECTS AFTER ROLL ── */
   var _csDelayRoll=G.rung._coldShoulder?2:0;
@@ -8688,10 +8636,6 @@ function doBust(){
   if(G.activeSynergies&&G.activeSynergies.includes('safety_net')){var _lrPts=G.kept.reduce(function(a,k){return a+k.pts;},0);if(_lrPts>0){var _lrSave=Math.floor(_lrPts*0.25);G.pPts+=_lrSave;spawnPop('+'+_lrSave+' \uD83D\uDEE1\uFE0F');}}
   /* NPC bust survival cards (opponent's cards that save THEM from busting are handled in runOppTurn) */
   setBtns(false,false);
-  /* Knight's Challenge: bust during challenge = lose 500 */
-  if(G.rung.boss==='KNIGHTS_CHALLENGE'&&G.bossState.challengeActive){
-    G.bossState.challengeActive=false;G.pPts=Math.max(0,G.pPts-500);
-  }
   /* NPC challenge: bust during challenge = penalty */
   if(G.npcCardState.challengeActive){
     G.npcCardState.challengeActive=false;
@@ -8953,36 +8897,8 @@ function handleBank(){
   if(G.activeSynergies&&G.activeSynergies.includes('slow_hand')&&!G._slowHandUsedThisTurn){G._slowHandUsedThisTurn=true;total+=200;bonusMsg+=' +200 SLOW HAND';spawnPop('+200');}
   /* Synergy: Iron Will — +150 when banking with ≤2 dice remaining */
   if(G.activeSynergies&&G.activeSynergies.includes('mixed_metals')){var _diceLeft=G.pool.filter(function(d){return!d.committed;}).length;if(_diceLeft<=2){total+=150;bonusMsg+=' +150 MIXED METALS';spawnPop('+150');}}
-  /* ── BOSS ATTACKS ON BANK ── */
-  const boss=G.rung.boss;
-  // FINNICK: Sticky Fingers — steal bank <300 once
-  if(boss==='STICKY_FINGERS'&&!G.bossState.stickyFingersUsed&&total<300){
-    G.bossState.stickyFingersUsed=true;G.oPts+=total;
-    bonusMsg+=' STOLEN!';setStatusMsg('STICKY FINGERS — '+G.rung.name+' STOLE '+total+'!','red');
-    flashEdict('🤏');if(window.DLG)DLG.trigger('BOSS_ATTACK');spawnPop('STOLEN!');
-    G.turnPts=0;G.kept=[];G.numDice=6;updHUD();refreshKeptTray();clearRow('playerDiceRow');G.pool=[];setBtns(false,false);
-    if(G.oPts>=G.target){setTimeout(()=>endMatch(false),700);return;}
-    setTimeout(endPTurn,1200);return;
-  }
-  // CORVUS: Merchant's Tax — 10% to Corvus
-  if(boss==='MERCHANTS_TAX'){
-    const tax=Math.ceil(total*0.1);total-=tax;G.oPts+=tax;
-    bonusMsg+=' -'+tax+' TAX';
-    flashEdict('📒');if(window.DLG&&Math.random()<0.3)DLG.trigger('BOSS_ATTACK');
-  }
-  // AMBROSE: Divine Tithe — 10% to Ambrose
-  if(boss==='DIVINE_TITHE'){
-    const tithe=Math.ceil(total*0.1);total-=tithe;G.oPts+=tithe;
-    bonusMsg+=' -'+tithe+' TITHE';
-    flashEdict('🍷');if(window.DLG&&Math.random()<0.3)DLG.trigger('BOSS_ATTACK');
-  }
-  // ALDRIC: Knight's Challenge resolution — if challenge was active, check if we met 500
-  if(boss==='KNIGHTS_CHALLENGE'&&G.bossState.challengeActive){
-    G.bossState.challengeActive=false;
-    if(total<500){G.pPts=Math.max(0,G.pPts-500);bonusMsg+=' -500 CHALLENGE FAILED';
-      setStatusMsg('CHALLENGE FAILED — LOST 500!','red');flashEdict('⚔️');if(window.DLG)DLG.trigger('BOSS_ATTACK');}
-    else{bonusMsg+=' CHALLENGE MET!';setStatusMsg('CHALLENGE MET!','green');}
-  }
+  /* ── Boss edicts removed — NPC card effects below provide all
+     patron-side disruption. ── */
 
   /* ── NPC CARD EFFECTS ON PLAYER BANK ── */
   G.oCards.forEach(function(cid){
@@ -10807,10 +10723,9 @@ function toggleLoadoutPanel(){
   var _mLoRenownEl=document.getElementById('mLoRenown');
   if(_mLoRenownEl)_mLoRenownEl.textContent=S?(S.renown||0):0;
   // Boss power
-  if(G&&G.rung&&G.rung.boss){
-    document.getElementById('mLoDecree').style.display='block';
-    document.getElementById('mLoDecreeTxt').textContent='\u26A1 '+G.rung.bossDesc;
-  } else {document.getElementById('mLoDecree').style.display='none';}
+  /* Boss-edict decree system removed — always hide the decree block. */
+  var _mLoDecree=document.getElementById('mLoDecree');
+  if(_mLoDecree)_mLoDecree.style.display='none';
   // Player dice
   const pd=document.getElementById('mLoPDice');pd.innerHTML='';
   const pDice=G&&G.matchDice?G.matchDice:(S?S.dice:['bone','bone','bone','bone','bone','bone']);
@@ -11629,7 +11544,8 @@ function initMatchScreen(data){
   // Update HUD
   document.getElementById('targetScore').textContent=G.target.toLocaleString();
   const oppEl=document.getElementById('oppName');
-  oppEl.innerHTML=(rung.boss?'<span id="skillIcon" style="cursor:pointer;color:var(--red);font-size:11px" onclick="toggleLoadoutPanel()" title="'+rung.bossDesc+'">&#9889;</span> ':'')+rung.name+(G._practice?' <span style="font-size:9px;color:var(--textdim);opacity:.6">PRACTICE</span>':'');
+  /* Boss edict lightning-bolt icon removed — edict system is gone. */
+  oppEl.innerHTML=rung.name+(G._practice?' <span style="font-size:9px;color:var(--textdim);opacity:.6">PRACTICE</span>':'');
   // Build card bars
   buildCBar('oppCards',G.oCards,true,rung.name);
   buildCBar('playerCards',G.pCards,false,'YOU');
