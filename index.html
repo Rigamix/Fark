@@ -901,8 +901,12 @@ body{
 .die.eff-glow-red{box-shadow:0 0 12px 3px rgba(220,60,40,.6),0 0 4px rgba(200,40,30,.35)!important;filter:brightness(1.1)}
 .die.eff-glow-blue{box-shadow:0 0 12px 3px rgba(80,160,240,.6),0 0 4px rgba(60,140,220,.35)!important;filter:brightness(1.12)}
 /* Sawdust dampened die */
-.die.die-dampened{animation:dieDampen .5s ease-out}
-@keyframes dieDampen{0%{filter:brightness(.5) saturate(.2)}100%{filter:brightness(1) saturate(1)}}
+/* dieDampen used to set `animation:` which overrode the .rolling
+   keyframes — dampened dice appeared to skip rolling and just appear at
+   their final face. Use a `transition:` on filter instead so it stacks
+   cleanly on top of the rolling rotation. */
+.die.die-dampened{filter:brightness(.5) saturate(.2);transition:filter .5s ease-out}
+.die.die-dampened.dampen-fade{filter:brightness(1) saturate(1)}
 /* Echo armed indicator on card */
 .mcard[data-cid="the_echo"].echo-armed .gcard{box-shadow:inset 0 0 0 1px rgba(100,180,255,.5),inset 0 0 0 5px var(--cface),inset 0 0 0 6px var(--ctrim2),0 0 8px 2px rgba(100,180,255,.35),0 5px 20px rgba(0,0,0,.85);border-color:rgba(100,180,255,.45)}
 .mcard[data-cid="the_echo"].echo-armed .card-outer::after{content:'';position:absolute;inset:0;z-index:10;pointer-events:none;border-radius:4px;background:repeating-conic-gradient(rgba(100,180,255,.12) 0% 25%,transparent 0% 50%) 0 0/4px 4px;image-rendering:pixelated;mix-blend-mode:screen;animation:echoArmedPulse 1.2s ease-in-out infinite}
@@ -9165,7 +9169,15 @@ function runOppTurn(){
       G.oppDice.push({val,el,kept:false,mat:dieMat});}
     sootyActive=false;
     setTimeout(()=>{
-      G.oppDice.forEach(d=>{if(d.el){settleDie(d.el);if(G._lanternActive)d.el.classList.add('die-blind');}});
+      G.oppDice.forEach(d=>{if(d.el){
+        settleDie(d.el);
+        if(G._lanternActive)d.el.classList.add('die-blind');
+        /* Trigger dampened brightness fade-back now that the roll has
+           landed (CSS transition restores brightness to 1 over .5s). */
+        if(d.el.classList.contains('die-dampened')){
+          d.el.classList.add('dampen-fade');
+        }
+      }});
       const fV=G.oppDice.filter(d=>!d.kept).map(d=>d.val);
       const fMats=G.oppDice.filter(d=>!d.kept).map(d=>d.mat);
       crowsCtx.crowsLuckFiredThisRoll=false;
