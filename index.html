@@ -615,12 +615,15 @@ body{
   background:linear-gradient(118deg,transparent 30%,rgba(255,255,255,.18) 46%,rgba(255,255,255,.22) 50%,rgba(255,255,255,.18) 54%,transparent 70%);
   animation:none;opacity:0;
 }
-/* Only active match-hand cards get the sheen */
+/* Only active match-hand cards get the sheen. Sweep speed unchanged
+   from before; the long idle gap between sweeps was the actual issue,
+   so the keyframe pushes the sweep across more of the timeline (0→75%)
+   and only ~25% of the cycle is idle. */
 .card-bar.bot .mcard-active .gcard::before{
   background:linear-gradient(105deg,transparent 25%,rgba(255,255,255,.25) 42%,rgba(255,255,255,.4) 50%,rgba(255,255,255,.25) 58%,transparent 75%);
-  animation:gcSheen 3s ease-in-out infinite;opacity:1;
+  animation:gcSheen 2s ease-in-out infinite;opacity:1;
 }
-@keyframes gcSheen{0%,100%{transform:translateX(-180%);opacity:0}10%{opacity:1}50%{transform:translateX(180%);opacity:0}}
+@keyframes gcSheen{0%,100%{transform:translateX(-180%);opacity:0}10%{opacity:1}75%{transform:translateX(180%);opacity:0}}
 .gcard-art{display:none}
 .gcard-cover{position:absolute;inset:0;z-index:0;display:flex;align-items:center;justify-content:center;pointer-events:none;font-size:32px;line-height:1;text-shadow:0 2px 8px rgba(0,0,0,.5);border-radius:4px}
 .mcard .gcard-cover{font-size:28px}
@@ -6981,7 +6984,12 @@ function applyCardAging(outerEl,tarnish,cardId){
     var t=+el.dataset.aging||0;
     if(cid && typeof getCard==='function'){
       var c=getCard(cid);
-      if(c && c.npc) t=Math.max(t,BOSS_AGING_LEVEL);
+      /* Any card associated with an NPC gets the weathered look:
+         - c.npc       → boss signature cards (e.g. Grog's Flask)
+         - c.npcOnly   → patron-only cards (e.g. Her Lucky Coin) — these
+                         show on the opponent's bar AND, once won, in the
+                         player's loadout/win-screen, mid-match panel etc. */
+      if(c && (c.npc || c.npcOnly)) t=Math.max(t,BOSS_AGING_LEVEL);
     }
     if(t>0)requestAnimationFrame(function(){applyCardAging(el,t,cid);});
   }
@@ -9969,9 +9977,13 @@ function endMatch(win){
     _bossDraftCards.forEach(function(card){
       var sd=(Math.random()*8).toFixed(1);
       bossHtml+='<div class="draft-card-wrap boss-draft" data-card-id="'+card.id+'">';
+      /* card-outer wrapper enables the weathered look (clip-path edge holes
+         + canvas grunge) via the aging MutationObserver. */
+      bossHtml+='<div class="card-outer" data-cid="'+card.id+'">';
       bossHtml+='<div class="gcard '+_bossRarClass+'" style="--sheen-delay:-'+sd+'s">';
       bossHtml+='<div class="gcard-cover" style="background:'+(CARD_BG[card.id]||'#444')+'">'+card.icon+'</div>';
       bossHtml+='<div class="gcard-frame"></div>'+gcCorners()+'</div>';
+      bossHtml+='</div>';/* /card-outer */
       bossHtml+=mkCardTooltipHTML(card,null,{showFlavor:false,asPlayer:true});
       bossHtml+='</div>';
     });
