@@ -4439,8 +4439,12 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
   font-family:var(--font-px);color:var(--text);
   text-align:center;letter-spacing:1px;line-height:1.1;
   background:transparent;border:0;box-shadow:none;
-  /* Pinned absolutely so the strip never shifts when dice are rolled or status text changes */
-  position:absolute;left:0;right:0;top:42%;transform:translateY(-50%);
+  /* Pinned absolutely so the strip never shifts when dice are rolled or
+     status text changes. Sit just below the HUD/edict bar so the patron
+     dialogue (which floats around the vertical middle at z:90) doesn't
+     overlap the pills. z:25 stays below the dialogue so dialogue still
+     reads on top if the strip ever moves into its zone. */
+  position:absolute;left:0;right:0;top:22%;transform:translateY(-50%);
   z-index:25;pointer-events:none;
 }
 .bounty-strip .bs-title{display:none}
@@ -9874,7 +9878,16 @@ function endMatch(win){
       dlgDiv.innerHTML=_bossLossData.dlgHTML;
       var _rde=document.getElementById('resDlg');
       if(_rde){_rde.innerHTML='';_rde.appendChild(dlgDiv);_rde.classList.add('show');}
-      requestAnimationFrame(function(){var cv=dlgDiv.querySelector('.res-dlg-canvas');if(cv)drawPixelScroll(cv);});
+      requestAnimationFrame(function(){
+        var cv=dlgDiv.querySelector('.res-dlg-canvas');if(cv)drawPixelScroll(cv);
+        /* Position the dialog right below the lost card so it never
+           overlaps. Hardcoded offset (38% + 200px) used to fall ~20px
+           short of the card's bottom on big screens. */
+        if(_rde && resCard){
+          var _rcRect=resCard.getBoundingClientRect();
+          if(_rcRect.bottom>0)_rde.style.top=(_rcRect.bottom+18)+'px';
+        }
+      });
     }
   }
 
