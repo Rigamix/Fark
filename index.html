@@ -10132,6 +10132,9 @@ function exitMatch(){
     S.run.points=0;
     S.run.tier=Math.min(S.run.tier+1,TIERS.length);
     if(S.run.tier>S.bestTier)S.bestTier=S.run.tier;
+    /* Drop the cached boss-card preview for the tier we just left so a
+       future replay/new tier rerolls fresh. */
+    if(S.run._bossCardPicks)delete S.run._bossCardPicks[S.run.tier-1];
     save();
     if(S.run.tier>=TIERS.length){
       /* Beat final boss — victory! */
@@ -12714,10 +12717,26 @@ function _renderBossLoadout(tier){
     var html='';
     var playerCardCount=(S.run.cards||[]).filter(function(c){return !!c;}).length;
     var n=Math.max(boss.cardCount||1,playerCardCount);
-    /* Shuffle boss pool so preview varies each visit */
-    var _bPool=[].concat(boss.cardPool);
-    for(var bi=_bPool.length-1;bi>0;bi--){var bj=Math.floor(Math.random()*(bi+1));var bt=_bPool[bi];_bPool[bi]=_bPool[bj];_bPool[bj]=bt;}
-    _bPool.slice(0,n).forEach(function(cid){
+    /* Persist the boss preview picks per tier so the player can actually
+       strategize. Picks are seeded on first visit to a tier and kept until
+       the tier is beaten / run resets. The slot count `n` can grow as the
+       player drafts cards mid-run, so we extend the pick list when needed
+       instead of regenerating it from scratch. */
+    if(!S.run._bossCardPicks)S.run._bossCardPicks={};
+    var _picks=S.run._bossCardPicks[S.run.tier];
+    if(!_picks||_picks.length<n){
+      var _bPool=[].concat(boss.cardPool);
+      /* Shuffle */
+      for(var bi=_bPool.length-1;bi>0;bi--){var bj=Math.floor(Math.random()*(bi+1));var bt=_bPool[bi];_bPool[bi]=_bPool[bj];_bPool[bj]=bt;}
+      if(!_picks){_picks=[];}
+      /* Append fresh picks (excluding already-picked) until we hit n */
+      for(var pi=0;pi<_bPool.length&&_picks.length<n;pi++){
+        if(_picks.indexOf(_bPool[pi])===-1)_picks.push(_bPool[pi]);
+      }
+      S.run._bossCardPicks[S.run.tier]=_picks;
+      save();
+    }
+    _picks.slice(0,n).forEach(function(cid){
       var cd=getNpcCard(cid);
       html+='<div class="tier-lo-wrap">';
       if(cd){
