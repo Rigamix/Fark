@@ -2018,7 +2018,10 @@ body:has(#mLoadout-ov.show) #dbgButtons{display:flex !important}
   width:56px;aspect-ratio:2/3;border-radius:5px;overflow:hidden;
   position:relative;flex-shrink:0;
 }
-.lo-mini-card .gcard{width:100%;height:100%;border-width:2px}
+.lo-mini-card .gcard{width:100%;height:100%;border-width:2px;
+  /* Kill the full-size gcard's 5px face-band box-shadow on thumbnails
+     (reads as a gap between body and outline at small sizes). */
+  box-shadow:inset 0 0 0 1px var(--ctrim2),0 3px 10px rgba(0,0,0,.7)}
 .lo-mini-card .gcard-art{
   position:absolute;inset:0;width:100%;height:100%;
   object-fit:cover;z-index:0;image-rendering:pixelated;pointer-events:none
@@ -2269,7 +2272,10 @@ body::before,body::after{display:none!important}
 .draft-slot.locked{border-color:rgba(120,100,90,.3);background:rgba(28,22,16,.4);color:rgba(150,130,90,.45)}
 .end-draft-slots .draft-slot.locked{border-color:rgba(120,100,90,.35);background:rgba(28,22,16,.4)}
 .end-draft-slots .draft-slot.locked::after{content:'\1F512';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:rgba(150,130,90,.5);font-size:18px;pointer-events:none}
-.tier-lo-card .gcard{position:absolute;inset:0;width:100%;height:100%;border-radius:4px;border-width:2px}
+.tier-lo-card .gcard{position:absolute;inset:0;width:100%;height:100%;border-radius:4px;border-width:2px;
+  /* Thumbnail: no inset face-band — avoids the visible 1px gap between
+     card body and outline. */
+  box-shadow:inset 0 0 0 1px var(--ctrim2),0 2px 6px rgba(0,0,0,.6)}
 .tier-lo-card .gcard-cover{font-size:16px}
 .tier-lo-card .gcard-frame{display:none}
 .tier-lo-card .gc{display:none}
@@ -4551,12 +4557,11 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
   font-family:var(--font-px);color:var(--text);
   text-align:center;letter-spacing:1px;line-height:1.1;
   background:transparent;border:0;box-shadow:none;
-  /* Pinned absolutely so the strip never shifts when dice are rolled or
-     status text changes. Sit just below the HUD/edict bar so the patron
-     dialogue (which floats around the vertical middle at z:90) doesn't
-     overlap the pills. z:25 stays below the dialogue so dialogue still
-     reads on top if the strip ever moves into its zone. */
-  position:absolute;left:0;right:0;top:22%;transform:translateY(-50%);
+  /* Pinned absolutely and visually centered between the opp dice row
+     and the player dice row. Dialog sits at z:90 so it naturally
+     covers the strip when a patron speaks — bounties re-appear once
+     dialog fades. */
+  position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);
   z-index:25;pointer-events:none;
 }
 .bounty-strip .bs-title{display:none}
@@ -11963,7 +11968,14 @@ function _draftPlaceCard(cardId,slotIdx,srcEl){
   if(!cd)return false;
   s.className='draft-slot filled'+(slotIdx>=3?' boss':'');
   var _slotRar=cd.npc?'boss-'+cd.npc:(cd.npcOnly&&cd.owner?'boss-'+cd.owner:(cd.npcOnly?'npc':cd.rarity));
-  s.innerHTML='<div class="gcard rarity-'+_slotRar+'" style="position:absolute;inset:0;width:100%;height:100%;border-radius:4px"><div class="gcard-cover" style="background:'+(CARD_BG[cardId]||'#444')+'">'+cd.icon+'</div><div class="gcard-frame"></div>'+gcCorners()+'</div>';
+  /* Wrap in .card-outer with data-cid so the aging MutationObserver
+     picks it up and applies the weathered look to boss/npc cards. */
+  s.innerHTML='<div class="card-outer" data-cid="'+cardId+'" style="position:absolute;inset:0;width:100%;height:100%">'+
+    '<div class="gcard rarity-'+_slotRar+'" style="position:absolute;inset:0;width:100%;height:100%;border-radius:4px">'+
+      '<div class="gcard-cover" style="background:'+(CARD_BG[cardId]||'#444')+'">'+cd.icon+'</div>'+
+      '<div class="gcard-frame"></div>'+gcCorners()+
+    '</div>'+
+  '</div>';
   /* Replace wrapper to clear any stale listeners */
   var oldWrap=s.parentElement;
   var newWrap=document.createElement('div');
