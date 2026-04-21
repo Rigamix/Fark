@@ -1802,6 +1802,19 @@ body:has(#mLoadout-ov.show) #dbgButtons{display:flex !important}
 .rnk-perk-label{font-size:14px;color:var(--gold);letter-spacing:1px}
 .rnk-perk-desc{font-family:'IM Fell English',serif;font-size:13px;color:var(--textdim);line-height:1.3;margin-top:2px}
 .rnk-perk-threshold{font-size:12px;color:var(--textdim);flex-shrink:0;letter-spacing:.5px}
+/* Renown info tabs */
+.rnk-tabs{display:flex;gap:0;margin-bottom:14px;border-bottom:1px solid rgba(200,160,80,.18)}
+.rnk-tab{flex:1;text-align:center;padding:8px 6px;font-family:var(--font-px);font-size:12px;letter-spacing:1.5px;color:var(--textdim);cursor:pointer;border-bottom:2px solid transparent;transition:color .15s,border-color .15s}
+.rnk-tab.active{color:var(--gold);border-bottom-color:var(--gold)}
+.rnk-tab:active{filter:brightness(1.3)}
+.rnk-source-row{display:flex;align-items:center;gap:10px;padding:9px 6px;border-bottom:1px solid rgba(200,160,80,.06)}
+.rnk-source-row.earned .rnk-source-label{color:#ffe080}
+.rnk-source-row.earned .rnk-source-icon{color:#a8d878}
+.rnk-source-icon{font-size:16px;flex-shrink:0;width:24px;text-align:center;color:var(--textdim)}
+.rnk-source-info{flex:1;min-width:0}
+.rnk-source-label{font-size:13px;color:var(--gold);letter-spacing:1px}
+.rnk-source-desc{font-family:'IM Fell English',serif;font-size:12px;color:var(--textdim);line-height:1.3;margin-top:2px}
+.rnk-source-amt{font-size:13px;color:var(--gold);font-weight:bold;flex-shrink:0;letter-spacing:.5px}
 
 /* ─── BANK SUMMARY (tap-score popover) ─── */
 /* Invisible overlay to catch outside-taps; panel is anchored to the HUD score */
@@ -5523,8 +5536,10 @@ function dismissRenownLevelUp(){
 }
 
 /* ── Renown Info Popup (tap renown bar) ── */
-function showRenownInfo(){
+var _renownTab='perks';/* 'perks' | 'sources' */
+function showRenownInfo(tab){
   SFX.nav();
+  if(tab)_renownTab=tab;
   /* If the mid-match loadout panel is open, close it first so the renown
      panel (z-index 9551) isn't covered by the loadout (z-index 9600). */
   var lov=document.getElementById('mLoadout-ov');
@@ -5544,15 +5559,34 @@ function showRenownInfo(){
   if(next){
     html+='<div class="rnk-info-bar"><div class="rnk-info-bar-fill" style="width:'+progress+'%"></div></div>';
   }
-  RENOWN_PERKS.forEach(function(p){
-    var unlocked=renown>=p.threshold;
-    var isCurrent=current&&p.key===current.key;
-    html+='<div class="rnk-perk-row'+(unlocked?' unlocked':' locked')+(isCurrent?' current':'')+'">';
-    html+='<div class="rnk-perk-icon">'+(unlocked?'\u2705':'\uD83D\uDD12')+'</div>';
-    html+='<div class="rnk-perk-info"><div class="rnk-perk-label">'+p.label+'</div><div class="rnk-perk-desc">'+jitterText(p.desc)+'</div></div>';
-    html+='<div class="rnk-perk-threshold">'+p.threshold+'</div>';
-    html+='</div>';
-  });
+  /* Tab switcher */
+  html+='<div class="rnk-tabs">';
+  html+='<div class="rnk-tab'+(_renownTab==='perks'?' active':'')+'" onclick="SFX.nav();showRenownInfo(\'perks\')">PERKS</div>';
+  html+='<div class="rnk-tab'+(_renownTab==='sources'?' active':'')+'" onclick="SFX.nav();showRenownInfo(\'sources\')">SOURCES</div>';
+  html+='</div>';
+  if(_renownTab==='perks'){
+    RENOWN_PERKS.forEach(function(p){
+      var unlocked=renown>=p.threshold;
+      var isCurrent=current&&p.key===current.key;
+      html+='<div class="rnk-perk-row'+(unlocked?' unlocked':' locked')+(isCurrent?' current':'')+'">';
+      html+='<div class="rnk-perk-icon">'+(unlocked?'\u2705':'\uD83D\uDD12')+'</div>';
+      html+='<div class="rnk-perk-info"><div class="rnk-perk-label">'+p.label+'</div><div class="rnk-perk-desc">'+jitterText(p.desc)+'</div></div>';
+      html+='<div class="rnk-perk-threshold">'+p.threshold+'</div>';
+      html+='</div>';
+    });
+  }else{
+    /* SOURCES tab — list every feat (renown source) with its description
+       and value. Marks each one earned this run with a check. */
+    var earnedThisRun=(S&&S.run&&S.run.feats)?S.run.feats:{};
+    FEATS.forEach(function(f){
+      var earned=!!earnedThisRun[f.id];
+      html+='<div class="rnk-source-row'+(earned?' earned':'')+'">';
+      html+='<div class="rnk-source-icon">'+(earned?'\u2705':'\u2B50')+'</div>';
+      html+='<div class="rnk-source-info"><div class="rnk-source-label">'+f.label+'</div><div class="rnk-source-desc">'+jitterText(f.desc)+'</div></div>';
+      html+='<div class="rnk-source-amt">+'+f.renown+'</div>';
+      html+='</div>';
+    });
+  }
   inner.innerHTML=html;
   document.getElementById('renown-info-backdrop').classList.add('show');
   var panel=document.getElementById('renown-info');
