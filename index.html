@@ -360,7 +360,19 @@ body{
   font-size:13px;color:var(--ctrim2);letter-spacing:.2px;line-height:1.35;
   padding:2px 10px 5px;z-index:3;position:relative;word-break:break-word;text-wrap:balance;
 }
-.mcard-tooltip .tip-num,.die-tooltip .tip-num,.dz-desc .tip-num,.dz-bias .tip-num,.dice-expand-popup .tip-num{color:var(--tip-num-color,#ffd040);font-weight:700;font-style:normal;font-size:1.13em;vertical-align:baseline}
+.mcard-tooltip .tip-num,.die-tooltip .tip-num,.dz-desc .tip-num,.dz-bias .tip-num,.dice-expand-popup .tip-num{
+  color:var(--tip-num-color,#ffd040);font-style:normal;
+  /* Pixel font (Alagard) — the "1" glyph reads as a proper numeral, not like a serif "I". */
+  font-family:var(--font-px);font-size:1em;letter-spacing:.5px;vertical-align:baseline;
+  /* CRISP rendering: pixel fonts should NOT be font-weight:700 (forces the browser to
+     synthesize bold by smearing pixels → visible halo) and should NOT be antialiased
+     at display size. These properties kill the subpixel glow the user was seeing. */
+  font-weight:normal;
+  -webkit-font-smoothing:none;
+  -moz-osx-font-smoothing:grayscale;
+  font-smooth:never;
+  text-rendering:geometricPrecision;
+}
 .tip-kw{font-style:italic;color:rgba(220,200,160,.9);font-weight:normal}
 .mcard-tooltip .tip-tarnish{
   display:flex;gap:5px;justify-content:center;
@@ -595,6 +607,7 @@ body{
 .dtype-ruby   {--dborder:#a02030;--dborder2:#d04050;--dface:#5a0810;--dface2:#7a1018;--dface3:#3a0408;--dhigh:#c03040;--dpip:#ffd0c0;--dpip2:#e8a090;--dglow:rgba(220,40,60,.5);--ddither:rgba(255,80,100,.18);--tip-num-color:#ff80a0}
 .dtype-obsidian{--dborder:#181828;--dborder2:#3a3a52;--dface:#0a0a14;--dface2:#1a1a28;--dface3:#04040a;--dhigh:#4a4a66;--dpip:#a0a0c0;--dpip2:#7a7aa0;--dglow:rgba(60,60,90,.4);--ddither:rgba(120,100,180,.18);--tip-num-color:#c0a0ff}
 .dtype-starstone{--dborder:#5050a0;--dborder2:#7878d0;--dface:#10142a;--dface2:#1a1e3c;--dface3:#08081a;--dhigh:#9090e0;--dpip:#fff8c0;--dpip2:#e0d090;--dglow:rgba(140,120,255,.5);--ddither:rgba(200,180,255,.22);--tip-num-color:#fff080}
+.dtype-vagabond{--dborder:#b0602a;--dborder2:#d88838;--dface:#4a2a14;--dface2:#663818;--dface3:#2a1608;--dhigh:#e8a858;--dpip:#ffd890;--dpip2:#d8a050;--dglow:rgba(216,136,56,.5);--ddither:rgba(240,180,100,.22);--tip-num-color:#ffb860}
 /* Fallback: unknown die types render as bone */
 .dtype-gold{--dborder:#a89882;--dborder2:#c8b898;--dface:#d8ccb4;--dface2:#efe4d0;--dface3:#c0b49a;--dhigh:#f5ece0;--dpip:#5a4a38;--dpip2:#3a2e20;--dglow:rgba(168,152,130,.3);--ddither:rgba(180,160,130,.18)}
 
@@ -826,6 +839,57 @@ body{
   animation:comboSheen .5s ease-out both;animation-delay:var(--gd,0s);
 }
 @keyframes comboSheen{0%{background-position:200% 0;opacity:0}12%{opacity:1}80%{opacity:1}100%{background-position:-100% 0;opacity:0}}
+/* ── IDLE BREATH (Option K) ──
+   Smooth ±2px translateY cycle on match dice at rest. Applies ONLY to #playerDiceRow
+   dice that aren't in a transient state (rolling/committed/bust/long-pressed/selected).
+   Staggered per slot via nth-child so the 6 dice don't breathe in sync.
+   Reduced Motion setting disables it via body.reduced-motion. */
+@keyframes dieIdleBreath{
+  0%,100% { transform: translateY(0); }
+  50%     { transform: translateY(-2px); }
+}
+#playerDiceRow .die:not(.rolling):not(.committed):not(.bust):not(.long-pressed):not(.selected):not(.die-frozen):not(.scatter){
+  animation: dieIdleBreath 2.8s ease-in-out infinite;
+  animation-delay: var(--breath-delay, 0s);
+  will-change: transform;
+  image-rendering: pixelated;
+}
+#playerDiceRow .die:nth-child(1){--breath-delay:0s}
+#playerDiceRow .die:nth-child(2){--breath-delay:.35s}
+#playerDiceRow .die:nth-child(3){--breath-delay:.7s}
+#playerDiceRow .die:nth-child(4){--breath-delay:1.05s}
+#playerDiceRow .die:nth-child(5){--breath-delay:1.4s}
+#playerDiceRow .die:nth-child(6){--breath-delay:1.75s}
+/* Reduced Motion: disable breath entirely */
+body.reduced-motion #playerDiceRow .die{animation:none!important}
+/* ── Long-press polish: brief scale + brightness pulse + gold glow ── */
+.die.long-pressed{animation:dieLongPress .5s ease-out both}
+@keyframes dieLongPress{
+  0%  {transform:scale(1)    ;filter:brightness(1)}
+  35% {transform:scale(1.14) ;filter:brightness(1.35) drop-shadow(0 0 10px rgba(255,220,120,.9))}
+  100%{transform:scale(1)    ;filter:brightness(1)}
+}
+/* Sheen sweep overlay injected on long-press (removed after 500ms) */
+.die-shine{
+  position:absolute;inset:0;pointer-events:none;z-index:4;border-radius:inherit;
+  background:linear-gradient(105deg,transparent 40%,rgba(255,240,200,.4) 48%,rgba(255,255,255,.65) 50%,rgba(255,240,200,.4) 52%,transparent 60%);
+  background-size:300% 100%;
+  animation:dieShineSweep .5s ease-out both;
+}
+@keyframes dieShineSweep{
+  0%  {background-position:200% 0;opacity:0}
+  15% {opacity:1}
+  85% {opacity:1}
+  100%{background-position:-100% 0;opacity:0}
+}
+/* ── Vagabond drag-to-reorder visuals ── */
+.die.vg-drag-origin{opacity:.25;filter:grayscale(.4);transition:opacity .15s ease,filter .15s ease}
+.die.vg-drag-clone{
+  position:fixed!important;z-index:9500;pointer-events:none;
+  box-shadow:0 8px 16px 2px rgba(0,0,0,.55),0 0 14px 4px rgba(255,184,96,.55)!important;
+  transform:scale(1.1);transition:transform .15s ease;
+  filter:brightness(1.08) drop-shadow(0 0 12px rgba(255,160,60,.6));
+}
 .die.committed{opacity:.38;cursor:default}
 .die.committed:active{transform:none}
 .die.rolling{animation:dRoll .4s linear infinite;cursor:default;box-shadow:none;transition:none;border-color:var(--dborder)}
@@ -856,7 +920,7 @@ body{
 #shopBody .dice-store-item .die .dc.dot{background:var(--dpip);width:4px!important;height:4px!important;margin:1px!important;border-radius:0}
 #shopBody .dice-store-item .ds-mat{font-size:10px}
 #shopBody .dice-store-item .ds-price{font-size:12px}
-#shopBody .dice-store-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;max-width:280px;margin:0 auto}
+#shopBody .dice-store-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;max-width:340px;margin:0 auto}
 /* Stock flag overlay on the top-right corner of each buyable die */
 .ds-die-wrap{position:relative;display:inline-block;line-height:0}
 .ds-stock-flag{
@@ -964,6 +1028,24 @@ body{
 @keyframes bustTableShake{0%,100%{transform:translateX(0)}12%{transform:translateX(-5px) rotate(-.3deg)}25%{transform:translateX(4px) rotate(.2deg)}37%{transform:translateX(-3px)}50%{transform:translateX(2px)}62%{transform:translateX(-1px)}75%{transform:translateX(0)}}
 #diceArea.bust-shake{animation:bustTableShake .4s ease-out}
 /* ─── BUST RED VIGNETTE ─── */
+/* ─── CRITICAL-HIT FLASH ─── triggers on 1000+ pt single selection */
+#critFlash{position:fixed;inset:0;z-index:9001;pointer-events:none;opacity:0;
+  background:radial-gradient(ellipse at center,rgba(255,240,180,.85) 0%,rgba(255,200,80,.45) 35%,rgba(255,180,40,0) 70%);
+  mix-blend-mode:screen;
+}
+#critFlash.flash{animation:critFlashFade .55s ease-out forwards}
+@keyframes critFlashFade{
+  0%  {opacity:0;transform:scale(1)}
+  12% {opacity:1;transform:scale(1.02)}
+  100%{opacity:0;transform:scale(1.08)}
+}
+/* Time-dilation: slight global slowdown + saturation boost during the flash */
+body.crit-dilate{animation:critDilate .55s ease-out both}
+@keyframes critDilate{
+  0%  {filter:none}
+  15% {filter:brightness(1.18) saturate(1.3)}
+  100%{filter:none}
+}
 #bustVignette{position:fixed;inset:0;z-index:8999;pointer-events:none;opacity:0;
   background:radial-gradient(ellipse at center,transparent 50%,rgba(120,20,20,.35) 100%)}
 #bustVignette.flash{animation:vigFade .7s ease-out forwards}
@@ -2247,6 +2329,93 @@ body::before,body::after{display:none!important}
 .tier-loadout::before{content:'';position:absolute;top:0;left:10%;right:10%;height:2px;
   background:linear-gradient(90deg,transparent,rgba(200,160,80,.3),transparent)}
 .tier-lo-label{font-family:var(--font-px);font-size:10px;color:rgba(200,160,80,.35);letter-spacing:2px;margin-bottom:6px}
+/* ══════════ POUCH — floating FAB + modal ══════════
+   FAB sits fixed top-right of the gauntlet screen so it doesn't displace any layout.
+   Modal overlays full-screen with an active deck row + pouch slots row for swaps. */
+.pouch-fab{
+  position:fixed;top:52px;right:10px;z-index:8700;
+  width:60px;height:60px;
+  background:transparent;border:none;padding:0;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;transition:transform .12s ease, filter .12s ease;
+  filter:drop-shadow(0 2px 3px rgba(0,0,0,.55));
+}
+.pouch-fab:hover{transform:translateY(-1px);filter:drop-shadow(0 3px 4px rgba(0,0,0,.6)) brightness(1.08)}
+.pouch-fab:active{transform:scale(.92)}
+.pouch-fab-img{width:100%;height:100%;image-rendering:pixelated;object-fit:contain}
+/* (drag-and-drop is self-contained — no pending-swap indicator needed) */
+
+/* Pouch modal reuses the .rnk-info-panel container/canvas system for visual
+   consistency with the perks panel. Only the inner row labels and card grid
+   need custom styling below. */
+.pouch-row-label{font-family:var(--font-px);font-size:9px;color:rgba(200,160,80,.4);letter-spacing:2px;margin-top:8px;text-align:center}
+.pouch-reserve-label{margin-top:22px}  /* extra breathing room between deck and pouch rows */
+/* Override the perks-panel defaults for the pouch — content is short, no scroll.
+   The base .rnk-info-panel anchors at bottom:-100px with 160px bottom padding to
+   hide its 40px canvas overhang. The pouch sits flush with viewport bottom instead. */
+#pouch-ov{
+  padding:48px 16px 26px;          /* top: portrait overlap space; bottom: small breathing */
+  max-height:none;overflow:visible; /* kill inherited overflow:auto — no scrolling */
+  bottom:0;                         /* flush with viewport */
+  /* Translate 100% of panel height PLUS the portrait's 44px overhang so nothing peeks
+     out the top of the closed panel (portrait is a child with top:-44px and moves
+     with the panel). */
+  transform:translateY(calc(100% + 44px));
+}
+#pouch-ov.show{transform:translateY(0)}
+#pouch-ov canvas{height:100%!important} /* no 40px overhang — canvas fits panel exactly */
+#pouch-ov .rnk-info-inner{padding-top:8px}
+/* Large pouch icon overlapping the top edge (like the mid-match loadout portrait) */
+.pouch-portrait{
+  position:absolute;left:50%;top:-44px;transform:translateX(-50%);
+  width:90px;height:90px;image-rendering:pixelated;object-fit:contain;z-index:3;
+  filter:drop-shadow(0 3px 4px rgba(0,0,0,.6));
+  pointer-events:none;
+}
+.pouch-active-row{display:flex;gap:4px;justify-content:center;min-height:72px;align-items:center}
+.pouch-slots-row{display:flex;gap:6px;justify-content:center;min-height:72px;align-items:center}
+/* Each slot is a simple positioning wrap. Visual styling comes entirely from
+   the .tier-lo-card child inside it — perfect match to the YOUR LOADOUT row. */
+.pouch-slot-wrap{
+  position:relative;width:clamp(42px,11.5vw,52px);aspect-ratio:2/3;
+  cursor:pointer;transition:transform .12s ease;
+}
+.pouch-slot-wrap.pc-drag-origin{opacity:.25;filter:grayscale(.6)}
+/* Drop-target highlight: outline the wrapper, not the card — keeps the card pristine */
+.pouch-slot-wrap.pc-drop-hover{transform:translateY(-2px)}
+/* Filled slot drop-target: thin outline over the card (card itself stays intact) */
+.pouch-slot-wrap.pc-drop-hover .tier-lo-card:not(.empty){outline:1px solid var(--gold);outline-offset:1px}
+.pouch-slot-wrap.pc-drop-invalid .tier-lo-card:not(.empty){outline:1px solid rgba(200,60,60,.7);outline-offset:1px}
+/* Empty slot drop-target: recolor the existing dashed border + background instead
+   of stacking an extra outline on top (avoids the "two rings" visual glitch). */
+.pouch-slot-wrap.pc-drop-hover .tier-lo-card.empty{
+  border-color:var(--gold)!important;background:rgba(80,62,24,.45)!important;
+}
+.pouch-slot-wrap.pc-drop-invalid .tier-lo-card.empty{
+  border-color:rgba(200,60,60,.75)!important;background:rgba(60,22,22,.4)!important;
+}
+/* The floating clone that follows the pointer — natural drop shadow only, no gold glow */
+.pc-drag-clone{
+  position:fixed!important;z-index:9800;pointer-events:none;
+  aspect-ratio:2/3;border-radius:4px;
+  box-shadow:0 8px 16px rgba(0,0,0,.5);
+  transform:scale(1.06) rotate(1deg);
+  transition:transform .12s ease;
+}
+.pc-drag-clone .tier-lo-card{animation:none!important}
+/* Pouch modal cards use ONLY the inner inset pixel edge (matches loadout look
+   at smaller size). Outer .tier-lo-card border becomes the dashed-empty frame
+   when empty, otherwise hidden so the card floats free. */
+#pouch-ov .tier-lo-card:not(.empty){border:none}
+.pouch-actions{display:flex;gap:10px;margin-top:10px}
+.pouch-btn{
+  font-family:var(--font-px);font-size:11px;letter-spacing:2px;
+  padding:10px 22px;background:rgba(30,20,10,.85);color:var(--gold);
+  border:2px solid rgba(180,140,70,.5);border-radius:4px;cursor:pointer;
+  transition:filter .1s, transform .05s;
+}
+.pouch-btn:hover{filter:brightness(1.15)}
+.pouch-btn:active{transform:scale(.96)}
 .tier-lo-row{display:flex;align-items:center;justify-content:center;gap:10px}
 .tier-lo-cards{gap:0;display:flex;justify-content:center;margin-bottom:0;position:relative}
 .tier-lo-wrap{position:relative;width:clamp(42px,12vw,56px);transition:transform .15s ease}
@@ -2973,6 +3142,7 @@ body::before,body::after{display:none!important}
 .dtype-ruby   {--dborder:#a02030;--dborder2:#d04050;--dface:#5a0810;--dface2:#7a1018;--dface3:#3a0408;--dhigh:#c03040;--dpip:#ffd0c0;--dpip2:#e8a090;--dglow:rgba(220,40,60,.5);--ddither:rgba(255,80,100,.18);--tip-num-color:#ff80a0}
 .dtype-obsidian{--dborder:#181828;--dborder2:#3a3a52;--dface:#0a0a14;--dface2:#1a1a28;--dface3:#04040a;--dhigh:#4a4a66;--dpip:#a0a0c0;--dpip2:#7a7aa0;--dglow:rgba(60,60,90,.4);--ddither:rgba(120,100,180,.18);--tip-num-color:#c0a0ff}
 .dtype-starstone{--dborder:#5050a0;--dborder2:#7878d0;--dface:#10142a;--dface2:#1a1e3c;--dface3:#08081a;--dhigh:#9090e0;--dpip:#fff8c0;--dpip2:#e0d090;--dglow:rgba(140,120,255,.5);--ddither:rgba(200,180,255,.22);--tip-num-color:#fff080}
+.dtype-vagabond{--dborder:#b0602a;--dborder2:#d88838;--dface:#4a2a14;--dface2:#663818;--dface3:#2a1608;--dhigh:#e8a858;--dpip:#ffd890;--dpip2:#d8a050;--dglow:rgba(216,136,56,.5);--ddither:rgba(240,180,100,.22);--tip-num-color:#ffb860}
 .dtype-gold{--dborder:#a89882;--dborder2:#c8b898;--dface:#d8ccb4;--dface2:#efe4d0;--dface3:#c0b49a;--dhigh:#f5ece0;--dpip:#5a4a38;--dpip2:#3a2e20;--dglow:rgba(168,152,130,.3);--ddither:rgba(180,160,130,.18)}
 /* ── Mini card (same pattern as match.html) ── */
 .rarity-tin     {--ctrim:#3d352c;--ctrim2:#7a6e5c;--cface:#18140f;--cface2:#221e18;--ctxt:#c0b498;--tip-num-color:#f060c0}
@@ -3165,8 +3335,13 @@ body::before,body::after{display:none!important}
 .dice-store-item{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 8px;border:1px solid rgba(255,255,255,.12);border-radius:6px;background:rgba(255,255,255,.04);cursor:pointer;transition:border-color .15s,opacity .15s,transform .12s;min-width:64px}
 .dice-store-item:hover{border-color:var(--gold);transform:scale(1.05)}
 .dice-store-item.sold-out{opacity:.25;filter:grayscale(.8)}
-.dice-store-item.too-expensive{opacity:.7}
+/* Too-expensive: no box/border, darker die, red price. Keeps the cart visually
+   simple — just communicates "can't afford" without feeling like a broken slot. */
+.dice-store-item.too-expensive{border-color:transparent!important;background:transparent!important}
+.dice-store-item.too-expensive:hover{border-color:transparent!important;transform:none!important}
+.dice-store-item.too-expensive .die{filter:brightness(.55) saturate(.75)}
 .dice-store-item.too-expensive .ds-price{color:var(--red)!important;text-shadow:0 0 6px rgba(160,80,80,.4)}
+.dice-store-item.too-expensive .ds-mat{color:rgba(200,160,120,.35)}
 .dice-store-item .ds-mat{font-family:var(--font-px);font-size:8px;color:var(--textdim);letter-spacing:.5px;text-transform:uppercase}
 .dice-store-item .ds-price{font-family:var(--font-px);font-size:9px;color:var(--gold);letter-spacing:.5px}
 .dice-store-item .ds-stock{font-family:var(--font-px);font-size:7px;color:rgba(255,255,255,.35);letter-spacing:.5px}
@@ -3724,6 +3899,7 @@ body::before,body::after{display:none!important}
 .dtype-ruby   {--dborder:#a02030;--dborder2:#d04050;--dface:#5a0810;--dface2:#7a1018;--dface3:#3a0408;--dhigh:#c03040;--dpip:#ffd0c0;--dpip2:#e8a090;--dglow:rgba(220,40,60,.5);--ddither:rgba(255,80,100,.18);--tip-num-color:#ff80a0}
 .dtype-obsidian{--dborder:#181828;--dborder2:#3a3a52;--dface:#0a0a14;--dface2:#1a1a28;--dface3:#04040a;--dhigh:#4a4a66;--dpip:#a0a0c0;--dpip2:#7a7aa0;--dglow:rgba(60,60,90,.4);--ddither:rgba(120,100,180,.18);--tip-num-color:#c0a0ff}
 .dtype-starstone{--dborder:#5050a0;--dborder2:#7878d0;--dface:#10142a;--dface2:#1a1e3c;--dface3:#08081a;--dhigh:#9090e0;--dpip:#fff8c0;--dpip2:#e0d090;--dglow:rgba(140,120,255,.5);--ddither:rgba(200,180,255,.22);--tip-num-color:#fff080}
+.dtype-vagabond{--dborder:#b0602a;--dborder2:#d88838;--dface:#4a2a14;--dface2:#663818;--dface3:#2a1608;--dhigh:#e8a858;--dpip:#ffd890;--dpip2:#d8a050;--dglow:rgba(216,136,56,.5);--ddither:rgba(240,180,100,.22);--tip-num-color:#ffb860}
 .dtype-gold{--dborder:#a89882;--dborder2:#c8b898;--dface:#d8ccb4;--dface2:#efe4d0;--dface3:#c0b49a;--dhigh:#f5ece0;--dpip:#5a4a38;--dpip2:#3a2e20;--dglow:rgba(168,152,130,.3);--ddither:rgba(180,160,130,.18)}
 
 /* ── Dice Grid ── */
@@ -4876,6 +5052,11 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
       <div class="tier-lo-dice" id="tierLoDice"></div>
     </div>
   </div>
+  <!-- Pouch FAB — floats at top-right of gauntlet screen when ≥1 pouch slot unlocked.
+       Tap opens the Pouch modal. Pure icon, no box/badge. -->
+  <div class="pouch-fab" id="pouchFab" onclick="togglePouchPanel()" style="display:none">
+    <img src="Menu_Art/pouch.png" alt="Pouch" class="pouch-fab-img">
+  </div>
   <div class="tier-match-header">PICK A MATCH</div>
   <div class="tier-matches" id="tierMatches">
     <div class="tier-match-btn" id="tierStandard" onclick="launchPatronMatch(false)">
@@ -5076,6 +5257,7 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
 <!-- OVERLAYS -->
 <div id="bust-ov"><div class="bust-word">BUST!</div></div>
 <div id="bustVignette"></div>
+<div id="critFlash"></div>
 <div id="turn-ov"><div class="turn-word">YOUR TURN</div></div>
 <div id="hot-ov"><div class="hot-word">HOT DICE</div></div>
 
@@ -5253,6 +5435,14 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
       <div class="setting-label"><div class="setting-name">SFX</div><div class="setting-desc">Sound effects for rolls, banks and busts</div></div>
       <div class="setting-check" id="sfxCheck" onclick="SFX.nav();toggleAudio('sfx')"></div>
     </div></div>
+    <div class="set-row"><canvas></canvas><div class="setting-inner">
+      <div class="setting-label"><div class="setting-name">HAPTICS</div><div class="setting-desc">Vibration pulses (Android only &mdash; iOS ignores)</div></div>
+      <div class="setting-check" id="hapticsCheck" onclick="SFX.nav();toggleSetting('haptics')"></div>
+    </div></div>
+    <div class="set-row"><canvas></canvas><div class="setting-inner">
+      <div class="setting-label"><div class="setting-name">REDUCED MOTION</div><div class="setting-desc">Disable crit flash, slow-mo bust and tumbles</div></div>
+      <div class="setting-check" id="reducedMotionCheck" onclick="SFX.nav();toggleSetting('reducedMotion')"></div>
+    </div></div>
     <div id="settingsResume" style="display:none;width:100%;margin:8px 0 4px">
       <div style="font-size:8px;letter-spacing:1.5px;color:var(--textdim);text-align:center;margin-bottom:8px" id="settingsResumeLabel"></div>
       <div style="display:flex;gap:8px;justify-content:center">
@@ -5264,6 +5454,22 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
       <div class="sbtn" onclick="SFX.nav();resetRun()"><canvas></canvas><div class="btn-inner" style="color:var(--red)">NEW RUN</div></div>
       <div class="sbtn" onclick="SFX.nav();closeSettings()"><canvas></canvas><div class="btn-inner" style="color:var(--gold)">BACK</div></div>
     </div>
+  </div>
+</div>
+
+<!-- POUCH MODAL — body-level overlay using the same container style as the
+     renown/perks panel (.rnk-info-*) so they look visually consistent.
+     Opens via togglePouchPanel() from the pouchFab floating icon. -->
+<div id="pouch-backdrop" class="rnk-info-backdrop" onclick="togglePouchPanel()"></div>
+<div id="pouch-ov" class="rnk-info-panel">
+  <canvas id="pouchCanvas"></canvas>
+  <!-- Large pouch icon overlapping the top edge of the panel (like the mid-match loadout portrait) -->
+  <img src="Menu_Art/pouch.png" alt="Pouch" class="pouch-portrait">
+  <div class="rnk-info-inner">
+    <div class="pouch-row-label">YOUR DECK</div>
+    <div class="pouch-active-row" id="pouchActiveRow"></div>
+    <div class="pouch-row-label pouch-reserve-label">POUCH CARDS</div>
+    <div class="pouch-slots-row" id="pouchSlotsRow"></div>
   </div>
 </div>
 
@@ -5295,7 +5501,7 @@ function _freshRun(){
   /* cards: 5 slots — [0..2] regular (progressively unlocked, see SLOT_UNLOCK_TIER),
      [3] boss-only signature (always available), [4] second boss slot (locked
      unless S.renownPerks.secondBoss is unlocked at 200 renown). */
-  return{tier:0,points:0,cards:[null,null,null,null,null],dice:[..._boneDice],bossesBeaten:[],diceRerolls:1,handicapOffer:null,inGauntlet:false,gauntletIndex:0,gold:100,diceStock:null,cardTarnish:{}};
+  return{tier:0,points:0,cards:[null,null,null,null,null],pouch:[null,null,null],dice:[..._boneDice],bossesBeaten:[],diceRerolls:1,handicapOffer:null,inGauntlet:false,gauntletIndex:0,gold:100,diceStock:null,cardTarnish:{}};
 }
 function _getS(){
   if(!S){
@@ -5334,6 +5540,11 @@ function _getS(){
     }
     /* Migrate stale boss-inventory state (from a removed earlier design) */
     if(S.run.bossInventory)delete S.run.bossInventory;
+    /* Pouch migration: ensure S.run.pouch exists for old saves. 3 slots (gated by renown perks). */
+    if(!Array.isArray(S.run.pouch))S.run.pouch=[null,null,null];
+    while(S.run.pouch.length<3)S.run.pouch.push(null);
+    /* Drop any pouch cards that were in the removed-cards list */
+    S.run.pouch=S.run.pouch.map(function(cid){return cid&&_removedCards.indexOf(cid)===-1?cid:null;});
   }
   return S;
 }
@@ -5436,8 +5647,20 @@ const RENOWN_PERKS=[
   {threshold:100,key:'shopDiscount', label:'Respected',      desc:'All shop prices reduced by 15%'},
   {threshold:150,key:'extraDraft',   label:'Honored guest',  desc:'Card drafts offer 4 cards instead of 3'},
   {threshold:200,key:'secondBoss',   label:'Lord of Dice',   desc:'Unlock a 5th loadout slot — a second boss-card slot'},
+  {threshold:250,key:'pouch1',       label:'Pocketed',       desc:'Unlock a Pouch — carry 1 card on the side, swap it with an active card before any match'},
   {threshold:300,key:'legend',       label:'Legend',         desc:'Begin every run with a free boss-signature draft (pick 1 of 3) — title shimmer too'},
+  {threshold:450,key:'pouch2',       label:'Deep Pockets',   desc:'Pouch holds 2 cards on the side instead of 1'},
+  {threshold:650,key:'pouch3',       label:'Hoarder',        desc:'Pouch holds 3 cards on the side instead of 2'},
 ];
+/* Returns how many pouch slots are unlocked (0-3). Pouched cards sit on the side
+   between matches — they don't contribute to archetype or synergy counts while there. */
+function getPouchCapacity(){
+  if(!S||!S.renownPerks)return 0;
+  if(S.renownPerks.pouch3)return 3;
+  if(S.renownPerks.pouch2)return 2;
+  if(S.renownPerks.pouch1)return 1;
+  return 0;
+}
 function _checkRenownPerks(){
   if(!S.renownPerks)S.renownPerks={};
   RENOWN_PERKS.forEach(function(p){if((S.renown||0)>=p.threshold&&!S.renownPerks[p.key])S.renownPerks[p.key]=true;});
@@ -5954,11 +6177,50 @@ const SFX={
   cardFlip(){this._click(1200,0.06,0.04);this._tone(380,'sine',0.04,0.004,0.08,0.02);},
   cardTrigger(){this._tone(540,'sine',0.05,0.005,0.12);this._tone(810,'sine',0.03,0.003,0.09,0.03);this._click(1400,0.025,0.03,0.01);},
   nav(){this._click(800,0.05,0.03);this._tone(500,'sine',0.03,0.003,0.04);},
+  pop(){/* long-press pop — subtle bubble-like chirp */
+    this._tone(880,'sine',0.055,0.002,0.06);
+    this._tone(1320,'sine',0.03,0.002,0.04,0.015);
+    this._click(2200,0.025,0.02,0.005);
+  },
   win(){[[392,0],[494,0.12],[587,0.22],[784,0.34],[987,0.46]].forEach(([f,t])=>{this._tone(f,'sine',0.12,0.008,0.2,t);this._tone(f*1.5,'sine',0.04,0.005,0.12,t);});},
   lose(){[330,294,261,220].forEach((f,i)=>this._tone(f,'sine',0.09,0.008,0.22,i*0.16));},
   err(){this._click(300,0.08,0.05);this._tone(200,'sine',0.05,0.005,0.08);},
   combo(n){n=Math.min(n||3,6);const notes=[440,523,587,659,784,880];for(let i=0;i<n;i++){this._tone(notes[i],'sine',0.045,0.004,0.09,i*0.065);this._click(1200,0.015,0.015,i*0.065);}},
+  crit(){/* critical hit — bright bell chime + deep thump */
+    this._tone(1047,'sine',0.08,0.004,0.22);
+    this._tone(1568,'sine',0.05,0.004,0.18,0.02);
+    this._tone(2093,'sine',0.04,0.003,0.14,0.05);
+    this._click(220,0.18,0.1);
+    this._tone(130,'sine',0.1,0.005,0.22,0.01);
+  },
 };
+/* ═══════ HAPTIC FEEDBACK ═══════
+   Android Chrome/Firefox support navigator.vibrate(); iOS Safari silently
+   ignores it. Gated by the "haptics" setting (default on — no-op on iOS
+   anyway). Short pulses only; no long buzzes. */
+var Haptic={
+  _supported:(typeof navigator!=='undefined'&&typeof navigator.vibrate==='function'),
+  _enabled(){return !S||!S.settings||S.settings.haptics!==false;},
+  tap(){if(this._supported&&this._enabled())try{navigator.vibrate(8);}catch(e){}},
+  select(){if(this._supported&&this._enabled())try{navigator.vibrate(12);}catch(e){}},
+  commit(){if(this._supported&&this._enabled())try{navigator.vibrate([10,20,18]);}catch(e){}},
+  bank(){if(this._supported&&this._enabled())try{navigator.vibrate([15,25,30]);}catch(e){}},
+  bust(){if(this._supported&&this._enabled())try{navigator.vibrate([60,40,60]);}catch(e){}},
+  crit(){if(this._supported&&this._enabled())try{navigator.vibrate([30,20,30,20,60]);}catch(e){}},
+};
+/* ═══════ CRITICAL-HIT FLASH ═══════
+   Big-score tactile moment: 1000+ point selection triggers a gold screen flash
+   + brief time-dilation filter + crit sound. Respects reduced-motion setting. */
+function showCritFlash(pts){
+  if(S&&S.settings&&S.settings.reducedMotion)return;
+  var f=document.getElementById('critFlash');
+  if(f){f.classList.remove('flash');void f.offsetWidth;f.classList.add('flash');
+    setTimeout(function(){f.classList.remove('flash');},560);}
+  document.body.classList.remove('crit-dilate');void document.body.offsetWidth;
+  document.body.classList.add('crit-dilate');
+  setTimeout(function(){document.body.classList.remove('crit-dilate');},560);
+  try{SFX.crit&&SFX.crit();}catch(e){}
+}
 /* Pre-warm AudioContext on first interaction */
 document.addEventListener('touchstart',function _w(){SFX._get();document.removeEventListener('touchstart',_w);},{once:true});
 document.addEventListener('click',function _w2(){SFX._get();document.removeEventListener('click',_w2);},{once:true});
@@ -6061,6 +6323,7 @@ var DICE_STORE=[
   {mat:'silver',   price:380, stock:1, label:'Silver'},
   {mat:'obsidian', price:420, stock:2, label:'Obsidian'},
   {mat:'ruby',     price:480, stock:2, label:'Ruby'},
+  {mat:'vagabond', price:650, stock:2, label:'Vagabond'},
   {mat:'crystal',  price:700, stock:1, label:'Crystal'},
   {mat:'starstone',price:780, stock:1, label:'Starstone'},
 ];
@@ -6457,6 +6720,10 @@ const CARDS=[
   {id:'ascending',name:'ASCENDING',icon:'📈',rarity:'silver',eff:'3 CONSECUTIVE: +400',desc:'Three consecutive values in your roll (1-2-3, 2-3-4, 3-4-5, or 4-5-6) score +400. Full straights override this.',arch:'collector'},
   {id:'bookends',name:'BOOKENDS',icon:'📖',rarity:'silver',eff:'1ST + LAST DIE SAME: +500',desc:'If the leftmost and rightmost dice in your roll show the same value, gain +500 bonus. Use Frozen Die to set this up.',arch:'collector'},
   {id:'six_serpents',name:'SIX SERPENTS',icon:'🐍',rarity:'gold',eff:'TRIPLE 6S SCORE 1000',desc:'Triple 6s score 1000 points instead of the standard 600.',arch:'collector'},
+  /* ── Position-based cards — pair with Vagabond dice for reliable triggers ── */
+  {id:'vanguard',name:'VANGUARD',icon:'🔰',rarity:'tin',eff:'1ST DIE 1 OR 5: +100',desc:'The leftmost die in your row, when scored as a 1 or 5, gets a +100 bonus. Pair with Vagabond dice to place scoring dice there.',arch:'collector'},
+  {id:'anchor',name:'ANCHOR',icon:'⚓',rarity:'silver',eff:'LAST DIE 6: SCORES 150',desc:'The rightmost die in your row, if it shows a 6 and is committed, scores as a lone single worth 150. Drag a Vagabond to slot 6 to guarantee it.',arch:'collector'},
+  {id:'sequence',name:'SEQUENCE',icon:'🎯',rarity:'gold',eff:'ROW IN STRICT ORDER: +1500',desc:'If the entire uncommitted row shows strictly ascending or descending values each differing by exactly 1 (e.g. 1-2-3-4-5-6 or 6-5-4-3-2), gain +1500. Fires on the first commit of the roll. Vagabond dice make this possible.',arch:'collector'},
   {id:'slippery_table',name:'SLIPPERY TABLE',icon:'💦',rarity:'silver',eff:'15% OPP DIE SLIPS BACK',desc:'15% chance each opponent turn: one of their kept scoring dice slips back and must be rerolled.',arch:'saboteur'},
   {id:'high_roller',name:'HIGH ROLLER',icon:'🎰',rarity:'silver',eff:'BANK 600+ → +400',desc:'When you bank 600 or more points in a single turn, gain a +400 bonus.',arch:'brinksman'},
   {id:'the_fence',name:'THE FENCE',icon:'🏚️',rarity:'silver',eff:'DISRUPTION CARDS +25%',desc:'Boosts your disruption cards (Sawdust, Short Pour, Slippery Table) by 25% — they hit the opponent harder.',arch:'saboteur'},
@@ -6749,6 +7016,10 @@ const DICE_TYPES=[
    faces:[1,2,3,4,5,6],
    effect:{type:'win_condition',mechanic:'starstone_set',amount:2500},
    desc:'If all 6 of your loadout dice are Starstone and you keep all 6 in one bank, instantly score +2500.'},
+  {id:'vagabond',name:'VAGABOND',icon:'🦊',cost:700,
+   faces:[1,2,3,4,5,6],
+   effect:{type:'movement',mechanic:'drag_reorder'},
+   desc:'Long-press and drag to reorder this die in the row. Scores normally — value is positioning.'},
 ];
 /* Tooltip number style: numerals are reserved for die faces (1–6) and point values.
    Counts like "one use", "two dice", "three turns" should stay as words.
@@ -7062,7 +7333,13 @@ function settleDie(el){
   setTimeout(()=>{
     el.style.transform='';
     el.style.boxShadow='';
-    setTimeout(()=>{el.style.transition='';},160);
+    setTimeout(()=>{
+      el.style.transition='';
+      /* Clear inline animation so CSS-driven idle breath can take over.
+         Without this, the inline animation:none set above sticks forever
+         and suppresses the idle-breath rule permanently. */
+      el.style.animation='';
+    },160);
   },80);
 }
 
@@ -8232,7 +8509,7 @@ function effectiveCards(){
 }
 /* Haptic helper — navigator.vibrate works on Android; iOS ignores it
    silently (no error, no effect). Wrap in try/catch for older browsers. */
-function _haptic(ms){try{if(navigator.vibrate)navigator.vibrate(ms);}catch(e){}}
+function _haptic(ms){try{if(navigator.vibrate&&(!S||!S.settings||S.settings.haptics!==false))navigator.vibrate(ms);}catch(e){}}
 
 function toggleDie(d){
   if(G.phase!=='choosing'||d.committed)return;
@@ -8397,7 +8674,7 @@ function handleRoll(){
     SFX.roll();G.turnRollCount++;
     setTimeout(function(){
       var free2=G.pool.filter(function(d){return !d.committed;});var fv=free2.map(function(d){return d.val;});var fm=free2.map(function(d){return d.mat;});var cards=effectiveCards();
-      if(!anyScoring(fv,cards,fm)){doBust();return;}
+      if(!anyScoring(fv,cards,fm)){_delayedDoBust(free2);return;}
       free2.forEach(function(d){d.el.onclick=function(){toggleDie(d);};});
       G.phase='choosing';refreshSelUI();
     },600);
@@ -8429,14 +8706,79 @@ function handleRoll(){
   }
   const selDice=G.pool.filter(d=>d.sel&&!d.committed);
   if(selDice.length){
-    const selVals=selDice.map(d=>d.val);const selMats=selDice.map(d=>d.mat);const locked=G.kept.reduce((a,k)=>a+k.pts,0);const cards=effectiveCards();
-    let pts=scoreSelection(selVals,cards,locked,undefined,selMats);
-    if(pts<=0){SFX.err();setStatusMsg('NO SCORE — TRY AGAIN','red');return;}
+    var _selVals=selDice.map(d=>d.val);var _selMats=selDice.map(d=>d.mat);const locked=G.kept.reduce((a,k)=>a+k.pts,0);const cards=effectiveCards();
+    /* ── ANCHOR pre-processing ──
+       Position-last die showing a 6, when committed, gets a +150 bonus.
+       Implementation: first check if the 6 is already consumed by normal scoring
+       (triple of 6s, etc). If YES → keep normal selection, add +150 on top.
+       If NO  → remove the 6 from scoring pool, treat it as a lone 150.
+       Either way the 6 is marked committed via selDice, and total pts include +150. */
+    var _anchorDie=null,_anchorPts=0,_anchorIdx=-1;
+    if(cards.includes('anchor')){
+      var _dLast=G.pool[G.pool.length-1];
+      if(_dLast&&_dLast.val===6){
+        _anchorIdx=selDice.indexOf(_dLast);
+        if(_anchorIdx>=0)_anchorDie=_dLast;
+      }
+    }
+    const selVals=_selVals,selMats=_selMats; // downstream compat (G.kept.push)
+    var _scoreVals,_scoreMats;
+    let pts;
+    if(_anchorDie){
+      /* Probe: is the 6 used by normal scoring (e.g. triple)? */
+      var _probe=scoreRoll(_selVals,cards,locked,undefined,_selMats);
+      if(_probe.used&&_probe.used[_anchorIdx]){
+        /* 6 is consumed by pattern → keep full selection, just stack +150 */
+        pts=scoreSelection(_selVals,cards,locked,undefined,_selMats);
+        _anchorPts=150;
+      }else{
+        /* 6 not used → remove it from scoring pool so commit accepts, treat as lone 150 */
+        _scoreVals=_selVals.filter(function(_,i){return i!==_anchorIdx;});
+        _scoreMats=_selMats.filter(function(_,i){return i!==_anchorIdx;});
+        pts=_scoreVals.length?scoreSelection(_scoreVals,cards,locked,undefined,_scoreMats):0;
+        _anchorPts=150;
+      }
+    }else{
+      pts=scoreSelection(_selVals,cards,locked,undefined,_selMats);
+    }
+    /* Reject if base scoring returned -1 (unused dice) OR returned 0 without anchor firing */
+    if(pts<0||(pts===0&&!_anchorDie)){SFX.err();setStatusMsg('NO SCORE — TRY AGAIN','red');return;}
+    pts+=_anchorPts;
+    if(_anchorDie)triggerCard('anchor','ANCHOR +150',true);
+    /* ── POSITION-BASED CARD BONUSES (Vagabond synergy) ──
+       Positions are read from G.pool (roll order, stable across commits). */
+    (function _positionBonuses(){
+      var rowLen=G.pool.length;
+      /* VANGUARD: leftmost die (pool index 0), when committed as a 1 or 5, +100 */
+      if(cards.includes('vanguard')){
+        var d0=G.pool[0];
+        if(d0&&selDice.indexOf(d0)>=0&&(d0.val===1||d0.val===5)){
+          pts+=100;triggerCard('vanguard','VANGUARD +100',true);
+        }
+      }
+      /* SEQUENCE: on the FIRST commit of this roll, check if the whole uncommitted
+         row (pool[0..rowLen-1]) shows strictly ±1 ascending or descending values.
+         Fires once per roll via G._sequenceArmedThisRoll flag. */
+      if(cards.includes('sequence')&&G._sequenceArmedThisRoll){
+        G._sequenceArmedThisRoll=false;
+        if(rowLen>=3){
+          var vals=G.pool.map(function(d){return d.val;});
+          var asc=true,desc=true;
+          for(var i=1;i<rowLen;i++){
+            if(vals[i]-vals[i-1]!==1)asc=false;
+            if(vals[i-1]-vals[i]!==1)desc=false;
+          }
+          if(asc||desc){pts+=1500;triggerCard('sequence','SEQUENCE +1500',true);spawnPop('+1500 🎯');}
+        }
+      }
+    })();
     if(G._vowDoubleActive){pts*=2;G._vowDoubleActive=false;spawnPop('VOW x2');}
     /* The Echo: previous roll scored → this selection gets +25% */
     if(G._echoReady&&G.pCards.includes('the_echo')){var _echoB=Math.floor(pts*0.35);if(_echoB>0){pts+=_echoB;spawnPop('+'+_echoB+' ECHO');triggerCard('the_echo','ECHO +'+_echoB,true);}G._echoReady=false;}
     selDice.forEach(d=>{d.committed=true;d.el.classList.remove('selected');d.el.classList.add('committed');d.el.onclick=null;d.el.style.cursor='default';});
-    SFX.commit();G.kept.push({vals:selVals,mat:selDice[0].mat,pts});G.turnPts=G.kept.reduce((a,k)=>a+k.pts,0);refreshKeptTray();
+    SFX.commit();Haptic.commit();G.kept.push({vals:selVals,mat:selDice[0].mat,pts});G.turnPts=G.kept.reduce((a,k)=>a+k.pts,0);refreshKeptTray();
+    /* Critical-hit flash — 1000+ point selection triggers screen-wide gold flash + brief time-dilation */
+    if(pts>=1000){showCritFlash(pts);Haptic.crit();}
   }
   // Hot dice check
   if(G.pool.filter(d=>!d.committed).length===0&&G.pool.length>0){
@@ -8465,6 +8807,8 @@ function handleRoll(){
     return;
   }
   G.phase='rolling';setBtns(false,false);setStatusMsg('ROLLING...','active');
+  /* Sequence card arms on every roll; first commit action consumes it */
+  G._sequenceArmedThisRoll=true;
   const useSpur=!!G.spurActive;if(typeof G.spurActive==='number'&&G.spurActive>0)G.spurActive--;else G.spurActive=0;
   const row=document.getElementById('playerDiceRow');
   /* Remove any leftover persistent-frozen-die preview from the NPC turn —
@@ -8662,7 +9006,7 @@ function afterRoll(){
   freeV=free.map(d=>d.val);
   if(!anyScoring(freeV,cards,freeMats)){
     if(_tryBustSave(free))return;
-    doBust();return;
+    _delayedDoBust(free);return;
   }
   if(G.pCards.includes('last_stand')&&free.length===1&&(freeV[0]===1||freeV[0]===5)){
     const d=free[0];d.committed=true;if(d.el){d.el.classList.add('committed');d.el.onclick=null;}
@@ -8712,7 +9056,7 @@ function afterRoll(){
   var freeVN=free.map(function(d){return d.val;});
   var freeMatsN=free.map(function(d){return d.mat;});
   var cardsN=effectiveCards();
-  if(!anyScoring(freeVN,cardsN,freeMatsN)){setTimeout(function(){doBust();},500);return;}
+  if(!anyScoring(freeVN,cardsN,freeMatsN)){setTimeout(function(){_delayedDoBust(free);},500);return;}
 
   /* Reckless die tracking (Brass): busts cost extra from banked total */
   /* (penalty applied in doBust, no forced bust here) */
@@ -8854,6 +9198,41 @@ function _tryBustSave(free){
   return false;
 }
 
+/* ── Close-bust slow-mo: when a bust is imminent AND the player has ≥300
+   points at risk (kept + turnPts), we dim the non-last dice, pulse-glow
+   the rightmost free die with a red "doom" tint, and delay doBust() by
+   ~750ms for drama. Cheap turns (no accumulated points) bust instantly. */
+var CLOSE_BUST_THRESHOLD=300;
+var CLOSE_BUST_DELAY_MS=750;
+function _closeBustDrama(freeArr){
+  if(S&&S.settings&&S.settings.reducedMotion)return false;
+  var keptPts=(G.kept||[]).reduce(function(a,k){return a+(k.pts||0);},0);
+  var atRisk=keptPts+(G.turnPts||0);
+  if(atRisk<CLOSE_BUST_THRESHOLD||!freeArr||freeArr.length===0)return false;
+  var lastDie=freeArr[freeArr.length-1];
+  /* Dim every other free die (grayscale + partial opacity) */
+  freeArr.forEach(function(d){
+    if(d===lastDie||!d.el)return;
+    d.el.style.transition='opacity 220ms ease, filter 220ms ease, transform 220ms ease';
+    d.el.style.opacity='0.32';
+    d.el.style.filter='grayscale(.7) brightness(.65)';
+    d.el.style.transform='scale(.88)';
+  });
+  /* Pulse the "reveal" die — scale up + red doom glow */
+  if(lastDie.el){
+    lastDie.el.style.transition='transform 260ms cubic-bezier(.4,1.6,.5,1), filter 260ms ease, box-shadow 260ms ease';
+    lastDie.el.style.filter='brightness(1.15)';
+    lastDie.el.style.boxShadow='0 0 18px 4px rgba(220,80,60,.75),3px 4px 0 rgba(30,18,8,.45),4px 5px 0 rgba(30,18,8,.2)';
+    lastDie.el.style.transform='scale(1.22)';
+  }
+  /* Optional: brief match-area desaturation overlay to sell the slow-mo mood */
+  try{var area=document.getElementById('diceArea');if(area){area.style.transition='filter 220ms ease';area.style.filter='saturate(.5) brightness(.9)';setTimeout(function(){area.style.filter='';setTimeout(function(){area.style.transition='';},240);},CLOSE_BUST_DELAY_MS);}}catch(e){}
+  return true;
+}
+function _delayedDoBust(freeArr){
+  if(_closeBustDrama(freeArr)){setTimeout(doBust,CLOSE_BUST_DELAY_MS);}
+  else doBust();
+}
 function doBust(){
   /* Feat tracking: count player busts for "Untouchable" feat */
   G._featBusts=(G._featBusts||0)+1;
@@ -8965,7 +9344,7 @@ function doBust(){
   updHUD();refreshKeptTray();
   setTimeout(()=>{
     G.pool.forEach(d=>{if(d.el){d.el.classList.add('bust');}});
-    var _bov=document.getElementById('bust-ov');_alignOverlayWord(_bov.querySelector('.bust-word'));_bov.classList.add('flash');SFX.bust();
+    var _bov=document.getElementById('bust-ov');_alignOverlayWord(_bov.querySelector('.bust-word'));_bov.classList.add('flash');SFX.bust();Haptic.bust();
     _bustImpact();
     if(window.DLG)DLG.trigger('PLAYER_BUST');
     setStatusMsg('BUST','red');
@@ -8983,7 +9362,7 @@ function handleBank(){
     let pts=scoreSelection(selV,cards,locked,undefined,selMats);
     if(pts>0){selD.forEach(d=>{d.committed=true;if(d.el){d.el.classList.add('committed');d.el.onclick=null;}});G.kept.push({vals:selV,mat:selD[0].mat,pts});}}
   let total=G.kept.reduce((a,k)=>a+k.pts,0);if(total<=0)return;
-  SFX.bank();
+  SFX.bank();Haptic.bank();
   G._consecutiveBusts=0;/* reset bust streak on successful bank */
   /* pixel pop on player score */
   var _pse=document.getElementById('pScore');
@@ -11250,7 +11629,7 @@ function activateGrogsFlask(){
   SFX.roll();
   setTimeout(()=>{
     const newFree=G.pool.filter(d=>!d.committed);const newFV=newFree.map(d=>d.val);const newFMats=newFree.map(d=>d.mat);
-    if(!anyScoring(newFV,cards,newFMats)){doBust();return;}
+    if(!anyScoring(newFV,cards,newFMats)){_delayedDoBust(newFree);return;}
     G.phase='choosing';refreshSelUI();
   },600);
 }
@@ -13219,7 +13598,7 @@ function _renderTierLoadout(){
        (second boss) is hidden until the Lord of Dice renown perk unlocks. */
     var _slotN=_loadoutSlotCount();
     S.run.cards.slice(0,_slotN).forEach(function(cid,i){
-      html+='<div class="tier-lo-wrap">';
+      html+='<div class="tier-lo-wrap" data-lo-kind="active" data-lo-idx="'+i+'">';
       if(cid){
         var cd=CARDS.find(function(c){return c.id===cid;})||getNpcCard(cid);
         if(cd){
@@ -13244,6 +13623,8 @@ function _renderTierLoadout(){
       if(w.querySelector('.tier-lo-card:not(.empty)'))attachTooltipTap(w);
     });
   }
+  /* ── Pouch FAB visibility + badge — actual swap UI lives in the modal ── */
+  _updatePouchFab();
   /* Dice loadout — 2 rows of 3, pixel dice with 3D tooltips */
   if(ld&&S.run.dice){
     ld.style.display='';
@@ -13264,6 +13645,278 @@ function _renderTierLoadout(){
     });
   }
 }
+
+/* ══════════ POUCH — pre-match side-deck (floating FAB + modal) ══════════
+   The pouch is a renown-unlocked extra card bank (1/2/3 slots) that persists
+   across matches within a run. Swaps happen in a modal — the floating FAB at
+   top-right opens it. No layout shift on the gauntlet screen.
+   Swap pattern: tap a card → highlights. Tap another card/slot → swap. Tap
+   same card → deselect. Boss cards limited to boss slots (3,4) or pouch.
+   Pouched cards don't count toward archetype / synergy counts. */
+function _updatePouchFab(){
+  var fab=document.getElementById('pouchFab');
+  if(!fab)return;
+  /* FAB shows whenever any pouch tier is unlocked. No badge — just the icon. */
+  fab.style.display = getPouchCapacity()===0 ? 'none' : 'flex';
+}
+function togglePouchPanel(){
+  var ov=document.getElementById('pouch-ov');
+  var bd=document.getElementById('pouch-backdrop');
+  if(!ov)return;
+  if(ov.classList.contains('show')){
+    ov.classList.remove('show');if(bd)bd.classList.remove('show');
+    /* Cancel any in-flight drag cleanly so the clone/origin styles clear */
+    if(_pcDrag){
+      if(_pcDrag.clone&&_pcDrag.clone.parentNode)_pcDrag.clone.parentNode.removeChild(_pcDrag.clone);
+      if(_pcDrag.srcEl)_pcDrag.srcEl.classList.remove('pc-drag-origin');
+      _pcDrag=null;
+    }
+    try{SFX.nav&&SFX.nav();}catch(e){}
+    return;
+  }
+  if(getPouchCapacity()===0)return;
+  _renderPouchPanel();
+  ov.classList.add('show');if(bd)bd.classList.add('show');
+  /* Draw the pixel-art panel background (same pattern as perks panel) */
+  requestAnimationFrame(function(){
+    var cv=document.getElementById('pouchCanvas');
+    if(cv){
+      cv.width=ov.offsetWidth;cv.height=ov.offsetHeight+40;
+      cv.style.width='100%';cv.style.height='';
+      try{drawPixelPanel(cv,'#4a3a28','#2a2018','#121010',7717,0.015);}catch(e){}
+    }
+  });
+  try{SFX.nav&&SFX.nav();}catch(e){}
+}
+function _renderPouchPanel(){
+  /* Render active deck row + pouch slots row inside the modal. Reuse the
+     existing _onLoadoutTap handler (keyed off data-lo-kind/data-lo-idx). */
+  var activeEl=document.getElementById('pouchActiveRow');
+  var slotsEl =document.getElementById('pouchSlotsRow');
+  if(!activeEl||!slotsEl)return;
+  var slotN=_loadoutSlotCount();
+  /* Build a .tier-lo-card (same class used on the gauntlet "YOUR LOADOUT" row)
+     so styling — borders, background, pixel feel, empty/boss/locked states — is
+     pixel-identical to the loadout cards. */
+  function _pcSlotHtml(kind, idx, cid, isBossSlot, locked){
+    var inner='';
+    var cardClass='tier-lo-card';
+    if(isBossSlot)cardClass+=' boss';
+    if(!cid){
+      cardClass+=' empty';
+      if(locked)cardClass+=' locked';
+    }
+    if(cid){
+      var cd=CARDS.find(function(c){return c.id===cid;})||getNpcCard(cid);
+      if(cd){
+        var rar=cd.npc?'boss-'+cd.npc:(cd.npcOnly&&cd.owner?'boss-'+cd.owner:(cd.npcOnly?'npc':cd.rarity));
+        inner='<div class="gcard rarity-'+rar+'">'
+             +'<div class="gcard-cover" style="background:'+(CARD_BG[cid]||'#444')+'">'+cd.icon+'</div>'
+             +'<div class="gcard-frame"></div></div>';
+      }
+    }
+    return '<div class="pouch-slot-wrap" data-lo-kind="'+kind+'" data-lo-idx="'+idx+'">'
+         + '<div class="'+cardClass+'">'+inner+'</div></div>';
+  }
+  /* Active deck row */
+  var aHtml='';
+  for(var i=0;i<slotN;i++){
+    var cid=S.run.cards[i];
+    aHtml+=_pcSlotHtml('active', i, cid, i>=3, !_isSlotUnlocked(i));
+  }
+  activeEl.innerHTML=aHtml;
+  /* Pouch slots row — always render all 3 slots; ones past the player's renown
+     capacity render as "locked" with a padlock glyph. This teases the progression
+     ("unlock more pouch space at 450 and 650 renown") without disrupting layout. */
+  var pHtml='';
+  var cap=getPouchCapacity();
+  for(var j=0;j<3;j++){
+    var pcid=(S.run.pouch||[])[j];
+    var isLocked = j>=cap;
+    pHtml+=_pcSlotHtml('pouch', j, isLocked?null:pcid, false, isLocked);
+  }
+  slotsEl.innerHTML=pHtml;
+  /* Wire drag-to-swap on every slot-wrap (pointer + touch) */
+  document.querySelectorAll('#pouch-ov .pouch-slot-wrap').forEach(function(el){
+    el.addEventListener('pointerdown', _onPouchDragStart);
+    el.addEventListener('touchstart', _onPouchDragStart, {passive:false});
+  });
+}
+/* ── Drag-to-swap implementation for pouch modal ──
+   On pointerdown on a filled slot, start tracking. If pointer moves > 6px, enter
+   drag mode: clone follows the cursor, drop zones highlight. On drop, perform the
+   swap via _performPouchSwap. Short clicks (no drag) do nothing. */
+var _pcDrag=null; // {src:{kind,idx}, clone, startX, startY, started, onMove, onUp}
+var PC_DRAG_START_PX=6;
+function _onPouchDragStart(e){
+  /* Identify source slot */
+  var el=e.currentTarget;
+  var kind=el.getAttribute('data-lo-kind');
+  var idx=parseInt(el.getAttribute('data-lo-idx'),10);
+  if(isNaN(idx))return;
+  /* Source must have a card (can't drag an empty slot) */
+  var cid = kind==='active' ? S.run.cards[idx] : S.run.pouch[idx];
+  if(!cid)return;
+  /* Locked pouch slot (past renown capacity) can't initiate drag */
+  if(kind==='pouch' && idx >= getPouchCapacity())return;
+  /* Prevent text selection on iOS and avoid scroll */
+  if(e.cancelable)e.preventDefault();
+  var x = e.clientX != null ? e.clientX : (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+  var y = e.clientY != null ? e.clientY : (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
+  _pcDrag={src:{kind,idx}, srcEl:el, startX:x, startY:y, started:false, clone:null};
+  function onMove(ev){
+    if(!_pcDrag)return;
+    var mx = ev.clientX != null ? ev.clientX : (ev.touches && ev.touches[0] ? ev.touches[0].clientX : 0);
+    var my = ev.clientY != null ? ev.clientY : (ev.touches && ev.touches[0] ? ev.touches[0].clientY : 0);
+    if(!_pcDrag.started){
+      if(Math.hypot(mx-_pcDrag.startX, my-_pcDrag.startY) < PC_DRAG_START_PX)return;
+      _pcStartDrag(mx, my);
+    }
+    if(ev.cancelable)ev.preventDefault();
+    _pcUpdateDrag(mx, my);
+  }
+  function onUp(ev){
+    document.removeEventListener('pointermove', onMove);
+    document.removeEventListener('pointerup', onUp);
+    document.removeEventListener('pointercancel', onUp);
+    document.removeEventListener('touchmove', onMove);
+    document.removeEventListener('touchend', onUp);
+    document.removeEventListener('touchcancel', onUp);
+    if(!_pcDrag)return;
+    if(!_pcDrag.started){
+      /* Short tap / no drag — treat as no-op (drag is the only interaction) */
+      _pcDrag=null;return;
+    }
+    var ux = ev.clientX != null ? ev.clientX : (ev.changedTouches && ev.changedTouches[0] ? ev.changedTouches[0].clientX : _pcDrag.startX);
+    var uy = ev.clientY != null ? ev.clientY : (ev.changedTouches && ev.changedTouches[0] ? ev.changedTouches[0].clientY : _pcDrag.startY);
+    _pcEndDrag(ux, uy);
+  }
+  _pcDrag.onMove=onMove;_pcDrag.onUp=onUp;
+  document.addEventListener('pointermove', onMove, {passive:false});
+  document.addEventListener('pointerup', onUp, {passive:true});
+  document.addEventListener('pointercancel', onUp, {passive:true});
+  document.addEventListener('touchmove', onMove, {passive:false});
+  document.addEventListener('touchend', onUp, {passive:true});
+  document.addEventListener('touchcancel', onUp, {passive:true});
+}
+function _pcStartDrag(x, y){
+  if(!_pcDrag)return;
+  _pcDrag.started=true;
+  var src=_pcDrag.srcEl;
+  /* Build a floating clone of the card's visual content */
+  var rect=src.getBoundingClientRect();
+  var clone=src.cloneNode(true);
+  clone.className='pc-drag-clone';
+  clone.style.width=rect.width+'px';
+  clone.style.height=rect.height+'px';
+  clone.style.left=(x - rect.width/2)+'px';
+  clone.style.top =(y - rect.height/2)+'px';
+  document.body.appendChild(clone);
+  _pcDrag.clone=clone;
+  src.classList.add('pc-drag-origin');
+  try{_haptic(14);}catch(e){}
+  try{SFX.pop&&SFX.pop();}catch(e){}
+}
+function _pcUpdateDrag(x, y){
+  if(!_pcDrag||!_pcDrag.started)return;
+  var c=_pcDrag.clone;
+  c.style.left=(x - c.offsetWidth/2)+'px';
+  c.style.top =(y - c.offsetHeight/2)+'px';
+  /* Highlight the slot under the cursor (skip the source itself) */
+  document.querySelectorAll('#pouch-ov .pouch-slot-wrap').forEach(function(el){
+    el.classList.remove('pc-drop-hover','pc-drop-invalid');
+  });
+  var target=_pcSlotAt(x,y);
+  if(target && target!==_pcDrag.srcEl){
+    var kind=target.getAttribute('data-lo-kind');
+    var idx=parseInt(target.getAttribute('data-lo-idx'),10);
+    var valid=_pcValidateDrop(_pcDrag.src, {kind,idx});
+    target.classList.add(valid?'pc-drop-hover':'pc-drop-invalid');
+  }
+}
+function _pcSlotAt(x,y){
+  /* Use elementFromPoint while temporarily hiding the clone so we can sample the slot beneath */
+  var c=_pcDrag&&_pcDrag.clone;
+  if(c)c.style.pointerEvents='none';
+  var el=document.elementFromPoint(x,y);
+  if(!el)return null;
+  return el.closest&&el.closest('.pouch-slot-wrap');
+}
+function _pcValidateDrop(src,dst){
+  /* Re-use the same rules as _performPouchSwap but without mutating state */
+  var arrA = src.kind==='active' ? S.run.cards : S.run.pouch;
+  var arrB = dst.kind==='active' ? S.run.cards : S.run.pouch;
+  var cidA = arrA[src.idx], cidB = arrB[dst.idx];
+  function isBossOnly(cid){if(!cid)return false;var c=getCard(cid);return !!(c&&(c.npc||c.npcOnly));}
+  function accepts(slot,cid){
+    if(slot.kind==='pouch'){
+      if(slot.idx >= getPouchCapacity())return false;
+      return true;
+    }
+    if(!cid)return true;
+    if(!_isSlotUnlocked(slot.idx))return false;
+    return (slot.idx>=3) === isBossOnly(cid);
+  }
+  return accepts(dst,cidA) && accepts(src,cidB);
+}
+function _pcEndDrag(x, y){
+  if(!_pcDrag)return;
+  var src=_pcDrag.src;
+  var target=_pcSlotAt(x,y);
+  /* Clean up clone + origin ghost */
+  if(_pcDrag.clone&&_pcDrag.clone.parentNode)_pcDrag.clone.parentNode.removeChild(_pcDrag.clone);
+  document.querySelectorAll('#pouch-ov .pouch-slot-wrap').forEach(function(el){
+    el.classList.remove('pc-drop-hover','pc-drop-invalid','pc-drag-origin');
+  });
+  _pcDrag=null;
+  if(!target || target===document.querySelector('[data-lo-kind="'+src.kind+'"][data-lo-idx="'+src.idx+'"]')){
+    /* Dropped on nothing or on source — no swap */
+    try{SFX.nav&&SFX.nav();}catch(e){}
+    return;
+  }
+  var dst={kind:target.getAttribute('data-lo-kind'), idx:parseInt(target.getAttribute('data-lo-idx'),10)};
+  if(_performPouchSwap(src, dst)){
+    save&&save();
+    _renderPouchPanel();
+    _updatePouchFab();
+    /* Also refresh the tier/gauntlet loadout so the underlying YOUR LOADOUT row
+       reflects the new deck composition — otherwise it'd show stale cards when the
+       modal closes. */
+    try{if(typeof _renderTierLoadout==='function')_renderTierLoadout();}catch(e){}
+    try{SFX.commit&&SFX.commit();}catch(e){}
+    try{_haptic(18);}catch(e){}
+  }else{
+    try{SFX.err&&SFX.err();}catch(e){}
+  }
+}
+function _performPouchSwap(a,b){
+  /* Returns true if swap succeeded. Validates that both endpoints are legal for
+     the card they'd receive. Boss slots (3,4) only accept boss-only cards;
+     regular slots (0..2) don't accept boss-only cards. Pouch slots must be
+     within the player's renown-unlocked capacity (getPouchCapacity). */
+  var arrA = a.kind==='active' ? S.run.cards : S.run.pouch;
+  var arrB = b.kind==='active' ? S.run.cards : S.run.pouch;
+  var cidA = arrA[a.idx], cidB = arrB[b.idx];
+  function isBossOnlyCard(cid){if(!cid)return false;var cd=getCard(cid);return !!(cd&&(cd.npc||cd.npcOnly));}
+  function slotAcceptsCard(slot, cid){
+    if(slot.kind==='pouch'){
+      /* Pouch slot must be unlocked for its index to accept ANYTHING (even empty is blocked) */
+      if(slot.idx >= getPouchCapacity())return false;
+      return true;
+    }
+    if(!cid)return true;
+    if(!_isSlotUnlocked(slot.idx))return false;
+    var isBossSlot = slot.idx>=3;
+    var cardIsBoss = isBossOnlyCard(cid);
+    return isBossSlot === cardIsBoss; // boss cards only in boss slots; regular cards only in regular slots
+  }
+  if(!slotAcceptsCard(b, cidA))return false;
+  if(!slotAcceptsCard(a, cidB))return false;
+  arrA[a.idx] = cidB;
+  arrB[b.idx] = cidA;
+  return true;
+}
+/* (Old tap-to-select visuals function removed — drag-and-drop self-contained via _pcDrag state.) */
 
 function _renderBossLoadout(tier){
   var bl=document.getElementById('tierBossLoadout');
@@ -13589,13 +14242,29 @@ function toggleAudio(type){
   updateAudioUI();
   if(type==='music')_bgMusicSync();
 }
+/* Generic settings toggle — haptics, reducedMotion, etc. default to ON.
+   Toggling flips the stored value; absence means ON. */
+function toggleSetting(key){
+  if(!S.settings)S.settings={};
+  S.settings[key]=!(S.settings[key]!==false);
+  save();updateAudioUI();
+}
 function updateAudioUI(){
   const musicOn=!S.settings||S.settings.music!==false;
   const sfxOn=!S.settings||S.settings.sfx!==false;
+  const hapticsOn=!S.settings||S.settings.haptics!==false;
+  const reducedMotion=!!(S.settings&&S.settings.reducedMotion===true);
   const mc=document.getElementById('musicCheck');
   const sc=document.getElementById('sfxCheck');
+  const hc=document.getElementById('hapticsCheck');
+  const rmc=document.getElementById('reducedMotionCheck');
   if(mc)mc.classList.toggle('on',musicOn);
   if(sc)sc.classList.toggle('on',sfxOn);
+  if(hc)hc.classList.toggle('on',hapticsOn);
+  /* reduced-motion check is "on" when the setting is enabled (i.e. motion IS reduced) */
+  if(rmc)rmc.classList.toggle('on',reducedMotion);
+  /* Body class drives the CSS-side gate (e.g. idle breath animation). */
+  document.body.classList.toggle('reduced-motion',reducedMotion);
 }
 // Browsers block autoplay until first user gesture. iOS additionally
 // requires AudioContext creation/resume to happen inside that gesture
@@ -13849,10 +14518,214 @@ function initMenuScreen() {
   setTimeout(function(){if(typeof initButtons === 'function') initButtons();},250);
 }
 
+/* ═══════ LONG-PRESS POLISH ═══════
+   Delegated pointer listener on the dice row. When a finger/cursor holds on a
+   .die for LONG_PRESS_MS, we play a brief shine + pop sfx. The long-press
+   does NOT block the normal tap (toggle select) — it's pure tactile polish.
+   Drag-to-reorder will hook into this same handler later by extending the
+   long-press branch into a drag start. */
+const LONG_PRESS_MS=450;        // hold threshold
+const LONG_PRESS_CANCEL_PX=20;   // move distance that cancels (generous for shaky fingers)
+window._longPressDebug=false;    // set true in console to log the state machine
+function _lpDbg(){if(window._longPressDebug)try{console.log.apply(console,['[longpress]'].concat([].slice.call(arguments)));}catch(e){}}
+/* Identify a vagabond die by its DOM class (set by mkDie via dtype-vagabond). */
+function _isVagabondDie(el){return !!(el&&el.classList&&el.classList.contains('dtype-vagabond'));}
+/* Can this die initiate a drag-to-reorder?
+   - Must be vagabond material
+   - Must be in #playerDiceRow (not shop/loadout preview)
+   - Must not be rolling/committed
+   - Game must be in 'choosing' phase */
+function _canDragDie(el){
+  if(!_isVagabondDie(el))return false;
+  if(el.classList.contains('rolling')||el.classList.contains('committed'))return false;
+  var row=document.getElementById('playerDiceRow');
+  if(!row||!row.contains(el))return false;
+  if(typeof G==='undefined'||!G||G.phase!=='choosing')return false;
+  return true;
+}
+function _fireDiePress(die){
+  if(!die)return;
+  _lpDbg('fire',die);
+  /* Vagabond dice: long-press opens drag mode instead of pulse. */
+  if(_canDragDie(die)){_startVagabondDrag(die);return;}
+  /* Non-vagabond: standard polish pulse + shine + pop. */
+  const shine=document.createElement('div');shine.className='die-shine';die.appendChild(shine);
+  setTimeout(function(){if(shine.parentNode)shine.parentNode.removeChild(shine);},520);
+  die.classList.remove('long-pressed');void die.offsetWidth;die.classList.add('long-pressed');
+  setTimeout(function(){die.classList.remove('long-pressed');},520);
+  try{SFX.pop&&SFX.pop();}catch(e){}
+  try{_haptic(12);}catch(e){}
+}
+function setupDiceLongPress(){
+  if(document._longPressBound)return; document._longPressBound=true;
+  let timer=null,startX=0,startY=0,activeDie=null,lastTouchAt=0;
+  function cancel(){if(timer){clearTimeout(timer);timer=null;_lpDbg('cancel');} activeDie=null;}
+  function start(die,x,y,src){
+    cancel();
+    activeDie=die;startX=x;startY=y;
+    _lpDbg('down',src,die);
+    timer=setTimeout(function(){
+      if(activeDie){_fireDiePress(activeDie);}
+      timer=null;activeDie=null;
+    },LONG_PRESS_MS);
+  }
+  function checkMove(x,y){
+    if(!timer)return;
+    if(Math.hypot(x-startX,y-startY)>LONG_PRESS_CANCEL_PX)cancel();
+  }
+  /* Touch path (primary on mobile). `e.target` inside a touchstart on iOS is
+     the element under the finger at touch time — closest('.die') catches pips.
+     We DO NOT preventDefault; the existing onclick/toggleDie still fires on
+     release so tap-to-select remains intact. */
+  document.addEventListener('touchstart',function(e){
+    if(!e.touches||e.touches.length!==1)return;  // ignore multi-touch
+    const t=e.touches[0];
+    const die=document.elementFromPoint(t.clientX,t.clientY);
+    const target=(die&&die.closest)?die.closest('.die'):null;
+    if(!target||target.classList.contains('rolling')||target.classList.contains('committed'))return;
+    lastTouchAt=Date.now();
+    start(target,t.clientX,t.clientY,'touch');
+  },{passive:true,capture:true});
+  document.addEventListener('touchmove',function(e){
+    if(!e.touches||!e.touches[0])return;
+    const t=e.touches[0];checkMove(t.clientX,t.clientY);
+  },{passive:true,capture:true});
+  document.addEventListener('touchend',cancel,{passive:true,capture:true});
+  document.addEventListener('touchcancel',cancel,{passive:true,capture:true});
+  /* Pointer path (desktop/mouse) — skipped on touch devices via pointerType check
+     + dedupe window to prevent double-fire when iOS synthesizes pointer events. */
+  document.addEventListener('pointerdown',function(e){
+    if(e.pointerType==='touch')return;
+    if(Date.now()-lastTouchAt<400)return;
+    const die=e.target&&e.target.closest?e.target.closest('.die'):null;
+    if(!die||die.classList.contains('rolling')||die.classList.contains('committed'))return;
+    start(die,e.clientX,e.clientY,'pointer');
+  },{passive:true});
+  document.addEventListener('pointermove',function(e){
+    if(e.pointerType==='touch')return;
+    checkMove(e.clientX,e.clientY);
+  },{passive:true});
+  document.addEventListener('pointerup',cancel,{passive:true});
+  document.addEventListener('pointercancel',cancel,{passive:true});
+}
+
+/* ═══════ VAGABOND DRAG-TO-REORDER ═══════
+   Triggered when long-press fires on a vagabond die in the choosing phase.
+   While active:
+   - Dragged die follows pointer via absolute-positioned clone
+   - Original die is ghosted in place with a dashed placeholder
+   - Other row dice animate to show where the drop will land
+   - Release snaps the die into the nearest slot, reorders G.pool + DOM. */
+var _vgDragState=null; // {die, clone, startIndex, rowRect, slotCenters, currentIdx, moveHandler, endHandler}
+function _startVagabondDrag(die){
+  if(_vgDragState)return;
+  var row=document.getElementById('playerDiceRow');
+  if(!row)return;
+  /* Lock down row metrics for this drag session */
+  var rowRect=row.getBoundingClientRect();
+  var kids=Array.prototype.slice.call(row.children);
+  var startIndex=kids.indexOf(die);
+  if(startIndex<0)return;
+  /* Compute slot centers once (x coordinate of each die) */
+  var slotCenters=kids.map(function(k){var r=k.getBoundingClientRect();return r.left+r.width/2;});
+  /* Visual: ghost the original die */
+  die.classList.add('vg-drag-origin');
+  /* Create a floating clone that follows the pointer */
+  var clone=die.cloneNode(true);
+  clone.classList.add('vg-drag-clone');
+  clone.classList.remove('vg-drag-origin','selected');
+  var dieRect=die.getBoundingClientRect();
+  clone.style.width=dieRect.width+'px';
+  clone.style.height=dieRect.height+'px';
+  clone.style.left=dieRect.left+'px';
+  clone.style.top=dieRect.top+'px';
+  document.body.appendChild(clone);
+  try{_haptic(20);}catch(e){}
+  try{SFX.pop&&SFX.pop();}catch(e){}
+  _vgDragState={die:die,clone:clone,startIndex:startIndex,rowRect:rowRect,slotCenters:slotCenters,currentIdx:startIndex,kids:kids};
+  function onMove(e){
+    if(!_vgDragState)return;
+    var x=e.clientX!=null?e.clientX:(e.touches&&e.touches[0]?e.touches[0].clientX:null);
+    var y=e.clientY!=null?e.clientY:(e.touches&&e.touches[0]?e.touches[0].clientY:null);
+    if(x==null)return;
+    var w=_vgDragState.clone.offsetWidth,h=_vgDragState.clone.offsetHeight;
+    _vgDragState.clone.style.left=(x-w/2)+'px';
+    _vgDragState.clone.style.top =(y-h/2)+'px';
+    var best=0,bestDist=Infinity;
+    for(var i=0;i<_vgDragState.slotCenters.length;i++){
+      var d=Math.abs(x-_vgDragState.slotCenters[i]);
+      if(d<bestDist){bestDist=d;best=i;}
+    }
+    if(best!==_vgDragState.currentIdx){_vgDragState.currentIdx=best;_updateSlotShift();}
+  }
+  function onEnd(){
+    if(!_vgDragState)return;
+    _commitVagabondDrag();
+  }
+  _vgDragState.moveHandler=onMove;
+  _vgDragState.endHandler=onEnd;
+  document.addEventListener('pointermove',onMove,{passive:true});
+  document.addEventListener('pointerup',onEnd,{passive:true,once:true});
+  document.addEventListener('pointercancel',onEnd,{passive:true,once:true});
+  document.addEventListener('touchmove',onMove,{passive:true});
+  document.addEventListener('touchend',onEnd,{passive:true,once:true});
+  document.addEventListener('touchcancel',onEnd,{passive:true,once:true});
+}
+/* Visual shift: slide other dice to preview where the dragged die will land */
+function _updateSlotShift(){
+  if(!_vgDragState)return;
+  var from=_vgDragState.startIndex,to=_vgDragState.currentIdx;
+  _vgDragState.kids.forEach(function(k,i){
+    if(k===_vgDragState.die)return;
+    var shift=0;
+    if(from<to){if(i>from&&i<=to)shift=-1;}
+    else if(from>to){if(i<from&&i>=to)shift=1;}
+    var slotW=_vgDragState.slotCenters[1]?(_vgDragState.slotCenters[1]-_vgDragState.slotCenters[0]):0;
+    k.style.transition='transform 180ms ease';
+    k.style.transform=shift?('translateX('+(shift*slotW)+'px)'):'';
+  });
+}
+function _commitVagabondDrag(){
+  var st=_vgDragState; if(!st)return;
+  _vgDragState=null;
+  /* Remove listeners */
+  document.removeEventListener('pointermove',st.moveHandler);
+  document.removeEventListener('touchmove',st.moveHandler);
+  /* Clean visual state */
+  if(st.clone&&st.clone.parentNode)st.clone.parentNode.removeChild(st.clone);
+  st.die.classList.remove('vg-drag-origin');
+  st.kids.forEach(function(k){k.style.transition='';k.style.transform='';});
+  /* If position unchanged, no-op */
+  var from=st.startIndex,to=st.currentIdx;
+  if(from===to){try{_haptic(6);}catch(e){}return;}
+  /* Reorder G.pool AND the DOM to match */
+  var row=document.getElementById('playerDiceRow');
+  if(!row||!window.G||!G.pool)return;
+  /* Find the pool index that matches the dragged DOM die */
+  var poolIdx=G.pool.findIndex(function(d){return d.el===st.die;});
+  if(poolIdx<0)return;
+  /* Splice the pool entry to the new position (DOM order matches pool order) */
+  var entry=G.pool.splice(poolIdx,1)[0];
+  /* Convert DOM target index to pool insertion index (same value since DOM mirrors pool) */
+  G.pool.splice(to,0,entry);
+  /* Reorder DOM */
+  var refNode=row.children[to+(to>from?1:0)]||null;
+  row.insertBefore(st.die,refNode);
+  try{_haptic(15);}catch(e){}
+  try{SFX.commit&&SFX.commit();}catch(e){}
+  setStatusMsg('REARRANGED','active');
+  setTimeout(function(){if(G.phase==='choosing')setStatusMsg('','');},900);
+}
+
 /* ═══════ BOOTSTRAP ═══════ */
 document.addEventListener('DOMContentLoaded', function(){
   _getS();
   try{showScreen('menu');}catch(e){console.error('showScreen failed:',e);}
+  setupDiceLongPress();
+  /* Sync body.reduced-motion class from stored settings so idle-breath animation
+     respects the user's preference immediately on page load (not just after
+     they open settings). */
+  try{if(S&&S.settings&&S.settings.reducedMotion===true)document.body.classList.add('reduced-motion');}catch(e){}
   /* Brute-force fallback — if initMenuScreen's double-RAF + setTimeout
      chain didn't fire (which has been observed in the wild on certain
      mobile browsers), force initButtons manually. */

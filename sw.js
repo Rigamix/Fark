@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gambit-v64';
+const CACHE_NAME = 'gambit-v83';
 const ASSETS = [
   './',
   './index.html',
@@ -47,7 +47,8 @@ const ASSETS = [
   './Menu_Art/Settings.png',
   './Menu_Art/Shop.png',
   './Menu_Art/Stamp.png',
-  './Menu_Art/iOS icon.png'
+  './Menu_Art/iOS icon.png',
+  './Menu_Art/pouch.png'
 ];
 
 // Install: cache all assets
