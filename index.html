@@ -6433,6 +6433,17 @@ const CARDS=[
   {id:'the_echo',name:'THE ECHO',icon:'🔊',rarity:'silver',eff:'SCORE → NEXT ROLL +35%',desc:'After a scoring roll, your next roll in the same turn gets a +35% score bonus.',arch:'sharp'},
   {id:'frozen_die',name:'FROZEN DIE',icon:'🧊',rarity:'silver',type:'active',maxUses:2,timing:'choosing',eff:'SAVE A DIE FOR NEXT TURN',desc:"Save one selected scoring die. It reappears on your next turn pre-placed — still selectable, so you can score it alone or fold it into a triple. Clears on bust. Two uses per match.",arch:'sharp'},
   {id:'double_down',name:'DOUBLE DOWN',icon:'✌️',rarity:'silver',type:'active',maxUses:1,timing:'choosing',eff:'2× PTS, REROLL ALL 6',desc:'Double your current turn points, but all kept dice are released and you must roll all 6. One use per match.',arch:'brinksman'},
+  /* ── Tactile active cards (select a die, then activate) ── */
+  {id:'coin_flip',name:'COIN FLIP',icon:'🪙',rarity:'tin',type:'active',maxUses:2,timing:'choosing',eff:'FLIP SELECTED DIE',desc:'Select a die, then activate — it flips to the opposite face (1↔6, 2↔5, 3↔4). Two uses per match.',arch:'sharp'},
+  {id:'alchemist_touch',name:"ALCHEMIST'S TOUCH",icon:'🧪',rarity:'silver',type:'active',maxUses:1,timing:'choosing',eff:'SELECTED DIE → 5',desc:'Select a non-scoring die (2/3/4/6), then activate — it becomes a 5 (50 pts). One use per match.',arch:'sharp'},
+  {id:'twinning_charm',name:'TWINNING CHARM',icon:'🧬',rarity:'silver',type:'active',maxUses:1,timing:'choosing',eff:'MIRROR SELECTED VALUE',desc:'Select a die, then activate — a random other unkept die changes to the same value. One use per match.',arch:'sharp'},
+  {id:'double_down_die',name:'DOUBLE DOWN DIE',icon:'⚗️',rarity:'gold',type:'active',maxUses:1,timing:'choosing',eff:'SELECTED 2/3/4 → DOUBLED',desc:'Select a die showing 2, 3, or 4, then activate — its value doubles (capped at 6). One use per match.',arch:'sharp'},
+  /* ── New scoring-pattern cards — unlock new combos ── */
+  {id:'sevens_gift',name:"SEVEN'S GIFT",icon:'🎲',rarity:'tin',eff:'ANY PAIR SUMMING TO 7: +100',desc:'Pairs of dice that sum to 7 (1+6, 2+5, 3+4) score +100 per pair. Dice are consumed by the pair.',arch:'collector'},
+  {id:'twin_fury',name:'TWIN FURY',icon:'👯',rarity:'tin',eff:'TWO PAIRS IN ONE ROLL: +600',desc:'If your roll contains two separate pairs (any values), score +600 bonus. The four dice are consumed.',arch:'collector'},
+  {id:'ascending',name:'ASCENDING',icon:'📈',rarity:'silver',eff:'3 CONSECUTIVE: +400',desc:'Three consecutive values in your roll (1-2-3, 2-3-4, 3-4-5, or 4-5-6) score +400. Full straights override this.',arch:'collector'},
+  {id:'bookends',name:'BOOKENDS',icon:'📖',rarity:'silver',eff:'1ST + LAST DIE SAME: +500',desc:'If the leftmost and rightmost dice in your roll show the same value, gain +500 bonus. Use Frozen Die to set this up.',arch:'collector'},
+  {id:'six_serpents',name:'SIX SERPENTS',icon:'🐍',rarity:'gold',eff:'TRIPLE 6S SCORE 1000',desc:'Triple 6s score 1000 points instead of the standard 600.',arch:'collector'},
   {id:'slippery_table',name:'SLIPPERY TABLE',icon:'💦',rarity:'silver',eff:'15% OPP DIE SLIPS BACK',desc:'15% chance each opponent turn: one of their kept scoring dice slips back and must be rerolled.',arch:'saboteur'},
   {id:'high_roller',name:'HIGH ROLLER',icon:'🎰',rarity:'silver',eff:'BANK 600+ → +400',desc:'When you bank 600 or more points in a single turn, gain a +400 bonus.',arch:'brinksman'},
   {id:'the_fence',name:'THE FENCE',icon:'🏚️',rarity:'silver',eff:'DISRUPTION CARDS +25%',desc:'Boosts your disruption cards (Sawdust, Short Pour, Slippery Table) by 25% — they hit the opponent harder.',arch:'saboteur'},
@@ -6465,6 +6476,9 @@ const CARD_BG={
   the_jinx:'#4A5A6A',thick_skin:'#6A6A5A',blood_tithe:'#8A2A30',
   the_echo:'#5A6A7A',frozen_die:'#3A6A8A',double_down:'#7A5A30',slippery_table:'#4A7A6A',high_roller:'#8A6A20',the_fence:'#5A4A3A',the_alchemist:'#6A5A2A',twin_flames:'#8A4A20',
   broken_lantern:'#3A3A3A',wild_die:'#6A3A7A',second_wind:'#4A6A5A',the_brewer:'#7A5A20',dead_mans_hand:'#4A4A5A',the_pyre:'#9A3A20',all_in:'#5A3A6A',
+  /* New tactile + scoring-pattern cards */
+  coin_flip:'#8A7A30',alchemist_touch:'#4A7060',twinning_charm:'#5A6080',double_down_die:'#7A5030',
+  sevens_gift:'#6A5A40',twin_fury:'#8A4040',ascending:'#4A6A7A',bookends:'#6A5030',six_serpents:'#3A6A40',
   /* NPC-only card backgrounds */
   her_lucky_coin:'#7A6A50',one_more_round:'#8A6030',
   the_last_stitch_npc:'#8B6080',measure_twice:'#706050',worn_thimble:'#9A7A60',the_nightshift:'#5A4A60',
@@ -6835,6 +6849,53 @@ function scoreRoll(vals,cards,locked,context,dieMats){
       }
     }
   }
+  /* ── Ascending (silver): 3 consecutive dice → +400. Skipped if a full
+     straight already fired (straightFound) or if the ladder consumed the
+     values above. */
+  if(!straightFound&&cards.includes('ascending')){
+    var _ascRuns=[[1,2,3],[2,3,4],[3,4,5],[4,5,6]];
+    for(var _ai=0;_ai<_ascRuns.length;_ai++){
+      if(hasSet(_ascRuns[_ai])){
+        pts+=400;markSet(_ascRuns[_ai]);
+        break;
+      }
+    }
+  }
+  /* ── Seven's Gift (tin): pairs summing to 7 (1+6, 2+5, 3+4) → +100/pair. */
+  if(cards.includes('sevens_gift')){
+    var _sgPairs=[[1,6],[2,5],[3,4]];
+    _sgPairs.forEach(function(pr){
+      while(cnt(pr[0])>=1&&cnt(pr[1])>=1){
+        pts+=100;mark(pr[0],1);mark(pr[1],1);
+      }
+    });
+  }
+  /* ── Bookends (silver): leftmost + rightmost die in the roll show the
+     same value → +500 once. Works on raw vals (positional). */
+  if(cards.includes('bookends')&&n>=2){
+    var _vFirst=vals[0],_vLast=vals[n-1];
+    if(_vFirst===_vLast){
+      /* Only consume if both positional dice are still unused */
+      if(!used[0]&&!used[n-1]){
+        pts+=500;used[0]=true;used[n-1]=true;
+      }
+    }
+  }
+  /* ── Twin Fury (tin): two separate pairs in one roll → +600. Consumes
+     four dice. Runs AFTER Seven's Gift so the more-specific card gets
+     first dibs on paired values. */
+  if(cards.includes('twin_fury')){
+    var _tfPairFaces=[];
+    for(var _tfF=1;_tfF<=6;_tfF++){
+      if(cnt(_tfF)>=2)_tfPairFaces.push(_tfF);
+      if(_tfPairFaces.length>=2)break;
+    }
+    if(_tfPairFaces.length>=2){
+      pts+=600;
+      mark(_tfPairFaces[0],2);
+      mark(_tfPairFaces[1],2);
+    }
+  }
   /* ── Scavenger (only if no straight consumed the 1+5) ── */
   let scavengerFired=false;
   if(!straightFound&&scavenger&&!context._scavengerBlocked){
@@ -6844,12 +6905,14 @@ function scoreRoll(vals,cards,locked,context,dieMats){
 
   /* ── Triples (with wild support) ── */
   const _triplesFired=[];/* track which face values produced triples for twin_flames */
+  const _hasSixSerpents=cards.includes('six_serpents');
   for(let f=1;f<=6;f++){
     const realC=cnt(f);const wc=cntWild();const totalC=realC+wc;
     if(totalC>=3){
       const wildsNeeded=Math.max(0,3-realC);
       const setSize=realC+wildsNeeded;/* total dice consumed: all real + wilds needed */
-      let base=f===1?SCORING_BASE.triple1:f*SCORING_BASE.tripleMult;
+      /* Six Serpents: triple 6s score 1000 instead of 600 */
+      let base=f===1?SCORING_BASE.triple1:(f===6&&_hasSixSerpents?1000:f*SCORING_BASE.tripleMult);
       for(let x=0;x<setSize-3;x++)base*=SCORING_BASE.doubleMultiplier;
       if(millersToll&&f>=2&&f<=4)base+=SCORING_BASE.millersTollTripleBonus;
       if(triplesPenalty&&f>=2)base=Math.max(0,base-SCORING_BASE.triplesPenalty);
@@ -11093,6 +11156,10 @@ function activateCard(cardId){
     case 'quick_hands': activateQuickHandsPlayer(); break;
     case 'crown_authority': activateCrownAuthorityPlayer(); break;
     case 'blessed_dice': activateBlessedDicePlayer(); break;
+    case 'coin_flip': activateCoinFlip(); break;
+    case 'alchemist_touch': activateAlchemistTouch(); break;
+    case 'twinning_charm': activateTwinningCharm(); break;
+    case 'double_down_die': activateDoubleDownDie(); break;
   }
   /* Trigger NPC reaction — only when the card actually affects the opponent */
   const _oppAffectingCards=['whispers_hex','sleight_of_hand','jesters_mask','plague_wind','serpents_whisper','broken_lantern','sticky_fingers_die','collateral_die','royal_seizure','blessed_confiscation','quick_hands','crown_authority','blessed_dice'];
@@ -11488,6 +11555,75 @@ function activateCrownAuthorityPlayer(){
 function activateBlessedDicePlayer(){
   G._playerRerollKeptArmed='blessed_dice';
   setStatusMsg("BLESSED DICE ARMED — OPP'S NEXT KEPT DICE REROLLED",'gold');
+}
+
+/* ═══════ NEW TACTILE ACTIVE CARDS (Apr 2026 batch) ═══════ */
+
+/* Coin Flip: selected die flips to its opposite face (1↔6, 2↔5, 3↔4). */
+function activateCoinFlip(){
+  var selDice=G.pool.filter(function(d){return d.sel&&!d.committed;});
+  if(!selDice.length){setStatusMsg('SELECT A DIE FIRST','red');refundActiveCardUse('coin_flip');return;}
+  var d=selDice[0];
+  var oppositeFace={1:6,2:5,3:4,4:3,5:2,6:1}[d.val]||d.val;
+  d.val=oppositeFace;
+  reDrawDieFace(d);
+  if(d.el){d.el.classList.add('eff-glow-gold');spawnPixelSparks(d.el,5);setTimeout(function(){if(d.el)d.el.classList.remove('eff-glow-gold');},700);}
+  triggerCard('coin_flip','FLIPPED → '+oppositeFace,true);
+  setStatusMsg('COIN FLIP — DIE NOW '+oppositeFace,'gold');
+  refreshSelUI();
+}
+
+/* Alchemist's Touch: selected non-scoring die becomes a 5. */
+function activateAlchemistTouch(){
+  var selDice=G.pool.filter(function(d){return d.sel&&!d.committed;});
+  if(!selDice.length){setStatusMsg('SELECT A NON-SCORING DIE FIRST','red');refundActiveCardUse('alchemist_touch');return;}
+  var d=selDice[0];
+  if(d.val===1||d.val===5){setStatusMsg('ALREADY SCORING — PICK A 2/3/4/6','red');refundActiveCardUse('alchemist_touch');return;}
+  d.val=5;
+  reDrawDieFace(d);
+  if(d.el){d.el.classList.add('eff-glow-green');spawnPixelSparks(d.el,6);setTimeout(function(){if(d.el)d.el.classList.remove('eff-glow-green');},700);}
+  triggerCard('alchemist_touch',"ALCHEMIST'S TOUCH → 5",true);
+  setStatusMsg("ALCHEMIST'S TOUCH — DIE NOW 5",'gold');
+  refreshSelUI();
+}
+
+/* Twinning Charm: a random other unkept die mirrors the selected die's value. */
+function activateTwinningCharm(){
+  var selDice=G.pool.filter(function(d){return d.sel&&!d.committed;});
+  if(!selDice.length){setStatusMsg('SELECT A DIE FIRST','red');refundActiveCardUse('twinning_charm');return;}
+  var src=selDice[0];
+  /* Eligible targets: any other free die (not committed, not the source itself,
+     and ideally not already the same value — otherwise no visible effect). */
+  var candidates=G.pool.filter(function(d){return !d.committed&&d!==src&&d.val!==src.val;});
+  if(!candidates.length){
+    /* If all other dice are already the same value, still allow it but fall
+       back to any non-source die so the use isn't wasted on a full-match roll. */
+    candidates=G.pool.filter(function(d){return !d.committed&&d!==src;});
+    if(!candidates.length){setStatusMsg('NO DICE TO MIRROR','red');refundActiveCardUse('twinning_charm');return;}
+  }
+  var target=candidates[Math.floor(Math.random()*candidates.length)];
+  target.val=src.val;
+  reDrawDieFace(target);
+  if(target.el){target.el.classList.add('eff-glow-blue');spawnPixelSparks(target.el,6);setTimeout(function(){if(target.el)target.el.classList.remove('eff-glow-blue');},700);}
+  if(src.el){spawnPixelSparks(src.el,3);}
+  triggerCard('twinning_charm','TWINNING → '+src.val,true);
+  setStatusMsg('TWINNING CHARM — MIRRORED '+src.val,'gold');
+  refreshSelUI();
+}
+
+/* Double Down Die: selected 2/3/4 doubles (cap 6). */
+function activateDoubleDownDie(){
+  var selDice=G.pool.filter(function(d){return d.sel&&!d.committed;});
+  if(!selDice.length){setStatusMsg('SELECT A 2, 3, OR 4','red');refundActiveCardUse('double_down_die');return;}
+  var d=selDice[0];
+  if(d.val<2||d.val>4){setStatusMsg('PICK A 2, 3, OR 4','red');refundActiveCardUse('double_down_die');return;}
+  var newVal=Math.min(6,d.val*2);
+  d.val=newVal;
+  reDrawDieFace(d);
+  if(d.el){d.el.classList.add('eff-glow-gold');spawnPixelSparks(d.el,8);setTimeout(function(){if(d.el)d.el.classList.remove('eff-glow-gold');},900);}
+  triggerCard('double_down_die','DOUBLED → '+newVal,true);
+  setStatusMsg('DOUBLE DOWN — DIE NOW '+newVal,'gold');
+  refreshSelUI();
 }
 
 /* ═══════ DICE ZOOM SYSTEM ═══════ */
