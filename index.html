@@ -5376,7 +5376,13 @@ const FEATS=[
   {id:'no_busts',       label:'Untouchable',      desc:'Win the match without busting',  renown:10,
     check:function(G){return (G._featBusts||0)===0;}},
   {id:'no_actives',     label:'Pure Bones',       desc:'Win without using any active cards', renown:10,
-    check:function(G){return !(G._featActivesUsed);}},
+    /* Only earnable if the player HAS active cards to begin with —
+       otherwise it's a free feat for an empty loadout. */
+    check:function(G){
+      if(!G||!G.pCards)return false;
+      var hasActive=G.pCards.some(function(cid){var c=getCard(cid);return c&&c.type==='active';});
+      return hasActive&&!(G._featActivesUsed);
+    }},
   {id:'full_straight',  label:'Straight Flush',   desc:'Roll a full straight (1-6)',     renown:5,
     check:function(G){return !!G._featFullStraight;}},
   {id:'hot_storm',      label:'Hot Storm',        desc:'Trigger Hot Dice 3+ times in one match', renown:10,
@@ -7327,6 +7333,9 @@ function clampTooltip(mcardEl){
 function initCardDrag(mcardEl,cardId){
   function onDragStart(e){
     if(mcardEl.classList.contains('used'))return;
+    /* Cards in the activation zone (already spent this turn) shouldn't
+       be draggable — tap-for-tooltip still works via click listeners. */
+    if(mcardEl.classList.contains('in-zone'))return;
     closeAllChips();
     const touch=e.touches?e.touches[0]:e;
     const rect=mcardEl.getBoundingClientRect();
@@ -12124,17 +12133,24 @@ function _endDraftSkip(){
 /* Build the post-match card-draft offer pool. Pulls from current tier's
    draft rarities, with a chance of next/prev tier sprinkled in. Honored
    guest perk bumps the slice from 3 → 4. */
-function _buildDraftPool(){
+function _buildDraftPool(excludeIds){
   _getS();
+  excludeIds=excludeIds||[];
   var tier=TIERS[S.run.tier]||TIERS[0];
   var pool=[];
   var _owned=S.run.cards.filter(Boolean);
-  tier.draftPool.forEach(function(rar){CARDS.forEach(function(c){if(c.rarity===rar&&!c.npcOnly&&!c.npc&&!c.dep&&_owned.indexOf(c.id)===-1)pool.push(c);});});
+  var _isBlocked=function(c){
+    return _owned.indexOf(c.id)!==-1||excludeIds.indexOf(c.id)!==-1;
+  };
+  tier.draftPool.forEach(function(rar){CARDS.forEach(function(c){if(c.rarity===rar&&!c.npcOnly&&!c.npc&&!c.dep&&!_isBlocked(c))pool.push(c);});});
   var _nextT=TIERS[S.run.tier+1];
-  if(_nextT&&_nextT.draftPool){_nextT.draftPool.forEach(function(rar){CARDS.forEach(function(c){if(c.rarity===rar&&!c.npcOnly&&!c.npc&&!c.dep&&_owned.indexOf(c.id)===-1&&pool.indexOf(c)===-1&&Math.random()<0.20)pool.push(c);});});}
-  if(S.run.tier>=2){var _prevT=TIERS[S.run.tier-1];if(_prevT&&_prevT.draftPool){_prevT.draftPool.forEach(function(rar){CARDS.forEach(function(c){if(c.rarity===rar&&!c.npcOnly&&!c.npc&&!c.dep&&_owned.indexOf(c.id)===-1&&pool.indexOf(c)===-1&&Math.random()<0.10)pool.push(c);});});}}
+  if(_nextT&&_nextT.draftPool){_nextT.draftPool.forEach(function(rar){CARDS.forEach(function(c){if(c.rarity===rar&&!c.npcOnly&&!c.npc&&!c.dep&&!_isBlocked(c)&&pool.indexOf(c)===-1&&Math.random()<0.20)pool.push(c);});});}
+  if(S.run.tier>=2){var _prevT=TIERS[S.run.tier-1];if(_prevT&&_prevT.draftPool){_prevT.draftPool.forEach(function(rar){CARDS.forEach(function(c){if(c.rarity===rar&&!c.npcOnly&&!c.npc&&!c.dep&&!_isBlocked(c)&&pool.indexOf(c)===-1&&Math.random()<0.10)pool.push(c);});});}}
   for(var di=pool.length-1;di>0;di--){var dj=Math.floor(Math.random()*(di+1));var dt=pool[di];pool[di]=pool[dj];pool[dj]=dt;}
   var _draftN=(S&&S.renownPerks&&S.renownPerks.extraDraft)?4:3;
+  /* If exclusions shrink the pool below what we want to offer, fall back
+     to the full pool so the reshuffle still produces a usable hand. */
+  if(pool.length<_draftN&&excludeIds.length)return _buildDraftPool([]);
   return pool.slice(0,_draftN);
 }
 
@@ -12144,8 +12160,10 @@ function reshuffleDraft(){
   if(!S.renownPerks||!S.renownPerks.freeRestock||S.run._restockUsed)return;
   S.run._restockUsed=true;
   save();
-  /* Regenerate offer */
-  _draftCards=_buildDraftPool();
+  /* Regenerate offer excluding the previously shown cards so reshuffle
+     always produces a genuinely different hand. */
+  var _prevIds=(_draftCards||[]).map(function(c){return c.id;});
+  _draftCards=_buildDraftPool(_prevIds);
   /* Re-render the offered cards in place — keep the slots/skip button intact */
   var draftCardsRow=document.querySelector('.end-draft .end-draft-cards');
   if(!draftCardsRow)return;
