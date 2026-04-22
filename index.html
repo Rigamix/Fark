@@ -14799,105 +14799,141 @@ function setupDiceLongPress(){
    - Original die is ghosted in place with a dashed placeholder
    - Other row dice animate to show where the drop will land
    - Release snaps the die into the nearest slot, reorders G.pool + DOM. */
-var _vgDragState=null; // {die, clone, startIndex, rowRect, slotCenters, currentIdx, moveHandler, endHandler}
+/* ═══ Vagabond drag (iPhone-icon-style real-time shifting) ═══
+   On long-press of a vagabond die: clone follows the cursor, source ghosts.
+   As the dragged die crosses each slot midpoint, the neighbors slide to make
+   room (live, real-time). Drop snaps the dice into the new arrangement.
+   Uses passive:false on touchmove so page can't scroll out from under the
+   gesture, and !important on transforms to beat the idle-breath animation. */
+var _vgDragState=null;
 function _startVagabondDrag(die){
   if(_vgDragState)return;
   var row=document.getElementById('playerDiceRow');
   if(!row)return;
-  /* Lock down row metrics for this drag session */
-  var rowRect=row.getBoundingClientRect();
   var kids=Array.prototype.slice.call(row.children);
   var startIndex=kids.indexOf(die);
   if(startIndex<0)return;
-  /* Compute slot centers once (x coordinate of each die) */
+  /* Snapshot original slot centers (x coords of each die's center) — these
+     are used to figure out which slot the cursor is over at any moment. */
   var slotCenters=kids.map(function(k){var r=k.getBoundingClientRect();return r.left+r.width/2;});
-  /* Visual: ghost the original die */
+  var slotWidth=(slotCenters[1]&&slotCenters[0])?(slotCenters[1]-slotCenters[0]):60;
+  /* Ghost the original */
   die.classList.add('vg-drag-origin');
-  /* Create a floating clone that follows the pointer */
+  /* Build the floating clone */
   var clone=die.cloneNode(true);
   clone.classList.add('vg-drag-clone');
-  clone.classList.remove('vg-drag-origin','selected');
+  clone.classList.remove('vg-drag-origin','selected','long-pressed');
+  /* Strip any inherited animations from the clone so it stays still under the cursor */
+  clone.style.animation='none';
   var dieRect=die.getBoundingClientRect();
   clone.style.width=dieRect.width+'px';
   clone.style.height=dieRect.height+'px';
   clone.style.left=dieRect.left+'px';
   clone.style.top=dieRect.top+'px';
   document.body.appendChild(clone);
-  try{_haptic(20);}catch(e){}
+  try{_haptic(25);}catch(e){}
   try{SFX.pop&&SFX.pop();}catch(e){}
-  _vgDragState={die:die,clone:clone,startIndex:startIndex,rowRect:rowRect,slotCenters:slotCenters,currentIdx:startIndex,kids:kids};
+  _vgDragState={
+    die:die, clone:clone, kids:kids,
+    startIndex:startIndex, currentIdx:startIndex,
+    slotCenters:slotCenters, slotWidth:slotWidth,
+  };
   function onMove(e){
     if(!_vgDragState)return;
-    var x=e.clientX!=null?e.clientX:(e.touches&&e.touches[0]?e.touches[0].clientX:null);
-    var y=e.clientY!=null?e.clientY:(e.touches&&e.touches[0]?e.touches[0].clientY:null);
+    /* Block the page from scrolling under the drag — touchmove must be non-passive */
+    if(e.cancelable)e.preventDefault();
+    var x = e.clientX!=null?e.clientX:(e.touches&&e.touches[0]?e.touches[0].clientX:null);
+    var y = e.clientY!=null?e.clientY:(e.touches&&e.touches[0]?e.touches[0].clientY:null);
     if(x==null)return;
-    var w=_vgDragState.clone.offsetWidth,h=_vgDragState.clone.offsetHeight;
+    /* Move the clone to the cursor */
+    var w=_vgDragState.clone.offsetWidth, h=_vgDragState.clone.offsetHeight;
     _vgDragState.clone.style.left=(x-w/2)+'px';
     _vgDragState.clone.style.top =(y-h/2)+'px';
-    var best=0,bestDist=Infinity;
+    /* Compute the slot under the cursor — nearest center wins */
+    var best=0, bestDist=Infinity;
     for(var i=0;i<_vgDragState.slotCenters.length;i++){
       var d=Math.abs(x-_vgDragState.slotCenters[i]);
       if(d<bestDist){bestDist=d;best=i;}
     }
-    if(best!==_vgDragState.currentIdx){_vgDragState.currentIdx=best;_updateSlotShift();}
+    if(best!==_vgDragState.currentIdx){
+      _vgDragState.currentIdx=best;
+      _updateSlotShift();
+      try{_haptic(6);}catch(e){}
+    }
   }
   function onEnd(){
     if(!_vgDragState)return;
     _commitVagabondDrag();
   }
-  _vgDragState.moveHandler=onMove;
-  _vgDragState.endHandler=onEnd;
-  document.addEventListener('pointermove',onMove,{passive:true});
+  _vgDragState.onMove=onMove;
+  _vgDragState.onEnd=onEnd;
+  /* IMPORTANT — passive:false so preventDefault works to block page scroll */
+  document.addEventListener('pointermove',onMove,{passive:false});
   document.addEventListener('pointerup',onEnd,{passive:true,once:true});
   document.addEventListener('pointercancel',onEnd,{passive:true,once:true});
-  document.addEventListener('touchmove',onMove,{passive:true});
+  document.addEventListener('touchmove',onMove,{passive:false});
   document.addEventListener('touchend',onEnd,{passive:true,once:true});
   document.addEventListener('touchcancel',onEnd,{passive:true,once:true});
+  /* Initial render */
+  _updateSlotShift();
 }
-/* Visual shift: slide other dice to preview where the dragged die will land */
+/* Live shift: slide other dice to make room for the dragged die — iPhone-style.
+   Uses setProperty with priority 'important' so the transform beats the idle-breath
+   animation that's also setting transform on these dice. */
 function _updateSlotShift(){
   if(!_vgDragState)return;
-  var from=_vgDragState.startIndex,to=_vgDragState.currentIdx;
+  var from=_vgDragState.startIndex, to=_vgDragState.currentIdx;
+  var slotW=_vgDragState.slotWidth;
   _vgDragState.kids.forEach(function(k,i){
     if(k===_vgDragState.die)return;
     var shift=0;
     if(from<to){if(i>from&&i<=to)shift=-1;}
     else if(from>to){if(i<from&&i>=to)shift=1;}
-    var slotW=_vgDragState.slotCenters[1]?(_vgDragState.slotCenters[1]-_vgDragState.slotCenters[0]):0;
-    k.style.transition='transform 180ms ease';
-    k.style.transform=shift?('translateX('+(shift*slotW)+'px)'):'';
+    /* Snappy spring curve so the shift feels mechanical/iOS-like, not slow */
+    k.style.transition='transform 220ms cubic-bezier(.32,1.4,.5,1)';
+    if(shift){
+      k.style.setProperty('transform','translateX('+(shift*slotW)+'px)','important');
+    }else{
+      k.style.removeProperty('transform');
+    }
   });
 }
 function _commitVagabondDrag(){
   var st=_vgDragState; if(!st)return;
   _vgDragState=null;
-  /* Remove listeners */
-  document.removeEventListener('pointermove',st.moveHandler);
-  document.removeEventListener('touchmove',st.moveHandler);
-  /* Clean visual state */
+  /* Remove listeners first */
+  document.removeEventListener('pointermove',st.onMove,{passive:false});
+  document.removeEventListener('touchmove',st.onMove,{passive:false});
+  /* Restore clean state on all sibling dice */
+  st.kids.forEach(function(k){
+    k.style.transition='';
+    k.style.removeProperty('transform');
+  });
+  /* Remove the floating clone */
   if(st.clone&&st.clone.parentNode)st.clone.parentNode.removeChild(st.clone);
   st.die.classList.remove('vg-drag-origin');
-  st.kids.forEach(function(k){k.style.transition='';k.style.transform='';});
-  /* If position unchanged, no-op */
-  var from=st.startIndex,to=st.currentIdx;
-  if(from===to){try{_haptic(6);}catch(e){}return;}
-  /* Reorder G.pool AND the DOM to match */
+  /* Position unchanged → no-op (small haptic for "nothing happened") */
+  var from=st.startIndex, to=st.currentIdx;
+  if(from===to){try{_haptic(8);}catch(e){}return;}
+  /* Reorder G.pool AND the DOM to match the new arrangement */
   var row=document.getElementById('playerDiceRow');
-  if(!row||!window.G||!G.pool)return;
-  /* Find the pool index that matches the dragged DOM die */
+  /* G is let-scoped (not on window) — check it directly, not window.G */
+  if(!row||typeof G==='undefined'||!G||!G.pool)return;
   var poolIdx=G.pool.findIndex(function(d){return d.el===st.die;});
   if(poolIdx<0)return;
-  /* Splice the pool entry to the new position (DOM order matches pool order) */
   var entry=G.pool.splice(poolIdx,1)[0];
-  /* Convert DOM target index to pool insertion index (same value since DOM mirrors pool) */
   G.pool.splice(to,0,entry);
-  /* Reorder DOM */
-  var refNode=row.children[to+(to>from?1:0)]||null;
+  /* Reorder DOM. After splicing the dragged die out, the row has N-1 children;
+     to insert it at index `to`, we reference children[to] (or null if at end). */
+  var refNode=null;
+  /* When moving rightward, the splice already shifted indices — adjust ref */
+  if(to>from){refNode=row.children[to+1]||null;}
+  else{refNode=row.children[to]||null;}
   row.insertBefore(st.die,refNode);
-  try{_haptic(15);}catch(e){}
+  try{_haptic(20);}catch(e){}
   try{SFX.commit&&SFX.commit();}catch(e){}
   setStatusMsg('REARRANGED','active');
-  setTimeout(function(){if(G.phase==='choosing')setStatusMsg('','');},900);
+  setTimeout(function(){if(G&&G.phase==='choosing')setStatusMsg('','');},900);
 }
 
 /* ═══════ BOOTSTRAP ═══════ */
