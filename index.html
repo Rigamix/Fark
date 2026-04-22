@@ -900,6 +900,14 @@ body.reduced-motion #playerDiceRow .die{animation:none!important}
   filter:grayscale(.8) brightness(.6)!important;
   transition:opacity .15s ease, filter .15s ease;
 }
+/* Dice currently shifting during a Vagabond drag — pause the idle breath
+   animation so the transition on transform actually interpolates. CSS animations
+   always win against transitions for the same property, which is why earlier
+   shifts looked like one-frame snaps. */
+.die.vg-shifting{
+  animation:none!important;
+  transition:transform 360ms cubic-bezier(.25,.46,.45,.94)!important;
+}
 .die.committed{opacity:.38;cursor:default}
 .die.committed:active{transform:none}
 .die.rolling{animation:dRoll .4s linear infinite;cursor:default;box-shadow:none;transition:none;border-color:var(--dborder)}
@@ -14827,8 +14835,11 @@ function _startVagabondDrag(die){
      are used to figure out which slot the cursor is over at any moment. */
   var slotCenters=kids.map(function(k){var r=k.getBoundingClientRect();return r.left+r.width/2;});
   var slotWidth=(slotCenters[1]&&slotCenters[0])?(slotCenters[1]-slotCenters[0]):60;
-  /* Ghost the original */
+  /* Ghost the original AND mark all siblings as vg-shifting so their idle breath
+     animation pauses for the duration of the drag. Without this the transition
+     on transform never interpolates (animations always beat transitions). */
   die.classList.add('vg-drag-origin');
+  kids.forEach(function(k){if(k!==die)k.classList.add('vg-shifting');});
   /* Build the floating clone */
   var clone=die.cloneNode(true);
   clone.classList.add('vg-drag-clone');
@@ -14888,32 +14899,22 @@ function _startVagabondDrag(die){
   _updateSlotShift();
 }
 /* Live shift: slide other dice to make room for the dragged die — iPhone-style.
-   Each die that's between the drag origin and the current target slides one slot
-   over with a smooth ease-out curve. The dragged die's clone follows the cursor
-   above (z-index:9500) so it always sits above the row. */
+   The breath animation is paused on these dice via the .vg-shifting class (set
+   in _startVagabondDrag), so the CSS transition on transform actually
+   interpolates smoothly instead of being clobbered by the animation each frame. */
 function _updateSlotShift(){
   if(!_vgDragState)return;
   var from=_vgDragState.startIndex, to=_vgDragState.currentIdx;
   var slotW=_vgDragState.slotWidth;
-  /* Stagger transitions slightly so each die's shift starts a hair after the
-     previous one, creating a visible "wave" effect when you drag across multiple
-     slots quickly. Cap the stagger so the wave doesn't lag. */
   _vgDragState.kids.forEach(function(k,i){
     if(k===_vgDragState.die)return;
-    var shift=0,distFromOrigin=0;
-    if(from<to){
-      if(i>from&&i<=to){shift=-1;distFromOrigin=i-from-1;}
-    }else if(from>to){
-      if(i<from&&i>=to){shift=1;distFromOrigin=from-i-1;}
-    }
-    /* Smoother, slower curve so the eye catches the shift; small stagger so multiple
-       shifts feel like a wave rather than all-at-once snap. */
-    var delay=Math.min(distFromOrigin*40,120);  /* up to 4 dice stagger by 40ms each */
-    k.style.transition='transform 320ms cubic-bezier(.25,.46,.45,.94) '+delay+'ms';
+    var shift=0;
+    if(from<to){if(i>from&&i<=to)shift=-1;}
+    else if(from>to){if(i<from&&i>=to)shift=1;}
     if(shift){
-      k.style.setProperty('transform','translateX('+(shift*slotW)+'px)','important');
+      k.style.transform='translateX('+(shift*slotW)+'px)';
     }else{
-      k.style.removeProperty('transform');
+      k.style.transform='';
     }
   });
 }
@@ -14923,10 +14924,12 @@ function _commitVagabondDrag(){
   /* Remove listeners first */
   document.removeEventListener('pointermove',st.onMove,{passive:false});
   document.removeEventListener('touchmove',st.onMove,{passive:false});
-  /* Restore clean state on all sibling dice */
+  /* Restore clean state on all sibling dice — clear inline transform/transition
+     AND remove the vg-shifting class so the idle breath animation resumes. */
   st.kids.forEach(function(k){
     k.style.transition='';
     k.style.removeProperty('transform');
+    k.classList.remove('vg-shifting');
   });
   /* Remove the floating clone */
   if(st.clone&&st.clone.parentNode)st.clone.parentNode.removeChild(st.clone);
