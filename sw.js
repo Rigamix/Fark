@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gambit-v96';
+const CACHE_NAME = 'gambit-v102';
 const ASSETS = [
   './',
   './index.html',
