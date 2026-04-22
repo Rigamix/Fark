@@ -886,9 +886,19 @@ body.reduced-motion #playerDiceRow .die{animation:none!important}
 .die.vg-drag-origin{opacity:.25;filter:grayscale(.4);transition:opacity .15s ease,filter .15s ease}
 .die.vg-drag-clone{
   position:fixed!important;z-index:9500;pointer-events:none;
-  box-shadow:0 8px 16px 2px rgba(0,0,0,.55),0 0 14px 4px rgba(255,184,96,.55)!important;
-  transform:scale(1.1);transition:transform .15s ease;
-  filter:brightness(1.08) drop-shadow(0 0 12px rgba(255,160,60,.6));
+  box-shadow:0 12px 22px 4px rgba(0,0,0,.65),0 0 18px 5px rgba(255,184,96,.4)!important;
+  /* Bigger lift so the clone clearly sits ABOVE the row — eliminates visual
+     overlap with neighbors as the cursor passes between them. */
+  transform:scale(1.18) translateY(-6px);
+  transition:transform .12s ease;
+  filter:brightness(1.12) drop-shadow(0 4px 6px rgba(0,0,0,.5));
+}
+/* Origin (ghosted) die during drag — fade more aggressively so the visible
+   "gap" where the dragged die was is unmistakable. */
+.die.vg-drag-origin{
+  opacity:.18!important;
+  filter:grayscale(.8) brightness(.6)!important;
+  transition:opacity .15s ease, filter .15s ease;
 }
 .die.committed{opacity:.38;cursor:default}
 .die.committed:active{transform:none}
@@ -14878,19 +14888,28 @@ function _startVagabondDrag(die){
   _updateSlotShift();
 }
 /* Live shift: slide other dice to make room for the dragged die — iPhone-style.
-   Uses setProperty with priority 'important' so the transform beats the idle-breath
-   animation that's also setting transform on these dice. */
+   Each die that's between the drag origin and the current target slides one slot
+   over with a smooth ease-out curve. The dragged die's clone follows the cursor
+   above (z-index:9500) so it always sits above the row. */
 function _updateSlotShift(){
   if(!_vgDragState)return;
   var from=_vgDragState.startIndex, to=_vgDragState.currentIdx;
   var slotW=_vgDragState.slotWidth;
+  /* Stagger transitions slightly so each die's shift starts a hair after the
+     previous one, creating a visible "wave" effect when you drag across multiple
+     slots quickly. Cap the stagger so the wave doesn't lag. */
   _vgDragState.kids.forEach(function(k,i){
     if(k===_vgDragState.die)return;
-    var shift=0;
-    if(from<to){if(i>from&&i<=to)shift=-1;}
-    else if(from>to){if(i<from&&i>=to)shift=1;}
-    /* Snappy spring curve so the shift feels mechanical/iOS-like, not slow */
-    k.style.transition='transform 220ms cubic-bezier(.32,1.4,.5,1)';
+    var shift=0,distFromOrigin=0;
+    if(from<to){
+      if(i>from&&i<=to){shift=-1;distFromOrigin=i-from-1;}
+    }else if(from>to){
+      if(i<from&&i>=to){shift=1;distFromOrigin=from-i-1;}
+    }
+    /* Smoother, slower curve so the eye catches the shift; small stagger so multiple
+       shifts feel like a wave rather than all-at-once snap. */
+    var delay=Math.min(distFromOrigin*40,120);  /* up to 4 dice stagger by 40ms each */
+    k.style.transition='transform 320ms cubic-bezier(.25,.46,.45,.94) '+delay+'ms';
     if(shift){
       k.style.setProperty('transform','translateX('+(shift*slotW)+'px)','important');
     }else{
