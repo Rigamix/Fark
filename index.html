@@ -995,8 +995,27 @@ body.reduced-motion #playerDiceRow .die{animation:none!important}
    keyframes — dampened dice appeared to skip rolling and just appear at
    their final face. Use a `transition:` on filter instead so it stacks
    cleanly on top of the rolling rotation. */
-.die.die-dampened{filter:brightness(.5) saturate(.2);transition:filter .5s ease-out}
-.die.die-dampened.dampen-fade{filter:brightness(1) saturate(1)}
+/* Sawdust dampened die — clearly tinted brown with a sepia/dust look so the player
+   can see at a glance which opp dice the Sawdust card neutered. */
+.die.die-dampened{
+  filter:brightness(.55) saturate(.3) sepia(.6) hue-rotate(-15deg);
+  transition:filter .5s ease-out;
+  position:relative;
+}
+.die.die-dampened::before{
+  content:'';position:absolute;inset:0;pointer-events:none;border-radius:inherit;
+  background:radial-gradient(circle at 50% 30%,rgba(200,160,100,.25) 0%,rgba(120,80,40,.18) 60%,transparent 100%);
+  mix-blend-mode:multiply;z-index:1;
+}
+.die.die-dampened.dampen-fade{filter:brightness(1) saturate(1) sepia(0) hue-rotate(0)}
+.die.die-dampened.dampen-fade::before{opacity:0;transition:opacity .5s ease-out}
+/* Sawdust spray — quick poof animation when the die is initially dampened */
+.die.die-dampened-fresh{animation:sawdustPoof .55s ease-out both}
+@keyframes sawdustPoof{
+  0%  {filter:brightness(1) saturate(1) drop-shadow(0 0 8px rgba(200,160,100,.8))}
+  35% {filter:brightness(.7) saturate(.5) sepia(.4) drop-shadow(0 0 12px rgba(180,140,80,.7))}
+  100%{filter:brightness(.55) saturate(.3) sepia(.6) drop-shadow(0 0 0 transparent)}
+}
 /* Echo armed indicator on card */
 .mcard[data-cid="the_echo"].echo-armed .gcard{box-shadow:inset 0 0 0 1px rgba(100,180,255,.5),inset 0 0 0 5px var(--cface),inset 0 0 0 6px var(--ctrim2),0 0 8px 2px rgba(100,180,255,.35),0 5px 20px rgba(0,0,0,.85);border-color:rgba(100,180,255,.45)}
 .mcard[data-cid="the_echo"].echo-armed .card-outer::after{content:'';position:absolute;inset:0;z-index:10;pointer-events:none;border-radius:4px;background:repeating-conic-gradient(rgba(100,180,255,.12) 0% 25%,transparent 0% 50%) 0 0/4px 4px;image-rendering:pixelated;mix-blend-mode:screen;animation:echoArmedPulse 1.2s ease-in-out infinite}
@@ -2329,6 +2348,63 @@ body::before,body::after{display:none!important}
 .tier-loadout::before{content:'';position:absolute;top:0;left:10%;right:10%;height:2px;
   background:linear-gradient(90deg,transparent,rgba(200,160,80,.3),transparent)}
 .tier-lo-label{font-family:var(--font-px);font-size:10px;color:rgba(200,160,80,.35);letter-spacing:2px;margin-bottom:6px}
+/* ── Tier-screen renown pill: star + number + progress bar to next perk ── */
+.tier-renown-pill{
+  position:absolute;top:50%;left:12px;transform:translateY(-50%);z-index:25;
+  font-family:var(--font-px);font-size:13px;color:#dca84a;letter-spacing:1px;
+  display:flex;flex-direction:column;align-items:flex-start;gap:2px;
+  cursor:pointer;padding:4px 6px;text-shadow:1px 1px 0 rgba(0,0,0,.6);
+}
+.tier-renown-pill .tier-renown-star{font-size:14px;line-height:1;display:inline-block;margin-right:3px}
+.tier-renown-pill .tier-renown-num{font-size:12px;display:inline-block}
+.tier-renown-pill .tier-renown-bar{width:60px;height:4px;background:rgba(40,30,18,.7);
+  border:1px solid rgba(120,90,40,.5);border-radius:2px;overflow:hidden;margin-top:1px}
+.tier-renown-pill .tier-renown-bar-fill{height:100%;background:linear-gradient(90deg,#dca84a,#ffd870);
+  width:0%;transition:width .8s cubic-bezier(.4,0,.2,1);box-shadow:0 0 4px rgba(220,170,60,.5)}
+/* Milestone glow — fires when renown crosses a perk threshold */
+.tier-renown-pill.milestone .tier-renown-bar-fill{animation:renownGlow 1.4s ease-out 2}
+@keyframes renownGlow{
+  0%,100%{box-shadow:0 0 4px rgba(220,170,60,.5);filter:brightness(1)}
+  50%{box-shadow:0 0 18px rgba(255,220,120,.95);filter:brightness(1.4)}
+}
+
+/* ── Perk unlock celebration overlay ── */
+.perk-unlock-ov{
+  position:fixed;left:50%;top:38%;transform:translate(-50%,-50%) scale(.4);
+  z-index:9700;pointer-events:none;opacity:0;
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  padding:24px 28px 22px;background:rgba(20,14,8,.92);
+  border:2px solid rgba(220,170,60,.6);border-radius:10px;
+  box-shadow:0 8px 30px rgba(0,0,0,.7),0 0 50px rgba(220,170,60,.4);
+  transition:opacity .35s ease, transform .45s cubic-bezier(.2,1.6,.4,1);
+  min-width:200px;text-align:center;
+}
+.perk-unlock-ov.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+.perk-unlock-ov.fade{opacity:0;transform:translate(-50%,-50%) scale(.85);transition:opacity .45s ease, transform .45s ease}
+.perk-unlock-ov .puk-star{font-size:54px;line-height:1;
+  filter:drop-shadow(0 0 18px rgba(255,220,120,.9));
+  animation:pukStarSpin 1.3s cubic-bezier(.2,.9,.4,1) both;
+}
+.perk-unlock-ov .puk-lock{position:absolute;top:24px;left:50%;transform:translateX(-50%);
+  font-size:30px;opacity:.9;transition:transform .4s ease, opacity .4s ease;
+}
+.perk-unlock-ov.shatter .puk-lock{transform:translate(-50%,30px) rotate(40deg);opacity:0;
+  filter:drop-shadow(0 0 8px rgba(220,80,80,.6));
+}
+.perk-unlock-ov .puk-label{font-family:var(--font-px);font-size:9px;letter-spacing:3px;
+  color:rgba(220,170,60,.8);margin-top:6px;
+}
+.perk-unlock-ov .puk-name{font-family:'Jacquard 24',serif;font-size:22px;color:var(--gold);
+  letter-spacing:1.5px;margin-top:2px;text-shadow:0 2px 0 rgba(0,0,0,.6);
+}
+.perk-unlock-ov .puk-desc{font-family:'IM Fell English',serif;font-size:13px;color:rgba(220,200,160,.85);
+  line-height:1.3;margin-top:4px;max-width:240px;
+}
+@keyframes pukStarSpin{
+  0%  {transform:scale(.3) rotate(-180deg);filter:drop-shadow(0 0 4px rgba(255,220,120,.4))}
+  60% {transform:scale(1.2) rotate(20deg);filter:drop-shadow(0 0 24px rgba(255,220,120,.95))}
+  100%{transform:scale(1) rotate(0deg);filter:drop-shadow(0 0 12px rgba(255,220,120,.7))}
+}
 /* ══════════ POUCH — floating FAB + modal ══════════
    FAB sits fixed top-right of the gauntlet screen so it doesn't displace any layout.
    Modal overlays full-screen with an active deck row + pouch slots row for swaps. */
@@ -5022,7 +5098,11 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
 <!-- SCREEN: GAUNTLET -->
 <div id="screen-gauntlet" class="screen">
 <div class="top-bar">
-  <div id="tierRenownPill" onclick="SFX.nav();showRenownInfo()" style="position:absolute;top:50%;left:12px;transform:translateY(-50%);z-index:25;font-family:var(--font-px);font-size:13px;color:#dca84a;letter-spacing:1px;display:flex;align-items:center;gap:4px;cursor:pointer;padding:4px 6px;text-shadow:1px 1px 0 rgba(0,0,0,.6)"><span style="font-size:14px;line-height:1">⭐</span><span id="tierRenown">0</span></div>
+  <div id="tierRenownPill" onclick="SFX.nav();showRenownInfo()" class="tier-renown-pill" title="Renown progress to next perk">
+    <span class="tier-renown-star">⭐</span>
+    <span class="tier-renown-num" id="tierRenown">0</span>
+    <div class="tier-renown-bar"><div class="tier-renown-bar-fill" id="tierRenownFill"></div></div>
+  </div>
   <div class="title"><span class="letter">F</span><span class="letter">a</span><span class="letter">r</span><span class="letter">K</span><span class="letter">!</span></div>
   <div id="tierGoldPill" style="position:absolute;top:50%;right:12px;transform:translateY(-50%);z-index:25;font-family:var(--font-px);font-size:13px;color:var(--gold);letter-spacing:1px;display:flex;align-items:center;gap:4px;text-shadow:1px 1px 0 rgba(0,0,0,.6)"><span class="coin-i" style="width:14px;height:14px;display:inline-block"></span><span id="tierGold">0g</span></div>
 </div>
@@ -5662,11 +5742,45 @@ function getPouchCapacity(){
 }
 function _checkRenownPerks(){
   if(!S.renownPerks)S.renownPerks={};
-  RENOWN_PERKS.forEach(function(p){if((S.renown||0)>=p.threshold&&!S.renownPerks[p.key])S.renownPerks[p.key]=true;});
+  /* Track newly unlocked perks so we can pop the celebration overlay */
+  var _newlyUnlocked=[];
+  RENOWN_PERKS.forEach(function(p){
+    if((S.renown||0)>=p.threshold&&!S.renownPerks[p.key]){
+      S.renownPerks[p.key]=true;
+      _newlyUnlocked.push(p);
+    }
+  });
   /* Legend cosmetic: body class drives the title shimmer */
   if(typeof document!=='undefined'){
     document.body.classList.toggle('legend',!!S.renownPerks.legend);
+    /* Pop a celebration overlay for each new perk (one at a time, queued) */
+    if(_newlyUnlocked.length&&typeof _showPerkUnlock==='function'){
+      _newlyUnlocked.forEach(function(p,i){
+        setTimeout(function(){_showPerkUnlock(p);},i*1900);
+      });
+    }
   }
+}
+/* Perk-unlock celebration: golden star pops in, lock icon shatters off, perk name appears.
+   Triggers on every new perk threshold crossed (Known Face, Pocketed, Honored Guest, etc). */
+function _showPerkUnlock(perk){
+  if(!perk||typeof document==='undefined')return;
+  /* Build a one-shot overlay */
+  var ov=document.createElement('div');
+  ov.className='perk-unlock-ov';
+  ov.innerHTML=
+    '<div class="puk-star">⭐</div>'+
+    '<div class="puk-lock">🔒</div>'+
+    '<div class="puk-label">PERK UNLOCKED</div>'+
+    '<div class="puk-name">'+perk.label.toUpperCase()+'</div>'+
+    '<div class="puk-desc">'+perk.desc+'</div>';
+  document.body.appendChild(ov);
+  try{SFX.synergy&&SFX.synergy();}catch(e){}
+  try{_haptic(40);}catch(e){}
+  setTimeout(function(){ov.classList.add('show');},20);
+  setTimeout(function(){ov.classList.add('shatter');},900);
+  setTimeout(function(){ov.classList.remove('show');ov.classList.add('fade');},2200);
+  setTimeout(function(){if(ov.parentNode)ov.parentNode.removeChild(ov);},2700);
 }
 /* Returns an ordered list of rank suffixes for dialogue lookup —
    highest unlocked rank first. Empty list = below the first threshold. */
@@ -6564,7 +6678,11 @@ function _initHandicapHUD(){
 function generatePatron(tierIndex){
   var t=TIERS[tierIndex];if(!t)t=TIERS[0];
   var ps=t.patronStats;
-  var target=Math.round((ps.targetMin+Math.floor(Math.random()*(ps.targetMax-ps.targetMin)))/100)*100;
+  /* Target is now FIXED at the midpoint of the tier's range so the same patron
+     tier always shows the same number — players were confused by random variance
+     ("Grog target was 3000 last run, now it's 2800"). Predictable difficulty
+     escalation is more important than per-match variety. */
+  var target=Math.round(((ps.targetMin+ps.targetMax)/2)/100)*100;
   var agg=ps.aggMin+Math.random()*(ps.aggMax-ps.aggMin);
   var dice=[];for(var i=0;i<6;i++)dice.push(ps.dicePool[Math.floor(Math.random()*ps.dicePool.length)]);
   /* 25% chance to splash in one die from next tier's pool for variety */
@@ -9856,8 +9974,15 @@ function runOppTurn(){
   function step(){
     clearRow('oppDiceRow');G.oppDice=[];oppRollNum++;
     const leakyActive=G.pCards.includes('leaky_cup')&&G.oppTurnCount%4===0&&G.oppTurnCount>0;
-    const rollDice=(oppRollNum===1&&leakyActive)?Math.min(left,5):left;
+    /* Player-side Pocket Sand: 70% chance the opponent's first roll uses 5 dice
+       (same threshold the NPC version uses against the player). Symmetric. */
+    let _pocketSandActive=false;
+    if(oppRollNum===1&&G.pCards.includes('pocket_sand')&&Math.random()<0.7){
+      _pocketSandActive=true;
+    }
+    const rollDice=(oppRollNum===1&&(leakyActive||_pocketSandActive))?Math.min(left,5):left;
     if(oppRollNum===1&&leakyActive&&left===6)triggerCard('leaky_cup','LEAKY CUP — 5 DICE',true);
+    if(_pocketSandActive&&left===6)triggerCard('pocket_sand','POCKET SAND — 5 DICE!',true);
     const row=document.getElementById('oppDiceRow');
     const rungDice=G.matchOppDice||((G.rung&&G.rung.dice)||['bone','bone','bone','bone','bone','bone']);
     var _sawdustCount=0;
@@ -9870,7 +9995,7 @@ function runOppTurn(){
         _sawdustCount++;_wasDampened=true;
       }
       const el=mkDie(val,dieMat);el.classList.add('rolling');row.appendChild(el);
-      if(_wasDampened){el.classList.add('die-dampened');}
+      if(_wasDampened){el.classList.add('die-dampened','die-dampened-fresh');setTimeout(function(){el.classList.remove('die-dampened-fresh');},600);}
       /* Broken Lantern: hide dice faces */
       if(G._lanternActive)el.classList.add('die-blind');
       G.oppDice.push({val,el,kept:false,mat:dieMat});}
@@ -12027,8 +12152,15 @@ function activateBlessedDicePlayer(){
 
 /* Coin Flip: selected die flips to its opposite face (1↔6, 2↔5, 3↔4). */
 function activateCoinFlip(){
+  /* Cancel any in-flight Vagabond drag — otherwise selDice can be stale because the
+     dragging die is in pc-drag-origin state and not officially "selected". */
+  if(typeof _vgDragState!=='undefined'&&_vgDragState){
+    if(_vgDragState.clone&&_vgDragState.clone.parentNode)_vgDragState.clone.parentNode.removeChild(_vgDragState.clone);
+    if(_vgDragState.srcEl)_vgDragState.srcEl.classList.remove('vg-drag-origin');
+    _vgDragState=null;
+  }
   var selDice=G.pool.filter(function(d){return d.sel&&!d.committed;});
-  if(!selDice.length){setStatusMsg('SELECT A DIE FIRST','red');refundActiveCardUse('coin_flip');return;}
+  if(!selDice.length){setStatusMsg('TAP A DIE FIRST, THEN TAP COIN FLIP','red');refundActiveCardUse('coin_flip');return;}
   var d=selDice[0];
   var oppositeFace={1:6,2:5,3:4,4:3,5:2,6:1}[d.val]||d.val;
   d.val=oppositeFace;
@@ -13515,9 +13647,36 @@ function initTierScreen(data){
   /* Update gold display */
   var _tierGoldEl=document.getElementById('tierGold');
   if(_tierGoldEl)_tierGoldEl.textContent=(S.run.gold||0)+'g';
-  /* Update renown display */
+  /* Update renown display + progress-bar fill toward next perk threshold */
   var _tierRenownEl=document.getElementById('tierRenown');
   if(_tierRenownEl)_tierRenownEl.textContent=(S.renown||0);
+  (function _updateRenownBar(){
+    var fill=document.getElementById('tierRenownFill');
+    if(!fill)return;
+    var renown=S.renown||0;
+    /* Find current perk threshold (highest unlocked) and next perk threshold */
+    var prev=0,next=null;
+    for(var i=0;i<RENOWN_PERKS.length;i++){
+      if(renown>=RENOWN_PERKS[i].threshold)prev=RENOWN_PERKS[i].threshold;
+      else if(next===null)next=RENOWN_PERKS[i].threshold;
+    }
+    var pct;
+    if(next===null){pct=100;} /* maxed out */
+    else{var span=next-prev;var into=renown-prev;pct=Math.max(0,Math.min(100,Math.round(into/span*100)));}
+    fill.style.width=pct+'%';
+    /* Detect milestone crossing — if last-known prev changed since the previous render, glow */
+    var pill=document.getElementById('tierRenownPill');
+    if(pill){
+      var lastPrev=parseInt(pill.dataset.lastPrev||'0',10);
+      if(prev>lastPrev){
+        pill.classList.remove('milestone');void pill.offsetWidth;
+        pill.classList.add('milestone');
+        try{SFX.synergy&&SFX.synergy();}catch(e){}
+        setTimeout(function(){pill.classList.remove('milestone');},2900);
+      }
+      pill.dataset.lastPrev=prev;
+    }
+  })();
   /* Update header */
   var tn=document.getElementById('tierName');if(tn)tn.textContent=tier.name;
   /* Render coin slots */
