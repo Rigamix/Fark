@@ -546,7 +546,12 @@ body{
 .mcard.in-zone .gc{opacity:.2!important}
 /* Tooltip on greyed-out in-zone cards: matching dim/grey treatment so
    the popup reads as "this card is spent" rather than fully vivid. */
-.mcard.in-zone .mcard-tooltip{filter:grayscale(.75) brightness(.65)}
+.mcard.in-zone .mcard-tooltip,.mcard-tooltip.tip-greyed{filter:grayscale(.75) brightness(.65)}
+/* Numbers and effect text stay slightly brighter even when tooltip is greyed, so values remain readable */
+.mcard-tooltip.tip-greyed .tip-eff,
+.mcard-tooltip.tip-greyed .tip-num,
+.mcard.in-zone .mcard-tooltip .tip-eff,
+.mcard.in-zone .mcard-tooltip .tip-num{filter:brightness(1.6) saturate(1.2);color:rgba(240,230,210,.95)!important}
 .mcard.in-zone .mcard-tooltip .tip-name,
 .mcard.in-zone .mcard-tooltip .tip-eff,
 .mcard.in-zone .mcard-tooltip .tip-flavor{color:rgba(220,220,220,.55)!important}
@@ -978,7 +983,24 @@ body{
   #shopBody .shop-your-dice{padding-top:6px!important;margin-top:6px!important;font-size:12px!important;margin-bottom:0!important}
 }
 @keyframes dRoll{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
-.die.bust{animation:dBust .38s steps(3);filter:grayscale(.7) brightness(.55);opacity:.55;transition:filter .3s ease, opacity .3s ease}
+.die.bust{opacity:1}
+/* Jade wildcard dice — blank face + glowing star in the center */
+.die.die-wild{position:relative}
+.die.die-wild::after{
+  content:'★';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-size:24px;color:#90e8a8;text-shadow:0 0 8px rgba(120,220,140,.85),0 0 14px rgba(80,200,120,.5);
+  pointer-events:none;z-index:2;
+  animation:wildPulse 2.4s ease-in-out infinite;
+}
+@keyframes wildPulse{0%,100%{opacity:.85}50%{opacity:1;text-shadow:0 0 12px rgba(140,240,160,.95),0 0 20px rgba(80,200,120,.6)}}
+/* Mini-cube tooltip wildcard face */
+.dice-face.wild-face{
+  display:flex!important;align-items:center;justify-content:center;
+  font-size:18px;color:#90e8a8;text-shadow:0 0 6px rgba(120,220,140,.7);
+}
+/* Bust overrides selected glow — kill the gold outline pseudo so all dice read as busted uniformly */
+.die.bust.selected,.die.bust{box-shadow:none!important}
+.die.bust::before,.die.bust::after{display:none!important}
 @keyframes dBust{0%,100%{transform:none}33%{transform:translate(-4px,3px)}66%{transform:translate(4px,-3px)}}
 /* ── Die effect popups ── */
 .die-eff-pop{
@@ -1078,13 +1100,13 @@ body.crit-dilate{animation:critDilate .55s ease-out both}
 #bustVignette.flash{animation:vigFade .7s ease-out forwards}
 @keyframes vigFade{0%{opacity:1}100%{opacity:0}}
 /* ─── DICE SCATTER ON BUST ─── */
-.die.scatter{transition:transform .45s cubic-bezier(.2,.8,.3,1),opacity .5s ease-out;opacity:.15}
-.die.scatter:nth-child(1){transform:translate(-8px,6px) rotate(-12deg)}
-.die.scatter:nth-child(2){transform:translate(5px,-7px) rotate(9deg)}
-.die.scatter:nth-child(3){transform:translate(-6px,-5px) rotate(-7deg)}
-.die.scatter:nth-child(4){transform:translate(9px,4px) rotate(14deg)}
-.die.scatter:nth-child(5){transform:translate(-4px,8px) rotate(-10deg)}
-.die.scatter:nth-child(6){transform:translate(7px,-6px) rotate(8deg)}
+.die.scatter{transition:transform .26s cubic-bezier(.16,.84,.3,1),opacity .2s ease-out;opacity:.32}
+.die.scatter:nth-child(1){transform:translate(-12px,8px) rotate(-14deg)}
+.die.scatter:nth-child(2){transform:translate(7px,-9px) rotate(11deg)}
+.die.scatter:nth-child(3){transform:translate(-8px,-6px) rotate(-9deg)}
+.die.scatter:nth-child(4){transform:translate(11px,5px) rotate(16deg)}
+.die.scatter:nth-child(5){transform:translate(-5px,10px) rotate(-12deg)}
+.die.scatter:nth-child(6){transform:translate(9px,-7px) rotate(10deg)}
 /* ─── NPC BUST (subtle red + small scatter) ─── */
 .die.opp-bust{animation:dOppBust .4s steps(3)}
 @keyframes dOppBust{0%,100%{transform:translate(0,0)}33%{transform:translate(-3px,2px)}66%{transform:translate(3px,-2px)}}
@@ -1774,6 +1796,9 @@ body:has(#mLoadout-ov.show) #dbgButtons{display:flex !important}
 .res-card .gcard{border-width:2px;border-radius:5px;filter:none}
 .res-card .res-card-inner .gcard{width:100px;height:150px;animation:cardRevealSpin 1s ease-out forwards}
 .end-draft-cards .draft-card-wrap .gcard{animation:cardRevealSpin .8s ease-out forwards}
+/* Locked draft cards (after a pick was placed + reshuffle was used) — show but can't be picked */
+.draft-card-wrap.draft-locked{filter:grayscale(.85) brightness(.55);opacity:.7;cursor:default}
+.draft-card-wrap.draft-locked .gcard{pointer-events:none}
 .end-draft-slots .gcard{animation:none!important}
 .res-card .gcard-art{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;image-rendering:pixelated;pointer-events:none}
 .res-card .gcard-frame{position:absolute;top:4px;left:4px;right:4px;bottom:4px;border-radius:2px;pointer-events:none;z-index:1;border:1px solid var(--ctrim2);opacity:.7}
@@ -2104,6 +2129,11 @@ body:has(#mLoadout-ov.show) #dbgButtons{display:flex !important}
   text-shadow:1px 1px 0 rgba(0,0,0,.6);
   cursor:pointer;
 }
+/* Expanded invisible hit-target so taps don't need to be precise on the small star/text */
+.lo-renown-corner::after{
+  content:'';position:absolute;inset:-18px -24px -18px -16px;
+  cursor:pointer;
+}
 .lo-renown-corner .renown-star{
   font-size:1em;line-height:1;display:inline-block;
 }
@@ -2159,7 +2189,9 @@ body:has(#mLoadout-ov.show) #dbgButtons{display:flex !important}
   position:absolute;inset:0;width:100%;height:100%;
   object-fit:cover;z-index:0;image-rendering:pixelated;pointer-events:none
 }
-.lo-mini-card .gcard-frame{position:absolute;top:4px;left:4px;right:4px;bottom:4px;border-radius:2px;pointer-events:none;z-index:1;border:1px solid var(--ctrim2);opacity:.7}
+/* Pull the inner frame all the way to the outer edge so there's no visible gap
+   between card body and the rim outline on thumbnails. Was 4px inset → looked empty. */
+.lo-mini-card .gcard-frame{position:absolute;inset:0;border-radius:5px;pointer-events:none;z-index:1;border:1px solid var(--ctrim2);opacity:.7}
 .lo-mini-card .gc{width:10px;height:10px}
 .lo-mini-card .gc.tl{top:4px;left:4px}
 .lo-mini-card .gc.tr{top:4px;right:4px}
@@ -2362,6 +2394,12 @@ body::before,body::after{display:none!important}
   display:flex;flex-direction:row;align-items:center;gap:6px;
   cursor:pointer;padding:0;
 }
+/* Expanded invisible hit-target so the player doesn't have to tap precisely on the
+   tiny star+bar. Extends ~16px in every direction beyond the visible pill. */
+.tier-renown-pill::after{
+  content:'';position:absolute;inset:-18px -24px -18px -16px;
+  cursor:pointer;
+}
 .tier-renown-pill .tier-renown-star{font-size:14px;line-height:1;
   filter:drop-shadow(0 1px 0 rgba(0,0,0,.6));
 }
@@ -2383,37 +2421,79 @@ body::before,body::after{display:none!important}
 }
 
 /* ── Perk unlock celebration overlay ── */
-.perk-unlock-ov{
-  position:fixed;left:50%;top:38%;transform:translate(-50%,-50%) scale(.4);
-  z-index:9700;pointer-events:none;opacity:0;
-  display:flex;flex-direction:column;align-items:center;gap:6px;
-  padding:24px 28px 22px;background:rgba(20,14,8,.92);
-  border:2px solid rgba(220,170,60,.6);border-radius:10px;
-  box-shadow:0 8px 30px rgba(0,0,0,.7),0 0 50px rgba(220,170,60,.4);
-  transition:opacity .35s ease, transform .45s cubic-bezier(.2,1.6,.4,1);
-  min-width:200px;text-align:center;
+/* Perk-unlock celebration: full-screen backdrop blocks clicks behind, modal box
+   centered, CONTINUE button BELOW the modal. */
+.puk-backdrop{
+  position:fixed;inset:0;z-index:9700;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;
+  background:rgba(8,4,0,.78);
+  opacity:0;transition:opacity .3s ease;
+  pointer-events:auto;/* CRITICAL: blocks all clicks behind the overlay */
 }
-.perk-unlock-ov.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
-.perk-unlock-ov.fade{opacity:0;transform:translate(-50%,-50%) scale(.85);transition:opacity .45s ease, transform .45s ease}
-.perk-unlock-ov .puk-star{font-size:54px;line-height:1;
-  filter:drop-shadow(0 0 18px rgba(255,220,120,.9));
+.puk-backdrop.show{opacity:1}
+.puk-backdrop.fade{opacity:0;transition:opacity .35s ease}
+.puk-modal{
+  position:relative;
+  display:flex;flex-direction:column;align-items:center;gap:10px;
+  padding:36px 36px 24px;background:transparent;
+  /* No CSS border — canvas paints the wobble bevel */
+  filter:drop-shadow(0 8px 18px rgba(0,0,0,.75));
+  min-width:260px;max-width:min(360px,86vw);text-align:center;
+  transform:scale(.4);opacity:0;
+  transition:transform .45s cubic-bezier(.2,1.6,.4,1),opacity .35s ease;
+}
+/* Canvas is the wobble pixel-panel painted via drawPixelPanel (same renderer as match-btn). */
+.puk-modal-canvas{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;pointer-events:none;z-index:0}
+.puk-modal-content{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:10px;width:100%}
+.puk-backdrop.show .puk-modal{transform:scale(1);opacity:1}
+.puk-backdrop.fade .puk-modal{transform:scale(.85);opacity:0;transition:transform .35s ease,opacity .35s ease}
+.puk-modal .puk-star{position:relative;z-index:1;font-size:88px;line-height:1;margin-top:0;
   animation:pukStarSpin 1.3s cubic-bezier(.2,.9,.4,1) both;
 }
-.perk-unlock-ov .puk-lock{position:absolute;top:24px;left:50%;transform:translateX(-50%);
-  font-size:30px;opacity:.9;transition:transform .4s ease, opacity .4s ease;
+/* Lock icon is no longer needed — PERK UNLOCKED text serves as the reveal */
+.puk-modal .puk-lock{display:none;}
+.puk-modal .puk-label{
+  /* PERK UNLOCKED sits over the centre of the star — white pixel text with thick dark outline */
+  position:absolute;top:54px;left:50%;transform:translateX(-50%);
+  z-index:4;pointer-events:none;white-space:nowrap;
+  font-family:var(--font-px);font-size:13px;letter-spacing:2.5px;
+  color:#ffffff;
+  text-shadow:0 2px 0 rgba(0,0,0,.95),0 -1px 0 rgba(0,0,0,.95),
+    1px 1px 0 rgba(0,0,0,.95),-1px 1px 0 rgba(0,0,0,.95),
+    1px -1px 0 rgba(0,0,0,.95),-1px -1px 0 rgba(0,0,0,.95),
+    2px 0 0 rgba(0,0,0,.95),-2px 0 0 rgba(0,0,0,.95);
 }
-.perk-unlock-ov.shatter .puk-lock{transform:translate(-50%,30px) rotate(40deg);opacity:0;
-  filter:drop-shadow(0 0 8px rgba(220,80,80,.6));
+.puk-modal .puk-name{
+  /* Match the perks-panel label font (Alagard pixel) — not all-caps */
+  font-family:var(--font-px);font-size:24px;color:var(--gold);
+  letter-spacing:1.5px;margin-top:8px;
+  text-shadow:0 2px 0 rgba(0,0,0,.6);
 }
-.perk-unlock-ov .puk-label{font-family:var(--font-px);font-size:9px;letter-spacing:3px;
-  color:rgba(220,170,60,.8);margin-top:6px;
+.puk-modal .puk-desc{
+  font-family:'IM Fell English',serif;font-size:16px;color:rgba(230,210,170,.95);
+  line-height:1.35;margin-top:8px;max-width:280px;
+  text-wrap:balance;/* avoid orphan words */
 }
-.perk-unlock-ov .puk-name{font-family:'Jacquard 24',serif;font-size:22px;color:var(--gold);
-  letter-spacing:1.5px;margin-top:2px;text-shadow:0 2px 0 rgba(0,0,0,.6);
+/* CONTINUE button — canvas-painted wobble pixel panel, same renderer as match-btn */
+.puk-backdrop .puk-continue{
+  position:relative;
+  background:transparent;border:none;cursor:pointer;
+  padding:0;width:170px;height:50px;
+  filter:drop-shadow(0 4px 8px rgba(0,0,0,.6));
+  pointer-events:auto;
+  transform:scale(.85);opacity:0;
+  transition:transform .35s cubic-bezier(.2,1.6,.4,1) .15s,opacity .25s ease .15s,filter .12s;
 }
-.perk-unlock-ov .puk-desc{font-family:'IM Fell English',serif;font-size:13px;color:rgba(220,200,160,.85);
-  line-height:1.3;margin-top:4px;max-width:240px;
+.puk-btn-canvas{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;pointer-events:none}
+.puk-btn-inner{
+  position:relative;z-index:2;
+  font-family:var(--font-px);font-size:14px;letter-spacing:2.5px;
+  color:#ffd890;text-shadow:0 1px 0 rgba(0,0,0,.85);
+  pointer-events:none;
+  display:flex;align-items:center;justify-content:center;height:100%;
 }
+.puk-backdrop.show .puk-continue{transform:scale(1);opacity:1}
+.puk-backdrop .puk-continue:active{transform:scale(.96);filter:brightness(1.25) drop-shadow(0 4px 8px rgba(0,0,0,.6))}
 @keyframes pukStarSpin{
   0%  {transform:scale(.3) rotate(-180deg);filter:drop-shadow(0 0 4px rgba(255,220,120,.4))}
   60% {transform:scale(1.2) rotate(20deg);filter:drop-shadow(0 0 24px rgba(255,220,120,.95))}
@@ -2552,13 +2632,37 @@ body::before,body::after{display:none!important}
 /* Locked regular slot — dimmed dashed border + padlock glyph */
 .tier-lo-card.empty.locked{border-color:rgba(120,100,90,.25);background:rgba(28,22,16,.5);position:relative}
 .tier-lo-card.empty.locked::after{content:'\1F512';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:rgba(150,130,90,.45);font-size:14px}
+/* Slot-unlock celebration: gold burst + scale pulse, lasts ~2s */
+.tier-lo-card.slot-unlock-pop{
+  animation:slotUnlockPop 2.4s cubic-bezier(.2,.8,.3,1);
+  z-index:10;position:relative;
+}
+.tier-lo-card.slot-unlock-pop::before{
+  content:'';position:absolute;inset:-12px;border-radius:8px;pointer-events:none;
+  border:2px solid rgba(255,220,120,.85);
+  box-shadow:0 0 24px rgba(255,200,80,.7),inset 0 0 16px rgba(255,220,120,.45);
+  animation:slotUnlockHalo 2.4s ease-out forwards;
+}
+@keyframes slotUnlockPop{
+  0%{transform:scale(1);filter:brightness(1)}
+  15%{transform:scale(1.32);filter:brightness(1.6) drop-shadow(0 0 16px rgba(255,220,120,.9))}
+  35%{transform:scale(1.08);filter:brightness(1.2)}
+  60%{transform:scale(1.18);filter:brightness(1.4)}
+  100%{transform:scale(1);filter:brightness(1)}
+}
+@keyframes slotUnlockHalo{
+  0%{opacity:0;transform:scale(.8)}
+  20%{opacity:1;transform:scale(1.05)}
+  60%{opacity:.7;transform:scale(1.15)}
+  100%{opacity:0;transform:scale(1.5)}
+}
 .draft-slot.locked{border-color:rgba(120,100,90,.3);background:rgba(28,22,16,.4);color:rgba(150,130,90,.45)}
 .end-draft-slots .draft-slot.locked{border-color:rgba(120,100,90,.35);background:rgba(28,22,16,.4)}
 .end-draft-slots .draft-slot.locked::after{content:'\1F512';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:rgba(150,130,90,.5);font-size:18px;pointer-events:none}
-.tier-lo-card .gcard{position:absolute;inset:0;width:100%;height:100%;border-radius:4px;border-width:2px;
-  /* Thumbnail: no inset face-band — avoids the visible 1px gap between
-     card body and outline. */
-  box-shadow:inset 0 0 0 1px var(--ctrim2),0 2px 6px rgba(0,0,0,.6)}
+.tier-lo-card .gcard{position:absolute;inset:0;width:100%;height:100%;border-radius:4px;
+  /* Thumbnail: drop the gcard's own border + inset rim. The parent .tier-lo-card
+     already frames it — extra outlines just look noisy at this size. */
+  border:none;box-shadow:0 2px 6px rgba(0,0,0,.6)}
 .tier-lo-card .gcard-cover{font-size:16px}
 .tier-lo-card .gcard-frame{display:none}
 .tier-lo-card .gc{display:none}
@@ -2659,6 +2763,16 @@ body::before,body::after{display:none!important}
 .end-draft-slots .draft-slot.boss{
   border-color:rgba(220,170,60,.65);
   background:rgba(80,64,30,.35);
+}
+/* Boss-slot hint label — only shown while empty so the player knows which slot
+   accepts the boss reward card. Subtle muted gold, hidden once a card is placed. */
+.end-draft-slots .draft-slot.boss:not(.filled)::before{
+  content:'BOSS\A CARD';
+  position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-family:var(--font-px);font-size:11px;letter-spacing:1.5px;line-height:1.5;
+  color:rgba(220,170,60,.5);text-align:center;white-space:pre;
+  pointer-events:none;
+  text-shadow:0 1px 0 rgba(0,0,0,.55);
 }
 .end-draft-slots .draft-slot.filled{border-style:solid;border-color:rgba(200,160,80,.4);touch-action:none}
 .end-draft-slots .draft-slot.drop-hover{border-color:rgba(200,160,80,.7);box-shadow:0 0 12px rgba(200,160,80,.3);background:rgba(80,64,30,.5)}
@@ -3433,12 +3547,259 @@ body::before,body::after{display:none!important}
 .dice-store-item.too-expensive .ds-price{color:var(--red)!important;text-shadow:0 0 6px rgba(160,80,80,.4)}
 .dice-store-item.too-expensive .ds-mat{color:rgba(200,160,120,.35)}
 .dice-store-item .ds-mat{font-family:var(--font-px);font-size:8px;color:var(--textdim);letter-spacing:.5px;text-transform:uppercase}
+/* ── Per-material name colors — names match the dice's dominant tone ── */
+.dice-store-item[data-mat="iron"]      .ds-mat{color:#b8c0d0;text-shadow:0 0 4px rgba(180,200,220,.3)}
+.dice-store-item[data-mat="flint"]     .ds-mat{color:#9e9e9e;text-shadow:0 0 4px rgba(160,160,160,.3)}
+.dice-store-item[data-mat="lead"]      .ds-mat{color:#a0a8c0;text-shadow:0 0 4px rgba(160,168,200,.3)}
+.dice-store-item[data-mat="amber"]     .ds-mat{color:#ffd870;text-shadow:0 0 6px rgba(255,200,80,.45)}
+.dice-store-item[data-mat="jade"]      .ds-mat{color:#80e8a8;text-shadow:0 0 6px rgba(120,220,140,.45)}
+.dice-store-item[data-mat="brass"]     .ds-mat{color:#e8b860;text-shadow:0 0 6px rgba(220,170,80,.5)}
+.dice-store-item[data-mat="silver"]    .ds-mat{color:#e0e8f0;text-shadow:0 0 8px rgba(220,230,240,.55)}
+.dice-store-item[data-mat="crystal"]   .ds-mat{color:#a8e8ff;text-shadow:0 0 10px rgba(160,220,255,.65)}
+.dice-store-item[data-mat="ruby"]      .ds-mat{color:#ff7888;text-shadow:0 0 10px rgba(255,100,120,.65)}
+.dice-store-item[data-mat="obsidian"]  .ds-mat{color:#c8a0e8;text-shadow:0 0 10px rgba(180,120,220,.6)}
+.dice-store-item[data-mat="starstone"] .ds-mat{color:#ffe8a0;text-shadow:0 0 12px rgba(255,220,140,.75)}
+.dice-store-item[data-mat="vagabond"]  .ds-mat{color:#e89860;text-shadow:0 0 8px rgba(220,140,80,.6)}
+
+/* ── Premium-dice visual flair ──
+   Each tier picks up an extra effect on the die wrapper so they FEEL exciting to own:
+   amber/jade  → soft inner glow pulse
+   brass       → diagonal sheen sweep
+   silver      → bright shimmer band
+   crystal     → floating sparkle particles
+   ruby        → red core pulse + outer halo
+   obsidian    → dark purple smoke wisp
+   starstone   → twinkling stars around */
+.dice-store-item .ds-die-wrap{position:relative;overflow:visible}
+/* Soft glow halo behind premium dice */
+.dice-store-item[data-mat="amber"]    .ds-die-wrap::before,
+.dice-store-item[data-mat="jade"]     .ds-die-wrap::before,
+.dice-store-item[data-mat="brass"]    .ds-die-wrap::before,
+.dice-store-item[data-mat="silver"]   .ds-die-wrap::before,
+.dice-store-item[data-mat="vagabond"] .ds-die-wrap::before,
+.dice-store-item[data-mat="crystal"]  .ds-die-wrap::before,
+.dice-store-item[data-mat="ruby"]     .ds-die-wrap::before,
+.dice-store-item[data-mat="obsidian"] .ds-die-wrap::before,
+.dice-store-item[data-mat="starstone"].ds-die-wrap::before{
+  content:'';position:absolute;inset:-8px;border-radius:50%;pointer-events:none;z-index:-1;
+  animation:dsHaloPulse 2.4s ease-in-out infinite;
+}
+.dice-store-item[data-mat="amber"]    .ds-die-wrap::before{background:radial-gradient(circle,rgba(255,200,80,.35) 0%,transparent 65%)}
+.dice-store-item[data-mat="jade"]     .ds-die-wrap::before{background:radial-gradient(circle,rgba(120,220,140,.35) 0%,transparent 65%)}
+.dice-store-item[data-mat="brass"]    .ds-die-wrap::before{background:radial-gradient(circle,rgba(220,170,80,.45) 0%,transparent 65%)}
+.dice-store-item[data-mat="silver"]   .ds-die-wrap::before{background:radial-gradient(circle,rgba(220,230,240,.5) 0%,transparent 65%)}
+.dice-store-item[data-mat="vagabond"] .ds-die-wrap::before{background:radial-gradient(circle,rgba(220,140,80,.45) 0%,transparent 65%);animation-duration:2.2s}
+.dice-store-item[data-mat="crystal"]  .ds-die-wrap::before{background:radial-gradient(circle,rgba(160,220,255,.6) 0%,transparent 65%);animation-duration:1.8s}
+.dice-store-item[data-mat="ruby"]     .ds-die-wrap::before{background:radial-gradient(circle,rgba(255,80,100,.6) 0%,transparent 65%);animation-duration:1.6s}
+.dice-store-item[data-mat="obsidian"] .ds-die-wrap::before{background:radial-gradient(circle,rgba(180,80,220,.55) 0%,transparent 65%);animation-duration:2.8s}
+.dice-store-item[data-mat="starstone"].ds-die-wrap::before{background:radial-gradient(circle,rgba(255,220,140,.7) 0%,transparent 65%);animation-duration:1.4s}
+@keyframes dsHaloPulse{0%,100%{opacity:.55;transform:scale(1)}50%{opacity:1;transform:scale(1.12)}}
+
+/* ── Brass: soft, slow sheen sweep ── */
+.dice-store-item[data-mat="brass"] .ds-die-wrap::after{
+  content:'';position:absolute;inset:0;border-radius:5px;pointer-events:none;z-index:2;
+  background:linear-gradient(105deg,transparent 35%,rgba(255,235,180,.35) 49%,rgba(255,245,200,.5) 50%,rgba(255,235,180,.35) 51%,transparent 65%);
+  background-size:280% 100%;background-position:200% 0;
+  animation:dsBrassSheen 4s linear infinite;
+  mix-blend-mode:overlay;
+}
+@keyframes dsBrassSheen{0%{background-position:200% 0}100%{background-position:-100% 0}}
+
+/* ── Silver: clean continuous sheen — softer opacity + silver-tinted (cool blue-white)
+   so the glow matches the dice's own tone instead of being pure white. ── */
+.dice-store-item[data-mat="silver"] .ds-die-wrap::after{
+  content:'';position:absolute;inset:0;border-radius:5px;pointer-events:none;z-index:2;
+  background:linear-gradient(110deg,transparent 42%,rgba(220,235,250,.4) 49%,rgba(230,242,255,.55) 50%,rgba(220,235,250,.4) 51%,transparent 58%);
+  background-size:240% 100%;background-position:200% 0;
+  animation:dsSilverSheen 2.6s linear infinite;
+  mix-blend-mode:screen;opacity:0;
+}
+@keyframes dsSilverSheen{
+  0%  {background-position:200% 0;opacity:0}
+  10% {opacity:.75}
+  55% {opacity:.75}
+  65% {background-position:-30% 0;opacity:0}
+  100%{background-position:-30% 0;opacity:0}
+}
+
+/* ── Vagabond: gentle 2-axis float — bobs vertically with a slight horizontal sway ── */
+.dice-store-item[data-mat="vagabond"] .ds-die-wrap .die{
+  animation:dsVagabondFloat 3.2s ease-in-out infinite;
+}
+@keyframes dsVagabondFloat{
+  0%,100%{transform:translate(0,0) rotate(0deg)}
+  25% {transform:translate(-2.5px,-3px) rotate(-1.5deg)}
+  50% {transform:translate( 0,    -5px) rotate(0deg)}
+  75% {transform:translate( 2.5px,-2px) rotate( 1.5deg)}
+}
+
+/* ── Jade: subtle vertical mist sweep — like green energy rising through the die ── */
+.dice-store-item[data-mat="jade"] .ds-die-wrap::after{
+  content:'';position:absolute;inset:0;border-radius:5px;pointer-events:none;z-index:2;
+  background:linear-gradient(180deg,transparent 0%,rgba(120,220,140,.18) 40%,rgba(80,200,120,.28) 55%,rgba(120,220,140,.18) 70%,transparent 100%);
+  background-size:100% 220%;background-position:0 0%;
+  animation:dsJadeMist 3.4s ease-in-out infinite;
+  mix-blend-mode:overlay;
+}
+@keyframes dsJadeMist{
+  0%{background-position:0 -50%}
+  100%{background-position:0 150%}
+}
+
+/* ── Ruby: tone the outer glow way down + add subtle internal glow via inset shadow ── */
+.dice-store-item[data-mat="ruby"] .ds-die-wrap .die{
+  animation:dsRubyPulse 2.4s ease-in-out infinite;
+}
+@keyframes dsRubyPulse{
+  0%,100%{
+    box-shadow:
+      inset 0 0 6px rgba(255,80,100,.35),
+      0 0 6px rgba(255,80,100,.2),
+      3px 4px 0 rgba(30,18,8,.45),4px 5px 0 rgba(30,18,8,.2);
+  }
+  50%{
+    box-shadow:
+      inset 0 0 12px rgba(255,100,120,.7),
+      0 0 8px rgba(255,80,100,.3),
+      3px 4px 0 rgba(30,18,8,.45),4px 5px 0 rgba(30,18,8,.2);
+  }
+}
+/* Remove the internal dither on ruby for a cleaner gem look */
+.dice-store-item[data-mat="ruby"] .ds-die-wrap .die::after{display:none!important}
+/* Also tone the outer halo */
+.dice-store-item[data-mat="ruby"] .ds-die-wrap::before{background:radial-gradient(circle,rgba(255,80,100,.32) 0%,transparent 65%)!important;animation-duration:2.4s}
+
+/* ── Obsidian: keep current dark purple smoke (user said it's great) ── */
+.dice-store-item[data-mat="obsidian"] .ds-die-wrap::after{
+  content:'';position:absolute;inset:-4px;pointer-events:none;z-index:1;
+  background:radial-gradient(ellipse at 50% 80%,rgba(120,40,180,.5) 0%,rgba(80,20,120,.25) 30%,transparent 65%);
+  filter:blur(3px);
+  animation:dsObsidianSmoke 3.4s ease-in-out infinite;
+}
+@keyframes dsObsidianSmoke{
+  0%,100%{opacity:.55;transform:translateY(2px) scale(1)}
+  50%{opacity:.85;transform:translateY(-4px) scale(1.08)}
+}
+
+/* ── Crystal: brilliant-cut gem facets — pale blue-white wedges meeting at
+   center, subtler opacity than before. No pure white. ── */
+.dice-store-item[data-mat="crystal"] .ds-die-wrap .die::after{display:none!important}
+.dice-store-item[data-mat="crystal"] .ds-die-wrap::after{
+  content:'';position:absolute;inset:0;border-radius:5px;pointer-events:none;z-index:2;
+  background:
+    /* 8-facet brilliant cut — softer pale-blue wedges */
+    conic-gradient(from 22deg at 50% 50%,
+      transparent              0deg,
+      rgba(180,220,250,.18)   22deg,
+      transparent             45deg,
+      rgba(180,220,250,.10)   67deg,
+      transparent             90deg,
+      rgba(180,220,250,.20)  112deg,
+      transparent            135deg,
+      rgba(180,220,250,.12)  157deg,
+      transparent            180deg,
+      rgba(180,220,250,.18)  202deg,
+      transparent            225deg,
+      rgba(180,220,250,.09)  247deg,
+      transparent            270deg,
+      rgba(180,220,250,.22)  292deg,
+      transparent            315deg,
+      rgba(180,220,250,.13)  337deg,
+      transparent           360deg),
+    /* central brilliance dot — pale blue, not white */
+    radial-gradient(circle at 50% 50%,rgba(200,235,255,.3) 0%,rgba(180,220,250,.1) 12%,transparent 30%);
+  mix-blend-mode:screen;
+  animation:dsCrystalFacet 4s ease-in-out infinite;
+}
+@keyframes dsCrystalFacet{
+  0%,100%{opacity:.7}
+  50%    {opacity:.9}
+}
+
+/* ── Starstone: many faint 1px stars scattered across the die face,
+   subtle breathing scale animation centered from the die's middle. ── */
+.dice-store-item[data-mat="starstone"] .ds-die-wrap .die::after{display:none!important}
+.dice-store-item[data-mat="starstone"] .ds-die-wrap::after{
+  content:'';position:absolute;left:50%;top:50%;
+  width:1px;height:1px;background:transparent;
+  pointer-events:none;z-index:2;
+  --sc:rgba(255,235,170,.45);
+  /* 12 single-pixel "stars" at varied offsets from center — organic scatter */
+  box-shadow:
+    -16px -15px 0 0 var(--sc),
+    -12px  -5px 0 0 var(--sc),
+     -7px -17px 0 0 var(--sc),
+     -2px  -8px 0 0 var(--sc),
+      6px -14px 0 0 var(--sc),
+     13px  -7px 0 0 var(--sc),
+    -14px   3px 0 0 var(--sc),
+     -5px   9px 0 0 var(--sc),
+      4px   5px 0 0 var(--sc),
+     11px  12px 0 0 var(--sc),
+    -10px  15px 0 0 var(--sc),
+     15px   2px 0 0 var(--sc);
+  transform:translate(-50%,-50%) scale(1);
+  transform-origin:center;
+  animation:dsStarBreathe 3.4s ease-in-out infinite;
+}
+@keyframes dsStarBreathe{
+  0%,100%{opacity:.45;transform:translate(-50%,-50%) scale(1)}
+  50%    {opacity:.8; transform:translate(-50%,-50%) scale(1.08)}
+}
+
+/* ── Amber: static vertical stone-like veins (no animation), thicker low-opacity
+   inclusions oriented primarily vertical — feels like looking into fossilized amber. ── */
+.dice-store-item[data-mat="amber"] .ds-die-wrap .die::after{display:none!important}
+/* No halo pulse on amber either — fully static look */
+.dice-store-item[data-mat="amber"] .ds-die-wrap::before{animation:none!important;opacity:.7}
+.dice-store-item[data-mat="amber"] .ds-die-wrap::after{
+  content:'';position:absolute;inset:0;border-radius:5px;pointer-events:none;z-index:2;
+  /* Veins 2× wider and 40% more transparent (.28 → .17, .32 → .19, etc.) for a softer stone look. */
+  background:
+    /* main vein — full-height, thicker (3px → 6px) */
+    linear-gradient(180deg,transparent 4%,rgba(100,60,20,.17) 30%,rgba(100,60,20,.19) 50%,rgba(100,60,20,.16) 70%,transparent 96%) no-repeat 32% 0/6px 100%,
+    /* second vein (2px → 4px) */
+    linear-gradient(180deg,transparent 6%,rgba(120,75,25,.13) 32%,rgba(120,75,25,.16) 55%,rgba(120,75,25,.12) 75%,transparent 95%) no-repeat 62% 0/4px 100%,
+    /* shorter side vein (2px → 4px) */
+    linear-gradient(180deg,transparent 18%,rgba(140,90,30,.11) 40%,rgba(140,90,30,.10) 65%,transparent 88%) no-repeat 80% 0/4px 100%,
+    /* tiny left-side fleck (1.5px → 3px) */
+    linear-gradient(180deg,transparent 25%,rgba(100,60,20,.12) 45%,rgba(100,60,20,.10) 60%,transparent 80%) no-repeat 18% 0/3px 100%,
+    /* subtle warm inner highlight (static) */
+    radial-gradient(ellipse at 28% 22%,rgba(255,220,140,.16) 0%,transparent 55%);
+  mix-blend-mode:multiply;
+}
+
+/* Disable the flair animations on too-expensive items so the "muted" state reads clearly */
+.dice-store-item.too-expensive .ds-die-wrap::before,
+.dice-store-item.too-expensive .ds-die-wrap::after,
+.dice-store-item.too-expensive .die{animation:none!important}
+.dice-store-item.too-expensive .ds-die-wrap::before,
+.dice-store-item.too-expensive .ds-die-wrap::after{opacity:.15!important}
 .dice-store-item .ds-price{font-family:var(--font-px);font-size:9px;color:var(--gold);letter-spacing:.5px}
 .dice-store-item .ds-stock{font-family:var(--font-px);font-size:7px;color:rgba(255,255,255,.35);letter-spacing:.5px}
 .ds-loadout{display:grid;grid-template-columns:repeat(6,44px);gap:6px;width:fit-content;margin:0 auto}
 .ds-slot{position:relative;cursor:pointer;display:flex;justify-content:center;align-items:center;padding:0;border:1px solid transparent;border-radius:4px;transition:border-color .15s,background .15s}
 .ds-slot .die.sm{width:44px!important;height:44px!important;border-radius:4px!important;border-width:2px!important;box-shadow:2px 2px 0 rgba(0,0,0,.45)!important}
-.ds-slot.drop-hover{border-color:var(--gold);background:rgba(255,215,0,.1)}
+/* Drop-hover on your-dice slot: NO yellow outline — the die being hovered over just scales up slightly. */
+.ds-slot.drop-hover{border-color:transparent;background:transparent}
+.ds-slot.drop-hover .die{transform:scale(1.12);transition:transform .15s cubic-bezier(.2,.8,.3,1)}
+.ds-slot .die{transition:transform .15s cubic-bezier(.2,.8,.3,1)}
+
+/* Floating "−Ng" pop that rises + fades from the gold counter on purchase */
+.gold-spend-pop{
+  position:fixed;z-index:10000;pointer-events:none;
+  transform:translate(-50%,-50%);
+  font-family:var(--font-px);font-size:16px;letter-spacing:1px;
+  color:#ff8070;
+  text-shadow:0 1px 0 rgba(0,0,0,.85),0 0 8px rgba(220,80,60,.75),0 0 12px rgba(200,60,40,.4);
+  animation:goldSpendFloat .9s cubic-bezier(.2,.8,.3,1) forwards;
+}
+@keyframes goldSpendFloat{
+  0%  {opacity:0;transform:translate(-50%,-30%) scale(.7)}
+  15% {opacity:1;transform:translate(-50%,-50%) scale(1.08)}
+  30% {opacity:1;transform:translate(-50%,-65%) scale(1)}
+  100%{opacity:0;transform:translate(-50%,-140%) scale(.95)}
+}
 /* ── Dice 3D Zoom Overlay ── */
 .dice-zoom-overlay{
   position:fixed;inset:0;z-index:9700;
@@ -4770,15 +5131,23 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
 .handicap-splash{
   position:fixed;inset:0;z-index:10000;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
-  opacity:0;transition:opacity .3s;
+  /* Show INSTANTLY so player never sees the board flash through during the boss reveal.
+     The icon + text inside still get their entrance animations via .hs-icon/.hs-name. */
+  opacity:1;transition:opacity .5s;
   pointer-events:none;
 }
-.handicap-splash .hs-bg{position:absolute;inset:0;background:rgba(6,4,2,.95);transition:opacity .5s}
+.handicap-splash .hs-bg{position:absolute;inset:0;background:#000;transition:opacity .5s}
+/* Hide ALL match-screen content while a splash is showing — EXCEPT the Tell badge,
+   which is positioned to be visible through the splash so it visually persists. */
+#screen-match.has-splash > *:not(.handicap-splash):not(#tellBadge){visibility:hidden}
 .handicap-splash.hs-in{opacity:1}
 .handicap-splash.hs-bg-out .hs-bg{opacity:0}
 .handicap-splash.hs-out{opacity:0;transition:opacity .5s}
 .bs-portrait{width:160px;height:160px;object-fit:contain;image-rendering:pixelated;filter:drop-shadow(0 0 30px var(--hs-color,#e06050));animation:hsSpin .8s ease-out}
 .bs-subtitle{font-family:var(--font-px);font-size:14px;letter-spacing:6px;color:rgba(200,180,140,.6);margin-top:4px;animation:hsSlide .5s .3s both cubic-bezier(.2,.8,.3,1)}
+/* Boss splash content (image + name + BOSS FIGHT) anchored to top half so the
+   persistent #tellBadge at viewport-50% sits visually below the boss without overlap. */
+.boss-splash{justify-content:flex-start;padding-top:10vh}
 .hs-icon{font-size:80px;filter:drop-shadow(0 0 20px var(--hs-color,#e8a030));animation:hsSpin .8s ease-out}
 .hs-name{
   font-family:var(--font-px);font-size:36px;letter-spacing:4px;
@@ -4801,22 +5170,34 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
 @keyframes lcDrop{0%{transform:scale(1.4);color:#ff3030}50%{transform:scale(0.9)}100%{transform:scale(1)}}
 @keyframes lcPulse{0%,100%{opacity:1}50%{opacity:.5}}
 
-/* ── Sudden Death: round counter ── */
-.sd-counter-wrap{display:flex;flex-direction:column;align-items:center;gap:1px;margin:0 auto}
-.sd-subtitle{font-family:var(--font-px);font-size:8px;color:rgba(200,180,140,.4);letter-spacing:1.5px;white-space:nowrap}
-/* Toned-down sudden-death counter — no box, muted tone progression */
-.sd-round-counter{
-  display:flex;align-items:baseline;justify-content:center;gap:4px;
+/* ── Sudden Death: round counter — same family as the Rising Stakes badge,
+   centered above the dice via #aboveDiceInfo. Per-round colour comes from --sd-color. */
+.sd-counter-wrap{
   font-family:var(--font-px);
-  background:transparent;border:none;border-radius:0;
-  padding:2px 6px;
+  text-align:center;padding:4px 0;
+  display:flex;flex-direction:column;align-items:center;gap:14px;margin:0 auto;
+  color:var(--sd-color,rgba(200,160,80,.55));
+  letter-spacing:1.5px;
+  transition:color .3s,text-shadow .3s;
 }
-.sd-label{font-size:10px;color:var(--sd-color,#a09060);letter-spacing:2px;margin-right:2px;opacity:.65}
-.sd-num{font-size:20px;color:var(--sd-color,#a09060)}
-.sd-of{font-size:11px;color:var(--sd-color,#a09060);opacity:.5}
-/* No final-round overlay text per design feedback */
-.sd-round-counter.sd-final{}
-.sd-counter-wrap.sd-final-wrap .sd-subtitle{display:none}
+.sd-round-counter{
+  display:flex;align-items:baseline;justify-content:center;gap:5px;
+}
+.sd-label{font-size:14px;color:var(--sd-color,rgba(200,160,80,.7));letter-spacing:2px;vertical-align:baseline}
+.sd-num{
+  font-size:22px;line-height:1;color:var(--sd-color,#dca84a);
+  display:inline-block;vertical-align:baseline;
+  text-shadow:0 0 10px var(--sd-glow,rgba(220,170,60,.4));
+  transition:all .3s;
+}
+.sd-of{font-size:14px;color:var(--sd-color,rgba(200,160,80,.6));opacity:.6;vertical-align:baseline}
+.sd-subtitle{
+  font-size:11px;letter-spacing:1.2px;
+  color:var(--sd-color,rgba(200,160,80,.4));
+  white-space:nowrap;opacity:.65;
+}
+/* Final-round colour escalation — drives both num + label + glow */
+.sd-round-counter.sd-final .sd-num{font-size:30px;text-shadow:0 0 15px var(--sd-glow,rgba(255,96,32,.6)),0 0 30px var(--sd-glow,rgba(255,60,20,.3));animation:rsFire .4s infinite alternate}
 
 /* ── Rising Stakes: multiplier badge ── */
 .rs-mult-badge{
@@ -4850,19 +5231,39 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
 
 /* ── Tells: per-patron passive-rule badge (medieval, sits beside player dice) ── */
 .tell-badge{
+  /* Pinned absolutely at ~50% viewport so it persists in the SAME spot through the
+     boss splash AND the live board — feels like one element, not two. Z-index above
+     the splash bg (which is z:10000) so the icon+name stay visible during reveal. */
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  z-index:10050;pointer-events:none;
   font-family:var(--font-px);
-  color:rgba(200,160,80,.7);letter-spacing:1.2px;
-  text-align:center;padding:5px 4px 4px;
-  display:flex;align-items:baseline;justify-content:center;gap:6px;
+  color:rgba(200,160,80,.85);letter-spacing:1.4px;
+  text-align:center;padding:6px 0;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  width:100vw;max-width:100vw;
   transition:color .3s,text-shadow .3s;
-  font-size:11px;
+  font-size:12px;
 }
-.tell-badge .tb-icon{font-size:14px;vertical-align:baseline}
-.tell-badge .tb-name{font-size:13px;color:rgba(220,180,90,.95);text-shadow:0 0 6px rgba(220,180,90,.25)}
-.tell-badge .tb-desc{font-size:10px;color:rgba(200,160,80,.55);letter-spacing:1px}
+.tell-badge .tb-icon{font-size:46px;line-height:1;margin-bottom:0}
+.tell-badge .tb-name{font-size:23px;color:rgba(230,190,100,1);text-shadow:0 0 10px rgba(220,180,90,.4),0 2px 0 rgba(0,0,0,.7);line-height:1}
+/* Stepped per-letter wave — each letter bobs on a 2-frame step-stagger so the
+   motion reads as hand-painted/drunken rather than smooth. */
+.tell-badge .tb-letter{
+  display:inline-block;
+  animation:tellLetterWave 1.6s steps(2) infinite;
+  animation-delay:calc(var(--li, 0) * -0.15s);
+  will-change:transform;
+}
+.tell-badge .tb-letter-space{animation:none}
+@keyframes tellLetterWave{
+  0%,100%{transform:translateY(0)}
+  50%{transform:translateY(-2px)}
+}
+.tell-badge .tb-desc{font-size:13px;color:rgba(220,200,160,.95);line-height:1.2;font-family:'IM Fell English',serif;letter-spacing:.3px;max-width:96vw;width:96vw;text-wrap:balance;font-style:italic;padding:0 4px}
 .tell-badge .tb-val{
-  font-size:14px;line-height:1;display:inline-block;vertical-align:baseline;
-  color:rgba(220,200,140,.95);transition:color .3s,text-shadow .3s;
+  font-size:17px;line-height:1;display:inline-block;vertical-align:baseline;
+  color:rgba(230,210,150,1);transition:color .3s,text-shadow .3s;
+  text-shadow:0 0 8px rgba(220,200,140,.4);
 }
 .tell-badge .tb-val.tb-pop{animation:rsPop .4s cubic-bezier(.2,.8,.3,1)}
 .tell-badge .tb-val.tb-warn{color:#e0a050;text-shadow:0 0 8px rgba(224,160,80,.45)}
@@ -4870,9 +5271,16 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
 /* Per-Tell color tint */
 .tell-badge.tell-last_call{color:rgba(255,200,140,.7)}
 .tell-badge.tell-last_call .tb-name{color:#ffd090;text-shadow:0 0 8px rgba(255,200,120,.35)}
-.tell-badge.tell-steeped{color:rgba(150,200,160,.7)}
-.tell-badge.tell-steeped .tb-name{color:#90c890;text-shadow:0 0 8px rgba(140,200,150,.35)}
-.tell-badge.tell-steeped .tb-val{color:#a8d8a8;text-shadow:0 0 8px rgba(140,200,150,.45)}
+.tell-badge.tell-steeped{color:rgba(150,200,160,.85)}
+.tell-badge.tell-steeped .tb-name{color:#a0d8a0;text-shadow:0 0 10px rgba(140,200,150,.55)}
+.tell-badge.tell-steeped .tb-val{
+  color:#c0f0c0;font-size:22px;font-weight:bold;
+  text-shadow:0 0 10px rgba(140,220,150,.7),0 0 20px rgba(80,200,120,.4);
+  padding:0 4px;
+}
+/* Brighten Steeped value as bonus grows */
+.tell-badge.tell-steeped .tb-val[data-tier="2"]{color:#d8f8c8;text-shadow:0 0 14px rgba(180,250,160,.85),0 0 24px rgba(80,220,120,.5)}
+.tell-badge.tell-steeped .tb-val[data-tier="3"]{color:#fff8a8;text-shadow:0 0 16px rgba(255,240,160,.95),0 0 26px rgba(255,200,80,.6);animation:rsFire .5s infinite alternate}
 .tell-badge.tell-cutpurse{color:rgba(180,210,140,.7)}
 .tell-badge.tell-cutpurse .tb-name{color:#b8e088;text-shadow:0 0 8px rgba(180,210,140,.35)}
 .tell-badge.tell-in_arrears{color:rgba(200,160,210,.7)}
@@ -5292,8 +5700,8 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
     <div class="shop-hint-bar"><span class="shop-hint">Drag a die to your loadout to buy it</span></div>
   </div>
   <div class="bottom-nav">
-    <div class="nav-btn" onclick="SFX.nav();setTimeout(()=>showScreen('gauntlet'),80)"><img class="nav-icon" src="Menu_Art/Gauntlet2.png" alt="Back"><span class="nav-label">BACK</span></div>
     <div class="nav-btn" onclick="SFX.nav();setTimeout(()=>showScreen('menu'),80)"><img class="nav-icon" src="Menu_Art/beer.png" alt="Menu"><span class="nav-label">MENU</span></div>
+    <div class="nav-btn" onclick="SFX.nav();setTimeout(()=>showScreen('gauntlet'),80)"><img class="nav-icon" src="Menu_Art/Gauntlet2.png" alt="Back"><span class="nav-label">BACK</span></div>
   </div>
 </div>
 
@@ -5715,7 +6123,10 @@ function _getS(){
     if(!S.run.diceStock)S.run.diceStock=null;
     if(!S.run.cardTarnish)S.run.cardTarnish={};
     /* Drop any equipped cards that no longer exist in the catalog (e.g. removed in an update) */
-    var _removedCards=['tyrants_gaze','the_hare','phoenix_ash','cracked_bell','drunkards_prayer','the_ledger_npc','the_collection_plate','rusty_spur','last_orders','iron_stomach','tavern_tales','bad_reputation','loaded_deck','the_alchemist'];
+    var _removedCards=['tyrants_gaze','the_hare','phoenix_ash','cracked_bell','drunkards_prayer','the_ledger_npc','the_collection_plate','rusty_spur','last_orders','iron_stomach','tavern_tales','bad_reputation','loaded_deck','the_alchemist','tab_at_bar','alchemist_touch','wild_die','brutus_fist','ambrose_grace','coin_flip','double_down_die'];
+    /* ID migration: card formerly known as 'last_call' was renamed 'closing_bell' to
+       free up the 'LAST CALL' name for Grog's Tell. Remap any saved decks. */
+    if(Array.isArray(S.run.cards))S.run.cards=S.run.cards.map(function(cid){return cid==='last_call'?'closing_bell':cid;});
     if(Array.isArray(S.run.cards))S.run.cards=S.run.cards.map(function(cid){return cid&&_removedCards.indexOf(cid)===-1?cid:null;});
     /* Boss-slot migration: pad to 5 slots ([0..2] regular, [3] boss, [4] 2nd boss
        — last unlocked via renown perk). Move any boss card from legacy slot 2
@@ -5869,34 +6280,86 @@ function _checkRenownPerks(){
   /* Legend cosmetic: body class drives the title shimmer */
   if(typeof document!=='undefined'){
     document.body.classList.toggle('legend',!!S.renownPerks.legend);
-    /* Pop a celebration overlay for each new perk (one at a time, queued) */
-    if(_newlyUnlocked.length&&typeof _showPerkUnlock==='function'){
-      _newlyUnlocked.forEach(function(p,i){
-        setTimeout(function(){_showPerkUnlock(p);},i*1900);
-      });
+    /* Queue perk celebrations to fire on the loadout screen (so the player has time to read
+       and the win screen doesn't get crowded). The gauntlet/loadout render dequeues. */
+    if(_newlyUnlocked.length){
+      S.run._pendingPerkUnlocks=(S.run._pendingPerkUnlocks||[]).concat(_newlyUnlocked.map(function(p){return p.key;}));
+      try{save();}catch(e){}
     }
   }
 }
 /* Perk-unlock celebration: golden star pops in, lock icon shatters off, perk name appears.
    Triggers on every new perk threshold crossed (Known Face, Pocketed, Honored Guest, etc). */
-function _showPerkUnlock(perk){
-  if(!perk||typeof document==='undefined')return;
-  /* Build a one-shot overlay */
-  var ov=document.createElement('div');
-  ov.className='perk-unlock-ov';
-  ov.innerHTML=
-    '<div class="puk-star">⭐</div>'+
-    '<div class="puk-lock">🔒</div>'+
-    '<div class="puk-label">PERK UNLOCKED</div>'+
-    '<div class="puk-name">'+perk.label.toUpperCase()+'</div>'+
-    '<div class="puk-desc">'+perk.desc+'</div>';
-  document.body.appendChild(ov);
+function _showPerkUnlock(perk,onClose){
+  if(!perk||typeof document==='undefined'){if(onClose)onClose();return;}
+  /* Backdrop captures all clicks behind. Modal centred. CONTINUE button BELOW the modal.
+     Both modal and button are painted with drawPixelPanel — same wobble pixel-bevel renderer
+     used by the match-btn (Roll/Bank/Yield) so the borders feel hand-drawn. */
+  var bd=document.createElement('div');
+  bd.className='puk-backdrop';
+  bd.innerHTML=
+    '<div class="puk-modal">'+
+      '<canvas class="puk-modal-canvas"></canvas>'+
+      '<div class="puk-modal-content">'+
+        '<div class="puk-label">PERK UNLOCKED</div>'+
+        '<div class="puk-star">⭐</div>'+
+        '<div class="puk-lock">🔒</div>'+
+        '<div class="puk-name">'+perk.label+'</div>'+
+        '<div class="puk-desc">'+perk.desc+'</div>'+
+      '</div>'+
+    '</div>'+
+    '<button class="puk-continue" type="button">'+
+      '<canvas class="puk-btn-canvas"></canvas>'+
+      '<span class="puk-btn-inner">CONTINUE</span>'+
+    '</button>';
+  document.body.appendChild(bd);
+  /* Paint the canvases AFTER they're in the DOM so we have measurable size.
+     Two RAFs to ensure flexbox layout has settled. */
+  function _paintPanels(){
+    var modalCv=bd.querySelector('.puk-modal-canvas');
+    var btnCv=bd.querySelector('.puk-btn-canvas');
+    /* Modal: dark wood face, gold-bronze bevel, deep shadow — seed 707 for repeatable wobble */
+    if(modalCv)sizeAndDrawPanel(modalCv,'#a07838','#1c130a','#070300',707,0.025);
+    /* Button: warmer wood + brighter gold rim */
+    if(btnCv)sizeAndDrawPanel(btnCv,'#b88848','#2a1810','#0a0500',808,0.03);
+  }
+  requestAnimationFrame(function(){requestAnimationFrame(_paintPanels);});
   try{SFX.synergy&&SFX.synergy();}catch(e){}
   try{_haptic(40);}catch(e){}
-  setTimeout(function(){ov.classList.add('show');},20);
-  setTimeout(function(){ov.classList.add('shatter');},900);
-  setTimeout(function(){ov.classList.remove('show');ov.classList.add('fade');},2200);
-  setTimeout(function(){if(ov.parentNode)ov.parentNode.removeChild(ov);},2700);
+  /* Eat ALL pointer/touch events on the backdrop so nothing reaches elements behind */
+  ['click','touchstart','touchend','touchmove','pointerdown','pointerup','mousedown','mouseup'].forEach(function(evt){
+    bd.addEventListener(evt,function(e){
+      /* Only swallow events on the backdrop itself / modal — let the button handle its own clicks */
+      if(e.target.closest('.puk-continue'))return;
+      e.stopPropagation();
+      if(evt==='touchmove'||evt==='touchstart')e.preventDefault();
+    },{passive:false,capture:true});
+  });
+  setTimeout(function(){bd.classList.add('show');},20);
+  setTimeout(function(){bd.classList.add('shatter');},900);
+  /* CONTINUE button — single dismiss path */
+  var _btn=bd.querySelector('.puk-continue');
+  var _closed=false;
+  function _close(){
+    if(_closed||!bd.parentNode)return;
+    _closed=true;
+    bd.classList.remove('show');bd.classList.add('fade');
+    setTimeout(function(){if(bd.parentNode)bd.parentNode.removeChild(bd);if(onClose)onClose();},380);
+  }
+  if(_btn){
+    _btn.addEventListener('click',function(e){e.stopPropagation();try{SFX.nav&&SFX.nav();}catch(e){}_close();});
+    _btn.addEventListener('touchend',function(e){e.stopPropagation();e.preventDefault();try{SFX.nav&&SFX.nav();}catch(e){}_close();},{passive:false});
+  }
+}
+/* Drain queued perk unlocks (one at a time, chained via Continue button) */
+function _drainPerkUnlockQueue(){
+  if(!S||!S.run||!S.run._pendingPerkUnlocks||!S.run._pendingPerkUnlocks.length)return;
+  var key=S.run._pendingPerkUnlocks.shift();save();
+  var perk=RENOWN_PERKS.find(function(p){return p.key===key;});
+  if(!perk){_drainPerkUnlockQueue();return;}
+  _showPerkUnlock(perk,function(){
+    setTimeout(_drainPerkUnlockQueue,250);
+  });
 }
 /* Returns an ordered list of rank suffixes for dialogue lookup —
    highest unlocked rank first. Empty list = below the first threshold. */
@@ -6501,52 +6964,52 @@ const RUNGS=[
      →jade→brass→silver→crystal/ruby. Bossier patrons mix in more premium materials. */
   {id:0,name:'GROG',key:'drunkard',icon:'🍺',tier:'regular',target:4000,gold:100,buyIn:10,
     boss:null,bossDesc:null,
-    agg:.55,cardRarity:null,wager:false,wagerCount:0,wagerMode:'none',minBank:0,diceStop:2,chaotic:true,adaptive:false,
-    dice:['bone','bone','bone','bone','bone','iron'],
+    agg:.56,cardRarity:null,wager:false,wagerCount:0,wagerMode:'none',minBank:150,diceStop:2,chaotic:true,adaptive:false,
+    dice:['bone','bone','bone','iron','iron','iron'],
     cardPool:['her_lucky_coin','one_more_round','grogs_bump'],cardCount:2,cardChance:1,
-    tell:{id:'last_call',name:'LAST CALL',desc:'BANK <300 → 0',icon:'🍻',threshold:300}},
+    tell:{id:'last_call',name:'LAST CALL',desc:"Banks under 300 don't count — house rule",icon:'🍻',threshold:300}},
   {id:1,name:'MABEL',key:'peasant',icon:'👨‍🌾',tier:'regular',target:5500,gold:175,buyIn:20,
     boss:null,bossDesc:null,
-    agg:.55,cardRarity:'tin',wager:true,wagerCount:1,wagerMode:'best',minBank:200,diceStop:2,chaotic:false,adaptive:false,
-    dice:['bone','bone','bone','iron','iron','amber'],
-    cardPool:['the_last_stitch_npc','measure_twice','worn_thimble','the_nightshift','mabels_pinch'],cardCount:2,
-    tell:{id:'steeped',name:'STEEPED',desc:'+25 PER ROLL PAST FIRST',icon:'🍵',perRoll:25}},
+    agg:.58,cardRarity:'tin',wager:true,wagerCount:1,wagerMode:'best',minBank:200,diceStop:2,chaotic:false,adaptive:false,
+    dice:['bone','bone','iron','iron','amber','amber'],
+    cardPool:['the_last_stitch_npc','measure_twice','worn_thimble','the_nightshift','mabels_pinch'],cardCount:3,
+    tell:{id:'steeped',name:'STEEPED',desc:'Each extra roll adds +25 to your bank — bust and you lose it all',icon:'🍵',perRoll:25}},
   {id:2,name:'FINNICK',key:'commoner',icon:'🎭',tier:'known',target:7500,gold:250,buyIn:35,
     boss:null,bossDesc:null,
-    agg:.58,cardRarity:'tin',wager:true,wagerCount:1,wagerMode:'best',minBank:250,diceStop:2,chaotic:false,adaptive:true,
-    dice:['bone','bone','iron','lead','amber','amber'],
-    cardPool:['quick_hands','pocket_sand','the_skim','beginners_luck','the_lords_seal','sticky_fingers_die'],cardCount:2,
-    tell:{id:'cutpurse',name:'CUTPURSE',desc:'20% POST-ROLL DIE PALMED',icon:'✋',chance:.20}},
+    agg:.62,cardRarity:'tin',wager:true,wagerCount:1,wagerMode:'best',minBank:250,diceStop:2,chaotic:false,adaptive:true,
+    dice:['bone','iron','iron','lead','amber','amber'],
+    cardPool:['quick_hands','pocket_sand','the_skim','beginners_luck','the_lords_seal','sticky_fingers_die'],cardCount:3,
+    tell:{id:'cutpurse',name:'CUTPURSE',desc:"After each roll, I might palm one of your dice",icon:'✋',chance:.20}},
   {id:3,name:'CORVUS',key:'merchant',icon:'💼',tier:'known',target:10000,gold:350,buyIn:50,
     boss:null,bossDesc:null,
-    agg:.52,cardRarity:'silver',wager:true,wagerCount:1,wagerMode:'best',minBank:150,diceStop:2,chaotic:false,adaptive:true,
+    agg:.60,cardRarity:'silver',wager:true,wagerCount:1,wagerMode:'best',minBank:250,diceStop:2,chaotic:false,adaptive:true,
     dice:['iron','flint','flint','lead','amber','amber'],
-    cardPool:['interest_due','fine_print','severance_npc','the_audit','collateral_die','corvus_writ'],cardCount:2,
-    tell:{id:'in_arrears',name:'IN ARREARS',desc:'−3g PER ROLL',icon:'📒',perRoll:3}},
+    cardPool:['interest_due','fine_print','severance_npc','the_audit','collateral_die','corvus_writ'],cardCount:3,
+    tell:{id:'in_arrears',name:'IN ARREARS',desc:'Every roll costs you 3 gold — your purse can go negative',icon:'📒',perRoll:3}},
   {id:4,name:'BRUTUS',key:'soldier',icon:'⚔️',tier:'respected',target:13000,gold:500,buyIn:70,
     boss:null,bossDesc:null,
-    agg:.65,cardRarity:'silver',wager:true,wagerCount:1,wagerMode:'best',minBank:300,diceStop:2,chaotic:false,adaptive:true,
+    agg:.68,cardRarity:'silver',wager:true,wagerCount:1,wagerMode:'best',minBank:300,diceStop:2,chaotic:false,adaptive:true,
     dice:['lead','amber','amber','jade','silver','silver'],
     cardPool:['hold_the_line','iron_gate_npc','campaign_veteran','steady_hands','old_partners_badge'],cardCount:3,
-    tell:{id:'drill_order',name:'DRILL ORDER',desc:'3 ROLLS MAX/TURN',icon:'🛡️',maxRolls:3}},
+    tell:{id:'drill_order',name:'DRILL ORDER',desc:'Maximum 3 rolls per turn — a 4th forces a bust',icon:'🛡️',maxRolls:3}},
   {id:5,name:'ALDRIC',key:'knight',icon:'🛡️',tier:'respected',target:17000,gold:700,buyIn:100,
     boss:null,bossDesc:null,
-    agg:.70,cardRarity:'gold',wager:true,wagerCount:2,wagerMode:'best',minBank:350,diceStop:1,chaotic:false,adaptive:true,
+    agg:.72,cardRarity:'gold',wager:true,wagerCount:2,wagerMode:'best',minBank:350,diceStop:1,chaotic:false,adaptive:true,
     dice:['amber','jade','jade','brass','brass','silver'],
-    cardPool:['the_verdict_npc','point_of_order','fathers_die','the_oath_npc','family_crest'],cardCount:3,
-    tell:{id:'confession',name:'CONFESSION',desc:'1 RANDOM CARD SEALED/TURN',icon:'⛪'}},
+    cardPool:['the_verdict_npc','point_of_order','fathers_die','the_oath_npc','family_crest'],cardCount:4,
+    tell:{id:'confession',name:'CONFESSION',desc:"Each turn, one of your cards is sealed and won't trigger",icon:'⛪'}},
   {id:6,name:'WHISPER',key:'noble',icon:'👑',tier:'renowned',target:22000,gold:950,buyIn:140,
     boss:null,bossDesc:null,
-    agg:.75,cardRarity:'gold',wager:true,wagerCount:2,wagerMode:'best',minBank:400,diceStop:1,chaotic:false,adaptive:true,
+    agg:.76,cardRarity:'gold',wager:true,wagerCount:2,wagerMode:'best',minBank:400,diceStop:1,chaotic:false,adaptive:true,
     dice:['jade','brass','brass','silver','silver','crystal'],
     cardPool:['the_royal_purse','crown_authority','the_quiet_decree','sundays_rest','old_roads','royal_seizure'],cardCount:4,
-    tell:{id:'counterfeit',name:'COUNTERFEIT COIN',desc:'CURSED DICE HALVE GROUPS',icon:'💀',startCount:1,addEvery:3}},
+    tell:{id:'counterfeit',name:'COUNTERFEIT COIN',desc:"Some of your dice are cursed — banking them halves the group's score",icon:'💀',startCount:1,addEvery:3}},
   {id:7,name:'AMBROSE',key:'bishop',icon:'✝️',tier:'renowned',target:28000,gold:1300,buyIn:200,
     boss:null,bossDesc:null,
-    agg:.80,cardRarity:'gold',wager:true,wagerCount:3,wagerMode:'all',minBank:250,diceStop:1,chaotic:false,adaptive:true,
+    agg:.80,cardRarity:'gold',wager:true,wagerCount:3,wagerMode:'all',minBank:350,diceStop:1,chaotic:false,adaptive:true,
     dice:['brass','silver','silver','crystal','crystal','ruby'],
-    cardPool:['communion_wine','blessed_dice','the_sermon','judgment_npc','never_saw_a_robe','blessed_confiscation'],cardCount:4,
-    tell:{id:'reckoning',name:'THE RECKONING',desc:'BANK ≥ AMBROSE\'S LAST',icon:'⚖️'}},
+    cardPool:['communion_wine','blessed_dice','the_sermon','judgment_npc','never_saw_a_robe','blessed_confiscation'],cardCount:5,
+    tell:{id:'reckoning',name:'THE RECKONING',desc:"Your bank must at least match my last one — or it scores nothing",icon:'⚖️'}},
 ];
 
 /* ═══════ BOSS ACCENT COLORS ═══════ */
@@ -6586,51 +7049,51 @@ function _dicePrice(mat){
 const TIERS=[
   {id:0,name:'THE DREG',pointsNeeded:3,
     boss:RUNGS[0],/* Grog @ 4000 */
-    patronStats:{targetMin:2500,targetMax:3500,aggMin:.40,aggMax:.52,dicePool:['bone'],minBank:0,diceStop:3},
+    patronStats:{targetMin:2500,targetMax:3500,aggMin:.50,aggMax:.62,dicePool:['bone'],minBank:150,diceStop:3},
     /* Tier 0/1: tin-only draft so the player commits to tins before
-       silvers start showing up — was 'tin' for 0 and 'tin','silver' for 1. */
+       silvers start showing up. */
     draftPool:['tin'],
     diceWeights:{bone:6}},
   {id:1,name:'THE HEARTH',pointsNeeded:4,
     boss:RUNGS[1],/* Mabel @ 5500 */
-    patronStats:{targetMin:3500,targetMax:4500,aggMin:.45,aggMax:.55,dicePool:['bone','bone','bone','iron'],minBank:100,diceStop:2},
+    patronStats:{targetMin:3500,targetMax:4500,aggMin:.55,aggMax:.65,dicePool:['bone','bone','bone','iron'],minBank:200,diceStop:2},
     draftPool:['tin'],
     diceWeights:{bone:4,iron:2}},
   {id:2,name:'THE PIT',pointsNeeded:4,
     boss:RUNGS[2],/* Finnick @ 7500 */
-    patronStats:{targetMin:4500,targetMax:6000,aggMin:.48,aggMax:.58,dicePool:['bone','bone','iron','iron','lead'],minBank:150,diceStop:2},
+    patronStats:{targetMin:4500,targetMax:6000,aggMin:.58,aggMax:.68,dicePool:['bone','bone','iron','iron','lead'],minBank:250,diceStop:2},
     draftPool:['tin','silver'],
     diceWeights:{bone:3,iron:2,lead:1}},
   {id:3,name:'THE LEDGER',pointsNeeded:5,
     boss:RUNGS[3],/* Corvus @ 10000 */
-    patronStats:{targetMin:6500,targetMax:8500,aggMin:.50,aggMax:.60,dicePool:['iron','lead','amber'],minBank:200,diceStop:2},
+    patronStats:{targetMin:6500,targetMax:8500,aggMin:.62,aggMax:.72,dicePool:['iron','lead','amber'],minBank:300,diceStop:2},
     draftPool:['tin','silver'],
     diceWeights:{iron:2,lead:2,amber:1,flint:1}},
   {id:4,name:'THE FORGE',pointsNeeded:5,
     boss:RUNGS[4],/* Brutus @ 13000 */
-    patronStats:{targetMin:8500,targetMax:11000,aggMin:.55,aggMax:.65,dicePool:['lead','flint','amber'],minBank:250,diceStop:2},
+    patronStats:{targetMin:8500,targetMax:11000,aggMin:.66,aggMax:.76,dicePool:['lead','flint','amber'],minBank:350,diceStop:2},
     draftPool:['silver','gold'],
     diceWeights:{lead:1,amber:2,jade:2,brass:1}},
   {id:5,name:'THE COURT',pointsNeeded:6,
     boss:RUNGS[5],/* Aldric @ 17000 */
-    patronStats:{targetMin:11000,targetMax:14000,aggMin:.58,aggMax:.70,dicePool:['flint','amber','jade'],minBank:300,diceStop:1},
+    patronStats:{targetMin:11000,targetMax:14000,aggMin:.70,aggMax:.80,dicePool:['flint','amber','jade'],minBank:400,diceStop:1},
     draftPool:['silver','gold'],
     diceWeights:{amber:2,jade:2,brass:1,silver:1}},
   {id:6,name:'THE PARLOUR',pointsNeeded:6,
     boss:RUNGS[6],/* Whisper @ 22000 */
-    patronStats:{targetMin:14500,targetMax:18000,aggMin:.62,aggMax:.75,dicePool:['amber','jade','brass'],minBank:350,diceStop:1},
+    patronStats:{targetMin:14500,targetMax:18000,aggMin:.74,aggMax:.84,dicePool:['amber','jade','brass'],minBank:450,diceStop:1},
     draftPool:['gold'],
     diceWeights:{jade:2,brass:2,silver:1,crystal:1}},
   {id:7,name:'THE SANCTUM',pointsNeeded:7,
     boss:RUNGS[7],/* Ambrose @ 28000 */
-    patronStats:{targetMin:18500,targetMax:23500,aggMin:.68,aggMax:.80,dicePool:['jade','brass','silver','crystal'],minBank:300,diceStop:1},
+    patronStats:{targetMin:18500,targetMax:23500,aggMin:.78,aggMax:.88,dicePool:['jade','brass','silver','crystal'],minBank:400,diceStop:1},
     draftPool:['gold'],
     diceWeights:{brass:2,silver:2,crystal:2}}
 ];
 
 /* ── Handicap match modifiers ── */
 const HANDICAPS=[
-  {id:'last_call',    name:'LAST CALL',     desc:'Target drops each turn',        icon:'⏳',  color:'#e8a030'},
+  {id:'last_call',    name:'HOURGLASS',     desc:'Target drops each turn',        icon:'⏳',  color:'#e8a030'},
   {id:'sudden_death', name:'SUDDEN DEATH',  desc:'3 turns each — highest wins',   icon:'💀',  color:'#e05050'},
   {id:'rising_stakes',name:'RISING STAKES', desc:'Bank streaks multiply points',  icon:'🔥',  color:'#e08830', minTier:1},
   {id:'bounty_board', name:'BOUNTY BOARD',  desc:'Complete bounties for bonuses',  icon:'📜',  color:'#c0a050', minTier:2},
@@ -6725,12 +7188,15 @@ function _showHandicapSplash(handicap,cb){
   ov.className='handicap-splash';
   ov.style.setProperty('--hs-color',h.color||'#e8a030');
   ov.innerHTML='<div class="hs-bg"></div><div class="hs-icon">'+h.icon+'</div><div class="hs-name">'+h.name+'</div><div class="hs-desc">'+h.desc+'</div>';
-  document.getElementById('screen-match').appendChild(ov);
+  var ms=document.getElementById('screen-match');
+  ms.appendChild(ov);
+  ms.classList.add('has-splash');/* hides board content for the entire splash */
   requestAnimationFrame(function(){ov.classList.add('hs-in');});
-  /* Background fades quickly, text lingers */
-  setTimeout(function(){ov.classList.add('hs-bg-out');},1200);
-  setTimeout(function(){ov.classList.add('hs-out');},2800);
-  setTimeout(function(){ov.remove();if(cb)cb();},3500);
+  /* Bg + text fade out together at the END of the splash so nothing leaks through */
+  /* Reveal board the instant fade-out begins so the bg + board crossfade together (.5s).
+     Saves ~700ms vs. waiting for opacity to finish before revealing. */
+  setTimeout(function(){ov.classList.add('hs-bg-out');ov.classList.add('hs-out');ms.classList.remove('has-splash');},2800);
+  setTimeout(function(){ov.remove();if(cb)cb();},3300);
 }
 
 function _showBossSplash(bossKey,bossName,cb){
@@ -6740,11 +7206,20 @@ function _showBossSplash(bossKey,bossName,cb){
   ov.className='handicap-splash boss-splash';
   ov.style.setProperty('--hs-color',accent);
   var imgHtml=portrait?'<img src="'+portrait+'" class="bs-portrait" alt="'+bossName+'">':'';
-  ov.innerHTML=imgHtml+'<div class="hs-name" style="margin-top:12px">'+bossName+'</div><div class="bs-subtitle">BOSS FIGHT</div>';
-  document.getElementById('screen-match').appendChild(ov);
+  /* Tell info is rendered by the persistent #tellBadge (positioned at viewport-50%,
+     visible through the splash via the has-splash exemption). Splash itself just
+     shows boss image + name + BOSS FIGHT subtitle, with content pushed to top half
+     so the tell-badge sits visually below it without overlap. */
+  ov.innerHTML='<div class="hs-bg"></div>'+imgHtml+'<div class="hs-name" style="margin-top:12px">'+bossName+'</div>';
+  var ms=document.getElementById('screen-match');
+  ms.appendChild(ov);
+  ms.classList.add('has-splash');
   requestAnimationFrame(function(){ov.classList.add('hs-in');});
-  setTimeout(function(){ov.classList.add('hs-out');},2800);
-  setTimeout(function(){ov.remove();if(cb)cb();},3500);
+  /* Bg + text fade out together at the END so the board doesn't leak through */
+  /* Reveal board the instant fade-out begins so the bg + board crossfade together (.5s).
+     Saves ~700ms vs. waiting for opacity to finish before revealing. */
+  setTimeout(function(){ov.classList.add('hs-bg-out');ov.classList.add('hs-out');ms.classList.remove('has-splash');},2800);
+  setTimeout(function(){ov.remove();if(cb)cb();},3300);
 }
 
 function _initHandicapHUD(){
@@ -6769,14 +7244,16 @@ function _initHandicapHUD(){
     }
   }
   if(G._handicap==='sudden_death'){
-    /* Replace target with round counter in the HUD mid area */
+    /* Hide the target HUD (sudden death has no target) */
     var tgt=document.getElementById('targetScore');
     if(tgt)tgt.style.display='none';
     var tgtLabel=document.querySelector('.hud-tgt-lbl');
     if(tgtLabel)tgtLabel.style.display='none';
+    /* Pin the round counter above the dice — same slot as the Rising Stakes multiplier */
     var sdW=document.createElement('div');sdW.className='sd-counter-wrap';sdW.id='sdCounterWrap';
-    sdW.innerHTML='<div class="sd-subtitle">HIGHEST SCORE WINS</div><div class="sd-round-counter" id="sdRoundCounter"><span class="sd-label">ROUND</span><span class="sd-num">1</span><span class="sd-of">/ 3</span></div>';
-    if(tgt&&tgt.parentNode)tgt.parentNode.insertBefore(sdW,tgt);
+    sdW.innerHTML='<div class="sd-subtitle">HIGHEST SCORE AFTER '+(G._suddenDeathTurns||3)+' ROUNDS WINS</div><div class="sd-round-counter" id="sdRoundCounter"><span class="sd-label">ROUND</span><span class="sd-num">1</span><span class="sd-of">/ '+(G._suddenDeathTurns||3)+'</span></div>';
+    var aboveDice=document.getElementById('aboveDiceInfo');
+    if(aboveDice)aboveDice.insertBefore(sdW,aboveDice.firstChild);
     else ms.appendChild(sdW);
   }
   if(G._handicap==='rising_stakes'){
@@ -6839,10 +7316,13 @@ function _showTellSplash(cb){
     '<div class="hs-desc" style="font-size:11px;opacity:.85;margin-top:8px">'+t.desc+'</div>';
   var ms=document.getElementById('screen-match');if(!ms){if(cb)cb();return;}
   ms.appendChild(ov);
+  ms.classList.add('has-splash');
   requestAnimationFrame(function(){ov.classList.add('hs-in');});
-  setTimeout(function(){ov.classList.add('hs-bg-out');},1200);
-  setTimeout(function(){ov.classList.add('hs-out');},2800);
-  setTimeout(function(){ov.remove();if(cb)cb();},3500);
+  /* Bg + text fade out together at the END so the board doesn't leak through */
+  /* Reveal board the instant fade-out begins so the bg + board crossfade together (.5s).
+     Saves ~700ms vs. waiting for opacity to finish before revealing. */
+  setTimeout(function(){ov.classList.add('hs-bg-out');ov.classList.add('hs-out');ms.classList.remove('has-splash');},2800);
+  setTimeout(function(){ov.remove();if(cb)cb();},3300);
 }
 function _initTellHUD(){
   document.querySelectorAll('.tell-badge,.tell-cursed-overlay').forEach(function(e){e.remove();});
@@ -6850,12 +7330,21 @@ function _initTellHUD(){
   var t=G._tell;
   var ms=document.getElementById('screen-match');if(!ms)return;
   var badge=document.createElement('div');badge.id='tellBadge';badge.className='tell-badge tell-'+t.id;
+  /* Wrap each letter of the Tell name so we can do a stepped per-letter wave — subtle
+     bobbing motion at steps(4) for that hand-painted feel. */
+  var _tellNameHtml=t.name.split('').map(function(c,i){
+    if(c===' ')return '<span class="tb-letter tb-letter-space">&nbsp;</span>';
+    return '<span class="tb-letter" style="--li:'+i+'">'+c+'</span>';
+  }).join('');
   badge.innerHTML='<span class="tb-icon">'+t.icon+'</span>'+
-    '<span class="tb-name">'+t.name+'</span>'+
+    '<span class="tb-name">'+_tellNameHtml+'</span>'+
     '<span class="tb-desc">'+t.desc+'</span>';
-  var aboveDice=document.getElementById('aboveDiceInfo');
-  if(aboveDice)aboveDice.insertBefore(badge,aboveDice.firstChild);
-  else ms.appendChild(badge);
+  /* Width auto via inline content; flex-direction:column groups them on top of each other. */
+  /* Direct child of #screen-match, position-pinned at vertical center. This way the
+     splash's hide rule can exempt #tellBadge specifically, and the same DOM element
+     is visible through both splash and board states — feels like ONE persistent
+     element, not two separate ones. */
+  ms.appendChild(badge);
   /* Per-Tell extra HUD bits */
   if(t.id==='steeped'){
     var sv=document.createElement('span');sv.className='tb-val';sv.id='steepedVal';sv.textContent='+0';
@@ -6875,7 +7364,14 @@ function _updateTellHUD(){
   var t=G._tell;
   if(t.id==='steeped'){
     var v=document.getElementById('steepedVal');
-    if(v){var b=(G._tellState&&G._tellState.bonus)||0;v.textContent='+'+b;v.classList.remove('tb-pop');void v.offsetWidth;v.classList.add('tb-pop');}
+    if(v){
+      var b=(G._tellState&&G._tellState.bonus)||0;
+      v.textContent='+'+b;
+      /* Tier 1: 0-49 (subtle), Tier 2: 50-149 (brighter), Tier 3: 150+ (gold pulsing) */
+      var tier=b>=150?3:(b>=50?2:1);
+      v.setAttribute('data-tier',tier);
+      v.classList.remove('tb-pop');void v.offsetWidth;v.classList.add('tb-pop');
+    }
   }
   if(t.id==='drill_order'){
     var d=document.getElementById('drillVal');
@@ -6965,17 +7461,25 @@ function generatePatron(tierIndex){
   var dice=[];for(var i=0;i<6;i++)dice.push(ps.dicePool[Math.floor(Math.random()*ps.dicePool.length)]);
   /* 25% chance to splash in one die from next tier's pool for variety */
   var _nt=TIERS[tierIndex+1];if(_nt&&_nt.patronStats&&_nt.patronStats.dicePool&&Math.random()<0.25){var _up=_nt.patronStats.dicePool;dice[Math.floor(Math.random()*6)]=_up[Math.floor(Math.random()*_up.length)];}
-  /* Patron cards scale by tier: 0=none, 1=1 card, 2+=2 cards */
-  var pCardCount=tierIndex>=2?2:tierIndex>=1?1:0;
+  /* Patron cards scale by tier:
+     T0: none. T1: 1 card. T2+ (Finnick onward): 3 cards, no tin allowed (tier-3+ rarities only). */
+  var pCardCount=tierIndex>=2?3:tierIndex>=1?1:0;
   var pCardPool=[];
   if(pCardCount>0){
     /* Build pool from regular CARDS matching tier's draft rarities (no boss NPC cards) */
     var _dp=t.draftPool||['tin'];
+    /* From Finnick (T2) up: drop tin from the patron pool — tin cards are too weak for that level */
+    if(tierIndex>=2)_dp=_dp.filter(function(rar){return rar!=='tin';});
+    /* If filtering left it empty, fall back to whatever the tier nominally allows */
+    if(!_dp.length)_dp=t.draftPool||['silver'];
     _dp.forEach(function(rar){
-      CARDS.forEach(function(c){if(c.rarity===rar&&!c.npcOnly&&!c.type&&!c.dep)pCardPool.push(c.id);});
+      /* Filter out counter cards (e.g. Keen Eyes, Iron Grip) — they're useless if the patron's
+         single card is just countering a card the player doesn't have, so the patron has no
+         functional effect. */
+      CARDS.forEach(function(c){if(c.rarity===rar&&!c.npcOnly&&!c.type&&!c.dep&&!c.counter)pCardPool.push(c.id);});
     });
-    /* Also include one tier down for variety */
-    if(tierIndex>0){var _pt=TIERS[tierIndex-1];if(_pt&&_pt.draftPool){_pt.draftPool.forEach(function(rar){CARDS.forEach(function(c){if(c.rarity===rar&&!c.npcOnly&&!c.type&&!c.dep&&!pCardPool.includes(c.id))pCardPool.push(c.id);});});}}
+    /* Tier-down splash: only allow rarities also present in current pool, so no tin leakage at T2+ */
+    if(tierIndex>0){var _pt=TIERS[tierIndex-1];if(_pt&&_pt.draftPool){_pt.draftPool.forEach(function(rar){if(_dp.indexOf(rar)===-1)return;CARDS.forEach(function(c){if(c.rarity===rar&&!c.npcOnly&&!c.type&&!c.dep&&!c.counter&&!pCardPool.includes(c.id))pCardPool.push(c.id);});});}}
     /* Shuffle */
     for(var si=pCardPool.length-1;si>0;si--){var sj=Math.floor(Math.random()*(si+1));var st=pCardPool[si];pCardPool[si]=pCardPool[sj];pCardPool[sj]=st;}
   }
@@ -7003,12 +7507,12 @@ function generateDiceLoadout(tierIndex){
 
 const CARDS=[
   {id:'flintlock',name:'THE FLINTLOCK',icon:'🔫',rarity:'silver',eff:'+300 EACH FIRST 1',desc:'Each turn: the first time a 1 appears on your roll, gain +300 bonus points.',arch:'safeBanker'},
-  {id:'copper_pincher',name:'COPPER PINCHER',icon:'🪙',rarity:'tin',eff:'1s=200, 5s=100 PTS',desc:'Singles are worth more: 1s score 200 (not 100), 5s score 100 (not 50).',arch:'safeBanker'},
+  {id:'copper_pincher',name:'COPPER PINCHER',icon:'🪙',rarity:'silver',eff:'1s=200, 5s=100 PTS',desc:'Singles are worth more: 1s score 200 (not 100), 5s score 100 (not 50).',arch:'safeBanker'},
   {id:'half_measure',name:'HALF MEASURE',icon:'⚖️',rarity:'tin',eff:'+400 FOR 3-DICE BANK',desc:'Bank by committing exactly three dice and earn a flat +400 bonus.',arch:'safeBanker'},
   {id:'the_hearth',name:'THE HEARTH',icon:'🔥',rarity:'tin',eff:'+250 FOR FIRST-ROLL BANK',desc:'Bank on your very first roll of a turn to earn +250 extra points.',arch:'safeBanker'},
   {id:'slow_burn',name:'SLOW BURN',icon:'🕯️',rarity:'tin',eff:'+500 EVERY 3 SAFE TURNS',desc:'Every three turns you bank safely without busting, automatically gain 500 points.',arch:'safeBanker'},
   {id:'fools_gold',name:"FOOL'S GOLD",icon:'✨',rarity:'tin',eff:'+300 ON 500-MULTIPLE BANK',desc:'Bank a score that is exactly a multiple of 500 (500, 1000…) to earn +300 bonus.',arch:'safeBanker',dep:true},
-  {id:'keen_eyes',name:'KEEN EYES',icon:'👀',rarity:'tin',eff:'BLOCKS POCKET SAND',desc:"Blocks the opponent's Pocket Sand — they can't shave a die from your first roll.",arch:'utility'},
+  {id:'keen_eyes',name:'KEEN EYES',icon:'👀',rarity:'tin',eff:'BLOCKS POCKET SAND',desc:"Blocks the opponent's Pocket Sand — they can't shave a die from your first roll.",arch:'utility',counter:true},
   {id:'millers_toll',name:"MILLER'S TOLL",icon:'⚙️',rarity:'gold',eff:'TRIPLE 2-4 +150; 1s=75',desc:'Triples of 2, 3, or 4 score +150 extra — but each 1 you roll is only worth 75 points instead of 100.',arch:'collector',dep:true},
   {id:'scavenger',name:'THE SCAVENGER',icon:'🦴',rarity:'silver',eff:'ONE 1 + ONE 5 = 300',desc:'Roll exactly one 1 and one 5 in the same throw to score a combined 300 points.',arch:'collector',dep:true},
   {id:'last_stand',name:'THE LAST STAND',icon:'🗡️',rarity:'silver',eff:'FINAL DIE 1 OR 5 = 600',desc:'If your very last die (with nothing left to keep) lands on 1 or 5, it scores 600 points.',arch:'brinksman'},
@@ -7032,10 +7536,10 @@ const CARDS=[
   {id:'mabels_stitch',name:"MABEL'S STITCH",icon:'🧵',rarity:'gold',type:'active',npc:'mabel',maxUses:1,timing:'idle|choosing|yielding',eff:'BUST → BANK PTS +300',desc:'Activate before rolling: if you bust this turn, bank your accumulated points AND gain +300 bonus. One use per match.',rewardQuote:'"Take this. May it mend thy fortune."',arch:'brinksman'},
   {id:'finnicks_palm',name:"FINNICK'S PALM",icon:'🤏',rarity:'gold',type:'active',npc:'finnick',maxUses:1,timing:'choosing',eff:'SWAP 1 DIE → 1 OR 5',desc:'During dice selection, flip one non-scoring die to a 1 or 5. One use per match.',rewardQuote:'"Not bad, mate! Keep this, yeah?"',arch:'sharp'},
   {id:'corvus_ledger',name:"CORVUS'S LEDGER",icon:'📒',rarity:'gold',type:'active',npc:'corvus',maxUses:1,timing:'idle|choosing|yielding',eff:'NEXT BANK +75%',desc:'Activate at any point during your turn — your next bank is worth 75% extra points. One use per match.',rewardQuote:'"Take the ledger. Consider it… a dividend."',arch:'hoarder'},
-  {id:'brutus_fist',name:"BRUTUS'S FIST",icon:'👊',rarity:'gold',type:'active',npc:'brutus',maxUses:1,timing:'choosing',eff:'FORCE 1 DIE → 1',desc:'During dice selection, force one non-scoring die to show a 1 (worth 100 pts). One use per match.',rewardQuote:'"Iron in thy bones. Take this, soldier."',arch:'sharp'},
+  {id:'brutus_fist',name:"BRUTUS'S FIST",icon:'👊',rarity:'gold',type:'active',npc:'brutus',maxUses:1,timing:'choosing',eff:'FORCE 1 DIE → 1',desc:'During dice selection, force one non-scoring die to show a 1 (worth 100 pts). One use per match.',rewardQuote:'"Iron in thy bones. Take this, soldier."',arch:'sharp',dep:true},
   {id:'aldrics_vow',name:"ALDRIC'S VOW",icon:'⚔️',rarity:'gold',type:'active',npc:'aldric',maxUses:1,timing:'idle',eff:'DOUBLE OR NOTHING',desc:'Your next roll: score 300+ and it doubles; score less and you lose your accumulated turn points. One use.',rewardQuote:'"Thou hast proven worthy. Bear this vow."',arch:'brinksman'},
   {id:'whispers_hex',name:"WHISPER'S HEX",icon:'🔮',rarity:'gold',type:'active',npc:'whisper',maxUses:1,timing:'yielding',eff:'OPP −1 DIE NEXT TURN',desc:'Activate while yielding your turn — the opponent starts their next turn with only five dice. One use.',rewardQuote:'"This hex is yours. Use it wisely."',arch:'saboteur'},
-  {id:'ambrose_grace',name:"AMBROSE'S GRACE",icon:'✝️',rarity:'gold',type:'active',npc:'ambrose',maxUses:1,timing:'choosing',eff:'2 BLANKS → 5s',desc:'During dice selection, convert up to 2 non-scoring dice into 5s (50 pts each). One use per match.',rewardQuote:'"The heavens smiled upon thee. Accept this grace."',arch:'sharp'},
+  {id:'ambrose_grace',name:"AMBROSE'S GRACE",icon:'✝️',rarity:'gold',type:'active',npc:'ambrose',maxUses:1,timing:'choosing',eff:'2 BLANKS → 5s',desc:'During dice selection, convert up to 2 non-scoring dice into 5s (50 pts each). One use per match.',rewardQuote:'"The heavens smiled upon thee. Accept this grace."',arch:'sharp',dep:true},
   /* ── Boss SIGNATURE passives (Phase 5) — alternative to one-use actives ── */
   {id:'mabels_ward',name:"MABEL'S WARD",icon:'🪡',rarity:'gold',npc:'mabel',eff:'EVERY BANK +200; 3RD BANK +600',desc:"Every bank gains +200. Your 3rd, 6th, 9th bank gains +600 instead.",rewardQuote:'"This thread holds firm. Take it, dear."',arch:'safeBanker'},
   {id:'corvus_book',name:"CORVUS'S BOOK",icon:'📖',rarity:'gold',npc:'corvus',eff:'EACH BANK +75 INTEREST (PERMANENT)',desc:"Each bank adds +75 to a running interest line that applies to every future bank this match. Banks of 1000+ add +150 instead.",rewardQuote:'"Compounding. The lender\'s purest art."',arch:'hoarder'},
@@ -7053,11 +7557,11 @@ const CARDS=[
   {id:'seven_dice',name:'SEVEN DICE',icon:'🎲',rarity:'gold',type:'active',maxUses:1,timing:'idle',eff:'NEXT ROLL: 7 DICE INSTEAD OF 6',desc:"Activate before your next roll: throw 7 dice instead of 6. Keep up to 6 scoring dice as normal.",arch:'sharp'},
   {id:'loan',name:'THE LOAN',icon:'💰',rarity:'gold',type:'active',maxUses:1,timing:'idle',eff:'+1500 NOW; −200/TURN FOR 5 TURNS',desc:"Take a loan: gain 1500 points immediately. The innkeeper docks 200 from your total at the start of each of your next 5 turns.",arch:'hoarder'},
   /* ── DICE PROTECTION / SWAP ── */
-  {id:'iron_grip',name:'IRON GRIP',icon:'🔒',rarity:'silver',eff:'DICE CAN\'T BE SWAPPED',desc:'Prevents any opponent effect from swapping, stealing, or downgrading your dice this match.',arch:'utility'},
+  {id:'iron_grip',name:'IRON GRIP',icon:'🔒',rarity:'silver',eff:'DICE CAN\'T BE SWAPPED',desc:'Prevents any opponent effect from swapping, stealing, or downgrading your dice this match.',arch:'utility',counter:true},
   {id:'sleight_of_hand',name:'SLEIGHT OF HAND',icon:'🃏',rarity:'gold',type:'active',maxUses:1,timing:'idle',eff:'SWAP ONE DIE WITH OPP',desc:'Before rolling, swap one of your dice with one of the opponent\'s — you choose which dice to exchange.',arch:'sharp',dep:true},
   /* ── NEW CARDS — Synergy Enablers ── */
   /* Archetype enablers (Phase 4 — reward committing to one archetype) */
-  {id:'tab_at_bar',name:'TAB AT THE BAR',icon:'📋',rarity:'silver',eff:'+150/BANK PER SAFE-BANKER CARD',desc:'For each Safe-Banker card you have equipped (this one included), every bank gains +150.',arch:'safeBanker'},
+  {id:'tab_at_bar',name:'TAB AT THE BAR',icon:'📋',rarity:'silver',eff:'+150/BANK PER SAFE-BANKER CARD',desc:'For each Safe-Banker card you have equipped (this one included), every bank gains +150.',arch:'safeBanker',dep:true},
   {id:'stakes_rising',name:'STAKES RISING',icon:'📈',rarity:'tin',eff:'BANK 500+ → NEXT TURN STARTS +300',desc:'Each turn you bank 500 or more, your next turn starts with +300 turn points already on the table.',arch:'brinksman'},
   {id:'bar_brawl',name:'BAR BRAWL',icon:'🥊',rarity:'gold',eff:'OPP BUST: +250, +50 EACH NEXT',desc:'Each time the opponent busts, gain +250 immediately, growing by +50 per bust this match (1st = +250, 2nd = +300, 3rd = +350…).',arch:'saboteur'},
   {id:'coin_jar',name:'COIN JAR',icon:'🏺',rarity:'silver',eff:'EVERY 3RD BANK: +200, GROWING',desc:'Every 3rd bank you make in a match earns a stacking bonus: +200, +400, +600, etc.',arch:'hoarder'},
@@ -7087,7 +7591,7 @@ const CARDS=[
   {id:'short_pour',name:'SHORT POUR',icon:'🍺',rarity:'silver',eff:'OPP BANKS -20%',desc:"Opponent's banks are worth 20% less.",arch:'saboteur'},
   {id:'the_collector',name:'THE COLLECTOR',icon:'🏆',rarity:'gold',eff:'+400 FOR 3+ SCORE TYPES/TURN',desc:'If you score 3 or more unique types (single 1, single 5, triple, straight) in a turn, gain +400 when you bank.',arch:'collector'},
   {id:'tavern_cheer',name:'TAVERN CHEER',icon:'🍻',rarity:'gold',eff:'FULL STRAIGHT +750 BONUS',desc:'Rolling a full straight (1-2-3-4-5-6) scores an extra +750 bonus.',arch:'collector'},
-  {id:'last_call',name:'LAST CALL',icon:'🔔',rarity:'gold',eff:'WINNING BANK +50%',desc:'If your bank would win the match, it gains +50% bonus.',arch:'hoarder'},
+  {id:'closing_bell',name:'CLOSING BELL',icon:'🔔',rarity:'gold',eff:'WINNING BANK +50%',desc:'If your bank would win the match, it gains +50% bonus.',arch:'hoarder'},
   {id:'old_bones',name:'OLD BONES',icon:'💀',rarity:'gold',type:'active',maxUses:1,timing:'choosing',eff:'ALL BLANKS → 1s',desc:'Once per match: all non-scoring dice become 1s. Use during dice selection.',arch:'sharp',dep:true},
   /* ── BATCH 2 — Remaining Cards ── */
   /* Tin */
@@ -7099,10 +7603,10 @@ const CARDS=[
   {id:'frozen_die',name:'FROZEN DIE',icon:'🧊',rarity:'silver',type:'active',maxUses:2,timing:'choosing',eff:'SAVE A DIE FOR NEXT TURN',desc:"Save one selected scoring die. It reappears on your next turn pre-placed — still selectable, so you can score it alone or fold it into a triple. Clears on bust. Two uses per match.",arch:'sharp'},
   {id:'double_down',name:'DOUBLE DOWN',icon:'✌️',rarity:'silver',type:'active',maxUses:1,timing:'choosing',eff:'2× PTS, REROLL ALL 6',desc:'Double your current turn points, but all kept dice are released and you must roll all 6. One use per match.',arch:'brinksman'},
   /* ── Tactile active cards (select a die, then activate) ── */
-  {id:'coin_flip',name:'COIN FLIP',icon:'🪙',rarity:'silver',type:'active',maxUses:2,timing:'choosing',eff:'FLIP SELECTED DIE',desc:'Select a die, then activate — it flips to the opposite face (1↔6, 2↔5, 3↔4). Two uses per match.',arch:'sharp'},
-  {id:'alchemist_touch',name:"ALCHEMIST'S TOUCH",icon:'🧪',rarity:'silver',type:'active',maxUses:1,timing:'choosing',eff:'SELECTED DIE → 5',desc:'Select a non-scoring die (2/3/4/6), then activate — it becomes a 5 (50 pts). One use per match.',arch:'sharp'},
+  {id:'coin_flip',name:'COIN FLIP',icon:'🪙',rarity:'silver',type:'active',maxUses:2,timing:'choosing',eff:'FLIP SELECTED DIE',desc:'Select a die, then activate — it flips to the opposite face (1↔6, 2↔5, 3↔4). Two uses per match.',arch:'sharp',dep:true},
+  {id:'alchemist_touch',name:"ALCHEMIST'S TOUCH",icon:'🧪',rarity:'silver',type:'active',maxUses:1,timing:'choosing',eff:'SELECTED DIE → 5',desc:'Select a non-scoring die (2/3/4/6), then activate — it becomes a 5 (50 pts). One use per match.',arch:'sharp',dep:true},
   {id:'twinning_charm',name:'TWINNING CHARM',icon:'🧬',rarity:'silver',type:'active',maxUses:1,timing:'choosing',eff:'MIRROR SELECTED VALUE',desc:'Select a die, then activate — a random other unkept die changes to the same value. One use per match.',arch:'sharp'},
-  {id:'double_down_die',name:'DOUBLE DOWN DIE',icon:'⚗️',rarity:'gold',type:'active',maxUses:1,timing:'choosing',eff:'SELECTED 2/3/4 → DOUBLED',desc:'Select a die showing 2, 3, or 4, then activate — its value doubles (capped at 6). One use per match.',arch:'sharp'},
+  {id:'double_down_die',name:'DOUBLE DOWN DIE',icon:'⚗️',rarity:'gold',type:'active',maxUses:1,timing:'choosing',eff:'SELECTED 2/3/4 → DOUBLED',desc:'Select a die showing 2, 3, or 4, then activate — its value doubles (capped at 6). One use per match.',arch:'sharp',dep:true},
   /* ── New scoring-pattern cards — unlock new combos ── */
   {id:'sevens_gift',name:"SEVEN'S GIFT",icon:'🎲',rarity:'tin',eff:'ANY PAIR SUMMING TO 7: +200',desc:'Pairs of dice that sum to 7 (1+6, 2+5, 3+4) score +200 per pair. Dice are consumed by the pair.',arch:'collector'},
   {id:'twin_fury',name:'TWIN FURY',icon:'👯',rarity:'tin',eff:'TWO PAIRS IN ONE ROLL: +600',desc:'If your roll contains two separate pairs (any values), score +600 bonus. The four dice are consumed.',arch:'collector'},
@@ -7111,7 +7615,7 @@ const CARDS=[
   {id:'six_serpents',name:'SIX SERPENTS',icon:'🐍',rarity:'gold',eff:'TRIPLE 6S SCORE 1000',desc:'Triple 6s score 1000 points instead of the standard 600.',arch:'collector'},
   /* ── Position-based cards — pair with Vagabond dice for reliable triggers ── */
   {id:'vanguard',name:'VANGUARD',icon:'🔰',rarity:'tin',eff:'1ST DIE 1 OR 5: +300',desc:'The leftmost die in your row, when scored as a 1 or 5, gets a +300 bonus.',arch:'collector'},
-  {id:'anchor',name:'ANCHOR',icon:'⚓',rarity:'silver',eff:'LAST DIE 6: SCORES 300',desc:'The rightmost die in your row, if it shows a 6 and is committed, scores as a lone single worth 300.',arch:'collector'},
+  {id:'anchor',name:'ANCHOR',icon:'⚓',rarity:'silver',eff:'LAST DIE 6: SCORES 600',desc:'The rightmost die in your row, if it shows a 6 and is committed, scores as a lone single worth 600.',arch:'collector'},
   {id:'sequence',name:'SEQUENCE',icon:'🎯',rarity:'gold',eff:'ROW IN STRICT ORDER: +1500',desc:'If the entire uncommitted row shows strictly ascending or descending values each differing by exactly 1 (e.g. 1-2-3-4-5-6 or 6-5-4-3-2), gain +1500. Fires on the first commit of the roll.',arch:'collector'},
   {id:'slippery_table',name:'SLIPPERY TABLE',icon:'💦',rarity:'silver',eff:'30% OPP DIE SLIPS BACK',desc:'30% chance each opponent turn: one of their kept scoring dice slips back and must be rerolled.',arch:'saboteur'},
   {id:'high_roller',name:'HIGH ROLLER',icon:'🎰',rarity:'silver',eff:'BANK 600+ → +400',desc:'When you bank 600 or more points in a single turn, gain a +400 bonus.',arch:'brinksman'},
@@ -7119,7 +7623,7 @@ const CARDS=[
   {id:'twin_flames',name:'TWIN FLAMES',icon:'🔥',rarity:'silver',eff:'2 DIFF TRIPLES → +750',desc:'If you score 2 different triples in a single turn, gain +750 bonus when you bank.',arch:'collector'},
   /* Gold */
   {id:'broken_lantern',name:'BROKEN LANTERN',icon:'🏮',rarity:'gold',type:'active',maxUses:1,timing:'yielding',eff:'OPP PLAYS BLIND 1 TURN',desc:'Opponent\'s next turn: their dice faces are hidden until committed. One use per match.',arch:'saboteur',dep:true},
-  {id:'wild_die',name:'THE WILD DIE',icon:'🃏',rarity:'gold',type:'active',maxUses:1,timing:'choosing',eff:'PICK ANY DIE FACE',desc:'Choose any face value (1-6) for one non-scoring die. One use per match.',arch:'sharp'},
+  {id:'wild_die',name:'THE WILD DIE',icon:'🃏',rarity:'gold',type:'active',maxUses:1,timing:'choosing',eff:'PICK ANY DIE FACE',desc:'Choose any face value (1-6) for one non-scoring die. One use per match.',arch:'sharp',dep:true},
   {id:'second_wind',name:'SECOND WIND',icon:'💨',rarity:'gold',type:'active',maxUses:1,timing:'idle|choosing|yielding',eff:'BUST → 3-DICE MINI TURN',desc:'If you bust this turn, immediately roll three dice for a rescue attempt. Score = banked. One use per match.',arch:'brinksman'},
   {id:'the_brewer',name:'THE BREWER',icon:'🍺',rarity:'gold',eff:'ACTIVE CARDS +1 USE',desc:'All your active cards get one extra use this match.',arch:'hoarder'},
   {id:'dead_mans_hand',name:"DEAD MAN'S HAND",icon:'🃏',rarity:'gold',eff:'ONCE-PER-MATCH → TWICE',desc:'Your once-per-match card effects can trigger twice instead of once.',arch:'hoarder'},
@@ -7140,7 +7644,7 @@ const CARD_BG={
   beggars_bowl:'#8A7560',loose_thread:'#9A6040',the_whetstone:'#6A7080',the_ladder:'#7A5A3A',snake_oil:'#405A30',fortunes_wheel:'#7A5A20',
   loaded_die:'#6A4A70',gamblers_ghost:'#5A5A70',greedy_hands:'#8A7A30',the_grudge:'#7A3030',lucky_seven:'#3A7A50',cold_shoulder:'#4A6A8A',
   warm_hands:'#8A4A30',gamblers_thumb:'#6A6A40',chain_lightning:'#4A5A8A',hot_streak:'#8A3A20',underdog:'#5A6A50',twin_dice:'#6A5A80',sawdust:'#7A6A50',short_pour:'#6A5A40',
-  the_collector:'#6A4A60',tavern_cheer:'#7A5A30',last_call:'#5A4A60',old_bones:'#4A4A50',
+  the_collector:'#6A4A60',tavern_cheer:'#7A5A30',closing_bell:'#5A4A60',old_bones:'#4A4A50',
   the_jinx:'#4A5A6A',thick_skin:'#6A6A5A',blood_tithe:'#8A2A30',
   the_echo:'#5A6A7A',frozen_die:'#3A6A8A',double_down:'#7A5A30',slippery_table:'#4A7A6A',high_roller:'#8A6A20',the_fence:'#5A4A3A',the_alchemist:'#6A5A2A',twin_flames:'#8A4A20',
   broken_lantern:'#3A3A3A',wild_die:'#6A3A7A',second_wind:'#4A6A5A',the_brewer:'#7A5A20',dead_mans_hand:'#4A4A5A',the_pyre:'#9A3A20',all_in:'#5A3A6A',
@@ -7171,10 +7675,10 @@ const NPC_CARDS=[
    playerDesc:'Once per match, survive a bust and keep rolling. Your turn points are halved but not lost.',
    effect:{type:'once',mechanic:'bust_survive',chance:1.0}},
   {id:'grogs_bump',name:"GROG'S BUMP",icon:'🍻',rarity:'npc',npcOnly:true,owner:'grog',
-   type:'active',maxUses:1,timing:'yielding',
-   eff:'YOUR HIGHEST DIE → 3 (once)',desc:"Once per match, Grog stumbles into the table and knocks your highest-value die down to a 3.",
-   playerDesc:'Activate while yielding: knock the opponent\'s highest-value die down to a 3 on their next scoring roll.',
-   effect:{type:'once',mechanic:'swap_best_to_3'}},
+   type:'active',maxUses:2,timing:'yielding',
+   eff:'YOUR SCORING DIE → 3 (twice)',desc:"Twice per match, Grog stumbles into the table and knocks one of your scoring dice (1 or 5) down to a 3. Felt twice in a single match.",
+   playerDesc:"Activate while yielding: knock one of the opponent's scoring dice (1 or 5) down to a 3. Two uses per match.",
+   effect:{type:'twice',mechanic:'swap_best_to_3',uses:2}},
 
   /* ── MABEL ── */
   {id:'the_last_stitch_npc',name:'THE LAST STITCH',icon:'🧵',rarity:'npc',npcOnly:true,owner:'mabel',
@@ -7396,8 +7900,8 @@ const DICE_TYPES=[
    desc:'6s count as any face for completing triples.'},
   {id:'brass',name:'BRASS',icon:'🟤',cost:450,
    faces:[1,1,5,5,3,4],
-   effect:{type:'risk_reward',mechanic:'reckless',penalty:200},
-   desc:'Extra 1 and 5 faces. Busts cost 200 from your total.'},
+   effect:{type:'risk_reward',mechanic:'reckless',penaltyPct:0.04},
+   desc:'Extra 1 and 5 faces. Each Brass die in your loadout costs 4% of your total when you bust.'},
   {id:'silver',name:'SILVER',icon:'🔘',cost:580,
    faces:[1,2,3,4,5,6],
    effect:{type:'utility',mechanic:'shield'},
@@ -7445,7 +7949,7 @@ function _dieEffectLabel(eff){
     case'single1_bonus':return'1s score '+(SCORING_BASE.single1+(eff.amount||50));
     case'single5_bonus':return'5s score '+(SCORING_BASE.single5+(eff.amount||25));
     case'wild_triple':return'6s are wild for triples';
-    case'reckless':return'Busts cost −'+(eff.penalty||200)+' from total';
+    case'reckless':return'Busts cost −'+Math.round((eff.penaltyPct||0.04)*100)+'% of total';
     case'shield':return'Saves one bust per match';
     default:return eff.mechanic.replace(/_/g,' ');
   }
@@ -7711,7 +8215,19 @@ function mkDie(val,mat,sizeClass){
   /* Jade 6 is a wildcard — render as a blank face so it visually reads as "any value" */
   const isWildJade=(mat==='jade'&&val===6);
   if(isWildJade)div.classList.add('die-wild');
-  const dotCells=isWildJade?[]:(FACE_DOTS[val]||FACE_DOTS[1]);
+  /* While the die is in the "rolling" state (CSS class added by handleRoll), show a
+     RANDOM face that isn't a 1. Otherwise the central single-dot pattern of a 1 is
+     visible mid-roll and lets the player anticipate scoring before settling. The
+     real `val` face is drawn by settleDie/reDrawDieFace once the spin ends.
+     We stash the true val so settleDie can reapply it. */
+  div._trueVal=val;div._trueMat=mat;
+  const isRollingPlaceholder=!isWildJade;
+  let displayVal=val;
+  if(isRollingPlaceholder){
+    const faces=[2,3,4,5,6];
+    displayVal=faces[Math.floor(Math.random()*faces.length)];
+  }
+  const dotCells=isWildJade?[]:(FACE_DOTS[displayVal]||FACE_DOTS[1]);
   for(let i=0;i<49;i++){
     const cell=document.createElement('div');
     cell.className=dotCells.includes(i)?'dc dot':'dc';
@@ -7728,7 +8244,23 @@ function settleDie(el){
   el.style.transform='';
   el.style.boxShadow='';
   el.style.transition='none';
-  el.style.opacity='1';
+  /* NOTE: do NOT set el.style.opacity='1' here. The dRoll keyframe only
+     animates rotation, not opacity, so there's nothing to reset. Setting
+     inline opacity here persists past the roll and overrides .die.bust /
+     .die.committed CSS opacity, leaving stale-pool dice (obsidian shatter,
+     Cutpurse palm, persistent frozen-die preview) at full brightness on
+     bust because doBust's inline-clear loop only iterates G.pool. */
+  /* Swap the placeholder rolling-face dots back to the real val now that the spin ended.
+     During mkDie we showed a random non-1 face to hide 1s mid-roll. */
+  if(typeof el._trueVal==='number'){
+    var _tv=el._trueVal,_tm=el._trueMat||'bone';
+    var _tIsWild=(_tm==='jade'&&_tv===6);
+    var _tCells=_tIsWild?[]:(FACE_DOTS[_tv]||FACE_DOTS[1]);
+    var _tDots=el.children;
+    for(var _ti=0;_ti<49;_ti++){if(!_tDots[_ti])continue;_tDots[_ti].className=_tCells.includes(_ti)?'dc dot':'dc';}
+    el.classList.toggle('die-wild',_tIsWild);
+    el._trueVal=undefined;/* consume so subsequent reDraws don't re-fire */
+  }
   /* Force reflow so the browser applies the clean state immediately */
   void el.offsetWidth;
   /* Gentle settle bounce */
@@ -7843,7 +8375,11 @@ function _cagBuildPath(W,H,level,seed){
   left.forEach(([x,y])=>b+=`L ${x.toFixed(1)} ${y.toFixed(1)} `);
   b+=`Q 0 0 ${rTL} 0 Z`;
   const holes=_cagGenHoles(W,H,level,rng,scale);
-  return{clipPath:b+_cagHolePath(holes,rng),borderStr:b,holes};
+  /* Clip-path used to include the hole cutouts via fill-rule:evenodd, which exposed
+     the background and created black gaps between the outer clip and inner card body.
+     We now keep clipPath as the torn OUTER EDGE ONLY — holes are painted onto the
+     canvas overlay (darker radial stains) instead of physically cut out. */
+  return{clipPath:b,borderStr:b,holes};
 }
 function _cagDrawAging(canvas,W,H,level,seed,holes,borderStr){
   const ctx=canvas.getContext('2d');
@@ -7931,6 +8467,11 @@ function applyCardAging(outerEl,tarnish,cardId){
     gcard.style.setProperty('--sheen-op',st.sheenOp);
     gcard.style.setProperty('--cover-op',1);
     gcard.style.setProperty('--cover-filter',st.wobble>0?`url(#emojiWobble${st.wobble})`:'none');
+    /* Apply the same torn clip to the inner card body so the rounded gcard border
+       follows the outer's irregular edge instead of leaving a black gap where the
+       outer clip cuts INTO what the inner gcard's own rounded corner would cover. */
+    gcard.style.clipPath=`path('${clipPath}')`;
+    gcard.style.borderRadius='0';
   }
   const ac=document.createElement('canvas');
   ac.className='age-canvas';
@@ -8036,6 +8577,7 @@ function closeAllChips(){
     if(tip._origParent){
       /* Remove .tip-arrow before returning — stale pixel position would conflict with CSS ::after */
       var ta=tip.querySelector('.tip-arrow');if(ta)ta.remove();
+      tip.classList.remove('tip-greyed');
       tip._origParent.appendChild(tip);tip.style.cssText='';tip._origParent=null;
     }else{tip.remove();}
   });
@@ -8118,6 +8660,10 @@ function clampTooltip(mcardEl){
       const cardR=mcardEl.getBoundingClientRect();
       /* Move tooltip to body so it's truly fixed-positioned */
       tip._origParent=mcardEl;
+      /* Carry over greyed-state class so body-promoted tooltip stays desaturated for used/in-zone cards */
+      if(mcardEl.classList.contains('in-zone')||mcardEl.classList.contains('used')||mcardEl.classList.contains('draft-greyed')||mcardEl.classList.contains('draft-locked')){
+        tip.classList.add('tip-greyed');
+      }
       document.body.appendChild(tip);
       tip.style.position='fixed';
       tip.style.bottom='auto';
@@ -8611,10 +9157,16 @@ function updHUD(){
       var isFinal=r>=G._suddenDeathTurns;
       sdC.classList.toggle('sd-final',isFinal);
       if(sdW)sdW.classList.toggle('sd-final-wrap',isFinal);
-      /* Toned color progression — muted earthy tones, no super-saturated hues */
+      /* Per-round colour escalation — same gold→orange→red ramp as Rising Stakes */
       var _sdMax=G._suddenDeathTurns||3;
-      var _sdCol=r>=_sdMax?'#b07060':(r>=Math.ceil(_sdMax*0.67)?'#b09070':'#a09060');
+      var _sdCol,_sdGlow;
+      if(r>=_sdMax){_sdCol='#ff6020';_sdGlow='rgba(255,96,32,.7)';}
+      else if(r>=Math.ceil(_sdMax*0.67)){_sdCol='#e08830';_sdGlow='rgba(224,136,48,.55)';}
+      else{_sdCol='#dca84a';_sdGlow='rgba(220,168,74,.45)';}
+      /* Set on the wrap so all descendants (label/num/of/subtitle) inherit */
+      if(sdW){sdW.style.setProperty('--sd-color',_sdCol);sdW.style.setProperty('--sd-glow',_sdGlow);}
       sdC.style.setProperty('--sd-color',_sdCol);
+      sdC.style.setProperty('--sd-glow',_sdGlow);
     }
   }else{
     document.getElementById('turnNum').textContent='TURN '+G.turnNum;
@@ -9183,13 +9735,13 @@ function handleRoll(){
       if(_probe.used&&_probe.used[_anchorIdx]){
         /* 6 is consumed by pattern → keep full selection, just stack +150 */
         pts=scoreSelection(_selVals,cards,locked,undefined,_selMats);
-        _anchorPts=300;
+        _anchorPts=600;
       }else{
         /* 6 not used → remove it from scoring pool so commit accepts, treat as lone 150 */
         _scoreVals=_selVals.filter(function(_,i){return i!==_anchorIdx;});
         _scoreMats=_selMats.filter(function(_,i){return i!==_anchorIdx;});
         pts=_scoreVals.length?scoreSelection(_scoreVals,cards,locked,undefined,_scoreMats):0;
-        _anchorPts=300;
+        _anchorPts=600;
       }
     }else{
       pts=scoreSelection(_selVals,cards,locked,undefined,_selMats);
@@ -9197,7 +9749,7 @@ function handleRoll(){
     /* Reject if base scoring returned -1 (unused dice) OR returned 0 without anchor firing */
     if(pts<0||(pts===0&&!_anchorDie)){SFX.err();setStatusMsg('NO SCORE — TRY AGAIN','red');return;}
     pts+=_anchorPts;
-    if(_anchorDie)triggerCard('anchor','ANCHOR +300',true);
+    if(_anchorDie)triggerCard('anchor','ANCHOR +600',true);
     /* ── POSITION-BASED CARD BONUSES (Vagabond synergy) ──
        Positions are read from G.pool (roll order, stable across commits). */
     (function _positionBonuses(){
@@ -9506,11 +10058,12 @@ function afterRoll(){
   var _csDelayRoll=G.rung._coldShoulder?2:0;
   G.oCards.forEach(function(cid){
     var npc=getNpcCard(cid);if(!npc)return;var eff=npc.effect;
-    /* quick_hands / grogs_bump: swap highest scoring die to 3 (once) */
-    if(eff.mechanic==='swap_best_to_3'&&!G.npcCardState.usedOnce[cid]&&G.turnNum>=(2+_csDelayRoll)){
+    /* quick_hands / grogs_bump: swap highest scoring die to 3 (uses defaults to 1; grogs_bump uses 2) */
+    var _sb3MaxUses=eff.uses||1;
+    if(eff.mechanic==='swap_best_to_3'&&(G.npcCardState.usedOnce[cid]||0)<_sb3MaxUses&&G.turnNum>=(2+_csDelayRoll)){
       var scoring=free.filter(function(d){return d.val===1||d.val===5;});
       if(scoring.length>0){
-        G.npcCardState.usedOnce[cid]=true;
+        G.npcCardState.usedOnce[cid]=(G.npcCardState.usedOnce[cid]||0)+1;
         var victim=scoring.sort(function(a,b){return(a.val===1?100:50)-(b.val===1?100:50);}).pop();
         victim.val=3;
         if(victim.el){
@@ -9583,7 +10136,7 @@ function afterRoll(){
   var freeVN=free.map(function(d){return d.val;});
   var freeMatsN=free.map(function(d){return d.mat;});
   var cardsN=effectiveCards();
-  if(!anyScoring(freeVN,cardsN,freeMatsN)){setTimeout(function(){_delayedDoBust(free);},500);return;}
+  if(!anyScoring(freeVN,cardsN,freeMatsN)){setTimeout(function(){_delayedDoBust(free);},150);return;}
 
   /* Reckless die tracking (Brass): busts cost extra from banked total */
   /* (penalty applied in doBust, no forced bust here) */
@@ -9625,6 +10178,9 @@ function _showDieEffects(selDice,effects){
   });
 }
 function refreshSelUI(){
+  /* Guard: don't update selection-status text outside the player's choosing/idle phases.
+     Otherwise stale 'NO SCORE' from the player UI bleeds into NPC turn status messages. */
+  if(G&&G.phase!=='choosing'&&G.phase!=='idle'&&G.phase!=='gamblers_eye')return;
   const selD=G.pool.filter(d=>d.sel&&!d.committed);const selV=selD.map(d=>d.val);const selMats=selD.map(d=>d.mat);const locked=G.kept.reduce((a,k)=>a+k.pts,0);const cards=effectiveCards();
   if(!selV.length){G.turnPts=locked;updHUD();setBtns(false,locked>0);setStatusMsg('','');_clearDieEffects();G.pool.forEach(d=>{d.el.classList.remove('combo-glow');d.el.style.removeProperty('--gd');});G._comboGlow=false;return;}
   const _sr=scoreRoll(selV,cards,locked,undefined,selMats);
@@ -9730,30 +10286,20 @@ function _tryBustSave(free){
    the rightmost free die with a red "doom" tint, and delay doBust() by
    ~750ms for drama. Cheap turns (no accumulated points) bust instantly. */
 var CLOSE_BUST_THRESHOLD=300;
-var CLOSE_BUST_DELAY_MS=750;
+var CLOSE_BUST_DELAY_MS=300;
 function _closeBustDrama(freeArr){
   if(S&&S.settings&&S.settings.reducedMotion)return false;
   var keptPts=(G.kept||[]).reduce(function(a,k){return a+(k.pts||0);},0);
   var atRisk=keptPts+(G.turnPts||0);
   if(atRisk<CLOSE_BUST_THRESHOLD||!freeArr||freeArr.length===0)return false;
-  var lastDie=freeArr[freeArr.length-1];
-  /* Dim every other free die (grayscale + partial opacity) */
+  /* Subtle scale + opacity dip across all free dice — NO grayscale/brightness
+     filter (was being read as "greying out before bust"). */
   freeArr.forEach(function(d){
-    if(d===lastDie||!d.el)return;
-    d.el.style.transition='opacity 220ms ease, filter 220ms ease, transform 220ms ease';
-    d.el.style.opacity='0.32';
-    d.el.style.filter='grayscale(.7) brightness(.65)';
-    d.el.style.transform='scale(.88)';
+    if(!d.el)return;
+    d.el.style.transition='opacity 180ms ease, transform 180ms ease';
+    d.el.style.opacity='0.8';
+    d.el.style.transform='scale(.94)';
   });
-  /* Pulse the "reveal" die — scale up + red doom glow */
-  if(lastDie.el){
-    lastDie.el.style.transition='transform 260ms cubic-bezier(.4,1.6,.5,1), filter 260ms ease, box-shadow 260ms ease';
-    lastDie.el.style.filter='brightness(1.15)';
-    lastDie.el.style.boxShadow='0 0 18px 4px rgba(220,80,60,.75),3px 4px 0 rgba(30,18,8,.45),4px 5px 0 rgba(30,18,8,.2)';
-    lastDie.el.style.transform='scale(1.22)';
-  }
-  /* Optional: brief match-area desaturation overlay to sell the slow-mo mood */
-  try{var area=document.getElementById('diceArea');if(area){area.style.transition='filter 220ms ease';area.style.filter='saturate(.5) brightness(.9)';setTimeout(function(){area.style.filter='';setTimeout(function(){area.style.transition='';},240);},CLOSE_BUST_DELAY_MS);}}catch(e){}
   return true;
 }
 function _delayedDoBust(freeArr){
@@ -9768,7 +10314,8 @@ function doBust(){
   /* Silver die shield: cancel bust once per shield die in loadout */
   if(G.dieShieldsPlayer>0){
     G.dieShieldsPlayer--;
-    G.pool.forEach(d=>{if(d.el)d.el.classList.add('bust');});
+    /* Apply bust to all visible dice in the row (not just G.pool — see comment in main bust path) */
+    (function(){var _r=document.getElementById('playerDiceRow');if(_r)Array.prototype.forEach.call(_r.querySelectorAll('.die'),function(el){el.style.opacity='';el.style.filter='';el.classList.add('bust');});})();
     setStatusMsg('SILVER SHIELD — BUST BLOCKED!','silver');
     spawnPop('🛡️ SHIELD');
     G.safeTurnStreak=0;G.turnPts=0;G.kept=[];updHUD();refreshKeptTray();setBtns(false,false);
@@ -9778,7 +10325,8 @@ function doBust(){
   /* Second Wind: bust → mini-turn with 3 dice (active card) */
   if(G.activeCardState&&G.activeCardState.secondWindActive){
     G.activeCardState.secondWindActive=false;clearCardLabel('second_wind');
-    G.pool.forEach(d=>{if(d.el)d.el.classList.add('bust');});
+    /* Apply bust to all visible dice in the row (not just G.pool — see comment in main bust path) */
+    (function(){var _r=document.getElementById('playerDiceRow');if(_r)Array.prototype.forEach.call(_r.querySelectorAll('.die'),function(el){el.style.opacity='';el.style.filter='';el.classList.add('bust');});})();
     setStatusMsg('BUST — SECOND WIND!','gold');triggerCard('second_wind','3-DICE RESCUE!',true);
     G.safeTurnStreak=0;G.turnPts=0;G.kept=[];G.numDice=3;updHUD();refreshKeptTray();
     setTimeout(()=>{clearRow('playerDiceRow');G.pool=[];G.phase='idle';setBtns(true,false);setStatusMsg('Second Wind — roll 3 dice!','gold');},1200);
@@ -9788,7 +10336,8 @@ function doBust(){
   if(!G._thickSkinUsed&&G.pCards.includes('thick_skin')){
     G._thickSkinUsed=true;
     var _tsSaved=Math.floor(G.kept.reduce((a,k)=>a+k.pts,0)/2);
-    G.pool.forEach(d=>{if(d.el)d.el.classList.add('bust');});
+    /* Apply bust to all visible dice in the row (not just G.pool — see comment in main bust path) */
+    (function(){var _r=document.getElementById('playerDiceRow');if(_r)Array.prototype.forEach.call(_r.querySelectorAll('.die'),function(el){el.style.opacity='';el.style.filter='';el.classList.add('bust');});})();
     if(_tsSaved>0){G.pPts+=_tsSaved;spawnPop('+'+_tsSaved+' THICK SKIN');}
     triggerCard('thick_skin','SAVED '+_tsSaved,true);
     setStatusMsg('BUST — THICK SKIN SAVED '+_tsSaved+'!','gold');
@@ -9801,7 +10350,8 @@ function doBust(){
     G.activeCardState.stitchActive=false;clearCardLabel('mabels_stitch');
     const saved=G.kept.reduce((a,k)=>a+k.pts,0);
     const _stitchBonus=300;
-    G.pool.forEach(d=>{if(d.el)d.el.classList.add('bust');});
+    /* Apply bust to all visible dice in the row (not just G.pool — see comment in main bust path) */
+    (function(){var _r=document.getElementById('playerDiceRow');if(_r)Array.prototype.forEach.call(_r.querySelectorAll('.die'),function(el){el.style.opacity='';el.style.filter='';el.classList.add('bust');});})();
     const total=saved+_stitchBonus;
     G.pPts+=total;
     spawnPop('+'+total+' STITCHED');
@@ -9850,11 +10400,12 @@ function doBust(){
   });
   /* Reckless die penalty (Brass): each brass die in loadout adds penalty on bust */
   if(G.matchDice){
-    var recklessPenalty=0;
+    var recklessPctTotal=0;
     G.matchDice.forEach(function(mid){
       var dt=getDie(mid);
-      if(dt&&dt.effect&&dt.effect.mechanic==='reckless')recklessPenalty+=(dt.effect.penalty||200);
+      if(dt&&dt.effect&&dt.effect.mechanic==='reckless')recklessPctTotal+=(dt.effect.penaltyPct||0.04);
     });
+    var recklessPenalty=Math.floor(G.pPts*recklessPctTotal);
     if(recklessPenalty>0&&G.pPts>0){
       G.pPts=Math.max(0,G.pPts-recklessPenalty);
       spawnPop('−'+recklessPenalty+' BRASS');
@@ -9872,23 +10423,27 @@ function doBust(){
   if(G._handicap==='bounty_board'){G._bountyBankStreak=0;G._bountyBustLastTurn=true;}
   updHUD();refreshKeptTray();
   setTimeout(()=>{
-    /* Clear any lingering close-bust drama inline styles before the bust class
-       takes over — otherwise inline transform/boxShadow override the .die.bust
-       animation and the dice never properly shake or grey out. */
-    G.pool.forEach(d=>{
-      if(d.el){
-        d.el.style.transform='';
-        d.el.style.boxShadow='';
-        d.el.style.transition='';
-        d.el.style.filter='';
-        d.el.style.opacity='';
-        d.el.classList.add('bust');
-      }
-    });
+    /* Clear lingering inline styles + apply bust to EVERY visible die in the row,
+       not just G.pool. Pool can lag the visible state during obsidian shatter,
+       Cutpurse palm, or persistent frozen-die preview, leaving a visible die
+       that was never touched by the bust pass. Iterating the row guarantees
+       every die the player sees grays out together. */
+    var _bustRow=document.getElementById('playerDiceRow');
+    if(_bustRow){
+      Array.prototype.forEach.call(_bustRow.querySelectorAll('.die'),function(el){
+        el.style.transform='';
+        el.style.boxShadow='';
+        el.style.transition='';
+        el.style.filter='';
+        el.style.opacity='';
+        el.classList.remove('selected','combo-glow','eff-glow-gold','eff-glow-green','eff-glow-red','eff-glow-blue');
+        el.classList.add('bust');
+      });
+    }
     var _bov=document.getElementById('bust-ov');_alignOverlayWord(_bov.querySelector('.bust-word'));_bov.classList.add('flash');SFX.bust();Haptic.bust();
     _bustImpact();
     if(window.DLG)DLG.trigger('PLAYER_BUST');
-    setStatusMsg('BUST','red');
+    /* No status-msg 'BUST' — the large bust-ov overlay covers it */
     /* Fire NPC card animations AFTER bust overlay appears */
     _pendingBustTriggers.forEach(function(p){triggerCard(p.cid,p.msg,false);});
     if(_pendingBustTriggers.length)updHUD();
@@ -9901,7 +10456,7 @@ function doBust(){
        full scale+fade arc instead of being cut off mid-animation. */
     setTimeout(()=>document.getElementById('bust-ov').classList.remove('flash'),1100);
     setTimeout(()=>{clearRow('playerDiceRow');G.pool=[];endPTurn();},1300);
-  },300);
+  },20);
 }
 
 function handleBank(){
@@ -9922,7 +10477,7 @@ function handleBank(){
   if(_pse){_pse.classList.remove('score-bank-pop');void _pse.offsetWidth;_pse.classList.add('score-bank-pop');_pse.addEventListener('animationend',function(){_pse.classList.remove('score-bank-pop');},{once:true});}
   let bonusMsg='';
   const totalCommitted=G.kept.reduce((a,k)=>a+k.vals.length,0);
-  if(G.pCards.includes('half_measure')&&totalCommitted===3){total+=200;bonusMsg=' +200 HALF MEASURE';triggerCard('half_measure','+200',true);}
+  if(G.pCards.includes('half_measure')&&totalCommitted===3){total+=400;bonusMsg=' +400 HALF MEASURE';triggerCard('half_measure','+400',true);}
   var _effectiveRollCount=G.turnRollCount;
   if(G.pCards.includes('the_hearth')&&_effectiveRollCount===1){total+=100;bonusMsg+=' +100 HEARTH';triggerCard('the_hearth','+100',true);}
   if(G.pCards.includes('thrifty_gambler')&&total>=400&&total<=600){total+=150;bonusMsg+=' +150 THRIFTY';triggerCard('thrifty_gambler','+150',true);}
@@ -10081,7 +10636,7 @@ function handleBank(){
     if(_ctCount>=3){total+=400;bonusMsg+=' +400 COLLECTOR';triggerCard('the_collector','+400 ('+_ctCount+' types)',true);}
   }
   /* Last Call: if this bank would win the match, +50% */
-  if(G.pCards.includes('last_call')&&(G.pPts+total)>=G.target){var _lcBonus=Math.floor(total*0.5);total+=_lcBonus;bonusMsg+=' +'+_lcBonus+' LAST CALL';triggerCard('last_call','+'+_lcBonus,true);}
+  if(G.pCards.includes('closing_bell')&&(G.pPts+total)>=G.target){var _lcBonus=Math.floor(total*0.5);total+=_lcBonus;bonusMsg+=' +'+_lcBonus+' CLOSING BELL';triggerCard('closing_bell','+'+_lcBonus,true);}
   /* The Grudge: add accumulated grudge bonus */
   if(G.pCards.includes('the_grudge')&&(G._grudgeStack||0)>0){var _grBonus=G._grudgeStack;total+=_grBonus;bonusMsg+=' +'+_grBonus+' GRUDGE';triggerCard('the_grudge','+'+_grBonus,true);G._grudgeStack=0;}
   /* Hot Streak: track safe turns and prime next roll */
@@ -10404,14 +10959,40 @@ function oppShouldBank(rung,oppBank,diceLeft,oppTotal,playerTotal,target){
     if(gapRatio>0.15)agg=Math.min(0.95,agg+0.25);else if(gapRatio<-0.25)agg=Math.max(0.1,agg-0.12);}
   /* NPC adaptation: soften after 3+ consecutive losses to this player */
   if(S&&S.npcState&&rung.key){var _aNs=S.npcState[rung.key];if(_aNs&&_aNs.streak<=-3)agg=Math.max(0.1,agg-0.05);}
-  /* Desperate play: when player is close to winning and NPC is far behind, go all-in */
+  /* Desperate play: when player is close to winning and NPC is far behind, push harder
+     but don't go all-in suicide (.95 = guaranteed bust). Capped at .85. */
   var pProg=playerTotal/target,oProg=oppTotal/target;
-  if(pProg>0.70&&(pProg-oProg)>0.30)agg=Math.max(agg,0.95);
-  else if(pProg>0.50&&(pProg-oProg)>0.20)agg=Math.max(agg,0.85);
-  if(oppBank<rung.minBank&&diceLeft>=2)return false;
-  /* diceStop: strong banking pressure when few dice remain */
+  if(pProg>0.70&&(pProg-oProg)>0.30)agg=Math.max(agg,0.85);
+  else if(pProg>0.50&&(pProg-oProg)>0.20)agg=Math.max(agg,0.78);
+  /* ── Context-aware push logic ── Score gap relative to target decides whether a
+     low-dice push is rational:
+       • BEHIND  (player leads by ≥10% target): push even at 1-2 dice, nothing to lose
+       • EVEN    (within 10%): occasional push at 2 dice (~35%), bank at 1 die
+       • AHEAD   (NPC leads by ≥10% target): bank, don't risk a hard-won lead
+     Handicap matches with low effective targets (Sudden Death) bias toward more pushing
+     since each turn matters more. */
+  var _gap=oppTotal-playerTotal;/* positive = NPC ahead */
+  var _gapRatio=_gap/target;
+  var _ahead=_gapRatio>0.10;
+  var _behind=_gapRatio<-0.10;
+  var _isSuddenDeath=G&&G._handicap==='sudden_death';
+  /* Force-push below minBank: always at 3+ dice. At 1-2 dice, depends on score context. */
+  if(oppBank<rung.minBank){
+    if(diceLeft>=3)return false;/* plenty of dice → standard push */
+    if(_behind)return false;/* nothing to lose → push at 1-2 dice */
+    if(_isSuddenDeath&&!_ahead)return false;/* SD pressure → push if not ahead */
+    if(_ahead)return true;/* protect the lead → bank below minBank */
+    /* Even score, 1-2 dice, sub-minBank: occasional push (~35%) */
+    if(diceLeft===2&&Math.random()<0.35)return false;
+    /* Otherwise bank what we have */
+    return true;
+  }
+  /* diceStop: strong banking pressure when few dice remain (above minBank — safe to bank) */
   if(diceLeft<=rung.diceStop&&oppBank>=rung.minBank){
     var stopChance=diceLeft===1?0.85:(1-agg*0.4);
+    /* AHEAD: lock in even harder (raise stopChance). BEHIND: push more (lower it). */
+    if(_ahead)stopChance=Math.min(0.98,stopChance+0.15);
+    else if(_behind)stopChance=Math.max(0.10,stopChance-0.20);
     if(Math.random()<stopChance)return true;
   }
   /* Safety bank: scale threshold with minBank so Serpent's Whisper isn't bypassed */
@@ -10795,7 +11376,7 @@ function runOppTurn(){
         triggerCard('bad_reputation','BAD REP −'+_brHalf,true);
       }
       /* The Grudge: increment player's grudge stack when opponent banks */
-      if(G.pCards.includes('the_grudge')){G._grudgeStack=Math.min((G._grudgeStack||0)+50,250);}
+      if(G.pCards.includes('the_grudge')){G._grudgeStack=Math.min((G._grudgeStack||0)+150,750);}
       if(G.pCards.includes('taxing_breath')&&pts>=250){pts-=250;G.pPts+=250;triggerCard('taxing_breath','+250 TAX',true);}
       /* ── Handicap: Rising Stakes — opponent streak multiplier ── */
       if(G._handicap==='rising_stakes'){
@@ -11593,7 +12174,13 @@ function exitMatch(){
     /* Boss win — record, advance tier, go straight to gauntlet (dice already chosen inline) */
     S.run.bossesBeaten.push(S.run.tier);
     S.run.points=0;
+    /* Detect newly-unlocked slots so the loadout can celebrate them on next render */
+    var _prevTier=S.run.tier;
+    var _wasUnlocked=[];for(var _us=0;_us<5;_us++){if(_isSlotUnlocked(_us))_wasUnlocked.push(_us);}
     S.run.tier=Math.min(S.run.tier+1,TIERS.length);
+    var _nowUnlocked=[];for(var _ns=0;_ns<5;_ns++){if(_isSlotUnlocked(_ns))_nowUnlocked.push(_ns);}
+    var _newlyUnlocked=_nowUnlocked.filter(function(s){return _wasUnlocked.indexOf(s)<0;});
+    if(_newlyUnlocked.length){S.run._slotsToCelebrate=(S.run._slotsToCelebrate||[]).concat(_newlyUnlocked);}
     if(S.run.tier>S.bestTier)S.bestTier=S.run.tier;
     /* Drop the cached boss-card preview for the tier we just left so a
        future replay/new tier rerolls fresh. */
@@ -12174,10 +12761,17 @@ function buildMiniCube(matId){
   for(var f=0;f<6;f++){
     var face=document.createElement('div');face.className='dice-face '+faceOrder[f];
     var val=dice.faces?dice.faces[f]:(f+1);
-    PIP_LAYOUTS[val].forEach(function(on){
-      var pip=document.createElement('div');pip.className='pip '+(on?'on':'off');
-      face.appendChild(pip);
-    });
+    /* Jade 6 is a wildcard — render as a blank face with a star to match in-match rendering */
+    var isWildJadeFace=(matId==='jade'&&val===6);
+    if(isWildJadeFace){
+      face.classList.add('wild-face');
+      face.textContent='★';
+    } else {
+      PIP_LAYOUTS[val].forEach(function(on){
+        var pip=document.createElement('div');pip.className='pip '+(on?'on':'off');
+        face.appendChild(pip);
+      });
+    }
     cube.appendChild(face);
   }
   wrap.appendChild(cube);
@@ -12188,7 +12782,10 @@ function buildDieTooltipHTML(matId){
   var dice=getDie(matId);if(!dice)return '';
   var effHtml='';
   if(dice.effect){effHtml='<div class="dt-eff">'+_wnHtml(_dieEffectLabel(dice.effect))+'</div>';}
-  var facesHtml=dice.faces.map(function(f){return '<b class="tip-num">'+f+'</b>';}).join(' · ');
+  var facesHtml=dice.faces.map(function(f){
+    if(matId==='jade'&&f===6)return '<b class="tip-num" style="color:#90e0a0">★</b>';
+    return '<b class="tip-num">'+f+'</b>';
+  }).join(' · ');
   return '<div class="die-tooltip dtype-'+matId+'">'+
     '<div class="dt-name">'+toTitleCase(dice.name)+'</div>'+
     '<div class="dt-3d-placeholder" data-mat="'+matId+'"></div>'+
@@ -12364,8 +12961,10 @@ function markActiveCardUsed(cardId){
 function refundActiveCardUse(cardId){
   if(!G||!G.activeCardState||!G.activeCardState.usedCards)return;
   G.activeCardState.usedCards[cardId]=(G.activeCardState.usedCards[cardId]||0)+1;
-  var chip=document.querySelector('.mcard-active[data-cid="'+cardId+'"]');
-  if(chip)chip.classList.remove('used');
+  /* Remove .used from all card representations (chip in activation zone + base mcard) */
+  document.querySelectorAll('[data-cid="'+cardId+'"]').forEach(function(el){el.classList.remove('used');});
+  /* Refresh card visuals so any chip that was greyed gets restored */
+  if(typeof _updatePlayerCardVisuals==='function')_updatePlayerCardVisuals();
 }
 
 /* Helper: redraw die face dots from d.val */
@@ -13201,14 +13800,16 @@ function initMatchScreen(data){
   /* Fallback for browsers without ResizeObserver */
   setTimeout(_drawMatchUI,300);
   setTimeout(_drawMatchUI,800);
-  /* Surface start-bonus cards so the opening score isn't a mystery */
+  /* Surface start-bonus cards. The card pulse + +XXX pop is enough — no extra
+     status-msg "HER LUCKY COIN — PATRON +600" line (redundant with the pop). */
   if(G._pendingStartBonuses&&G._pendingStartBonuses.length){
     var _sb=G._pendingStartBonuses;G._pendingStartBonuses=[];
+    var _hasSplash=!!(G._handicap||G._isBoss||G._tell);
+    var _sbBase=_hasSplash?3500:800;
     _sb.forEach(function(b,i){setTimeout(function(){
       triggerCard(b.cid,'+'+b.amount,!b.opp,true);
-      if(b.opp){setStatusMsg(b.name+' — PATRON +'+b.amount,'red');}
-      else{setStatusMsg(b.name+' — YOU +'+b.amount,'green');spawnPop('+'+b.amount);}
-    },1400+i*900);});
+      if(!b.opp)spawnPop('+'+b.amount);
+    },_sbBase+i*700);});
   }
   // Clean up any stale state from previous match
   /* Clear status bars (top/bot) so leftover messages like "BANKED X" don't bleed into the next match */
@@ -13236,13 +13837,15 @@ function initMatchScreen(data){
   // Start match
   updHUD();setTurnMode(false);setBtns(false,false);
   var _matchStartDelay=params._resumeData?200:800;
-  /* Helper: chain Tell splash after handicap/boss splash so the player sees both */
-  function _afterPrimarySplash(){
-    if(G&&G._tell){
+  /* Helper: chain Tell splash after handicap splash. Boss splash inlines the Tell
+     so we skip the second Tell splash for boss matches — fluid single-step reveal. */
+  function _afterPrimarySplash(skipTellSplash){
+    /* Tell rule is now permanently displayed on-screen via #tellBadge, so we no longer
+       fire a separate TELL dialogue line — that would just repeat the rule the player
+       can already read at the center of the board. */
+    if(G&&G._tell&&!skipTellSplash){
       _showTellSplash(function(){
         DLG.trigger('MATCH_START');
-        /* Tell flavor line ~6s after match start so it doesn't overlap */
-        setTimeout(function(){if(window.DLG)DLG.trigger('TELL');},6500);
         flashYourTurn();setTimeout(startPTurn,600);
       });
     } else {
@@ -13253,7 +13856,7 @@ function initMatchScreen(data){
   if(!params._resumeData){
     /* Show handicap splash before match begins */
     if(G._handicap){
-      _showHandicapSplash(G._handicap,_afterPrimarySplash);
+      _showHandicapSplash(G._handicap,function(){_afterPrimarySplash(false);});
       /* NPC rivalry + head start still fire on delay */
       var _rivalNs=rung.key&&S.npcState&&S.npcState[rung.key]?S.npcState[rung.key]:null;
       if(_rivalNs){
@@ -13264,9 +13867,9 @@ function initMatchScreen(data){
       if(pCards.includes('jesters_mask')){setTimeout(function(){if(window.DLG)DLG.trigger('CARD_EFFECT');},4500);}
       return;/* splash callback handles match start */
     }
-    /* Boss fight splash */
+    /* Boss fight splash — inlines the Tell info, no second splash needed */
     if(G._isBoss&&rung.key){
-      _showBossSplash(rung.key,rung.name,_afterPrimarySplash);
+      _showBossSplash(rung.key,rung.name,function(){_afterPrimarySplash(true);});
       return;
     }
     /* No handicap/boss but patron has a Tell → show just the Tell splash */
@@ -13422,7 +14025,12 @@ function _closeAllDraftTooltips(){
 }
 function _greyOutOfferedCards(){
   document.querySelectorAll('.end-draft-cards .draft-card-wrap').forEach(function(w){
-    if(w.style.visibility!=='hidden'){w.style.opacity='0.25';w.style.pointerEvents='none';w.classList.add('draft-greyed');}
+    if(w.style.visibility!=='hidden'){
+      w.style.opacity='0.45';
+      /* Keep pointerEvents intact so tooltips still tap-open. Drag handlers will
+         self-skip via the draft-greyed class check at gesture-start. */
+      w.classList.add('draft-greyed');
+    }
   });
 }
 function _ungreyOfferedCards(){
@@ -13686,9 +14294,12 @@ function _buildDraftPool(excludeIds){
     return _owned.indexOf(c.id)!==-1||excludeIds.indexOf(c.id)!==-1;
   };
   tier.draftPool.forEach(function(rar){CARDS.forEach(function(c){if(c.rarity===rar&&!c.npcOnly&&!c.npc&&!c.dep&&!_isBlocked(c))pool.push(c);});});
+  /* Next-tier sampling: only include rarities that ALREADY exist in this tier's pool.
+     Otherwise pre-Mabel players (T0/T1, tin-only) leak silver cards from T2 sampling. */
+  var _curRars=tier.draftPool;
   var _nextT=TIERS[S.run.tier+1];
-  if(_nextT&&_nextT.draftPool){_nextT.draftPool.forEach(function(rar){CARDS.forEach(function(c){if(c.rarity===rar&&!c.npcOnly&&!c.npc&&!c.dep&&!_isBlocked(c)&&pool.indexOf(c)===-1&&Math.random()<0.20)pool.push(c);});});}
-  if(S.run.tier>=2){var _prevT=TIERS[S.run.tier-1];if(_prevT&&_prevT.draftPool){_prevT.draftPool.forEach(function(rar){CARDS.forEach(function(c){if(c.rarity===rar&&!c.npcOnly&&!c.npc&&!c.dep&&!_isBlocked(c)&&pool.indexOf(c)===-1&&Math.random()<0.10)pool.push(c);});});}}
+  if(_nextT&&_nextT.draftPool){_nextT.draftPool.forEach(function(rar){if(_curRars.indexOf(rar)===-1)return;CARDS.forEach(function(c){if(c.rarity===rar&&!c.npcOnly&&!c.npc&&!c.dep&&!_isBlocked(c)&&pool.indexOf(c)===-1&&Math.random()<0.20)pool.push(c);});});}
+  if(S.run.tier>=2){var _prevT=TIERS[S.run.tier-1];if(_prevT&&_prevT.draftPool){_prevT.draftPool.forEach(function(rar){if(_curRars.indexOf(rar)===-1)return;CARDS.forEach(function(c){if(c.rarity===rar&&!c.npcOnly&&!c.npc&&!c.dep&&!_isBlocked(c)&&pool.indexOf(c)===-1&&Math.random()<0.10)pool.push(c);});});}}
   for(var di=pool.length-1;di>0;di--){var dj=Math.floor(Math.random()*(di+1));var dt=pool[di];pool[di]=pool[dj];pool[dj]=dt;}
   var _draftN=(S&&S.renownPerks&&S.renownPerks.extraDraft)?4:3;
   /* If exclusions shrink the pool below what we want to offer, fall back
@@ -13722,9 +14333,16 @@ function reshuffleDraft(){
   });
   draftCardsRow.innerHTML=html;
   /* Re-attach drag + tooltip handlers */
+  var alreadyPicked=!!_draftPickedCardId;
   draftCardsRow.querySelectorAll('.draft-card-wrap').forEach(function(el){
     attachTooltipTap(el);
-    _initEndDraftDrag(el,el.dataset.cardId);
+    if(alreadyPicked){
+      /* Player already locked in a pick before reshuffling — new cards are display-only. */
+      el.classList.add('draft-locked');
+      el.style.pointerEvents='auto';/* keep tooltip working */
+    } else {
+      _initEndDraftDrag(el,el.dataset.cardId);
+    }
   });
   /* Hide the reshuffle button now that it's used. Use visibility instead
      of display so the surrounding layout doesn't shift up. */
@@ -13938,8 +14556,25 @@ function _buyDieAtSlot(mat,price,slotIdx){
   S.run.dice[slotIdx]=mat;
   S.run.diceStock=stock;
   save();
-  SFX.nav();
+  /* Coin SFX + "-Ng" floating pop rising from the gold counter */
+  try{SFX.coins&&SFX.coins();}catch(e){}
+  _spawnGoldSpendPop(price);
   _dsUpdateUI();
+}
+/* Floating "-Ng" text that rises + fades above whichever gold counter is visible. */
+function _spawnGoldSpendPop(price){
+  /* Prefer the visible counter: top-bar shop one first, inline dsGold fallback */
+  var anchor=document.getElementById('shopTopGoldAmt')||document.getElementById('dsGold');
+  if(!anchor)return;
+  var r=anchor.getBoundingClientRect();
+  if(r.width<2)return;
+  var pop=document.createElement('div');
+  pop.className='gold-spend-pop';
+  pop.textContent='−'+price+'g';
+  pop.style.left=(r.left+r.width/2)+'px';
+  pop.style.top=(r.top+r.height/2)+'px';
+  document.body.appendChild(pop);
+  setTimeout(function(){if(pop.parentNode)pop.parentNode.removeChild(pop);},900);
 }
 function _dsUpdateUI(){
   var gEl=document.getElementById('dsGold');
@@ -14500,6 +15135,22 @@ function _renderTierLoadout(){
     lc.querySelectorAll('.tier-lo-wrap').forEach(function(w){
       if(w.querySelector('.tier-lo-card:not(.empty)'))attachTooltipTap(w);
     });
+    /* Celebrate any newly-unlocked slot from the boss-win flow */
+    if(S.run._slotsToCelebrate&&S.run._slotsToCelebrate.length){
+      var _toCelebrate=S.run._slotsToCelebrate.slice();
+      S.run._slotsToCelebrate=[];save();
+      _toCelebrate.forEach(function(slotIdx,i){
+        setTimeout(function(){
+          var slotEl=lc.querySelector('.tier-lo-wrap[data-lo-idx="'+slotIdx+'"] .tier-lo-card');
+          if(!slotEl)return;
+          slotEl.classList.add('slot-unlock-pop');
+          try{spawnPixelSparks(slotEl,18);}catch(e){}
+          try{SFX.coins?SFX.coins():(SFX.bank&&SFX.bank());}catch(e){}
+          try{Haptic.bank&&Haptic.bank();}catch(e){}
+          setTimeout(function(){slotEl&&slotEl.classList.remove('slot-unlock-pop');},2400);
+        },800+i*350);
+      });
+    }
   }
   /* ── Pouch FAB visibility + badge — actual swap UI lives in the modal ── */
   _updatePouchFab();
@@ -14942,6 +15593,9 @@ function launchBossMatch(){
 function initGauntletScreen(data) {
   _getS();
   initTierScreen(data);
+  /* Drain any pending perk-unlock celebrations now that we're on a stable screen.
+     Defer slightly so the gauntlet visual settles first. */
+  setTimeout(function(){if(typeof _drainPerkUnlockQueue==='function')_drainPerkUnlockQueue();},900);
 }
 
 
