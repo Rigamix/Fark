@@ -3774,6 +3774,187 @@ body::before,body::after{display:none!important}
 /* Keep flair animations alive on too-expensive items — the dice should still
    look enticing so the player wants to come back and buy them. The red box
    tint + scale-down already communicate "out of reach". */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MATCH-DIE FLAIR — premium dice in #playerDiceRow / #oppDiceRow get the
+   same per-material visuals as the dice-store grid. Each match die is wrapped
+   at insertion time in a `.die-wrap[data-mat="X"]` element. The wrap holds
+   ambient flair (halo, smoke) which stays world-stationary; face-bound flair
+   (sheens, facets, veins, stars, mist) sits on `.die::before` so it tumbles
+   with the cube during rolls. Flair dims+pauses on bust/committed via :has().
+   Base materials (bone/iron/flint/lead) get nothing — focus stays on premiums.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.die-wrap{position:relative;display:inline-block;flex-shrink:0;overflow:visible;vertical-align:top}
+.die-wrap.sm{display:inline-block}
+/* When the die is removed (shatter, palm, etc.) hide the empty wrap so its
+   pseudo-elements don't linger as ghost halos. */
+.die-wrap:not(:has(.die)){display:none}
+
+/* Halos — premium materials only, sized just outside the die */
+.die-wrap[data-mat="amber"]::before,
+.die-wrap[data-mat="jade"]::before,
+.die-wrap[data-mat="brass"]::before,
+.die-wrap[data-mat="silver"]::before,
+.die-wrap[data-mat="vagabond"]::before,
+.die-wrap[data-mat="crystal"]::before,
+.die-wrap[data-mat="ruby"]::before,
+.die-wrap[data-mat="obsidian"]::before,
+.die-wrap[data-mat="starstone"]::before{
+  content:'';position:absolute;inset:-8px;border-radius:50%;pointer-events:none;z-index:-1;
+  animation:dwHaloPulse 2.4s ease-in-out infinite;
+}
+.die-wrap[data-mat="amber"]::before    {background:radial-gradient(circle,rgba(255,200,80,.35) 0%,transparent 65%);animation:none;opacity:.7}
+.die-wrap[data-mat="jade"]::before     {background:radial-gradient(circle,rgba(120,220,140,.35) 0%,transparent 65%)}
+.die-wrap[data-mat="brass"]::before    {background:radial-gradient(circle,rgba(220,170,80,.45) 0%,transparent 65%)}
+.die-wrap[data-mat="silver"]::before   {background:radial-gradient(circle,rgba(220,230,240,.5) 0%,transparent 65%)}
+.die-wrap[data-mat="vagabond"]::before {background:radial-gradient(circle,rgba(220,140,80,.45) 0%,transparent 65%);animation-duration:2.2s}
+.die-wrap[data-mat="crystal"]::before  {background:radial-gradient(circle,rgba(160,220,255,.6) 0%,transparent 65%);animation-duration:1.8s}
+.die-wrap[data-mat="ruby"]::before     {background:radial-gradient(circle,rgba(255,80,100,.32) 0%,transparent 65%);animation-duration:2.4s}
+.die-wrap[data-mat="obsidian"]::before {background:radial-gradient(circle,rgba(180,80,220,.55) 0%,transparent 65%);animation-duration:2.8s}
+.die-wrap[data-mat="starstone"]::before{background:radial-gradient(circle,rgba(140,150,255,.7) 0%,transparent 65%);animation-duration:1.4s}
+@keyframes dwHaloPulse{0%,100%{opacity:.55;transform:scale(1)}50%{opacity:1;transform:scale(1.12)}}
+
+/* Face-level flair sits on `.die::before` so it rotates with the cube */
+.die-wrap .die{position:relative}
+
+/* Brass — sheen sweep */
+.die-wrap[data-mat="brass"] .die::before{
+  content:'';position:absolute;inset:0;border-radius:2px;pointer-events:none;z-index:3;
+  background:linear-gradient(105deg,transparent 35%,rgba(255,235,180,.35) 49%,rgba(255,245,200,.5) 50%,rgba(255,235,180,.35) 51%,transparent 65%);
+  background-size:280% 100%;background-position:200% 0;
+  animation:dwBrassSheen 4s linear infinite;mix-blend-mode:overlay;
+}
+@keyframes dwBrassSheen{0%{background-position:200% 0}100%{background-position:-100% 0}}
+
+/* Silver — pulsing sheen */
+.die-wrap[data-mat="silver"] .die::before{
+  content:'';position:absolute;inset:0;border-radius:2px;pointer-events:none;z-index:3;
+  background:linear-gradient(110deg,transparent 42%,rgba(220,235,250,.4) 49%,rgba(230,242,255,.55) 50%,rgba(220,235,250,.4) 51%,transparent 58%);
+  background-size:240% 100%;background-position:200% 0;
+  animation:dwSilverSheen 2.6s linear infinite;mix-blend-mode:screen;opacity:0;
+}
+@keyframes dwSilverSheen{
+  0%{background-position:200% 0;opacity:0}
+  10%{opacity:.75} 55%{opacity:.75}
+  65%{background-position:-30% 0;opacity:0}
+  100%{background-position:-30% 0;opacity:0}
+}
+
+/* Vagabond — gentle float, scoped :not(.rolling) so the spin wins */
+.die-wrap[data-mat="vagabond"] .die:not(.rolling):not(.bust):not(.committed):not(.scatter){
+  animation:dwVagabondFloat 3.2s ease-in-out infinite;
+}
+@keyframes dwVagabondFloat{
+  0%,100%{transform:translate(0,0) rotate(0deg)}
+  25%{transform:translate(-2.5px,-3px) rotate(-1.5deg)}
+  50%{transform:translate(0,-5px) rotate(0deg)}
+  75%{transform:translate(2.5px,-2px) rotate(1.5deg)}
+}
+
+/* Jade — vertical mist sweep */
+.die-wrap[data-mat="jade"] .die::before{
+  content:'';position:absolute;inset:0;border-radius:2px;pointer-events:none;z-index:3;
+  background:linear-gradient(180deg,transparent 0%,rgba(120,220,140,.18) 40%,rgba(80,200,120,.28) 55%,rgba(120,220,140,.18) 70%,transparent 100%);
+  background-size:100% 220%;background-position:0 0%;
+  animation:dwJadeMist 3.4s ease-in-out infinite;mix-blend-mode:overlay;
+}
+@keyframes dwJadeMist{0%{background-position:0 -50%}100%{background-position:0 150%}}
+
+/* Ruby — internal glow pulse, scoped :not(.rolling) so the spin wins */
+.die-wrap[data-mat="ruby"] .die:not(.rolling):not(.bust):not(.committed):not(.scatter){
+  animation:dwRubyPulse 2.4s ease-in-out infinite;
+}
+@keyframes dwRubyPulse{
+  0%,100%{box-shadow:inset 0 0 6px rgba(255,80,100,.35),0 0 6px rgba(255,80,100,.2),3px 4px 0 rgba(30,18,8,.45),4px 5px 0 rgba(30,18,8,.2)}
+  50%{box-shadow:inset 0 0 12px rgba(255,100,120,.7),0 0 8px rgba(255,80,100,.3),3px 4px 0 rgba(30,18,8,.45),4px 5px 0 rgba(30,18,8,.2)}
+}
+.die-wrap[data-mat="ruby"] .die::after{display:none!important}
+
+/* Obsidian — purple smoke fog under the die (stays world-stationary) */
+.die-wrap[data-mat="obsidian"]::after{
+  content:'';position:absolute;inset:-4px;pointer-events:none;z-index:1;
+  background:radial-gradient(ellipse at 50% 80%,rgba(120,40,180,.5) 0%,rgba(80,20,120,.25) 30%,transparent 65%);
+  filter:blur(3px);animation:dwObsidianSmoke 3.4s ease-in-out infinite;
+}
+@keyframes dwObsidianSmoke{
+  0%,100%{opacity:.55;transform:translateY(2px) scale(1)}
+  50%    {opacity:.85;transform:translateY(-4px) scale(1.08)}
+}
+
+/* Crystal — 8-facet conic gradient riding the die face */
+.die-wrap[data-mat="crystal"] .die::after{display:none!important}
+.die-wrap[data-mat="crystal"] .die::before{
+  content:'';position:absolute;inset:0;border-radius:2px;pointer-events:none;z-index:3;
+  background:
+    conic-gradient(from 22deg at 50% 50%,
+      transparent 0deg,rgba(180,220,250,.18) 22deg,transparent 45deg,
+      rgba(180,220,250,.10) 67deg,transparent 90deg,
+      rgba(180,220,250,.20) 112deg,transparent 135deg,
+      rgba(180,220,250,.12) 157deg,transparent 180deg,
+      rgba(180,220,250,.18) 202deg,transparent 225deg,
+      rgba(180,220,250,.09) 247deg,transparent 270deg,
+      rgba(180,220,250,.22) 292deg,transparent 315deg,
+      rgba(180,220,250,.13) 337deg,transparent 360deg),
+    radial-gradient(circle at 50% 50%,rgba(200,235,255,.3) 0%,rgba(180,220,250,.1) 12%,transparent 30%);
+  mix-blend-mode:screen;animation:dwCrystalFacet 4s ease-in-out infinite;
+}
+@keyframes dwCrystalFacet{0%,100%{opacity:.7}50%{opacity:.9}}
+
+/* Starstone — 16-star scattered pixel field riding the die face.
+   8 outer ring (hugs edges), 4 mid-ring, 4 inner accents. */
+.die-wrap[data-mat="starstone"] .die::after{display:none!important}
+.die-wrap[data-mat="starstone"] .die::before{
+  content:'';position:absolute;left:50%;top:50%;
+  width:1px;height:1px;background:transparent;
+  pointer-events:none;z-index:3;
+  --sc:rgba(255,235,170,.55);
+  box-shadow:
+    -19px -17px 0 0 var(--sc),   -3px -20px 0 0 var(--sc),
+     17px -19px 0 0 var(--sc),  -21px  -2px 0 0 var(--sc),
+     20px   1px 0 0 var(--sc),  -18px  18px 0 0 var(--sc),
+      2px  20px 0 0 var(--sc),   19px  16px 0 0 var(--sc),
+    -10px -12px 0 0 var(--sc),   13px  -9px 0 0 var(--sc),
+    -13px   8px 0 0 var(--sc),    9px  13px 0 0 var(--sc),
+     -4px  -5px 0 0 var(--sc),    6px  -3px 0 0 var(--sc),
+     -5px   6px 0 0 var(--sc),    4px   4px 0 0 var(--sc);
+  transform:translate(-50%,-50%) scale(1);
+  transform-origin:center;animation:dwStarBreathe 3.4s ease-in-out infinite;
+}
+@keyframes dwStarBreathe{
+  0%,100%{opacity:.45;transform:translate(-50%,-50%) scale(1)}
+  50%    {opacity:.8; transform:translate(-50%,-50%) scale(1.08)}
+}
+
+/* Amber — static vertical veins riding the die face */
+.die-wrap[data-mat="amber"] .die::after{display:none!important}
+.die-wrap[data-mat="amber"] .die::before{
+  content:'';position:absolute;inset:0;border-radius:2px;pointer-events:none;z-index:3;
+  background:
+    linear-gradient(180deg,transparent 4%,rgba(100,60,20,.17) 30%,rgba(100,60,20,.19) 50%,rgba(100,60,20,.16) 70%,transparent 96%) no-repeat 32% 0/6px 100%,
+    linear-gradient(180deg,transparent 6%,rgba(120,75,25,.13) 32%,rgba(120,75,25,.16) 55%,rgba(120,75,25,.12) 75%,transparent 95%) no-repeat 62% 0/4px 100%,
+    linear-gradient(180deg,transparent 18%,rgba(140,90,30,.11) 40%,rgba(140,90,30,.10) 65%,transparent 88%) no-repeat 80% 0/4px 100%,
+    linear-gradient(180deg,transparent 25%,rgba(100,60,20,.12) 45%,rgba(100,60,20,.10) 60%,transparent 80%) no-repeat 18% 0/3px 100%,
+    radial-gradient(ellipse at 28% 22%,rgba(255,220,140,.16) 0%,transparent 55%);
+  mix-blend-mode:multiply;
+}
+
+/* Dim ALL flair (wrap halo + smoke + face overlay + per-die animations)
+   when the inner die is bust or committed. Halo + face overlay pause + fade
+   to 18%; ruby/vagabond per-die animations are killed entirely. */
+.die-wrap:has(.die.bust)::before,
+.die-wrap:has(.die.committed)::before,
+.die-wrap:has(.die.bust)::after,
+.die-wrap:has(.die.committed)::after,
+.die-wrap:has(.die.bust) .die::before,
+.die-wrap:has(.die.committed) .die::before{
+  animation-play-state:paused!important;
+  opacity:.18!important;
+}
+.die-wrap:has(.die.bust) .die,
+.die-wrap:has(.die.committed) .die{
+  animation:none!important;
+}
+
 .dice-store-item .ds-price{font-family:var(--font-px);font-size:9px;color:var(--gold);letter-spacing:.5px}
 .dice-store-item .ds-stock{font-family:var(--font-px);font-size:7px;color:rgba(255,255,255,.35);letter-spacing:.5px}
 .ds-loadout{display:grid;grid-template-columns:repeat(6,44px);gap:6px;width:fit-content;margin:0 auto}
@@ -9009,6 +9190,32 @@ function newG(rung,pCards,oCards,pStake,oStake){
 
 /* ═══════ UI HELPERS ═══════ */
 function clearRow(id){const el=document.getElementById(id);if(el)el.innerHTML='';}
+/* Wrap a match die in a `.die-wrap[data-mat="X"]` parent before adding it to
+   the dice row. The wrap hosts the per-material flair pseudo-elements
+   (halos, smoke) so the inner die can tumble during rolls without the
+   ambient glow tumbling with it. Returns the wrap so callers can also use
+   insertBefore(wrap, ref). */
+function _wrapDie(die){
+  if(!die)return null;
+  /* Idempotent — if already wrapped, return existing wrap */
+  if(die.parentElement&&die.parentElement.classList&&die.parentElement.classList.contains('die-wrap'))return die.parentElement;
+  var mat=die._trueMat||(die.className.match(/dtype-(\w+)/)||['','bone'])[1];
+  var wrap=document.createElement('div');
+  wrap.className='die-wrap';
+  wrap.dataset.mat=mat;
+  if(die.classList.contains('sm'))wrap.classList.add('sm');
+  wrap.appendChild(die);
+  return wrap;
+}
+function _appendDie(row,die){if(row&&die)row.appendChild(_wrapDie(die));}
+function _insertDie(row,die,refNode){
+  if(!row||!die)return;
+  var wrap=_wrapDie(die);
+  /* If refNode is itself a die, walk up to its wrap so insertBefore lands
+     in the right slot of the row's wrap children. */
+  if(refNode&&refNode.classList&&refNode.classList.contains('die')&&refNode.parentElement&&refNode.parentElement.classList.contains('die-wrap'))refNode=refNode.parentElement;
+  row.insertBefore(wrap,refNode||null);
+}
 var _matchBtnDefs={
   btnRoll: {cols:['#4a9a50','#1a3818','#0c1c0a'],seed:777,wobble:0.006},
   btnBank: {cols:['#c8a050','#7a5828','#3a2810'],seed:1088,wobble:0.012},
@@ -9819,7 +10026,7 @@ function handleRoll(){
       setStatusMsg('ROLLING...','active');const row=document.getElementById('playerDiceRow');
       var hotN=G.numDice||6;
       for(let i=0;i<hotN;i++){const mat=G.matchDice[i%G.matchDice.length]||'bone';const val=hotSpur?rollFaceSpur(mat):rollFace(mat);
-        const el=mkDie(val,mat);el.classList.add('rolling');row.appendChild(el);G.pool.push({val,mat,sel:false,committed:false,el});}
+        const el=mkDie(val,mat);el.classList.add('rolling');_appendDie(row,el);G.pool.push({val,mat,sel:false,committed:false,el});}
       SFX.roll(hotN);
       setTimeout(()=>{G.pool.forEach(d=>{if(!d.committed)settleDie(d.el);});afterRoll();},480);
     },700);
@@ -9874,13 +10081,13 @@ function handleRoll(){
   }
   const newEntries=[];
   for(let i=0;i<needNew;i++){const mat=G.matchDice[(G.pool.length+i)%G.matchDice.length]||'bone';const val=useSpur?rollFaceSpur(mat):rollFace(mat);
-    const el=mkDie(val,mat);el.classList.add('rolling');row.appendChild(el);newEntries.push({val,mat,sel:false,committed:false,el});}
+    const el=mkDie(val,mat);el.classList.add('rolling');_appendDie(row,el);newEntries.push({val,mat,sel:false,committed:false,el});}
   /* Insert the frozen die at its saved index — clamp to the row bounds */
   if(_fdEntry){
     var _fdPos=Math.min(Math.max(0,G._frozenDie.pos|0),newEntries.length);
     newEntries.splice(_fdPos,0,_fdEntry);
     var _refNode=row.children[_fdPos]||null;
-    row.insertBefore(_fdEntry.el,_refNode);
+    _insertDie(row,_fdEntry.el,_refNode);
     G._frozenDie=null;/* consume — only pre-places once */
   }
   G.pool=[...G.pool,...newEntries];
@@ -10939,7 +11146,7 @@ function _showPersistentFrozenDie(){
   if(row.querySelector('.die.die-frozen'))return;/* already placed */
   var el=mkDie(G._frozenDie.val,G._frozenDie.mat);
   el.classList.add('die-frozen');
-  row.appendChild(el);
+  _appendDie(row,el);
 }
 
 /* ═══════ OPPONENT AI ═══════ */
@@ -11057,7 +11264,7 @@ function runOppTurn(){
         var _sdGuard=20;while((val===1||val===5)&&_sdGuard-->0)val=rollFace(dieMat);
         _sawdustCount++;_wasDampened=true;
       }
-      const el=mkDie(val,dieMat);el.classList.add('rolling');row.appendChild(el);
+      const el=mkDie(val,dieMat);el.classList.add('rolling');_appendDie(row,el);
       if(_wasDampened){el.classList.add('die-dampened','die-dampened-fresh');setTimeout(function(){el.classList.remove('die-dampened-fresh');},600);}
       /* Broken Lantern: hide dice faces */
       if(G._lanternActive)el.classList.add('die-blind');
