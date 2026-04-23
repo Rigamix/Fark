@@ -1091,22 +1091,27 @@ body.crit-dilate{animation:critDilate .55s ease-out both}
 @keyframes vigFade{0%{opacity:1}100%{opacity:0}}
 /* ─── DICE SCATTER ON BUST ─── */
 .die.scatter{transition:transform .26s cubic-bezier(.16,.84,.3,1),opacity .2s ease-out;opacity:.32}
-.die.scatter:nth-child(1){transform:translate(-12px,8px) rotate(-14deg)}
-.die.scatter:nth-child(2){transform:translate(7px,-9px) rotate(11deg)}
-.die.scatter:nth-child(3){transform:translate(-8px,-6px) rotate(-9deg)}
-.die.scatter:nth-child(4){transform:translate(11px,5px) rotate(16deg)}
-.die.scatter:nth-child(5){transform:translate(-5px,10px) rotate(-12deg)}
-.die.scatter:nth-child(6){transform:translate(9px,-7px) rotate(10deg)}
+/* Per-die scatter offsets — selectors target the WRAP's nth-child position
+   in the row (each die now lives inside its own .die-wrap, so `.die:nth-
+   child(N)` would always match index 1 and every die snapped to the same
+   angle). Matching .die in non-wrapped contexts kept as fallback. */
+.die-wrap:nth-child(1) .die.scatter,.die.scatter:nth-child(1){transform:translate(-12px,8px) rotate(-14deg)}
+.die-wrap:nth-child(2) .die.scatter,.die.scatter:nth-child(2){transform:translate(7px,-9px) rotate(11deg)}
+.die-wrap:nth-child(3) .die.scatter,.die.scatter:nth-child(3){transform:translate(-8px,-6px) rotate(-9deg)}
+.die-wrap:nth-child(4) .die.scatter,.die.scatter:nth-child(4){transform:translate(11px,5px) rotate(16deg)}
+.die-wrap:nth-child(5) .die.scatter,.die.scatter:nth-child(5){transform:translate(-5px,10px) rotate(-12deg)}
+.die-wrap:nth-child(6) .die.scatter,.die.scatter:nth-child(6){transform:translate(9px,-7px) rotate(10deg)}
 /* ─── NPC BUST (subtle red + small scatter) ─── */
 .die.opp-bust{animation:dOppBust .4s steps(3)}
 @keyframes dOppBust{0%,100%{transform:translate(0,0)}33%{transform:translate(-3px,2px)}66%{transform:translate(3px,-2px)}}
 .die.opp-scatter{transition:transform .4s cubic-bezier(.2,.8,.3,1),opacity .45s ease-out;opacity:0.35}
-.die.opp-scatter:nth-child(1){transform:translate(-4px,3px) rotate(-5deg)}
-.die.opp-scatter:nth-child(2){transform:translate(3px,-4px) rotate(4deg)}
-.die.opp-scatter:nth-child(3){transform:translate(-3px,-2px) rotate(-3deg)}
-.die.opp-scatter:nth-child(4){transform:translate(4px,2px) rotate(6deg)}
-.die.opp-scatter:nth-child(5){transform:translate(-2px,3px) rotate(-4deg)}
-.die.opp-scatter:nth-child(6){transform:translate(3px,-3px) rotate(4deg)}
+/* Same wrap-aware nth-child fix as the player scatter above. */
+.die-wrap:nth-child(1) .die.opp-scatter,.die.opp-scatter:nth-child(1){transform:translate(-4px,3px) rotate(-5deg)}
+.die-wrap:nth-child(2) .die.opp-scatter,.die.opp-scatter:nth-child(2){transform:translate(3px,-4px) rotate(4deg)}
+.die-wrap:nth-child(3) .die.opp-scatter,.die.opp-scatter:nth-child(3){transform:translate(-3px,-2px) rotate(-3deg)}
+.die-wrap:nth-child(4) .die.opp-scatter,.die.opp-scatter:nth-child(4){transform:translate(4px,2px) rotate(6deg)}
+.die-wrap:nth-child(5) .die.opp-scatter,.die.opp-scatter:nth-child(5){transform:translate(-2px,3px) rotate(-4deg)}
+.die-wrap:nth-child(6) .die.opp-scatter,.die.opp-scatter:nth-child(6){transform:translate(3px,-3px) rotate(4deg)}
 /* ─── BROKEN LANTERN: blind dice ─── */
 .die.die-blind{background:#1a1a2a!important;color:transparent!important;border-color:#333!important;box-shadow:0 0 8px rgba(0,0,0,.6)!important;position:relative}
 .die.die-blind::after{content:'?';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:1.3em;font-weight:bold;color:rgba(180,180,200,.7);text-shadow:0 0 6px rgba(100,100,150,.4)}
@@ -3971,9 +3976,11 @@ body::before,body::after{display:none!important}
    die's own ::before pseudo, which is now occupied by face flair on premium
    materials. Moving the outline to a wrap-mounted pseudo lets the flair AND
    the gold outline coexist. The override rule below disables the old rule
-   for wrapped dice so we don't get a double outline on bone/iron/flint/lead. */
+   for wrapped dice so we don't get a double outline on bone/iron/flint/lead.
+   Outline sits 2px outside the die edge (was -8px which left a wide gap
+   filled with halo glow that the user didn't want). */
 .die-wrap:has(.die.selected)::after{
-  content:'';position:absolute;inset:-8px;pointer-events:none;z-index:5;
+  content:'';position:absolute;inset:-2px;pointer-events:none;z-index:5;
   border:3px solid var(--gold);
   background:none!important;background-color:transparent!important;background-image:none!important;
   clip-path:polygon(5px 0,calc(100% - 5px) 0,100% 5px,100% calc(100% - 5px),calc(100% - 5px) 100%,5px 100%,0 calc(100% - 5px),0 5px);
@@ -3981,6 +3988,9 @@ body::before,body::after{display:none!important}
   border-radius:0!important;mix-blend-mode:normal!important;
   box-shadow:none!important;
 }
+/* Hide the wrap-mounted halo when the die is selected — user doesn't want
+   any glow inside the gold outline. */
+.die-wrap:has(.die.selected)::before{display:none!important}
 /* Suppress the old `.die.selected::before` outline on wrapped dice so we
    don't render two outlines (one inside, one outside). */
 .die-wrap .die.selected::before{
