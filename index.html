@@ -984,20 +984,8 @@ body{
 }
 @keyframes dRoll{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 .die.bust{opacity:1}
-/* Jade wildcard dice — blank face + glowing star in the center */
+/* Jade wildcard dice — fully blank face (was previously a glowing star) */
 .die.die-wild{position:relative}
-.die.die-wild::after{
-  content:'★';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-  font-size:24px;color:#90e8a8;text-shadow:0 0 8px rgba(120,220,140,.85),0 0 14px rgba(80,200,120,.5);
-  pointer-events:none;z-index:2;
-  animation:wildPulse 2.4s ease-in-out infinite;
-}
-@keyframes wildPulse{0%,100%{opacity:.85}50%{opacity:1;text-shadow:0 0 12px rgba(140,240,160,.95),0 0 20px rgba(80,200,120,.6)}}
-/* Mini-cube tooltip wildcard face */
-.dice-face.wild-face{
-  display:flex!important;align-items:center;justify-content:center;
-  font-size:18px;color:#90e8a8;text-shadow:0 0 6px rgba(120,220,140,.7);
-}
 /* Bust overrides selected glow — kill the gold outline pseudo so all dice read as busted uniformly */
 .die.bust.selected,.die.bust{box-shadow:none!important}
 .die.bust::before,.die.bust::after{display:none!important}
@@ -6127,6 +6115,11 @@ function _getS(){
     /* ID migration: card formerly known as 'last_call' was renamed 'closing_bell' to
        free up the 'LAST CALL' name for Grog's Tell. Remap any saved decks. */
     if(Array.isArray(S.run.cards))S.run.cards=S.run.cards.map(function(cid){return cid==='last_call'?'closing_bell':cid;});
+    /* Stock migration: Starstone redesigned (was set-bonus stock 1, now flat-bonus stock 3).
+       Bring saved stock up to current default if it's been left at the old value. */
+    if(S.run.diceStock&&typeof S.run.diceStock.starstone==='number'&&S.run.diceStock.starstone<3){
+      S.run.diceStock.starstone=3;
+    }
     if(Array.isArray(S.run.cards))S.run.cards=S.run.cards.map(function(cid){return cid&&_removedCards.indexOf(cid)===-1?cid:null;});
     /* Boss-slot migration: pad to 5 slots ([0..2] regular, [3] boss, [4] 2nd boss
        — last unlocked via renown perk). Move any boss card from legacy slot 2
@@ -7030,7 +7023,7 @@ var DICE_STORE=[
   {mat:'ruby',     price:480, stock:2, label:'Ruby'},
   {mat:'vagabond', price:650, stock:2, label:'Vagabond'},
   {mat:'crystal',  price:700, stock:1, label:'Crystal'},
-  {mat:'starstone',price:780, stock:1, label:'Starstone'},
+  {mat:'starstone',price:620, stock:3, label:'Starstone'},
 ];
 function _initDiceStock(){var s={};DICE_STORE.forEach(function(d){s[d.mat]=d.stock;});return s;}
 function _dicePrice(mat){
@@ -7918,10 +7911,10 @@ const DICE_TYPES=[
    faces:[1,2,3,4,5,6],
    effect:{type:'risk_reward',mechanic:'shatter_bonus',chance:0.06,amount:500},
    desc:'6% chance per roll to shatter (lost for the match) — shatter triggers +500 bonus pts.'},
-  {id:'starstone',name:'STARSTONE',icon:'⭐',cost:850,
+  {id:'starstone',name:'STARSTONE',icon:'⭐',cost:700,
    faces:[1,2,3,4,5,6],
-   effect:{type:'win_condition',mechanic:'starstone_set',amount:2500},
-   desc:'If all 6 of your loadout dice are Starstone and you keep all 6 in one bank, instantly score +2500.'},
+   effect:{type:'scoring_boost',mechanic:'starstone_bonus',amount:100},
+   desc:'Each Starstone in your loadout adds +100 to every bank you make. Stacks per die.'},
   {id:'vagabond',name:'VAGABOND',icon:'🦊',cost:700,
    faces:[1,2,3,4,5,6],
    effect:{type:'movement',mechanic:'drag_reorder'},
@@ -8553,9 +8546,13 @@ function attachTooltipTap(wrapperEl,opts){
   opts=opts||{};
   const toggle=function(e){
     if(_dragState&&_dragState.dragging)return;
-    if(window._dragEndedAt&&Date.now()-window._dragEndedAt<300)return;
+    if(window._dragEndedAt&&Date.now()-window._dragEndedAt<400)return;
     if(window._shopDragging)return;
     if(window._loDragging)return;
+    /* Also gate on the dice-store + card-draft drag flags so the synthesized
+       click after a touch-drag (iOS Safari) doesn't pop a tooltip. */
+    if(typeof _dsDragging!=='undefined'&&_dsDragging)return;
+    if(typeof _draftDragging!=='undefined'&&_draftDragging)return;
     if(opts.excludeSelector&&e.target.closest(opts.excludeSelector))return;
     if(opts.requireSelector&&!e.target.closest(opts.requireSelector))return;
     /* If clicking the tooltip itself, just close everything */
@@ -10777,16 +10774,14 @@ function handleBank(){
     var _cbCut=Math.ceil(total*0.10);
     if(_cbCut>0){total-=_cbCut;bonusMsg+=' -'+_cbCut+" COWARD'S BELL";triggerCard('cowards_bell','-'+_cbCut,false);}
   }
-  /* ── Starstone set bonus — +2500 if the player's loadout is 6x starstone
-     AND this bank used all 6 dice (hot-dice sweep). The check is opt-in
-     only when player has the starstone dice, so normal play is unaffected. */
-  if(G.matchDice&&G.matchDice.length===6&&G.matchDice.every(function(m){return m==='starstone';})){
-    var _keptDiceCount=G.kept.reduce(function(a,k){return a+((k.vals&&k.vals.length)||0);},0);
-    if(_keptDiceCount>=6){
-      total+=2500;
-      bonusMsg+=' +2500 STARSTONE SET';
-      triggerCard('starstone','STARSTONE SET +2500',true);
-      spawnPop('+2500 ⭐');
+  /* ── Starstone bonus — +100 per Starstone die in your loadout, applied to every bank. */
+  if(G.matchDice){
+    var _ssCount=G.matchDice.filter(function(m){return m==='starstone';}).length;
+    if(_ssCount>0){
+      var _ssBonus=_ssCount*100;
+      total+=_ssBonus;
+      bonusMsg+=' +'+_ssBonus+' STARSTONE';
+      triggerCard('starstone','STARSTONE +'+_ssBonus,true);
     }
   }
   /* ── TELL HOOKS (applied after all card bonuses, before celebration) ── */
@@ -12765,7 +12760,7 @@ function buildMiniCube(matId){
     var isWildJadeFace=(matId==='jade'&&val===6);
     if(isWildJadeFace){
       face.classList.add('wild-face');
-      face.textContent='★';
+      /* Wild jade face is intentionally blank — no star, no pips */
     } else {
       PIP_LAYOUTS[val].forEach(function(on){
         var pip=document.createElement('div');pip.className='pip '+(on?'on':'off');
@@ -12783,7 +12778,8 @@ function buildDieTooltipHTML(matId){
   var effHtml='';
   if(dice.effect){effHtml='<div class="dt-eff">'+_wnHtml(_dieEffectLabel(dice.effect))+'</div>';}
   var facesHtml=dice.faces.map(function(f){
-    if(matId==='jade'&&f===6)return '<b class="tip-num" style="color:#90e0a0">★</b>';
+    /* Jade's 6 is a wildcard — render as a blank slot (no number, no star) */
+    if(matId==='jade'&&f===6)return '<b class="tip-num" style="color:rgba(180,220,180,.4)">·</b>';
     return '<b class="tip-num">'+f+'</b>';
   }).join(' · ');
   return '<div class="die-tooltip dtype-'+matId+'">'+
@@ -14210,6 +14206,11 @@ function _initEndDraftDrag(el,cardId){
       closeAllChips();
       /* Suppress the click event that browsers fire after pointerup — prevents tooltip from popping */
       el.addEventListener('click',function _eatClick(ev){ev.stopPropagation();ev.preventDefault();el.removeEventListener('click',_eatClick,true);},true);
+      /* iOS Safari fires a synthesized click on whatever elementFromPoint returns
+         after touchend — that lands on a random tooltip-bearing element and pops
+         a chip "out of nowhere". The global timestamp gate in attachTooltipTap
+         swallows any tap within 400ms of a drag end. */
+      window._dragEndedAt=Date.now();
       _draftDragging=false;
     }
 
@@ -14269,6 +14270,8 @@ function _initSlotUndoDrag(slotEl,slotIdx){
       if(skipBtn){skipBtn.querySelector('span').textContent='SKIP';skipBtn.onclick=function(){SFX.nav();_endDraftSkip();};}
       SFX.nav();
       _draftRemoveClone(clone);
+      /* Suppress synthesized iOS click after touch-drag ends. */
+      window._dragEndedAt=Date.now();
       _draftDragging=false;
     }
 
@@ -14526,7 +14529,10 @@ function _initDiceDrag(el,mat,price){
         var idx=parseInt(target.dataset.slotIdx);
         _buyDieAtSlot(mat,price,idx);
       }
-      _dsDragging=false;
+      /* Suppress synthesized click after touch-drag (iOS Safari fires click after touchend
+         on the original elementFromPoint, which would pop a tooltip otherwise). */
+      window._dragEndedAt=Date.now();
+      setTimeout(function(){_dsDragging=false;},50);
     }
     document.addEventListener('pointermove',onMove);
     document.addEventListener('pointerup',onUp);
