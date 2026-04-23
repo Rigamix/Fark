@@ -3526,7 +3526,9 @@ body::before,body::after{display:none!important}
 .dice-store-wrap{display:flex;flex-direction:column;align-items:center;gap:10px;width:100%}
 .dice-store-gold{font-family:var(--font-px);font-size:18px;color:var(--gold);letter-spacing:2px}
 .dice-store-grid{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:340px}
-.dice-store-item{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 8px;border:1px solid rgba(255,255,255,.12);border-radius:6px;background:rgba(255,255,255,.04);cursor:pointer;transition:border-color .15s,opacity .15s,transform .12s;min-width:64px}
+/* Affordable dice cells get a subtle gold wash so they read as "you can buy this".
+   Too-expensive cells override below with a red tint. */
+.dice-store-item{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 8px;border:1px solid rgba(232,184,48,.28);border-radius:6px;background:linear-gradient(180deg,rgba(232,184,48,.10) 0%,rgba(232,184,48,.05) 100%);cursor:pointer;transition:border-color .15s,opacity .15s,transform .12s;min-width:64px}
 .dice-store-item:hover{border-color:var(--gold);transform:scale(1.05)}
 .dice-store-item.sold-out{opacity:.25;filter:grayscale(.8)}
 /* Too-expensive: keep the dice visually appealing (so the player still WANTS them)
@@ -14517,13 +14519,20 @@ function _initDiceDrag(el,mat,price){
         closeAllChips();
         var old=document.getElementById('activeDieTooltip');if(old)old.remove();
         el.style.opacity='0.3';
-        clone=el.cloneNode(true);
-        clone.style.cssText='position:fixed;z-index:10000;pointer-events:none;opacity:.85;transform:scale(1.1);transition:none';
-        clone.style.width=el.offsetWidth+'px';
+        /* Clone just the inner die (not the box + label + price) so only the cube
+           follows the cursor. Falls back to the whole cell if no die found. */
+        var sourceDie=el.querySelector('.die')||el;
+        clone=sourceDie.cloneNode(true);
+        var dieRect=sourceDie.getBoundingClientRect();
+        clone.style.cssText='position:fixed;z-index:10000;pointer-events:none;opacity:.95;transform:scale(1.15);transition:none;margin:0';
+        clone.style.width=dieRect.width+'px';
+        clone.style.height=dieRect.height+'px';
         document.body.appendChild(clone);
+        /* Stash the die size on the clone for the move handler to use */
+        clone._dragW=dieRect.width;clone._dragH=dieRect.height;
       }
-      clone.style.left=(e2.clientX-el.offsetWidth/2)+'px';
-      clone.style.top=(e2.clientY-el.offsetHeight/2)+'px';
+      clone.style.left=(e2.clientX-clone._dragW/2)+'px';
+      clone.style.top=(e2.clientY-clone._dragH/2)+'px';
       /* Highlight loadout slots */
       document.querySelectorAll('.ds-slot').forEach(function(s){s.classList.remove('drop-hover');});
       var target=_findDiceDropSlot(e2.clientX,e2.clientY);
