@@ -1101,10 +1101,12 @@ body.crit-dilate{animation:critDilate .55s ease-out both}
 .die-wrap:nth-child(4) .die.scatter,.die.scatter:nth-child(4){transform:translate(11px,5px) rotate(16deg)}
 .die-wrap:nth-child(5) .die.scatter,.die.scatter:nth-child(5){transform:translate(-5px,10px) rotate(-12deg)}
 .die-wrap:nth-child(6) .die.scatter,.die.scatter:nth-child(6){transform:translate(9px,-7px) rotate(10deg)}
-/* ─── NPC BUST (subtle red + small scatter) ─── */
-.die.opp-bust{animation:dOppBust .4s steps(3)}
-@keyframes dOppBust{0%,100%{transform:translate(0,0)}33%{transform:translate(-3px,2px)}66%{transform:translate(3px,-2px)}}
-.die.opp-scatter{transition:transform .4s cubic-bezier(.2,.8,.3,1),opacity .45s ease-out;opacity:0.35}
+/* ─── NPC BUST ─── opp-bust class kept for any external hooks but the
+   shake animation was removed: it ran first, then opp-scatter applied a
+   second transform 120ms later, reading as a "double scatter". The single
+   opp-scatter transform now does the whole bust visual. */
+.die.opp-bust{}
+.die.opp-scatter{transition:transform .4s cubic-bezier(.2,.8,.3,1),opacity .45s ease-out;opacity:0.55}
 /* Same wrap-aware nth-child fix as the player scatter above. */
 .die-wrap:nth-child(1) .die.opp-scatter,.die.opp-scatter:nth-child(1){transform:translate(-4px,3px) rotate(-5deg)}
 .die-wrap:nth-child(2) .die.opp-scatter,.die.opp-scatter:nth-child(2){transform:translate(3px,-4px) rotate(4deg)}
@@ -1789,8 +1791,14 @@ body:has(#mLoadout-ov.show) #dbgButtons{display:flex !important}
 .res-card.show{display:flex;flex-direction:column;align-items:center}
 .res-card-inner{position:relative;width:100px;height:150px}
 .res-card .gcard{border-width:2px;border-radius:5px;filter:none}
-.res-card .res-card-inner .gcard{width:100px;height:150px;animation:cardRevealSpin 1s ease-out forwards}
-.end-draft-cards .draft-card-wrap .gcard{animation:cardRevealSpin .8s ease-out forwards}
+/* Spin the card-outer (which wraps the .gcard AND the aging canvas) so the
+   torn-edge clip + stains rotate together with the card body. Previously
+   the spin was on .gcard alone; the static canvas appended to .card-outer
+   stayed put, making the outline appear "broken / static" mid-spin. */
+.res-card .res-card-inner .card-outer{animation:cardRevealSpin 1s ease-out forwards;transform-style:preserve-3d}
+.res-card .res-card-inner .gcard{width:100px;height:150px}
+.end-draft-cards .draft-card-wrap .card-outer{animation:cardRevealSpin .8s ease-out forwards;transform-style:preserve-3d}
+.end-draft-cards .draft-card-wrap .gcard{animation:none}
 /* Locked draft cards (after a pick was placed + reshuffle was used) — show but can't be picked */
 .draft-card-wrap.draft-locked{filter:grayscale(.85) brightness(.55);opacity:.7;cursor:default}
 .draft-card-wrap.draft-locked .gcard{pointer-events:none}
@@ -5370,12 +5378,32 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
 .handicap-splash.hs-in{opacity:1}
 .handicap-splash.hs-bg-out .hs-bg{opacity:0}
 .handicap-splash.hs-out{opacity:0;transition:opacity .5s}
-.bs-portrait{width:160px;height:160px;object-fit:contain;image-rendering:pixelated;filter:drop-shadow(0 0 30px var(--hs-color,#e06050));animation:hsSpin .8s ease-out}
+.bs-portrait{width:160px;height:160px;object-fit:contain;image-rendering:pixelated;animation:hsSpin .8s ease-out;position:relative;z-index:1}
+/* Wrap that hosts the radial-gradient halo behind the boss image. The
+   previous drop-shadow filter on the img clipped to the PNG's opaque
+   bounding box, leaving a visible square crop. The halo lives on the
+   wrapper's ::before so it can extend well beyond the image. */
+.bs-portrait-wrap{position:relative;display:inline-block;line-height:0}
+.bs-portrait-wrap::before{
+  content:'';position:absolute;left:50%;top:50%;width:230%;height:230%;
+  transform:translate(-50%,-50%);
+  background:radial-gradient(circle,var(--hs-color,#e06050) 0%,transparent 55%);
+  opacity:.6;pointer-events:none;z-index:0;
+  animation:hsSpin .8s ease-out;
+}
 .bs-subtitle{font-family:var(--font-px);font-size:14px;letter-spacing:6px;color:rgba(200,180,140,.6);margin-top:4px;animation:hsSlide .5s .3s both cubic-bezier(.2,.8,.3,1)}
 /* Boss splash content (image + name + BOSS FIGHT) anchored to top half so the
    persistent #tellBadge at viewport-50% sits visually below the boss without overlap. */
 .boss-splash{justify-content:flex-start;padding-top:10vh}
-.hs-icon{font-size:80px;filter:drop-shadow(0 0 20px var(--hs-color,#e8a030));animation:hsSpin .8s ease-out}
+/* Same trick as .bs-portrait-wrap — radial halo on a pseudo so the glow
+   isn't clipped to the emoji glyph's alpha box. */
+.hs-icon{font-size:80px;animation:hsSpin .8s ease-out;position:relative;display:inline-block;z-index:1}
+.hs-icon::before{
+  content:'';position:absolute;left:50%;top:50%;width:200%;height:200%;
+  transform:translate(-50%,-50%);
+  background:radial-gradient(circle,var(--hs-color,#e8a030) 0%,transparent 55%);
+  opacity:.55;pointer-events:none;z-index:-1;
+}
 .hs-name{
   font-family:var(--font-px);font-size:36px;letter-spacing:4px;
   color:var(--hs-color,#e8a030);
@@ -7437,7 +7465,7 @@ function _showBossSplash(bossKey,bossName,cb){
   var ov=document.createElement('div');
   ov.className='handicap-splash boss-splash';
   ov.style.setProperty('--hs-color',accent);
-  var imgHtml=portrait?'<img src="'+portrait+'" class="bs-portrait" alt="'+bossName+'">':'';
+  var imgHtml=portrait?'<span class="bs-portrait-wrap" style="--hs-color:'+accent+'"><img src="'+portrait+'" class="bs-portrait" alt="'+bossName+'"></span>':'';
   /* Tell info is rendered by the persistent #tellBadge (positioned at viewport-50%,
      visible through the splash via the has-splash exemption). Splash itself just
      shows boss image + name + BOSS FIGHT subtitle, with content pushed to top half
@@ -8393,10 +8421,10 @@ function scoreRoll(vals,cards,locked,context,dieMats){
   }
   /* Twin Dice: pair of 1s scored as singles = 300 (bonus +100 over normal 200) */
   if(cards.includes('twin_dice')&&_single1Count>=2)pts+=300;
-  /* Lucky Seven: non-scoring dice total exactly 7 → +200 */
+  /* Lucky Seven: non-scoring dice total exactly 7 → +400 (matches desc) */
   if(cards.includes('lucky_seven')){
     var _nonScoreSum=0;for(var _li=0;_li<n;_li++){if(!used[_li])_nonScoreSum+=vals[_li];}
-    if(_nonScoreSum===7){pts+=200;}
+    if(_nonScoreSum===7){pts+=400;}
   }
   return{total:pts,used,context,effects,_triplesFired};
 }
@@ -8785,13 +8813,19 @@ function attachTooltipTap(wrapperEl,opts){
   opts=opts||{};
   const toggle=function(e){
     if(_dragState&&_dragState.dragging)return;
+    /* Timestamp gate covers the gap between drag-end and any synthesized
+       click that browsers fire after touchend on iOS. */
     if(window._dragEndedAt&&Date.now()-window._dragEndedAt<400)return;
     if(window._shopDragging)return;
     if(window._loDragging)return;
-    /* Also gate on the dice-store + card-draft drag flags so the synthesized
-       click after a touch-drag (iOS Safari) doesn't pop a tooltip. */
+    /* Active-drag flags — a drag's onUp runs LATER than touchend, so the
+       timestamp above is set too late to gate the touchend tooltip listener.
+       These flags are still truthy at the moment touchend fires, so they
+       catch the synthesized tap that would otherwise pop a tooltip. */
     if(typeof _dsDragging!=='undefined'&&_dsDragging)return;
     if(typeof _draftDragging!=='undefined'&&_draftDragging)return;
+    if(typeof _pcDrag!=='undefined'&&_pcDrag)return;
+    if(typeof _vgDragState!=='undefined'&&_vgDragState)return;
     if(opts.excludeSelector&&e.target.closest(opts.excludeSelector))return;
     if(opts.requireSelector&&!e.target.closest(opts.requireSelector))return;
     /* If clicking the tooltip itself, just close everything */
@@ -9802,11 +9836,13 @@ function startPTurn(){
       _maybeAdvanceCounterfeit();
     }
   }
-  /* Stakes Rising: previous turn banked 500+ → start with +100 turn pts */
+  /* Stakes Rising: previous turn banked 500+ → start with +300 turn pts
+     (matches card description "your next turn starts with +300 turn points
+     already on the table"). */
   if(G._stakesRisingNext&&G.pCards.includes('stakes_rising')){
     G._stakesRisingNext=false;
-    G.turnPts=100;
-    triggerCard('stakes_rising','+100 START',true);
+    G.turnPts=300;
+    triggerCard('stakes_rising','+300 START',true);
   }
   /* Loan repayment: dock 200 from total at the start of each of the next 5 turns */
   if(G._loanRemaining&&G._loanRemaining>0){
@@ -10543,12 +10579,14 @@ function _tryBustSave(free){
   return false;
 }
 
-/* ── Close-bust slow-mo: when a bust is imminent AND the player has ≥300
-   points at risk (kept + turnPts), we dim the non-last dice, pulse-glow
-   the rightmost free die with a red "doom" tint, and delay doBust() by
-   ~750ms for drama. Cheap turns (no accumulated points) bust instantly. */
+/* ── Bust pause: always delay doBust() by a short interval so the player
+   can READ the dice that just settled before they scatter. When stakes are
+   high (≥300 at risk), bump to a longer dramatic delay AND dim the non-
+   last dice so the moment lands. Reduced-motion users get a smaller delay
+   but still some pause — the read time matters even without animation. */
 var CLOSE_BUST_THRESHOLD=300;
-var CLOSE_BUST_DELAY_MS=300;
+var BASE_BUST_DELAY_MS=420;     /* always-on read pause */
+var CLOSE_BUST_DELAY_MS=750;    /* dramatic delay for high-stakes busts */
 function _closeBustDrama(freeArr){
   if(S&&S.settings&&S.settings.reducedMotion)return false;
   var keptPts=(G.kept||[]).reduce(function(a,k){return a+(k.pts||0);},0);
@@ -10565,8 +10603,11 @@ function _closeBustDrama(freeArr){
   return true;
 }
 function _delayedDoBust(freeArr){
-  if(_closeBustDrama(freeArr)){setTimeout(doBust,CLOSE_BUST_DELAY_MS);}
-  else doBust();
+  /* Always pause so the dice are readable before the scatter. Use the
+     longer dramatic delay when stakes are high enough for the dimming
+     drama; otherwise a base read pause. */
+  var delay=_closeBustDrama(freeArr)?CLOSE_BUST_DELAY_MS:BASE_BUST_DELAY_MS;
+  setTimeout(doBust,delay);
 }
 function doBust(){
   /* Feat tracking: count player busts for "Untouchable" feat */
@@ -10743,7 +10784,7 @@ function handleBank(){
   var _effectiveRollCount=G.turnRollCount;
   if(G.pCards.includes('the_hearth')&&_effectiveRollCount===1){total+=100;bonusMsg+=' +100 HEARTH';triggerCard('the_hearth','+100',true);}
   if(G.pCards.includes('thrifty_gambler')&&total>=400&&total<=600){total+=150;bonusMsg+=' +150 THRIFTY';triggerCard('thrifty_gambler','+150',true);}
-  if(G.pCards.includes('beggars_bowl')&&!G._beggarsBowlUsed){G._beggarsBowlUsed=true;total+=150;bonusMsg+=' +150 BOWL';triggerCard('beggars_bowl','+150',true);}
+  if(G.pCards.includes('beggars_bowl')&&!G._beggarsBowlUsed){G._beggarsBowlUsed=true;total+=300;bonusMsg+=' +300 BOWL';triggerCard('beggars_bowl','+300',true);}
   if(G.pCards.includes('kings_ransom')&&(G.pPts+total-G.oPts)>=3000){total+=1000;bonusMsg+=' +1000 RANSOM';triggerCard('kings_ransom','+1000',true);}
   G.safeTurnStreak=(G.safeTurnStreak||0)+1;
   if(G.pCards.includes('slow_burn')&&G.safeTurnStreak%3===0){total+=300;bonusMsg+=' +300 SLOW BURN';triggerCard('slow_burn','+300',true);}
@@ -10752,8 +10793,8 @@ function handleBank(){
     triggerCard('rusty_spur','SPUR +1 ('+G.spurActive+'/3)',true);
   }
   if(G.pCards.includes('fools_gold')&&total>0&&total%500===0){total+=300;bonusMsg+=" +300 FOOL'S GOLD";triggerCard('fools_gold','+300',true);}
-  /* The Whetstone: first 3 rolls each turn score +50 extra */
-  if(G.pCards.includes('the_whetstone')){var _wsRolls=Math.min(G.turnRollCount||1,3);var _wsBonus=_wsRolls*125;total+=_wsBonus;bonusMsg+=' +'+_wsBonus+' WHETSTONE';triggerCard('the_whetstone','+'+_wsBonus,true);}
+  /* The Whetstone: first 3 rolls each turn score +200 extra (matches desc). */
+  if(G.pCards.includes('the_whetstone')){var _wsRolls=Math.min(G.turnRollCount||1,3);var _wsBonus=_wsRolls*200;total+=_wsBonus;bonusMsg+=' +'+_wsBonus+' WHETSTONE';triggerCard('the_whetstone','+'+_wsBonus,true);}
   /* Fortune's Wheel: every 3rd bank is doubled */
   if(G.pCards.includes('fortunes_wheel')){G._bankCount=(G._bankCount||0)+1;if(G._bankCount%3===0){total*=2;bonusMsg+=' x2 FORTUNE';triggerCard('fortunes_wheel','x2 BANK!',true);}}
   /* Corvus's Ledger: +75% on next bank after activation */
@@ -10793,10 +10834,11 @@ function handleBank(){
     }
     G._ciMult=Math.min(0.5,G._ciMult+0.05);
   }
-  /* The Estate: linear scaling — 1st bank +50, 2nd +100, 3rd +150… */
+  /* The Estate: linear scaling — 1st bank +150, 2nd +250, 3rd +350…
+     (matches desc; was +50 base which contradicted the card text). */
   if(G.pCards.includes('the_estate')){
     G._estateBanks=(G._estateBanks||0)+1;
-    var _esBonus=G._estateBanks*50;
+    var _esBonus=50+G._estateBanks*100;
     total+=_esBonus;bonusMsg+=' +'+_esBonus+' ESTATE';triggerCard('the_estate','+'+_esBonus,true);
   }
   /* Coin Jar: every 3rd bank earns stacking bonus 200/400/600… */
@@ -12140,6 +12182,13 @@ function endMatch(win){
       dlgDiv.innerHTML=_bossLossData.dlgHTML;
       var _rde=document.getElementById('resDlg');
       if(_rde){_rde.innerHTML='';_rde.appendChild(dlgDiv);_rde.classList.add('show');}
+      /* Hide the dialog text until the parchment canvas is drawn — otherwise
+         the text appears on its own first, with the scroll background popping
+         in 1s later. We draw, position, then fade in the text together. */
+      var _dlgTextEl=dlgDiv.querySelector('.dlg-text');
+      var _dlgPortraitEl=dlgDiv.querySelector('.dlg-portrait');
+      if(_dlgTextEl){_dlgTextEl.style.opacity='0';_dlgTextEl.style.transition='opacity .35s ease';}
+      if(_dlgPortraitEl){_dlgPortraitEl.style.opacity='0';_dlgPortraitEl.style.transition='opacity .35s ease';}
       /* Wait for the card reveal animation (1s cardRevealSpin) so the
          measurement captures the final settled bottom, then position the
          dialog well below with a clear visual beat. */
@@ -12149,6 +12198,12 @@ function endMatch(win){
           var _rcRect=resCard.getBoundingClientRect();
           if(_rcRect.bottom>0)_rde.style.top=(_rcRect.bottom+100)+'px';
         }
+        /* Reveal text + portrait after the parchment is drawn — small delay
+           so the parchment lands first. */
+        setTimeout(function(){
+          if(_dlgTextEl)_dlgTextEl.style.opacity='1';
+          if(_dlgPortraitEl)_dlgPortraitEl.style.opacity='1';
+        },180);
       },1050);
     }
   }
@@ -15596,6 +15651,10 @@ function _onPouchDragStart(e){
     document.removeEventListener('touchend', onUp);
     document.removeEventListener('touchcancel', onUp);
     if(!_pcDrag)return;
+    /* Stamp drag-end so the post-touchend synthesized click on iOS gets
+       gated out by attachTooltipTap (the touchend gate uses the _pcDrag
+       flag directly; this covers the click event that follows). */
+    window._dragEndedAt=Date.now();
     if(!_pcDrag.started){
       /* Short tap / no drag — treat as no-op (drag is the only interaction) */
       _pcDrag=null;return;
@@ -16500,6 +16559,8 @@ function _startVagabondDrag(die){
   }
   function onEnd(){
     if(!_vgDragState)return;
+    /* Stamp drag-end so any post-touchend synthesized click is gated out. */
+    window._dragEndedAt=Date.now();
     _commitVagabondDrag();
   }
   _vgDragState.onMove=onMove;
