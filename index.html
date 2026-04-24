@@ -537,8 +537,13 @@ body{
   transition:none!important;
 }
 /* In-zone card: greyed out, emoji hidden, no sheen sweep */
-.mcard.in-zone .gcard{filter:brightness(.55) saturate(.3) grayscale(.4)!important}
-.mcard.in-zone .gcard::before{animation:none!important;opacity:0!important}
+.mcard.in-zone .gcard,
+.mcard.used .gcard{filter:brightness(.55) saturate(.3) grayscale(.4)!important}
+.mcard.in-zone .gcard::before,
+.mcard.used .gcard::before{animation:none!important;opacity:0!important}
+/* Spent passive cards keep their corner gems but dim the frame too. */
+.mcard.used .gcard-frame{opacity:.3!important}
+.mcard.used .gc{opacity:.4!important}
 /* Kill only the outer drop shadow on in-zone cards; keep the pixel-frame insets. */
 .mcard-active.in-zone .gcard{box-shadow:inset 0 0 0 1px var(--ctrim),inset 0 0 0 5px var(--cface),inset 0 0 0 6px var(--card-accent,rgba(255,215,0,.9))}
 .mcard.in-zone .gcard-cover{font-size:0!important}/* hide emoji */
@@ -1089,8 +1094,15 @@ body.crit-dilate{animation:critDilate .55s ease-out both}
   background:radial-gradient(ellipse at center,transparent 50%,rgba(120,20,20,.35) 100%)}
 #bustVignette.flash{animation:vigFade .7s ease-out forwards}
 @keyframes vigFade{0%{opacity:1}100%{opacity:0}}
-/* ─── DICE SCATTER ON BUST ─── */
-.die.scatter{transition:transform .26s cubic-bezier(.16,.84,.3,1),opacity .2s ease-out;opacity:.55}
+/* ─── DICE SCATTER ON BUST ───
+   Dice darken + desaturate instead of fading to low opacity — keeps the
+   die shape visible and lets the player still read the values, while
+   clearly communicating the "dead" state. */
+.die.scatter{
+  transition:transform .26s cubic-bezier(.16,.84,.3,1),filter .2s ease-out;
+  opacity:1;
+  filter:brightness(.55) saturate(.4);
+}
 /* Per-die scatter offsets — selectors target the WRAP's nth-child position
    in the row (each die now lives inside its own .die-wrap, so `.die:nth-
    child(N)` would always match index 1 and every die snapped to the same
@@ -1106,7 +1118,7 @@ body.crit-dilate{animation:critDilate .55s ease-out both}
    second transform 120ms later, reading as a "double scatter". The single
    opp-scatter transform now does the whole bust visual. */
 .die.opp-bust{}
-.die.opp-scatter{transition:transform .4s cubic-bezier(.2,.8,.3,1),opacity .45s ease-out;opacity:0.55}
+.die.opp-scatter{transition:transform .4s cubic-bezier(.2,.8,.3,1),filter .45s ease-out;opacity:1;filter:brightness(.55) saturate(.4)}
 /* Same wrap-aware nth-child fix as the player scatter above. */
 .die-wrap:nth-child(1) .die.opp-scatter,.die.opp-scatter:nth-child(1){transform:translate(-4px,3px) rotate(-5deg)}
 .die-wrap:nth-child(2) .die.opp-scatter,.die.opp-scatter:nth-child(2){transform:translate(3px,-4px) rotate(4deg)}
@@ -1353,6 +1365,19 @@ body.crit-dilate{animation:critDilate .55s ease-out both}
 .status-msg.green{color:var(--green);opacity:1}
 .status-msg.active{color:var(--text);opacity:.65}
 .status-msg:empty::after{content:'\00a0'}
+/* Crit pulse — replaces the screen-flash when a 1000+ point selection fires.
+   Just a quick scale-up + gold tint on the score number above the dice. */
+.status-msg.crit-pulse{
+  animation:statusCritPulse .65s cubic-bezier(.2,1.6,.4,1) forwards;
+  transform-origin:center;
+  display:inline-block;
+}
+@keyframes statusCritPulse{
+  0%  {transform:scale(1);    color:var(--text);text-shadow:0 0 0 transparent;opacity:.65}
+  25% {transform:scale(1.45); color:#ffe080;text-shadow:0 0 14px rgba(255,200,80,.85);opacity:1}
+  60% {transform:scale(1.1);  color:#ffe080;text-shadow:0 0 8px rgba(255,200,80,.55);opacity:1}
+  100%{transform:scale(1);    color:var(--text);text-shadow:0 0 0 transparent;opacity:.65}
+}
 
 /* ─── MATCH BUTTONS (pixel-panel styled) ─── */
 .controls{
@@ -5486,10 +5511,12 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
 
 /* ── Tells: per-patron passive-rule badge (medieval, sits beside player dice) ── */
 .tell-badge{
-  /* Pinned absolutely at ~50% viewport so it persists in the SAME spot through the
-     boss splash AND the live board — feels like one element, not two. Z-index above
-     the splash bg (which is z:10000) so the icon+name stay visible during reveal. */
-  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  /* Pinned absolutely at ~40% viewport so it sits visually below the boss
+     portrait during the splash AND above the dice row in-match — feels like
+     one persistent element. Was 50% which felt too low on phones with the
+     boss content anchored to the top half. Z-index above the splash bg
+     (which is z:10000) so the icon+name stay visible during reveal. */
+  position:absolute;top:40%;left:50%;transform:translate(-50%,-50%);
   z-index:10050;pointer-events:none;
   font-family:var(--font-px);
   color:rgba(200,160,80,.85);letter-spacing:1.4px;
@@ -6344,9 +6371,14 @@ var _boneDice=['bone','bone','bone','bone','bone','bone'];
    Slot 3 (boss) is always available so signatures equip the moment
    they're earned. Slot 4 (second boss) is renown-gated, not tier-gated.
    Tweak these thresholds to retune the curve. */
-var SLOT_UNLOCK_TIER=[3,1,0,0,99];/* slot 0..4 → tier index needed (slot 4 disabled by default) */
+var SLOT_UNLOCK_TIER=[3,99,0,0,99];/* slot 0..4 → tier index needed
+   (slot 1 was tier 1 — Mabel — but felt too early; now gated on the
+   'fourthSlot' renown perk at 75 renown instead. Slot 4 is gated on
+   the Lord of Dice perk.) */
 function _isSlotUnlocked(idx){
   if(idx<0||idx>=SLOT_UNLOCK_TIER.length)return true;
+  /* Slot 1: gated on the fourthSlot renown perk (75 renown) */
+  if(idx===1)return !!(S&&S.renownPerks&&S.renownPerks.fourthSlot);
   /* Slot 4: gated on Lord of Dice renown perk, not tier */
   if(idx===4)return !!(S&&S.renownPerks&&S.renownPerks.secondBoss);
   return (S&&S.run&&(S.run.tier||0)>=SLOT_UNLOCK_TIER[idx]);
@@ -6510,6 +6542,7 @@ const FEATS=[
 const RENOWN_PERKS=[
   {threshold:25, key:'startGold',    label:'Known Face',     desc:'Begin every run with +200 starting gold'},
   {threshold:50, key:'freeRestock',  label:'Regular at the bar', desc:'Reshuffle the post-match card draft once after every match'},
+  {threshold:75, key:'fourthSlot',   label:'Trusted Hand',   desc:'Unlock your 4th card loadout slot'},
   {threshold:100,key:'shopDiscount', label:'Respected',      desc:'All shop prices reduced by 15%'},
   {threshold:150,key:'extraDraft',   label:'Honored guest',  desc:'Card drafts offer 4 cards instead of 3'},
   {threshold:200,key:'secondBoss',   label:'Lord of Dice',   desc:'Unlock a 5th loadout slot — a second boss-card slot'},
@@ -7162,18 +7195,20 @@ var Haptic={
   bust(){if(this._supported&&this._enabled())try{navigator.vibrate([60,40,60]);}catch(e){}},
   crit(){if(this._supported&&this._enabled())try{navigator.vibrate([30,20,30,20,60]);}catch(e){}},
 };
-/* ═══════ CRITICAL-HIT FLASH ═══════
-   Big-score tactile moment: 1000+ point selection triggers a gold screen flash
-   + brief time-dilation filter + crit sound. Respects reduced-motion setting. */
+/* ═══════ CRITICAL-HIT PULSE ═══════
+   Big-score moment: 1000+ point selection plays the crit sound and pulses
+   the score number above the dice. Used to trigger a screen-wide gold flash
+   + time dilation, but the player wanted something subtler — keep the sound,
+   draw attention to the score itself. */
 function showCritFlash(pts){
-  if(S&&S.settings&&S.settings.reducedMotion)return;
-  var f=document.getElementById('critFlash');
-  if(f){f.classList.remove('flash');void f.offsetWidth;f.classList.add('flash');
-    setTimeout(function(){f.classList.remove('flash');},560);}
-  document.body.classList.remove('crit-dilate');void document.body.offsetWidth;
-  document.body.classList.add('crit-dilate');
-  setTimeout(function(){document.body.classList.remove('crit-dilate');},560);
   try{SFX.crit&&SFX.crit();}catch(e){}
+  if(S&&S.settings&&S.settings.reducedMotion)return;
+  var statusBot=document.getElementById('statusBot');
+  if(statusBot){
+    statusBot.classList.remove('crit-pulse');void statusBot.offsetWidth;
+    statusBot.classList.add('crit-pulse');
+    setTimeout(function(){statusBot.classList.remove('crit-pulse');},720);
+  }
 }
 /* Pre-warm AudioContext on first interaction */
 document.addEventListener('touchstart',function _w(){SFX._get();document.removeEventListener('touchstart',_w);},{once:true});
@@ -7227,7 +7262,7 @@ const RUNGS=[
     agg:.56,cardRarity:null,wager:false,wagerCount:0,wagerMode:'none',minBank:150,diceStop:2,chaotic:true,adaptive:false,
     dice:['bone','bone','bone','iron','iron','iron'],
     cardPool:['her_lucky_coin','one_more_round','grogs_bump'],cardCount:2,cardChance:1,
-    tell:{id:'last_call',name:'LAST CALL',desc:"Banks under 300 don't count — house rule",icon:'🍻',threshold:300}},
+    tell:{id:'last_call',name:'LAST CALL',desc:"Banks under 500 don't count — house rule",icon:'🍻',threshold:500}},
   {id:1,name:'MABEL',key:'peasant',icon:'👨‍🌾',tier:'regular',target:5500,gold:175,buyIn:20,
     boss:null,bossDesc:null,
     agg:.58,cardRarity:'tin',wager:true,wagerCount:1,wagerMode:'best',minBank:200,diceStop:2,chaotic:false,adaptive:false,
@@ -7722,8 +7757,10 @@ function generatePatron(tierIndex){
   /* 25% chance to splash in one die from next tier's pool for variety */
   var _nt=TIERS[tierIndex+1];if(_nt&&_nt.patronStats&&_nt.patronStats.dicePool&&Math.random()<0.25){var _up=_nt.patronStats.dicePool;dice[Math.floor(Math.random()*6)]=_up[Math.floor(Math.random()*_up.length)];}
   /* Patron cards scale by tier:
-     T0: none. T1: 1 card. T2+ (Finnick onward): 3 cards, no tin allowed (tier-3+ rarities only). */
-  var pCardCount=tierIndex>=2?3:tierIndex>=1?1:0;
+     T0: none. T1: 2 cards (was 1 — felt unfair vs the player's 2-3 cards at
+     Mabel level). T2+ (Finnick onward): 3 cards, no tin allowed
+     (tier-3+ rarities only). */
+  var pCardCount=tierIndex>=2?3:tierIndex>=1?2:0;
   var pCardPool=[];
   if(pCardCount>0){
     /* Build pool from regular CARDS matching tier's draft rarities (no boss NPC cards) */
@@ -7769,7 +7806,7 @@ const CARDS=[
   {id:'flintlock',name:'THE FLINTLOCK',icon:'🔫',rarity:'silver',eff:'+300 EACH FIRST 1',desc:'Each turn: the first time a 1 appears on your roll, gain +300 bonus points.',arch:'safeBanker'},
   {id:'copper_pincher',name:'COPPER PINCHER',icon:'🪙',rarity:'silver',eff:'1s=200, 5s=100 PTS',desc:'Singles are worth more: 1s score 200 (not 100), 5s score 100 (not 50).',arch:'safeBanker'},
   {id:'half_measure',name:'HALF MEASURE',icon:'⚖️',rarity:'tin',eff:'+400 FOR 3-DICE BANK',desc:'Bank by committing exactly three dice and earn a flat +400 bonus.',arch:'safeBanker'},
-  {id:'the_hearth',name:'THE HEARTH',icon:'🔥',rarity:'tin',eff:'+250 FOR FIRST-ROLL BANK',desc:'Bank on your very first roll of a turn to earn +250 extra points.',arch:'safeBanker'},
+  {id:'the_hearth',name:'THE HEARTH',icon:'🔥',rarity:'tin',eff:'BANK IN \u22642 ROLLS \u2192 +200',desc:'When you bank within your first 2 rolls of a turn, gain +200. Repeats every turn — rewards quick, cautious banking.',arch:'safeBanker'},
   {id:'slow_burn',name:'SLOW BURN',icon:'🕯️',rarity:'tin',eff:'+500 EVERY 3 SAFE TURNS',desc:'Every three turns you bank safely without busting, automatically gain 500 points.',arch:'safeBanker'},
   {id:'fools_gold',name:"FOOL'S GOLD",icon:'✨',rarity:'tin',eff:'+300 ON 500-MULTIPLE BANK',desc:'Bank a score that is exactly a multiple of 500 (500, 1000…) to earn +300 bonus.',arch:'safeBanker',dep:true},
   {id:'keen_eyes',name:'KEEN EYES',icon:'👀',rarity:'tin',eff:'BLOCKS POCKET SAND',desc:"Blocks the opponent's Pocket Sand — they can't shave a die from your first roll.",arch:'utility',counter:true},
@@ -9572,10 +9609,19 @@ function _updateNpcCardVisuals(){
 function _updatePlayerCardVisuals(){
   if(!G||!G.pCards)return;
   var bar=document.getElementById('playerCards');if(!bar)return;
+  /* Map of cid → "is this once-per-match passive spent?" predicates. Extended
+     so the visible card greys out (along with its tooltip) when a one-shot
+     trigger has fired and can no longer pay out for the rest of the match. */
+  var _passiveSpent={
+    'martyr':            !!G.martyrUsed,
+    'beggars_bowl':      !!G._beggarsBowlUsed,
+    'thick_skin':        !!G._thickSkinUsed,
+    'bad_reputation':    !!G._badRepUsed,
+    'silver_tongue':     !!G._silverTongueUsed
+  };
   G.pCards.forEach(function(cid){
     var mc=bar.querySelector('.mcard[data-cid="'+cid+'"]');if(!mc)return;
-    var exhausted=false;
-    if(cid==='martyr'&&G.martyrUsed)exhausted=true;
+    var exhausted=!!_passiveSpent[cid];
     /* Flintlock is now per-turn (resets in endPTurn) so it's never
        permanently exhausted within a match. */
     if(G.activeCardState&&G.activeCardState.usedCards&&G.activeCardState.usedCards[cid]!==undefined){
@@ -10782,7 +10828,11 @@ function handleBank(){
   const totalCommitted=G.kept.reduce((a,k)=>a+k.vals.length,0);
   if(G.pCards.includes('half_measure')&&totalCommitted===3){total+=400;bonusMsg=' +400 HALF MEASURE';triggerCard('half_measure','+400',true);}
   var _effectiveRollCount=G.turnRollCount;
-  if(G.pCards.includes('the_hearth')&&_effectiveRollCount===1){total+=100;bonusMsg+=' +100 HEARTH';triggerCard('the_hearth','+100',true);}
+  /* The Hearth: bank within first 2 rolls of a turn → +200 (repeats every turn).
+     Was first-roll only at +100, which felt identical to Beggar's Bowl's
+     one-time match starter. Wider window + bigger bonus + different framing
+     (per-turn quick-bank reward) makes them play distinctly. */
+  if(G.pCards.includes('the_hearth')&&_effectiveRollCount<=2){total+=200;bonusMsg+=' +200 HEARTH';triggerCard('the_hearth','+200',true);}
   if(G.pCards.includes('thrifty_gambler')&&total>=400&&total<=600){total+=150;bonusMsg+=' +150 THRIFTY';triggerCard('thrifty_gambler','+150',true);}
   if(G.pCards.includes('beggars_bowl')&&!G._beggarsBowlUsed){G._beggarsBowlUsed=true;total+=300;bonusMsg+=' +300 BOWL';triggerCard('beggars_bowl','+300',true);}
   if(G.pCards.includes('kings_ransom')&&(G.pPts+total-G.oPts)>=3000){total+=1000;bonusMsg+=' +1000 RANSOM';triggerCard('kings_ransom','+1000',true);}
@@ -12235,8 +12285,13 @@ function endMatch(win){
     });
     draftHtml+='</div>';
     draftHtml+='<div class="end-draft-label">CHOOSE A CARD</div>';
-    /* Renown perk: Regular at the bar → reshuffle icon directly under the label */
-    if(S.renownPerks&&S.renownPerks.freeRestock&&!S.run._restockUsed){
+    /* Renown perk: Regular at the bar → reshuffle icon directly under the label.
+       Suppressed on the very match where the perk was just unlocked, so the
+       celebration notification fires first (next gauntlet screen) and the
+       button only appears on the FOLLOWING match — feels like a proper
+       "perk unlocked, then perk active" beat instead of effect-then-notice. */
+    var _freeRestockPending=(S.run._pendingPerkUnlocks||[]).indexOf('freeRestock')!==-1;
+    if(S.renownPerks&&S.renownPerks.freeRestock&&!S.run._restockUsed&&!_freeRestockPending){
       draftHtml+='<div class="end-draft-reshuffle" id="endDraftReshuffleBtn" onclick="reshuffleDraft()" title="Reshuffle (renown)"><span>↻</span></div>';
     }
     draftHtml+='<div class="end-draft-slots" id="endDraftSlots"></div>';
