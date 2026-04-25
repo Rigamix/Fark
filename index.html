@@ -7782,11 +7782,24 @@ function _markCounterfeitDice(){
   });
 }
 
+/* WARDED helper: returns true (and consumes a charge) if the player has
+   the WARDED card and a charge remaining. Disruption hooks call this
+   first and bail out if it returns true — the disruption fizzles. */
+function _consumeWard(label){
+  if(!G||!G._wardCharges||G._wardCharges<=0)return false;
+  G._wardCharges--;
+  setStatusMsg('🛡️ WARDED — '+(label||'DISRUPTION')+' FIZZLED','silver');
+  triggerCard('warded','WARDED!',true);
+  try{SFX.commit&&SFX.commit();}catch(e){}
+  return true;
+}
 /* ── CUTPURSE (Finnick): random post-roll die palm with flight animation ── */
 function _maybeFireCutpurse(){
   if(!G||!G._tell||G._tell.id!=='cutpurse')return;
   if(G.pCards&&G.pCards.includes('iron_grip'))return;/* counter-card */
   if(Math.random()>(G._tell.chance||0.3))return;
+  /* WARDED shield: fizzle the palm before any animation. */
+  if(_consumeWard('CUTPURSE'))return;
   /* Pick a random uncommitted die */
   var free=G.pool.filter(function(d){return !d.committed;});
   if(free.length<=1)return;/* don't palm if only 1 die left */
@@ -7984,12 +7997,26 @@ const CARDS=[
   {id:'six_serpents',name:'SIX SERPENTS',icon:'🐍',rarity:'gold',eff:'TRIPLE 6S SCORE 1000',desc:'Triple 6s score 1000 points instead of the standard 600.',arch:'collector'},
   /* ── Position-based cards — pair with Vagabond dice for reliable triggers ── */
   {id:'vanguard',name:'VANGUARD',icon:'🔰',rarity:'tin',eff:'1ST DIE 1 OR 5: +300',desc:'The leftmost die in your row, when scored as a 1 or 5, gets a +300 bonus.',arch:'collector'},
+  /* New tin cards — designed around EVENTS the player anticipates rather
+     than passive +X bonuses. Each fires at a clear moment with juicy
+     feedback: chain bonus per commit, comeback bonus, big-selection
+     reward, opp-bust reactive trigger. */
+  {id:'hot_hand',name:'HOT HAND',icon:'🔥',rarity:'tin',eff:'CHAIN BONUS +75/COMMIT',desc:'Each scoring commit within a turn adds +75 to that commit. Stacks per chain (75, 150, 225...). Resets on bust.',arch:'sharp'},
+  {id:'the_underdog',name:'THE UNDERDOG',icon:'🐕',rarity:'tin',eff:'BEHIND 1000+: +200/BANK',desc:'When your score is at least 1000 behind the opponent, every bank gains +200.',arch:'hoarder'},
+  {id:'perfect_storm',name:'PERFECT STORM',icon:'⛈️',rarity:'tin',eff:'5+ DICE COMMIT: +400',desc:'Commit 5 or more scoring dice in a single selection: gain +400 bonus.',arch:'collector'},
+  {id:'turncoat',name:'TURNCOAT',icon:'🎭',rarity:'tin',eff:'NEXT BANK +250 AFTER OPP BUST',desc:'When the opponent busts, your next bank gains +250.',arch:'saboteur'},
   {id:'anchor',name:'ANCHOR',icon:'⚓',rarity:'silver',eff:'LAST DIE 6: SCORES 600',desc:'The rightmost die in your row, if it shows a 6 and is committed, scores as a lone single worth 600.',arch:'collector'},
   {id:'sequence',name:'SEQUENCE',icon:'🎯',rarity:'gold',eff:'ROW IN STRICT ORDER: +1500',desc:'If the entire uncommitted row shows strictly ascending or descending values each differing by exactly 1 (e.g. 1-2-3-4-5-6 or 6-5-4-3-2), gain +1500. Fires on the first commit of the roll.',arch:'collector'},
   {id:'slippery_table',name:'SLIPPERY TABLE',icon:'💦',rarity:'silver',eff:'30% OPP DIE SLIPS BACK',desc:'30% chance each opponent turn: one of their kept scoring dice slips back and must be rerolled.',arch:'saboteur'},
   {id:'high_roller',name:'HIGH ROLLER',icon:'🎰',rarity:'silver',eff:'BANK 600+ → +400',desc:'When you bank 600 or more points in a single turn, gain a +400 bonus.',arch:'brinksman'},
   {id:'the_fence',name:'THE FENCE',icon:'🏚️',rarity:'silver',eff:'DISRUPTION CARDS +25%',desc:'Boosts your disruption cards (Sawdust, Short Pour, Slippery Table) by 25% — they hit the opponent harder.',arch:'saboteur'},
   {id:'twin_flames',name:'TWIN FLAMES',icon:'🔥',rarity:'silver',eff:'2 DIFF TRIPLES → +750',desc:'If you score 2 different triples in a single turn, gain +750 bonus when you bank.',arch:'collector'},
+  /* Warded (gold, utility) — replaces the removed counter cards (Keen Eyes
+     / Iron Grip) with a SINGLE general shield. One charge per match,
+     blocks the next disruption (palm, swap, seize, downgrade, etc).
+     Worth picking even if the opponent has no specific attacker because
+     ANY disruption gets fizzled. */
+  {id:'warded',name:'WARDED',icon:'🛡️',rarity:'gold',eff:'FIZZLES NEXT OPP DISRUPTION',desc:'The first time the opponent tries to palm, swap, seize, or downgrade one of your dice this match, the effect fizzles harmlessly. One charge per match.',arch:'utility'},
   /* Gold */
   {id:'broken_lantern',name:'BROKEN LANTERN',icon:'🏮',rarity:'gold',type:'active',maxUses:1,timing:'yielding',eff:'OPP PLAYS BLIND 1 TURN',desc:'Opponent\'s next turn: their dice faces are hidden until committed. One use per match.',arch:'saboteur',dep:true},
   {id:'wild_die',name:'THE WILD DIE',icon:'🃏',rarity:'gold',type:'active',maxUses:1,timing:'choosing',eff:'PICK ANY DIE FACE',desc:'Choose any face value (1-6) for one non-scoring die. One use per match.',arch:'sharp',dep:true},
@@ -8020,6 +8047,8 @@ const CARD_BG={
   /* New tactile + scoring-pattern cards */
   coin_flip:'#8A7A30',alchemist_touch:'#4A7060',twinning_charm:'#5A6080',double_down_die:'#7A5030',
   sevens_gift:'#6A5A40',twin_fury:'#8A4040',ascending:'#4A6A7A',bookends:'#6A5030',six_serpents:'#3A6A40',
+  /* New tin cards (D21) — distinct hues so they don't fall back to default grey */
+  hot_hand:'#9A4020',the_underdog:'#7A6A50',perfect_storm:'#4A5A70',turncoat:'#6A3A7A',
   /* NPC-only card backgrounds */
   her_lucky_coin:'#7A6A50',one_more_round:'#8A6030',grogs_bump:'#9A6028',
   the_last_stitch_npc:'#8B6080',measure_twice:'#706050',worn_thimble:'#9A7A60',the_nightshift:'#5A4A60',mabels_pinch:'#9A5070',
@@ -9354,6 +9383,8 @@ function newG(rung,pCards,oCards,pStake,oStake){
     turnPts:0,numDice:6,phase:'waiting',turnNum:1,pool:[],kept:[],oppDice:[],
     martyrUsed:false,flintlockFired:false,safeTurnStreak:0,turnRollCount:0,oppTurnCount:0,
     dieShieldsPlayer:_pShields,dieShieldsOpp:_oShields,
+    /* WARDED (gold): one-charge shield against opp disruptions. */
+    _wardCharges:pCards.includes('warded')?1:0,
     matchDice:[..._playerDice],
     matchOppDice:[...((rung&&rung.dice)||_boneDice)],
     originalPlayerDice:[..._playerDice],
@@ -10120,19 +10151,18 @@ function handleRoll(){
     triggerCard('seven_dice','SEVEN DICE!',true);
   }
   /* NPC reduce_first_roll cards (Pocket Sand 70%, Mabel's Pinch 50%, etc) — first
-     roll of each turn uses 5 dice. Chance pulled from each card's effect.chance
-     so each patron can have a different probability. Keen Eyes still blocks all. */
+     roll of each turn uses 5 dice. Chance pulled from each card's effect.chance.
+     Keen Eyes was the old counter; WARDED replaces it as a general shield. */
   if(G.turnRollCount===0){
     var _rfrId=G.oCards.find(function(cid){var n=getNpcCard(cid);return n&&n.effect.mechanic==='reduce_first_roll';});
     if(_rfrId){
       var _rfrCard=getNpcCard(_rfrId);
       var _rfrChance=(_rfrCard&&_rfrCard.effect&&_rfrCard.effect.chance!=null)?_rfrCard.effect.chance:0.7;
-      var hasKeenEyes=G.pCards.includes('keen_eyes');
-      if(!hasKeenEyes&&Math.random()<_rfrChance){
-        G.numDice=Math.min(G.numDice,5);
-        triggerCard(_rfrId,(_rfrCard?_rfrCard.name:'').toUpperCase()+' — 5 DICE!',false);
-      }else if(hasKeenEyes){
-        triggerCard('keen_eyes','BLOCKED!',true);
+      if(Math.random()<_rfrChance){
+        if(!_consumeWard((_rfrCard?_rfrCard.name:'POCKET SAND'))){
+          G.numDice=Math.min(G.numDice,5);
+          triggerCard(_rfrId,(_rfrCard?_rfrCard.name:'').toUpperCase()+' — 5 DICE!',false);
+        }
       }
     }
   }
@@ -10210,6 +10240,18 @@ function handleRoll(){
         }
       }
     })();
+    /* HOT HAND (tin): chain bonus per commit within a turn — +75, +150, +225...
+       Resets on bust (cleared in doBust). Encourages stringing scoring
+       commits together rather than committing one big set. */
+    if(cards.includes('hot_hand')){
+      G._hotHandChain=(G._hotHandChain||0)+1;
+      var _hhBonus=G._hotHandChain*75;
+      pts+=_hhBonus;triggerCard('hot_hand','HOT HAND +'+_hhBonus,true);
+    }
+    /* PERFECT STORM (tin): committing 5+ scoring dice in one selection: +400 */
+    if(cards.includes('perfect_storm')&&selDice.length>=5){
+      pts+=400;triggerCard('perfect_storm','PERFECT STORM +400',true);
+    }
     if(G._vowDoubleActive){pts*=2;G._vowDoubleActive=false;spawnPop('VOW x2');}
     /* The Echo: previous roll scored → this selection gets +25% */
     if(G._echoReady&&G.pCards.includes('the_echo')){var _echoB=Math.floor(pts*0.35);if(_echoB>0){pts+=_echoB;spawnPop('+'+_echoB+' ECHO');triggerCard('the_echo','ECHO +'+_echoB,true);}G._echoReady=false;}
@@ -10505,6 +10547,12 @@ function afterRoll(){
     if(eff.mechanic==='swap_best_to_3'&&(G.npcCardState.usedOnce[cid]||0)<_sb3MaxUses&&G.turnNum>=(2+_csDelayRoll)){
       var scoring=free.filter(function(d){return d.val===1||d.val===5;});
       if(scoring.length>0){
+        /* WARDED shield: fizzle the swap-to-3 attempt. Use is consumed
+           to prevent infinite retries until next match. */
+        if(_consumeWard((npc.name||'DICE SWAP'))){
+          G.npcCardState.usedOnce[cid]=(G.npcCardState.usedOnce[cid]||0)+1;
+          return;
+        }
         G.npcCardState.usedOnce[cid]=(G.npcCardState.usedOnce[cid]||0)+1;
         var victim=scoring.sort(function(a,b){return(a.val===1?100:50)-(b.val===1?100:50);}).pop();
         victim.val=3;
@@ -10737,6 +10785,8 @@ function doBust(){
   G._featBusts=(G._featBusts||0)+1;
   /* Rusty Spur: bias was earned by banking — a bust resets it so the bias doesn't carry past failure */
   if(G.spurActive){G.spurActive=0;}
+  /* Hot Hand chain reset on bust — losing the chain is the real cost. */
+  G._hotHandChain=0;
   /* Silver die shield: cancel bust once per shield die in loadout */
   if(G.dieShieldsPlayer>0){
     G.dieShieldsPlayer--;
@@ -11208,6 +11258,19 @@ function handleBank(){
     var _cbCut=Math.ceil(total*0.10);
     if(_cbCut>0){total-=_cbCut;bonusMsg+=' -'+_cbCut+" COWARD'S BELL";triggerCard('cowards_bell','-'+_cbCut,false);}
   }
+  /* THE UNDERDOG (tin): catch-up bonus when behind by 1000+. Encourages
+     not surrendering when the opponent pulls ahead. */
+  if(G.pCards.includes('the_underdog')&&(G.oPts-G.pPts)>=1000){
+    total+=200;bonusMsg+=' +200 UNDERDOG';triggerCard('the_underdog','+200 UNDERDOG',true);
+  }
+  /* TURNCOAT (tin): banked +250 if armed by an opponent bust. Single-use,
+     consumes the armed flag. */
+  if(G.pCards.includes('turncoat')&&G._turncoatArmed){
+    total+=250;bonusMsg+=' +250 TURNCOAT';triggerCard('turncoat','+250 TURNCOAT',true);
+    G._turncoatArmed=false;
+  }
+  /* Hot Hand chain resets at end of turn (banking) — chain is per-turn. */
+  G._hotHandChain=0;
   /* ── Starstone bonus — +500 per Starstone die in your loadout, applied to every bank. */
   if(G.matchDice){
     var _ssCount=G.matchDice.filter(function(m){return m==='starstone';}).length;
@@ -11628,6 +11691,8 @@ function runOppTurn(){
           var _rcLoss=Math.min(200,G.oPts);
           if(_rcLoss>0){G.oPts-=_rcLoss;triggerCard('rats_in_cellar','RATS −'+_rcLoss,true);updHUD();}
         }
+        /* TURNCOAT (tin): arm a +250 bonus on the player's next bank. */
+        if(G.pCards.includes('turncoat')){G._turncoatArmed=true;}
         /* ── Handicap: Rising Stakes — opponent streak reset on bust ── */
         if(G._handicap==='rising_stakes'){G._rsOppStreak=0;G._rsOppMultiplier=1.0;}
         if(G._handicap==='bounty_board')G._bountyOppBankStreak=0;
@@ -11921,6 +11986,9 @@ function _npcEndOfTurnActives(){
     var oWorstIdx=0;G.matchOppDice.forEach(function(d,i){if(dieRank(d)<dieRank(G.matchOppDice[oWorstIdx]))oWorstIdx=i;});
     var pBestIdx=0;G.matchDice.forEach(function(d,i){if(dieRank(d)>dieRank(G.matchDice[pBestIdx]))pBestIdx=i;});
     if(dieRank(G.matchDice[pBestIdx])>dieRank(G.matchOppDice[oWorstIdx])){
+      /* WARDED shield: fizzle the swap. Still consumes the NPC's use so
+         they can't try again until next match — feels fair. */
+      if(_consumeWard('SLEIGHT OF HAND')){npcUseActive('sleight_of_hand');return;}
       npcUseActive('sleight_of_hand');
       var pOld=G.matchDice[pBestIdx],oOld=G.matchOppDice[oWorstIdx];
       G.matchDice[pBestIdx]=oOld;G.matchOppDice[oWorstIdx]=pOld;
