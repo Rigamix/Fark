@@ -8589,16 +8589,26 @@ function scoreRoll(vals,cards,locked,context,dieMats){
   }
 
   /* ── Triples (with wild support) ──
-     Iterate HIGH→LOW so jade wilds attach to bigger triples first.
-     Bug fix: with hand [6(jade),5,5,6,6], forward iteration gave triple 5
-     (consuming the wild) and stranded the two real 6s, returning -1 for
-     the selection. Reversed, the wild fills the triple-6 slot first
-     (600 + two 5s as singles = 700, all used).
+     Iteration order: 6, 4, 3, 2, 1, 5  (non-singleton-scoring faces first
+     HIGH→LOW, then 1, then 5).
+     Why this order:
+       - HIGH→LOW prevents the original [6jade,5,5,6,6] bug where forward
+         iteration gave triple-5 and stranded the two real 6s (-1 invalid).
+       - But pure HIGH→LOW also broke [4,4,jade,5,5]: jade went to triple-5
+         (500 pts) and stranded the 4s (-1 invalid), when it could have
+         filled triple-4 (400) + two single 5s (100) = 500 valid. The 5s
+         survive as singles (50 each) but 4s do not — they're wasted unless
+         tripled. So faces that can NOT score as singles (2,3,4,6) MUST get
+         first dibs on wilds; only after that do we consider 1 and 5 (which
+         survive intact as singles).
+       - Among non-singleton faces, HIGH→LOW (6,4,3,2) maximizes pts.
+       - 1 comes before 5 so a triple-1 (1000) wins over a triple-5 (500)
+         when both could complete.
      Jade L2+ wilds also extend the set — when realC>=3 and a level-2+ wild
      is unused, attach it to bump triple→quad (doubles base). */
   const _triplesFired=[];/* track which face values produced triples for twin_flames */
   const _hasSixSerpents=cards.includes('six_serpents');
-  for(let f=6;f>=1;f--){
+  for(const f of [6,4,3,2,1,5]){
     const realC=cnt(f);const wc=cntWild();const totalC=realC+wc;
     if(totalC>=3){
       let wildsNeeded=Math.max(0,3-realC);
