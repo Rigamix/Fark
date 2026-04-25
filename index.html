@@ -5602,6 +5602,10 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
 .tell-badge .tb-val.tb-val-inline{
   display:inline-block;font-size:22px;margin-left:8px;vertical-align:baseline;
 }
+/* In Arrears debt-tinted variant — running gold cost in red. */
+.tell-badge .tb-val.tb-val-debt{
+  color:#ff7060;text-shadow:0 0 10px rgba(255,80,60,.6);
+}
 .tell-badge .tb-val.tb-warn{color:#e0a050;text-shadow:0 0 8px rgba(224,160,80,.45)}
 .tell-badge .tb-val.tb-danger{color:#e05050;text-shadow:0 0 10px rgba(224,80,80,.6);animation:rsFire .4s infinite alternate}
 /* Per-Tell color tint */
@@ -7334,13 +7338,13 @@ const RUNGS=[
     agg:.62,cardRarity:'tin',wager:true,wagerCount:1,wagerMode:'best',minBank:250,diceStop:2,chaotic:false,adaptive:true,
     dice:['bone','iron','iron','lead','amber','amber'],
     cardPool:['quick_hands','pocket_sand','the_skim','beginners_luck','the_lords_seal','sticky_fingers_die'],cardCount:3,
-    tell:{id:'cutpurse',name:'CUTPURSE',desc:"One of your dice might get palmed",icon:'✋',chance:.20}},
+    tell:{id:'cutpurse',name:'CUTPURSE',desc:"20% chance one of your dice gets palmed",icon:'✋',chance:.20}},
   {id:3,name:'CORVUS',key:'merchant',icon:'💼',tier:'known',target:10000,gold:350,buyIn:50,
     boss:null,bossDesc:null,
     agg:.60,cardRarity:'silver',wager:true,wagerCount:1,wagerMode:'best',minBank:250,diceStop:2,chaotic:false,adaptive:true,
     dice:['iron','flint','flint','lead','amber','amber'],
     cardPool:['interest_due','fine_print','severance_npc','the_audit','collateral_die','corvus_writ'],cardCount:3,
-    tell:{id:'in_arrears',name:'IN ARREARS',desc:'Every roll costs you 3 gold — your purse can go negative',icon:'📒',perRoll:3}},
+    tell:{id:'in_arrears',name:'IN ARREARS',desc:'Every roll costs you 15 gold — your purse can go negative',icon:'📒',perRoll:15}},
   {id:4,name:'BRUTUS',key:'soldier',icon:'⚔️',tier:'respected',target:13000,gold:500,buyIn:70,
     boss:null,bossDesc:null,
     agg:.68,cardRarity:'silver',wager:true,wagerCount:1,wagerMode:'best',minBank:300,diceStop:2,chaotic:false,adaptive:true,
@@ -7695,8 +7699,12 @@ function _initTellHUD(){
      (instead of below the desc) and skip the per-die spawnPop. Reads
      cleaner — one place to look for the accumulated bonus. */
   var _stedInlineVal=(t.id==='steeped')?' <span class="tb-val tb-val-inline" id="steepedVal">+0</span>':'';
+  /* IN ARREARS: show running gold cost inline next to the tell name so the
+     player sees how much the tell has drained from their purse. Updated
+     per-roll in afterRoll alongside the actual gold deduction. */
+  var _arInlineVal=(t.id==='in_arrears')?' <span class="tb-val tb-val-inline tb-val-debt" id="arrearsVal">−0g</span>':'';
   badge.innerHTML='<span class="tb-icon">'+t.icon+'</span>'+
-    '<span class="tb-name">'+_tellNameHtml+_stedInlineVal+'</span>'+
+    '<span class="tb-name">'+_tellNameHtml+_stedInlineVal+_arInlineVal+'</span>'+
     '<span class="tb-desc">'+t.desc+'</span>';
   /* Width auto via inline content; flex-direction:column groups them on top of each other. */
   /* Direct child of #screen-match, position-pinned at vertical center. This way the
@@ -7737,6 +7745,15 @@ function _updateTellHUD(){
   if(t.id==='reckoning'){
     var r=document.getElementById('reckoningVal');
     if(r){var f=(G._tellState&&G._tellState.lastNpcBank)||0;r.textContent='≥'+f;}
+  }
+  if(t.id==='in_arrears'){
+    var ar=document.getElementById('arrearsVal');
+    if(ar){
+      var _arCost=(G._tellState&&G._tellState.totalRollCost)||0;
+      ar.textContent='−'+_arCost+'g';
+      /* Pop animation each time it ticks */
+      ar.classList.remove('tb-pop');void ar.offsetWidth;ar.classList.add('tb-pop');
+    }
   }
 }
 /* Triggered when a Tell cancels a bank (Last Call below threshold,
@@ -7917,7 +7934,7 @@ const CARDS=[
   {id:'grogs_flask',name:"GROG'S FLASK",icon:'🍺',rarity:'gold',type:'active',npc:'grog',maxUses:1,timing:'choosing',eff:'REROLL 2 NON-SCORING DICE',desc:'During dice selection, pick up to two dice that aren\'t scoring and reroll them. One use per match.',rewardQuote:'"Here… take thish. Won it fair an\' shquare."',arch:'sharp'},
   {id:'mabels_stitch',name:"MABEL'S STITCH",icon:'🧵',rarity:'gold',type:'active',npc:'mabel',maxUses:1,timing:'idle|choosing|yielding',eff:'BUST → BANK PTS +300',desc:'Activate before rolling: if you bust this turn, bank your accumulated points AND gain +300 bonus. One use per match.',rewardQuote:'"Take this. May it mend thy fortune."',arch:'brinksman'},
   {id:'finnicks_palm',name:"FINNICK'S PALM",icon:'🤏',rarity:'gold',type:'active',npc:'finnick',maxUses:1,timing:'choosing',eff:'SWAP 1 DIE → 1 OR 5',desc:'During dice selection, flip one non-scoring die to a 1 or 5. One use per match.',rewardQuote:'"Not bad, mate! Keep this, yeah?"',arch:'sharp'},
-  {id:'corvus_ledger',name:"CORVUS'S LEDGER",icon:'📒',rarity:'gold',type:'active',npc:'corvus',maxUses:1,timing:'idle|choosing|yielding',eff:'NEXT BANK +75%',desc:'Activate at any point during your turn — your next bank is worth 75% extra points. One use per match.',rewardQuote:'"Take the ledger. Consider it… a dividend."',arch:'hoarder'},
+  {id:'corvus_ledger',name:"CORVUS'S LEDGER",icon:'📒',rarity:'gold',type:'active',npc:'corvus',maxUses:1,timing:'idle|choosing|yielding',eff:'NEXT BANK x2',desc:'Activate at any point during your turn — your next bank is doubled. One use per match.',rewardQuote:'"Take the ledger. Consider it… a dividend."',arch:'hoarder'},
   {id:'brutus_fist',name:"BRUTUS'S FIST",icon:'👊',rarity:'gold',type:'active',npc:'brutus',maxUses:1,timing:'choosing',eff:'FORCE 1 DIE → 1',desc:'During dice selection, force one non-scoring die to show a 1 (worth 100 pts). One use per match.',rewardQuote:'"Iron in thy bones. Take this, soldier."',arch:'sharp',dep:true},
   {id:'aldrics_vow',name:"ALDRIC'S VOW",icon:'⚔️',rarity:'gold',type:'active',npc:'aldric',maxUses:1,timing:'idle',eff:'DOUBLE OR NOTHING',desc:'Your next roll: score 300+ and it doubles; score less and you lose your accumulated turn points. One use.',rewardQuote:'"Thou hast proven worthy. Bear this vow."',arch:'brinksman'},
   {id:'whispers_hex',name:"WHISPER'S HEX",icon:'🔮',rarity:'gold',type:'active',npc:'whisper',maxUses:1,timing:'yielding',eff:'OPP −1 DIE NEXT TURN',desc:'Activate while yielding your turn — the opponent starts their next turn with only five dice. One use.',rewardQuote:'"This hex is yours. Use it wisely."',arch:'saboteur'},
@@ -8142,9 +8159,10 @@ const NPC_CARDS=[
    effect:{type:'passive',mechanic:'gain_when_ahead',amount:500}},
   {id:'corvus_writ',name:"CORVUS'S WRIT",icon:'📜',rarity:'npc',npcOnly:true,owner:'corvus',
    type:'active',maxUses:1,timing:'yielding',
-   eff:'Reroll ALL your kept dice (once)',desc:'Once per match, Corvus invokes a writ — you must reroll every die you selected on your next turn.',
-   playerDesc:'Activate while yielding: the opponent must reroll every die they selected on their next turn.',
-   effect:{type:'once',mechanic:'reroll_all_kept'}},
+   eff:'HALVES YOUR NEXT BIG BANK',
+   desc:'Once per match, Corvus invokes a writ — your next bank of 500+ is halved.',
+   playerDesc:"Activate while yielding: the opponent's next bank of 500+ is halved.",
+   effect:{type:'on_player_bank',mechanic:'halve_big_bank',threshold:500}},
 
   /* ── BRUTUS ── */
   {id:'hold_the_line',name:'HOLD THE LINE',icon:'🛡️',rarity:'npc',npcOnly:true,owner:'brutus',
@@ -8244,8 +8262,8 @@ const NPC_CARDS=[
    effect:{type:'once',mechanic:'swap_die',mode:'best_for_worst'}},
   {id:'collateral_die',name:'COLLATERAL',icon:'📦',rarity:'npc',npcOnly:true,owner:'corvus',
    type:'active',maxUses:1,timing:'idle',
-   eff:'Downgrades your best die (once)',desc:'Once per match, Corvus downgrades your highest-quality die to a weaker type.',
-   playerDesc:"Activate before rolling: downgrade the opponent's highest-quality die to bone for the rest of the match.",
+   eff:'Downgrades your TWO best dice (once)',desc:"Once per match, Corvus downgrades your two highest-quality dice to bone for the rest of the match.",
+   playerDesc:"Activate before rolling: downgrade the opponent's two highest-quality dice to bone for the rest of the match.",
    effect:{type:'once',mechanic:'swap_die',mode:'downgrade_best'}},
   {id:'royal_seizure',name:'ROYAL SEIZURE',icon:'👑',rarity:'npc',npcOnly:true,owner:'whisper',
    type:'active',maxUses:1,timing:'idle',
@@ -8298,8 +8316,8 @@ const DICE_TYPES=[
    desc:'6s count as any face for completing triples.'},
   {id:'brass',name:'BRASS',icon:'🟤',cost:450,
    faces:[1,1,5,5,3,4],
-   effect:{type:'risk_reward',mechanic:'reckless',penaltyPct:0.04},
-   desc:'Extra 1 and 5 faces. Each Brass die in your loadout costs 4% of your total when you bust.'},
+   effect:{type:'risk_reward',mechanic:'reckless',penaltyPct:0.15},
+   desc:'Extra 1 and 5 faces. Each Brass die in your loadout costs 15% of your total when you bust.'},
   {id:'silver',name:'SILVER',icon:'🔘',cost:580,
    faces:[1,2,3,4,5,6],
    effect:{type:'utility',mechanic:'shield'},
@@ -8314,8 +8332,8 @@ const DICE_TYPES=[
    desc:'Only rolls 1, 5, or 6. Guaranteed scoring on every face.'},
   {id:'obsidian',name:'OBSIDIAN',icon:'🖤',cost:500,
    faces:[1,2,3,4,5,6],
-   effect:{type:'risk_reward',mechanic:'shatter_bonus',chance:0.06,amount:500},
-   desc:'6% chance per roll to shatter (lost for the match) — shatter triggers +500 bonus pts.'},
+   effect:{type:'risk_reward',mechanic:'shatter_bonus',chance:0.06,amount:1000},
+   desc:'6% chance per roll to shatter (lost for the match) — shatter triggers +1000 bonus pts.'},
   {id:'starstone',name:'STARSTONE',icon:'⭐',cost:700,
    faces:[1,2,3,4,5,6],
    effect:{type:'scoring_boost',mechanic:'starstone_bonus',amount:500},
@@ -8856,7 +8874,18 @@ function _cardIdHash(cid){
 function applyCardAging(outerEl,tarnish,cardId){
   if(!outerEl||tarnish<=0)return;
   const W=outerEl.offsetWidth,H=outerEl.offsetHeight;
-  if(!W||!H)return;
+  if(!W||!H){
+    /* Card was added to a hidden parent (e.g. #end-ov display:none on win/
+       defeat screens). Retry on next frames until the parent becomes
+       visible and gives us a real size. Caps at 30 retries (~500ms) so
+       a permanently-hidden card doesn't loop forever. */
+    var _agRetry=outerEl._agRetry||0;
+    if(_agRetry>=30)return;
+    outerEl._agRetry=_agRetry+1;
+    requestAnimationFrame(function(){applyCardAging(outerEl,tarnish,cardId);});
+    return;
+  }
+  outerEl._agRetry=0;
   const seed=(_cardIdHash(cardId)*137+tarnish*31)^0xc0ffee;
   const{clipPath,borderStr,holes}=_cagBuildPath(W,H,tarnish,seed);
   outerEl.style.clipPath=`path('${clipPath}')`;
@@ -10068,13 +10097,24 @@ function startPTurn(){
         spawnPop('🔄 SWAPPED');
         setTimeout(function(){if(window.DLG)DLG.triggerCard(cid,false);},600);
       }else if(eff.mode==='downgrade_best'){
-        var pBestIdx2=0;G.matchDice.forEach(function(d,i){if(dieRank(d)>dieRank(G.matchDice[pBestIdx2]))pBestIdx2=i;});
-        var oldDie=G.matchDice[pBestIdx2];
-        G.matchDice[pBestIdx2]='bone';
-        triggerCard(cid,npc.name+': '+oldDie.toUpperCase()+' → BONE',false);
-        setStatusMsg(G.rung.name+' DOWNGRADED YOUR '+oldDie.toUpperCase()+'!','red');
-        spawnPop('📦 DOWNGRADED');
-        setTimeout(function(){if(window.DLG)DLG.triggerCard(cid,false);},600);
+        /* Downgrade the TOP TWO premium dice to bone (was just one). The
+           single-die downgrade felt soft compared to Finnick's swap which
+           also upgrades Finnick's die in addition to nerfing the player. */
+        var _dgnDowngraded=[];
+        for(var _dgI=0;_dgI<2;_dgI++){
+          var pBestIdx2=0;G.matchDice.forEach(function(d,i){if(dieRank(d)>dieRank(G.matchDice[pBestIdx2]))pBestIdx2=i;});
+          var oldDie=G.matchDice[pBestIdx2];
+          if(dieRank(oldDie)<=dieRank('bone'))break;/* nothing left to downgrade */
+          G.matchDice[pBestIdx2]='bone';
+          _dgnDowngraded.push(oldDie);
+        }
+        if(_dgnDowngraded.length){
+          var _dgLabel=_dgnDowngraded.map(function(d){return d.toUpperCase();}).join(' + ');
+          triggerCard(cid,npc.name+': '+_dgLabel+' → BONE',false);
+          setStatusMsg(G.rung.name+' DOWNGRADED '+_dgLabel+'!','red');
+          spawnPop('📦 ×'+_dgnDowngraded.length+' DOWNGRADED');
+          setTimeout(function(){if(window.DLG)DLG.triggerCard(cid,false);},600);
+        }
       }
     }
     /* steal_die: NPC takes player's best die */
@@ -10374,15 +10414,17 @@ function afterRoll(){
       _updateTellHUD();
       try{SFX.coins&&SFX.coins();}catch(e){}
     }
-    /* In Arrears (Corvus): −Xg per roll, gold can go negative */
+    /* In Arrears (Corvus): −Xg per roll, gold can go negative.
+       Also ticks the inline HUD value next to the Tell title. */
     if(G._tell.id==='in_arrears'&&S&&S.run){
-      var _iaCost=G._tell.perRoll||3;
+      if(!G._tellState)G._tellState={totalRollCost:0};
+      var _iaCost=G._tell.perRoll||15;
       S.run.gold=(S.run.gold||0)-_iaCost;
       G._tellState.totalRollCost=(G._tellState.totalRollCost||0)+_iaCost;
       var _gel=document.getElementById('goldAmt');
       if(_gel){_gel.textContent=S.run.gold;_gel.classList.toggle('gold-debt',S.run.gold<0);
         _gel.classList.remove('gold-tick-down');void _gel.offsetWidth;_gel.classList.add('gold-tick-down');}
-      try{spawnPop('−'+_iaCost+'g');}catch(e){}
+      _updateTellHUD();
       /* save() persists S to localStorage. Was `saveState()` which doesn't
          exist — threw a ReferenceError that crashed afterRoll mid-flight,
          leaving phase stuck on "rolling" with no way for the player to
@@ -10980,8 +11022,10 @@ function handleBank(){
   if(G.pCards.includes('fortunes_wheel')){G._bankCount=(G._bankCount||0)+1;if(G._bankCount%3===0){total*=2;bonusMsg+=' x2 FORTUNE';triggerCard('fortunes_wheel','x2 BANK!',true);}}
   /* Corvus's Ledger: +75% on next bank after activation */
   if(G.activeCardState&&G.activeCardState.ledgerActive){
-    var ledgerBonus=Math.floor(total*0.75);total+=ledgerBonus;
-    bonusMsg+=' +'+ledgerBonus+' LEDGER';triggerCard('corvus_ledger','+'+ledgerBonus,true);
+    /* +100% (doubles bank) — was +75% which felt weak vs Double Down's
+       2× current points. */
+    var ledgerBonus=total;total+=ledgerBonus;
+    bonusMsg+=' +'+ledgerBonus+' LEDGER';triggerCard('corvus_ledger','x2 LEDGER',true);
     G.activeCardState.ledgerActive=false;clearCardLabel('corvus_ledger');
   }
   /* Greedy Hands: banks under 250 are doubled */
@@ -11172,6 +11216,19 @@ function handleBank(){
       var half=Math.floor(total/2);total-=half;
       bonusMsg+=' -'+half+' '+npc.name;
       triggerCard(cid,npc.name+' −'+half+'!',false);
+      (function(_cid){setTimeout(function(){if(window.DLG)DLG.triggerCard(_cid,false);},800);})(cid);
+    }
+    /* Halve next big bank (corvus_writ): once per match, fires on the
+       first player bank ≥ threshold (500). The old reroll_all_kept
+       mechanic almost never fired in practice — it required the player
+       to commit dice mid-turn AND roll again, AND for opp turn to
+       interleave at the right moment. This straight bank-halve is far
+       more reliable and meaningful. */
+    if(eff.type==='on_player_bank'&&eff.mechanic==='halve_big_bank'&&!G.npcCardState.usedOnce[cid]&&total>=(eff.threshold||500)){
+      G.npcCardState.usedOnce[cid]=true;
+      var _cwHalf=Math.floor(total/2);total-=_cwHalf;
+      bonusMsg+=' -'+_cwHalf+' '+npc.name;
+      triggerCard(cid,npc.name+' −'+_cwHalf+'!',false);
       (function(_cid){setTimeout(function(){if(window.DLG)DLG.triggerCard(_cid,false);},800);})(cid);
     }
     /* Steal low bank (the_lords_seal) */
@@ -12062,7 +12119,8 @@ function endMatch(win){
   document.querySelectorAll('.tell-badge,.tell-cursed-overlay').forEach(function(e){e.remove();});
   document.querySelectorAll('.die-counterfeit,.die-palmed').forEach(function(e){e.classList.remove('die-counterfeit','die-palmed');});
   document.querySelectorAll('.mcard.card-sealed').forEach(function(e){e.classList.remove('card-sealed');});
-  win?SFX.win():SFX.lose();
+  /* SFX moved to the animation-sequence block below — was firing here AND
+     there, causing the win/lose sound to stack on itself. */
 
   var isBoss=!!G._isBoss;
   var isGauntlet=!!G._isGauntlet;
@@ -13760,24 +13818,30 @@ function activateFrozenDie(){
 
 /* Double Down: double turn pts, release all kept, must roll 6 */
 function activateDoubleDown(){
-  var _ddPts=G.kept.reduce(function(a,k){return a+k.pts;},0);
-  if(_ddPts<=0){setStatusMsg('NO POINTS TO DOUBLE','red');
+  var _ddOldPts=G.kept.reduce(function(a,k){return a+k.pts;},0);
+  if(_ddOldPts<=0){setStatusMsg('NO POINTS TO DOUBLE','red');
     G.activeCardState.usedCards['double_down']=(G.activeCardState.usedCards['double_down']||0)+1;
     var _chip=document.querySelector('.mcard-active[data-cid="double_down"]');if(_chip)_chip.classList.remove('used');
     return;}
-  _ddPts*=2;
-  /* Clear all kept, create a single keep entry with doubled pts */
-  G.kept=[{vals:[],mat:'bone',pts:_ddPts}];
-  G.turnPts=_ddPts;
+  /* Double each kept entry's pts in place — preserves the original dice
+     icons in the kept tray (was overwriting kept with a single empty-vals
+     entry, which made the tray render a random-face placeholder die that
+     made it look like nothing happened). */
+  G.kept.forEach(function(k){k.pts=k.pts*2;});
+  var _ddNewPts=G.kept.reduce(function(a,k){return a+k.pts;},0);
+  G.turnPts=_ddNewPts;
   /* Double Down visual juice: scatter + sparks on committed dice */
   G.pool.forEach(function(d){if(d.committed&&d.el){d.el.classList.add('scatter');spawnPixelSparks(d.el,3);}});
+  refreshKeptTray();updHUD();
+  spawnPop('×2 DOUBLED');
   /* Release all committed dice — force reroll of all 6 */
   setTimeout(function(){
     G.pool.forEach(function(d){d.committed=false;d.sel=false;if(d.el){d.el.classList.remove('committed','selected','scatter');d.el.onclick=null;}});
     clearRow('playerDiceRow');G.pool=[];G.numDice=6;
     refreshKeptTray();updHUD();
-    setStatusMsg('DOUBLE DOWN! '+_ddPts+' PTS — ROLLING ALL 6','gold');
-    /* Auto-roll */
+    setStatusMsg('DOUBLE DOWN! '+_ddNewPts+' PTS — ROLLING ALL 6','gold');
+    /* Auto-roll: phase MUST be idle/choosing for handleRoll's gamblers_eye
+       branch to skip cleanly. */
     G.phase='idle';
     setTimeout(function(){handleRoll();},600);
   },450);
