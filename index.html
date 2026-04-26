@@ -8987,10 +8987,11 @@ function applyCardAging(outerEl,tarnish,cardId){
   if(!W||!H){
     /* Card was added to a hidden parent (e.g. #end-ov display:none on win/
        defeat screens). Retry on next frames until the parent becomes
-       visible and gives us a real size. Caps at 30 retries (~500ms) so
-       a permanently-hidden card doesn't loop forever. */
+       visible and gives us a real size. Caps at 180 retries (~3s) — was
+       30 (~500ms) which dropped boss tarnish on the victory screen because
+       the result-card animation takes longer than that to settle layout. */
     var _agRetry=outerEl._agRetry||0;
-    if(_agRetry>=30)return;
+    if(_agRetry>=180)return;
     outerEl._agRetry=_agRetry+1;
     requestAnimationFrame(function(){applyCardAging(outerEl,tarnish,cardId);});
     return;
@@ -14728,6 +14729,7 @@ var _draftDragState=null;
 var _draftPickedCardId=null;/* Track which card was placed — only 1 pick allowed */
 var _draftPickedSlotIdx=-1;
 var _draftPickedEl=null;/* The offered-card element that was placed */
+var _draftPrevSlotCardId=null;/* What S.run.cards[_draftPickedSlotIdx] held BEFORE the pick — restored on undo or when the player picks again (different card or slot). */
 var _draftBossMode=false;/* True when drafting boss signature cards (target slot 2) */
 var _draftDragging=false;/* Global lock — only one drag at a time */
 function _endDraftPick(cardId){/* no-op — drag handles placement */}
@@ -14774,17 +14776,18 @@ function _draftSnapBack(clone,srcEl){
   setTimeout(function(){_draftRemoveClone(clone);},250);
 }
 function _draftFindDropSlot(x,y){
-  /* Try elementFromPoint first */
+  /* Try elementFromPoint first.
+     Slot-type filter dropped: any unlocked slot accepts any card. Players
+     wanted to replace the leftmost (boss) slot's card with a regular card
+     and the previous filter blocked that — produced an inconsistency where
+     slot 1 accepted drops but slot 0 silently refused. */
   var hit=document.elementFromPoint(x,y);
   if(hit){
     var slot=hit.closest('.draft-slot');
     if(slot&&slot.closest('#endDraftSlots')){
       var idx=parseInt(slot.dataset.slotIdx);
-      /* Boss draft only accepts the boss slot (idx 0); regular draft only accepts
-         the regular slots (1/2/3). Locked slots are also rejected. */
       if(!_isSlotUnlocked(idx))return null;
-      var _slotOk=_draftBossMode?(idx===0):(idx>=1);
-      if(_slotOk)return{el:slot,idx:idx};
+      return{el:slot,idx:idx};
     }
   }
   /* Fallback: generous rect check (±25px tolerance) */
@@ -14792,8 +14795,6 @@ function _draftFindDropSlot(x,y){
   document.querySelectorAll('#endDraftSlots .draft-slot').forEach(function(s){
     var idx=parseInt(s.dataset.slotIdx);
     if(!_isSlotUnlocked(idx))return;
-    var _slotOk=_draftBossMode?(idx===0):(idx>=1);
-    if(!_slotOk)return;
     var r=s.getBoundingClientRect();
     if(x>=r.left-25&&x<=r.right+25&&y>=r.top-25&&y<=r.bottom+25)best={el:s,idx:idx};
   });
@@ -14801,65 +14802,57 @@ function _draftFindDropSlot(x,y){
 }
 function _draftPlaceCard(cardId,slotIdx,srcEl){
   var s=document.querySelector('#endDraftSlots .draft-slot[data-slot-idx="'+slotIdx+'"]');
-  if(!s){/* Fallback: find by index */
+  if(!s){
     var all=document.querySelectorAll('#endDraftSlots .draft-slot');
     s=all[slotIdx];
   }
   if(!s)return false;
-  /* If this slot held the previously drafted card, undo that pick first */
-  if(_draftPickedCardId&&_draftPickedSlotIdx===slotIdx&&_draftPickedEl){
-    _draftPickedEl.style.visibility='';_draftPickedEl.style.pointerEvents='';_draftPickedEl.style.opacity='';
-    _draftPickedCardId=null;_draftPickedSlotIdx=-1;_draftPickedEl=null;
-    _ungreyOfferedCards();
-  }
-  _getS();S.run.cards[slotIdx]=cardId;
-  /* Boss cards always render with the unified aged look (no per-equip
-     tarnish progression — kept the cardTarnish state for save compat
-     but stop incrementing it). */
-  var _tC=CARDS.find(function(c){return c.id===cardId;})||getNpcCard(cardId);
-  save();
-  var cd=_tC;
+  var cd=CARDS.find(function(c){return c.id===cardId;})||getNpcCard(cardId);
   if(!cd)return false;
-  s.className='draft-slot filled'+(slotIdx===0?' boss':'');
-  var _slotRar=cd.npc?'boss-'+cd.npc:(cd.npcOnly&&cd.owner?'boss-'+cd.owner:(cd.npcOnly?'npc':cd.rarity));
-  /* Wrap in .card-outer with data-cid so the aging MutationObserver
-     picks it up and applies the weathered look to boss/npc cards. */
-  s.innerHTML='<div class="card-outer" data-cid="'+cardId+'" style="position:absolute;inset:0;width:100%;height:100%">'+
-    '<div class="gcard rarity-'+_slotRar+'" style="position:absolute;inset:0;width:100%;height:100%;border-radius:4px">'+
-      '<div class="gcard-cover" style="background:'+(CARD_BG[cardId]||'#444')+'">'+cd.icon+'</div>'+
-      '<div class="gcard-frame"></div>'+gcCorners()+
-    '</div>'+
-  '</div>';
-  /* Replace wrapper to clear any stale listeners */
-  var oldWrap=s.parentElement;
-  var newWrap=document.createElement('div');
-  newWrap.style.cssText=oldWrap.style.cssText;
-  newWrap.className=oldWrap.className||'';
-  newWrap.appendChild(s);
-  var tipDiv=document.createElement('div');
-  tipDiv.innerHTML=mkCardTooltipHTML(cd,null,{showFlavor:false});
-  var tip=tipDiv.firstChild;
-  if(tip){tip.style.cssText='position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%)';newWrap.appendChild(tip);}
-  oldWrap.parentElement.replaceChild(newWrap,oldWrap);
-  attachTooltipTap(newWrap);
-  _initSlotUndoDrag(s,slotIdx);
-  SFX.nav();
+  _getS();
+  /* Change-of-mind support: if there's an active pick, undo it first.
+     This restores the previous srcEl visibility AND restores the previous
+     slot to whatever it held BEFORE the pick (could be a different card or
+     empty). Without this, picking a second card would leave both placed —
+     the old solution was to grey-out the other offered cards entirely. The
+     player asked for the grey-out to go away ("I might change my mind"),
+     so we instead make every new pick atomically replace the previous one. */
+  if(_draftPickedCardId!==null&&_draftPickedSlotIdx>=0){
+    S.run.cards[_draftPickedSlotIdx]=_draftPrevSlotCardId;
+    if(_draftPickedEl){
+      _draftPickedEl.style.visibility='';
+      _draftPickedEl.style.pointerEvents='';
+      _draftPickedEl.style.opacity='';
+    }
+    _draftPickedCardId=null;_draftPickedSlotIdx=-1;_draftPickedEl=null;
+  }
+  /* Stash what's in the target slot now — restored if the player picks
+     again (or drags this card back out). */
+  _draftPrevSlotCardId=S.run.cards[slotIdx]||null;
+  S.run.cards[slotIdx]=cardId;
+  save();
+  /* Re-render all slots from S.run.cards. _renderEndDraftSlots wraps each
+     gcard in .card-outer (so the aging observer fires for boss cards) and
+     re-attaches tooltip + undo-drag listeners. */
+  _renderEndDraftSlots();
   _draftPickedCardId=cardId;
   _draftPickedSlotIdx=slotIdx;
   _draftPickedEl=srcEl;
   srcEl.style.visibility='hidden';srcEl.style.pointerEvents='none';
-  _greyOutOfferedCards();
+  /* No more _greyOutOfferedCards() — player can pick a different card and
+     the change-mind logic above swaps cleanly. */
+  SFX.nav();
   var skipBtn=document.getElementById('endDraftSkipBtn');
   if(skipBtn){skipBtn.querySelector('span').textContent='CONTINUE';skipBtn.onclick=function(){SFX.nav();_endDraftDone();};}
   return true;
 }
 function _draftTapPlace(el,cardId){
-  /* Auto-place in first valid empty slot */
+  /* Auto-place in first unlocked empty slot. Slot-type filter dropped to
+     match _draftFindDropSlot — any unlocked slot accepts any card. */
   var slots=document.querySelectorAll('#endDraftSlots .draft-slot');
   for(var i=0;i<slots.length;i++){
     var idx=parseInt(slots[i].dataset.slotIdx);
-    /* Boss mode: only slot 0. Regular mode: only slots 1+ (slot 0 is boss-only). */
-    if(_draftBossMode?(idx!==0):(idx<1))continue;
+    if(!_isSlotUnlocked(idx))continue;
     if(slots[i].classList.contains('filled'))continue;
     return _draftPlaceCard(cardId,idx,el);
   }
@@ -14977,15 +14970,20 @@ function _initSlotUndoDrag(slotEl,slotIdx){
         return;
       }
 
-      /* Undo: clear the slot, restore the offered card */
-      _getS();S.run.cards[slotIdx]=null;save();
-      slotEl.className='draft-slot'+(slotIdx>=3?' boss':'');
-      slotEl.innerHTML='';slotEl.style.opacity='';
+      /* Undo: restore the slot to its pre-pick content (was incorrectly
+         clearing to null — would lose the previously-equipped card if the
+         player drafted on top of it then changed their mind). Boss-class
+         used to use slotIdx>=3 (stale from before the slot reorder); now
+         the boss slot is idx 0 and _renderEndDraftSlots applies the class. */
+      _getS();
+      S.run.cards[slotIdx]=_draftPrevSlotCardId;
+      save();
+      _renderEndDraftSlots();
       if(_draftPickedEl){
         _draftPickedEl.style.visibility='';_draftPickedEl.style.pointerEvents='';_draftPickedEl.style.opacity='';
       }
-      _ungreyOfferedCards();
       _draftPickedCardId=null;_draftPickedSlotIdx=-1;_draftPickedEl=null;
+      _draftPrevSlotCardId=null;
       var skipBtn=document.getElementById('endDraftSkipBtn');
       if(skipBtn){skipBtn.querySelector('span').textContent='SKIP';skipBtn.onclick=function(){SFX.nav();_endDraftSkip();};}
       SFX.nav();
@@ -15363,7 +15361,11 @@ function _renderEndDraftSlots(){
       var cd=CARDS.find(function(c){return c.id===cid;})||getNpcCard(cid);
       if(cd){
         var _sRar=cd.npc?'boss-'+cd.npc:(cd.npcOnly&&cd.owner?'boss-'+cd.owner:(cd.npcOnly?'npc':cd.rarity));
-        slot.innerHTML='<div class="gcard rarity-'+_sRar+'" style="position:absolute;inset:0;width:100%;height:100%;border-radius:4px"><div class="gcard-cover" style="background:'+(CARD_BG[cid]||'#444')+'">'+cd.icon+'</div><div class="gcard-frame"></div>'+gcCorners()+'</div>';
+        /* Wrap gcard in card-outer so the aging MutationObserver applies the
+           weathered look (boss/npc cards always render at level 3). Without
+           this wrap, the observer never sees the slot's card and the boss
+           tarnish silently no-ops on the victory screen's loadout slots. */
+        slot.innerHTML='<div class="card-outer" data-cid="'+cid+'" style="position:absolute;inset:0;width:100%;height:100%"><div class="gcard rarity-'+_sRar+'" style="position:absolute;inset:0;width:100%;height:100%;border-radius:4px"><div class="gcard-cover" style="background:'+(CARD_BG[cid]||'#444')+'">'+cd.icon+'</div><div class="gcard-frame"></div>'+gcCorners()+'</div></div>';
       }
     }else{
       slot.style.pointerEvents='none';
