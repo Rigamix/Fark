@@ -2814,6 +2814,26 @@ body::before,body::after{display:none!important}
   text-shadow:0 1px 0 rgba(0,0,0,.55);
 }
 .end-draft-slots .draft-slot.filled{border-style:solid;border-color:rgba(200,160,80,.4);touch-action:none}
+/* Filled boss slot keeps a brighter gold border + soft glow so the player
+   can still tell it apart from regular filled slots — without this, slot 0
+   visually looks like any other filled slot once a boss card is placed and
+   players misread it as a regular slot, then can't drop a regular card on
+   it (correct behavior, but confusing). */
+.end-draft-slots .draft-slot.boss.filled{
+  border-color:rgba(220,170,60,.85);
+  box-shadow:0 0 8px rgba(220,170,60,.35),inset 0 0 6px rgba(220,170,60,.18);
+}
+/* Tiny "BOSS" tag at the top edge of a filled boss slot — small, gold,
+   unobtrusive but clearly labels what the slot is for. */
+.end-draft-slots .draft-slot.boss.filled::after{
+  content:'BOSS';
+  position:absolute;top:-7px;left:50%;transform:translateX(-50%);
+  font-family:var(--font-px);font-size:7px;letter-spacing:1.5px;
+  color:rgba(220,170,60,.95);background:rgba(28,22,16,.95);
+  padding:1px 4px;border-radius:2px;
+  pointer-events:none;z-index:5;
+  text-shadow:0 1px 0 rgba(0,0,0,.6);
+}
 .end-draft-slots .draft-slot.drop-hover{border-color:rgba(200,160,80,.7);box-shadow:0 0 12px rgba(200,160,80,.3);background:rgba(80,64,30,.5)}
 .end-draft-slots .draft-slot .gcard{position:absolute;inset:0;width:100%;height:100%;border-radius:4px}
 .end-draft-slots .draft-slot .gcard-cover{font-size:16px}
@@ -14776,18 +14796,21 @@ function _draftSnapBack(clone,srcEl){
   setTimeout(function(){_draftRemoveClone(clone);},250);
 }
 function _draftFindDropSlot(x,y){
-  /* Try elementFromPoint first.
-     Slot-type filter dropped: any unlocked slot accepts any card. Players
-     wanted to replace the leftmost (boss) slot's card with a regular card
-     and the previous filter blocked that — produced an inconsistency where
-     slot 1 accepted drops but slot 0 silently refused. */
+  /* Boss draft only accepts the boss slot (idx 0); regular draft only accepts
+     the regular slots (1+). Locked slots are also rejected.
+     The boss slot reservation is intentional — a previous tweak removed it
+     and the player corrected: they want the boss slot protected from regular
+     cards. The "leftmost slot didn't accept" confusion was actually a visual
+     issue (filled boss slot lost its gold styling), addressed separately in
+     CSS. */
   var hit=document.elementFromPoint(x,y);
   if(hit){
     var slot=hit.closest('.draft-slot');
     if(slot&&slot.closest('#endDraftSlots')){
       var idx=parseInt(slot.dataset.slotIdx);
       if(!_isSlotUnlocked(idx))return null;
-      return{el:slot,idx:idx};
+      var _slotOk=_draftBossMode?(idx===0):(idx>=1);
+      if(_slotOk)return{el:slot,idx:idx};
     }
   }
   /* Fallback: generous rect check (±25px tolerance) */
@@ -14795,6 +14818,8 @@ function _draftFindDropSlot(x,y){
   document.querySelectorAll('#endDraftSlots .draft-slot').forEach(function(s){
     var idx=parseInt(s.dataset.slotIdx);
     if(!_isSlotUnlocked(idx))return;
+    var _slotOk=_draftBossMode?(idx===0):(idx>=1);
+    if(!_slotOk)return;
     var r=s.getBoundingClientRect();
     if(x>=r.left-25&&x<=r.right+25&&y>=r.top-25&&y<=r.bottom+25)best={el:s,idx:idx};
   });
@@ -14847,12 +14872,13 @@ function _draftPlaceCard(cardId,slotIdx,srcEl){
   return true;
 }
 function _draftTapPlace(el,cardId){
-  /* Auto-place in first unlocked empty slot. Slot-type filter dropped to
-     match _draftFindDropSlot — any unlocked slot accepts any card. */
+  /* Auto-place in first valid empty slot. Boss mode: only slot 0.
+     Regular mode: only slots 1+ (slot 0 is boss-only). */
   var slots=document.querySelectorAll('#endDraftSlots .draft-slot');
   for(var i=0;i<slots.length;i++){
     var idx=parseInt(slots[i].dataset.slotIdx);
     if(!_isSlotUnlocked(idx))continue;
+    if(_draftBossMode?(idx!==0):(idx<1))continue;
     if(slots[i].classList.contains('filled'))continue;
     return _draftPlaceCard(cardId,idx,el);
   }
