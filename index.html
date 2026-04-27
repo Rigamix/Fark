@@ -5579,11 +5579,13 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
 
 /* ── Tells: per-patron passive-rule badge (medieval, sits beside player dice) ── */
 .tell-badge{
-  /* Pinned absolutely at ~55% viewport — the sweet spot that sits below the
-     NPC dialogue (which lives around 30-45%) AND below the boss portrait
-     during the splash, while staying above the dice row at the bottom of
-     the screen. Z-index above the splash bg (which is z:10000) so the
-     icon+name stay visible during reveal. */
+  /* Pinned absolutely at ~44% viewport. Z-index above the splash bg
+     (which is z:10000) so the icon+name stay visible during reveal.
+     left:50% + translateX is viewport-centered (NOT in the same flex
+     container as the score-preview row) so it cannot be pushed by the
+     gold score widening. On short phones (height<=700) the 44% landed
+     visually on top of the score-preview row above the dice — small-
+     screen overrides below pull it higher. */
   position:absolute;top:44%;left:50%;transform:translate(-50%,-50%);
   z-index:10050;pointer-events:none;
   font-family:var(--font-px);
@@ -5594,6 +5596,10 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
   transition:color .3s,text-shadow .3s;
   font-size:12px;
 }
+/* Short phones: pull the badge up above the score-preview row so it
+   stops overlapping the gold/green numbers above the dice. */
+@media (max-height:700px){.tell-badge{top:34%}}
+@media (max-height:620px){.tell-badge{top:30%}}
 .tell-badge .tb-icon{font-size:46px;line-height:1;margin-bottom:0}
 .tell-badge .tb-name{font-size:23px;color:rgba(230,190,100,1);text-shadow:0 0 10px rgba(220,180,90,.4),0 2px 0 rgba(0,0,0,.7);line-height:1}
 /* Stepped per-letter wave — each letter bobs on a 2-frame step-stagger so the
@@ -5747,12 +5753,16 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
   font-family:var(--font-px);color:var(--text);
   text-align:center;letter-spacing:1px;line-height:1.1;
   background:transparent;border:0;box-shadow:none;
-  /* Pinned absolutely and visually centered between the opp dice row
-     and the player dice row. Dialog sits at z:90 so it naturally
-     covers the strip when a patron speaks — bounties re-appear once
-     dialog fades. */
-  position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);
-  z-index:25;pointer-events:none;
+  /* Lives in the dice-area's flex flow (between dialogue and the player
+     zone) so it naturally pushes the player dice down instead of floating
+     over them. Used to be position:absolute;top:50% pinned to the match
+     screen, which on small phones (height<700) landed the strip's bottom
+     edge inside the player dice row.
+     pointer-events:none keeps it click-through; dialog sits at z:90 so
+     it still covers the strip when a patron speaks. */
+  flex-shrink:0;width:100%;
+  pointer-events:none;
+  z-index:25;
 }
 .bounty-strip .bs-title{display:none}
 .bs-row{display:contents}
@@ -6430,8 +6440,11 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
     <div id="settingsResume" style="display:none;width:100%;margin:8px 0 4px">
       <div style="font-size:8px;letter-spacing:1.5px;color:var(--textdim);text-align:center;margin-bottom:8px" id="settingsResumeLabel"></div>
       <div style="display:flex;gap:8px;justify-content:center">
-        <button onclick="closeSettings();resumeMatch()" style="font-family:var(--font-px);font-size:11px;letter-spacing:1px;padding:9px 16px;background:rgba(30,60,30,.9);border:1px solid rgba(80,160,80,.45);border-radius:3px;color:#a8e0a8;cursor:pointer;touch-action:manipulation">RESUME MATCH</button>
-        <button onclick="abandonMatch();initSettingsUI()" style="font-family:var(--font-px);font-size:11px;letter-spacing:1px;padding:9px 16px;background:rgba(50,18,18,.9);border:1px solid rgba(140,60,60,.35);border-radius:3px;color:var(--reddim);cursor:pointer;touch-action:manipulation">ABANDON</button>
+        <!-- RESUME MATCH button removed: state was never persisted on Settings open
+             so the button never had anything to resume to. The Resume banner on
+             the menu (if pendingMatch DOES exist via some other code path) keeps
+             working — this only drops the broken Settings entry point. -->
+        <button onclick="abandonMatch();initSettingsUI()" style="font-family:var(--font-px);font-size:11px;letter-spacing:1px;padding:9px 16px;background:rgba(50,18,18,.9);border:1px solid rgba(140,60,60,.35);border-radius:3px;color:var(--reddim);cursor:pointer;touch-action:manipulation">ABANDON MATCH</button>
       </div>
     </div>
     <div class="settings-actions">
@@ -7665,10 +7678,15 @@ function _initHandicapHUD(){
     else ms.appendChild(badge);
   }
   if(G._handicap==='bounty_board'){
-    /* Bounty strip — pinned absolutely to the match screen so it never reflows
-       when dice roll, status changes, or the activation zone appears */
+    /* Bounty strip — insert as a regular flex child of #diceArea, just before
+       the player-zone, so the dice naturally sit below it (no overlap on
+       small phones). */
     var strip=document.createElement('div');strip.id='bountyStrip';strip.className='bounty-strip';
-    ms.appendChild(strip);
+    var _da=document.getElementById('diceArea');
+    var _pz=document.getElementById('playerZone');
+    if(_da&&_pz)_da.insertBefore(strip,_pz);
+    else if(_da)_da.appendChild(strip);
+    else ms.appendChild(strip);
     _updateBountyHUD();
   }
   if(G._handicap==='mirror_match'){
@@ -8584,15 +8602,11 @@ function scoreRoll(vals,cards,locked,context,dieMats){
       }
     }
   }
-  /* ── Seven's Gift (tin): pairs summing to 7 (1+6, 2+5, 3+4) → +100/pair. */
-  if(cards.includes('sevens_gift')){
-    var _sgPairs=[[1,6],[2,5],[3,4]];
-    _sgPairs.forEach(function(pr){
-      while(cnt(pr[0])>=1&&cnt(pr[1])>=1){
-        pts+=200;mark(pr[0],1);mark(pr[1],1);
-      }
-    });
-  }
+  /* Seven's Gift moved AFTER triples — see comment near line 8700. The
+     greedy pair-consumption used to break valid triple selections (e.g.
+     [6,6,6,5,1] greedily ate 1+6 = 200 and stranded the [6,6] pair,
+     returning -1 invalid; should score triple-6 + single 1 + single 5
+     = 750). */
   /* ── Bookends (silver): leftmost + rightmost die in the roll show the
      same value → +500 once. Works on raw vals (positional). */
   if(cards.includes('bookends')&&n>=2){
@@ -8686,6 +8700,18 @@ function scoreRoll(vals,cards,locked,context,dieMats){
       }
       _triplesFired.push(f);
     }
+  }
+
+  /* ── Seven's Gift (tin): pairs summing to 7 (1+6, 2+5, 3+4) → +200/pair.
+     Runs AFTER triples so it can't strand a triple by greedily consuming
+     one of its faces. Pairs only fire on dice that triples didn't claim. */
+  if(cards.includes('sevens_gift')){
+    var _sgPairs=[[1,6],[2,5],[3,4]];
+    _sgPairs.forEach(function(pr){
+      while(cnt(pr[0])>=1&&cnt(pr[1])>=1){
+        pts+=200;mark(pr[0],1);mark(pr[1],1);
+      }
+    });
   }
 
   /* ── Singles ── */
@@ -10505,7 +10531,17 @@ function handleRoll(){
     },100);});
   /* Frozen Die: pre-build the saved die so it occupies one of the new
      dice slots at its original position, instead of being appended at
-     the end of the row. */
+     the end of the row. Bug fixes:
+       (1) `needNew--` removed — startPTurn already decremented G.numDice
+           by 1 when the frozen die exists, so needNew here is already
+           correct (was double-decrementing → only 4 fresh dice + 1 frozen
+           = 5 total instead of 6).
+       (2) `_fdPos` is clamped against `needNew` (post-roll row length),
+           not the obsolete-pool index from G._frozenDie.pos which could
+           sit anywhere from 0..pool.length-1 of the OLD turn (including
+           past committed dice that don't exist in the new row). The
+           player's intent is "leftmost-ish" — clamping to a sensible
+           visual range avoids the "ends up centered" artifact. */
   var _doFrozen=G._frozenDieRestore&&G._frozenDie&&G.turnRollCount===0;
   var _fdEntry=null;
   if(_doFrozen){
@@ -10513,15 +10549,15 @@ function handleRoll(){
     var _fdEl=mkDie(G._frozenDie.val,G._frozenDie.mat);
     _fdEl.classList.add('die-frozen-entry');
     _fdEntry={val:G._frozenDie.val,mat:G._frozenDie.mat,sel:false,committed:false,el:_fdEl,_frozenSlot:true};
-    /* Reduce the count of fresh dice by 1 — the frozen die takes one slot */
-    if(needNew>0)needNew--;
   }
   const newEntries=[];
   for(let i=0;i<needNew;i++){const mat=G.matchDice[(G.pool.length+i)%G.matchDice.length]||'bone';const val=useSpur?rollFaceSpur(mat):rollFace(mat);
     const el=mkDie(val,mat);el.classList.add('rolling');_appendDie(row,el);newEntries.push({val,mat,sel:false,committed:false,el});}
-  /* Insert the frozen die at its saved index — clamp to the row bounds */
+  /* Insert the frozen die. Use the saved free-only visual index, capped
+     to the actual roll count — `pos` was set to free-die index at freeze
+     time (see activateFrozenDie). */
   if(_fdEntry){
-    var _fdPos=Math.min(Math.max(0,G._frozenDie.pos|0),newEntries.length);
+    var _fdPos=Math.max(0,Math.min(G._frozenDie.pos|0,newEntries.length));
     newEntries.splice(_fdPos,0,_fdEntry);
     var _refNode=row.children[_fdPos]||null;
     _insertDie(row,_fdEntry.el,_refNode);
@@ -10532,6 +10568,20 @@ function handleRoll(){
 }
 
 function afterRoll(){
+  /* Safety net: if anything in the body throws, the catch unsticks the
+     phase from 'rolling' so the player can always at least try to bank or
+     roll again instead of being frozen. The Frozen-Die jade-wild crash
+     hit this — an exception mid-flight left phase='rolling' with no UI
+     recovery. */
+  try{ _afterRollImpl(); }
+  catch(e){
+    console.error('afterRoll crashed:',e);
+    G.phase='choosing';
+    setBtns(G.kept.length===0,G.kept.length>0);
+    setStatusMsg('','');
+  }
+}
+function _afterRollImpl(){
   G.turnRollCount++;
   /* ── TELL HOOKS (post-roll) ── */
   if(G._tell){
@@ -11463,14 +11513,17 @@ function handleBank(){
   }
   /* Hot Hand chain resets at end of turn (banking) — chain is per-turn. */
   G._hotHandChain=0;
-  /* ── Starstone bonus — +500 per Starstone die in your loadout, applied to every bank. */
+  /* ── Starstone bonus — +500 per Starstone die in your loadout, applied to every bank.
+     triggerCard('starstone', ...) used to silently no-op (starstone is a die,
+     not a card — there's no card element to anchor a label to). Now uses
+     spawnPop for a visible floating bonus so the player knows it fired. */
   if(G.matchDice){
     var _ssCount=G.matchDice.filter(function(m){return m==='starstone';}).length;
     if(_ssCount>0){
       var _ssBonus=_ssCount*500;
       total+=_ssBonus;
-      bonusMsg+=' +'+_ssBonus+' STARSTONE';
-      triggerCard('starstone','STARSTONE +'+_ssBonus,true);
+      bonusMsg+=' +'+_ssBonus+' ⭐';
+      try{spawnPop('+'+_ssBonus+' ⭐ STARSTONE');}catch(e){}
     }
   }
   /* ── TELL HOOKS (applied after all card bonuses, before celebration) ── */
@@ -13928,11 +13981,17 @@ function activateFrozenDie(){
     var _chip=document.querySelector('.mcard-active[data-cid="frozen_die"]');if(_chip)_chip.classList.remove('used');
     return;}
   /* Store the first selected die's value + material for restoration next turn.
-     Also remember its index in the pool so the die comes back in the same
-     visual position instead of being appended at the end of the row. */
+     pos = visual index among NON-COMMITTED dice. Using the raw G.pool index
+     was wrong: pool index includes committed/banked dice from earlier in
+     the turn, but next turn's row starts fresh with only free dice — so
+     the index would land too far right (showed up "centered" or beyond). */
   var savedDie=selDice[0];
-  var _fdPos=G.pool.indexOf(savedDie);
-  G._frozenDie={val:savedDie.val,mat:savedDie.mat,pos:_fdPos>=0?_fdPos:0};
+  var _fdPos=0;
+  for(var _i=0;_i<G.pool.length;_i++){
+    if(G.pool[_i]===savedDie)break;
+    if(!G.pool[_i].committed)_fdPos++;
+  }
+  G._frozenDie={val:savedDie.val,mat:savedDie.mat,pos:_fdPos};
   /* Swap the selection outline from gold to blue so the saved die is
      visually distinct, and add a chunky shake + strong haptic so the
      freeze action lands physically. */
