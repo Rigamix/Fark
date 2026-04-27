@@ -8469,6 +8469,12 @@ const SCORING_BASE={
 };
 function scoreRoll(vals,cards,locked,context,dieMats){
   cards=cards||[];locked=locked||0;context=context||{};dieMats=dieMats||null;
+  /* Multi-pass scoring flag — when set, ladder/ascending blocks run AFTER
+     the triples loop instead of before. scoreSelection tries both
+     orderings and picks the higher valid total. Lets the engine find
+     [1,1,1,2,3,4] = triple-1 (1000) + ladder [2,3,4] (400) = 1400, which
+     standard order misses (ladder eats one 1 then triple-1 can't fire). */
+  const _triplesFirst=!!(context&&context._triplesFirst);
   const n=vals.length,used=new Array(n).fill(false);let pts=0;
   const effects=[];/* track die effect activations for visual feedback */
   const copperPincher=cards.includes('copper_pincher'),millersToll=cards.includes('millers_toll'),scavenger=cards.includes('scavenger'),noSingles=cards.includes('_nosingles'),triplesPenalty=cards.includes('_triplepenalty'),bloodTithe=cards.includes('blood_tithe');
@@ -8578,11 +8584,31 @@ function scoreRoll(vals,cards,locked,context,dieMats){
     if(_crowsCanFire){_consumeCrows();/* low straight fully negated — dice not consumed so they bust or score singles */}
     else{pts+=Math.floor(SCORING_BASE.straight5low*(_tavernTales?1.5:(_tavernTalesPartial?1.2:1)));markSet([1,2,3,4,5]);straightFound=true;}
   }
-  /* ── The Ladder: partial straights (only if no 5/6-long straight fired) ── */
-  if(!straightFound&&cards.includes('the_ladder')){
+  /* Helper: would firing this run strand a triple-completable face?
+     Returns true if any face in the run has cnt>=3 AND that face is one
+     that would be wasted as singles (i.e. NOT 1 or 5, which always score
+     as singles). Used to skip ladder/ascending runs that would consume
+     a die needed by an inevitable triple — e.g. [1,2,3,4,4,4] with the
+     Ladder card: firing [1,2,3,4] eats one 4 and strands the [4,4] pair
+     (-1 invalid). Skipping that run lets the triple-4 fire first, then
+     the 3-long [1,2,3] ladder run still scores. */
+  var _runConflictsWithTriple=function(run){
+    var counts=[0,0,0,0,0,0,0];
+    for(var _ci=0;_ci<n;_ci++)counts[vals[_ci]]=(counts[vals[_ci]]||0)+1;
+    for(var _rj=0;_rj<run.length;_rj++){
+      var _f=run[_rj];
+      if(counts[_f]>=3&&(_f===2||_f===3||_f===4||_f===6))return true;
+    }
+    return false;
+  };
+  /* ── The Ladder + Ascending: standard position (BEFORE triples).
+     Skipped when _triplesFirst is set — duplicate block runs after the
+     triples loop in that case. */
+  if(!_triplesFirst&&!straightFound&&cards.includes('the_ladder')){
     var _ladderRuns=[[1,2,3,4],[2,3,4,5],[3,4,5,6],[1,2,3],[2,3,4],[3,4,5],[4,5,6]];
     for(var _li=0;_li<_ladderRuns.length;_li++){
       var _run=_ladderRuns[_li];
+      if(_runConflictsWithTriple(_run))continue;
       if(hasSet(_run)){
         pts+=(_run.length===4?800:400);
         markSet(_run);
@@ -8590,12 +8616,10 @@ function scoreRoll(vals,cards,locked,context,dieMats){
       }
     }
   }
-  /* ── Ascending (silver): 3 consecutive dice → +400. Skipped if a full
-     straight already fired (straightFound) or if the ladder consumed the
-     values above. */
-  if(!straightFound&&cards.includes('ascending')){
+  if(!_triplesFirst&&!straightFound&&cards.includes('ascending')){
     var _ascRuns=[[1,2,3],[2,3,4],[3,4,5],[4,5,6]];
     for(var _ai=0;_ai<_ascRuns.length;_ai++){
+      if(_runConflictsWithTriple(_ascRuns[_ai]))continue;
       if(hasSet(_ascRuns[_ai])){
         pts+=400;markSet(_ascRuns[_ai]);
         break;
@@ -8607,32 +8631,11 @@ function scoreRoll(vals,cards,locked,context,dieMats){
      [6,6,6,5,1] greedily ate 1+6 = 200 and stranded the [6,6] pair,
      returning -1 invalid; should score triple-6 + single 1 + single 5
      = 750). */
-  /* ── Bookends (silver): leftmost + rightmost die in the roll show the
-     same value → +500 once. Works on raw vals (positional). */
-  if(cards.includes('bookends')&&n>=2){
-    var _vFirst=vals[0],_vLast=vals[n-1];
-    if(_vFirst===_vLast){
-      /* Only consume if both positional dice are still unused */
-      if(!used[0]&&!used[n-1]){
-        pts+=500;used[0]=true;used[n-1]=true;
-      }
-    }
-  }
-  /* ── Twin Fury (tin): two separate pairs in one roll → +600. Consumes
-     four dice. Runs AFTER Seven's Gift so the more-specific card gets
-     first dibs on paired values. */
-  if(cards.includes('twin_fury')){
-    var _tfPairFaces=[];
-    for(var _tfF=1;_tfF<=6;_tfF++){
-      if(cnt(_tfF)>=2)_tfPairFaces.push(_tfF);
-      if(_tfPairFaces.length>=2)break;
-    }
-    if(_tfPairFaces.length>=2){
-      pts+=600;
-      mark(_tfPairFaces[0],2);
-      mark(_tfPairFaces[1],2);
-    }
-  }
+  /* Bookends and Twin Fury moved AFTER the triples loop — they used to
+     greedily consume dice that were needed by triples (e.g. bookends on
+     [6,1,6,6,5,6] ate idx 0 and 5, leaving the [6,6] pair stranded;
+     twin_fury on [3,3,3,4,4,4] consumed 2 pairs and stranded both
+     triples). */
   /* ── Scavenger (only if no straight consumed the 1+5) ── */
   let scavengerFired=false;
   if(!straightFound&&scavenger&&!context._scavengerBlocked){
@@ -8702,6 +8705,62 @@ function scoreRoll(vals,cards,locked,context,dieMats){
     }
   }
 
+  /* ── Ladder + Ascending: alternative position (AFTER triples).
+     Only fires when _triplesFirst was set — scoreSelection runs scoreRoll
+     a second time with this flag and picks the higher valid total. Catches
+     [1,1,1,2,3,4]: standard order ladder eats one 1 → 1000; this order
+     fires triple-1 first → ladder [2,3,4] → 1400. Same _runConflictsWith-
+     Triple guard applies. */
+  if(_triplesFirst&&!straightFound&&cards.includes('the_ladder')){
+    var _ladderRunsB=[[1,2,3,4],[2,3,4,5],[3,4,5,6],[1,2,3],[2,3,4],[3,4,5],[4,5,6]];
+    for(var _liB=0;_liB<_ladderRunsB.length;_liB++){
+      var _runB=_ladderRunsB[_liB];
+      if(_runConflictsWithTriple(_runB))continue;
+      if(hasSet(_runB)){
+        pts+=(_runB.length===4?800:400);
+        markSet(_runB);
+        break;
+      }
+    }
+  }
+  if(_triplesFirst&&!straightFound&&cards.includes('ascending')){
+    var _ascRunsB=[[1,2,3],[2,3,4],[3,4,5],[4,5,6]];
+    for(var _aiB=0;_aiB<_ascRunsB.length;_aiB++){
+      if(_runConflictsWithTriple(_ascRunsB[_aiB]))continue;
+      if(hasSet(_ascRunsB[_aiB])){
+        pts+=400;markSet(_ascRunsB[_aiB]);
+        break;
+      }
+    }
+  }
+
+  /* ── Bookends (silver): leftmost + rightmost die in the roll show the
+     same value → +500 once. Works on raw vals (positional). Runs AFTER
+     triples so a quad/quint of the same face (which triples already claim
+     positionally) doesn't get its positional dice double-claimed. */
+  if(cards.includes('bookends')&&n>=2){
+    var _vFirst=vals[0],_vLast=vals[n-1];
+    if(_vFirst===_vLast){
+      if(!used[0]&&!used[n-1]){
+        pts+=500;used[0]=true;used[n-1]=true;
+      }
+    }
+  }
+  /* ── Twin Fury (tin): two separate pairs in one roll → +600. Consumes
+     four dice. Runs AFTER triples so it claims only leftover pairs and
+     never strands a triple. */
+  if(cards.includes('twin_fury')){
+    var _tfPairFaces=[];
+    for(var _tfF=1;_tfF<=6;_tfF++){
+      if(cnt(_tfF)>=2)_tfPairFaces.push(_tfF);
+      if(_tfPairFaces.length>=2)break;
+    }
+    if(_tfPairFaces.length>=2){
+      pts+=600;
+      mark(_tfPairFaces[0],2);
+      mark(_tfPairFaces[1],2);
+    }
+  }
   /* ── Seven's Gift (tin): pairs summing to 7 (1+6, 2+5, 3+4) → +200/pair.
      Runs AFTER triples so it can't strand a triple by greedily consuming
      one of its faces. Pairs only fire on dice that triples didn't claim. */
@@ -8744,7 +8803,30 @@ function scoreRoll(vals,cards,locked,context,dieMats){
   }
   return{total:pts,used,context,effects,_triplesFired};
 }
-function scoreSelection(selVals,cards,locked,context,dieMats){if(!selVals.length)return 0;const{total,used}=scoreRoll(selVals,cards,locked,context,dieMats);if(used.some(u=>!u))return-1;/* Golden Crown synergy: +10% scoring */var _gc=G&&G.activeSynergies&&G.activeSynergies.includes('gilded_pair')?Math.floor(total*0.1):0;return total+_gc;}
+function scoreSelection(selVals,cards,locked,context,dieMats){
+  if(!selVals.length)return 0;
+  cards=cards||[];
+  /* Multi-pass: try standard ordering first (ladder/ascending BEFORE
+     triples), then if there's a card that could conflict, also try the
+     triples-first ordering. Pick the higher valid total. Fixes cases
+     like [1,1,1,2,3,4] where standard gives 1000 but triples-first
+     gives 1400. The second pass costs ~2x scoreRoll only when relevant
+     cards are present. */
+  const _r1=scoreRoll(selVals,cards,locked,context,dieMats);
+  let _bestValid=-1;
+  let _r1Valid=!_r1.used.some(u=>!u);
+  if(_r1Valid)_bestValid=_r1.total;
+  const _orderSensitive=cards.includes('the_ladder')||cards.includes('ascending');
+  if(_orderSensitive){
+    const _ctx2=Object.assign({},context||{},{_triplesFirst:true});
+    const _r2=scoreRoll(selVals,cards,locked,_ctx2,dieMats);
+    if(!_r2.used.some(u=>!u)&&_r2.total>_bestValid)_bestValid=_r2.total;
+  }
+  if(_bestValid<0)return -1;
+  /* Golden Crown synergy: +10% scoring */
+  var _gc=G&&G.activeSynergies&&G.activeSynergies.includes('gilded_pair')?Math.floor(_bestValid*0.1):0;
+  return _bestValid+_gc;
+}
 function anyScoring(vals,cards,dieMats){return scoreRoll(vals,cards||[],0,{},dieMats).total>0;}
 function isCombo(vals){
   if(vals.length<3)return false;
