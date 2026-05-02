@@ -5533,21 +5533,22 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
    left as the gold preview score grew (player feedback: "shifts to the
    side and then everything shifts up"). */
 .sd-counter-wrap{
-  /* Anchored to the TOP of the play area, just below the HUD bar — out
-     of conflict with the centered tell-badge AND the dice row. Fixed
-     pixel offset (not %) so it doesn't drift across viewport heights.
-     ~88px clears the 80px HUD plus a small gap. */
-  position:absolute;top:88px;left:50%;transform:translateX(-50%);
-  z-index:25;pointer-events:none;
+  /* Lives INSIDE .hud-mid where the TARGET HUD lives (target is hidden
+     for Sudden Death anyway). Keeping it inside the HUD bar means it
+     can't overlap the NPC dice, dialogue, tell-badge, score row, or
+     player dice — those are all OUTSIDE the HUD. */
   font-family:var(--font-px);
-  text-align:center;padding:4px 0;
-  display:flex;flex-direction:column;align-items:center;gap:6px;
+  text-align:center;padding:0;
+  display:flex;flex-direction:column;align-items:center;gap:2px;
   color:var(--sd-color,rgba(200,160,80,.55));
-  letter-spacing:1.5px;
+  letter-spacing:1.2px;
   transition:color .3s,text-shadow .3s;
 }
-@media (max-height:700px){.sd-counter-wrap{top:72px;gap:4px}}
-@media (max-height:620px){.sd-counter-wrap{top:64px;gap:2px}}
+.sd-counter-wrap .sd-subtitle{font-size:8px;letter-spacing:1px;line-height:1.1;opacity:.7}
+.sd-counter-wrap .sd-round-counter{gap:3px}
+.sd-counter-wrap .sd-num{font-size:18px}
+.sd-counter-wrap .sd-label{font-size:10px}
+.sd-counter-wrap .sd-of{font-size:10px}
 .sd-round-counter{
   display:flex;align-items:baseline;justify-content:center;gap:5px;
 }
@@ -5570,17 +5571,17 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
 /* ── Rising Stakes: multiplier badge — same overlay treatment as the SD
    counter (was a flex child inside #aboveDiceInfo, shifted with score). */
 .rs-mult-badge{
-  /* Anchored to top of play area like SD counter — never overlaps tell. */
-  position:absolute;top:88px;left:50%;transform:translateX(-50%);
-  z-index:25;pointer-events:none;
+  /* Lives INSIDE .hud-mid (same approach as SD counter — keeps it in
+     the dedicated HUD zone where it cannot overlap dice/dialogue/etc.) */
   font-family:var(--font-px);
-  color:rgba(200,160,80,.55);letter-spacing:1.5px;
-  text-align:center;padding:4px 0;
-  display:flex;align-items:baseline;justify-content:center;gap:5px;
+  color:rgba(200,160,80,.55);letter-spacing:1.2px;
+  text-align:center;padding:0;
+  display:flex;align-items:baseline;justify-content:center;gap:3px;
   transition:color .3s,text-shadow .3s;
 }
-@media (max-height:700px){.rs-mult-badge{top:72px}}
-@media (max-height:620px){.rs-mult-badge{top:64px}}
+.rs-mult-badge .rs-val{font-size:18px}
+.rs-mult-badge .rs-x{font-size:12px}
+.rs-mult-badge .rs-desc{display:none}/* too long for HUD slot */
 .rs-mult-badge .rs-val{
   font-size:22px;line-height:1;transition:all .3s;display:inline-block;vertical-align:baseline;
 }
@@ -7711,18 +7712,21 @@ function _initHandicapHUD(){
     if(tgt)tgt.style.display='none';
     var tgtLabel=document.querySelector('.hud-tgt-lbl');
     if(tgtLabel)tgtLabel.style.display='none';
-    /* Append to the match screen as an absolute overlay (CSS positions it
-       above the dice). Used to insertBefore in #aboveDiceInfo which made
-       it shift left as the gold preview score widened. */
+    /* Mount the SD counter INSIDE .hud-mid where the (now-hidden) target
+       lived. Keeps it in the dedicated HUD zone so it cannot overlap NPC
+       dice / dialogue / tell-badge / score row / player dice — all of
+       which live OUTSIDE the HUD. */
     var sdW=document.createElement('div');sdW.className='sd-counter-wrap';sdW.id='sdCounterWrap';
-    sdW.innerHTML='<div class="sd-subtitle">HIGHEST SCORE AFTER '+(G._suddenDeathTurns||3)+' ROUNDS WINS</div><div class="sd-round-counter" id="sdRoundCounter"><span class="sd-label">ROUND</span><span class="sd-num">1</span><span class="sd-of">/ '+(G._suddenDeathTurns||3)+'</span></div>';
-    ms.appendChild(sdW);
+    sdW.innerHTML='<div class="sd-round-counter" id="sdRoundCounter"><span class="sd-label">ROUND</span><span class="sd-num">1</span><span class="sd-of">/ '+(G._suddenDeathTurns||3)+'</span></div><div class="sd-subtitle">HIGHEST AFTER '+(G._suddenDeathTurns||3)+' WINS</div>';
+    var hudMid=document.querySelector('.hud-mid');
+    if(hudMid)hudMid.appendChild(sdW); else ms.appendChild(sdW);
   }
   if(G._handicap==='rising_stakes'){
-    /* Multiplier badge — overlay (same change as SD counter above). */
+    /* Multiplier badge — also lives inside .hud-mid (same reasoning). */
     var badge=document.createElement('div');badge.id='rsMultBadge';badge.className='rs-mult-badge';
     badge.innerHTML='<span class="rs-x">×</span><span class="rs-val">1.0</span><span class="rs-desc">BANK STREAKS MULTIPLY</span>';
-    ms.appendChild(badge);
+    var hudMidR=document.querySelector('.hud-mid');
+    if(hudMidR)hudMidR.appendChild(badge); else ms.appendChild(badge);
   }
   if(G._handicap==='bounty_board'){
     /* Bounty strip — insert as a regular flex child of #diceArea, just before
