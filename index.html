@@ -5604,30 +5604,49 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
 @keyframes rsPop{0%{transform:scale(1.5);opacity:.6}100%{transform:scale(1);opacity:1}}
 @keyframes rsLost{0%{transform:scale(1.3);opacity:1}50%{transform:scale(.9);opacity:.5}100%{transform:scale(1);opacity:1}}
 
-/* ── Tells: per-patron passive-rule badge (medieval, sits beside player dice) ── */
+/* ── Tells: per-patron passive-rule badge (medieval, sits beside player dice) ──
+   Lives as a flex CHILD of #diceArea (between dlgBox and the player-zone
+   spacer) so it sits in the natural empty space between NPC dice and
+   player dice. No more viewport-% positioning that overlaps either the
+   NPC dice (when % is too small) or the player score row (when % is
+   too big). Pointer-events:none keeps it click-through; z-index above
+   the splash bg (z:10000) so it stays visible during reveal. */
 .tell-badge{
-  /* Pinned absolutely at ~44% viewport. Z-index above the splash bg
-     (which is z:10000) so the icon+name stay visible during reveal.
-     left:50% + translateX is viewport-centered (NOT in the same flex
-     container as the score-preview row) so it cannot be pushed by the
-     gold score widening. On short phones (height<=700) the 44% landed
-     visually on top of the score-preview row above the dice — small-
-     screen overrides below pull it higher. */
-  position:absolute;top:44%;left:50%;transform:translate(-50%,-50%);
+  position:relative;
   z-index:10050;pointer-events:none;
   font-family:var(--font-px);
   color:rgba(200,160,80,.85);letter-spacing:1.4px;
   text-align:center;padding:6px 0;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
-  width:100vw;max-width:100vw;
+  width:100%;
+  flex-shrink:0;
   transition:color .3s,text-shadow .3s;
   font-size:12px;
+  /* Breathing room from the score-preview row below — without this the
+     desc text bottom sits right at the kept-tray's top edge on short
+     phones (player feedback "still some overlap"). */
+  margin-bottom:32px;
 }
-/* Short phones: pull the badge up above the score-preview row so it
-   stops overlapping the gold/green numbers above the dice. v186 set
-   34/30 but reports of overlap continued — pulling higher to 30/26. */
-@media (max-height:700px){.tell-badge{top:30%}}
-@media (max-height:620px){.tell-badge{top:26%}}
+@media (max-height:700px){.tell-badge{margin-bottom:24px}}
+@media (max-height:620px){.tell-badge{margin-bottom:18px}}
+@media (max-height:580px){.tell-badge{margin-bottom:14px}}
+/* Short phones: shrink the badge so it consumes less vertical space —
+   leaves more room for NPC dice above and player dice/score below. */
+@media (max-height:700px){
+  .tell-badge .tb-icon{font-size:34px;margin-bottom:-2px}
+  .tell-badge .tb-name{font-size:19px}
+  .tell-badge .tb-desc{font-size:11px;line-height:1.15}
+}
+@media (max-height:620px){
+  .tell-badge .tb-icon{font-size:28px;margin-bottom:-3px}
+  .tell-badge .tb-name{font-size:16px}
+  .tell-badge .tb-desc{font-size:10px}
+}
+@media (max-height:580px){
+  .tell-badge .tb-icon{font-size:22px;margin-bottom:-4px}
+  .tell-badge .tb-name{font-size:14px}
+  .tell-badge .tb-desc{font-size:9px}
+}
 .tell-badge .tb-icon{font-size:46px;line-height:1;margin-bottom:0}
 .tell-badge .tb-name{font-size:23px;color:rgba(230,190,100,1);text-shadow:0 0 10px rgba(220,180,90,.4),0 2px 0 rgba(0,0,0,.7);line-height:1}
 /* Stepped per-letter wave — each letter bobs on a 2-frame step-stagger so the
@@ -7816,12 +7835,17 @@ function _initTellHUD(){
   badge.innerHTML='<span class="tb-icon">'+t.icon+'</span>'+
     '<span class="tb-name">'+_tellNameHtml+_stedInlineVal+_arInlineVal+'</span>'+
     '<span class="tb-desc">'+t.desc+'</span>';
-  /* Width auto via inline content; flex-direction:column groups them on top of each other. */
-  /* Direct child of #screen-match, position-pinned at vertical center. This way the
-     splash's hide rule can exempt #tellBadge specifically, and the same DOM element
-     is visible through both splash and board states — feels like ONE persistent
-     element, not two separate ones. */
-  ms.appendChild(badge);
+  /* Mount inside #diceArea between #dlgBox and #playerZone — sits in
+     the natural empty space, can never overlap NPC dice (above) or
+     player dice/score (below). Falls back to ms append if the dice
+     area isn't ready yet (boss splash phase). */
+  var diceArea=document.getElementById('diceArea');
+  var playerZone=document.getElementById('playerZone');
+  if(diceArea&&playerZone){
+    diceArea.insertBefore(badge,playerZone);
+  }else{
+    ms.appendChild(badge);
+  }
   /* Per-Tell extra HUD bits */
   if(t.id==='drill_order'){
     var dv=document.createElement('span');dv.className='tb-val';dv.id='drillVal';dv.textContent='0/'+t.maxRolls;
@@ -12321,16 +12345,49 @@ function runOppTurn(){
           triggerCard(cid,npc.name+' −'+half,true);
         }
       });
-      /* Mirror Match: NPC has the player's regular cards (oCards == player's
-         original pCards). Some bank-time bonus cards weren't being applied
-         to NPC banks — handle them here so mirror plays symmetrically.
-         The Estate is the most-noticed missing one ("did not add any points
-         to NPC scoring"). Add other simple bank-bonus cards as needed. */
+      /* Symmetric bank-bonus cards — fire for whoever owns them.
+         These can end up in NPC's deck via Mirror Match handicap OR
+         via S.npcWonCards (cards the NPC seized from the player after
+         a previous boss loss). Player feedback on the_estate: "why
+         would it be in their deck if it doesn't work for them?". So
+         all simple bank-bonus cards mirror to NPC here. */
       if(G.oCards.includes('the_estate')&&pts>0){
         G._estateOppBanks=(G._estateOppBanks||0)+1;
         var _esoBonus=50+G._estateOppBanks*100;
         pts+=_esoBonus;
         triggerCard('the_estate','+'+_esoBonus,false);
+      }
+      if(G.oCards.includes('the_ledger')&&pts>0){
+        /* +75 to a running total applied to every future bank */
+        G._oLedgerTotal=(G._oLedgerTotal||0)+75;
+        pts+=G._oLedgerTotal;
+        triggerCard('the_ledger','+'+G._oLedgerTotal,false);
+      }
+      if(G.oCards.includes('beggars_bowl')&&pts>0&&!G._oBeggarsUsed){
+        /* First bank +300 once per match */
+        G._oBeggarsUsed=true;pts+=300;triggerCard('beggars_bowl','+300',false);
+      }
+      if(G.oCards.includes('mabels_ward')&&pts>0){
+        /* +200 every bank, +600 every 3rd */
+        G._oWardCount=(G._oWardCount||0)+1;
+        var _mwBonus=(G._oWardCount%3===0)?600:200;
+        pts+=_mwBonus;triggerCard('mabels_ward','+'+_mwBonus,false);
+      }
+      if(G.oCards.includes('corvus_book')&&pts>0){
+        /* +75 interest per bank, +150 if bank was 1000+ */
+        var _cbAdd=(pts>=1000)?150:75;
+        G._oCorvusInterest=(G._oCorvusInterest||0)+_cbAdd;
+        pts+=G._oCorvusInterest;triggerCard('corvus_book','+'+G._oCorvusInterest,false);
+      }
+      if(G.oCards.includes('compound_interest')&&pts>0){
+        /* +5% mult per bank, cap +50% — apply CURRENT mult then increment */
+        G._oCompoundMult=G._oCompoundMult||1;
+        if(G._oCompoundMult>1)pts=Math.floor(pts*G._oCompoundMult);
+        G._oCompoundMult=Math.min(1.5,G._oCompoundMult+0.05);
+        triggerCard('compound_interest','×'+G._oCompoundMult.toFixed(2),false);
+      }
+      if(G.oCards.includes('the_underdog')&&pts>0&&(G.pPts-G.oPts)>=1000){
+        pts+=200;triggerCard('the_underdog','+200',false);
       }
       /* Record NPC bank for opp-score-tap summary (before G.oppDice is cleared) */
       if(!G.oBankHistory)G.oBankHistory=[];
