@@ -167,7 +167,10 @@ body{
 .prog-fill{height:100%;transition:width .4s;border-radius:3px}
 .prog-fill.p{background:linear-gradient(90deg,var(--golddim),var(--gold))}
 .prog-fill.o{background:linear-gradient(90deg,var(--reddim),var(--red))}
-.hud-mid{display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 0 auto;padding:0 6px;min-width:110px}
+/* Fixed width so the target/turnPts/turnNum text changing length (banking,
+   rolling, hourglass tick-down) doesn't reflow the column and shift the
+   centered hourglass / number left-right. */
+.hud-mid{display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 0 auto;padding:0 6px;width:clamp(130px,32vw,160px)}
 .hud-tgt-lbl{font-family:var(--font-px);font-size:12px;color:var(--textdim);letter-spacing:2px}
 .hud-target{font-family:var(--font-px);font-size:clamp(24px,7.5vw,36px);color:var(--gold);letter-spacing:1px;white-space:nowrap;text-shadow:2px 2px 0 rgba(0,0,0,.6)}
 .hud-turn-pts{font-size:clamp(13px,3.5vw,17px);color:var(--green);height:0;overflow:visible;text-shadow:0 0 8px rgba(106,154,112,.4);pointer-events:none}
@@ -5288,12 +5291,18 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
 }
 .rules-page{
   flex:0 0 100%;height:100%;
-  overflow-y:auto;
+  /* overflow-y:scroll forces the scrollbar to always show — was 'auto'
+     which hides it when not actively scrolling, so players didn't
+     realize the page was longer. */
+  overflow-y:scroll;
+  scrollbar-gutter:stable;
   padding:8px 10px 16px;
   -webkit-overflow-scrolling:touch;overscroll-behavior:contain;
 }
-.rules-page::-webkit-scrollbar{width:4px}
-.rules-page::-webkit-scrollbar-thumb{background:rgba(120,100,70,.3);border-radius:2px}
+.rules-page::-webkit-scrollbar{width:6px}
+.rules-page::-webkit-scrollbar-track{background:rgba(80,60,40,.15);border-radius:3px}
+.rules-page::-webkit-scrollbar-thumb{background:rgba(140,110,70,.55);border-radius:3px;border:1px solid rgba(60,40,20,.4)}
+.rules-page::-webkit-scrollbar-thumb:hover{background:rgba(170,135,85,.7)}
 
 /* Rules text — v15 style */
 .rp-section{margin-bottom:16px}
@@ -5518,16 +5527,27 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
 @keyframes lcDrop{0%{transform:scale(1.4);color:#ff3030}50%{transform:scale(0.9)}100%{transform:scale(1)}}
 @keyframes lcPulse{0%,100%{opacity:1}50%{opacity:.5}}
 
-/* ── Sudden Death: round counter — same family as the Rising Stakes badge,
-   centered above the dice via #aboveDiceInfo. Per-round colour comes from --sd-color. */
+/* ── Sudden Death: round counter — overlay positioned above the dice
+   like the tell-badge so it never reflows when the score-preview row
+   widens. Used to be a flex child inside #aboveDiceInfo which shifted
+   left as the gold preview score grew (player feedback: "shifts to the
+   side and then everything shifts up"). */
 .sd-counter-wrap{
+  /* Anchored to the TOP of the play area, just below the HUD bar — out
+     of conflict with the centered tell-badge AND the dice row. Fixed
+     pixel offset (not %) so it doesn't drift across viewport heights.
+     ~88px clears the 80px HUD plus a small gap. */
+  position:absolute;top:88px;left:50%;transform:translateX(-50%);
+  z-index:25;pointer-events:none;
   font-family:var(--font-px);
   text-align:center;padding:4px 0;
-  display:flex;flex-direction:column;align-items:center;gap:14px;margin:0 auto;
+  display:flex;flex-direction:column;align-items:center;gap:6px;
   color:var(--sd-color,rgba(200,160,80,.55));
   letter-spacing:1.5px;
   transition:color .3s,text-shadow .3s;
 }
+@media (max-height:700px){.sd-counter-wrap{top:72px;gap:4px}}
+@media (max-height:620px){.sd-counter-wrap{top:64px;gap:2px}}
 .sd-round-counter{
   display:flex;align-items:baseline;justify-content:center;gap:5px;
 }
@@ -5547,14 +5567,20 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
 /* Final-round colour escalation — drives both num + label + glow */
 .sd-round-counter.sd-final .sd-num{font-size:30px;text-shadow:0 0 15px var(--sd-glow,rgba(255,96,32,.6)),0 0 30px var(--sd-glow,rgba(255,60,20,.3));animation:rsFire .4s infinite alternate}
 
-/* ── Rising Stakes: multiplier badge ── */
+/* ── Rising Stakes: multiplier badge — same overlay treatment as the SD
+   counter (was a flex child inside #aboveDiceInfo, shifted with score). */
 .rs-mult-badge{
+  /* Anchored to top of play area like SD counter — never overlaps tell. */
+  position:absolute;top:88px;left:50%;transform:translateX(-50%);
+  z-index:25;pointer-events:none;
   font-family:var(--font-px);
   color:rgba(200,160,80,.55);letter-spacing:1.5px;
   text-align:center;padding:4px 0;
   display:flex;align-items:baseline;justify-content:center;gap:5px;
   transition:color .3s,text-shadow .3s;
 }
+@media (max-height:700px){.rs-mult-badge{top:72px}}
+@media (max-height:620px){.rs-mult-badge{top:64px}}
 .rs-mult-badge .rs-val{
   font-size:22px;line-height:1;transition:all .3s;display:inline-block;vertical-align:baseline;
 }
@@ -5597,9 +5623,10 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
   font-size:12px;
 }
 /* Short phones: pull the badge up above the score-preview row so it
-   stops overlapping the gold/green numbers above the dice. */
-@media (max-height:700px){.tell-badge{top:34%}}
-@media (max-height:620px){.tell-badge{top:30%}}
+   stops overlapping the gold/green numbers above the dice. v186 set
+   34/30 but reports of overlap continued — pulling higher to 30/26. */
+@media (max-height:700px){.tell-badge{top:30%}}
+@media (max-height:620px){.tell-badge{top:26%}}
 .tell-badge .tb-icon{font-size:46px;line-height:1;margin-bottom:0}
 .tell-badge .tb-name{font-size:23px;color:rgba(230,190,100,1);text-shadow:0 0 10px rgba(220,180,90,.4),0 2px 0 rgba(0,0,0,.7);line-height:1}
 /* Stepped per-letter wave — each letter bobs on a 2-frame step-stagger so the
@@ -6630,8 +6657,6 @@ const FEATS=[
   {id:'no_busts',       label:'Untouchable',      desc:'Win the match without busting',  renown:10,
     check:function(G){return (G._featBusts||0)===0;}},
   {id:'no_actives',     label:'Pure Bones',       desc:'Win without using any active cards', renown:10,
-    /* Only earnable if the player HAS active cards to begin with —
-       otherwise it's a free feat for an empty loadout. */
     check:function(G){
       if(!G||!G.pCards)return false;
       var hasActive=G.pCards.some(function(cid){var c=getCard(cid);return c&&c.type==='active';});
@@ -6643,26 +6668,36 @@ const FEATS=[
     check:function(G){return (G._featHotDiceCount||0)>=3;}},
   {id:'boss_slayer',    label:'Boss Slayer',      desc:'Beat a boss without losing any cards in this run', renown:15,
     check:function(G){
-      /* Was awarded if THIS match didn't drop a card — but rematches after
-         losing cards earlier still triggered it. Now requires no cards
-         lost across the entire run. */
       var runLosses=(typeof S!=='undefined'&&S&&S.run&&S.run._cardsLostThisRun)||0;
       return G._isBoss && !(G._bossLossData) && runLosses===0;
     }},
+  /* ── Easier renown sources (added per player feedback that perks were too
+     hard to reach). Each only worth 5 but firing on common play patterns. */
+  {id:'hot_hand',       label:'Hot Hand',         desc:'Trigger Hot Dice in a match',    renown:5,
+    check:function(G){return (G._featHotDiceCount||0)>=1;}},
+  {id:'first_blood',    label:'First Blood',      desc:'Win your first match of the run', renown:5,
+    check:function(G){return (typeof S!=='undefined'&&S&&S.run)?(S.run.bossesBeaten||[]).length===0&&(S.run._matchWinsThisRun||0)<=1:false;}},
+  {id:'comeback',       label:'Comeback',         desc:'Win after trailing by 50% of target', renown:10,
+    check:function(G){return !!G._featTrailedDeep;}},
+  {id:'high_roller',    label:'High Roller',      desc:'Bank 1500+ in a single turn',    renown:5,
+    check:function(G){return (G._featMaxBank||0)>=1500;}},
 ];
 
-/* ── Renown Perks (curated, threshold-based unlocks — never spent) ── */
+/* ── Renown Perks (curated, threshold-based unlocks — never spent) ──
+   Thresholds reduced ~25-30% to make perks more reachable + earlier
+   feedback (player feedback: "renown perks are too expensive"). Paired
+   with new feats above for more sources. */
 const RENOWN_PERKS=[
-  {threshold:25, key:'startGold',    label:'Known Face',     desc:'Begin every run with +200 starting gold'},
-  {threshold:50, key:'freeRestock',  label:'Regular at the bar', desc:'Reshuffle the post-match card draft once after every match'},
-  {threshold:75, key:'fourthSlot',   label:'Trusted Hand',   desc:'Unlock your 3rd card slot'},
-  {threshold:100,key:'shopDiscount', label:'Respected',      desc:'All shop prices reduced by 15%'},
-  {threshold:150,key:'extraDraft',   label:'Honored guest',  desc:'Card drafts offer 4 cards instead of 3'},
-  {threshold:200,key:'secondBoss',   label:'Lord of Dice',   desc:'Unlock your 4th card slot'},
-  {threshold:250,key:'pouch1',       label:'Pocketed',       desc:'Unlock a Pouch — carry 1 card on the side, swap it with an active card before any match'},
-  {threshold:300,key:'legend',       label:'Legend',         desc:'Begin every run with a free boss-signature draft (pick 1 of 3) — title shimmer too'},
-  {threshold:450,key:'pouch2',       label:'Deep Pockets',   desc:'Pouch holds 2 cards on the side instead of 1'},
-  {threshold:650,key:'pouch3',       label:'Hoarder',        desc:'Pouch holds 3 cards on the side instead of 2'},
+  {threshold:20, key:'startGold',    label:'Known Face',     desc:'Begin every run with +200 starting gold'},
+  {threshold:40, key:'freeRestock',  label:'Regular at the bar', desc:'Reshuffle the post-match card draft once after every match'},
+  {threshold:60, key:'fourthSlot',   label:'Trusted Hand',   desc:'Unlock your 3rd card slot'},
+  {threshold:80, key:'shopDiscount', label:'Respected',      desc:'All shop prices reduced by 15%'},
+  {threshold:120,key:'extraDraft',   label:'Honored guest',  desc:'Card drafts offer 4 cards instead of 3'},
+  {threshold:160,key:'secondBoss',   label:'Lord of Dice',   desc:'Unlock your 4th card slot'},
+  {threshold:200,key:'pouch1',       label:'Pocketed',       desc:'Unlock a Pouch — carry 1 card on the side, swap it with an active card before any match'},
+  {threshold:250,key:'legend',       label:'Legend',         desc:'Begin every run with a free boss-signature draft (pick 1 of 3) — title shimmer too'},
+  {threshold:360,key:'pouch2',       label:'Deep Pockets',   desc:'Pouch holds 2 cards on the side instead of 1'},
+  {threshold:520,key:'pouch3',       label:'Hoarder',        desc:'Pouch holds 3 cards on the side instead of 2'},
 ];
 /* Returns how many pouch slots are unlocked (0-3). Pouched cards sit on the side
    between matches — they don't contribute to archetype or synergy counts while there. */
@@ -7249,6 +7284,16 @@ const SFX={
     this._click(2000,0.02,0.03,0.12);
   },
   bust(){this._click(200,0.18,0.12);this._tone(160,'sine',0.1,0.005,0.18);this._tone(120,'sine',0.07,0.005,0.22,0.1);},
+  /* Last Call sub-threshold bank rejection — distinct from bust: a sharp
+     "denied" tone (descending major-third) followed by a rough thud, so
+     it reads as house-rule rejection rather than a regular bust. */
+  lastCallFail(){
+    this._click(450,0.16,0.08);
+    this._tone(330,'square',0.08,0.005,0.10);
+    this._tone(220,'square',0.07,0.005,0.14,0.08);
+    this._click(180,0.14,0.18,0.12);
+    this._tone(110,'sine',0.06,0.005,0.20,0.14);
+  },
   hotDice(){/* epic rewarding trumpet */
     const notes=[[262,0],[330,0.1],[392,0.2],[494,0.32],[524,0.44],[659,0.56]];
     notes.forEach(([f,t])=>{this._tone(f,'triangle',0.06,0.015,0.3,t);this._tone(f*1.5,'sine',0.03,0.01,0.2,t);this._tone(f*2,'sine',0.015,0.008,0.15,t);});
@@ -7381,7 +7426,7 @@ const RUNGS=[
     agg:.58,cardRarity:'tin',wager:true,wagerCount:1,wagerMode:'best',minBank:200,diceStop:2,chaotic:false,adaptive:false,
     dice:['bone','bone','iron','iron','amber','amber'],
     cardPool:['the_last_stitch_npc','measure_twice','worn_thimble','the_nightshift','mabels_pinch'],cardCount:3,
-    tell:{id:'steeped',name:'STEEPED',desc:'Each extra roll adds +200 to your bank — bust and you lose it all',icon:'🍵',perRoll:200}},
+    tell:{id:'steeped',name:'STEEPED',desc:'Each extra roll adds +100 to your bank — bust and you lose it all',icon:'🍵',perRoll:100}},
   {id:2,name:'FINNICK',key:'commoner',icon:'🎭',tier:'known',target:7500,gold:250,buyIn:35,
     boss:null,bossDesc:null,
     agg:.62,cardRarity:'tin',wager:true,wagerCount:1,wagerMode:'best',minBank:250,diceStop:2,chaotic:false,adaptive:true,
@@ -7434,9 +7479,13 @@ var DICE_STORE=[
   /* Jade tiers: only ONE of each per match. The shop dynamically shows the
      next-purchasable tier (jade → jade2 → jade3). After buying L1, the slot
      is replaced with L2; after L2, with L3; after L3, the slot is hidden. */
+  /* Sharper progression: each Jade tier is meaningfully more expensive
+     than the last (was 180/380/760 → now 180/450/1100). Reflects the
+     compounding power of L2 (extends triples to quads) and L3 (also
+     fills straights). */
   {mat:'jade',     price:180, stock:1, label:'Jade'},
-  {mat:'jade2',    price:380, stock:1, label:'Jade II'},
-  {mat:'jade3',    price:760, stock:1, label:'Jade III'},
+  {mat:'jade2',    price:450, stock:1, label:'Jade II'},
+  {mat:'jade3',    price:1100,stock:1, label:'Jade III'},
   {mat:'brass',    price:350, stock:2, label:'Brass'},
   {mat:'silver',   price:380, stock:1, label:'Silver'},
   {mat:'obsidian', price:420, stock:2, label:'Obsidian'},
@@ -7662,20 +7711,18 @@ function _initHandicapHUD(){
     if(tgt)tgt.style.display='none';
     var tgtLabel=document.querySelector('.hud-tgt-lbl');
     if(tgtLabel)tgtLabel.style.display='none';
-    /* Pin the round counter above the dice — same slot as the Rising Stakes multiplier */
+    /* Append to the match screen as an absolute overlay (CSS positions it
+       above the dice). Used to insertBefore in #aboveDiceInfo which made
+       it shift left as the gold preview score widened. */
     var sdW=document.createElement('div');sdW.className='sd-counter-wrap';sdW.id='sdCounterWrap';
     sdW.innerHTML='<div class="sd-subtitle">HIGHEST SCORE AFTER '+(G._suddenDeathTurns||3)+' ROUNDS WINS</div><div class="sd-round-counter" id="sdRoundCounter"><span class="sd-label">ROUND</span><span class="sd-num">1</span><span class="sd-of">/ '+(G._suddenDeathTurns||3)+'</span></div>';
-    var aboveDice=document.getElementById('aboveDiceInfo');
-    if(aboveDice)aboveDice.insertBefore(sdW,aboveDice.firstChild);
-    else ms.appendChild(sdW);
+    ms.appendChild(sdW);
   }
   if(G._handicap==='rising_stakes'){
-    /* Fire multiplier badge above player dice */
+    /* Multiplier badge — overlay (same change as SD counter above). */
     var badge=document.createElement('div');badge.id='rsMultBadge';badge.className='rs-mult-badge';
     badge.innerHTML='<span class="rs-x">×</span><span class="rs-val">1.0</span><span class="rs-desc">BANK STREAKS MULTIPLY</span>';
-    var aboveDice=document.getElementById('aboveDiceInfo');
-    if(aboveDice)aboveDice.insertBefore(badge,aboveDice.firstChild);
-    else ms.appendChild(badge);
+    ms.appendChild(badge);
   }
   if(G._handicap==='bounty_board'){
     /* Bounty strip — insert as a regular flex child of #diceArea, just before
@@ -7883,12 +7930,20 @@ function _maybeFireCutpurse(){
   if(!victim||!victim.el)return;
   /* Visual: die flies toward Finnick portrait */
   victim.el.classList.add('die-palmed');
-  /* Remove from pool after animation */
+  /* Persist the palm — die stays visible in the row marked as palmed
+     until the turn ends, instead of vanishing 650ms later. Mark as
+     committed so it's excluded from selection / scoring / re-rolls,
+     and disable click. Player feedback: "Cutpurse: die should get
+     palmed and stay palmed until the end of the turn". */
   setTimeout(function(){
-    var idx=G.pool.indexOf(victim);
-    if(idx>=0)G.pool.splice(idx,1);
-    if(victim.el&&victim.el.parentNode)victim.el.parentNode.removeChild(victim.el);
-    /* Recheck scoring — if no scoring left, force bust */
+    victim.committed=true;
+    victim._palmed=true;
+    if(victim.el){
+      victim.el.style.pointerEvents='none';
+      victim.el.onclick=null;
+      victim.el.classList.remove('selected');
+    }
+    /* Recheck scoring on remaining FREE dice — if nothing scoreable, bust. */
     var fv=G.pool.filter(function(d){return !d.committed;});
     if(fv.length===0||!anyScoring(fv.map(function(d){return d.val;}),effectiveCards(),fv.map(function(d){return d.mat;}))){
       setTimeout(function(){_delayedDoBust(fv);},200);
@@ -7978,7 +8033,7 @@ const CARDS=[
   {id:'blood_debt',name:'BLOOD DEBT',icon:'🩸',rarity:'gold',eff:'-100 START; +400 PER OPP BUST',desc:'You start -100 points. Each time the opponent busts, you gain 400 points.',arch:'hoarder',dep:true},
   {id:'leaky_cup',name:'LEAKY CUP',icon:'🥛',rarity:'gold',eff:"RIVAL 5 DICE EVERY 4TH TURN",desc:"Every fourth turn the opponent takes, they start with only 5 dice on their first roll.",arch:'saboteur'},
   {id:'crows_luck',name:"CROW'S LUCK",icon:'🐦',rarity:'gold',eff:'DOWNGRADE RIVAL STRAIGHTS (2x)',desc:"Twice per match, downgrades any straight the opponent rolls by one tier: Full (1500) → High (750), High (750) → Low (500), Low (500) → nothing.",arch:'saboteur'},
-  {id:'taxing_breath',name:'TAXING BREATH',icon:'💨',rarity:'gold',eff:'STEAL 250 ON RIVAL BANK',desc:'Each time the opponent banks any points, steal 250 of those points for yourself.',arch:'saboteur'},
+  {id:'taxing_breath',name:'TAXING BREATH',icon:'💨',rarity:'gold',eff:'STEAL 400 ON RIVAL BANK',desc:'Each time the opponent banks any points, steal 400 of those points for yourself.',arch:'saboteur'},
   {id:'thieves_luck',name:"THIEF'S LUCK",icon:'🎭',rarity:'gold',eff:'STEAL RIVAL BANK <200',desc:"When the opponent banks less than 200 points in a turn, those points transfer to you instead.",arch:'saboteur',dep:true},
   {id:'plague_wind',name:'PLAGUE WIND',icon:'🌬️',rarity:'gold',eff:'RIVAL PLAYS SAFER',desc:"Reduces the opponent's tendency to keep re-rolling aggressively — they play safer.",arch:'saboteur',dep:true},
   {id:'kings_ransom',name:"KING'S RANSOM",icon:'👑',rarity:'gold',eff:'WIN BY 3000+ = +1000 PTS',desc:'If you are ahead by 3,000 or more points, gain an instant 1,000 bonus points when you bank.',arch:'hoarder'},
@@ -8028,7 +8083,7 @@ const CARDS=[
   {id:'the_ledger',name:'THE LEDGER',icon:'📒',rarity:'gold',eff:'EACH BANK +75 TO PERMANENT BONUS',desc:'Each bank adds +75 to a running total. That total is added to every future bank this match.',arch:'hoarder'},
   {id:'beggars_bowl',name:"BEGGAR'S BOWL",icon:'🥣',rarity:'tin',eff:'+300 ON FIRST BANK',desc:'Your very first bank each match gains an extra 300 bonus points.',arch:'safeBanker'},
   {id:'loose_thread',name:'LOOSE THREAD',icon:'🧶',rarity:'tin',eff:'+400 AFTER DOUBLE BUST',desc:'If you bust twice in a row, gain 400 points automatically.',arch:'brinksman',dep:true},
-  {id:'the_whetstone',name:'THE WHETSTONE',icon:'🪨',rarity:'tin',eff:'FIRST 3 ROLLS +200',desc:'Your first three rolls each turn score 200 extra points on top of their normal value.',arch:'brinksman'},
+  {id:'the_whetstone',name:'THE WHETSTONE',icon:'🪨',rarity:'tin',eff:'FIRST 3 ROLLS +250 EACH',desc:'Each of your first three rolls per turn adds +250 to that turn\'s bank (1st roll +250, 2nd +500, 3rd +750 max).',arch:'brinksman'},
   {id:'the_ladder',name:'THE LADDER',icon:'🪜',rarity:'gold',eff:'3 IN A ROW = 400, 4 = 800',desc:'Partial straights score: 3 consecutive dice = 400, 4 consecutive = 800. Full / high / low straights override this.',arch:'collector'},
   {id:'snake_oil',name:'SNAKE OIL',icon:'🐍',rarity:'silver',eff:'RIVAL TRIPLE → NEXT ROLL = 0',desc:'Twice per match, when the opponent rolls a triple, their very next roll scores nothing (forced bust). Resets between triggers.',arch:'saboteur'},
   {id:'fortunes_wheel',name:"FORTUNE'S WHEEL",icon:'☸️',rarity:'gold',eff:'EVERY 3RD BANK DOUBLED',desc:'Every 3rd time you bank points in a match, that bank is doubled.',arch:'hoarder'},
@@ -8376,13 +8431,13 @@ const DICE_TYPES=[
   /* Jade L2 — once you own a Jade, the shop replaces it with this. Wild
      for triples AND extends triples to 4-of-a-kind (the wild attaches to
      an existing triple to double the score). Bluer-teal tint. */
-  {id:'jade2',name:'JADE II',icon:'💠',cost:700,
+  {id:'jade2',name:'JADE II',icon:'💠',cost:900,
    faces:[1,2,3,4,5,6],
    effect:{type:'rule_changer',mechanic:'wild_quad'},
    desc:'6s are wild for triples AND attach to triples to make 4-of-a-kind (doubles the score).'},
   /* Jade L3 — apex variant. Wild for triples, quads, and STRAIGHTS.
      Golden-jade tint. */
-  {id:'jade3',name:'JADE III',icon:'✨',cost:1400,
+  {id:'jade3',name:'JADE III',icon:'✨',cost:2000,
    faces:[1,2,3,4,5,6],
    effect:{type:'rule_changer',mechanic:'wild_straight'},
    desc:'6s are wild for triples, 4-of-a-kind, AND fill any missing value in a straight.'},
@@ -9855,6 +9910,9 @@ function updHUD(){
   pEl.textContent=G.pPts.toLocaleString();
   oEl.textContent=G.oPts.toLocaleString();
   tpEl.textContent=G.turnPts>0?'+'+G.turnPts.toLocaleString():'';
+  /* Comeback feat tracking — flag the moment opponent is up by 50% target.
+     If the player still wins after that, the Comeback feat awards renown. */
+  if(G.target&&(G.oPts-G.pPts)>=G.target*0.5)G._featTrailedDeep=true;
   /* ── Handicap: Sudden Death — show ROUND X / 3 ── */
   if(G._handicap==='sudden_death'){
     document.getElementById('turnNum').textContent='';/* hide normal turn */
@@ -11280,7 +11338,7 @@ function handleBank(){
   }
   if(G.pCards.includes('fools_gold')&&total>0&&total%500===0){total+=300;bonusMsg+=" +300 FOOL'S GOLD";triggerCard('fools_gold','+300',true);}
   /* The Whetstone: first 3 rolls each turn score +200 extra (matches desc). */
-  if(G.pCards.includes('the_whetstone')){var _wsRolls=Math.min(G.turnRollCount||1,3);var _wsBonus=_wsRolls*200;total+=_wsBonus;bonusMsg+=' +'+_wsBonus+' WHETSTONE';triggerCard('the_whetstone','+'+_wsBonus,true);}
+  if(G.pCards.includes('the_whetstone')){var _wsRolls=Math.min(G.turnRollCount||1,3);var _wsBonus=_wsRolls*250;total+=_wsBonus;bonusMsg+=' +'+_wsBonus+' WHETSTONE';triggerCard('the_whetstone','+'+_wsBonus,true);}
   /* Fortune's Wheel: every 3rd bank is doubled */
   if(G.pCards.includes('fortunes_wheel')){G._bankCount=(G._bankCount||0)+1;if(G._bankCount%3===0){total*=2;bonusMsg+=' x2 FORTUNE';triggerCard('fortunes_wheel','x2 BANK!',true);}}
   /* Corvus's Ledger: +75% on next bank after activation */
@@ -11630,7 +11688,10 @@ function handleBank(){
       var _lcT=G._tell.threshold;
       total=0;bonusMsg=' LAST CALL <'+_lcT;
       setStatusMsg("LAST CALL — UNDER "+_lcT+'!','red');
-      try{SFX.bust&&SFX.bust();}catch(e){}
+      /* Distinct harsh sound — was reusing SFX.bust which felt like a
+         normal bust; this is a house-rule rejection and deserves its own
+         tone (square-wave descending fail + thud). */
+      try{(SFX.lastCallFail||SFX.bust).call(SFX);}catch(e){}
       try{Haptic.bust&&Haptic.bust();}catch(e){}
       _flashTellRule();
     }
@@ -11760,6 +11821,18 @@ function _showPersistentFrozenDie(){
 /* ═══════ OPPONENT AI ═══════ */
 function oppShouldBank(rung,oppBank,diceLeft,oppTotal,playerTotal,target){
   if((oppTotal+oppBank)>=target)return true;
+  /* Huge bank protection — even when behind, an NPC banking 2500+ in a
+     single turn risks too much by pushing further. Player feedback:
+     "NPC had rolled like 4000 points and still kept rolling to his last
+     die which was idiotic." Tiered:
+       3000+ : ALWAYS bank (no matter how few dice or how behind)
+       2000+ : bank unless 4+ dice AND severely behind
+       1500+ : bank when 3 or fewer dice (can still push at 4+) */
+  var _gapForLock=oppTotal-playerTotal;
+  var _severelyBehind=(_gapForLock/target)<-0.25;
+  if(oppBank>=3000)return true;
+  if(oppBank>=2000&&!(diceLeft>=4&&_severelyBehind))return true;
+  if(oppBank>=1500&&diceLeft<=3)return true;
   let agg=rung.agg;
   /* Sudden Death: opponent plays much more aggressively — only 3 turns to score high */
   if(G&&G._handicap==='sudden_death'){agg=Math.max(agg,0.80);if(playerTotal>oppTotal+oppBank)agg=Math.max(agg,0.92);}
@@ -12200,7 +12273,7 @@ function runOppTurn(){
       }
       /* The Grudge: increment player's grudge stack when opponent banks */
       if(G.pCards.includes('the_grudge')){G._grudgeStack=Math.min((G._grudgeStack||0)+150,750);}
-      if(G.pCards.includes('taxing_breath')&&pts>=250){pts-=250;G.pPts+=250;triggerCard('taxing_breath','+250 TAX',true);}
+      if(G.pCards.includes('taxing_breath')&&pts>=400){pts-=400;G.pPts+=400;triggerCard('taxing_breath','+400 TAX',true);}
       /* ── Handicap: Rising Stakes — opponent streak multiplier ── */
       if(G._handicap==='rising_stakes'){
         G._rsOppStreak=(G._rsOppStreak||0)+1;
@@ -12244,6 +12317,17 @@ function runOppTurn(){
           triggerCard(cid,npc.name+' −'+half,true);
         }
       });
+      /* Mirror Match: NPC has the player's regular cards (oCards == player's
+         original pCards). Some bank-time bonus cards weren't being applied
+         to NPC banks — handle them here so mirror plays symmetrically.
+         The Estate is the most-noticed missing one ("did not add any points
+         to NPC scoring"). Add other simple bank-bonus cards as needed. */
+      if(G.oCards.includes('the_estate')&&pts>0){
+        G._estateOppBanks=(G._estateOppBanks||0)+1;
+        var _esoBonus=50+G._estateOppBanks*100;
+        pts+=_esoBonus;
+        triggerCard('the_estate','+'+_esoBonus,false);
+      }
       /* Record NPC bank for opp-score-tap summary (before G.oppDice is cleared) */
       if(!G.oBankHistory)G.oBankHistory=[];
       if(pts>0){
@@ -12392,6 +12476,10 @@ function endMatch(win){
   var isGauntlet=!!G._isGauntlet;
   var isHandicap=!!G._handicap;
   var pointsEarned=win?(isHandicap?2:1):0;
+  /* Track per-run match wins for the First Blood feat. Increments on any
+     win (boss or patron) so the feat fires exactly once on the first match
+     win of a run. */
+  if(win&&S&&S.run){S.run._matchWinsThisRun=(S.run._matchWinsThisRun||0)+1;}
 
   /* Show animated end overlay */
   var ov=document.getElementById('end-ov');
@@ -12572,7 +12660,20 @@ function endMatch(win){
   if(!win&&isBoss){
     _getS();
     var _filledSlots=[];
-    S.run.cards.forEach(function(c,i){if(c){var cd=getCard(c);if(cd&&!cd.npc)_filledSlots.push(i);}});
+    /* Explicit slot-0 protection — boss slot is reserved for boss cards
+       and must NEVER be eligible for loss-card selection regardless of
+       what's in it. Also exclude any card with .npc OR .npcOnly OR an
+       owner field (covers all boss-tier reward cards) so a regular
+       loss-card draft can't accidentally take a boss reward. Player
+       feedback: "Finick stole my boss cards. Boss cards should be safe." */
+    S.run.cards.forEach(function(c,i){
+      if(i===0)return;
+      if(!c)return;
+      var cd=getCard(c);
+      if(!cd)return;
+      if(cd.npc||cd.npcOnly||cd.owner)return;
+      _filledSlots.push(i);
+    });
     if(_filledSlots.length){
       var _ri=_filledSlots[Math.floor(Math.random()*_filledSlots.length)];
       var _lostCardId=S.run.cards[_ri];
