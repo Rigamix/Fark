@@ -12389,6 +12389,71 @@ function runOppTurn(){
       if(G.oCards.includes('the_underdog')&&pts>0&&(G.pPts-G.oPts)>=1000){
         pts+=200;triggerCard('the_underdog','+200',false);
       }
+      /* Conditional bank bonuses — mirror player bank handler logic for fairness.
+         Player feedback: "cards should work the same for me and NPCs otherwise
+         the game will never feel fair and I will always streamroll the
+         opponents". When NPC has these cards (Mirror Match or seized after
+         a player loss), the bonuses fire symmetrically. */
+      if(G.oCards.includes('half_measure')&&pts>0){
+        /* +400 if NPC banked exactly 3 dice. Use kept-dice count from the
+           opp pool. */
+        var _hmKept=(G.oppDice||[]).filter(function(d){return d.kept;}).length;
+        if(_hmKept===3){pts+=400;triggerCard('half_measure','+400',false);}
+      }
+      if(G.oCards.includes('the_hearth')&&pts>0&&oppRollNum<=2){
+        pts+=200;triggerCard('the_hearth','+200',false);
+      }
+      if(G.oCards.includes('thrifty_gambler')&&pts>=400&&pts<=600){
+        pts+=150;triggerCard('thrifty_gambler','+150',false);
+      }
+      if(G.oCards.includes('kings_ransom')&&(G.oPts+pts-G.pPts)>=3000){
+        pts+=1000;triggerCard('kings_ransom','+1000',false);
+      }
+      if(G.oCards.includes('fools_gold')&&pts>0&&pts%500===0){
+        pts+=300;triggerCard('fools_gold','+300',false);
+      }
+      if(G.oCards.includes('the_whetstone')&&pts>0){
+        var _woRolls=Math.min(oppRollNum||1,3);
+        var _woBonus=_woRolls*250;
+        pts+=_woBonus;triggerCard('the_whetstone','+'+_woBonus,false);
+      }
+      if(G.oCards.includes('fortunes_wheel')&&pts>0){
+        /* x2 every 3rd opp bank */
+        G._oFortuneCount=(G._oFortuneCount||0)+1;
+        if(G._oFortuneCount%3===0){pts*=2;triggerCard('fortunes_wheel','x2 BANK!',false);}
+      }
+      if(G.oCards.includes('greedy_hands')&&pts>0&&pts<=250){
+        pts*=2;triggerCard('greedy_hands','x2 BANK!',false);
+      }
+      if(G.oCards.includes('closing_bell')&&pts>0&&(G.oPts+pts)>=G.target){
+        var _cbBonus=Math.floor(pts*0.5);pts+=_cbBonus;
+        triggerCard('closing_bell','+'+_cbBonus,false);
+      }
+      if(G.oCards.includes('high_roller')&&pts>=600){
+        pts+=400;triggerCard('high_roller','+400',false);
+      }
+      if(G.oCards.includes('blood_tithe')&&pts>0){
+        pts=Math.max(0,pts-50);triggerCard('blood_tithe','-50',false);
+      }
+      if(G.oCards.includes('slow_burn')&&pts>0){
+        /* Reward NPC's safe-bank streak — every 3rd consecutive non-bust */
+        G._oSafeBankStreak=(G._oSafeBankStreak||0)+1;
+        if(G._oSafeBankStreak%3===0){pts+=300;triggerCard('slow_burn','+300',false);}
+      }
+      if(G.oCards.includes('bakers_dozen')&&pts>0){
+        /* Every 13th bank +1300 (player-side equivalent rounded) */
+        G._oBakersCount=(G._oBakersCount||0)+1;
+        if(G._oBakersCount%13===0){pts+=1300;triggerCard('bakers_dozen','+1300!',false);}
+      }
+      if(G.oCards.includes('coin_jar')&&pts>0){
+        /* +25 per opp bank, scales each match */
+        G._oCoinJarCount=(G._oCoinJarCount||0)+1;
+        var _cjB=G._oCoinJarCount*25;
+        pts+=_cjB;triggerCard('coin_jar','+'+_cjB,false);
+      }
+      if(G.oCards.includes('the_heir')&&pts>0&&G.turnNum>3){
+        pts+=300;triggerCard('the_heir','+300',false);
+      }
       /* Record NPC bank for opp-score-tap summary (before G.oppDice is cleared) */
       if(!G.oBankHistory)G.oBankHistory=[];
       if(pts>0){
