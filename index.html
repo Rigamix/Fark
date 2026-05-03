@@ -12,6 +12,25 @@
 <title>Fark!</title>
 <style>
 /* ════════════════════════════════════
+   LAYOUT ZONE SYSTEM (rule: NO element may overlap another zone)
+   Established to stop UI elements (dice, score row, tell badge,
+   activate zone, controls) from drifting into each other on different
+   viewport sizes. EVERY adjustment to a positioned element MUST keep
+   these gaps; if a change requires breaking them, change the variables
+   here so the whole layout stays consistent.
+   ════════════════════════════════════ */
+:root{
+  --hud-h: 80px;                 /* HUD bar at top of screen */
+  --controls-h: 80px;            /* match controls bar at bottom */
+  --activate-zone-h: 76px;       /* activation zone above controls */
+  --activate-zone-gap: 100px;    /* gap from controls top to activate zone bottom */
+  --dice-min-clearance: 18px;    /* mandatory min space dice → activate zone / tell-badge → score row */
+  --dice-area-pad-bottom: calc(var(--activate-zone-h) + var(--activate-zone-gap) + var(--dice-min-clearance));
+}
+@media (max-height:700px){:root{--activate-zone-h: 50px;--activate-zone-gap: 50px;--dice-min-clearance: 14px}}
+@media (max-height:580px){:root{--activate-zone-h: 44px;--activate-zone-gap: 38px;--dice-min-clearance: 10px}}
+
+/* ════════════════════════════════════
    SCREEN WRAPPER
    ════════════════════════════════════ */
 .screen{display:none;position:absolute;inset:0;flex-direction:column;overflow:hidden;overflow-y:auto}
@@ -765,7 +784,13 @@ body{
 /* ─── DICE AREA ─── */
 .dice-area{
   flex:1;min-height:0;display:flex;flex-direction:column;
-  align-items:center;padding:62px 6px 0;
+  align-items:center;
+  /* Mandatory bottom padding reserves layout space for the .activate-zone
+     overlay (which is position:absolute over the player card bar) plus a
+     min clearance. This prevents player dice from drifting down into the
+     activation zone when the dice-spacer flex grows. Without this, on
+     short phones the dice landed on top of the chest icon. */
+  padding:62px 6px var(--dice-area-pad-bottom);
   position:relative;overflow:hidden;
 }
 .dice-spacer{flex:1;min-height:0}
@@ -797,16 +822,20 @@ body{
 .dlg-box.show{opacity:1}
 /* Push the dialogue content down so it sits below the NPC status/scoring strip
    (the parent .dlg-box is height:0, so this just shifts the floating content). */
-.dlg-inner{display:flex;align-items:center;gap:8px;padding:2px 12px;transform:translateY(36px)}
+.dlg-inner{display:flex;align-items:center;gap:6px;padding:2px 8px;transform:translateY(36px);width:100%;max-width:100vw;justify-content:flex-start}
 .dlg-portrait{
-  width:70px;height:70px;border-radius:4px;image-rendering:auto;
+  width:60px;height:60px;border-radius:4px;image-rendering:auto;
   border:none;box-shadow:none;
   background:transparent;overflow:hidden;flex-shrink:0;
+  margin-left:4px;
 }
 .dlg-portrait img{width:100%;height:100%;image-rendering:auto;display:block}
 .dlg-scroll{
-  position:relative;max-width:280px;padding:10px 28px;overflow:visible;
-  display:flex;align-items:center;
+  /* Wider parchment so 3-line dialogues with orphan words fit on 2.
+     Uses available viewport width minus portrait + paddings. Was 280px
+     fixed which forced wraps mid-sentence. */
+  position:relative;flex:1;max-width:calc(100vw - 90px);padding:10px 22px;overflow:visible;
+  display:flex;align-items:center;justify-content:center;
 }
 .dlg-scroll canvas{position:absolute;inset:0;width:100%;height:100%;z-index:0}
 .dlg-text{
@@ -3219,6 +3248,7 @@ body::before,body::after{display:none!important}
   .bs-portrait{width:120px!important;height:120px!important}
   .boss-splash .hs-name{margin-top:6px!important;font-size:30px}
   /* Match screen — reposition elements for small screens */
+  /* Override only top padding — bottom is now driven by --dice-area-pad-bottom */
   .dice-area{padding-top:2px}
   .loadout-fab{bottom:88px}
   .activate-zone{bottom:calc(100% + 50px);height:50px}
@@ -5784,13 +5814,21 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
 
 /* ── Cutpurse: die-flight animation toward Finnick ── */
 .die.die-palmed{
+  /* Animation now SETTLES the die at a "captured" state (scaled small,
+     faded, greyed) instead of flying off-screen. The die persists for
+     the rest of the turn so the player can see what was taken — used
+     to vanish completely (opacity:0 translateX(40vw) translateY(-40vh))
+     which contradicted the "stays palmed until end of turn" intent. */
   animation:cpPalm .7s ease-in forwards;
   pointer-events:none;
 }
+/* (no ::after for palmed state — die already gets greyed/scaled in the
+   keyframes; ::after on .die is used by some material-flair styles and
+   would conflict.) */
 @keyframes cpPalm{
-  0%{transform:scale(1) translate(0,0) rotate(0);opacity:1}
-  40%{transform:scale(.85) translate(0,-20px) rotate(-15deg);opacity:.9}
-  100%{transform:scale(.3) translate(40vw,-40vh) rotate(-90deg);opacity:0}
+  0%  {transform:scale(1)   translate(0,0)    rotate(0);   opacity:1;   filter:none}
+  40% {transform:scale(.85) translate(0,-12px) rotate(-12deg);opacity:.9}
+  100%{transform:scale(.55) translate(0,-4px)  rotate(-8deg); opacity:.4; filter:grayscale(.8) brightness(.55)}
 }
 
 /* ── Bounty Board: bounty strip ── */
@@ -7482,7 +7520,7 @@ const RUNGS=[
     agg:.80,cardRarity:'gold',wager:true,wagerCount:3,wagerMode:'all',minBank:350,diceStop:1,chaotic:false,adaptive:true,
     dice:['brass','silver','silver','crystal','crystal','ruby'],
     cardPool:['communion_wine','blessed_dice','the_sermon','judgment_npc','never_saw_a_robe','blessed_confiscation'],cardCount:5,
-    tell:{id:'reckoning',name:'THE RECKONING',desc:"Your bank must at least match my last one — or it scores nothing",icon:'⚖️'}},
+    tell:{id:'reckoning',name:'THE RECKONING',desc:"Match my last bank — or score nothing",icon:'⚖️'}},
 ];
 
 /* ═══════ BOSS ACCENT COLORS ═══════ */
@@ -11172,11 +11210,11 @@ function _tryBustSave(free){
 }
 
 /* ── Bust pause: a single, consistent delay so the player can READ the
-   dice that just settled before they scatter. The previous version had
-   two different delays (420ms vs 750ms based on at-risk stakes) plus a
-   pre-scatter opacity dim that the player read as "dice fading first".
-   Now: one uniform 600ms pause, dice stay fully visible until scatter. */
-var BUST_PAUSE_MS=600;
+   dice that just settled before they scatter. Was 600ms — bumped to
+   1000ms after player feedback "If I bust on the first roll, dice all
+   disappear before the bust" — first-roll busts surprise the player
+   and 600ms wasn't enough to register what happened. */
+var BUST_PAUSE_MS=1000;
 function _delayedDoBust(_freeArr){
   setTimeout(doBust,BUST_PAUSE_MS);
 }
@@ -11187,8 +11225,20 @@ function doBust(){
   if(G.spurActive){G.spurActive=0;}
   /* Hot Hand chain reset on bust — losing the chain is the real cost. */
   G._hotHandChain=0;
-  /* Silver die shield: cancel bust once per shield die in loadout */
+  /* Silver die shield: cancel bust once per shield die in loadout.
+     Defensive recount: if dieShieldsPlayer is undefined (init missed) or
+     0 but matchDice still contains shield dice that haven't been used,
+     re-derive the count. Player feedback "Die that saves you from busting
+     didn't work" — most likely cause is state drift between matches. */
+  if(G.dieShieldsPlayer===undefined&&G.matchDice){
+    G.dieShieldsPlayer=G.matchDice.filter(function(m){
+      var dt=getDie(m);return dt&&dt.effect&&dt.effect.mechanic==='shield';
+    }).length;
+    G._shieldUses=G._shieldUses||0;
+    G.dieShieldsPlayer=Math.max(0,G.dieShieldsPlayer-G._shieldUses);
+  }
   if(G.dieShieldsPlayer>0){
+    G._shieldUses=(G._shieldUses||0)+1;
     G.dieShieldsPlayer--;
     /* Apply bust to all visible dice in the row (not just G.pool — see comment in main bust path) */
     (function(){var _r=document.getElementById('playerDiceRow');if(_r)Array.prototype.forEach.call(_r.querySelectorAll('.die'),function(el){el.style.opacity='';el.style.filter='';el.classList.add('bust');});})();
