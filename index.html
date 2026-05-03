@@ -10347,11 +10347,27 @@ function _bustImpact(){
 }
 /* Align overlay word element to vertical centre of the dice area, not screen centre */
 function _alignOverlayWord(wordEl){
-  var da=document.getElementById('diceArea');
-  if(!da||!wordEl)return;
-  var r=da.getBoundingClientRect();
-  var offset=Math.round((r.top+r.height/2)-window.innerHeight/2);
-  wordEl.style.marginTop=offset+'px';
+  /* Anchor YOUR TURN / BUST / HOT DICE words to the PLAYER DICE ROW
+     vertical center (not the dice-area center). Player feedback:
+     "move them down so they line up vertically with my dice".
+     Falls back to dice-area center if the player row isn't ready. */
+  var pd=document.getElementById('playerDiceRow');
+  var pdR=pd?pd.getBoundingClientRect():null;
+  var anchor=(pdR&&pdR.height>0)?pdR:null;
+  if(!anchor){
+    var da=document.getElementById('diceArea');
+    if(!da||!wordEl)return;
+    anchor=da.getBoundingClientRect();
+  }
+  if(!wordEl)return;
+  /* Use translateY (not marginTop) — the overlay is flex-centered, and
+     marginTop on a flex item only shifts content by HALF the value (the
+     box is centered including margin), so the word landed at half the
+     intended offset. translateY moves the rendered element directly. */
+  var offset=Math.round((anchor.top+anchor.height/2)-window.innerHeight/2);
+  wordEl.style.transform='';
+  wordEl.style.marginTop='0';
+  wordEl.style.translate='0 '+offset+'px';
 }
 function showHot(){
   if(window.DLG)DLG.trigger('PLAYER_HOT_DICE');
