@@ -10785,7 +10785,21 @@ function handleRoll(){
   }
   const newEntries=[];
   for(let i=0;i<needNew;i++){const mat=G.matchDice[(G.pool.length+i)%G.matchDice.length]||'bone';const val=useSpur?rollFaceSpur(mat):rollFace(mat);
-    const el=mkDie(val,mat);el.classList.add('rolling');_appendDie(row,el);newEntries.push({val,mat,sel:false,committed:false,el});}
+    const el=mkDie(val,mat);
+    el.classList.add('rolling');
+    /* Defensive: explicitly force visibility/opacity so no inherited or
+       leftover style hides the brand-new die. Player feedback "first
+       roll where it happens... dice invisible" persisted past v200/v201
+       even after splash + turn-ov dismissals — explicit inline reset
+       overrides any stale inline styles too. */
+    el.style.visibility='visible';el.style.opacity='1';el.style.transform='';
+    _appendDie(row,el);
+    /* Force layout so the browser commits the dice to the next paint
+       before any subsequent setTimeout fires. */
+    el.offsetWidth;
+    newEntries.push({val,mat,sel:false,committed:false,el});}
+  /* Also force-reset any wrap-level styles that might have leaked in. */
+  row.querySelectorAll('.die-wrap').forEach(function(w){w.style.visibility='visible';w.style.opacity='1';});
   /* Insert the frozen die. Use the saved free-only visual index, capped
      to the actual roll count — `pos` was set to free-die index at freeze
      time (see activateFrozenDie). */
@@ -10797,12 +10811,12 @@ function handleRoll(){
     G._frozenDie=null;/* consume — only pre-places once */
   }
   G.pool=[...G.pool,...newEntries];
-  /* Roll animation duration. On the FIRST roll of a turn (no kept dice
-     yet), bumped from 480ms to 700ms — gives the player long enough to
-     SEE the dice spin before the bust visual fires on a no-scoring roll.
-     Player feedback: "dice invisible before busting, only on first roll
-     when all dice are going to bust with no previous die kept". */
-  var _rollDur=(G.turnRollCount===0&&(G.kept||[]).length===0)?700:480;
+  /* Roll animation duration. First roll of a turn (no kept dice yet)
+     uses 1200ms — gives the player ~1.2s of clearly-visible spinning
+     before the bust visual fires on a no-scoring roll. Subsequent rolls
+     stay snappy at 480ms. Player feedback: bug persisted at 700ms;
+     bumping further to ensure dice are unmistakably visible. */
+  var _rollDur=(G.turnRollCount===0&&(G.kept||[]).length===0)?1200:480;
   setTimeout(()=>{G.pool.forEach(d=>{if(!d.committed){settleDie(d.el);d.el.onclick=()=>toggleDie(d);d.el.style.cursor='pointer';}});afterRoll();},_rollDur);
 }
 
