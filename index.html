@@ -36,12 +36,14 @@
      is absolute-positioned at this Y so it NEVER shifts when player dice
      come/go from the row. */
   /* y offset (within dice-area) for the tell-badge overlay. Anchored
-     well below the dialogue/parchment band (which sits at ~80-180 when
-     active) so the badge doesn't collide with patron speech. */
-  --tell-badge-y: 200px;
-  --tell-badge-h: 110px;         /* reserved height — full-size badge fits comfortably */
+     well below the dialogue/parchment band (which can extend down to
+     ~y=200-220 within dice-area) so the badge never collides with
+     patron speech. Player feedback "still overlaps with the npc
+     dialogue" — pushed badge further down. */
+  --tell-badge-y: 260px;
+  --tell-badge-h: 110px;
 }
-@media (max-height:700px){:root{--activate-zone-h: 50px;--activate-zone-gap: 50px;--dice-min-clearance: 28px;--tell-badge-y: 150px;--tell-badge-h: 80px}}
+@media (max-height:700px){:root{--activate-zone-h: 50px;--activate-zone-gap: 50px;--dice-min-clearance: 28px;--tell-badge-y: 200px;--tell-badge-h: 80px}}
 /* ≤580: keep activate-zone-h/gap same as ≤700 (the .activate-zone CSS
    override only goes that far). Tell-badge reserved height drops to
    60px because at SE1 viewport (320x568) the sum of fixed children
@@ -49,7 +51,7 @@
    the available content area, forcing dice to overflow into the
    activate-zone band. Reducing tell-badge-h frees ~24px of vertical
    space — enough to keep dice cleanly above the activate zone. */
-@media (max-height:580px){:root{--dice-min-clearance: 22px;--tell-badge-y: 130px;--tell-badge-h: 60px}}
+@media (max-height:580px){:root{--dice-min-clearance: 22px;--tell-badge-y: 170px;--tell-badge-h: 60px}}
 
 /* ════════════════════════════════════
    SCREEN WRAPPER
@@ -2119,7 +2121,11 @@ body:has(#mLoadout-ov.show) #dbgButtons{display:flex !important}
 
 /* ─── QUIT CONFIRM ─── */
 #quit-ov{
-  display:none;position:fixed;inset:0;z-index:9600;
+  /* z-index 9600 -> 10250 so the flee confirm panel sits ABOVE the
+     tell-badge (z:10050) — same fix family as the loadout panel.
+     Player feedback: "when fleeing, it still shows on top of
+     everything, it should not". */
+  display:none;position:fixed;inset:0;z-index:10250;
   background:rgba(12,10,6,.88);
   flex-direction:column;align-items:center;justify-content:center;gap:24px;
   padding:24px;
@@ -5540,8 +5546,12 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
 }
 .handicap-splash .hs-bg{position:absolute;inset:0;background:#000;transition:opacity .5s}
 /* Hide ALL match-screen content while a splash is showing — EXCEPT the Tell badge,
-   which is positioned to be visible through the splash so it visually persists. */
+   which is positioned to be visible through the splash so it visually persists.
+   The #tellBadge selector explicitly defends visibility:visible so even if it
+   inherits hidden from a parent, it shows. Player feedback: "the Tell badge
+   doesn't appear anymore during the boss black screen overlay". */
 #screen-match.has-splash > *:not(.handicap-splash):not(#tellBadge){visibility:hidden}
+#screen-match.has-splash #tellBadge{visibility:visible !important}
 .handicap-splash.hs-in{opacity:1}
 .handicap-splash.hs-bg-out .hs-bg{opacity:0}
 .handicap-splash.hs-out{opacity:0;transition:opacity .5s}
@@ -10863,12 +10873,11 @@ function handleRoll(){
     G._frozenDie=null;/* consume — only pre-places once */
   }
   G.pool=[...G.pool,...newEntries];
-  /* Roll animation duration. First roll of a turn (no kept dice yet)
-     uses 1200ms — gives the player ~1.2s of clearly-visible spinning
-     before the bust visual fires on a no-scoring roll. Subsequent rolls
-     stay snappy at 480ms. Player feedback: bug persisted at 700ms;
-     bumping further to ensure dice are unmistakably visible. */
-  var _rollDur=(G.turnRollCount===0&&(G.kept||[]).length===0)?1200:480;
+  /* Roll animation duration — uniform 480ms. Earlier experiments at
+     700ms / 1200ms for first roll didn't fix the dice-invisible bug
+     (root cause was overlay-hiding, fixed in handleRoll's overlay
+     dismissal). Reverted per player request. */
+  var _rollDur=480;
   setTimeout(()=>{G.pool.forEach(d=>{if(!d.committed){settleDie(d.el);d.el.onclick=()=>toggleDie(d);d.el.style.cursor='pointer';}});afterRoll();},_rollDur);
 }
 
