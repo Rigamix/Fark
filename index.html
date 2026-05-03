@@ -35,10 +35,13 @@
      Above this band: opp dice + dialogue. Below: player area. Tell-badge
      is absolute-positioned at this Y so it NEVER shifts when player dice
      come/go from the row. */
-  --tell-badge-y: 140px;
+  /* y offset (within dice-area) for the tell-badge overlay. Anchored
+     well below the dialogue/parchment band (which sits at ~80-180 when
+     active) so the badge doesn't collide with patron speech. */
+  --tell-badge-y: 200px;
   --tell-badge-h: 110px;         /* reserved height — full-size badge fits comfortably */
 }
-@media (max-height:700px){:root{--activate-zone-h: 50px;--activate-zone-gap: 50px;--dice-min-clearance: 28px;--tell-badge-y: 110px;--tell-badge-h: 80px}}
+@media (max-height:700px){:root{--activate-zone-h: 50px;--activate-zone-gap: 50px;--dice-min-clearance: 28px;--tell-badge-y: 150px;--tell-badge-h: 80px}}
 /* ≤580: keep activate-zone-h/gap same as ≤700 (the .activate-zone CSS
    override only goes that far). Tell-badge reserved height drops to
    60px because at SE1 viewport (320x568) the sum of fixed children
@@ -46,7 +49,7 @@
    the available content area, forcing dice to overflow into the
    activate-zone band. Reducing tell-badge-h frees ~24px of vertical
    space — enough to keep dice cleanly above the activate zone. */
-@media (max-height:580px){:root{--dice-min-clearance: 22px;--tell-badge-y: 84px;--tell-badge-h: 60px}}
+@media (max-height:580px){:root{--dice-min-clearance: 22px;--tell-badge-y: 130px;--tell-badge-h: 60px}}
 
 /* ════════════════════════════════════
    SCREEN WRAPPER
@@ -5682,22 +5685,26 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
    too big). Pointer-events:none keeps it click-through; z-index above
    the splash bg (z:10000) so it stays visible during reveal. */
 .tell-badge{
-  position:relative;
+  /* ABSOLUTE positioning, anchored to viewport (position:fixed) so the
+     badge stays put regardless of:
+       - whether the boss splash is up or has faded (splash and match
+         both render the badge at the SAME y now)
+       - whether the player dice row is empty or full (no flex flow
+         shifting the badge up/down between rolls)
+     Player feedback: "Tell overlay shift down when the match starts...
+     when my dice are there or not there, it shifts the Tell overlay
+     up and down, it should not happen". */
+  position:fixed;
+  top:calc(var(--hud-h) + var(--tell-badge-y));
+  left:0;right:0;
   z-index:10050;pointer-events:none;
   font-family:var(--font-px);
   color:rgba(200,160,80,.85);letter-spacing:1.4px;
   text-align:center;padding:6px 0;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
   width:100%;
-  flex-shrink:0;
-  /* Reserved minimum height so the badge occupies a STABLE vertical
-     band regardless of whether player dice are present. Without this,
-     the dice-area flex flow shifts the badge up/down when the player
-     dice row appears/disappears between rolls. */
-  min-height:var(--tell-badge-h);
   transition:color .3s,text-shadow .3s;
   font-size:12px;
-  margin:var(--dice-min-clearance) 0;
 }
 /* Short phones: only modest shrink — leave the badge readable. */
 @media (max-height:700px){
@@ -6374,8 +6381,10 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
   </div>
 </div>
 
-<!-- DEBUG: visible during play, auto-hidden once the end overlay is showing -->
-<div id="dbgButtons" style="position:fixed;top:6px;right:6px;z-index:9999;display:flex;gap:4px">
+<!-- DEBUG: visible during play, auto-hidden once the end overlay is showing.
+     z-index 10300 sits above the loadout backdrop (10100) and panel (10200)
+     so the buttons remain clickable while the loadout panel is open. -->
+<div id="dbgButtons" style="position:fixed;top:6px;right:6px;z-index:10300;display:flex;gap:4px">
   <button onclick="dbgWin()" style="padding:4px 8px;font-size:10px;background:#2a2;color:#fff;border:none;border-radius:4px;cursor:pointer;opacity:.7">DBG WIN</button>
   <button onclick="dbgLose()" style="padding:4px 8px;font-size:10px;background:#a22;color:#fff;border:none;border-radius:4px;cursor:pointer;opacity:.7">DBG LOSE</button>
 </div>
