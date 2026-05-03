@@ -24,11 +24,17 @@
   --controls-h: 80px;            /* match controls bar at bottom */
   --activate-zone-h: 76px;       /* activation zone above controls */
   --activate-zone-gap: 100px;    /* gap from controls top to activate zone bottom */
-  --dice-min-clearance: 18px;    /* mandatory min space dice → activate zone / tell-badge → score row */
+  --dice-min-clearance: 18px;    /* mandatory min space between zones */
   --dice-area-pad-bottom: calc(var(--activate-zone-h) + var(--activate-zone-gap) + var(--dice-min-clearance));
+  /* Stable Y position (within #diceArea) for the tell-badge overlay.
+     Above this band: opp dice + dialogue. Below: player area. Tell-badge
+     is absolute-positioned at this Y so it NEVER shifts when player dice
+     come/go from the row. */
+  --tell-badge-y: 140px;
+  --tell-badge-h: 110px;         /* reserved height — full-size badge fits comfortably */
 }
-@media (max-height:700px){:root{--activate-zone-h: 50px;--activate-zone-gap: 50px;--dice-min-clearance: 14px}}
-@media (max-height:580px){:root{--activate-zone-h: 44px;--activate-zone-gap: 38px;--dice-min-clearance: 10px}}
+@media (max-height:700px){:root{--activate-zone-h: 50px;--activate-zone-gap: 50px;--dice-min-clearance: 14px;--tell-badge-y: 110px;--tell-badge-h: 96px}}
+@media (max-height:580px){:root{--activate-zone-h: 44px;--activate-zone-gap: 38px;--dice-min-clearance: 10px;--tell-badge-y: 90px;--tell-badge-h: 84px}}
 
 /* ════════════════════════════════════
    SCREEN WRAPPER
@@ -5646,33 +5652,34 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
   z-index:10050;pointer-events:none;
   font-family:var(--font-px);
   color:rgba(200,160,80,.85);letter-spacing:1.4px;
-  text-align:center;padding:4px 0;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;
+  text-align:center;padding:6px 0;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
   width:100%;
   flex-shrink:0;
+  /* Reserved minimum height so the badge occupies a STABLE vertical
+     band regardless of whether player dice are present. Without this,
+     the dice-area flex flow shifts the badge up/down when the player
+     dice row appears/disappears between rolls. */
+  min-height:var(--tell-badge-h);
   transition:color .3s,text-shadow .3s;
   font-size:12px;
-  /* Mandatory breathing room above (from dialogue) and below (from
-     score-preview row). var(--dice-min-clearance) keeps it consistent
-     with the layout zone system. */
   margin:var(--dice-min-clearance) 0;
 }
-/* Short phones: shrink the badge so it consumes less vertical space —
-   leaves more room for NPC dice above and player dice/score below. */
+/* Short phones: only modest shrink — leave the badge readable. */
 @media (max-height:700px){
-  .tell-badge .tb-icon{font-size:34px;margin-bottom:-2px}
-  .tell-badge .tb-name{font-size:19px}
-  .tell-badge .tb-desc{font-size:11px;line-height:1.15}
+  .tell-badge .tb-icon{font-size:40px;margin-bottom:-2px}
+  .tell-badge .tb-name{font-size:21px}
+  .tell-badge .tb-desc{font-size:12px;line-height:1.2}
 }
 @media (max-height:620px){
-  .tell-badge .tb-icon{font-size:28px;margin-bottom:-3px}
-  .tell-badge .tb-name{font-size:16px}
-  .tell-badge .tb-desc{font-size:10px}
+  .tell-badge .tb-icon{font-size:36px;margin-bottom:-3px}
+  .tell-badge .tb-name{font-size:19px}
+  .tell-badge .tb-desc{font-size:11px}
 }
 @media (max-height:580px){
-  .tell-badge .tb-icon{font-size:22px;margin-bottom:-4px}
-  .tell-badge .tb-name{font-size:14px}
-  .tell-badge .tb-desc{font-size:9px}
+  .tell-badge .tb-icon{font-size:30px;margin-bottom:-3px}
+  .tell-badge .tb-name{font-size:17px}
+  .tell-badge .tb-desc{font-size:10px}
 }
 .tell-badge .tb-icon{font-size:46px;line-height:1;margin-bottom:0}
 .tell-badge .tb-name{font-size:23px;color:rgba(230,190,100,1);text-shadow:0 0 10px rgba(220,180,90,.4),0 2px 0 rgba(0,0,0,.7);line-height:1}
@@ -10772,7 +10779,13 @@ function handleRoll(){
     G._frozenDie=null;/* consume — only pre-places once */
   }
   G.pool=[...G.pool,...newEntries];
-  setTimeout(()=>{G.pool.forEach(d=>{if(!d.committed){settleDie(d.el);d.el.onclick=()=>toggleDie(d);d.el.style.cursor='pointer';}});afterRoll();},480);
+  /* Roll animation duration. On the FIRST roll of a turn (no kept dice
+     yet), bumped from 480ms to 700ms — gives the player long enough to
+     SEE the dice spin before the bust visual fires on a no-scoring roll.
+     Player feedback: "dice invisible before busting, only on first roll
+     when all dice are going to bust with no previous die kept". */
+  var _rollDur=(G.turnRollCount===0&&(G.kept||[]).length===0)?700:480;
+  setTimeout(()=>{G.pool.forEach(d=>{if(!d.committed){settleDie(d.el);d.el.onclick=()=>toggleDie(d);d.el.style.cursor='pointer';}});afterRoll();},_rollDur);
 }
 
 function afterRoll(){
