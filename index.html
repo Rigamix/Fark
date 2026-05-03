@@ -16250,31 +16250,34 @@ function _showLegendDraft(){
   var ov=document.createElement('div');
   ov.id='legendDraftOv';
   ov.style.cssText='position:fixed;inset:0;z-index:9900;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;padding:16px;touch-action:manipulation';
-  /* Title uses the same Uncial Antiqua serif as boss splashes — was
-     MedievalSharp which doesn't read as title-y enough. Bigger size. */
-  var title='<div style="font-family:\'Uncial Antiqua\',\'MedievalSharp\',serif;font-size:clamp(26px,7vw,34px);color:#dca84a;letter-spacing:2px;text-align:center;margin-bottom:10px;text-shadow:0 2px 0 rgba(0,0,0,.6),0 0 12px rgba(220,168,74,.25);line-height:1.1">A LEGEND ARRIVES</div>';
-  /* Sub: bigger font, italic flavor (IM Fell English same as patron
-     dialogue). text-wrap:balance prevents orphan words. */
-  var sub='<div style="font-family:\'IM Fell English\',serif;font-size:clamp(13px,3.6vw,16px);color:#cfc4a8;font-style:italic;text-align:center;margin-bottom:20px;line-height:1.35;text-wrap:balance;padding:0 8px">Even before sitting down, your name carries weight. Choose a signature card to begin this run with.</div>';
-  var cardsHtml='<div style="display:flex;gap:14px;justify-content:center;align-items:flex-start;margin-bottom:8px">';
+  /* Title sized to fit ONE line at the panel width (max-width 420). */
+  var title='<div style="font-family:\'Uncial Antiqua\',\'MedievalSharp\',serif;font-size:clamp(20px,5.5vw,26px);color:#dca84a;letter-spacing:2px;text-align:center;margin-bottom:10px;text-shadow:0 2px 0 rgba(0,0,0,.6),0 0 12px rgba(220,168,74,.25);line-height:1.1;white-space:nowrap">A LEGEND ARRIVES</div>';
+  /* Body shortened to fit on TWO lines on standard mobile. */
+  var sub='<div style="font-family:\'IM Fell English\',serif;font-size:clamp(13px,3.6vw,15px);color:#cfc4a8;font-style:italic;text-align:center;margin-bottom:18px;line-height:1.35;text-wrap:balance;padding:0 8px">Your name carries weight. Choose a signature card to begin this run.</div>';
+  var cardsHtml='<div style="display:flex;gap:10px;justify-content:center;align-items:flex-start;margin-bottom:6px">';
   offer.forEach(function(cd){
     var rar=cd.npc?'boss-'+cd.npc:cd.rarity;
-    /* Card column: explicit width AND aspect-ratio on the gcard wrap so
-       the card is guaranteed 2:3 — was leaving aspect-ratio on the
-       inner .gcard which inherits height:100% from its CSS, producing
-       inconsistent stretching. */
-    cardsHtml+='<div class="legend-pick-card" data-cid="'+cd.id+'" style="flex:1 1 0;max-width:120px;cursor:pointer;transition:transform .15s;display:flex;flex-direction:column;align-items:center">';
+    /* Card now uses the SAME visual structure as the in-match card bar
+       (.mcard wrapper + .gcard inner). Name + effect render INSIDE the
+       card via the standard layout — was a bare gcard with empty
+       interior + tiny external labels which read as "blank rectangle". */
+    cardsHtml+='<div class="legend-pick-card" data-cid="'+cd.id+'" style="flex:1 1 0;max-width:118px;cursor:pointer;transition:transform .15s;display:flex;flex-direction:column;align-items:center">';
     cardsHtml+='<div style="width:100%;aspect-ratio:2/3;position:relative">';
-    cardsHtml+='<div class="gcard rarity-'+rar+'" style="position:absolute;inset:0">';
-    cardsHtml+='<div class="gcard-cover" style="background:'+(CARD_BG[cd.id]||'#600')+';font-size:36px;display:flex;align-items:center;justify-content:center">'+cd.icon+'</div>';
-    cardsHtml+='<div class="gcard-frame"></div>'+gcCorners()+'</div>';
-    cardsHtml+='</div>';
-    cardsHtml+='<div style="font-family:var(--font-px);font-size:11px;color:#dca84a;text-align:center;margin-top:8px;letter-spacing:1px;line-height:1.2;text-wrap:balance">'+cd.name+'</div>';
-    cardsHtml+='<div style="font-family:var(--font-px);font-size:9px;color:var(--textdim);text-align:center;margin-top:3px;letter-spacing:.5px;line-height:1.25;text-wrap:balance">'+(cd.eff||'')+'</div>';
-    cardsHtml+='</div>';
+    cardsHtml+='<div class="gcard rarity-'+rar+'" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:8px 4px;gap:0">';
+    cardsHtml+='<div class="gcard-frame"></div>'+gcCorners();
+    /* Icon zone — scaled to ~38% of card height */
+    cardsHtml+='<div style="font-size:clamp(28px,9vw,38px);line-height:1;margin-top:8px;z-index:2;position:relative">'+cd.icon+'</div>';
+    /* Card name — INSIDE the card, gold accent */
+    cardsHtml+='<div style="font-family:var(--font-px);font-size:clamp(8px,2.4vw,10px);color:#dca84a;text-align:center;margin-top:auto;margin-bottom:6px;letter-spacing:.5px;line-height:1.15;text-wrap:balance;z-index:2;position:relative;padding:0 4px">'+cd.name+'</div>';
+    cardsHtml+='</div>';/* /gcard */
+    cardsHtml+='</div>';/* /aspect-ratio wrap */
+    /* Effect label OUTSIDE the card — bigger now (player feedback "card
+       tooltip text is too small"). */
+    cardsHtml+='<div style="font-family:var(--font-px);font-size:clamp(10px,2.8vw,12px);color:#cfc4a8;text-align:center;margin-top:8px;letter-spacing:.5px;line-height:1.3;text-wrap:balance;padding:0 2px">'+(cd.eff||'')+'</div>';
+    cardsHtml+='</div>';/* /legend-pick-card */
   });
   cardsHtml+='</div>';
-  ov.innerHTML='<div style="background:#28221c;border:2px solid #6a5430;border-radius:8px;padding:24px 18px 20px;max-width:420px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.7)">'+title+sub+cardsHtml+'</div>';
+  ov.innerHTML='<div style="background:#28221c;border:2px solid #6a5430;border-radius:8px;padding:22px 16px 18px;max-width:420px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.7)">'+title+sub+cardsHtml+'</div>';
   document.body.appendChild(ov);
   ov.querySelectorAll('.legend-pick-card').forEach(function(el){
     el.addEventListener('click',function(){
