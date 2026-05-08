@@ -2466,6 +2466,10 @@ body::before,body::after{display:none!important}
   opacity:0;transition:opacity .3s;
 }
 #screen-match.active::before{opacity:1}
+/* Per-boss background overrides — initMatchScreen adds `boss-{name}` to
+   #screen-match based on the rung. Bosses without a custom image fall
+   back to the default match.png above. */
+#screen-match.boss-grog::before{background-image:url('Environment_ART/Grog_match.png?v=1')}
 #screen-match::after{
   content:'';position:fixed;inset:0;z-index:-1;
   /* Brownish vignette: top and bottom edges darken to ~50%, middle stays
@@ -15541,6 +15545,16 @@ function initMatchScreen(data){
   if(pCards.includes('the_jinx'))rung._jinx=true;
 
   G=newG(rung,pCards,params.oCards||[],params.pStake,params.oStake);
+  /* Per-boss background swap — apply boss-{name} modifier class to
+     #screen-match so the ::before's background-image picks up that
+     boss's custom art. Falls back to match.png if no override. */
+  (function(){
+    var sm=document.getElementById('screen-match');
+    if(!sm)return;
+    sm.className=sm.className.replace(/\bboss-[\w-]+\b/g,'').replace(/\s+/g,' ').trim();
+    var bossKey=(rung.name||'').toLowerCase().replace(/[^a-z0-9-]/g,'');
+    if(bossKey)sm.classList.add('boss-'+bossKey);
+  })();
   /* The Alchemist: if 2+ tin cards, activate doubled tin effects */
   if(pCards.includes('the_alchemist')){
     var _tinCount=pCards.filter(function(cid){var c=CARDS.find(function(x){return x.id===cid;});return c&&c.rarity==='tin';}).length;
