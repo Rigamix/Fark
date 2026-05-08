@@ -11505,8 +11505,8 @@ function _afterRollImpl(){
       G._vowDoubleActive=true;
       setStatusMsg('VOW: 300+ ROLL! PICKS DOUBLED','green');triggerCard('aldrics_vow','DOUBLED!',true);
     }else{
-      const lost=G.kept.reduce((a,k)=>a+k.pts,0);
-      G.turnPts=0;G.kept=[];refreshKeptTray();updHUD();
+      const lost=G.kept.reduce((a,k)=>a+k.pts,0)+(G._stakesRisingBonus||0);
+      G.turnPts=0;G.kept=[];G._stakesRisingBonus=0;refreshKeptTray();updHUD();
       setStatusMsg('VOW FAILED — LOST '+lost+' TURN PTS','red');triggerCard('aldrics_vow','VOW FAILED',true);
     }
   }
@@ -11519,7 +11519,7 @@ function _afterRollImpl(){
   }
   if(G.pCards.includes('last_stand')&&free.length===1&&(freeV[0]===1||freeV[0]===5)){
     const d=free[0];d.committed=true;if(d.el){d.el.classList.add('committed');d.el.onclick=null;}
-    G.kept.push({vals:[freeV[0]],mat:d.mat,pts:600});G.turnPts=G.kept.reduce((a,k)=>a+k.pts,0);refreshKeptTray();updHUD();
+    G.kept.push({vals:[freeV[0]],mat:d.mat,pts:600});G.turnPts=G.kept.reduce((a,k)=>a+k.pts,0)+(G._stakesRisingBonus||0);refreshKeptTray();updHUD();
     triggerCard('last_stand','LAST STAND! 600',true);if(window.DLG)setTimeout(function(){DLG.triggerCard('last_stand',true);},800);setBtns(false,true);return;
   }
   /* ── Boss edicts removed — patron "edict" system simplified away.
@@ -11843,7 +11843,10 @@ function doBust(){
      "Thick Skin should play bust animation BEFORE saving". */
   if(!G._thickSkinUsed&&G.pCards.includes('thick_skin')){
     G._thickSkinUsed=true;
-    var _tsSaved=Math.floor(G.kept.reduce((a,k)=>a+k.pts,0)/2);
+    /* Save half of all turn pts (kept dice + stakes-rising bonus). */
+    var _tsTurnPts=G.kept.reduce((a,k)=>a+k.pts,0)+(G._stakesRisingBonus||0);
+    var _tsSaved=Math.floor(_tsTurnPts/2);
+    G._stakesRisingBonus=0;
     /* Apply bust class to all visible dice in the row */
     (function(){var _r=document.getElementById('playerDiceRow');if(_r)Array.prototype.forEach.call(_r.querySelectorAll('.die'),function(el){el.style.opacity='';el.style.filter='';el.classList.add('bust');});})();
     G.safeTurnStreak=0;G.turnPts=0;G.kept=[];updHUD();refreshKeptTray();setBtns(false,false);
@@ -11868,7 +11871,8 @@ function doBust(){
   /* Mabel's Stitch: bank turn pts instead of losing them, PLUS +300 bonus */
   if(G.activeCardState&&G.activeCardState.stitchActive){
     G.activeCardState.stitchActive=false;clearCardLabel('mabels_stitch');
-    const saved=G.kept.reduce((a,k)=>a+k.pts,0);
+    const saved=G.kept.reduce((a,k)=>a+k.pts,0)+(G._stakesRisingBonus||0);
+    G._stakesRisingBonus=0;
     const _stitchBonus=300;
     /* Apply bust to all visible dice in the row (not just G.pool — see comment in main bust path) */
     (function(){var _r=document.getElementById('playerDiceRow');if(_r)Array.prototype.forEach.call(_r.querySelectorAll('.die'),function(el){el.style.opacity='';el.style.filter='';el.classList.add('bust');});})();
@@ -11896,9 +11900,10 @@ function doBust(){
   if(G.activeSynergies&&G.activeSynergies.includes('safety_net')){var _lrPts=G.kept.reduce(function(a,k){return a+k.pts;},0);if(_lrPts>0){var _lrSave=Math.floor(_lrPts*0.25);G.pPts+=_lrSave;spawnPop('+'+_lrSave+' \uD83D\uDEE1\uFE0F');}}
   /* AEGIS (guardian): bust loses HALF turn pts, not all. Stacks with
      thick_skin / mabels_stitch (those return earlier so this only fires
-     on the regular bust path). */
+     on the regular bust path). Includes the Stakes Rising bonus in the
+     saved-pool since the card description is "half turn pts". */
   if(G.pCards.includes('aegis')){
-    var _aegisPts=G.kept.reduce(function(a,k){return a+k.pts;},0);
+    var _aegisPts=G.kept.reduce(function(a,k){return a+k.pts;},0)+(G._stakesRisingBonus||0);
     if(_aegisPts>0){
       var _aegisSave=Math.floor(_aegisPts/2);
       G.pPts+=_aegisSave;
@@ -12813,8 +12818,11 @@ function runOppTurn(){
           if(eff.mechanic==='bust_immune_turns'&&G.npcCardState.oppTurnCount<eff.turns){bustSaved=true;bustSavedCid=cid;}
           if(eff.mechanic==='bust_survive'&&!G.npcCardState.usedOnce[cid]&&Math.random()<eff.chance){
             G.npcCardState.usedOnce[cid]=true;bustSaved=true;bustSavedCid=cid;
-            /* Halve accumulated turn points as cost of survival */
-            G.turnPts=Math.floor(G.turnPts/2);
+            /* Halve NPC's accumulated turn points as cost of survival.
+               Was incorrectly halving G.turnPts (the PLAYER's turn points)
+               instead of oppBank (the NPC's). Card description: "Grog
+               survives a bust... his turn points are halved but not lost." */
+            oppBank=Math.floor(oppBank/2);
           }
         });
         /* NPC bust → bank half (the_last_stitch_npc) */
@@ -15185,7 +15193,9 @@ function activateDoubleDown(){
      made it look like nothing happened). */
   G.kept.forEach(function(k){k.pts=k.pts*2;});
   var _ddNewPts=G.kept.reduce(function(a,k){return a+k.pts;},0);
-  G.turnPts=_ddNewPts;
+  /* Preserve the Stakes Rising bonus (it isn't a kept-dice score so the
+     k.pts*=2 doubling above doesn't touch it). */
+  G.turnPts=_ddNewPts+(G._stakesRisingBonus||0);
   /* Double Down visual juice: scatter + sparks on committed dice */
   G.pool.forEach(function(d){if(d.committed&&d.el){d.el.classList.add('scatter');spawnPixelSparks(d.el,3);}});
   refreshKeptTray();updHUD();
