@@ -5724,6 +5724,10 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
    doesn't appear anymore during the boss black screen overlay". */
 #screen-match.has-splash > *:not(.handicap-splash):not(#tellBadge){visibility:hidden}
 #screen-match.has-splash #tellBadge{visibility:visible !important}
+/* Tell splash already shows the tell content full-size — hide the
+   persistent badge so the same info doesn't render twice on top of the
+   splash. Cleared when the splash closes. */
+#screen-match.has-tell-splash #tellBadge{visibility:hidden !important}
 .handicap-splash.hs-in{opacity:1}
 .handicap-splash.hs-bg-out .hs-bg{opacity:0}
 .handicap-splash.hs-out{opacity:0;transition:opacity .5s}
@@ -8208,22 +8212,30 @@ function _showTellSplash(cb){
   if(!G||!G._tell){if(cb)cb();return;}
   var t=G._tell;
   var accent=BOSS_ACCENT[(G.rung.name||'').toLowerCase()]||'#c890e0';
+  var portrait=GAUNTLET_PORTRAITS[G.rung.key]||'';
   var ov=document.createElement('div');
   ov.className='handicap-splash tell-splash';
   ov.style.setProperty('--hs-color',accent);
+  /* Mirror the boss-splash structure: portrait + character name on top, then
+     the tell info (icon, name, desc) below. Drops the "X'S TELL" wording —
+     having "MABEL" right above the tell already establishes ownership. */
+  var imgHtml=portrait?'<span class="bs-portrait-wrap" style="--hs-color:'+accent+'"><img src="'+portrait+'" class="bs-portrait" alt="'+G.rung.name+'"></span>':'';
   ov.innerHTML='<div class="hs-bg"></div>'+
-    '<div class="hs-icon">'+t.icon+'</div>'+
-    '<div class="hs-name">'+G.rung.name+"'S TELL</div>"+
+    imgHtml+
+    '<div class="hs-name" style="margin-top:12px">'+G.rung.name+'</div>'+
+    '<div class="hs-icon" style="font-size:36px;margin-top:18px">'+t.icon+'</div>'+
     '<div class="hs-desc" style="font-size:18px;margin-top:6px">'+t.name+'</div>'+
     '<div class="hs-desc" style="font-size:11px;opacity:.85;margin-top:8px">'+t.desc+'</div>';
   var ms=document.getElementById('screen-match');if(!ms){if(cb)cb();return;}
   ms.appendChild(ov);
-  ms.classList.add('has-splash');
+  /* has-tell-splash hides the persistent #tellBadge so its info doesn't
+     duplicate on top of the splash text. Cleared on splash close below. */
+  ms.classList.add('has-splash','has-tell-splash');
   requestAnimationFrame(function(){ov.classList.add('hs-in');});
   /* Bg + text fade out together at the END so the board doesn't leak through */
   /* Reveal board the instant fade-out begins so the bg + board crossfade together (.5s).
      Saves ~700ms vs. waiting for opacity to finish before revealing. */
-  setTimeout(function(){ov.classList.add('hs-bg-out');ov.classList.add('hs-out');ms.classList.remove('has-splash');},2800);
+  setTimeout(function(){ov.classList.add('hs-bg-out');ov.classList.add('hs-out');ms.classList.remove('has-splash','has-tell-splash');},2800);
   setTimeout(function(){ov.remove();if(cb)cb();},3300);
 }
 function _initTellHUD(){
