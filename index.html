@@ -6630,6 +6630,12 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
   <div id="end-btns">
     <button id="btnContinue" onclick="handleContinue()"><canvas id="cvBtnContinue"></canvas><span>CONTINUE</span></button>
   </div>
+  <!-- Host for the bottom action row (SKIP/CONTINUE + pouch). Lives at
+       #end-ov level so position:fixed inside it anchors to the viewport
+       (the .res-card has perspective+transform which would otherwise
+       trap fixed children to its own box and create a phantom bottom
+       margin on short phones). -->
+  <div id="endDraftActionsHost"></div>
 </div>
 
 <!-- QUIT CONFIRM -->
@@ -13375,6 +13381,8 @@ function endMatch(win){
   }
   var resGoldText=document.getElementById('resGoldText');if(resGoldText)resGoldText.textContent='';
   var resCard=document.getElementById('resCard');if(resCard){resCard.innerHTML='';resCard.className='res-card';}
+  /* Clear leftover action row from previous match — re-populated below for wins. */
+  var _eaHost=document.getElementById('endDraftActionsHost');if(_eaHost)_eaHost.innerHTML='';
   var resFeats=document.getElementById('resFeats');if(resFeats){resFeats.innerHTML='';resFeats.classList.remove('show');resFeats.style.display='none';}
   var resDlg=document.getElementById('resDlg');if(resDlg){resDlg.classList.remove('show');resDlg.innerHTML='';}
   var endBtns=document.getElementById('end-btns');
@@ -13757,9 +13765,15 @@ function endMatch(win){
       draftHtml+='<div class="end-draft-reshuffle" id="endDraftReshuffleBtn" onclick="reshuffleDraft()" title="Reshuffle (renown)"><span>↻</span></div>';
     }
     draftHtml+='<div class="end-draft-slots" id="endDraftSlots"></div>';
-    draftHtml+=_endDraftActionsHtml();
+    /* Action row injected separately into #endDraftActionsHost below — must
+       live OUTSIDE .res-card so position:fixed anchors to the viewport. */
     draftHtml+='</div>';
     if(resCard){resCard.innerHTML=draftHtml;resCard.classList.add('show');}
+    /* Inject the action row into the #end-ov-level host (escapes resCard's
+       perspective/transform containing block so position:fixed pins to
+       the actual viewport bottom). */
+    var _actionsHost=document.getElementById('endDraftActionsHost');
+    if(_actionsHost)_actionsHost.innerHTML=_endDraftActionsHtml();
     /* Attach tooltip + drag handlers + draw button canvases */
     setTimeout(function(){
       document.querySelectorAll('.end-draft .draft-card-wrap').forEach(function(el){
@@ -13818,9 +13832,11 @@ function endMatch(win){
     });
     bossHtml+='</div>';
     bossHtml+='<div class="end-draft-slots" id="endDraftSlots"></div>';
-    bossHtml+=_endDraftActionsHtml();
+    /* Action row injected separately into #endDraftActionsHost below. */
     bossHtml+='</div>';
     if(resCard){resCard.innerHTML=bossHtml;resCard.classList.add('show');}
+    var _actionsHostBoss=document.getElementById('endDraftActionsHost');
+    if(_actionsHostBoss)_actionsHostBoss.innerHTML=_endDraftActionsHtml();
     setTimeout(function(){
       document.querySelectorAll('.end-draft .draft-card-wrap').forEach(function(el){
         attachTooltipTap(el);
