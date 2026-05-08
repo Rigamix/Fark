@@ -3024,6 +3024,29 @@ body::before,body::after{display:none!important}
 .end-draft-skip:active{transform:scale(.96);filter:brightness(1.3)}
 .end-draft-skip canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;border-radius:6px;z-index:0;image-rendering:pixelated}
 .end-draft-skip span{position:relative;z-index:1}
+/* Bottom action row on the victory draft — SKIP/CONTINUE + pouch button
+   sit side-by-side so the pouch isn't floating in the top corner. The
+   skip is narrower in this layout to make room. Player feedback:
+   "make the SKIP/CONTINUE bottom buttons narrower and add the pouch on
+   the right side of it". */
+.end-draft-actions{
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  margin:0 auto calc(env(safe-area-inset-bottom,0px) + 4px);
+  width:fit-content;
+}
+.end-draft-actions .end-draft-skip{
+  margin:0;min-width:120px;padding:14px 28px;
+}
+.end-draft-pouch-btn{
+  position:relative;flex-shrink:0;
+  width:54px;height:54px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  filter:drop-shadow(0 2px 3px rgba(0,0,0,.55));
+  transition:transform .12s ease, filter .12s ease;
+}
+.end-draft-pouch-btn:hover{transform:translateY(-1px);filter:drop-shadow(0 3px 4px rgba(0,0,0,.6)) brightness(1.08)}
+.end-draft-pouch-btn:active{transform:scale(.92)}
+.end-draft-pouch-btn img{width:100%;height:100%;image-rendering:pixelated;object-fit:contain;pointer-events:none}
 /* Reshuffle icon (renown perk: Regular at the bar) — sits compact under
    the CHOOSE A CARD label, no chrome. Keep the visual footprint the
    same as before; just scale the glyph itself up. */
@@ -6575,15 +6598,9 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
 
 <!-- END MATCH OVERLAY -->
 <div id="end-ov">
-  <!-- Pouch FAB on the victory screen — same overlay as the gauntlet FAB,
-       just exposed during the post-match draft so the player can rearrange
-       active/pouch cards before continuing. Hidden by default; shown by
-       endMatch() when win && getPouchCapacity() > 0.
-       Inline z-index needed to outrank #end-ov>*{z-index:1} so the FAB
-       sits above the draft cards / continue button. -->
-  <div class="pouch-fab" id="endPouchFab" onclick="togglePouchPanel()" style="display:none;z-index:9510">
-    <img src="Menu_Art/pouch.png" alt="Pouch" class="pouch-fab-img">
-  </div>
+  <!-- Pouch button moved into the bottom action row next to SKIP/CONTINUE
+       (see _endDraftActionsHtml). Floating top-right FAB removed per
+       player feedback to consolidate UI. -->
   <div class="res-title" id="resTitle">VICTORY</div>
   <div class="res-scores">
     <div class="hud-block">
@@ -13308,10 +13325,8 @@ function endMatch(win){
 
   /* Show animated end overlay */
   var ov=document.getElementById('end-ov');
-  /* C1: Pouch FAB — visible on victory only, gated on renown perks. Player
-     can shuffle active/pouch cards any time the victory screen is up. */
-  var _epfab=document.getElementById('endPouchFab');
-  if(_epfab){_epfab.style.display=(win&&typeof getPouchCapacity==='function'&&getPouchCapacity()>0)?'flex':'none';}
+  /* (Pouch button now lives inline in the .end-draft-actions row — see
+     _endDraftActionsHtml. Old top-right FAB removed.) */
   var resTitle=document.getElementById('resTitle');
   resTitle.className='res-title '+(win?'win':'lose');
   resTitle.textContent=win?'VICTORY':'DEFEAT';
@@ -13735,7 +13750,7 @@ function endMatch(win){
       draftHtml+='<div class="end-draft-reshuffle" id="endDraftReshuffleBtn" onclick="reshuffleDraft()" title="Reshuffle (renown)"><span>↻</span></div>';
     }
     draftHtml+='<div class="end-draft-slots" id="endDraftSlots"></div>';
-    draftHtml+='<div class="end-draft-skip" id="endDraftSkipBtn" onclick="SFX.nav();_endDraftSkip()"><canvas></canvas><span>SKIP</span></div>';
+    draftHtml+=_endDraftActionsHtml();
     draftHtml+='</div>';
     if(resCard){resCard.innerHTML=draftHtml;resCard.classList.add('show');}
     /* Attach tooltip + drag handlers + draw button canvases */
@@ -13796,7 +13811,7 @@ function endMatch(win){
     });
     bossHtml+='</div>';
     bossHtml+='<div class="end-draft-slots" id="endDraftSlots"></div>';
-    bossHtml+='<div class="end-draft-skip" id="endDraftSkipBtn" onclick="SFX.nav();_endDraftSkip()"><canvas></canvas><span>SKIP</span></div>';
+    bossHtml+=_endDraftActionsHtml();
     bossHtml+='</div>';
     if(resCard){resCard.innerHTML=bossHtml;resCard.classList.add('show');}
     setTimeout(function(){
@@ -16146,6 +16161,22 @@ function _initSlotUndoDrag(slotEl,slotIdx){
 }
 function _endDraftSkip(){
   _endDraftDone();
+}
+
+/* Builds the bottom action row injected into the post-match draft. Always
+   includes SKIP/CONTINUE; appends a pouch button when getPouchCapacity()>0
+   so the pouch sits next to the skip button instead of floating in the
+   top corner. Player feedback: "make the SKIP/CONTINUE bottom buttons
+   narrower and add the pouch on the right side of it". */
+function _endDraftActionsHtml(){
+  var pouchBtn='';
+  if(typeof getPouchCapacity==='function'&&getPouchCapacity()>0){
+    pouchBtn='<div class="end-draft-pouch-btn" id="endDraftPouchBtn" onclick="togglePouchPanel()" title="Pouch"><img src="Menu_Art/pouch.png" alt="Pouch"></div>';
+  }
+  return '<div class="end-draft-actions">'
+       + '<div class="end-draft-skip" id="endDraftSkipBtn" onclick="SFX.nav();_endDraftSkip()"><canvas></canvas><span>SKIP</span></div>'
+       + pouchBtn
+       + '</div>';
 }
 
 /* Build the post-match card-draft offer pool. Pulls from current tier's
