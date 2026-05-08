@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gambit-v235';
+const CACHE_NAME = 'gambit-v236';
 const ASSETS = [
   './',
   './index.html',
@@ -16,6 +16,7 @@ const ASSETS = [
   './Characters_ART/Soldier.png',
   './Environment_ART/gauntlet.png',
   './Environment_ART/Grog_match.png',
+  './Environment_ART/Mabel_match.png',
   './Environment_ART/loadout.png',
   './Environment_ART/main_01.png',
   './Environment_ART/main_02.png',
