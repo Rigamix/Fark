@@ -511,7 +511,13 @@ body{
   animation:tipGrow .25s ease-out,tipFloat 3s ease-in-out .25s infinite;
 }
 /* only the tooltip gets elevated z-index, not the card wrapper */
-#mLoadout-ov .lo-mini-card.peeked .mcard-tooltip{z-index:9700}
+/* Force opacity:1 on the mid-match loadout tooltip — the .peeked rule
+   above relies on the tipGrow keyframe completing to land on opacity:1
+   (animation-fill-mode is the default `none`), and on some devices the
+   rAF-based clampTooltip move-to-body never fires reliably. This ensures
+   the tooltip is visible the moment .peeked is toggled. Player feedback:
+   "Still can't see card tooltips in mid match loadout panel". */
+#mLoadout-ov .lo-mini-card.peeked .mcard-tooltip{z-index:9700;opacity:1!important;pointer-events:auto}
 
 /* ─── ACTIVATE ZONE (drag target) ─── */
 .activate-zone{
@@ -1408,12 +1414,10 @@ body.crit-dilate{animation:critDilate .55s ease-out both}
 .kept-tray.has-items{display:flex}
 .kept-tray .die{width:20px!important;height:20px!important;box-shadow:none!important;border-color:rgba(80,60,40,.5)!important;opacity:.65;filter:brightness(.8)}
 .kept-tray .die::after{display:none}
-/* Above-dice score numbers (kept-pts green + status-msg gold) — darker
-   tones + soft brown drop-shadow now that the wood background is brighter
-   (75% brightness). Player feedback: "Darken score numbers (gold and
-   green) above the dice... Maybe add a faint soft drop (dark brown)
-   shadow under". */
-.kept-pts{font-family:var(--font-px);font-size:12px;color:#3a6240;align-self:center;margin-right:4px;text-shadow:0 1px 0 rgba(20,12,4,.7),0 0 6px rgba(20,12,4,.5)}
+/* Above-dice score numbers (kept-pts green + status-msg gold) — bright,
+   solid colors with a dark-brown drop shadow for contrast against the
+   lighter wood background. */
+.kept-pts{font-family:var(--font-px);font-size:12px;color:#7ec888;align-self:center;margin-right:4px;text-shadow:0 1px 0 rgba(20,12,4,.85),0 0 6px rgba(20,12,4,.7)}
 
 /* ─── STATUS STRIPS ─── */
 .status-strip{
@@ -1440,9 +1444,9 @@ body.crit-dilate{animation:critDilate .55s ease-out both}
   white-space:nowrap;color:var(--textdim);opacity:.45;
   line-height:22px;
 }
-.status-msg.gold{color:#7a5e2a;opacity:1;text-shadow:0 1px 0 rgba(20,12,4,.7),0 0 6px rgba(20,12,4,.5)}
-.status-msg.red{color:var(--red);opacity:1;text-shadow:0 1px 0 rgba(20,12,4,.7),0 0 6px rgba(20,12,4,.5)}
-.status-msg.green{color:#3a6240;opacity:1;text-shadow:0 1px 0 rgba(20,12,4,.7),0 0 6px rgba(20,12,4,.5)}
+.status-msg.gold{color:#f0c860;opacity:1;text-shadow:0 1px 0 rgba(20,12,4,.85),0 0 6px rgba(20,12,4,.7)}
+.status-msg.red{color:#e07058;opacity:1;text-shadow:0 1px 0 rgba(20,12,4,.85),0 0 6px rgba(20,12,4,.7)}
+.status-msg.green{color:#7ec888;opacity:1;text-shadow:0 1px 0 rgba(20,12,4,.85),0 0 6px rgba(20,12,4,.7)}
 .status-msg.active{color:var(--text);opacity:.65}
 .status-msg:empty::after{content:'\00a0'}
 /* Crit pulse — replaces the screen-flash when a 1000+ point selection fires.
@@ -2485,15 +2489,16 @@ body::before,body::after{display:none!important}
 #screen-match.boss-ambrose::before{background-image:url('Environment_ART/ambrose_match.png?v=3')}
 #screen-match::after{
   content:'';position:fixed;inset:0;z-index:-1;
-  /* Brownish vignette: top and bottom edges darken to ~50%, middle stays
-     at ~80% brightness so the wood grain reads cleanly behind dice/cards.
-     Subtle, not overpowering — frames the playfield without eating it. */
+  /* Stronger vignette: top and bottom edges darken to ~75% (was 50%),
+     middle stays light so the wood grain still reads. Player feedback:
+     "Increase the top and bottom vignetting on the bg image on match
+     screen, maybe 50% more". */
   background:linear-gradient(
     180deg,
-    rgba(42,28,18,0.50) 0%,
+    rgba(42,28,18,0.75) 0%,
     rgba(42,28,18,0.18) 22%,
     rgba(42,28,18,0.18) 78%,
-    rgba(42,28,18,0.50) 100%
+    rgba(42,28,18,0.75) 100%
   );
   pointer-events:none;
   opacity:0;transition:opacity .3s;
@@ -2995,7 +3000,12 @@ body::before,body::after{display:none!important}
 .end-draft-cards .draft-card-wrap .gcard{width:100%;height:100%}
 .end-draft-slots{display:flex;gap:10px;justify-content:center;margin-top:32px;margin-bottom:16px}
 .end-draft-slots .draft-slot{
-  width:100%;height:0;padding-bottom:150%;/* Forces 2:3 ratio via padding trick */
+  /* aspect-ratio:2/3 (was padding-bottom:150% trick) so slots match the
+     offer cards' true 3:2 height:width. The padding trick combined with
+     border-box was producing ~1.567 ratio instead of 1.5, making slots
+     look slightly stretched/taller than the offer cards on small phones.
+     Player feedback: "cards are stretched sometimes on victory screen".  */
+  width:100%;aspect-ratio:2/3;
   position:relative;
   border:2px dashed rgba(140,130,110,.25);border-radius:5px;
   background:rgba(60,55,45,.3);overflow:visible;
@@ -8181,15 +8191,26 @@ function _initHandicapHUD(){
        which live OUTSIDE the HUD. */
     var sdW=document.createElement('div');sdW.className='sd-counter-wrap';sdW.id='sdCounterWrap';
     sdW.innerHTML='<div class="sd-round-counter" id="sdRoundCounter"><span class="sd-label">ROUND</span><span class="sd-num">1</span><span class="sd-of">/ '+(G._suddenDeathTurns||3)+'</span></div><div class="sd-subtitle">HIGHEST AFTER '+(G._suddenDeathTurns||3)+' WINS</div>';
-    var hudMid=document.querySelector('.hud-mid');
-    if(hudMid)hudMid.appendChild(sdW); else ms.appendChild(sdW);
+    /* Player feedback: "Handicap rule (highest score after three turns
+       win) should be in the middle of the match screen... we had it
+       there before and now it's back at the top". Mount in #diceArea
+       before #playerZone so it sits between NPC dice and player dice
+       (same pattern as bounty-strip). */
+    var _sdDA=document.getElementById('diceArea');
+    var _sdPZ=document.getElementById('playerZone');
+    if(_sdDA&&_sdPZ)_sdDA.insertBefore(sdW,_sdPZ);
+    else if(_sdDA)_sdDA.appendChild(sdW);
+    else ms.appendChild(sdW);
   }
   if(G._handicap==='rising_stakes'){
-    /* Multiplier badge — also lives inside .hud-mid (same reasoning). */
     var badge=document.createElement('div');badge.id='rsMultBadge';badge.className='rs-mult-badge';
     badge.innerHTML='<span class="rs-x">×</span><span class="rs-val">1.0</span><span class="rs-desc">BANK STREAKS MULTIPLY</span>';
-    var hudMidR=document.querySelector('.hud-mid');
-    if(hudMidR)hudMidR.appendChild(badge); else ms.appendChild(badge);
+    /* Same mid-screen mount as Sudden Death counter (above). */
+    var _rsDA=document.getElementById('diceArea');
+    var _rsPZ=document.getElementById('playerZone');
+    if(_rsDA&&_rsPZ)_rsDA.insertBefore(badge,_rsPZ);
+    else if(_rsDA)_rsDA.appendChild(badge);
+    else ms.appendChild(badge);
   }
   if(G._handicap==='bounty_board'){
     /* Bounty strip — insert as a regular flex child of #diceArea, just before
@@ -11135,8 +11156,13 @@ function handleRoll(){
       }
       /* SEQUENCE: on the FIRST commit of this roll, check if the whole uncommitted
          row (pool[0..rowLen-1]) shows strictly ±1 ascending or descending values.
-         Fires once per roll via G._sequenceArmedThisRoll flag. */
-      if(cards.includes('sequence')&&G._sequenceArmedThisRoll){
+         Fires once per roll via G._sequenceArmedThisRoll flag.
+         Defensive double-check against S.run.cards: if G.pCards somehow has
+         a stale 'sequence' entry from a previous match but the player's
+         persistent loadout doesn't, we suppress the bonus. Player feedback:
+         "Card effect still shows even though I don't have that card". */
+      var _sequenceEquipped=cards.includes('sequence')&&(!S||!S.run||!Array.isArray(S.run.cards)||S.run.cards.includes('sequence'));
+      if(_sequenceEquipped&&G._sequenceArmedThisRoll){
         G._sequenceArmedThisRoll=false;
         if(rowLen>=3){
           var vals=G.pool.map(function(d){return d.val;});
@@ -11145,7 +11171,7 @@ function handleRoll(){
             if(vals[i]-vals[i-1]!==1)asc=false;
             if(vals[i-1]-vals[i]!==1)desc=false;
           }
-          if(asc||desc){pts+=1500;triggerCard('sequence','SEQUENCE +1500',true);spawnPop('+1500 🎯');}
+          if(asc||desc){pts+=1500;triggerCard('sequence','SEQUENCE +1500',true);spawnPop('+1500 SEQUENCE');}
         }
       }
     })();
@@ -13398,6 +13424,13 @@ function _spawnCoinParticles(coinEl,goldAmt,gravDir){
   }
 }
 function endMatch(win){
+  /* Idempotency guard: multiple win/loss-condition checks can race
+     (player bank crosses target, then NPC's parallel finOpp also crosses,
+     etc.) and end up calling endMatch twice — duplicating SFX.win()/lose()
+     and the entire end-overlay animation chain. Player feedback:
+     "Victory screen audio repeats several times". */
+  if(G&&G._endMatchFired)return;
+  if(G)G._endMatchFired=true;
   /* Clear mid-match save */
   if(S&&S.pendingMatch){delete S.pendingMatch;save();}
   if(window.DLG)DLG.hide();clearRow('playerDiceRow');clearRow('oppDiceRow');
