@@ -17120,15 +17120,19 @@ function initTierScreen(data){
       coinHtml+='<div class="tier-coin '+(isEarned&&!isNew?'earned':'empty')+'" data-idx="'+ci+'"></div>';
     }
     tc.innerHTML=coinHtml;
-    /* Animate newly earned coins popping in */
+    /* Animate newly earned coins popping in. SFX.coinScatter fires ONCE
+       up-front (sounds like coins clinking together over ~0.5s) instead
+       of SFX.coins() per coin — the per-coin version was reading as
+       "victory audio repeating several times" (player feedback). */
     if(_coinAnim){
       var newCoins=tc.querySelectorAll('.tier-coin');
+      var _coinCount=Math.min(_coinAnim.earned,8);
+      if(_coinCount>0)setTimeout(function(){if(SFX.coinScatter)SFX.coinScatter(_coinCount);else if(SFX.coins)SFX.coins();},250);
       for(var ai=_coinAnim.from;ai<_coinAnim.from+_coinAnim.earned&&ai<newCoins.length;ai++){
         (function(coin,delay){
           setTimeout(function(){
             coin.classList.remove('empty');
             coin.classList.add('earned','pop');
-            SFX.coins();
           },delay);
         })(newCoins[ai],(ai-_coinAnim.from)*350+300);
       }
