@@ -7232,7 +7232,8 @@ function awardRenown(amount, label){
    hot-dice overlay (gold radial sunburst + 3-line stack vs. hot's red
    word pop). Returns a Promise that resolves when the splash finishes,
    so the caller can chain multiple feats sequentially without overlap. */
-function _showFeatUnlock(feat){
+function _showFeatUnlock(feat,opts){
+  opts=opts||{};
   return new Promise(function(resolve){
     var ov=document.getElementById('feat-ov');
     if(!ov||!feat){resolve();return;}
@@ -7242,10 +7243,14 @@ function _showFeatUnlock(feat){
     if(r)r.textContent='+'+(feat.renown||0)+' RENOWN';
     ov.classList.remove('flash');void ov.offsetWidth;
     ov.classList.add('flash');
-    /* Audio: triumphant fanfare (re-use hotDice — it's already a celebratory
-       trumpet flourish). Wrap in try/catch so audio failures don't block
-       the visual sequence. */
-    try{SFX.hotDice&&SFX.hotDice();}catch(e){}
+    /* Audio: only the FIRST feat in a batch gets the big trumpet fanfare;
+       subsequent feats get a soft synergy chime. Player feedback:
+       "the feats each playing a sound" — the 5-tone hotDice fanfare
+       repeating per feat sounded like the victory audio looping. */
+    try{
+      if(opts.first){if(SFX.hotDice)SFX.hotDice();}
+      else if(SFX.synergy){SFX.synergy();}
+    }catch(e){}
     try{Haptic.commit&&Haptic.commit();}catch(e){}
     setTimeout(function(){ov.classList.remove('flash');resolve();},2400);
   });
@@ -7254,7 +7259,7 @@ function _showFeatUnlock(feat){
 function _showFeatUnlocksSequential(feats){
   if(!feats||!feats.length)return Promise.resolve();
   var p=Promise.resolve();
-  feats.forEach(function(f){p=p.then(function(){return _showFeatUnlock(f);});});
+  feats.forEach(function(f,i){p=p.then(function(){return _showFeatUnlock(f,{first:i===0});});});
   return p;
 }
 /* Evaluate all feats against current G state. Returns the list of feats
