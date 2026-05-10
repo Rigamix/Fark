@@ -9356,6 +9356,13 @@ function scoreRoll(vals,cards,locked,context,dieMats){
     if(_vFirst===_vLast){
       if(!used[0]&&!used[n-1]){
         pts+=500;used[0]=true;used[n-1]=true;
+        /* Consume any middle dice as part of the bookends sacrifice — the
+           card's bonus +500 is paid for by burning everything between the
+           bookends. Without this, the validity check (`!used.some(u=>!u)`)
+           in scoreSelection rejects the selection because middle dice
+           that aren't 1s/5s never get marked used. Player feedback:
+           "Bookends card doesn't seem to work". */
+        for(var _beI=1;_beI<n-1;_beI++){if(!used[_beI])used[_beI]=true;}
       }
     }
   }
@@ -9372,6 +9379,12 @@ function scoreRoll(vals,cards,locked,context,dieMats){
       pts+=600;
       mark(_tfPairFaces[0],2);
       mark(_tfPairFaces[1],2);
+      /* Consume any remaining selected dice — the card's "+600 for the
+         four pair dice" pays for the rest of the selection too, so the
+         player can include extras (e.g. a non-scoring 4) without the
+         validity check rejecting the commit. Player feedback: "Twin
+         Fury card doesn't seem to work". */
+      for(var _tfI=0;_tfI<n;_tfI++){if(!used[_tfI])used[_tfI]=true;}
     }
   }
   /* ── Seven's Gift (tin): pairs summing to 7 (1+6, 2+5, 3+4) → +200/pair.
