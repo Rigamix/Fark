@@ -9225,6 +9225,10 @@ function scoreRoll(vals,cards,locked,context,dieMats){
       if(hasSet(_run)){
         pts+=(_run.length===4?800:400);
         markSet(_run);
+        /* Sweep extras as "consumed for the run" — same fix as Bookends/
+           Twin Fury so a stray non-scoring die in the selection doesn't
+           invalidate the commit. */
+        for(var _laI=0;_laI<n;_laI++){if(!used[_laI])used[_laI]=true;}
         break;/* one ladder run per roll */
       }
     }
@@ -9235,6 +9239,8 @@ function scoreRoll(vals,cards,locked,context,dieMats){
       if(_runConflictsWithTriple(_ascRuns[_ai]))continue;
       if(hasSet(_ascRuns[_ai])){
         pts+=400;markSet(_ascRuns[_ai]);
+        /* Sweep extras (same reason). */
+        for(var _asI=0;_asI<n;_asI++){if(!used[_asI])used[_asI]=true;}
         break;
       }
     }
@@ -9332,6 +9338,7 @@ function scoreRoll(vals,cards,locked,context,dieMats){
       if(hasSet(_runB)){
         pts+=(_runB.length===4?800:400);
         markSet(_runB);
+        for(var _laBI=0;_laBI<n;_laBI++){if(!used[_laBI])used[_laBI]=true;}
         break;
       }
     }
@@ -9342,6 +9349,7 @@ function scoreRoll(vals,cards,locked,context,dieMats){
       if(_runConflictsWithTriple(_ascRunsB[_aiB]))continue;
       if(hasSet(_ascRunsB[_aiB])){
         pts+=400;markSet(_ascRunsB[_aiB]);
+        for(var _asBI=0;_asBI<n;_asBI++){if(!used[_asBI])used[_asBI]=true;}
         break;
       }
     }
@@ -9392,11 +9400,17 @@ function scoreRoll(vals,cards,locked,context,dieMats){
      one of its faces. Pairs only fire on dice that triples didn't claim. */
   if(cards.includes('sevens_gift')){
     var _sgPairs=[[1,6],[2,5],[3,4]];
+    var _sgFired=false;
     _sgPairs.forEach(function(pr){
       while(cnt(pr[0])>=1&&cnt(pr[1])>=1){
-        pts+=200;mark(pr[0],1);mark(pr[1],1);
+        pts+=200;mark(pr[0],1);mark(pr[1],1);_sgFired=true;
       }
     });
+    /* If sevens_gift fired, sweep any remaining selected dice as
+       "consumed for the bonus" — same fix as Twin Fury / Bookends.
+       Without this, extras like a non-scoring 4 in [3,4,2] kept the
+       commit invalid. Player feedback follow-up audit. */
+    if(_sgFired){for(var _sgI=0;_sgI<n;_sgI++){if(!used[_sgI])used[_sgI]=true;}}
   }
 
   /* ── Singles ── */
@@ -9422,10 +9436,17 @@ function scoreRoll(vals,cards,locked,context,dieMats){
   }
   /* Twin Dice: pair of 1s scored as singles = 300 (bonus +100 over normal 200) */
   if(cards.includes('twin_dice')&&_single1Count>=2)pts+=300;
-  /* Lucky Seven: non-scoring dice total exactly 7 → +400 (matches desc) */
+  /* Lucky Seven: non-scoring dice in the selection total exactly 7 → +400.
+     The card NEEDS unused dice in the selection to compute the sum, so
+     when it fires we mark those dice as consumed by the bonus —
+     otherwise the validity check rejected the commit (extras left
+     unmarked). Player feedback follow-up audit. */
   if(cards.includes('lucky_seven')){
     var _nonScoreSum=0;for(var _li=0;_li<n;_li++){if(!used[_li])_nonScoreSum+=vals[_li];}
-    if(_nonScoreSum===7){pts+=400;}
+    if(_nonScoreSum===7){
+      pts+=400;
+      for(var _l7I=0;_l7I<n;_l7I++){if(!used[_l7I])used[_l7I]=true;}
+    }
   }
   return{total:pts,used,context,effects,_triplesFired};
 }
