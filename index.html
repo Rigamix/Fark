@@ -9089,6 +9089,14 @@ function scoreRoll(vals,cards,locked,context,dieMats){
      standard order misses (ladder eats one 1 then triple-1 can't fire). */
   const _triplesFirst=!!(context&&context._triplesFirst);
   const n=vals.length,used=new Array(n).fill(false);let pts=0;
+  /* Set when a "consume-extras" pattern card fires (Bookends / Twin Fury /
+     Sevens Gift / Lucky Seven / The Ladder / Ascending). scoreSelection
+     uses this to relax its all-dice-must-be-used validity check so the
+     player can commit selections with leftover non-scoring dice. The
+     `used` array stays strictly accurate — NPCs read `used` directly to
+     decide which dice to keep, so they're never forced to commit
+     leftovers they should reroll. */
+  let _bonusFiredFlag=false;
   const effects=[];/* track die effect activations for visual feedback */
   const copperPincher=cards.includes('copper_pincher'),millersToll=cards.includes('millers_toll'),scavenger=cards.includes('scavenger'),noSingles=cards.includes('_nosingles'),triplesPenalty=cards.includes('_triplepenalty'),bloodTithe=cards.includes('blood_tithe');
   /* Tavern Tales: graduated Collector boost — 2 cards = small bonus, 3+ = full */
@@ -9225,10 +9233,7 @@ function scoreRoll(vals,cards,locked,context,dieMats){
       if(hasSet(_run)){
         pts+=(_run.length===4?800:400);
         markSet(_run);
-        /* Sweep extras as "consumed for the run" — same fix as Bookends/
-           Twin Fury so a stray non-scoring die in the selection doesn't
-           invalidate the commit. */
-        for(var _laI=0;_laI<n;_laI++){if(!used[_laI])used[_laI]=true;}
+        _bonusFiredFlag=true;
         break;/* one ladder run per roll */
       }
     }
@@ -9239,8 +9244,7 @@ function scoreRoll(vals,cards,locked,context,dieMats){
       if(_runConflictsWithTriple(_ascRuns[_ai]))continue;
       if(hasSet(_ascRuns[_ai])){
         pts+=400;markSet(_ascRuns[_ai]);
-        /* Sweep extras (same reason). */
-        for(var _asI=0;_asI<n;_asI++){if(!used[_asI])used[_asI]=true;}
+        _bonusFiredFlag=true;
         break;
       }
     }
@@ -9338,7 +9342,7 @@ function scoreRoll(vals,cards,locked,context,dieMats){
       if(hasSet(_runB)){
         pts+=(_runB.length===4?800:400);
         markSet(_runB);
-        for(var _laBI=0;_laBI<n;_laBI++){if(!used[_laBI])used[_laBI]=true;}
+        _bonusFiredFlag=true;
         break;
       }
     }
@@ -9349,7 +9353,7 @@ function scoreRoll(vals,cards,locked,context,dieMats){
       if(_runConflictsWithTriple(_ascRunsB[_aiB]))continue;
       if(hasSet(_ascRunsB[_aiB])){
         pts+=400;markSet(_ascRunsB[_aiB]);
-        for(var _asBI=0;_asBI<n;_asBI++){if(!used[_asBI])used[_asBI]=true;}
+        _bonusFiredFlag=true;
         break;
       }
     }
@@ -9364,13 +9368,7 @@ function scoreRoll(vals,cards,locked,context,dieMats){
     if(_vFirst===_vLast){
       if(!used[0]&&!used[n-1]){
         pts+=500;used[0]=true;used[n-1]=true;
-        /* Consume any middle dice as part of the bookends sacrifice — the
-           card's bonus +500 is paid for by burning everything between the
-           bookends. Without this, the validity check (`!used.some(u=>!u)`)
-           in scoreSelection rejects the selection because middle dice
-           that aren't 1s/5s never get marked used. Player feedback:
-           "Bookends card doesn't seem to work". */
-        for(var _beI=1;_beI<n-1;_beI++){if(!used[_beI])used[_beI]=true;}
+        _bonusFiredFlag=true;
       }
     }
   }
@@ -9387,12 +9385,7 @@ function scoreRoll(vals,cards,locked,context,dieMats){
       pts+=600;
       mark(_tfPairFaces[0],2);
       mark(_tfPairFaces[1],2);
-      /* Consume any remaining selected dice — the card's "+600 for the
-         four pair dice" pays for the rest of the selection too, so the
-         player can include extras (e.g. a non-scoring 4) without the
-         validity check rejecting the commit. Player feedback: "Twin
-         Fury card doesn't seem to work". */
-      for(var _tfI=0;_tfI<n;_tfI++){if(!used[_tfI])used[_tfI]=true;}
+      _bonusFiredFlag=true;
     }
   }
   /* ── Seven's Gift (tin): pairs summing to 7 (1+6, 2+5, 3+4) → +200/pair.
@@ -9400,17 +9393,11 @@ function scoreRoll(vals,cards,locked,context,dieMats){
      one of its faces. Pairs only fire on dice that triples didn't claim. */
   if(cards.includes('sevens_gift')){
     var _sgPairs=[[1,6],[2,5],[3,4]];
-    var _sgFired=false;
     _sgPairs.forEach(function(pr){
       while(cnt(pr[0])>=1&&cnt(pr[1])>=1){
-        pts+=200;mark(pr[0],1);mark(pr[1],1);_sgFired=true;
+        pts+=200;mark(pr[0],1);mark(pr[1],1);_bonusFiredFlag=true;
       }
     });
-    /* If sevens_gift fired, sweep any remaining selected dice as
-       "consumed for the bonus" — same fix as Twin Fury / Bookends.
-       Without this, extras like a non-scoring 4 in [3,4,2] kept the
-       commit invalid. Player feedback follow-up audit. */
-    if(_sgFired){for(var _sgI=0;_sgI<n;_sgI++){if(!used[_sgI])used[_sgI]=true;}}
   }
 
   /* ── Singles ── */
@@ -9437,18 +9424,16 @@ function scoreRoll(vals,cards,locked,context,dieMats){
   /* Twin Dice: pair of 1s scored as singles = 300 (bonus +100 over normal 200) */
   if(cards.includes('twin_dice')&&_single1Count>=2)pts+=300;
   /* Lucky Seven: non-scoring dice in the selection total exactly 7 → +400.
-     The card NEEDS unused dice in the selection to compute the sum, so
-     when it fires we mark those dice as consumed by the bonus —
-     otherwise the validity check rejected the commit (extras left
-     unmarked). Player feedback follow-up audit. */
+     Sets the bonus-fired flag so scoreSelection's validity check accepts
+     a commit that includes the 7-summing extras (the dice aren't marked
+     `used` here so NPCs reading the `used` array don't auto-keep them). */
   if(cards.includes('lucky_seven')){
     var _nonScoreSum=0;for(var _li=0;_li<n;_li++){if(!used[_li])_nonScoreSum+=vals[_li];}
     if(_nonScoreSum===7){
-      pts+=400;
-      for(var _l7I=0;_l7I<n;_l7I++){if(!used[_l7I])used[_l7I]=true;}
+      pts+=400;_bonusFiredFlag=true;
     }
   }
-  return{total:pts,used,context,effects,_triplesFired};
+  return{total:pts,used,context,effects,_triplesFired,_bonusFired:_bonusFiredFlag};
 }
 function scoreSelection(selVals,cards,locked,context,dieMats){
   if(!selVals.length)return 0;
@@ -9461,13 +9446,21 @@ function scoreSelection(selVals,cards,locked,context,dieMats){
      cards are present. */
   const _r1=scoreRoll(selVals,cards,locked,context,dieMats);
   let _bestValid=-1;
-  let _r1Valid=!_r1.used.some(u=>!u);
+  /* Validity: every selected die must be marked used. EXCEPTION: when a
+     "consume-extras" pattern card fires (Bookends / Twin Fury / Sevens
+     Gift / Lucky Seven / The Ladder / Ascending), the player is paying
+     for their selection's leftover dice with the bonus. Detected via
+     the _bonusFired flag set inside scoreRoll. NPCs don't read this
+     flag — they keep dice strictly via the `used` array, so they don't
+     get pushed to commit useless extras they should reroll. */
+  let _r1Valid=!_r1.used.some(u=>!u)||(_r1._bonusFired&&_r1.total>0);
   if(_r1Valid)_bestValid=_r1.total;
   const _orderSensitive=cards.includes('the_ladder')||cards.includes('ascending');
   if(_orderSensitive){
     const _ctx2=Object.assign({},context||{},{_triplesFirst:true});
     const _r2=scoreRoll(selVals,cards,locked,_ctx2,dieMats);
-    if(!_r2.used.some(u=>!u)&&_r2.total>_bestValid)_bestValid=_r2.total;
+    var _r2Valid=!_r2.used.some(u=>!u)||(_r2._bonusFired&&_r2.total>0);
+    if(_r2Valid&&_r2.total>_bestValid)_bestValid=_r2.total;
   }
   if(_bestValid<0)return -1;
   /* Golden Crown synergy: +10% scoring */
