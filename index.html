@@ -6020,8 +6020,8 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
    ✋ cutpurse = skin/amber, 📒 in_arrears = red-brown ledger,
    ⛪ confession = stone grey, 💀 counterfeit = bone pale,
    ⚖️ reckoning = brass gold. */
-.tell-badge.tell-cutpurse{color:#e0b878}
-.tell-badge.tell-cutpurse .tb-name{color:#e8c088;text-shadow:0 0 8px rgba(220,180,120,.45)}
+.tell-badge.tell-pickpocket{color:#e0b878}
+.tell-badge.tell-pickpocket .tb-name{color:#e8c088;text-shadow:0 0 8px rgba(220,180,120,.45)}
 .tell-badge.tell-in_arrears{color:#e8c850}
 .tell-badge.tell-in_arrears .tb-name{color:#f0d868;text-shadow:0 0 8px rgba(220,180,40,.5)}
 .tell-badge.tell-drill_order{color:#90b0d8}
@@ -7874,7 +7874,7 @@ const PORTRAITS={
   commoner:'Match_Art/commoner_frame.png',merchant:'Match_Art/merchant_frame.png',
   soldier:'Match_Art/soldier_frame.png',knight:'Match_Art/knight_frame.png',
   noble:'Match_Art/noble_frame.png',bishop:'Match_Art/bishop_frame.png',
-  patron:'Match_Art/patron_frame.png',
+  patron:'Match_Art/patron_frame.png?v=2',
 };
 const CHAR_COLORS={
   drunkard:{bevel:'#93867b',face:'#312c29',shadow:'#1d1a18'},
@@ -7906,8 +7906,12 @@ const RUNGS=[
     boss:null,bossDesc:null,
     agg:.62,cardRarity:'tin',wager:true,wagerCount:1,wagerMode:'best',minBank:250,diceStop:2,chaotic:false,adaptive:true,
     dice:['bone','iron','iron','lead','amber','amber'],
-    cardPool:['quick_hands','pocket_sand','the_skim','beginners_luck','the_lords_seal','sticky_fingers_die'],cardCount:3,
-    tell:{id:'cutpurse',name:'CUTPURSE',desc:"20% chance: one of your dice gets palmed",icon:'✋',chance:.20}},
+    /* pocket_sand removed from cardPool — combined with the Pickpocket tell
+       it stacks two "lose a die" effects on the same turn, which players
+       found unfair. Still appears in the post-victory boss reward draft
+       (line ~14248 picks it up via owner==='finnick'). */
+    cardPool:['quick_hands','the_skim','beginners_luck','the_lords_seal','sticky_fingers_die'],cardCount:3,
+    tell:{id:'pickpocket',name:'PICKPOCKET',desc:"50% chance: one of your dice gets palmed",icon:'✋',chance:.50}},
   {id:3,name:'CORVUS',key:'merchant',icon:'💼',tier:'known',target:8500,gold:350,buyIn:50,
     boss:null,bossDesc:null,
     agg:.60,cardRarity:'silver',wager:true,wagerCount:1,wagerMode:'best',minBank:250,diceStop:2,chaotic:false,adaptive:true,
@@ -8252,7 +8256,7 @@ function _applyTell(){
   switch(G._tell.id){
     case 'last_call':/* threshold-only, no per-match state */ break;
     case 'steeped': G._tellState.bonus=0; break;
-    case 'cutpurse':/* per-roll RNG, no persistent state */ break;
+    case 'pickpocket':/* per-roll RNG, no persistent state */ break;
     case 'in_arrears': G._tellState.totalRollCost=0; break;
     case 'drill_order':/* uses turnRollCount + maxRolls */ break;
     case 'confession': G._tellState.sealedCard=null;G._tellState.lastSealed=null; break;
@@ -8420,47 +8424,66 @@ function _consumeWard(label){
   try{SFX.commit&&SFX.commit();}catch(e){}
   return true;
 }
-/* ── CUTPURSE (Finnick): random post-roll die palm with flight animation ── */
+/* ── PICKPOCKET (Finnick, renamed from Cutpurse): random post-roll die palm
+     with flight animation. The palmed die is REMOVED entirely from the pool
+     (was previously left in place as committed, which confused players —
+     "next roll places it back already settled on the same face"). UI is
+     locked during the 650 ms animation so the player can't pre-select dice
+     and break selection state mid-palm. */
 function _maybeFireCutpurse(){
-  if(!G||!G._tell||G._tell.id!=='cutpurse')return;
+  if(!G||!G._tell||(G._tell.id!=='cutpurse'&&G._tell.id!=='pickpocket'))return;
   if(G.pCards&&G.pCards.includes('iron_grip'))return;/* counter-card */
   if(Math.random()>(G._tell.chance||0.3))return;
   /* WARDED shield: fizzle the palm before any animation. */
-  if(_consumeWard('CUTPURSE'))return;
-  /* Pick a random uncommitted die */
+  if(_consumeWard('PICKPOCKET'))return;
+  /* Pick a random uncommitted die — but EXCLUDE candidates whose removal
+     would leave the player without any scoring options (forced bust).
+     Player feedback: "if possible avoid stealing a die which would let me
+     go bust. It doesn't feel fun". */
   var free=G.pool.filter(function(d){return !d.committed;});
   if(free.length<=1)return;/* don't palm if only 1 die left */
-  var victim=free[Math.floor(Math.random()*free.length)];
+  var _safeCandidates=free.filter(function(cand){
+    var _remaining=free.filter(function(d){return d!==cand;});
+    if(_remaining.length===0)return false;
+    return anyScoring(_remaining.map(function(d){return d.val;}),effectiveCards(),_remaining.map(function(d){return d.mat;}));
+  });
+  /* If every candidate would force a bust, skip the palm entirely this roll.
+     Worth firing only when at least one safe target exists. */
+  if(_safeCandidates.length===0)return;
+  var victim=_safeCandidates[Math.floor(Math.random()*_safeCandidates.length)];
   if(!victim||!victim.el)return;
-  /* Visual: die flies toward Finnick portrait */
+  /* Lock the dice tray during the flight animation: any click the player
+     queues up between now and the palm landing would race with the post-
+     palm state and could leave them with stale selections. */
+  G._palmAnimating=true;
   victim.el.classList.add('die-palmed');
-  /* Persist the palm — die stays visible in the row marked as palmed
-     until the turn ends, instead of vanishing 650ms later. Mark as
-     committed so it's excluded from selection / scoring / re-rolls,
-     and disable click. Player feedback: "Cutpurse: die should get
-     palmed and stay palmed until the end of the turn". */
   setTimeout(function(){
-    victim.committed=true;
-    victim._palmed=true;
-    if(victim.el){
-      victim.el.style.pointerEvents='none';
-      victim.el.onclick=null;
-      victim.el.classList.remove('selected');
-    }
-    /* Recheck scoring on remaining FREE dice — if nothing scoreable, bust. */
+    /* Remove the palmed die from the pool entirely and from the DOM.
+       Previously we kept it visible as committed which confused the player
+       — they'd see the same face next roll and think the palm didn't take. */
+    var _vIdx=G.pool.indexOf(victim);
+    if(_vIdx>=0)G.pool.splice(_vIdx,1);
+    if(victim.el&&victim.el.parentNode)victim.el.parentNode.removeChild(victim.el);
+    G._palmAnimating=false;
+    /* Recheck scoring on remaining FREE dice — if nothing scoreable, bust.
+       Note: the safe-candidate filter above guarantees at least one
+       scoring option remains after a single palm. This re-check is a
+       belt-and-braces guard for edge cases (e.g. weird die materials). */
     var fv=G.pool.filter(function(d){return !d.committed;});
     if(fv.length===0||!anyScoring(fv.map(function(d){return d.val;}),effectiveCards(),fv.map(function(d){return d.mat;}))){
       setTimeout(function(){_delayedDoBust(fv);},200);
     }
   },650);
-  setStatusMsg('CUTPURSE — DIE PALMED!','red');
+  setStatusMsg('PICKPOCKET — DIE PALMED!','red');
   try{SFX.err&&SFX.err();}catch(e){}
   try{Haptic.bust&&Haptic.bust();}catch(e){}
   /* Anchor the popup above the palmed die so it reads as targeted, not
      generic "something happened" floating off in the corner. */
   try{spawnPop('✋ PALMED',victim.el);}catch(e){}
   /* Patron dialogue first-fire */
-  if(window.DLG)setTimeout(function(){DLG.triggerCard('cutpurse',false);},400);
+  /* DLG hook: reuse the pocket_sand (=PICKPOCKET card) dialog lines since
+     the tell and the card share theme/name now. */
+  if(window.DLG)setTimeout(function(){DLG.triggerCard('pocket_sand',false);},400);
 }
 
 /* Generate a faceless patron for a given tier */
@@ -8795,7 +8818,7 @@ const NPC_CARDS=[
    eff:'YOUR HIGHEST DIE → 3',desc:'Once per match, Finnick swaps your highest-value die down to a 3.',
    playerDesc:"Activate while yielding: on the opponent's next scoring roll, swap their highest-value die down to a 3.",
    effect:{type:'once',mechanic:'swap_best_to_3'}},
-  {id:'pocket_sand',name:'POCKET SAND',icon:'✋',rarity:'npc',npcOnly:true,owner:'finnick',
+  {id:'pocket_sand',name:'PICKPOCKET',icon:'✋',rarity:'npc',npcOnly:true,owner:'finnick',
    eff:'70% CHANCE: First roll = 5 dice',desc:'Seventy percent chance each turn — your opponent shaves a die from your first roll, leaving you with five instead of six.',
    playerDesc:"Seventy percent chance each turn that your opponent's first roll only uses five dice instead of six.",
    effect:{type:'passive',mechanic:'reduce_first_roll'}},
@@ -10861,6 +10884,10 @@ function _haptic(ms){try{if(navigator.vibrate&&(!S||!S.settings||S.settings.hapt
 
 function toggleDie(d){
   if(G.phase!=='choosing'||d.committed)return;
+  /* Block selection while a Pickpocket palm animation is in flight — a
+     click landing during the 650ms animation could select a die that's
+     about to be palmed (or another die in a stale state). */
+  if(G._palmAnimating)return;
   d.sel=!d.sel;
   d.el.classList.toggle('selected',d.sel);
   /* Every tap: subtle bounce + short haptic so the die always feels responsive */
@@ -11424,7 +11451,7 @@ function _afterRollImpl(){
     /* Counterfeit: re-mark cursed dice after each roll (pool re-rendered) */
     if(G._tell.id==='counterfeit'){setTimeout(_markCounterfeitDice,500);}
     /* Cutpurse: maybe palm a die after the roll settles */
-    if(G._tell.id==='cutpurse'){setTimeout(_maybeFireCutpurse,650);}
+    if(G._tell.id==='pickpocket'){setTimeout(_maybeFireCutpurse,650);}
   }
   /* ── Obsidian shatter check — each rolled obsidian die has a small
      chance to shatter, granting bonus points and removing the die from
@@ -12501,6 +12528,10 @@ function handleBank(){
   G.pBankHistory.push({pts:total,turn:G.turnNum,bonus:(bonusMsg||'').trim(),
     dice:G.kept.map(function(k){return {vals:[].concat(k.vals),mat:k.mat,pts:k.pts};})});
   G.pPts+=total;G._lastBankAmount=total;spawnBankPop(total);G.turnPts=0;G.kept=[];G.numDice=6;
+  /* THE GRUDGE NPC mirror: increment opp's grudge stack when player banks
+     (max 750). Consumed in finOpp at NPC's next bank. Mirrors the
+     player-side increment in finOpp at line ~13141. */
+  if(G.oCards.includes('the_grudge')){G._oGrudgeStack=Math.min((G._oGrudgeStack||0)+150,750);}
   /* Feat tracking */
   G._featBanks=(G._featBanks||0)+1;
   if(total>(G._featMaxBank||0))G._featMaxBank=total;
@@ -12707,6 +12738,54 @@ function runOppTurn(){
   G._oTurnDiceCommitted=0;
   /* OPENING SHOT mirror for NPC: count dice kept on oppRollNum===1 only. */
   G._oFirstRollKept=0;
+  /* ── Phase 1 NPC bank-bonus mirrors: per-turn trackers ── */
+  G._oTurnTriples={};/* twin_flames: face → true */
+  G._oTurnComboTypes={};/* the_collector: triple/straight/single1/single5 → true */
+  G._oTurnRollScored=0;/* chain_lightning: count of consecutive scoring rolls this turn */
+  G._oLastHotDice=false;/* aldrics_banner: this turn produced hot dice */
+  /* stakes_rising NPC seed: previous turn banked 500+ → start with +300 turn pts.
+     Mirrors player startPTurn at line ~10940. */
+  G._oStakesRisingBonus=0;
+  if(G._oStakesRisingNext&&G.oCards.includes('stakes_rising')){
+    G._oStakesRisingNext=false;
+    G._oStakesRisingBonus=300;oppBank=300;
+    triggerCard('stakes_rising','+300 START',false);
+  }
+  /* ── Phase 2A NPC active-card AI: idle-timing activations ── */
+  /* LOAN repayment: dock 200 from oPts each NPC turn while owing.
+     Mirrors player startPTurn line ~10947. */
+  if(G._oLoanRemaining&&G._oLoanRemaining>0){
+    var _olnPay=Math.min(200,G.oPts);
+    G.oPts=Math.max(0,G.oPts-200);
+    G._oLoanRemaining--;
+    triggerCard('loan','LOAN −'+_olnPay+' ('+G._oLoanRemaining+' LEFT)',false);
+    updHUD();
+  }
+  /* LOAN activation: take the +1500 on NPC's first turn if available
+     (matches player heuristic of using big-tempo cards early). */
+  if(npcHasActive('loan')&&G.npcCardState.oppTurnCount===0){
+    npcUseActive('loan');
+    G.oPts+=1500;G._oLoanRemaining=5;updHUD();
+    triggerCard('loan','+1500 LOAN',false);
+    setStatusMsg(G.rung.name+': LOAN +1500 (−200/TURN)','red');
+  }
+  /* SEVEN DICE: NPC's next roll uses 7 dice. Use it on turn 1 for max value. */
+  if(npcHasActive('seven_dice')&&G.npcCardState.oppTurnCount===0){
+    npcUseActive('seven_dice');
+    left=7;
+    triggerCard('seven_dice','7 DICE!',false);
+    setStatusMsg(G.rung.name+': SEVEN DICE — 7 DICE!','red');
+  }
+  /* ALL IN: arm next-bank doubling when NPC could win the match in one big bank.
+     Heuristic: if oPts is within striking distance (≤target/2 from win) and
+     NPC has 1+ score-multiplying cards stacking. Use it on turn ≥3 once
+     enough state is built. */
+  if(npcHasActive('all_in')&&G.oPts*2>=G.target&&G.oPts<G.target&&G.npcCardState.oppTurnCount>=2){
+    npcUseActive('all_in');
+    G._oAllInArmed=true;
+    triggerCard('all_in','ALL IN ARMED',false);
+    setStatusMsg(G.rung.name+': ALL IN — NEXT BANK 2× (OR −500)','red');
+  }
   /* Cold Shoulder: fire any deferred opp start_bonus cards once the 2-turn
      delay has elapsed (matches the once-per-match-card delay at line ~10575
      which gates on turnNum<(2+_csDelay) → turnNum>=4). If the player ends
@@ -12771,6 +12850,24 @@ function runOppTurn(){
       if(G._lanternActive)el.classList.add('die-blind');
       G.oppDice.push({val,el,kept:false,mat:dieMat});}
     sootyActive=false;
+    /* HOT STREAK NPC mirror: after 2 safe banked turns, NPC's next first-roll
+       gets one die forced to 1 and another to 5. Consume the armed flag here. */
+    if(G._oHotStreakReady&&oppRollNum===1&&G.oCards.includes('hot_streak')){
+      G._oHotStreakReady=false;
+      var _ohsCand=G.oppDice.filter(function(d){return d.val!==1&&d.val!==5;});
+      if(_ohsCand.length>0){
+        var _ohsV1=_ohsCand[Math.floor(Math.random()*_ohsCand.length)];
+        _ohsV1.val=1;reDrawDieFace(_ohsV1);
+        if(_ohsV1.el){_ohsV1.el.classList.add('eff-glow-red');setTimeout(function(){if(_ohsV1.el)_ohsV1.el.classList.remove('eff-glow-red');},700);}
+        var _ohsRest=_ohsCand.filter(function(d){return d!==_ohsV1;});
+        if(_ohsRest.length>0){
+          var _ohsV5=_ohsRest[Math.floor(Math.random()*_ohsRest.length)];
+          _ohsV5.val=5;reDrawDieFace(_ohsV5);
+          if(_ohsV5.el){_ohsV5.el.classList.add('eff-glow-red');setTimeout(function(){if(_ohsV5.el)_ohsV5.el.classList.remove('eff-glow-red');},700);}
+        }
+        triggerCard('hot_streak','HOT STREAK!',false);
+      }
+    }
     setTimeout(()=>{
       G.oppDice.forEach(d=>{if(d.el){
         settleDie(d.el);
@@ -12794,6 +12891,32 @@ function runOppTurn(){
           triggerCard('masters_forge','FORGED → 5!',false);
         }
       }
+      /* TWINNING CHARM NPC AI: if there's an existing 1 or 5 in the unkept
+         pool plus a non-scoring die, mirror the 1/5 to the non-scoring die
+         (gain 100/50 pts). Fires before scoreRoll so the new value scores. */
+      if(npcHasActive('twinning_charm')){
+        var _otcFree=G.oppDice.filter(function(d){return !d.kept;});
+        var _otcSrc=_otcFree.filter(function(d){return d.val===1;})[0]||_otcFree.filter(function(d){return d.val===5;})[0];
+        var _otcTgt=_otcFree.filter(function(d){return d.val!==1&&d.val!==5;})[0];
+        if(_otcSrc&&_otcTgt){
+          npcUseActive('twinning_charm');
+          _otcTgt.val=_otcSrc.val;reDrawDieFace(_otcTgt);
+          if(_otcTgt.el){_otcTgt.el.classList.add('eff-glow-blue');spawnPixelSparks(_otcTgt.el,6);setTimeout(function(){if(_otcTgt.el)_otcTgt.el.classList.remove('eff-glow-blue');},700);}
+          triggerCard('twinning_charm','TWINNING → '+_otcSrc.val,false);
+        }
+      }
+      /* ALDRIC'S VOW NPC AI: arm before scoring on a "good odds" roll —
+         when there are 4+ unkept dice (high chance of 300+ score) and
+         oppBank is moderate (200-500). Effect applied after scoreRoll. */
+      if(npcHasActive('aldrics_vow')&&!G._oVowArmed){
+        var _ovFreeCount=G.oppDice.filter(function(d){return !d.kept;}).length;
+        if(_ovFreeCount>=4&&oppBank>=200&&oppBank<=500){
+          npcUseActive('aldrics_vow');
+          G._oVowArmed=true;
+          triggerCard('aldrics_vow','VOW ARMED',false);
+          setStatusMsg(G.rung.name+': VOW — 300+ DOUBLES, ELSE LOSE PTS','red');
+        }
+      }
       const fV=G.oppDice.filter(d=>!d.kept).map(d=>d.val);
       const fMats=G.oppDice.filter(d=>!d.kept).map(d=>d.mat);
       crowsCtx.crowsLuckFiredThisRoll=false;
@@ -12801,6 +12924,23 @@ function runOppTurn(){
       if(crowsCtx.crowsLuckFiredThisRoll)triggerCard('crows_luck',"CROW'S LUCK — STRAIGHT DOWNGRADED",true);
       /* Snake Oil: zero out this roll's score */
       if(G._snakeOilActive){G._snakeOilActive=false;total=0;setStatusMsg('SNAKE OIL — SCORE ZEROED!','gold');}
+      /* ALDRIC'S VOW NPC effect: if armed, this roll resolves the vow.
+         300+ → score doubled; <300 (but >0) → forfeit accumulated oppBank;
+         0 → bust (vow consumed but bust handled normally). */
+      if(G._oVowArmed){
+        G._oVowArmed=false;
+        if(total>=300){
+          var _ovBefore=total;total*=2;
+          triggerCard('aldrics_vow','×2 ('+_ovBefore+'→'+total+')',false);
+          setStatusMsg(G.rung.name+': VOW DOUBLED!','red');
+        }else if(total>0){
+          /* Vow failed: keep the roll's pts but lose accumulated oppBank */
+          var _ovLost=oppBank;oppBank=0;
+          triggerCard('aldrics_vow','VOW FAILED −'+_ovLost,false);
+          setStatusMsg(G.rung.name+': VOW FAILED — LOST '+_ovLost,'red');
+        }
+        /* total===0 → falls through to normal bust path */
+      }
       /* BLOCKADE (guardian, player card): on the opponent's first roll
          each turn, 25% chance to zero the roll → opp busts before
          scoring. Defensive disruption. */
@@ -12867,6 +13007,18 @@ function runOppTurn(){
           /* Flash the silver dice in the opp's pool so the effect is visually clear */
           if(G.oppDice){G.oppDice.forEach(function(d){if(d.mat==='silver'&&d.el){d.el.classList.add('eff-glow-blue');setTimeout(function(){if(d.el)d.el.classList.remove('eff-glow-blue');},900);}});}
           setTimeout(function(){clearRow('oppDiceRow');G.oppDice=[];step();},900);return;
+        }
+        /* BRUTUS'S GRIT NPC mirror: only the FIRST bust under 500 oppBank is
+           saved per match. NPC clears bust dice and re-rolls (mirrors player
+           _runSave). */
+        if(G.oCards.includes('brutus_grit')&&oppBank<500){
+          G._oGritUses=G._oGritUses||0;
+          if(G._oGritUses<1){
+            G._oGritUses++;
+            triggerCard('brutus_grit','GRIT — STILL STANDING',false);
+            setStatusMsg(G.rung.name+': BRUTUS GRIT — SURVIVES BUST!','red');
+            setTimeout(function(){clearRow('oppDiceRow');G.oppDice=[];step();},900);return;
+          }
         }
         /* NPC bust immunity (hold_the_line, sundays_rest, one_more_round) */
         var bustSaved=false,bustSavedCid=null;
@@ -12948,6 +13100,16 @@ function runOppTurn(){
         /* ── Handicap: Rising Stakes — opponent streak reset on bust ── */
         if(G._handicap==='rising_stakes'){G._rsOppStreak=0;G._rsOppMultiplier=1.0;}
         if(G._handicap==='bounty_board')G._bountyOppBankStreak=0;
+        /* Phase 1 NPC bank-bonus mirrors: bust resets safe-streak counters
+           (matches player handlers that read safeTurnStreak / chainCount).
+           Also clear any stakes_rising seed since the bust forfeited it. */
+        G._oSafeTurnStreak=0;/* hot_streak — broken by a bust */
+        G._oSafeBankStreak=0;/* slow_burn — broken by a bust */
+        G._oStakesRisingBonus=0;/* lose any seeded turn-pts bonus */
+        /* Phase 2 NPC active-card armed flags: bust consumes/clears them so
+           they don't carry over to next turn (matches player startPTurn
+           clear at line ~10960). */
+        G._oVowArmed=false;G._oAllInArmed=false;
         G.oppDice.forEach(d=>{if(d.el){d.el.classList.remove('die-blind');d.el.classList.add('opp-bust');}});
         if(G._lanternActive)G._lanternActive=false;
         if(window.DLG)DLG.trigger('OPP_BUST');
@@ -13080,8 +13242,35 @@ function runOppTurn(){
       G._oTurnDiceCommitted=(G._oTurnDiceCommitted||0)+_oRollKept;
       /* OPENING SHOT mirror: count first-roll keeps only */
       if(oppRollNum===1)G._oFirstRollKept=(G._oFirstRollKept||0)+_oRollKept;
+      /* ── Phase 1 NPC bank-bonus mirrors: per-roll trackers ──
+         G.oppDice is cleared at the start of each step(), so kept dice here
+         represent THIS roll's commits only. We tag combo types per roll;
+         twin_flames/the_collector/aldrics_banner read these on bank. */
+      if(total>0){
+        G._oTurnRollScored=(G._oTurnRollScored||0)+1;/* chain_lightning consecutive */
+        var _otjK=G.oppDice.filter(function(d){return d.kept;});
+        var _otjV={};_otjK.forEach(function(d){_otjV[d.val]=(_otjV[d.val]||0)+1;});
+        Object.keys(_otjV).forEach(function(v){
+          if(_otjV[v]>=3){G._oTurnTriples[v]=true;G._oTurnComboTypes.triple=true;}
+        });
+        if(Object.keys(_otjV).length>=5)G._oTurnComboTypes.straight=true;
+        if(_otjV[1]&&_otjV[1]<3)G._oTurnComboTypes.single1=true;
+        if(_otjV[5]&&_otjV[5]<3)G._oTurnComboTypes.single5=true;
+      }
       left=G.oppDice.filter(d=>!d.kept).length;
-      if(left===0){left=6;setTimeout(step,1500);return;}
+      if(left===0){G._oLastHotDice=true;left=6;setTimeout(step,1500);return;}
+      /* DOUBLE DOWN NPC AI: when oppBank is solid (≥400) and reroll dice are
+         scarce (≤2 left), double oppBank and force re-roll all 6. Mirrors
+         player activateDoubleDown line ~15399. */
+      if(npcHasActive('double_down')&&oppBank>=400&&left<=2){
+        npcUseActive('double_down');
+        var _oddBefore=oppBank;oppBank*=2;
+        triggerCard('double_down','×2 ('+_oddBefore+'→'+oppBank+')',false);
+        setStatusMsg(G.rung.name+': DOUBLE DOWN! '+oppBank+' — REROLL ALL 6','red');
+        /* Visual: scatter committed dice */
+        G.oppDice.forEach(function(d){if(d.el){d.el.classList.add('opp-scatter');}});
+        setTimeout(function(){clearRow('oppDiceRow');G.oppDice=[];left=6;setTimeout(step,200);},900);return;
+      }
       const bank=oppShouldBank(G.rung,oppBank,left,G.oPts,G.pPts,G.target);
       setTimeout(()=>{if(bank)finOpp(oppBank);else step();},1900);
     },1100);
@@ -13090,6 +13279,56 @@ function runOppTurn(){
   step();
   function finOpp(pts){
     if(pts>0){
+      /* STAKES RISING NPC mirror: surface the +300 seed bonus (already in
+         oppBank/pts). Reset the carry-over flag. Mirrors player handleScore
+         line ~12085. */
+      if(G._oStakesRisingBonus){
+        triggerCard('stakes_rising','+'+G._oStakesRisingBonus+' STAKES',false);
+        G._oStakesRisingBonus=0;
+      }
+      /* THE PYRE NPC AI: burn the lowest-rarity oCard (excluding the_pyre itself
+         and boss-signature cards) for +500. Worth using when pts is solid (≥400).
+         Mirrors player activateThePyre line ~15473. */
+      if(npcHasActive('the_pyre')&&pts>=400){
+        var _oprRarOrder={tin:0,silver:1,gold:2,npc:3};
+        var _oprBurnable=G.oCards.filter(function(cid){
+          if(cid==='the_pyre')return false;
+          var _cd=getCard(cid);
+          if(!_cd)return false;
+          if(_cd.npc)return false;/* don't burn boss-signature cards */
+          return true;
+        });
+        if(_oprBurnable.length>0){
+          _oprBurnable.sort(function(a,b){
+            var ra=_oprRarOrder[(getCard(a)||{}).rarity]||0;
+            var rb=_oprRarOrder[(getCard(b)||{}).rarity]||0;
+            return ra-rb;
+          });
+          var _oprBurn=_oprBurnable[0];
+          var _oprBurnCard=getCard(_oprBurn);
+          npcUseActive('the_pyre');
+          var _oprIdx=G.oCards.indexOf(_oprBurn);
+          if(_oprIdx>=0)G.oCards.splice(_oprIdx,1);
+          pts+=500;
+          triggerCard('the_pyre','BURNED '+(_oprBurnCard?_oprBurnCard.name:_oprBurn)+' +500',false);
+          setStatusMsg(G.rung.name+': PYRE — BURNED '+(_oprBurnCard?_oprBurnCard.name:_oprBurn),'red');
+        }
+      }
+      /* ALL IN NPC effect: armed via runOppTurn opener — apply at bank.
+         If oPts+pts*2 wins → 2× pts. Else penalty −500. Mirrors player
+         handleScore line ~12304. */
+      if(G._oAllInArmed){
+        G._oAllInArmed=false;
+        pts*=2;
+        if((G.oPts+pts)<G.target){
+          pts=Math.max(0,pts-500);
+          triggerCard('all_in','ALL IN FAILED −500',false);
+          setStatusMsg(G.rung.name+': ALL IN FAILED','red');
+        }else{
+          triggerCard('all_in','ALL IN ×2!',false);
+          setStatusMsg(G.rung.name+': ALL IN ×2!','red');
+        }
+      }
       /* Synergy: Silver Tongue — halve opponent's first bank */
       if(!G._silverTongueUsed&&G.activeSynergies&&G.activeSynergies.includes('silver_set')){
         G._silverTongueUsed=true;pts=Math.floor(pts/2);spawnPop('\uD83D\uDDE3 HALVED!');
@@ -13329,6 +13568,81 @@ function runOppTurn(){
       }
       if(G.oCards.includes('the_heir')&&pts>0&&G.turnNum>3){
         pts+=300;triggerCard('the_heir','+300',false);
+      }
+      /* ── Phase 1 NPC bank-bonus mirrors — these cards previously had
+         player-only handlers in handleScore. NPCs can equip them via
+         Mirror Match handicap or seizure (S.npcWonCards). ── */
+      /* BRUTUS'S GRIT (bank side): +15% on banks ≥500. Mirrors player line ~12228. */
+      if(G.oCards.includes('brutus_grit')&&pts>=500){
+        var _ogBonus=Math.floor(pts*0.15);
+        pts+=_ogBonus;triggerCard('brutus_grit','+'+_ogBonus,false);
+      }
+      /* AMBROSE'S CHALICE: +250 if NPC's first 3 oCards share archetype.
+         For player, this checks S.run.cards[0..2] (loadout slots). For NPC,
+         we check the first 3 of G.oCards (boss card excluded by convention,
+         though for true mirror we'd need to know which slot is the boss).
+         Mirrors player line ~12239. */
+      if(G.oCards.includes('ambrose_chalice')){
+        var _oacRegular=[];
+        for(var _oaci=0;_oaci<Math.min(3,G.oCards.length);_oaci++){
+          var _oacc=getCard(G.oCards[_oaci]);
+          if(_oacc&&_oacc.arch)_oacRegular.push(_oacc.arch);
+        }
+        if(_oacRegular.length===3&&_oacRegular[0]===_oacRegular[1]&&_oacRegular[1]===_oacRegular[2]){
+          pts+=250;triggerCard('ambrose_chalice','+250 PURE',false);
+        }
+      }
+      /* ALDRIC'S BANNER: +150 per unique combo type ever scored this match.
+         Persist G._oAbTypes across the whole match. Mirrors player line ~12252. */
+      if(G.oCards.includes('aldrics_banner')){
+        G._oAbTypes=G._oAbTypes||{};
+        if(G._oTurnComboTypes&&G._oTurnComboTypes.triple)G._oAbTypes.triple=true;
+        if(G._oTurnComboTypes&&G._oTurnComboTypes.straight)G._oAbTypes.straight=true;
+        if(G._oLastHotDice)G._oAbTypes.hotdice=true;
+        var _oabN=Object.keys(G._oAbTypes).length;
+        if(_oabN>0){
+          var _oabBonus=_oabN*150;
+          pts+=_oabBonus;triggerCard('aldrics_banner','+'+_oabBonus+' ('+_oabN+' TYPES)',false);
+        }
+      }
+      /* CHAIN LIGHTNING: +50 per consecutive scoring roll this turn (n-1 stacks).
+         Resets via turn-start G._oTurnRollScored=0. Mirrors player line ~12273. */
+      if(G.oCards.includes('chain_lightning')&&(G._oTurnRollScored||0)>0){
+        var _oclBonus=(G._oTurnRollScored-1)*50;
+        if(_oclBonus>0){pts+=_oclBonus;triggerCard('chain_lightning','+'+_oclBonus,false);}
+      }
+      /* THE COLLECTOR: +400 if 3+ unique scoring types this turn. Mirrors
+         player line ~12275. Types tracked per-roll in step(). */
+      if(G.oCards.includes('the_collector')){
+        var _octCount=Object.keys(G._oTurnComboTypes||{}).length;
+        if(_octCount>=3){pts+=400;triggerCard('the_collector','+400 ('+_octCount+' types)',false);}
+      }
+      /* THE GRUDGE: consume the accumulated stack from player banks (max 750).
+         Stack is incremented in handleScore when the player banks (Edit F).
+         Mirrors player line ~12288. */
+      if(G.oCards.includes('the_grudge')&&(G._oGrudgeStack||0)>0){
+        pts+=G._oGrudgeStack;triggerCard('the_grudge','+'+G._oGrudgeStack,false);
+        G._oGrudgeStack=0;
+      }
+      /* HOT STREAK: track NPC safe-bank turns; arm guaranteed 1+5 next roll
+         after 2 consecutive safe banks. Counter resets on bust. Mirrors
+         player line ~12290 (player uses G.safeTurnStreak which it shares
+         with slow_burn). */
+      if(G.oCards.includes('hot_streak')){
+        G._oSafeTurnStreak=(G._oSafeTurnStreak||0)+1;
+        if(G._oSafeTurnStreak>=2)G._oHotStreakReady=true;
+      }
+      /* TWIN FLAMES: 2 different triples in this NPC turn → +750.
+         Triples tracked per-roll in step(). Mirrors player line ~12296. */
+      if(G.oCards.includes('twin_flames')){
+        if(Object.keys(G._oTurnTriples||{}).length>=2){
+          pts+=750;triggerCard('twin_flames','+750',false);
+        }
+      }
+      /* STAKES RISING: bank 500+ → arm next-turn +300 seed. Mirrors player
+         line ~12133. The seed is consumed at runOppTurn start (Edit A). */
+      if(G.oCards.includes('stakes_rising')&&pts>=500){
+        G._oStakesRisingNext=true;
       }
       /* Record NPC bank for opp-score-tap summary (before G.oppDice is cleared) */
       if(!G.oBankHistory)G.oBankHistory=[];
@@ -14363,10 +14677,10 @@ const OPP_DIALOGUE={
     RIVALRY_SOFT:["Bad streak, friend. Happens to all of us.","I'll go easy. Maybe. Probably not."],
     RIVALRY_GRUDGE:["Yer good. Don't get cocky, that's me job.","Been practicin' against me reflection. Shut up about it."],
     NEW_CARDS:["Found this in a pocket. Wasn't mine. Is now.","New trick. Borrowed off a Guildbrother. Permanently."],
-    TELL:["Watch yer dice, friend. Me hands move quicker than yer eye.","Three in ten, friend. Three in ten times yer dice take a wee walk.","Cutpurse trick. Sometimes one o' yer bones just... goes home with me."],
+    TELL:["Watch yer dice, friend. Me hands move quicker than yer eye.","Half the time, friend — half the time yer dice take a wee walk.","Pickpocket trick. Sometimes one o' yer bones just... goes home with me."],
     CARDS:{
       quick_hands:["Quick hands, friend. Pa taught me 'em.","The slip. Done it three times before ye blinked.","Quick hands and quicker apologies, eh?"],
-      pocket_sand:["Pocket sand! Old beggar's trick.","Sorry mate, sand's everywhere round here.","Eyes shut means dice run loose. Pocket sand'll do it."],
+      pocket_sand:["Pickpocket, friend. Yer down one die.","Hands faster than yer eye, mate — one less to roll.","Pickpocket trick. A die slipped out yer pocket."],
       the_skim:["Just the skim, friend. Nothing personal.","Yer purse is a touch lighter. The skim does that.","A coin off the top. Ye'll not miss it."],
       the_lords_seal:["The lord's seal, see? Bank's mine by writ.","Pretty seal, ain't it? Says yer purse is mine.","Forged it meself. The lord's seal opens any purse."],
       sticky_fingers_die:["Sticky fingers, that. Bone went home with me.","Fingers find their way, friend. Sticky business.","Yer die's mine now. Sticky fingers, ain't they."]
@@ -14641,34 +14955,40 @@ const OPP_DIALOGUE={
       quick_hands:["Quick hands. Thievery. Sin number eight, by mine count.","Sleight of hand. Repent at thy convenience."]
     }
   },
-  /* Generic patron pool — short, faceless, more grunts than monologues. Used for
-     all non-boss matches via key:'patron'. Subtler personality, same slang. */
+  /* Generic patron pool — used for all non-boss matches via key:'patron'.
+     Voice: a slow-witted but venomous tavern lout. Insults flow easy (fool,
+     lout, wretch, halfwit, cretin, dunderhead, dolt, twit, berk, numbskull),
+     then mid-sentence the abuse trails off into confused dumbness. The
+     aggression deliberately contrasts the cute portrait. Plain English only
+     — no Latin or archaic terms ("knave/varlet/churl/thee") which read as
+     stage-medieval out of context. Keeps rural tavern slang (tch, hoy, aye,
+     hells, bones, yer, ye) consistent with the bosses. */
   PATRON:{
-    MATCH_START:["Sit, then.","Yer turn, friend.","Bones're callin'.","Let's see yer coin.","Ah. Another one.","Sit. Roll. Drink later.","Right, then.","Pour 'em.","Settle in, eh.","Coin down, then.","Sit, sit. Bones're cold yet.","Put yer arse here. Mind the splinter.","Hoy. Pull up.","Pour first, throw second. Old order.","Settle in. Cup'll find ye.","Aye, sit yerself. Less talkin', more rollin'.","Let's see what ye're made of, then.","Throw in. Coin in. Drink later.","Hoy. Sit.","Roll 'em.","Aye, sit.","Pull up, friend.","Bones ready?","Coin first, aye.","Right. Sit.","Hoy, friend.","Cup's open.","Settle.","Bones're warm.","Throw in, friend.","Sit, then. Roll.","Aye. Pour up.","Come on, then.","Sit. Cup awaits.","Bones want ye.","Right. Coin down.","Hoy. Roll.","Sit. Drink.","Aye. Throw.","Coin's good?","Bones're hungry.","Sit, friend.","Pour. Throw.","Hoy. Coin.","Aye. Roll, friend.","Sit. Now.","Bones in hand?"],
-    MATCH_START_KNOWN:["Yer that one. Sit.","Heard yer name once. Maybe twice.","Sit, sit. Yer becomin' a regular.","Hoy, you again. Sit.","Familiar mug. Coin still works, mind?","Yer back. Same seat?","Recognized ye. Mostly the limp.","Same face. Sit.","Twice in a week, friend.","Yer mug's familiar.","Sit. Ye know the drill."],
-    MATCH_START_RESPECTED:["Hells. Heard about ye.","Sit. Try not t' wreck me too quick.","Yer reputation precedes ye, friend.","Word's gone round about ye. Sit anyway.","Other tables warned me. Pour anyway.","Yer name's on the wall. In chalk. Don't smudge it.","Hells. Yer that one.","Sit. I'll pour, ye throw.","Reputation's loud, friend. Sit.","Word's out on ye. Sit."],
-    MATCH_START_LEGEND:["Right. The legend sits at me table. Right.","Hells, alright. Just don't make me cry.","Sit. Tell the bards I said hello.","Hells. The whole tavern just went quiet.","Yer that one the bards sing about. Sit. I'll be brief.","Songs about ye reached this corner. Wasn't expectin' ye in person.","Hells. A legend. Sit.","Sit. Bards'll hear of this later, aye?","Right. The famous one. Sit."],
-    RISKY_REROLL:["Bold.","Hoy.","Brave or daft.","Push it, then.","Reckless.","Tch. Brave.","Pluck like that gets buried.","Hoy. The bones love a fool.","Risky.","One way to lose a purse fast.","Drunk-brave, that.","Bones don't reward stupid. Often.","Pluck.","Hoy, bold.","Tch. Plucky.","Reckless, friend.","Aye. Brave throw.","Push it, kark.","Hells. Bold.","Daft throw.","Bones like bold. Sometimes.","Hmph. Risky.","Pluck like that kills.","Aye. Brave.","Hells. Plucky.","Aye. Bold throw.","Tch. Reckless.","Hoy. Daft.","Push it.","Bones favor fools.","Aye. Daft.","Tch. Bold."],
-    GREEDY_REROLL:["Greed gets ye buried.","Don't push it.","One more, eh? Tch.","Greedy.","Tch. Hungry.","Bones smell yer hunger.","One more roll. Famous last words.","Stop pushin', friend.","Greed grows quick. So do graves.","Hmph. Bones'll bite back.","Hoy. Greedy.","Tch. Reachin'.","One more? Tch.","Don't grasp, friend.","Hmph. Hungry.","Bones hate greed.","Aye. Greedy.","Push, push. Bust soon.","Tch. Too far.","Hells. Hungry.","Aye. Greed.","Tch. One more, eh.","Don't push, friend.","Hmph. Reachin'."],
-    EARLY_BANK:["Quitter's pour.","Tch. Safe.","Cautious lot, ye are.","Soft pour.","Boring.","Coppers. Tch.","Coward's choice.","Banked early. Borin'.","No fire in that.","Yer ma raise ye that careful?","Safe. Forgettable.","Tch. Soft.","Coppers.","Timid pour.","Aye. Safe.","Hoy. Banked early.","Tch. Borin'.","Cautious.","Hmph. Small.","Coward's cup.","Tch. Pittance.","Aye. Modest.","Hells. Boring.","Soft as ale-foam.","Tch. Cautious lot."],
-    BIG_BANK:["Hoy. Tidy.","Where'd ye stash that?","Bones love ye today.","Hells. Big haul.","That's a winter's coal.","Tidy purse, that.","Heavy throw. Mind yer back.","Yer luck's louder than me cup.","Bones bowed for ye.","Proper haul, friend.","Hells. Tidy.","Big throw, aye.","Hoy. Pretty.","Bones favor ye.","Tidy haul.","Aye. Good throw.","Hmph. Big.","Proper, that.","Winter's ale, that haul.","Hoy. Heavy.","Aye. Pretty haul.","Hells. Big one.","Bones smiled.","Tidy, friend."],
-    PLAYER_BUST:["Down ye go.","Tch.","Bones said nae.","Pissed it away.","Down. Tch.","Bust.","Bones turned.","Lost the lot. Familiar.","Tch. Pushed too hard.","That's a throw gone bitter.","Hells. Bones don't lie.","Bust. Common as dirt.","Down. Wipe yer mouth.","Bones laughed at ye.","Tch. Down.","Aye. Bust.","Hells. Down.","Bones said no.","Hoy. Bust.","Tch. Lost it.","Down, friend.","Hmph. Bust.","Gone. Tch.","Aye. Busted.","Down to nothin'.","Tch. Bones turned.","Hoy. Down ye went.","Aye. Bones bit ye.","Tch. Pissed it.","Hells. Lost the lot.","Bust, friend.","Down. Tch.","Aye. Bones turned cold."],
-    PLAYER_HOT_DICE:["Hells.","All six? Hells.","Cheatin' bones.","Bards'll write that one.","Six in a throw? Tch.","All matched. Don't push it again.","Hot dice. Don't preen."],
-    PLAYER_TRIPLE:["Tidy.","Three of 'em. Hoy.","That's a throw.","Trio. Bones in love.","Three matched. Tidy."],
-    PLAYER_STRAIGHT:["A line of 'em. Hells.","Tidy, that.","Straight as a priest's posture.","Six in a row. Hoy.","Straight. Like a hangman's drop."],
-    PLAYER_SIX_KIND:["Hells. Six.","I'll be drunk by sundown rememberin' that.","Sing it in three taverns by mornin'.","Six matched. Hells.","All six. The bones've gone strange."],
-    PLAYER_TAKES_LEAD:["Tch. Yer ahead.","Climbin' past me, eh?","Nice trick.","Past me. Briefly.","Took the lead. Pretty.","Climbed past. Don't gloat.","Hoy. Yer ahead. Won't last."],
-    PLAYER_NEAR_WIN:["Hells, almost.","One more roll.","Don't get cocky now.","One bank away. Hells.","Yer breath's hot on me purse.","Don't trip on the finish, friend."],
-    OPP_BUST:["Tch.","Stupid bones.","Pissed it.","Dammit.","Bust. Hells.","Bones turned on me.","Tch. Pushed too far.","Should've banked.","Hells. Empty pockets.","Bust. Familiar.","That's me purse, gone.","Aye. Bust.","Hmph. Down.","Tch. Again.","Karkin' bones.","Lost. Tch.","Down. Pour.","Hells. Lost it.","Aye. Familiar.","Bust. Pay up.","Hells. Bust.","Tch. Stupid.","Aye. Down again.","Hmph. Lost it."],
-    OPP_BIG_BANK:["Heh. Tidy.","There. Bones owe me.","I'll take that.","Hoy. Big haul.","Bones favor me, briefly.","Tidy. Pay the cup.","That'll buy a round.","Decent throw. I'll take it.","Aye. Tidy.","Hells. Good throw.","Heh. Big one.","Hmph. Pretty.","Aye. Bones smiled.","Hoy. Heavy.","Aye. Tidy haul.","Hells. Pretty.","Heh. Bones owe me."],
-    OPP_TAKES_LEAD:["Hoy. Ahead.","Caught up.","Tide turned, friend.","Past ye. Mind the gap.","Climbed back. Familiar view.","On top. Briefly. Mostly.","Aye. Past ye.","Heh. Ahead.","Hoy. Climbed.","Past ye, friend.","Aye. Top.","Heh. Past ye.","Hoy. On top."],
-    OPP_NEAR_WIN:["Almost. Almost.","One more.","Smell the ale already.","One bank from done.","Almost finished, friend.","Closing time soon.","Nearly there.","One more, aye.","Done soon, friend.","Almost, almost."],
-    MATCH_CLOSE:["Close one.","Bones gone fickle.","Hells, sweatin' now.","Tighter than rent day.","Knife-edge.","Bones can't decide.","Hoy. Tense, this.","Close as two cups on a wet table.","Tight.","Aye. Close.","Hells. Tight.","Knife-edge, friend.","Sweatin'.","Bones playin' coy.","Hoy. Close one."],
-    LOSING_BADLY:["Walloped.","Tch. Story of me life.","Down so far I can't see the table.","Battered. Familiar.","Down. Bones gone home.","Hells. Bad night.","Tch. Walloped.","Aye. Bad.","Hmph. Down bad.","Hells. Pour more."],
-    WINNING_BADLY:["Heh.","Look at me.","Magnificent. Briefly.","Up. Hells, up.","Bones love me tonight.","Smug. Briefly.","Heh. Up.","Aye. Winnin'.","Hells. Good night."],
-    OPP_WINS:["Won. Drinks on you.","Bones loved me tonight.","Tell the bards. Or don't.","Done. Pour the cup.","Won. Pay up.","Tch. Yer purse is mine.","Aye. Won.","Hells. Won.","Pour up, loser.","Done. Pay.","Tch. Yer coin's mine.","Won. Thanks."],
-    REMATCH_START:["Back? Aye.","Same seat. Same bones.","Couldn't stay away, eh?","Twice in a night.","Hoy. Yer back.","Glutton, are ye?","Back again, friend.","Aye. Yer back.","Twice, then.","Hoy. Sit."],
-    CARD_EFFECT:["Hells. Felt that.","Twitchy thing.","What was that, then?","Bones moved on their own.","Tch. Cards stirrin'.","Felt a chill. Card magic.","Somethin' just shifted.","Did ye do that?","Hoy. Magic?","Tch. Cards.","Bones twitched.","Felt that, aye.","Hells. Cards movin'.","Somethin's off."]
+    MATCH_START:["Sit, fool.","Hoy. The idiot's here. Sit.","Sit, lout. Or stand. Either.","Was I waitin' fer ye? Cretin.","Bones, halfwit! Bones!","Sit, sit. Sit-sit. ...Three times now, fool.","Oh. Hoy. Forgot ye were comin'. Dunderhead.","Hoy. Dolt. Sit. ...What were I sayin'?","Pour up, lout. And shut yer mouth.","Sit, dolt. Did ye wash? Stink o' pig-coppers on ye.","Throw the bones, halfwit. Y'know. The bones.","Sit, fool. ...Are ye stupid? Sit.","Hoy, dunderhead. Cup awaits.","Pour. Throw. Lose. In order.","Stupid me forgot why we're here. Sit anyway.","Coin down, lout. Down-down.","Hells. Another wretch t' fleece.","Sit, fool. King o' the fools, ye are.","Bones await yer idiot hands.","Idiot. Aye. That's the word. Sit.","Sit. ...Hoy. What's a dolt, anyway? Don't matter. Sit, fool.","Yer here. ...Why? Nay, sit. Sit-sit.","Throw the bones. ...What's a bone? Oh. These. ...I think.","Coin first, lout. Coin coin coin.","Hoy. Fool. Sit. Or don't. Stupid either way.","Sit yer dim arse. There. Right. There.","Pour first, throw second. Old rule. ...Or t'other way. Hmph.","Cup awaits. ...What's a cup? Oh. This. Aye. Cup.","Bones're hungry, halfwit. Roll 'em.","Sit, lout. Be quick. Or slow. Don't care.","Hoy. Numbskull. ...Numbskull's me favorite word.","Coin's good? Mine ain't. Yers prolly ain't. Cretins, both.","Sit, wretch. ...Was that rude? Don't care.","Bones in hand? Or in yer arse? Hells, I forget which side they go.","Sit, fool. Drink. Lose. In order.","Pour. ...Pour what? Hells. Ale, halfwit. Pour ale.","Hoy. Coin. Down. Now. Idiot."],
+    MATCH_START_KNOWN:["Yer that one. Sit, lout.","Heard yer name. Forgot it. Cretin.","Sit, sit. Yer a regular. Regularly stupid.","Hoy, you again, halfwit.","Familiar mug. Familiar coin. ...Familiar arse on me bench.","Yer back? Again? Sit, fool.","Recognized yer limp. ...Wait, that's me limp. Stupid me.","Same face. Same stink. Sit, lout.","Twice in a week, fool. Or eight. I lose count.","Yer mug's familiar. They all are. Common lot.","Sit. Ye know the drill, dunderhead.","Hoy. Back again, idiot. Sit."],
+    MATCH_START_RESPECTED:["Hells. Heard about ye. ...Was it bad? Aye, prolly.","Sit, lout. Try not t' wreck me. Cretin.","Yer reputation precedes ye. ...What's that mean? Sit anyway.","Word's gone round. The word were... 'lout', I think.","Other tables warned me. Pour anyway. Stupid me.","Yer name's on the wall. ...Wait, that's 'wash hands'. Different word.","Hells. Yer that one. ...That one what, though?","Sit. I'll pour, ye throw. Or t'other. Don't care.","Reputation's loud, friend. Mine's silent. Like the bones.","Word's out on ye. Word's never out on me. Hmph. Idiot me."],
+    MATCH_START_LEGEND:["Right. The 'legend' sits at me table. ...What's a legend? Cretin.","Hells, alright. Don't make me cry. I cry easy.","Sit, lout. Tell the bards I said somethin' rude.","Hells. Whole tavern went quiet. ...Did I... did I fart?","Yer that one the bards sing about. Sing slow, halfwit.","Songs about ye reached this corner. Songs travel? Hells.","Hells. A legend. ...What were yer name? Wait. Don't. ...Do.","Sit. Bards'll hear of this. ...What's a bard.","Right. The famous one. ...Famous fer bein' stupid? Aye, that'd be me."],
+    RISKY_REROLL:["Bold. Stupid.","Hoy. ...Are ye daft, fool?","Brave. Or stupid. Same thing.","Push it, lout. Cretin.","Reckless. ...What's that mean? Sounds bad.","Tch. Brave. ...Or just thick.","Pluck like that gets ye buried.","Hoy. Bones love a fool. Yer fool-shaped.","Risky. ...Risky-stupid.","Hoy. Daft. Daft-daft.","Tch. ...Wait, what just happened? Cretin.","Reckless, lout. That's stupid.","Aye. Brave throw. Or thick. ...Both, prolly.","Push it, ye berk.","Hells. Bold. ...Or daft. Same thing, halfwit.","Daft. Aye. Daft as me da. And he were a wretch.","Bones like bold. Bones also like stupid. Aye.","Hmph. Risky. ...What's risky, fool?","Pluck like that kills.","Aye. Brave. ...Why'd ye reroll, dunderhead?","Hells. Plucky. ...Is plucky a word?","Aye. Bold throw. Did ye mean that? Cretin.","Tch. Reckless. Stupid reckless.","Hoy. Daft. Daft as me cousin, who ate a bone.","Push it, halfwit. Push it harder.","Bones favor fools. So... favor ye. Stands t' reason.","Aye. Daft. Friend, that's daft.","Tch. Bold. ...Were that bold? I think so. Cretin."],
+    GREEDY_REROLL:["Greed gets ye buried.","Don't push it, fool.","One more, eh? Stupid.","Greedy. Like a swineherd. ...What's a swineherd.","Tch. Hungry. Hungry-hungry.","Bones smell yer hunger, lout.","One more roll. Famous last words, halfwit.","Stop pushin', cretin. ...Wait, am I pushin'? Or ye?","Greed grows quick. So do graves.","Hmph. Bones'll bite yer stupid hand.","Hoy. Greedy. Like me cousin, who ate eleven pies and died.","Tch. Reachin'. Reachin' fer what, fool?","One more? Tch. Stupid again.","Don't grasp, lout. Grasp what? ...Don't grasp anythin'.","Hmph. Hungry. Me too. ...Wait, that's me belly.","Bones hate greed. Or love it. Don't care.","Aye. Greedy. ...That a sin? I think so. Aye.","Push, push. Bust soon. Mark me words.","Tch. Too far. How far's too far? Halfwit doesn't know.","Hells. Hungry. Should we eat? ...Lout, focus.","Aye. Greed. ...Or just stupid. Same thing.","Tch. One more, eh. ...Why, fool?","Don't push, lout. ...Wait, ye ARE pushin'. Idiot.","Hmph. Reachin'. ...What're ye reachin' for? Cretin."],
+    EARLY_BANK:["Banked already? Stupid, lout.","Soft pour.","Cautious lot, ye are. Like a... cautious lout.","Tch. Safe. Safe as me grandmama.","Borin'. Cretin.","Coppers. Tch.","Coward's choice. Idiot.","Banked early. Borin'. ...Or smart? Hmph. Don't care.","No fire in that. None at all.","Yer ma raise ye that careful? Yer ma were a wretch, prolly.","Safe. Forgettable. Forgot already.","Tch. Soft. Soft like me head, said me da.","Coppers. Just coppers. Babyish.","Timid. ...What's timid mean?","Aye. Safe. ...Safe's bad? I get confused. Cretin.","Hoy. Banked early. Why'd ye do that, halfwit?","Tch. Borin'. ...I'm borin' too. Don't mind.","Cautious. Like... a cautious wretch.","Hmph. Small. Small as yer spine, lout.","Coward's cup. ...Whose cup is that?","Tch. Pittance. Crumbs.","Aye. Modest. ...What's modest mean?","Hells. Boring. I yawned. Like that. Yawn.","Soft as ale-foam. ...I like ale-foam. It tickles.","Tch. Cautious lot. Whole tavern. ...Wait. Just me. Hmph.","Banked? Already? ...What was the score? Stupid me lost track."],
+    BIG_BANK:["Hoy. Tidy, lout.","Where'd ye stash that? Lucky cretin.","Bones love ye today. ...Bones can love? Stupid.","Hells. Big haul. Big-big. Hells.","That's a winter's coal. Or two. I can't math, fool.","Tidy purse, lout. ...What's tidy mean?","Heavy throw. Mind yer back. I hurt me back once. Liftin' a turnip.","Yer luck's louder than me cup. And me cup's loud.","Bones bowed fer ye. ...Did they? Stupid me missed it.","Proper haul, fool. Proper. Aye.","Hells. Tidy. ...What's the number? Cretin me can't read it.","Big throw, aye. ...How big? Real big? Bigger than me?","Hoy. Pretty. Pretty number.","Bones favor ye. I'm jealous. Aye, jealous.","Tidy haul. Tidy like me bed. ...Which ain't tidy.","Aye. Good throw. ...Was it? Aye. Cretin me says aye.","Hmph. Big. Big like yer ego, lout.","Proper, that. Proper-proper.","Winter's ale, that haul. Winter's ale's good.","Hoy. Heavy. ...Heavy fer ye to carry? Halfwit'd struggle.","Aye. Pretty haul. Pretty as a... pretty thing.","Hells. Big one. ...Bigger than me purse. Hmph.","Bones smiled. I saw it. ...Or didn't. Cretin.","Tidy, lout. Tidy! ...Tidy.","That's a lot. I think. Is it a lot? Aye. A lot.","Hoy. Numbers got big. Big-big numbers."],
+    PLAYER_BUST:["Down ye go, fool.","Tch. Stupid.","Bones said nae.","Pissed it away. Like me uncle pissed his wages.","Down. Tch. ...What just happened, cretin?","Bust. ...What's bust mean again?","Bones turned. They do that. Mostly t' fools.","Lost the lot. Familiar.","Tch. Pushed too hard. Or not enough. Stupid me can't say.","That's a throw gone bitter. Bitter like ale.","Hells. Bones don't lie. Or do they? Cretin me can't tell.","Bust. Common as turnips, lout.","Down. Wipe yer mouth. ...Why's yer mouth wet?","Bones laughed at ye. I heard 'em.","Tch. Down. Down's bad, aye, halfwit?","Aye. Bust. ...Were that yer turn? Cretin me lost track.","Hells. Down. Who's down? ...Ye. Ye's down.","Bones said no, fool.","Hoy. Bust. ...Bust like me da's pots.","Tch. Lost it, lout.","Down, friend. Wave at the bones. ...Why'd I say that. Stupid.","Hmph. Bust. Bust-bust.","Gone. Tch. ...What's gone? Yer coin, halfwit.","Aye. Busted. Like a barrel.","Down to nothin'. Nothin's a number, aye? Cretin.","Tch. Bones turned. Cold bones.","Hoy. Down ye went. Cretin me didn't see it.","Aye. Bones bit ye. They bit me last week. ...I think.","Tch. Pissed it. Tradition, fool. Tradition.","Hells. Lost the lot. ...What were the lot, again?","Bust, lout. ...That's the word, aye? Bust.","Down. Tch. Want me to count fer ye? I can't count, mind. Stupid me.","Aye. Bones turned cold. So's me ale, now I look."],
+    PLAYER_HOT_DICE:["Hells. Stupid bones.","All six? Hells. Six is a lot.","Cheatin' bones. Or ye. Cretin.","Bards'll write that one. ...Bards write? Stupid me.","Six in a throw? Tch. ...All of 'em, aye?","All matched. Don't push it, lout. Or do. Stupid either way.","Hot dice. Don't preen. ...What's preen?","Six. Six bones. Six is more than five, halfwit.","All six matched. How, fool? How?","Hells. Bones gone strange.","Wait. All six? Hells, cretin me missed it. Show me. Ye can't. Hmph."],
+    PLAYER_TRIPLE:["Tidy, lout. Three of somethin'.","Three of 'em, fool. Three.","That's a throw. ...What kinda throw, halfwit?","Trio. Bones in love. ...Made that up.","Three matched. Tidy as me hair. Which ain't.","Hoy. Three. Three matchin'. Hells.","Three. ...Or four. Wait. Three. Cretin me counted."],
+    PLAYER_STRAIGHT:["A line of 'em. Hells.","Tidy, that. Tidy line, lout.","Straight as a... straight thing.","Six in a row. Hoy. ...Wait, all of 'em?","Straight. Like a hangman's drop.","All the numbers in order. ...How'd that work, fool?","Tch. A line. Long one."],
+    PLAYER_SIX_KIND:["Hells. Six.","I'll be drunk by sundown rememberin' that. ...Already drunk now.","Sing it in three taverns by mornin'. ...What's a tavern? Oh. Here.","Six matched. Hells. Hells, fool.","All six. The bones've gone strange. Strange as me uncle.","Hoy. Six of one kind. ...All six? All of 'em?","Hells. ...How'd that happen? Cretin me saw it. Aye."],
+    PLAYER_TAKES_LEAD:["Tch. Yer ahead, fool.","Climbin' past me, eh? Or am I sinkin', cretin?","Nice trick. ...What were the trick, halfwit?","Past me. Briefly.","Took the lead. ...What's a lead, again? Cretin.","Climbed past. Don't gloat. ...Why'd I say that. Gloat away.","Hoy. Ahead. Won't last.","Yer winnin'? I think yer winnin'. ...Aye. Cretin me thinks."],
+    PLAYER_NEAR_WIN:["Hells, almost. ...Almost what?","One more roll. ...Or two. Stupid me loses count.","Don't get cocky, lout. Pride and all.","One bank away. Hells. Cretin.","Yer breath's hot on me purse. ...Why's yer breath hot? Stink, fool.","Don't trip on the finish, halfwit. ...What's a finish?","Yer nearly done. Done's the end. End's done.","Almost. ...Almost done. Almost... what were I sayin'? Cretin."],
+    OPP_BUST:["Tch. Stupid me.","Stupid bones. Stupid like me.","Pissed it. ...Wait. Did I piss the bones?","Dammit. ...What's dammit mean?","Bust. Hells.","Bones turned on me. They do that. Often. Cretin.","Tch. Pushed too far. ...How far's too far? Halfwit me never knows.","Should've banked. Stupid me.","Hells. Empty pockets.","Bust. Familiar. Familiar again.","That's me purse, gone. Where? Where'd it go, fool?","Aye. Bust. ...That were me, aye? Cretin.","Hmph. Down. ...Wait, I were the one rollin'? Aye. Aye, that were me.","Tch. Again. Stupid again.","Karkin' bones. Stupid bones.","Lost. Tch. ...Lost what, exactly?","Down. Pour. Drink. Forget. In that order.","Hells. Lost it. ...What's it?","Aye. Familiar. Familiar like home. Home's familiar.","Bust. Pay up. ...Wait, that's me payin'? Hells. Cretin.","Hells. Bust. ...That's me, aye? Aye.","Tch. Stupid. Me or the bones. Same thing.","Aye. Down again. Down again again. Cretin.","Hmph. Lost it. Lost the bones. Lost me coin. Lost me mind. All of it."],
+    OPP_BIG_BANK:["Heh. Tidy, lout.","There. Bones owe me. ...Or did. They paid.","I'll take that, fool. Take what's mine.","Hoy. Big haul. Big like... big.","Bones favor me. Briefly. ...Then they hate me. Round-round.","Tidy. Pay the cup.","That'll buy a round. ...What's a round? Like a circle? Cretin.","Decent throw. I'll take it. ...Already took it, halfwit.","Aye. Tidy. ...What's the number? Don't tell me. Tell me.","Hells. Good throw. ...Were that good? I think so. Stupid me.","Heh. Big one. Big as me belly. Me belly's big.","Hmph. Pretty. ...Pretty bones.","Aye. Bones smiled. At me. ...That's nice.","Hoy. Heavy. Heavy as a sack of... heavy things. Cretin.","Aye. Tidy haul. Tidy as me bed. Which ain't.","Hells. Pretty. Pretty number, that.","Heh. Bones owe me. They paid. ...Did they? Cretin.","Wait. Did I bank? I banked, aye? Hells. Aye. Stupid me."],
+    OPP_TAKES_LEAD:["Hoy. Ahead. ...Of ye, aye?","Caught up. ...To ye. Caught up to ye, fool.","Tide turned, lout. ...What's a tide?","Past ye. Mind the gap. ...What's the gap?","Climbed back. Familiar view. ...What view? It's a table, halfwit.","On top. Briefly. Mostly briefly.","Aye. Past ye. ...Or ye past me. Don't care.","Heh. Ahead. Ahead's good, aye?","Hoy. Climbed. Like a... climber.","Past ye, lout. ...Or am I? Hmph. Cretin me ain't sure.","Aye. Top. Top o' the table. Top o' the world.","Heh. Past ye. Past-past.","Hoy. On top. ...Wait. Did I move ahead? Hells. Aye. Stupid me."],
+    OPP_NEAR_WIN:["Almost. Almost.","One more. One more bone? Or coin? Cretin.","Smell the ale already. Mine's been smellin' the whole time.","One bank from done.","Almost finished, fool. Like a meal? I finished a meal once.","Closing time soon. ...What's closing? Cretin.","Nearly there. Where's there?","One more, aye. One more then I... I forget.","Done soon, lout. ...What's done? I keep askin', halfwit.","Almost, almost. Almost what."],
+    MATCH_CLOSE:["Close one. Close like... close, halfwit.","Bones gone fickle. ...What's fickle? Stupid me.","Hells, sweatin'. Why's me forehead wet?","Tighter than rent day. ...What's rent? I don't pay rent. Or do I? Cretin.","Knife-edge. Whose knife?","Bones can't decide. They never could. Stupid bones.","Hoy. Tense. Tense like me back.","Close as two cups on a wet table. ...Why're me cups wet?","Tight. Tight as me belt. After dinner.","Aye. Close. Close to what, though, fool?","Hells. Tight. Tight-tight-tight.","Knife-edge, lout. ...What's knife-edge?","Sweatin'. Me palms. Me brow. Me everywhere.","Bones playin' coy. ...What's coy?","Hoy. Close one. ...Close like... close, cretin."],
+    LOSING_BADLY:["Walloped. ...What's walloped?","Tch. Story of me life. Whole life.","Down so far I can't see the table. ...Wait. Table's right there. Stupid me.","Battered. Familiar. Battered like fish, fool.","Down. Bones gone home. They live somewhere, aye? Cretin.","Hells. Bad night. Bad-bad.","Tch. Walloped. ...Walloped like a... walloped thing.","Aye. Bad. Bad-bad. Bad.","Hmph. Down bad. Down's bad, aye? Stupid me.","Hells. Pour more. Pour more ale. Always.","Bones've forgotten me. They never write. Stupid bones."],
+    WINNING_BADLY:["Heh. Stupid ye.","Look at me. Look. ...Are ye lookin', fool?","Magnificent. Briefly.","Up. Hells, up. Up-up.","Bones love me tonight. They told me. Quietly.","Smug. Briefly. ...What's smug?","Heh. Up. Up's good.","Aye. Winnin'. ...That's me winnin', aye? Stupid me asks.","Hells. Good night. Good night-night.","I'm doin' it. Doin' a win. ...Wait, am I? Cretin."],
+    OPP_WINS:["Won, fool. Drinks on ye.","Bones loved me tonight. ...They wrote me a song. Quietly.","Tell the bards. Or don't. ...What's a bard? Stupid me forgot.","Done. Pour the cup. Why's me cup empty?","Won. Pay up, lout. ...Pay me. ...Yes, me.","Tch. Yer purse is mine. ...Mine. ...Mine.","Aye. Won. ...Did I win? I think I won. Cretin me thinks. Aye.","Hells. Won. ...How'd that happen?","Pour up, loser. ...That's ye.","Done. Pay. Pay coin. To me.","Tch. Yer coin's mine. ...Or me coin's still mine. Same thing.","Won. Thanks, halfwit. ...Were that the right thing to say?"],
+    REMATCH_START:["Back? Aye, fool. ...Have we met?","Same seat. Same bones. Same cretin me.","Couldn't stay away, eh? Stupid again.","Twice in a night. Twice-twice.","Hoy. Yer back. ...Or new? Cretin can't tell.","Glutton, are ye? ...What's a glutton?","Back again, lout. Friend? ...Are we friends? Aye.","Aye. Yer back. ...Were ye gone?","Twice, then. Twice-times.","Hoy. Sit. ...Wait, didn't ye sit already? Today? Last week? Cretin."],
+    CARD_EFFECT:["Hells. Felt that. ...Felt what, exactly?","Twitchy thing. ...What twitched, fool?","What was that?","Bones moved on their own. ...They do that, cretin?","Tch. Cards stirrin'.","Felt a chill. Card magic, prolly.","Somethin' just shifted. ...Or didn't. Don't care.","Did ye do that, lout? ...Tell me ye did. So I'm not goin' daft.","Hoy. Magic? ...Or just yer hand movin'?","Tch. Cards. Cards do things. Stupid things.","Bones twitched. ...They alive?","Felt that, aye. Felt it in me... where do ye feel things, halfwit?","Hells. Cards movin'. Cards're s'posed t' be still. Stupid cards.","Somethin's off. ...Off like... not on.","Hells. What's a card do, again? Hmph. Forgot. Cretin.","Hoy. Magic-thing. ...Or a regular thing. Stupid me gets 'em mixed."]
   }
 };
 
@@ -15722,8 +16042,14 @@ function initMatchScreen(data){
   G._handicap=params.handicap||null;
   /* Init active card uses */
   pCards.forEach(cid=>{const cd=CARDS.find(c=>c.id===cid)||NPC_CARDS_MAP[cid];if(cd&&cd.type==='active')G.activeCardState.usedCards[cid]=cd.maxUses||1;});
-  /* Init NPC-side active uses so mirror-match (and future boss loadouts) can wield them */
+  /* Init NPC-side active uses so mirror-match (and future boss loadouts) can wield them.
+     Skip-list: gamblers_eye / frozen_die need multi-roll state plumbing the NPC AI
+     doesn't have yet — leaving uses=0 means npcHasActive returns false and the AI
+     never tries to activate them. The cards are still visible in the NPC's bar but
+     are functionally inert (preferable to NPC misusing them or crashing). */
+  var _npcActiveSkip=['gamblers_eye','frozen_die'];
   (params.oCards||[]).forEach(function(cid){
+    if(_npcActiveSkip.indexOf(cid)>=0)return;
     var cd=CARDS.find(function(c){return c.id===cid;})||NPC_CARDS_MAP[cid];
     if(cd&&cd.type==='active')G.npcCardState.npcActiveUses[cid]=cd.maxUses||1;
   });
