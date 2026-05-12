@@ -1,8 +1,11 @@
-const CACHE_NAME = 'gambit-v274';
+const CACHE_NAME = 'gambit-v280';
 const ASSETS = [
   './',
   './index.html',
   './manifest.json',
+  './Audio/Tavern_8bit.mp3',
+  './Audio/Tavern_8bit_relax.mp3',
+  './Audio/ambiance.mp3',
   './Card_ART/Flintlock_face.jpg',
   './Card_ART/Flintlock_face.png',
   './Characters_ART/Bishop.png',

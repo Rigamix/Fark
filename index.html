@@ -854,20 +854,27 @@ body{
 .dlg-box.show{opacity:1}
 /* Push the dialogue content down so it sits below the NPC status/scoring strip
    (the parent .dlg-box is height:0, so this just shifts the floating content). */
-.dlg-inner{display:flex;align-items:center;gap:6px;padding:2px 8px;transform:translateY(36px);width:100%;max-width:100vw;justify-content:flex-start}
+.dlg-inner{display:flex;align-items:center;gap:8px;padding:2px 4px;transform:translateY(36px);width:100%;max-width:100vw;justify-content:flex-start}
 .dlg-portrait{
-  width:60px;height:60px;border-radius:4px;image-rendering:auto;
+  /* Bumped 60→78 px (~30% larger) per player feedback. The 8px gap above
+     and reduced .dlg-inner side padding (8→4) buys back the space so the
+     parchment width doesn't shrink. */
+  width:78px;height:78px;border-radius:4px;image-rendering:auto;
   border:none;box-shadow:none;
   background:transparent;overflow:hidden;flex-shrink:0;
-  margin-left:4px;
+  margin-left:2px;
 }
 .dlg-portrait img{width:100%;height:100%;image-rendering:auto;display:block}
 .dlg-scroll{
   /* Wider parchment so 3-line dialogues with orphan words fit on 2.
      Uses available viewport width minus portrait + paddings. Was 280px
-     fixed which forced wraps mid-sentence. */
-  position:relative;flex:1;max-width:calc(100vw - 90px);padding:10px 22px;overflow:visible;
+     fixed which forced wraps mid-sentence. Calc updated for larger
+     portrait: 78px portrait + 8px gap + ~14px margins ≈ 100px reserved. */
+  position:relative;flex:1;max-width:calc(100vw - 100px);padding:10px 22px;overflow:visible;
   display:flex;align-items:center;justify-content:center;
+  /* Sharp dark-brown drop shadow so the parchment reads cleanly against
+     the wood background. Zero blur = crisp pixel-art edge. */
+  filter:drop-shadow(2px 4px 0 rgba(38,22,12,0.85));
 }
 .dlg-scroll canvas{position:absolute;inset:0;width:100%;height:100%;z-index:0}
 .dlg-text{
@@ -3026,6 +3033,28 @@ body::before,body::after{display:none!important}
   text-shadow:0 1px 0 rgba(0,0,0,.55);
 }
 .end-draft-slots .draft-slot.filled{border-style:solid;border-color:rgba(200,160,80,.4);touch-action:none}
+/* Underneath ghost — when the player drafted a new card on top of an
+   existing deck card, the original peeks out from behind the new pick.
+   Purely informational: dragging the new pick back out restores this
+   card to the slot. No pointer events so it never competes for taps. */
+.end-draft-slots .draft-ghost-underneath{
+  position:absolute;
+  /* Inset slightly to match the slot size, then offset down+right so the
+     edge pokes out behind the active card. aspect-ratio kept identical
+     to the draft-slot so proportions line up. */
+  inset:0;
+  transform:translate(6px,6px) rotate(-3deg);
+  aspect-ratio:2/3;width:100%;
+  pointer-events:none;
+  opacity:.4;
+  filter:grayscale(.5) brightness(.7);
+  z-index:0;
+  border-radius:5px;
+  overflow:hidden;
+}
+.end-draft-slots .draft-ghost-underneath .gcard{width:100%;height:100%;border-radius:4px}
+/* Lift the active slot above its ghost so the new pick remains primary */
+.end-draft-slots .draft-slot{z-index:1}
 /* Filled boss slot keeps a brighter gold border + soft glow so the player
    can still tell it apart from regular filled slots — without this, slot 0
    visually looks like any other filled slot once a boss card is placed and
@@ -3505,9 +3534,9 @@ body::before,body::after{display:none!important}
   .opp-dice-row .die{width:41px!important;height:41px!important;grid-template-columns:repeat(7,5px)!important;grid-template-rows:repeat(7,5px)!important}
   .opp-dice-row .die .dc{width:5px!important;height:5px!important}
   .opp-dice-row .die .dc.dot{width:3px!important;height:3px!important;margin:1px!important}
-  .dlg-inner{max-height:56px}
-  .dlg-portrait{width:46px;height:46px}
-  .dlg-scroll{max-width:240px;padding:8px 22px}
+  .dlg-inner{max-height:72px}
+  .dlg-portrait{width:60px;height:60px}
+  .dlg-scroll{max-width:calc(100vw - 80px);padding:8px 22px}
   .dlg-text{font-size:clamp(12px,3.2vw,14px)}
   /* ── Compact above-dice info ── */
   .above-dice-info{min-height:18px}
@@ -6843,8 +6872,12 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
     <div class="setting-note" id="diceStyleNote"></div>
     -->
     <div class="set-row"><canvas></canvas><div class="setting-inner">
-      <div class="setting-label"><div class="setting-name">MUSIC</div><div class="setting-desc">Background music during matches</div></div>
+      <div class="setting-label"><div class="setting-name">MUSIC</div><div class="setting-desc">Background music (tavern + boss-fight tracks)</div></div>
       <div class="setting-check" id="musicCheck" onclick="SFX.nav();toggleAudio('music')"></div>
+    </div></div>
+    <div class="set-row"><canvas></canvas><div class="setting-inner">
+      <div class="setting-label"><div class="setting-name">AMBIENCE</div><div class="setting-desc">Tavern ambience underlay (crackling fire, chatter)</div></div>
+      <div class="setting-check" id="ambienceCheck" onclick="SFX.nav();toggleAudio('ambience')"></div>
     </div></div>
     <div class="set-row"><canvas></canvas><div class="setting-inner">
       <div class="setting-label"><div class="setting-name">SFX</div><div class="setting-desc">Sound effects for rolls, banks and busts</div></div>
@@ -7243,13 +7276,12 @@ function _showFeatUnlock(feat,opts){
     if(r)r.textContent='+'+(feat.renown||0)+' RENOWN';
     ov.classList.remove('flash');void ov.offsetWidth;
     ov.classList.add('flash');
-    /* Audio: only the FIRST feat in a batch gets the big trumpet fanfare;
-       subsequent feats get a soft synergy chime. Player feedback:
-       "the feats each playing a sound" — the 5-tone hotDice fanfare
-       repeating per feat sounded like the victory audio looping. */
+    /* Audio: only the FIRST feat in a batch plays a sound (hotDice fanfare).
+       Subsequent feats are SILENT. Earlier the second/third feat played a
+       soft synergy chime, which the player still heard as the victory audio
+       "playing several times". A single fanfare covers the whole sequence. */
     try{
-      if(opts.first){if(SFX.hotDice)SFX.hotDice();}
-      else if(SFX.synergy){SFX.synergy();}
+      if(opts.first&&SFX.hotDice)SFX.hotDice();
     }catch(e){}
     try{Haptic.commit&&Haptic.commit();}catch(e){}
     setTimeout(function(){ov.classList.remove('flash');resolve();},2400);
@@ -8145,6 +8177,11 @@ function _showHandicapSplash(handicap,cb){
 }
 
 function _showBossSplash(bossKey,bossName,cb){
+  /* Crossfade music from tavern → boss the moment the splash starts. The
+     1.5s fade ramps the boss track up while the splash itself fades in,
+     so the audio leads the visual just enough to feel cued. Reverts to
+     tavern in exitMatch after the victory/loss screen. */
+  try{if(typeof _setMusicLayer==='function')_setMusicLayer('boss');}catch(e){}
   var portrait=GAUNTLET_PORTRAITS[bossKey]||'';
   var accent=BOSS_ACCENT[(bossName||'').toLowerCase()]||'#e06050';
   var ov=document.createElement('div');
@@ -14206,6 +14243,7 @@ function endMatch(win){
     _draftCards=_buildDraftPool();
     _draftSelected=null;_draftTargetSlot=-1;
     _draftPickedCardId=null;_draftPickedSlotIdx=-1;_draftPickedEl=null;
+    _draftOriginals={};
     /* Build inline draft HTML in resCard */
     var draftHtml='<div class="end-draft">';
     /* Spacer keeps the layout breathing room above the cards (the
@@ -14281,6 +14319,7 @@ function endMatch(win){
     _draftCards=_bossDraftCards;
     _draftSelected=null;_draftTargetSlot=-1;
     _draftPickedCardId=null;_draftPickedSlotIdx=-1;_draftPickedEl=null;
+    _draftOriginals={};
     var bossHtml='<div class="end-draft">';
     bossHtml+='<div class="end-draft-label">CHOOSE A SIGNATURE CARD</div>';
     bossHtml+='<div class="end-draft-cards">';
@@ -14472,6 +14511,11 @@ function handleContinue(){
   exitMatch();
 }
 function exitMatch(){
+  /* Music: crossfade back to tavern as the player leaves the match screen.
+     Whether the match was patron or boss, the player ends up on the tier
+     / gauntlet / shop screens — tavern is the right layer for all of
+     them. The crossfade no-ops if we were already on tavern. */
+  try{if(typeof _setMusicLayer==='function')_setMusicLayer('tavern');}catch(e){}
   if(window._endTimers){window._endTimers.forEach(t=>clearTimeout(t));window._endTimers=[];}
   document.querySelectorAll('.coin-burst-p').forEach(el=>el.remove());
   var lov=document.getElementById('mLoadout-ov');if(lov)lov.classList.remove('show');
@@ -16396,11 +16440,15 @@ function generateOppStake(rung){
 /* ═══════ GAUNTLET SCREEN INIT ═══════ */
 /* ═══════ END-SCREEN INLINE DRAFT ═══════ */
 var _draftDragState=null;
-var _draftPickedCardId=null;/* Track which card was placed — only 1 pick allowed */
+var _draftPickedCardId=null;/* Track which offered card is currently placed — at most one active pick per draft session */
 var _draftPickedSlotIdx=-1;
-var _draftPickedEl=null;/* The offered-card element that was placed */
-var _draftPrevSlotCardId=null;/* What S.run.cards[_draftPickedSlotIdx] held BEFORE the pick — restored on undo or when the player picks again (different card or slot). */
-var _draftBossMode=false;/* True when drafting boss signature cards (target slot 2) */
+var _draftPickedEl=null;/* The offered-card DOM element that was placed (hidden while picked) */
+/* Session-scoped "originals" map: {slotIdx: originalCardId|null}.
+   Records each slot's content at FIRST disturbance during this draft session.
+   This is what gets restored on undo (drag-out, switch picks, reshuffle, skip).
+   It's also what drives the underneath-ghost render. Wiped on CONTINUE/exit. */
+var _draftOriginals={};
+var _draftBossMode=false;/* True when drafting boss signature cards (target slot 0) */
 var _draftDragging=false;/* Global lock — only one drag at a time */
 function _endDraftPick(cardId){/* no-op — drag handles placement */}
 
@@ -16475,6 +16523,28 @@ function _draftFindDropSlot(x,y){
   });
   return best;
 }
+/* Restore an active pick: put the slot back to its session-original content,
+   un-hide the offered card element (if still attached), and clear pick state.
+   Used internally by _draftPlaceCard before placing a new pick, by drag-out,
+   by reshuffle, by skip, and by pouch-swap conflict resolution.
+
+   Note: _draftPickedEl may be detached from the DOM after a reshuffle (the
+   offer row gets rebuilt). isConnected check makes the un-hide step a no-op
+   in that case rather than throwing or doing nothing useful. */
+function _draftUndoActivePick(){
+  if(_draftPickedCardId===null||_draftPickedSlotIdx<0)return;
+  _getS();
+  var orig=_draftOriginals[_draftPickedSlotIdx];
+  S.run.cards[_draftPickedSlotIdx]=(orig===undefined?null:orig);
+  delete _draftOriginals[_draftPickedSlotIdx];
+  if(_draftPickedEl&&_draftPickedEl.isConnected){
+    _draftPickedEl.style.visibility='';
+    _draftPickedEl.style.pointerEvents='';
+    _draftPickedEl.style.opacity='';
+  }
+  _draftPickedCardId=null;_draftPickedSlotIdx=-1;_draftPickedEl=null;
+}
+
 function _draftPlaceCard(cardId,slotIdx,srcEl){
   var s=document.querySelector('#endDraftSlots .draft-slot[data-slot-idx="'+slotIdx+'"]');
   if(!s){
@@ -16485,37 +16555,31 @@ function _draftPlaceCard(cardId,slotIdx,srcEl){
   var cd=CARDS.find(function(c){return c.id===cardId;})||getNpcCard(cardId);
   if(!cd)return false;
   _getS();
-  /* Change-of-mind support: if there's an active pick, undo it first.
-     This restores the previous srcEl visibility AND restores the previous
-     slot to whatever it held BEFORE the pick (could be a different card or
-     empty). Without this, picking a second card would leave both placed —
-     the old solution was to grey-out the other offered cards entirely. The
-     player asked for the grey-out to go away ("I might change my mind"),
-     so we instead make every new pick atomically replace the previous one. */
-  if(_draftPickedCardId!==null&&_draftPickedSlotIdx>=0){
-    S.run.cards[_draftPickedSlotIdx]=_draftPrevSlotCardId;
-    if(_draftPickedEl){
-      _draftPickedEl.style.visibility='';
-      _draftPickedEl.style.pointerEvents='';
-      _draftPickedEl.style.opacity='';
-    }
-    _draftPickedCardId=null;_draftPickedSlotIdx=-1;_draftPickedEl=null;
+  /* Change-of-mind support: undo any current active pick FIRST. This
+     restores the previous slot to its session-original, un-hides the old
+     offered card, and clears pick state. Players want to swap offered
+     cards freely (drag B onto slot 2 even if A is already there) — undoing
+     before placing keeps the model "at most one pick at a time, the
+     underneath is always the session-original". */
+  _draftUndoActivePick();
+  /* Stash the slot's session-original — only on FIRST disturbance. If the
+     player previously picked A on this slot then undid and is now placing
+     B, _draftOriginals[slotIdx] is undefined (cleared by undo), so this
+     re-stashes the slot's true original. */
+  if(_draftOriginals[slotIdx]===undefined){
+    _draftOriginals[slotIdx]=S.run.cards[slotIdx]||null;
   }
-  /* Stash what's in the target slot now — restored if the player picks
-     again (or drags this card back out). */
-  _draftPrevSlotCardId=S.run.cards[slotIdx]||null;
   S.run.cards[slotIdx]=cardId;
   save();
   /* Re-render all slots from S.run.cards. _renderEndDraftSlots wraps each
-     gcard in .card-outer (so the aging observer fires for boss cards) and
-     re-attaches tooltip + undo-drag listeners. */
+     gcard in .card-outer (so the aging observer fires for boss cards),
+     re-attaches tooltip + undo-drag listeners, AND renders a ghost
+     underneath for any slot where _draftOriginals differs from current. */
   _renderEndDraftSlots();
   _draftPickedCardId=cardId;
   _draftPickedSlotIdx=slotIdx;
   _draftPickedEl=srcEl;
   srcEl.style.visibility='hidden';srcEl.style.pointerEvents='none';
-  /* No more _greyOutOfferedCards() — player can pick a different card and
-     the change-mind logic above swaps cleanly. */
   SFX.nav();
   var skipBtn=document.getElementById('endDraftSkipBtn');
   if(skipBtn){skipBtn.querySelector('span').textContent='CONTINUE';skipBtn.onclick=function(){SFX.nav();_endDraftDone();};}
@@ -16543,7 +16607,11 @@ function _initEndDraftDrag(el,cardId){
   el.addEventListener('pointerdown',function onDown(e){
     /* Guards */
     if(_draftDragging)return;
-    if(_draftPickedCardId&&_draftPickedCardId!==cardId)return;
+    /* Removed: offered-card lock when a different card is already picked.
+       Players asked to be able to switch picks freely — _draftPlaceCard
+       now handles the undo-then-place flow atomically. Only block the
+       picked offered card itself (it's hidden anyway, but a stale ref
+       could still receive events on some browsers). */
     if(el.classList.contains('draft-greyed'))return;
     if(el.style.visibility==='hidden')return;
 
@@ -16646,20 +16714,13 @@ function _initSlotUndoDrag(slotEl,slotIdx){
         return;
       }
 
-      /* Undo: restore the slot to its pre-pick content (was incorrectly
-         clearing to null — would lose the previously-equipped card if the
-         player drafted on top of it then changed their mind). Boss-class
-         used to use slotIdx>=3 (stale from before the slot reorder); now
-         the boss slot is idx 0 and _renderEndDraftSlots applies the class. */
-      _getS();
-      S.run.cards[slotIdx]=_draftPrevSlotCardId;
+      /* Undo: restore the slot to its session-original content from
+         _draftOriginals. _draftUndoActivePick handles state cleanup + the
+         offered-card un-hide (with isConnected guard for the reshuffle
+         edge case where the old offered element is gone). */
+      _draftUndoActivePick();
       save();
       _renderEndDraftSlots();
-      if(_draftPickedEl){
-        _draftPickedEl.style.visibility='';_draftPickedEl.style.pointerEvents='';_draftPickedEl.style.opacity='';
-      }
-      _draftPickedCardId=null;_draftPickedSlotIdx=-1;_draftPickedEl=null;
-      _draftPrevSlotCardId=null;
       var skipBtn=document.getElementById('endDraftSkipBtn');
       if(skipBtn){skipBtn.querySelector('span').textContent='SKIP';skipBtn.onclick=function(){SFX.nav();_endDraftSkip();};}
       SFX.nav();
@@ -16675,6 +16736,12 @@ function _initSlotUndoDrag(slotEl,slotIdx){
   });
 }
 function _endDraftSkip(){
+  /* Belt-and-braces: if SKIP is pressed while a pick is somehow still
+     active (shouldn't happen — skip button relabels to CONTINUE on pick —
+     but guard against state drift), restore the original first so the
+     player exits with their deck untouched. */
+  _draftUndoActivePick();
+  _getS();save();
   _endDraftDone();
 }
 
@@ -16721,11 +16788,23 @@ function _buildDraftPool(excludeIds){
   return pool.slice(0,_draftN);
 }
 
-/* Free Restock perk handler — reshuffle the offered cards once per run */
+/* Free Restock perk handler — reshuffle the offered cards once per run.
+   Players asked to be able to pick from the reshuffled offers even after
+   an earlier pick: previously the new offers were rendered with
+   .draft-locked (display-only) if the player had already drafted. Now we
+   force-undo the existing pick first (restore slot to its session-original,
+   un-hide the old offered card — though it's about to be removed anyway)
+   and render the new offers fully draggable. The discarded picked card was
+   from the OLD offer set and is simply gone after reshuffle. */
 function reshuffleDraft(){
   _getS();
   if(!S.renownPerks||!S.renownPerks.freeRestock||S.run._restockUsed)return;
   S.run._restockUsed=true;
+  /* Undo active pick BEFORE rebuilding the offer row. After this the slot
+     is restored and the picked card is just one of the about-to-be-deleted
+     offer DOM elements. */
+  _draftUndoActivePick();
+  _renderEndDraftSlots();
   save();
   /* Regenerate offer excluding the previously shown cards so reshuffle
      always produces a genuinely different hand. */
@@ -16745,18 +16824,15 @@ function reshuffleDraft(){
     html+='</div>';
   });
   draftCardsRow.innerHTML=html;
-  /* Re-attach drag + tooltip handlers */
-  var alreadyPicked=!!_draftPickedCardId;
+  /* Re-attach drag + tooltip handlers — new offers are FULLY pickable. */
   draftCardsRow.querySelectorAll('.draft-card-wrap').forEach(function(el){
     attachTooltipTap(el);
-    if(alreadyPicked){
-      /* Player already locked in a pick before reshuffling — new cards are display-only. */
-      el.classList.add('draft-locked');
-      el.style.pointerEvents='auto';/* keep tooltip working */
-    } else {
-      _initEndDraftDrag(el,el.dataset.cardId);
-    }
+    _initEndDraftDrag(el,el.dataset.cardId);
   });
+  /* Skip button label may have been "CONTINUE" if the player had a pick
+     before reshuffle — reset to SKIP since we just undid that pick. */
+  var skipBtn=document.getElementById('endDraftSkipBtn');
+  if(skipBtn){skipBtn.querySelector('span').textContent='SKIP';skipBtn.onclick=function(){SFX.nav();_endDraftSkip();};}
   /* Hide the reshuffle button now that it's used. Use visibility instead
      of display so the surrounding layout doesn't shift up. */
   var rb=document.getElementById('endDraftReshuffleBtn');
@@ -16767,6 +16843,10 @@ function _endDraftDone(){
   _draftDragState=null;
   _draftDragging=false;
   _draftPickedCardId=null;_draftPickedSlotIdx=-1;_draftPickedEl=null;
+  /* Wipe the session-originals map. Any "underneath" cards the player
+     drafted on top of are now permanently discarded — the slot keeps
+     whatever is currently in it (the active pick, if any). */
+  _draftOriginals={};
   /* Always exit straight to the tier screen. The post-boss-win inline
      dice store is gone — players use the standalone Shop from the
      bottom-nav now if they want to buy dice. */
@@ -17045,6 +17125,23 @@ function _renderEndDraftSlots(){
     /* Wrapper for slot + tooltip (tooltip as sibling, not child of slot) */
     var wrap=document.createElement('div');
     wrap.style.cssText='position:relative;width:'+_slotW;
+    /* Underneath ghost: render BEFORE the slot so it sits behind via DOM
+       order + negative-offset transform. Only when (a) this slot has a
+       session-original recorded, (b) that original is a real card id, AND
+       (c) it differs from the current card (no point ghosting same card).
+       The ghost is a static visual hint — no pointer events, no tooltip,
+       so it doesn't compete with the active card for taps. */
+    var origCid=_draftOriginals[i];
+    if(origCid!==undefined&&origCid&&origCid!==cid){
+      var ocd=CARDS.find(function(c){return c.id===origCid;})||getNpcCard(origCid);
+      if(ocd){
+        var _oRar=ocd.npc?'boss-'+ocd.npc:(ocd.npcOnly&&ocd.owner?'boss-'+ocd.owner:(ocd.npcOnly?'npc':ocd.rarity));
+        var ghost=document.createElement('div');
+        ghost.className='draft-ghost-underneath';
+        ghost.innerHTML='<div class="gcard rarity-'+_oRar+'"><div class="gcard-cover" style="background:'+(CARD_BG[origCid]||'#444')+'">'+ocd.icon+'</div><div class="gcard-frame"></div>'+gcCorners()+'</div>';
+        wrap.appendChild(ghost);
+      }
+    }
     var slot=document.createElement('div');
     var _lockCls=(!cid&&!_isSlotUnlocked(i))?' locked':'';
     slot.className='draft-slot'+(cid?' filled':'')+(i===0?' boss':'')+_lockCls;
@@ -17895,16 +17992,17 @@ function _pcEndDrag(x, y){
        modal closes. */
     try{if(typeof _renderTierLoadout==='function')_renderTierLoadout();}catch(e){}
     /* C1: if the victory screen's draft is showing underneath, refresh its
-       slot row too so the swap is reflected when the pouch closes. */
+       slot row too so the swap is reflected when the pouch closes.
+       (Anti-exploit note: previously this branch also force-committed any
+       active draft pick on EVERY pouch swap so the player couldn't pouch
+       the drafted card and then pick another offered for free. That guard
+       moved to _performPouchSwap, which now auto-undoes the draft pick
+       only when the swap touches the picked slot — finer-grained and lets
+       the player pouch unrelated slots without losing their draft pick's
+       undo ability.) */
     try{
       var _eov=document.getElementById('end-ov');
       if(_eov&&_eov.classList.contains('show')&&typeof _renderEndDraftSlots==='function'){
-        /* Anti-exploit: a pouch swap during an uncommitted draft pick would
-           let the player pouch the drafted card and then pick a different
-           one (free extra card). Commit the current pick the moment a
-           swap happens so subsequent clicks treat the new selection as a
-           fresh draft pick (no "undo" restore). */
-        _draftPickedCardId=null;_draftPickedSlotIdx=-1;_draftPickedEl=null;_draftPrevSlotCardId=null;
         _renderEndDraftSlots();
       }
     }catch(e){}
@@ -17918,7 +18016,28 @@ function _performPouchSwap(a,b){
   /* Returns true if swap succeeded. Validates that both endpoints are legal for
      the card they'd receive. Boss slot (idx 0) only accepts boss-only cards;
      regular slots (1..3) don't accept boss-only cards. Pouch slots must be
-     within the player's renown-unlocked capacity (getPouchCapacity). */
+     within the player's renown-unlocked capacity (getPouchCapacity).
+     ── Draft conflict rule ──
+     If the player has an active draft pick AND this swap touches the active
+     slot holding that pick, undo the pick first. The pouch action takes
+     precedence: the drafted offered card returns to the offer row and the
+     slot reverts to its session-original BEFORE the pouch swap mutates it.
+     Without this, the pouch swap would shuffle the drafted card around and
+     desync _draftPicked* / _draftOriginals state. */
+  if(typeof _draftPickedSlotIdx!=='undefined'&&_draftPickedSlotIdx>=0){
+    var conflict=(a.kind==='active'&&a.idx===_draftPickedSlotIdx)||
+                 (b.kind==='active'&&b.idx===_draftPickedSlotIdx);
+    if(conflict){
+      _draftUndoActivePick();
+      _renderEndDraftSlots();
+      /* Relabel CONTINUE → SKIP since the pick is gone */
+      var skipBtn=document.getElementById('endDraftSkipBtn');
+      if(skipBtn&&skipBtn.querySelector('span')){
+        skipBtn.querySelector('span').textContent='SKIP';
+        skipBtn.onclick=function(){SFX.nav();_endDraftSkip();};
+      }
+    }
+  }
   var arrA = a.kind==='active' ? S.run.cards : S.run.pouch;
   var arrB = b.kind==='active' ? S.run.cards : S.run.pouch;
   var cidA = arrA[a.idx], cidB = arrB[b.idx];
@@ -18173,103 +18292,225 @@ function updateDiceStyleUI(style){
 // Mobile browsers (iOS especially) ignore <audio>.volume — it's pinned
 // to system media volume. Routing through Web Audio API + GainNode gives
 // us actual volume control on every platform.
-var BG_MUSIC=null;
-var BG_GAIN=null;
+/* ─── BACKGROUND AUDIO: TAVERN + BOSS + AMBIENCE ───
+   Three layered audio sources sharing one AudioContext:
+   - TAVERN: default music (Tavern_8bit_relax.mp3) — patron matches, menu, draft
+   - BOSS:   boss-fight music (Tavern_8bit.mp3) — crossfades in at boss splash
+             start, out at exitMatch after victory/loss
+   - AMB:    ambience underlay (ambiance.mp3) — always-on (subject to setting),
+             looped via two-element crossfade so the loop seam is inaudible
+   Web Audio GainNodes are needed because <audio>.volume on iOS/Android
+   doesn't give us reliable volume control or smooth fades.
+   Settings: S.settings.music (default ON) gates TAVERN + BOSS;
+             S.settings.ambience (default ON) gates AMB. */
 var BG_CTX=null;
-var BG_VOLUME=0.07;
-function _ensureBgMusic(){
-  if(BG_MUSIC)return BG_MUSIC;
-  var a=document.getElementById('bgMusic');
-  if(!a){
-    a=document.createElement('audio');
-    a.id='bgMusic';
-    a.src='Audio/Tavern_8bit.mp3';
-    a.loop=true;
-    a.preload='auto';
-    a.crossOrigin='anonymous';
-    a.style.display='none';
-    document.body.appendChild(a);
-  }
-  // Fallback for browsers that honor <audio>.volume
-  a.volume=BG_VOLUME;
-  BG_MUSIC=a;
-  return a;
-}
-// Build the AudioContext only — DON'T connect mediaElementSource yet.
-// On iOS, once an <audio> is wired to a suspended context, .play()
-// becomes silent. We connect the source AFTER play() succeeds.
+var BG_TAVERN_VOL=0.07;
+var BG_BOSS_VOL=0.07;
+/* Ambience volume: was 0.035 (50% of music) and barely audible. Bumped
+   to 0.06 — still slightly quieter than music so it reads as "underlay"
+   but actually audible behind the dice/UI sfx. */
+var BG_AMB_VOL=0.06;
+var BG_FADE_MS=1500;
+var BG_AMB_CROSSFADE_MS=2000;
+var BG_TAVERN={audio:null,gain:null,attached:false};
+var BG_BOSS  ={audio:null,gain:null,attached:false};
+var BG_AMB   ={audioA:null,audioB:null,gainA:null,gainB:null,
+               attachedA:false,attachedB:false,active:'A',crossfading:false};
+var _bgCurrentLayer='tavern';/* 'tavern' or 'boss' */
 function _ensureBgCtx(){
   if(BG_CTX)return BG_CTX;
-  try{
-    var AC=window.AudioContext||window.webkitAudioContext;
-    if(!AC)return null;
-    BG_CTX=new AC();
-  }catch(e){BG_CTX=null;}
+  try{var AC=window.AudioContext||window.webkitAudioContext;if(!AC)return null;BG_CTX=new AC();}
+  catch(e){BG_CTX=null;}
   return BG_CTX;
 }
-// Connect the audio element to the gain node — only safe to call once
-// the audio is actually playing (otherwise iOS routes through a
-// suspended context and goes silent).
-function _attachBgGain(){
-  if(BG_GAIN||!BG_CTX)return BG_GAIN;
+function _bgMkAudio(src){
+  var a=document.createElement('audio');
+  a.src=src;a.preload='auto';a.crossOrigin='anonymous';a.style.display='none';
+  document.body.appendChild(a);
+  return a;
+}
+function _ensureLayer(layerName){
+  var L=(layerName==='tavern')?BG_TAVERN:BG_BOSS;
+  if(L.audio)return L;
+  var src=(layerName==='tavern')?'Audio/Tavern_8bit_relax.mp3':'Audio/Tavern_8bit.mp3';
+  L.audio=_bgMkAudio(src);L.audio.loop=true;
+  return L;
+}
+function _ensureAmbience(){
+  if(BG_AMB.audioA)return;
+  BG_AMB.audioA=_bgMkAudio('Audio/ambiance.mp3');
+  BG_AMB.audioB=_bgMkAudio('Audio/ambiance.mp3');
+  /* Manual loop via crossfade — last 2s of A overlap with start of B. */
+  BG_AMB.audioA.loop=false;
+  BG_AMB.audioB.loop=false;
+  function watchSeam(el,key){
+    el.addEventListener('timeupdate',function(){
+      if(BG_AMB.active!==key||BG_AMB.crossfading)return;
+      var rem=el.duration-el.currentTime;
+      if(isNaN(rem))return;
+      if(rem<=BG_AMB_CROSSFADE_MS/1000)_ambCrossfadeToOther();
+    });
+    /* Safety: if a crossfade somehow missed (tab throttling), restart. */
+    el.addEventListener('ended',function(){
+      if(BG_AMB.active===key){el.currentTime=0;try{el.play();}catch(e){}}
+    });
+  }
+  watchSeam(BG_AMB.audioA,'A');
+  watchSeam(BG_AMB.audioB,'B');
+}
+/* Attach a MediaElementSource → GainNode → destination. iOS quirk: only
+   safe AFTER the audio element has started playing — otherwise the
+   element gets routed through a suspended context and goes silent. */
+function _attachLayerGain(layerName){
+  var L=(layerName==='tavern')?BG_TAVERN:BG_BOSS;
+  if(L.attached||!BG_CTX)return;
   try{
-    var a=_ensureBgMusic();
-    var src=BG_CTX.createMediaElementSource(a);
-    BG_GAIN=BG_CTX.createGain();
-    BG_GAIN.gain.value=BG_VOLUME;
-    src.connect(BG_GAIN);
-    BG_GAIN.connect(BG_CTX.destination);
-  }catch(e){BG_GAIN=null;}
-  return BG_GAIN;
+    var src=BG_CTX.createMediaElementSource(L.audio);
+    L.gain=BG_CTX.createGain();
+    L.gain.gain.value=0;/* start silent — _setMusicLayer / _bgMusicSync brings it in */
+    src.connect(L.gain);L.gain.connect(BG_CTX.destination);
+    L.attached=true;
+  }catch(e){}
 }
-/* Apply the muted-state without ever calling pause() — pause/play race
-   conditions on iOS were causing the "music bugs out when turning off"
-   issue (the play promise would resolve after pause, leaving audio in a
-   glitched state). Instead we keep the element playing and toggle
-   audio.muted + gain.value for instant, race-free silence. */
-function _bgApplyMute(muted){
-  var a=BG_MUSIC;
-  if(a)a.muted=!!muted;
-  if(BG_GAIN){try{BG_GAIN.gain.value=muted?0:BG_VOLUME;}catch(e){}}
+function _attachAmbGain(key){
+  if(!BG_CTX)return;
+  if(BG_AMB['attached'+key])return;
+  try{
+    var src=BG_CTX.createMediaElementSource(BG_AMB['audio'+key]);
+    var g=BG_CTX.createGain();g.gain.value=0;
+    src.connect(g);g.connect(BG_CTX.destination);
+    BG_AMB['gain'+key]=g;BG_AMB['attached'+key]=true;
+  }catch(e){}
 }
-function _bgMusicSync(){
-  var a=_ensureBgMusic();
+function _fadeGain(gainNode,target,ms){
+  if(!gainNode||!BG_CTX)return;
+  try{
+    var now=BG_CTX.currentTime;
+    gainNode.gain.cancelScheduledValues(now);
+    gainNode.gain.setValueAtTime(gainNode.gain.value,now);
+    gainNode.gain.linearRampToValueAtTime(target,now+ms/1000);
+  }catch(e){}
+}
+/* Crossfade between tavern and boss music. Called from _showBossSplash
+   (→ 'boss') and exitMatch (→ 'tavern'). When entering boss mode, the
+   boss track restarts from time 0 so every boss fight gets the full
+   intro fanfare (was picking up mid-track since the audio element was
+   left silently looping in the background). */
+function _setMusicLayer(layer){
+  if(_bgCurrentLayer===layer)return;
+  _bgCurrentLayer=layer;
+  _bgMusicSync();/* ensure both layers exist + playing */
   var on=!S||!S.settings||S.settings.music!==false;
-  if(on){
-    /* Pre-create context within this user-gesture call so iOS unlocks it. */
-    _ensureBgCtx();
-    if(BG_CTX&&BG_CTX.state==='suspended'){
-      try{BG_CTX.resume();}catch(e){}
-    }
-    a.muted=false;
-    /* If already playing, just unmute via gain — no need to call play() again. */
-    if(!a.paused){
-      _bgApplyMute(false);
-      return;
-    }
-    var p=a.play();
-    if(p&&p.then){
-      p.then(function(){
-        _attachBgGain();
-        _bgApplyMute(false);
-      }).catch(function(){});
-    }else{
-      _attachBgGain();
-      _bgApplyMute(false);
-    }
+  if(!on)return;/* music muted — gains stay at 0 */
+  if(layer==='boss'){
+    /* Restart boss track from the top for every boss fight. The element
+       was kept playing (so the crossfade has something to ramp into) but
+       resetting currentTime gives the track its proper intro. */
+    try{if(BG_BOSS.audio){BG_BOSS.audio.currentTime=0;}}catch(e){}
+    _fadeGain(BG_TAVERN.gain,0,BG_FADE_MS);
+    _fadeGain(BG_BOSS.gain,BG_BOSS_VOL,BG_FADE_MS);
   }else{
-    /* Mute instead of pause — race-free, no glitch. The element keeps
-       looping silently in the background. */
-    _bgApplyMute(true);
+    _fadeGain(BG_BOSS.gain,0,BG_FADE_MS);
+    _fadeGain(BG_TAVERN.gain,BG_TAVERN_VOL,BG_FADE_MS);
   }
 }
+/* Apply S.settings.music. Starts both layers if needed; the currently
+   active layer plays at full gain, the other stays at 0. Crossfade
+   schedules from _setMusicLayer are preserved (we only set gains when
+   transitioning state, not on every sync call). */
+function _bgMusicSync(){
+  var on=!S||!S.settings||S.settings.music!==false;
+  _ensureBgCtx();
+  if(BG_CTX&&BG_CTX.state==='suspended'){try{BG_CTX.resume();}catch(e){}}
+  var T=_ensureLayer('tavern');
+  var B=_ensureLayer('boss');
+  T.audio.muted=!on;B.audio.muted=!on;
+  function startIfNeeded(L,layerName,vol){
+    if(L.audio.paused){
+      var p=L.audio.play();
+      var onReady=function(){
+        _attachLayerGain(layerName);
+        /* Note: GainNode value is on .gain.value, NOT .value. Setting the
+           wrong path silently no-ops (sets a property on the node, not the
+           AudioParam) and leaves audio at gain 0. */
+        if(L.gain)L.gain.gain.value=(_bgCurrentLayer===layerName&&on)?vol:0;
+      };
+      if(p&&p.then){p.then(onReady).catch(function(){});}else{onReady();}
+    }
+    /* If already playing, don't touch gain here — _setMusicLayer manages
+       crossfade ramps. The mute toggle (above) handles the OFF case. */
+  }
+  if(on){
+    startIfNeeded(T,'tavern',BG_TAVERN_VOL);
+    startIfNeeded(B,'boss',BG_BOSS_VOL);
+  }else{
+    /* Mute by zeroing gain too — keep playback running so resume is instant. */
+    if(BG_TAVERN.gain)BG_TAVERN.gain.gain.value=0;
+    if(BG_BOSS.gain)BG_BOSS.gain.gain.value=0;
+  }
+}
+function _ambienceSync(){
+  var on=!S||!S.settings||S.settings.ambience!==false;
+  _ensureBgCtx();
+  if(BG_CTX&&BG_CTX.state==='suspended'){try{BG_CTX.resume();}catch(e){}}
+  _ensureAmbience();
+  if(on){
+    var key=BG_AMB.active;
+    var audio=BG_AMB['audio'+key];
+    if(audio.paused){
+      var p=audio.play();
+      var onReady=function(){
+        _attachAmbGain(key);
+        var g=BG_AMB['gain'+key];
+        if(g)g.gain.value=BG_AMB_VOL;
+      };
+      if(p&&p.then){p.then(onReady).catch(function(){});}else{onReady();}
+    }else{
+      var g=BG_AMB['gain'+key];
+      if(g)g.gain.value=BG_AMB_VOL;
+    }
+  }else{
+    if(BG_AMB.gainA)BG_AMB.gainA.gain.value=0;
+    if(BG_AMB.gainB)BG_AMB.gainB.gain.value=0;
+  }
+}
+function _ambCrossfadeToOther(){
+  BG_AMB.crossfading=true;
+  var fromKey=BG_AMB.active;
+  var toKey=fromKey==='A'?'B':'A';
+  var toAudio=BG_AMB['audio'+toKey];
+  if(!toAudio){BG_AMB.crossfading=false;return;}
+  toAudio.currentTime=0;
+  var p=toAudio.play();
+  var doFade=function(){
+    _attachAmbGain(toKey);
+    var on=!S||!S.settings||S.settings.ambience!==false;
+    var target=on?BG_AMB_VOL:0;
+    _fadeGain(BG_AMB['gain'+toKey],target,BG_AMB_CROSSFADE_MS);
+    _fadeGain(BG_AMB['gain'+fromKey],0,BG_AMB_CROSSFADE_MS);
+    setTimeout(function(){
+      BG_AMB.active=toKey;
+      var fromAudio=BG_AMB['audio'+fromKey];
+      try{fromAudio.pause();fromAudio.currentTime=0;}catch(e){}
+      BG_AMB.crossfading=false;
+    },BG_AMB_CROSSFADE_MS);
+  };
+  if(p&&p.then){p.then(doFade).catch(function(){BG_AMB.crossfading=false;});}
+  else{doFade();}
+}
+/* Back-compat stubs in case other modules referenced the old API. */
+function _ensureBgMusic(){var T=_ensureLayer('tavern');return T.audio;}
+function _attachBgGain(){_attachLayerGain('tavern');}
+function _bgApplyMute(muted){_bgMusicSync();}
 function toggleAudio(type){
   if(!S.settings)S.settings={};
   if(type==='music'){S.settings.music=!(S.settings.music!==false);}
+  else if(type==='ambience'){S.settings.ambience=!(S.settings.ambience!==false);}
   else{S.settings.sfx=!(S.settings.sfx!==false);}
   save();
   updateAudioUI();
   if(type==='music')_bgMusicSync();
+  else if(type==='ambience')_ambienceSync();
 }
 /* Generic settings toggle — haptics, reducedMotion, etc. default to ON.
    Toggling flips the stored value; absence means ON. */
@@ -18280,14 +18521,17 @@ function toggleSetting(key){
 }
 function updateAudioUI(){
   const musicOn=!S.settings||S.settings.music!==false;
+  const ambienceOn=!S.settings||S.settings.ambience!==false;
   const sfxOn=!S.settings||S.settings.sfx!==false;
   const hapticsOn=!S.settings||S.settings.haptics!==false;
   const reducedMotion=!!(S.settings&&S.settings.reducedMotion===true);
   const mc=document.getElementById('musicCheck');
+  const ac=document.getElementById('ambienceCheck');
   const sc=document.getElementById('sfxCheck');
   const hc=document.getElementById('hapticsCheck');
   const rmc=document.getElementById('reducedMotionCheck');
   if(mc)mc.classList.toggle('on',musicOn);
+  if(ac)ac.classList.toggle('on',ambienceOn);
   if(sc)sc.classList.toggle('on',sfxOn);
   if(hc)hc.classList.toggle('on',hapticsOn);
   /* reduced-motion check is "on" when the setting is enabled (i.e. motion IS reduced) */
@@ -18306,23 +18550,21 @@ function updateAudioUI(){
   function _kick(){
     try{
       var s=null;try{s=JSON.parse(localStorage.getItem('gambit4'));}catch(e){}
-      var on=!s||!s.settings||s.settings.music!==false;
-      if(!on)return;
-      var a=_ensureBgMusic();
+      var musicOn=!s||!s.settings||s.settings.music!==false;
+      var ambOn=!s||!s.settings||s.settings.ambience!==false;
       _ensureBgCtx();
-      if(BG_CTX&&BG_CTX.state==='suspended'){
-        try{BG_CTX.resume();}catch(e){}
-      }
-      var p=a.play();
-      if(p&&p.then){
-        p.then(function(){
-          _attachBgGain();
-          _off();
-        }).catch(function(){});
-      }else{
-        _attachBgGain();
-        _off();
-      }
+      if(BG_CTX&&BG_CTX.state==='suspended'){try{BG_CTX.resume();}catch(e){}}
+      /* Kick BOTH music + ambience on the same user-gesture. Default tavern
+         layer plays at full volume; boss layer plays silent until
+         _setMusicLayer('boss') is called. Ambience starts at full setting
+         volume on element A; the loop-watcher swaps to B when needed. */
+      if(musicOn)_bgMusicSync();
+      if(ambOn)_ambienceSync();
+      /* Only unbind listeners once playback has actually started on the
+         intended layers — otherwise iOS can leave us stuck silent. */
+      var musicReady=!musicOn||(BG_TAVERN.audio&&!BG_TAVERN.audio.paused);
+      var ambReady=!ambOn||(BG_AMB.audioA&&!BG_AMB.audioA.paused);
+      if(musicReady&&ambReady)_off();
     }catch(e){}
   }
   function _off(){
@@ -18832,6 +19074,9 @@ document.addEventListener('DOMContentLoaded', function(){
 if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
 
 </script>
-<audio id="bgMusic" src="Audio/Tavern_8bit.mp3" loop preload="auto" style="display:none"></audio>
+<!-- Audio elements (tavern music, boss music, ambience-A, ambience-B) are
+     created from JS in the BG_* system below. The previous static
+     <audio id="bgMusic"> element has been replaced. -->
+
 </body>
 </html>
