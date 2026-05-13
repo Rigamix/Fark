@@ -517,7 +517,8 @@ body{
    rAF-based clampTooltip move-to-body never fires reliably. This ensures
    the tooltip is visible the moment .peeked is toggled. Player feedback:
    "Still can't see card tooltips in mid match loadout panel". */
-#mLoadout-ov .lo-mini-card.peeked .mcard-tooltip{z-index:9700;opacity:1!important;pointer-events:auto}
+/* Mid-match panel is z:10200 — tooltip needs higher to clear it. */
+#mLoadout-ov .lo-mini-card.peeked .mcard-tooltip{z-index:10500;opacity:1!important;pointer-events:auto}
 
 /* ─── ACTIVATE ZONE (drag target) ─── */
 .activate-zone{
@@ -1591,6 +1592,18 @@ body.crit-dilate{animation:critDilate .55s ease-out both}
   position:fixed;inset:0;z-index:9050;pointer-events:none;opacity:0;
   display:flex;align-items:center;justify-content:center;
   background:radial-gradient(circle at center,rgba(255,200,60,.55) 0%,rgba(180,120,20,.25) 35%,rgba(0,0,0,.6) 80%);
+}
+/* Pixel-art dither over the radial gradient. Two repeating-conic-gradient
+   layers at offset coordinates produce a 4-px checker that blends with
+   the smooth gradient beneath — gives the overlay a chunky 8-bit feel
+   instead of the photoshop-soft glow. */
+#feat-ov::before{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background:
+    repeating-conic-gradient(rgba(0,0,0,.18) 0% 25%,transparent 0% 50%) 0 0/4px 4px,
+    repeating-conic-gradient(rgba(255,210,80,.10) 0% 25%,transparent 0% 50%) 2px 2px/4px 4px;
+  mix-blend-mode:overlay;
+  image-rendering:pixelated;
 }
 #feat-ov.flash{animation:featOvFade 2.4s ease-out forwards}
 @keyframes featOvFade{
@@ -3081,6 +3094,14 @@ body::before,body::after{display:none!important}
 .end-draft-slots .mcard-tooltip{bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);z-index:100}
 .end-draft-slots .draft-slot.peeked .mcard-tooltip{opacity:1;pointer-events:auto;animation:tipGrow .25s ease-out}
 .end-draft-slots .draft-slot.drop-hover{border-color:var(--gold);box-shadow:0 0 12px rgba(200,160,80,.4)}
+/* Drag-rejection visual: highlight slots that are unlocked but disallowed
+   by the active-pick rule (a pick exists in a different slot, so this
+   empty slot can't accept the drop — "one card per draft" enforcement). */
+.end-draft-slots .draft-slot.drop-invalid{
+  border-color:rgba(220,80,80,.85)!important;
+  box-shadow:0 0 12px rgba(220,80,80,.45)!important;
+  background:rgba(80,30,30,.45)!important;
+}
 .end-draft-skip{
   position:relative;display:block;
   /* Safe-area bottom margin so iPhone home indicator doesn't clip
@@ -7943,7 +7964,7 @@ const RUNGS=[
        found unfair. Still appears in the post-victory boss reward draft
        (line ~14248 picks it up via owner==='finnick'). */
     cardPool:['quick_hands','the_skim','beginners_luck','the_lords_seal','sticky_fingers_die'],cardCount:3,
-    tell:{id:'pickpocket',name:'PICKPOCKET',desc:"50% chance: one of your dice gets palmed",icon:'✋',chance:.50}},
+    tell:{id:'pickpocket',name:'PICKPOCKET',desc:"30% chance: one of your dice gets palmed",icon:'✋',chance:.30}},
   {id:3,name:'CORVUS',key:'merchant',icon:'💼',tier:'known',target:8500,gold:350,buyIn:50,
     boss:null,bossDesc:null,
     agg:.60,cardRarity:'silver',wager:true,wagerCount:1,wagerMode:'best',minBank:250,diceStop:2,chaotic:false,adaptive:true,
@@ -8856,9 +8877,9 @@ const NPC_CARDS=[
    playerDesc:"Activate while yielding: on the opponent's next scoring roll, swap their highest-value die down to a 3.",
    effect:{type:'once',mechanic:'swap_best_to_3'}},
   {id:'pocket_sand',name:'PICKPOCKET',icon:'✋',rarity:'npc',npcOnly:true,owner:'finnick',
-   eff:'70% CHANCE: First roll = 5 dice',desc:'Seventy percent chance each turn — your opponent shaves a die from your first roll, leaving you with five instead of six.',
-   playerDesc:"Seventy percent chance each turn that your opponent's first roll only uses five dice instead of six.",
-   effect:{type:'passive',mechanic:'reduce_first_roll'}},
+   eff:'30% CHANCE: First roll = 5 dice',desc:'Thirty percent chance each turn — your opponent shaves a die from your first roll, leaving you with five instead of six.',
+   playerDesc:"Thirty percent chance each turn that your opponent's first roll only uses five dice instead of six.",
+   effect:{type:'passive',mechanic:'reduce_first_roll',chance:0.30}},
   {id:'the_skim',name:'THE SKIM',icon:'💸',rarity:'npc',npcOnly:true,owner:'finnick',
    eff:'Takes 30% of your banks',desc:'Every time you bank, Finnick takes 30% of your banked points for himself.',
    playerDesc:'Every time the opponent banks, you take 30% of their banked points.',
@@ -9946,8 +9967,20 @@ function attachTooltipTap(wrapperEl,opts){
     closeAllChips();
     if(!wasPeeked){SFX.cardFlip();wrapperEl.classList.add('peeked');clampTooltip(wrapperEl);}
   };
-  wrapperEl.addEventListener('click',toggle);
-  wrapperEl.addEventListener('touchend',function(e){e.preventDefault();toggle(e);},{passive:false});
+  /* Touch devices fire BOTH touchend and a synthesized click ~50-300ms
+     later. Without gating, the click toggles the tooltip closed again
+     immediately after the touchend opens it — net effect: tap does
+     nothing. Set _tapJustFired on touchend and have the click handler
+     ignore taps that follow a touchend within 500ms. */
+  wrapperEl.addEventListener('click',function(e){
+    if(window._tapJustFired&&Date.now()-window._tapJustFired<500)return;
+    toggle(e);
+  });
+  wrapperEl.addEventListener('touchend',function(e){
+    e.preventDefault();
+    window._tapJustFired=Date.now();
+    toggle(e);
+  },{passive:false});
 }
 
 function closeAllChips(){
@@ -10050,7 +10083,12 @@ function clampTooltip(mcardEl){
       tip.style.bottom='auto';
       tip.style.transform='none';
       tip.style.opacity='1';tip.style.pointerEvents='auto';
-      tip.style.zIndex='9999';
+      /* z-index must beat every panel the tooltip can be moved out of.
+         Mid-match loadout panel is z:10200, lo-backdrop is z:10100.
+         Old value (9999) put the body-promoted tooltip BEHIND the panel,
+         which is why mid-match loadout tooltips weren't appearing even
+         after the touchend/click double-fire fix landed. */
+      tip.style.zIndex='10500';
       tip.style.left='0px';tip.style.top='0px';
       const tipW=tip.offsetWidth;
       const tipH=tip.offsetHeight;
@@ -10881,7 +10919,12 @@ function _alignOverlayWord(wordEl){
   wordEl.style.translate='0 '+offset+'px';
 }
 function showHot(){
-  if(window.DLG)DLG.trigger('PLAYER_HOT_DICE');
+  /* Suppress the "all six!" patron commentary if a bust-save (Martyr,
+     Iron Stomach, Brutus's Grit) fired earlier this turn. The bonus and
+     overlay still fire, but the NPC dialogue otherwise reads as if the
+     player legitimately rolled all six clean — which is misleading when
+     a save rescued a real bust. */
+  if(window.DLG&&!(G&&G._bustSavedThisTurn))DLG.trigger('PLAYER_HOT_DICE');
   const ov=document.getElementById('hot-ov');
   _alignOverlayWord(ov.querySelector('.hot-word'));
   ov.classList.remove('flash');void ov.offsetWidth;ov.classList.add('flash');
@@ -10961,7 +11004,7 @@ function toggleDie(d){
 }
 
 function startPTurn(){
-  G.phase='idle';G.turnPts=0;G.kept=[];G.numDice=G.matchDice?G.matchDice.length:6;G.pool=[];G.turnRollCount=0;G._slowHandUsedThisTurn=false;G._warmHandsActive=false;G._lastHotDice=false;G._firstRollCommitted=0;
+  G.phase='idle';G.turnPts=0;G.kept=[];G.numDice=G.matchDice?G.matchDice.length:6;G.pool=[];G.turnRollCount=0;G._slowHandUsedThisTurn=false;G._warmHandsActive=false;G._lastHotDice=false;G._firstRollCommitted=0;G._bustSavedThisTurn=false;
   /* ── TELL: turn-start hooks ── */
   if(G._tell){
     /* Steeped: reset accumulated bonus each turn */
@@ -11116,6 +11159,14 @@ function startPTurn(){
 }
 
 function handleRoll(){
+  /* Race guard: the roll button can stay visually clickable for a few ms
+     between turn handoffs, letting a frantic-tapping player fire a roll
+     DURING the NPC's turn (G.phase==='opp'). That puts both turns into
+     the same dice state and corrupts the match. Bail immediately if
+     phase isn't a player phase. Also bail if the dice are mid-roll
+     (phase==='rolling') so a second tap can't queue up a re-roll
+     before the first settles. */
+  if(!G||G.phase==='opp'||G.phase==='rolling'||G.phase==='yielding')return;
   /* Dismiss any board-covering overlays before rolling, so the new dice
      are visible immediately. Otherwise on a non-scoring first roll, the
      dice render hidden behind an overlay, bust fires, dice cleared —
@@ -11846,6 +11897,12 @@ function _tryBustSave(free){
   function _runSave(label,text){
     free.forEach(d=>{if(d.el){d.el.classList.add('bust');setTimeout(()=>{if(d.el)d.el.remove();},380);}});
     G.pool=G.pool.filter(d=>d.committed);G.phase='idle';
+    /* Flag the turn as a bust-save turn. Subsequent dialogue triggers
+       (PLAYER_HOT_DICE, PLAYER_SIX_KIND, etc) skip their NPC comment
+       because they'd otherwise praise the player for "scoring all six"
+       even though the streak only completed thanks to Martyr/Iron Stomach
+       /Brutus's Grit rescuing a real bust. Cleared on next startPTurn. */
+    G._bustSavedThisTurn=true;
     triggerCard(label,text,true);
     _updatePlayerCardVisuals();
     setTimeout(handleRoll,1700);
@@ -12600,8 +12657,9 @@ function handleYield(){
     else if(G._lastBankForDlg<=200)DLG.trigger('EARLY_BANK');
     G._lastBankForDlg=0;
   }
-  /* Hand-type dialogue triggers — fire on yield so they don't spoil the roll */
-  if(window.DLG){
+  /* Hand-type dialogue triggers — fire on yield so they don't spoil the roll.
+     Suppressed when a bust-save fired this turn (same reasoning as showHot). */
+  if(window.DLG&&!(G&&G._bustSavedThisTurn)){
     const free=G.pool.filter(d=>!d.committed);const freeV=free.map(d=>d.val);
     if(freeV.length>=3){const sorted=[...freeV].sort();
       if(freeV.length===6&&new Set(freeV).size===1)DLG.trigger('PLAYER_SIX_KIND');
@@ -14046,6 +14104,16 @@ function endMatch(win){
   /* Feats: evaluate now (writes renown to S), reveal later in the post-coin
      setTimeout block so feats fade in exactly where coins faded out. */
   var _featsEarned=win?evaluateFeats():[];
+  /* Fire the fullscreen FEAT UNLOCKED splash IMMEDIATELY when feats are
+     earned, NOT inside the post-animation setTimeout below. The old delay
+     (3.2s for patron wins) let the player tap CONTINUE before the splash
+     ran, which then overflowed into the next match — the player saw the
+     splash mid-new-match instead of as a reward for the match they just
+     won. Player feedback: "check that this is happening when the feat
+     happens. Seems like it happens later." */
+  if(win&&_featsEarned&&_featsEarned.length){
+    try{_showFeatUnlocksSequential(_featsEarned);}catch(e){}
+  }
 
   /* 5. Prepare boss-loss card/dialogue data (before delay, while G is still available) */
   var _bossLossData=null;
@@ -14114,15 +14182,11 @@ function endMatch(win){
   /* Fully remove the wrap after the fade so layout doesn't hold space */
   setTimeout(function(){if(resGoldWrap)resGoldWrap.style.display='none';},320);
 
-  /* Feats reveal — slot in where the coins just were */
+  /* Feats reveal — slot in where the coins just were. The fullscreen
+     splash for newly-earned feats already fired earlier (immediately when
+     endMatch ran, see the call right after evaluateFeats). Here we just
+     render the listed-out feat rows in the victory panel. */
   if(win){
-    /* D3: Fire a fullscreen golden FEAT UNLOCKED splash for each newly
-       earned feat BEFORE rendering them in the panel. Chained sequentially
-       (one splash fades, the next plays). Player feedback D3: "Feat unlock
-       full-screen golden overlay + text (distinct from hot dice)". */
-    if(_featsEarned&&_featsEarned.length){
-      try{_showFeatUnlocksSequential(_featsEarned);}catch(e){}
-    }
     var rf=document.getElementById('resFeats');
     if(rf){
       var fhtml='';
@@ -14280,6 +14344,16 @@ function endMatch(win){
        the actual viewport bottom). */
     var _actionsHost=document.getElementById('endDraftActionsHost');
     if(_actionsHost)_actionsHost.innerHTML=_endDraftActionsHtml();
+    /* Slot-unlock celebration: drain pending perk-unlock modals NOW so the
+       "SLOT UNLOCKED" splash pops BEFORE the player drafts into the new
+       slot. The modal backdrop blocks draft interaction until dismissed.
+       Previously this drained on the gauntlet screen 900ms after exit,
+       which meant the player saw the unlocked slot and could draft into
+       it without ever understanding why it became available. The drain is
+       no-op if no perks are pending. */
+    setTimeout(function(){
+      if(typeof _drainPerkUnlockQueue==='function')_drainPerkUnlockQueue();
+    },1200);
     /* Attach tooltip + drag handlers + draw button canvases */
     setTimeout(function(){
       document.querySelectorAll('.end-draft .draft-card-wrap').forEach(function(el){
@@ -14516,6 +14590,13 @@ function exitMatch(){
      / gauntlet / shop screens — tavern is the right layer for all of
      them. The crossfade no-ops if we were already on tavern. */
   try{if(typeof _setMusicLayer==='function')_setMusicLayer('tavern');}catch(e){}
+  /* Hard-cancel any in-flight feat-unlock splash so it can't bleed into the
+     next match. Belt-and-braces: the splash now fires immediately on
+     endMatch, so it should always be done by the time exitMatch runs, but
+     in pathological cases (paused tab, slow device) the 2400 ms could
+     still be running when the player taps CONTINUE. */
+  var _featOv=document.getElementById('feat-ov');
+  if(_featOv)_featOv.classList.remove('flash');
   if(window._endTimers){window._endTimers.forEach(t=>clearTimeout(t));window._endTimers=[];}
   document.querySelectorAll('.coin-burst-p').forEach(el=>el.remove());
   var lov=document.getElementById('mLoadout-ov');if(lov)lov.classList.remove('show');
@@ -15000,39 +15081,40 @@ const OPP_DIALOGUE={
     }
   },
   /* Generic patron pool — used for all non-boss matches via key:'patron'.
-     Voice: a slow-witted but venomous tavern lout. Insults flow easy (fool,
-     lout, wretch, halfwit, cretin, dunderhead, dolt, twit, berk, numbskull),
-     then mid-sentence the abuse trails off into confused dumbness. The
-     aggression deliberately contrasts the cute portrait. Plain English only
-     — no Latin or archaic terms ("knave/varlet/churl/thee") which read as
-     stage-medieval out of context. Keeps rural tavern slang (tch, hoy, aye,
-     hells, bones, yer, ye) consistent with the bosses. */
+     Voice: a small, naive, easily-distracted tavern-goer. Cute and dim,
+     NOT aggressive. Forgets where he is, mentions absurd domestic details
+     (his many children, his wife, betting grass on top of gold),
+     trails off mid-sentence. NO self-aware "I'm stupid" lines — the
+     dumbness reads through asides and questions ("how did I get here?"),
+     not self-flagellation. Keeps rural slang (hoy, aye, oh, hells)
+     gentler than before. Lines are shorter and less repetitive
+     (~12-16 per bucket) so they don't read as redundant. */
   PATRON:{
-    MATCH_START:["Sit, fool.","Hoy. The idiot's here. Sit.","Sit, lout. Or stand. Either.","Was I waitin' fer ye? Cretin.","Bones, halfwit! Bones!","Sit, sit. Sit-sit. ...Three times now, fool.","Oh. Hoy. Forgot ye were comin'. Dunderhead.","Hoy. Dolt. Sit. ...What were I sayin'?","Pour up, lout. And shut yer mouth.","Sit, dolt. Did ye wash? Stink o' pig-coppers on ye.","Throw the bones, halfwit. Y'know. The bones.","Sit, fool. ...Are ye stupid? Sit.","Hoy, dunderhead. Cup awaits.","Pour. Throw. Lose. In order.","Stupid me forgot why we're here. Sit anyway.","Coin down, lout. Down-down.","Hells. Another wretch t' fleece.","Sit, fool. King o' the fools, ye are.","Bones await yer idiot hands.","Idiot. Aye. That's the word. Sit.","Sit. ...Hoy. What's a dolt, anyway? Don't matter. Sit, fool.","Yer here. ...Why? Nay, sit. Sit-sit.","Throw the bones. ...What's a bone? Oh. These. ...I think.","Coin first, lout. Coin coin coin.","Hoy. Fool. Sit. Or don't. Stupid either way.","Sit yer dim arse. There. Right. There.","Pour first, throw second. Old rule. ...Or t'other way. Hmph.","Cup awaits. ...What's a cup? Oh. This. Aye. Cup.","Bones're hungry, halfwit. Roll 'em.","Sit, lout. Be quick. Or slow. Don't care.","Hoy. Numbskull. ...Numbskull's me favorite word.","Coin's good? Mine ain't. Yers prolly ain't. Cretins, both.","Sit, wretch. ...Was that rude? Don't care.","Bones in hand? Or in yer arse? Hells, I forget which side they go.","Sit, fool. Drink. Lose. In order.","Pour. ...Pour what? Hells. Ale, halfwit. Pour ale.","Hoy. Coin. Down. Now. Idiot."],
-    MATCH_START_KNOWN:["Yer that one. Sit, lout.","Heard yer name. Forgot it. Cretin.","Sit, sit. Yer a regular. Regularly stupid.","Hoy, you again, halfwit.","Familiar mug. Familiar coin. ...Familiar arse on me bench.","Yer back? Again? Sit, fool.","Recognized yer limp. ...Wait, that's me limp. Stupid me.","Same face. Same stink. Sit, lout.","Twice in a week, fool. Or eight. I lose count.","Yer mug's familiar. They all are. Common lot.","Sit. Ye know the drill, dunderhead.","Hoy. Back again, idiot. Sit."],
-    MATCH_START_RESPECTED:["Hells. Heard about ye. ...Was it bad? Aye, prolly.","Sit, lout. Try not t' wreck me. Cretin.","Yer reputation precedes ye. ...What's that mean? Sit anyway.","Word's gone round. The word were... 'lout', I think.","Other tables warned me. Pour anyway. Stupid me.","Yer name's on the wall. ...Wait, that's 'wash hands'. Different word.","Hells. Yer that one. ...That one what, though?","Sit. I'll pour, ye throw. Or t'other. Don't care.","Reputation's loud, friend. Mine's silent. Like the bones.","Word's out on ye. Word's never out on me. Hmph. Idiot me."],
-    MATCH_START_LEGEND:["Right. The 'legend' sits at me table. ...What's a legend? Cretin.","Hells, alright. Don't make me cry. I cry easy.","Sit, lout. Tell the bards I said somethin' rude.","Hells. Whole tavern went quiet. ...Did I... did I fart?","Yer that one the bards sing about. Sing slow, halfwit.","Songs about ye reached this corner. Songs travel? Hells.","Hells. A legend. ...What were yer name? Wait. Don't. ...Do.","Sit. Bards'll hear of this. ...What's a bard.","Right. The famous one. ...Famous fer bein' stupid? Aye, that'd be me."],
-    RISKY_REROLL:["Bold. Stupid.","Hoy. ...Are ye daft, fool?","Brave. Or stupid. Same thing.","Push it, lout. Cretin.","Reckless. ...What's that mean? Sounds bad.","Tch. Brave. ...Or just thick.","Pluck like that gets ye buried.","Hoy. Bones love a fool. Yer fool-shaped.","Risky. ...Risky-stupid.","Hoy. Daft. Daft-daft.","Tch. ...Wait, what just happened? Cretin.","Reckless, lout. That's stupid.","Aye. Brave throw. Or thick. ...Both, prolly.","Push it, ye berk.","Hells. Bold. ...Or daft. Same thing, halfwit.","Daft. Aye. Daft as me da. And he were a wretch.","Bones like bold. Bones also like stupid. Aye.","Hmph. Risky. ...What's risky, fool?","Pluck like that kills.","Aye. Brave. ...Why'd ye reroll, dunderhead?","Hells. Plucky. ...Is plucky a word?","Aye. Bold throw. Did ye mean that? Cretin.","Tch. Reckless. Stupid reckless.","Hoy. Daft. Daft as me cousin, who ate a bone.","Push it, halfwit. Push it harder.","Bones favor fools. So... favor ye. Stands t' reason.","Aye. Daft. Friend, that's daft.","Tch. Bold. ...Were that bold? I think so. Cretin."],
-    GREEDY_REROLL:["Greed gets ye buried.","Don't push it, fool.","One more, eh? Stupid.","Greedy. Like a swineherd. ...What's a swineherd.","Tch. Hungry. Hungry-hungry.","Bones smell yer hunger, lout.","One more roll. Famous last words, halfwit.","Stop pushin', cretin. ...Wait, am I pushin'? Or ye?","Greed grows quick. So do graves.","Hmph. Bones'll bite yer stupid hand.","Hoy. Greedy. Like me cousin, who ate eleven pies and died.","Tch. Reachin'. Reachin' fer what, fool?","One more? Tch. Stupid again.","Don't grasp, lout. Grasp what? ...Don't grasp anythin'.","Hmph. Hungry. Me too. ...Wait, that's me belly.","Bones hate greed. Or love it. Don't care.","Aye. Greedy. ...That a sin? I think so. Aye.","Push, push. Bust soon. Mark me words.","Tch. Too far. How far's too far? Halfwit doesn't know.","Hells. Hungry. Should we eat? ...Lout, focus.","Aye. Greed. ...Or just stupid. Same thing.","Tch. One more, eh. ...Why, fool?","Don't push, lout. ...Wait, ye ARE pushin'. Idiot.","Hmph. Reachin'. ...What're ye reachin' for? Cretin."],
-    EARLY_BANK:["Banked already? Stupid, lout.","Soft pour.","Cautious lot, ye are. Like a... cautious lout.","Tch. Safe. Safe as me grandmama.","Borin'. Cretin.","Coppers. Tch.","Coward's choice. Idiot.","Banked early. Borin'. ...Or smart? Hmph. Don't care.","No fire in that. None at all.","Yer ma raise ye that careful? Yer ma were a wretch, prolly.","Safe. Forgettable. Forgot already.","Tch. Soft. Soft like me head, said me da.","Coppers. Just coppers. Babyish.","Timid. ...What's timid mean?","Aye. Safe. ...Safe's bad? I get confused. Cretin.","Hoy. Banked early. Why'd ye do that, halfwit?","Tch. Borin'. ...I'm borin' too. Don't mind.","Cautious. Like... a cautious wretch.","Hmph. Small. Small as yer spine, lout.","Coward's cup. ...Whose cup is that?","Tch. Pittance. Crumbs.","Aye. Modest. ...What's modest mean?","Hells. Boring. I yawned. Like that. Yawn.","Soft as ale-foam. ...I like ale-foam. It tickles.","Tch. Cautious lot. Whole tavern. ...Wait. Just me. Hmph.","Banked? Already? ...What was the score? Stupid me lost track."],
-    BIG_BANK:["Hoy. Tidy, lout.","Where'd ye stash that? Lucky cretin.","Bones love ye today. ...Bones can love? Stupid.","Hells. Big haul. Big-big. Hells.","That's a winter's coal. Or two. I can't math, fool.","Tidy purse, lout. ...What's tidy mean?","Heavy throw. Mind yer back. I hurt me back once. Liftin' a turnip.","Yer luck's louder than me cup. And me cup's loud.","Bones bowed fer ye. ...Did they? Stupid me missed it.","Proper haul, fool. Proper. Aye.","Hells. Tidy. ...What's the number? Cretin me can't read it.","Big throw, aye. ...How big? Real big? Bigger than me?","Hoy. Pretty. Pretty number.","Bones favor ye. I'm jealous. Aye, jealous.","Tidy haul. Tidy like me bed. ...Which ain't tidy.","Aye. Good throw. ...Was it? Aye. Cretin me says aye.","Hmph. Big. Big like yer ego, lout.","Proper, that. Proper-proper.","Winter's ale, that haul. Winter's ale's good.","Hoy. Heavy. ...Heavy fer ye to carry? Halfwit'd struggle.","Aye. Pretty haul. Pretty as a... pretty thing.","Hells. Big one. ...Bigger than me purse. Hmph.","Bones smiled. I saw it. ...Or didn't. Cretin.","Tidy, lout. Tidy! ...Tidy.","That's a lot. I think. Is it a lot? Aye. A lot.","Hoy. Numbers got big. Big-big numbers."],
-    PLAYER_BUST:["Down ye go, fool.","Tch. Stupid.","Bones said nae.","Pissed it away. Like me uncle pissed his wages.","Down. Tch. ...What just happened, cretin?","Bust. ...What's bust mean again?","Bones turned. They do that. Mostly t' fools.","Lost the lot. Familiar.","Tch. Pushed too hard. Or not enough. Stupid me can't say.","That's a throw gone bitter. Bitter like ale.","Hells. Bones don't lie. Or do they? Cretin me can't tell.","Bust. Common as turnips, lout.","Down. Wipe yer mouth. ...Why's yer mouth wet?","Bones laughed at ye. I heard 'em.","Tch. Down. Down's bad, aye, halfwit?","Aye. Bust. ...Were that yer turn? Cretin me lost track.","Hells. Down. Who's down? ...Ye. Ye's down.","Bones said no, fool.","Hoy. Bust. ...Bust like me da's pots.","Tch. Lost it, lout.","Down, friend. Wave at the bones. ...Why'd I say that. Stupid.","Hmph. Bust. Bust-bust.","Gone. Tch. ...What's gone? Yer coin, halfwit.","Aye. Busted. Like a barrel.","Down to nothin'. Nothin's a number, aye? Cretin.","Tch. Bones turned. Cold bones.","Hoy. Down ye went. Cretin me didn't see it.","Aye. Bones bit ye. They bit me last week. ...I think.","Tch. Pissed it. Tradition, fool. Tradition.","Hells. Lost the lot. ...What were the lot, again?","Bust, lout. ...That's the word, aye? Bust.","Down. Tch. Want me to count fer ye? I can't count, mind. Stupid me.","Aye. Bones turned cold. So's me ale, now I look."],
-    PLAYER_HOT_DICE:["Hells. Stupid bones.","All six? Hells. Six is a lot.","Cheatin' bones. Or ye. Cretin.","Bards'll write that one. ...Bards write? Stupid me.","Six in a throw? Tch. ...All of 'em, aye?","All matched. Don't push it, lout. Or do. Stupid either way.","Hot dice. Don't preen. ...What's preen?","Six. Six bones. Six is more than five, halfwit.","All six matched. How, fool? How?","Hells. Bones gone strange.","Wait. All six? Hells, cretin me missed it. Show me. Ye can't. Hmph."],
-    PLAYER_TRIPLE:["Tidy, lout. Three of somethin'.","Three of 'em, fool. Three.","That's a throw. ...What kinda throw, halfwit?","Trio. Bones in love. ...Made that up.","Three matched. Tidy as me hair. Which ain't.","Hoy. Three. Three matchin'. Hells.","Three. ...Or four. Wait. Three. Cretin me counted."],
-    PLAYER_STRAIGHT:["A line of 'em. Hells.","Tidy, that. Tidy line, lout.","Straight as a... straight thing.","Six in a row. Hoy. ...Wait, all of 'em?","Straight. Like a hangman's drop.","All the numbers in order. ...How'd that work, fool?","Tch. A line. Long one."],
-    PLAYER_SIX_KIND:["Hells. Six.","I'll be drunk by sundown rememberin' that. ...Already drunk now.","Sing it in three taverns by mornin'. ...What's a tavern? Oh. Here.","Six matched. Hells. Hells, fool.","All six. The bones've gone strange. Strange as me uncle.","Hoy. Six of one kind. ...All six? All of 'em?","Hells. ...How'd that happen? Cretin me saw it. Aye."],
-    PLAYER_TAKES_LEAD:["Tch. Yer ahead, fool.","Climbin' past me, eh? Or am I sinkin', cretin?","Nice trick. ...What were the trick, halfwit?","Past me. Briefly.","Took the lead. ...What's a lead, again? Cretin.","Climbed past. Don't gloat. ...Why'd I say that. Gloat away.","Hoy. Ahead. Won't last.","Yer winnin'? I think yer winnin'. ...Aye. Cretin me thinks."],
-    PLAYER_NEAR_WIN:["Hells, almost. ...Almost what?","One more roll. ...Or two. Stupid me loses count.","Don't get cocky, lout. Pride and all.","One bank away. Hells. Cretin.","Yer breath's hot on me purse. ...Why's yer breath hot? Stink, fool.","Don't trip on the finish, halfwit. ...What's a finish?","Yer nearly done. Done's the end. End's done.","Almost. ...Almost done. Almost... what were I sayin'? Cretin."],
-    OPP_BUST:["Tch. Stupid me.","Stupid bones. Stupid like me.","Pissed it. ...Wait. Did I piss the bones?","Dammit. ...What's dammit mean?","Bust. Hells.","Bones turned on me. They do that. Often. Cretin.","Tch. Pushed too far. ...How far's too far? Halfwit me never knows.","Should've banked. Stupid me.","Hells. Empty pockets.","Bust. Familiar. Familiar again.","That's me purse, gone. Where? Where'd it go, fool?","Aye. Bust. ...That were me, aye? Cretin.","Hmph. Down. ...Wait, I were the one rollin'? Aye. Aye, that were me.","Tch. Again. Stupid again.","Karkin' bones. Stupid bones.","Lost. Tch. ...Lost what, exactly?","Down. Pour. Drink. Forget. In that order.","Hells. Lost it. ...What's it?","Aye. Familiar. Familiar like home. Home's familiar.","Bust. Pay up. ...Wait, that's me payin'? Hells. Cretin.","Hells. Bust. ...That's me, aye? Aye.","Tch. Stupid. Me or the bones. Same thing.","Aye. Down again. Down again again. Cretin.","Hmph. Lost it. Lost the bones. Lost me coin. Lost me mind. All of it."],
-    OPP_BIG_BANK:["Heh. Tidy, lout.","There. Bones owe me. ...Or did. They paid.","I'll take that, fool. Take what's mine.","Hoy. Big haul. Big like... big.","Bones favor me. Briefly. ...Then they hate me. Round-round.","Tidy. Pay the cup.","That'll buy a round. ...What's a round? Like a circle? Cretin.","Decent throw. I'll take it. ...Already took it, halfwit.","Aye. Tidy. ...What's the number? Don't tell me. Tell me.","Hells. Good throw. ...Were that good? I think so. Stupid me.","Heh. Big one. Big as me belly. Me belly's big.","Hmph. Pretty. ...Pretty bones.","Aye. Bones smiled. At me. ...That's nice.","Hoy. Heavy. Heavy as a sack of... heavy things. Cretin.","Aye. Tidy haul. Tidy as me bed. Which ain't.","Hells. Pretty. Pretty number, that.","Heh. Bones owe me. They paid. ...Did they? Cretin.","Wait. Did I bank? I banked, aye? Hells. Aye. Stupid me."],
-    OPP_TAKES_LEAD:["Hoy. Ahead. ...Of ye, aye?","Caught up. ...To ye. Caught up to ye, fool.","Tide turned, lout. ...What's a tide?","Past ye. Mind the gap. ...What's the gap?","Climbed back. Familiar view. ...What view? It's a table, halfwit.","On top. Briefly. Mostly briefly.","Aye. Past ye. ...Or ye past me. Don't care.","Heh. Ahead. Ahead's good, aye?","Hoy. Climbed. Like a... climber.","Past ye, lout. ...Or am I? Hmph. Cretin me ain't sure.","Aye. Top. Top o' the table. Top o' the world.","Heh. Past ye. Past-past.","Hoy. On top. ...Wait. Did I move ahead? Hells. Aye. Stupid me."],
-    OPP_NEAR_WIN:["Almost. Almost.","One more. One more bone? Or coin? Cretin.","Smell the ale already. Mine's been smellin' the whole time.","One bank from done.","Almost finished, fool. Like a meal? I finished a meal once.","Closing time soon. ...What's closing? Cretin.","Nearly there. Where's there?","One more, aye. One more then I... I forget.","Done soon, lout. ...What's done? I keep askin', halfwit.","Almost, almost. Almost what."],
-    MATCH_CLOSE:["Close one. Close like... close, halfwit.","Bones gone fickle. ...What's fickle? Stupid me.","Hells, sweatin'. Why's me forehead wet?","Tighter than rent day. ...What's rent? I don't pay rent. Or do I? Cretin.","Knife-edge. Whose knife?","Bones can't decide. They never could. Stupid bones.","Hoy. Tense. Tense like me back.","Close as two cups on a wet table. ...Why're me cups wet?","Tight. Tight as me belt. After dinner.","Aye. Close. Close to what, though, fool?","Hells. Tight. Tight-tight-tight.","Knife-edge, lout. ...What's knife-edge?","Sweatin'. Me palms. Me brow. Me everywhere.","Bones playin' coy. ...What's coy?","Hoy. Close one. ...Close like... close, cretin."],
-    LOSING_BADLY:["Walloped. ...What's walloped?","Tch. Story of me life. Whole life.","Down so far I can't see the table. ...Wait. Table's right there. Stupid me.","Battered. Familiar. Battered like fish, fool.","Down. Bones gone home. They live somewhere, aye? Cretin.","Hells. Bad night. Bad-bad.","Tch. Walloped. ...Walloped like a... walloped thing.","Aye. Bad. Bad-bad. Bad.","Hmph. Down bad. Down's bad, aye? Stupid me.","Hells. Pour more. Pour more ale. Always.","Bones've forgotten me. They never write. Stupid bones."],
-    WINNING_BADLY:["Heh. Stupid ye.","Look at me. Look. ...Are ye lookin', fool?","Magnificent. Briefly.","Up. Hells, up. Up-up.","Bones love me tonight. They told me. Quietly.","Smug. Briefly. ...What's smug?","Heh. Up. Up's good.","Aye. Winnin'. ...That's me winnin', aye? Stupid me asks.","Hells. Good night. Good night-night.","I'm doin' it. Doin' a win. ...Wait, am I? Cretin."],
-    OPP_WINS:["Won, fool. Drinks on ye.","Bones loved me tonight. ...They wrote me a song. Quietly.","Tell the bards. Or don't. ...What's a bard? Stupid me forgot.","Done. Pour the cup. Why's me cup empty?","Won. Pay up, lout. ...Pay me. ...Yes, me.","Tch. Yer purse is mine. ...Mine. ...Mine.","Aye. Won. ...Did I win? I think I won. Cretin me thinks. Aye.","Hells. Won. ...How'd that happen?","Pour up, loser. ...That's ye.","Done. Pay. Pay coin. To me.","Tch. Yer coin's mine. ...Or me coin's still mine. Same thing.","Won. Thanks, halfwit. ...Were that the right thing to say?"],
-    REMATCH_START:["Back? Aye, fool. ...Have we met?","Same seat. Same bones. Same cretin me.","Couldn't stay away, eh? Stupid again.","Twice in a night. Twice-twice.","Hoy. Yer back. ...Or new? Cretin can't tell.","Glutton, are ye? ...What's a glutton?","Back again, lout. Friend? ...Are we friends? Aye.","Aye. Yer back. ...Were ye gone?","Twice, then. Twice-times.","Hoy. Sit. ...Wait, didn't ye sit already? Today? Last week? Cretin."],
-    CARD_EFFECT:["Hells. Felt that. ...Felt what, exactly?","Twitchy thing. ...What twitched, fool?","What was that?","Bones moved on their own. ...They do that, cretin?","Tch. Cards stirrin'.","Felt a chill. Card magic, prolly.","Somethin' just shifted. ...Or didn't. Don't care.","Did ye do that, lout? ...Tell me ye did. So I'm not goin' daft.","Hoy. Magic? ...Or just yer hand movin'?","Tch. Cards. Cards do things. Stupid things.","Bones twitched. ...They alive?","Felt that, aye. Felt it in me... where do ye feel things, halfwit?","Hells. Cards movin'. Cards're s'posed t' be still. Stupid cards.","Somethin's off. ...Off like... not on.","Hells. What's a card do, again? Hmph. Forgot. Cretin.","Hoy. Magic-thing. ...Or a regular thing. Stupid me gets 'em mixed."]
+    MATCH_START:["Oh! H-hello. Are we playing dice?","W-what? Oh. Yes. My turn? Your turn?","I sat down. ...Why did I sit down?","Hello, friend. Have we met?","Hoy. ...How did I get here?","Oh good. Bones. I love bones. ...I think.","Sit, sit. Mind the splinter — my wife says it's haunted.","My 247 kids need a winter coat. Roll!","Hoy. What about betting some grass on top of the gold?","Oh dear. The bones are looking at me again.","Sit. ...Wait. Are you Marvin? You look like Marvin.","Yes, dice. Right. Where's my cup gone?","H-hello! I brought a turnip. For luck. Pay no mind.","Sit, sit. The chair's warm. ...Was someone here?","Oh! You startled me. I was thinking about clouds.","Bones in hand! Bones in... oh. I had them a minute ago."],
+    MATCH_START_KNOWN:["Oh! You again. You look familiar. ...Or is it the hat?","Hoy. We've played before, haven't we? Twice, maybe four.","Hello, friend. You owe me a copper. Or I owe you. One.","Sit. The bones remember you. They told me.","Oh, the kind one! Sit, sit. My wife says hello.","Hoy. You're the one with the nice cloak. Or shoes. Something.","Back again? My 247 kids said you'd come.","Hello! ...Have we met? Yes? Hoy. Brilliant."],
+    MATCH_START_RESPECTED:["Oh! It's you. My wife said you were tall. You are not tall.","H-hoy. The famous one. Don't break me, please.","Oh dear. I heard about you. Was it good or bad? I forget.","Sit. I'll try not to weep if you win. I might weep.","Hello, friend! The bards mentioned you. Or my cousin did. Same thing.","Oh. The kind one with the reputation. Be gentle.","Hoy. You're the one. ...The one what? Sit anyway."],
+    MATCH_START_LEGEND:["Oh GOODNESS. It's you. ...Should I bow? I'll bow.","H-hello, legend! I am very small. Please be kind.","The bards sing about you. My wife hums it sometimes. Off-key.","Oh! Oh. Sit. I'll fetch my best dice. ...These are my only dice.","Hoy. The famous one at my little table. I might cry. Happily."],
+    RISKY_REROLL:["Oh dear. Was that wise?","H-hoy. Risky. I'd not have dared.","Brave one, you are. Brave as my cousin who climbed a roof.","Oh. ...Oh! That's bold.","Hoy. The bones blink at that.","My wife would scold you. Brave, though.","Oh dear. My 247 kids are watching. Mind your manners.","Risky! ...Risky's exciting. Or scary. One.","Hoy. Bold throw. My uncle did one of those. Broke his ankle.","Oh. ...Why'd you do that? Brave reason, surely.","Reckless. ...What's reckless mean? Sounds important.","Hoy. The missus'd faint at that. She faints a lot.","Bold! Or daft. The line's thin, you know.","Oh dear. The bones grumbled. I heard them."],
+    GREEDY_REROLL:["Oh! Another? Greedy, that.","Hoy. ...One more? My belly says yes, my coin says no.","Pushing it. Pushing it like the cart up the hill.","Oh dear. My wife says greed sours the milk.","One more, eh? My 247 kids gasped just then.","Hoy. The bones don't like greed. They told me. Probably.","Another? ...Bold. Or hungry. Both?","Oh. ...You're hungry-eyed, friend. Eat first, then roll.","Greedy. Like the goat. The goat eats everything.","Hoy. Push, push. ...Was that a song? I sang it once.","One more, you say? My cousin said that once. He's still rolling, somewhere.","Oh dear. The bones are tired. They want a nap."],
+    EARLY_BANK:["Oh! Safe. That's nice.","Hoy. Cautious. My wife approves. I approve too, I suppose.","Banked already? ...Reasonable, that.","Oh, modest. Like my Sunday cloak.","Hoy. Small purse. Small purse buys a small pie.","Safe pour. My 247 kids would have done the same. Probably.","Oh. Quick to bank. Like my cousin who runs from cats.","Hoy. ...Pittance, that. ...Is pittance a word? Sounds like one.","Banked! ...Already? Goodness. Quick fingers.","Oh dear. Boring. ...Sorry, that was rude. Was it rude?","Hoy. Cautious as the cat. Cat doesn't roll dice, mind."],
+    BIG_BANK:["Oh my. That's a lot. A real lot.","Hoy! Tidy. Tidier than my mantel, and that's saying.","Goodness. The bones love you today.","Oh! Bigger than my whole pie. And the pie was big.","Hoy. ...How did you do that? Magic, surely.","Big haul! My 247 kids would each get a copper from that.","Oh dear. That's more coin than I've seen in a moon.","Pretty number, that. ...Is it pretty? I think so.","Hoy. ...Was that real? Did I see it? I think I saw it.","Big! Big-big! ...Sorry, I got excited.","Oh. My wife'd be cross at the bones. They favor you so.","Hoy. A winter's worth. Maybe two winters'.","Goodness me. I'll need a moment."],
+    PLAYER_BUST:["Oh dear.","H-hoy. Bones turned. They do that sometimes.","Oh no. ...Was it me? No, you. Right, you.","Bust. ...Poor friend. Was it the dice or the gods?","Oh. ...My wife says bones have moods. Maybe today's a sad mood.","Hoy. Down you go. Up later, perhaps.","Oh dear. My 247 kids would cry at that.","Bust. ...Is that what we call it? Bust? Odd word.","Oh no. Pour, pour. A drink helps. Or so I'm told.","Hoy. ...The bones gave a little sigh just then. I heard it.","Bust. ...Brave try, friend. Brave try.","Oh. ...Did you mean to do that? No? Thought not.","Hoy. The cat'd have done better. Sorry. Was that mean?","Down. ...Down's not so bad. There's stuff down there. Soil. And worms."],
+    PLAYER_HOT_DICE:["Oh! Oh! All six? All SIX?","H-hoy! That's... that's... I have no words.","Goodness. The bones agreed. ALL of them. Hells.","Oh my. My 247 kids would scream at that.","All six matched? Magic. Surely magic.","Hoy. ...How? How did that happen?","Oh dear. ...My wife won't believe me when I tell her.","Six! Six bones in love. I'm misty.","Hoy! I might faint. ...I have fainted before. It's pleasant."],
+    PLAYER_TRIPLE:["Oh! Three! Three of them!","Hoy. Three matched. Like my three favorite pies.","Goodness. A trio. Tidy.","Oh, pretty. The bones agreed on that one.","Three of a kind! ...Like my cousins. Three of them. All troublesome."],
+    PLAYER_STRAIGHT:["Oh! A line of bones! All in a row!","Hoy. Straight as my wife's broom. And she's strict.","Goodness. Like little soldiers, those.","Oh my. ...Did the bones plan that? Surely they did.","A straight! ...My 247 kids stood like that once. Briefly."],
+    PLAYER_SIX_KIND:["Oh! Oh! Six the same?","Goodness me. All six? I'll never forget.","Hoy. I'll tell the missus. She won't believe. But I'll tell.","Oh dear. The bones agreed too much. Suspicious. Lovely.","Six! Six! ...I might need to sit down. I am sitting down."],
+    PLAYER_TAKES_LEAD:["Oh. You're ahead now. ...Goodness.","Hoy. Past me. Briefly, surely. ...Surely?","Oh dear. The bones favor you.","Past me already? ...My 247 kids will tease me forever.","Hoy. Ahead! ...That's good for you. ...Less good for me."],
+    PLAYER_NEAR_WIN:["Oh! Oh dear. You're nearly done.","H-hoy. One more bank? Goodness.","Oh. My purse trembles. ...Purses can't tremble, can they?","Almost won! ...The bones whisper your name. Maybe.","Hoy. Don't trip on the finish, friend. My uncle tripped on his."],
+    OPP_BUST:["Oh no. The bones turned on me.","Hoy. ...Did I just? Yes. Yes I did. Oh dear.","Goodness. Pour, pour. My wife'd weep.","My 247 kids will go hungry if I lose more. Probably.","Oh. The bones don't love me today. Sad bones.","Hoy. ...Was I the one rolling? Yes. Right. ...Oh no.","Bust! Me. Me bust. ...Sorry, friend, talking to myself.","Oh dear. The bones have moods. Today is a bad mood.","Hoy. ...Lost. Again. ...My wife's going to laugh.","Oh. Pour me one. A small one. ...A big one.","Hoy. Bones, why? ...The bones don't answer.","Goodness. Down to nothing. ...Nothing's quite peaceful, actually."],
+    OPP_BIG_BANK:["Oh! Oh, look! I did a thing!","Hoy. Tidy! ...Did I do that? I think I did.","Goodness me. My wife will be pleased.","Oh dear. ...In a good way. A big purse is a good purse.","My 247 kids! They'll have new boots! ...Or one new boot, shared.","Hoy. ...Was that mine? Mine. Yes. Mine.","Goodness. The bones smiled. At ME. ...Lovely.","Oh! I haven't seen coin like that since the harvest fair.","Hoy! ...I might dance. Quietly. In my head."],
+    OPP_TAKES_LEAD:["Oh. ...I'm ahead? Goodness.","Hoy. ...Past you, friend. Sorry. Not sorry. Sorry.","Goodness. The bones favor me. Just for a moment, surely.","Oh dear. ...In a good way. Wait, is it good?","My 247 kids cheer in my head. They're loud, those kids.","Hoy. Ahead! ...Briefly. Probably."],
+    OPP_NEAR_WIN:["Oh! Almost done? Goodness.","Hoy. ...One more bank? Me? Goodness me.","Almost won. ...My wife won't believe it. I'll bring proof.","H-hoy. Nearly there. Don't faint, don't faint.","Oh. Closing time soon. ...Closing what? The match. Right."],
+    MATCH_CLOSE:["Oh dear. Close, this one.","Hoy. Tight as my belt after pie.","Goodness. The bones can't decide.","Oh. ...Sweating. Why am I sweating? It's not warm.","Knife-edge, this. ...What's knife-edge mean? Sounds dangerous.","Hoy. The missus'd be at the edge of her stool for this one.","Oh dear. My 247 kids hold their breath. All of them. At once."],
+    LOSING_BADLY:["Oh dear. Walloped, I am.","Hoy. ...The bones forgot me. They never write.","Goodness. The missus will fetch the consolation pie.","Oh. Down so far. ...Down's quiet. Peaceful, almost.","Hoy. My 247 kids will console me. Loudly. Lovely chaos.","Oh dear. I should have stayed in bed. ...Was I in bed today? Can't remember.","Hoy. Battered as my second-best hat."],
+    WINNING_BADLY:["Oh! Look at me, dancing in my head.","Hoy. ...Up! Up! ...Briefly, surely.","Goodness me. The bones are kind today.","Oh dear. ...In a good way! A good way.","Hoy! My 247 kids would whoop. Loud little things.","Oh. ...Am I winning? I think I am. Goodness."],
+    OPP_WINS:["Oh! I won? I won! ...Did I? Yes?","Hoy. My wife will fetch the special pie tonight. Or any pie.","Goodness. ...A win. For me. Imagine.","Oh dear. ...In a good way. A very good way.","Hoy! My 247 kids will eat tonight. All of them. At once.","Oh. ...Thank you for playing, friend. Drinks on me. ...Or you.","Hoy. The bones loved me today. Briefly. Lovely.","Goodness. ...I'll tell the cat. The cat doesn't care."],
+    REMATCH_START:["Oh! You again? Goodness, twice in a night.","Hoy. ...Couldn't stay away? Or got lost coming back? Same thing.","Sit, sit. The chair missed you. ...Chairs can't miss. Or can they?","Oh! H-hello again. Have we played already today? Yes? Right.","Hoy. My 247 kids said you'd come back. They were right!","Oh dear. ...In a good way. Welcome, welcome."],
+    CARD_EFFECT:["Oh! Did you do something?","Hoy. ...The air went funny. Magic, probably.","Goodness. Bones twitched. ...Bones can twitch?","Oh dear. ...Was that a card? Cards do things, I'm told.","H-hoy. Felt that in my whiskers. ...I don't have whiskers.","Oh. ...Did the room shift? Just me, then.","Hoy. Magic-thing. ...My wife says I'm too credulous. What's credulous?","Goodness. ...The bones gave a little jump. I saw it. Maybe."]
   }
 };
 
@@ -16495,33 +16577,52 @@ function _draftSnapBack(clone,srcEl){
 }
 function _draftFindDropSlot(x,y){
   /* Boss draft only accepts the boss slot (idx 0); regular draft only accepts
-     the regular slots (1+). Locked slots are also rejected.
-     The boss slot reservation is intentional — a previous tweak removed it
-     and the player corrected: they want the boss slot protected from regular
-     cards. The "leftmost slot didn't accept" confusion was actually a visual
-     issue (filled boss slot lost its gold styling), addressed separately in
-     CSS. */
+     the regular slots (1+). Locked slots are also rejected. Once a pick is
+     active, only the slot currently holding the pick is valid (enforces
+     "one card per draft" — dropping elsewhere is rejected with a red
+     visual via .draft-invalid-target during drag). */
+  function _isValidIdx(idx){
+    if(!_isSlotUnlocked(idx))return false;
+    var _slotOk=_draftBossMode?(idx===0):(idx>=1);
+    if(!_slotOk)return false;
+    /* Pick-active rule: only the currently-picked slot accepts further drops */
+    if(_draftPickedCardId!==null&&_draftPickedSlotIdx>=0&&idx!==_draftPickedSlotIdx)return false;
+    return true;
+  }
   var hit=document.elementFromPoint(x,y);
   if(hit){
     var slot=hit.closest('.draft-slot');
     if(slot&&slot.closest('#endDraftSlots')){
       var idx=parseInt(slot.dataset.slotIdx);
-      if(!_isSlotUnlocked(idx))return null;
-      var _slotOk=_draftBossMode?(idx===0):(idx>=1);
-      if(_slotOk)return{el:slot,idx:idx};
+      if(_isValidIdx(idx))return{el:slot,idx:idx};
     }
   }
   /* Fallback: generous rect check (±25px tolerance) */
   var best=null;
   document.querySelectorAll('#endDraftSlots .draft-slot').forEach(function(s){
     var idx=parseInt(s.dataset.slotIdx);
-    if(!_isSlotUnlocked(idx))return;
-    var _slotOk=_draftBossMode?(idx===0):(idx>=1);
-    if(!_slotOk)return;
+    if(!_isValidIdx(idx))return;
     var r=s.getBoundingClientRect();
     if(x>=r.left-25&&x<=r.right+25&&y>=r.top-25&&y<=r.bottom+25)best={el:s,idx:idx};
   });
   return best;
+}
+/* Returns the slot the cursor is OVER (any unlocked slot in this mode),
+   ignoring the active-pick rule. Used by the drag visual to red-out
+   invalid slots — the rule check then decides red vs green. */
+function _draftFindHoverSlot(x,y){
+  var hit=document.elementFromPoint(x,y);
+  if(hit){
+    var slot=hit.closest('.draft-slot');
+    if(slot&&slot.closest('#endDraftSlots')){
+      var idx=parseInt(slot.dataset.slotIdx);
+      if(_isSlotUnlocked(idx)){
+        var _slotOk=_draftBossMode?(idx===0):(idx>=1);
+        if(_slotOk)return{el:slot,idx:idx};
+      }
+    }
+  }
+  return null;
 }
 /* Restore an active pick: put the slot back to its session-original content,
    un-hide the offered card element (if still attached), and clear pick state.
@@ -16599,7 +16700,7 @@ function _draftTapPlace(el,cardId){
   return false;
 }
 function _draftClearDropHovers(){
-  document.querySelectorAll('#endDraftSlots .draft-slot.drop-hover').forEach(function(s){s.classList.remove('drop-hover');});
+  document.querySelectorAll('#endDraftSlots .draft-slot.drop-hover,#endDraftSlots .draft-slot.drop-invalid').forEach(function(s){s.classList.remove('drop-hover','drop-invalid');});
 }
 
 /* ── Main card drag handler (pointer events) ── */
@@ -16633,10 +16734,20 @@ function _initEndDraftDrag(el,cardId){
       }
       clone.style.left=(e2.clientX-el.offsetWidth/2)+'px';
       clone.style.top=(e2.clientY-el.offsetHeight/2)+'px';
-      /* Highlight valid drop slot */
+      /* Drop-target visual:
+         - Valid (green gold border) when hovering a slot that will accept
+         - Invalid (red border) when hovering a slot the rule forbids
+           (e.g. trying to drop on a different empty slot while a pick is
+           already active). Helps the player understand "you can't draft
+           two cards" without a confusing silent rejection. */
       _draftClearDropHovers();
       var target=_draftFindDropSlot(e2.clientX,e2.clientY);
-      if(target)target.el.classList.add('drop-hover');
+      if(target){
+        target.el.classList.add('drop-hover');
+      }else{
+        var hover=_draftFindHoverSlot(e2.clientX,e2.clientY);
+        if(hover)hover.el.classList.add('drop-invalid');
+      }
     }
 
     function onUp(e2){
@@ -16789,22 +16900,22 @@ function _buildDraftPool(excludeIds){
 }
 
 /* Free Restock perk handler — reshuffle the offered cards once per run.
-   Players asked to be able to pick from the reshuffled offers even after
-   an earlier pick: previously the new offers were rendered with
-   .draft-locked (display-only) if the player had already drafted. Now we
-   force-undo the existing pick first (restore slot to its session-original,
-   un-hide the old offered card — though it's about to be removed anyway)
-   and render the new offers fully draggable. The discarded picked card was
-   from the OLD offer set and is simply gone after reshuffle. */
+   Players asked: the placed pick should STAY in the slot when reshuffling
+   (not get undone). Previously reshuffle force-undid the active pick so
+   the new offers could be picked, but that meant "drag card in slot, then
+   shuffle → card disappears" — exactly the wrong behaviour. Now reshuffle:
+   - Keeps the placed pick where it is (slot stays filled)
+   - The picked offered card from the OLD batch is lost (DOM rebuilds)
+   - To swap the placed pick for a fresh one, the player drags a new
+     offered card ONTO the picked slot (regular replace flow). */
 function reshuffleDraft(){
   _getS();
   if(!S.renownPerks||!S.renownPerks.freeRestock||S.run._restockUsed)return;
   S.run._restockUsed=true;
-  /* Undo active pick BEFORE rebuilding the offer row. After this the slot
-     is restored and the picked card is just one of the about-to-be-deleted
-     offer DOM elements. */
-  _draftUndoActivePick();
-  _renderEndDraftSlots();
+  /* Detach the picked-element reference (its DOM is about to be deleted).
+     Keep the slot's content and _draftOriginals intact so the placed card
+     remains visible AND the underneath state is preserved for undo. */
+  if(_draftPickedCardId){_draftPickedEl=null;}
   save();
   /* Regenerate offer excluding the previously shown cards so reshuffle
      always produces a genuinely different hand. */
@@ -16829,10 +16940,9 @@ function reshuffleDraft(){
     attachTooltipTap(el);
     _initEndDraftDrag(el,el.dataset.cardId);
   });
-  /* Skip button label may have been "CONTINUE" if the player had a pick
-     before reshuffle — reset to SKIP since we just undid that pick. */
-  var skipBtn=document.getElementById('endDraftSkipBtn');
-  if(skipBtn){skipBtn.querySelector('span').textContent='SKIP';skipBtn.onclick=function(){SFX.nav();_endDraftSkip();};}
+  /* Skip-button label stays as-is: if a pick is still in a slot (we kept
+     it through reshuffle) the button still reads CONTINUE; if no pick
+     was active it stays SKIP. Don't blow away the existing handler. */
   /* Hide the reshuffle button now that it's used. Use visibility instead
      of display so the surrounding layout doesn't shift up. */
   var rb=document.getElementById('endDraftReshuffleBtn');
