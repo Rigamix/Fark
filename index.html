@@ -678,7 +678,7 @@ body{
 .dtype-ruby   {--dborder:#a02030;--dborder2:#d04050;--dface:#5a0810;--dface2:#7a1018;--dface3:#3a0408;--dhigh:#c03040;--dpip:#ffd0c0;--dpip2:#e8a090;--dglow:rgba(220,40,60,.5);--ddither:rgba(255,80,100,.18);--tip-num-color:#ff80a0}
 .dtype-obsidian{--dborder:#181828;--dborder2:#3a3a52;--dface:#0a0a14;--dface2:#1a1a28;--dface3:#04040a;--dhigh:#4a4a66;--dpip:#a0a0c0;--dpip2:#7a7aa0;--dglow:rgba(60,60,90,.4);--ddither:rgba(120,100,180,.18);--tip-num-color:#c0a0ff}
 .dtype-starstone{--dborder:#5050a0;--dborder2:#7878d0;--dface:#10142a;--dface2:#1a1e3c;--dface3:#08081a;--dhigh:#9090e0;--dpip:#fff8c0;--dpip2:#e0d090;--dglow:rgba(140,120,255,.5);--ddither:rgba(200,180,255,.22);--tip-num-color:#fff080}
-.dtype-vagabond{--dborder:#b0602a;--dborder2:#d88838;--dface:#4a2a14;--dface2:#663818;--dface3:#2a1608;--dhigh:#e8a858;--dpip:#ffd890;--dpip2:#d8a050;--dglow:rgba(216,136,56,.5);--ddither:rgba(240,180,100,.22);--tip-num-color:#ffb860}
+.dtype-vagabond{--dborder:#a02030;--dborder2:#d04050;--dface:#5a0810;--dface2:#7a1018;--dface3:#3a0408;--dhigh:#c03040;--dpip:#ffd0c0;--dpip2:#e8a090;--dglow:rgba(220,40,60,.5);--ddither:rgba(255,80,100,.18);--tip-num-color:#ff80a0}
 /* Fallback: unknown die types render as bone */
 .dtype-gold{--dborder:#a89882;--dborder2:#c8b898;--dface:#d8ccb4;--dface2:#efe4d0;--dface3:#c0b49a;--dhigh:#f5ece0;--dpip:#5a4a38;--dpip2:#3a2e20;--dglow:rgba(168,152,130,.3);--ddither:rgba(180,160,130,.18)}
 
@@ -1112,12 +1112,23 @@ body{
 }
 .die.die-dampened.dampen-fade{filter:brightness(1) saturate(1) sepia(0) hue-rotate(0)}
 .die.die-dampened.dampen-fade::before{opacity:0;transition:opacity .5s ease-out}
-/* Sawdust spray — quick poof animation when the die is initially dampened */
-.die.die-dampened-fresh{animation:sawdustPoof .55s ease-out both}
+/* Sawdust spray — quick poof when the die is initially dampened.
+   CRITICAL: this MUST run on a ::after pseudo-element, NOT on the die
+   itself. Setting `animation:` on `.die` overrides the `.rolling` spin
+   keyframes — the exact bug the comment above warns about, which got
+   reintroduced. Driving the poof on ::after leaves the die's own
+   `animation` slot free for `.rolling` (and its `filter` free for the
+   `.die-dampened` brown tint). */
+.die.die-dampened-fresh::after{
+  content:'';position:absolute;inset:-5px;pointer-events:none;border-radius:6px;
+  z-index:3;
+  background:radial-gradient(circle,rgba(210,165,95,.65) 0%,rgba(160,115,55,.32) 42%,transparent 72%);
+  animation:sawdustPoof .55s ease-out both;
+}
 @keyframes sawdustPoof{
-  0%  {filter:brightness(1) saturate(1) drop-shadow(0 0 8px rgba(200,160,100,.8))}
-  35% {filter:brightness(.7) saturate(.5) sepia(.4) drop-shadow(0 0 12px rgba(180,140,80,.7))}
-  100%{filter:brightness(.55) saturate(.3) sepia(.6) drop-shadow(0 0 0 transparent)}
+  0%  {opacity:0;transform:scale(.35)}
+  35% {opacity:1;transform:scale(1.25)}
+  100%{opacity:0;transform:scale(1.7)}
 }
 /* Echo armed indicator on card */
 .mcard[data-cid="the_echo"].echo-armed .gcard{box-shadow:inset 0 0 0 1px rgba(100,180,255,.5),inset 0 0 0 5px var(--cface),inset 0 0 0 6px var(--ctrim2),0 0 8px 2px rgba(100,180,255,.35),0 5px 20px rgba(0,0,0,.85);border-color:rgba(100,180,255,.45)}
@@ -1502,6 +1513,17 @@ body.crit-dilate{animation:critDilate .55s ease-out both}
 }
 .match-btn-roll:active{transform:translateX(-50%) scale(.98)}
 .match-btn.disabled{opacity:.35;pointer-events:none;cursor:default}
+/* Drill Order roll-lock: the roll button is greyed + shows a chain/lock
+   glyph so the player understands they CAN'T roll again this turn (Drill
+   Order cap reached) but can still bank what's on the table. Distinct
+   from .disabled — it's a deliberate "locked" state, not a transient
+   between-turns disable. */
+.match-btn-roll.roll-locked{pointer-events:none;cursor:default;filter:grayscale(.7) brightness(.6)}
+.match-btn-roll.roll-locked .btn-inner{color:rgba(180,180,190,.6)}
+.match-btn-roll.roll-locked .btn-inner::after{
+  content:' \1F517';/* chain-link glyph */
+  font-size:.8em;
+}
 
 /* Flee — small square, left */
 .match-btn-flee{flex:0 0 auto;width:clamp(54px,14vw,66px);height:clamp(58px,15vw,70px)}
@@ -2136,6 +2158,11 @@ body:has(#mLoadout-ov.show) #dbgButtons{display:flex !important}
 .rnk-info-sub{
   text-align:center;font-size:14px;color:var(--textdim);
   letter-spacing:1px;margin-bottom:12px;
+}
+.rnk-info-persist{
+  text-align:center;font-size:10px;color:rgba(200,160,80,.55);
+  letter-spacing:.5px;margin:-6px 0 12px;font-style:italic;
+  font-family:'IM Fell English',serif;
 }
 .rnk-info-bar{
   width:100%;height:8px;background:rgba(200,160,80,.1);border-radius:4px;
@@ -3726,7 +3753,7 @@ body::before,body::after{display:none!important}
 .dtype-ruby   {--dborder:#a02030;--dborder2:#d04050;--dface:#5a0810;--dface2:#7a1018;--dface3:#3a0408;--dhigh:#c03040;--dpip:#ffd0c0;--dpip2:#e8a090;--dglow:rgba(220,40,60,.5);--ddither:rgba(255,80,100,.18);--tip-num-color:#ff80a0}
 .dtype-obsidian{--dborder:#181828;--dborder2:#3a3a52;--dface:#0a0a14;--dface2:#1a1a28;--dface3:#04040a;--dhigh:#4a4a66;--dpip:#a0a0c0;--dpip2:#7a7aa0;--dglow:rgba(60,60,90,.4);--ddither:rgba(120,100,180,.18);--tip-num-color:#c0a0ff}
 .dtype-starstone{--dborder:#5050a0;--dborder2:#7878d0;--dface:#10142a;--dface2:#1a1e3c;--dface3:#08081a;--dhigh:#9090e0;--dpip:#fff8c0;--dpip2:#e0d090;--dglow:rgba(140,120,255,.5);--ddither:rgba(200,180,255,.22);--tip-num-color:#fff080}
-.dtype-vagabond{--dborder:#b0602a;--dborder2:#d88838;--dface:#4a2a14;--dface2:#663818;--dface3:#2a1608;--dhigh:#e8a858;--dpip:#ffd890;--dpip2:#d8a050;--dglow:rgba(216,136,56,.5);--ddither:rgba(240,180,100,.22);--tip-num-color:#ffb860}
+.dtype-vagabond{--dborder:#a02030;--dborder2:#d04050;--dface:#5a0810;--dface2:#7a1018;--dface3:#3a0408;--dhigh:#c03040;--dpip:#ffd0c0;--dpip2:#e8a090;--dglow:rgba(220,40,60,.5);--ddither:rgba(255,80,100,.18);--tip-num-color:#ff80a0}
 .dtype-gold{--dborder:#a89882;--dborder2:#c8b898;--dface:#d8ccb4;--dface2:#efe4d0;--dface3:#c0b49a;--dhigh:#f5ece0;--dpip:#5a4a38;--dpip2:#3a2e20;--dglow:rgba(168,152,130,.3);--ddither:rgba(180,160,130,.18)}
 /* ── Mini card (same pattern as match.html) ── */
 .rarity-tin     {--ctrim:#3d352c;--ctrim2:#7a6e5c;--cface:#18140f;--cface2:#221e18;--ctxt:#c0b498;--tip-num-color:#f060c0}
@@ -3951,7 +3978,7 @@ body::before,body::after{display:none!important}
 .dice-store-item[data-mat="ruby"]      .ds-mat{color:#ff7888;text-shadow:0 0 10px rgba(255,100,120,.65)}
 .dice-store-item[data-mat="obsidian"]  .ds-mat{color:#c8a0e8;text-shadow:0 0 10px rgba(180,120,220,.6)}
 .dice-store-item[data-mat="starstone"] .ds-mat{color:#b0b8ff;text-shadow:0 0 12px rgba(140,150,255,.85),0 0 4px rgba(180,180,255,.6)}
-.dice-store-item[data-mat="vagabond"]  .ds-mat{color:#e89860;text-shadow:0 0 8px rgba(220,140,80,.6)}
+.dice-store-item[data-mat="vagabond"]  .ds-mat{color:#ff7888;text-shadow:0 0 10px rgba(255,100,120,.65)}
 
 /* ── Premium-dice visual flair ──
    Each tier picks up an extra effect on the die wrapper so they FEEL exciting to own:
@@ -3980,7 +4007,7 @@ body::before,body::after{display:none!important}
 .dice-store-item[data-mat="jade"]     .ds-die-wrap::before{background:radial-gradient(circle,rgba(120,220,140,.35) 0%,transparent 65%)}
 .dice-store-item[data-mat="brass"]    .ds-die-wrap::before{background:radial-gradient(circle,rgba(220,170,80,.45) 0%,transparent 65%)}
 .dice-store-item[data-mat="silver"]   .ds-die-wrap::before{background:radial-gradient(circle,rgba(220,230,240,.5) 0%,transparent 65%)}
-.dice-store-item[data-mat="vagabond"] .ds-die-wrap::before{background:radial-gradient(circle,rgba(220,140,80,.45) 0%,transparent 65%);animation-duration:2.2s}
+.dice-store-item[data-mat="vagabond"] .ds-die-wrap::before{background:radial-gradient(circle,rgba(255,80,100,.55) 0%,transparent 65%);animation-duration:2.2s}
 .dice-store-item[data-mat="crystal"]  .ds-die-wrap::before{background:radial-gradient(circle,rgba(160,220,255,.6) 0%,transparent 65%);animation-duration:1.8s}
 .dice-store-item[data-mat="ruby"]     .ds-die-wrap::before{background:radial-gradient(circle,rgba(255,80,100,.6) 0%,transparent 65%);animation-duration:1.6s}
 .dice-store-item[data-mat="obsidian"] .ds-die-wrap::before{background:radial-gradient(circle,rgba(180,80,220,.55) 0%,transparent 65%);animation-duration:2.8s}
@@ -4217,7 +4244,7 @@ body::before,body::after{display:none!important}
 :where(.die-wrap,.lo-dw,.tier-lo-die,.ds-slot)[data-mat="jade3"]::before    {background:radial-gradient(circle,rgba(240,240,80,.55) 0%,transparent 65%);animation-duration:1.6s}
 :where(.die-wrap,.lo-dw,.tier-lo-die,.ds-slot)[data-mat="brass"]::before    {background:radial-gradient(circle,rgba(220,170,80,.45) 0%,transparent 65%)}
 :where(.die-wrap,.lo-dw,.tier-lo-die,.ds-slot)[data-mat="silver"]::before   {background:radial-gradient(circle,rgba(220,230,240,.5) 0%,transparent 65%)}
-:where(.die-wrap,.lo-dw,.tier-lo-die,.ds-slot)[data-mat="vagabond"]::before {background:radial-gradient(circle,rgba(220,140,80,.45) 0%,transparent 65%);animation-duration:2.2s}
+:where(.die-wrap,.lo-dw,.tier-lo-die,.ds-slot)[data-mat="vagabond"]::before {background:radial-gradient(circle,rgba(255,80,100,.55) 0%,transparent 65%);animation-duration:2.2s}
 :where(.die-wrap,.lo-dw,.tier-lo-die,.ds-slot)[data-mat="crystal"]::before  {background:radial-gradient(circle,rgba(160,220,255,.6) 0%,transparent 65%);animation-duration:1.8s}
 :where(.die-wrap,.lo-dw,.tier-lo-die,.ds-slot)[data-mat="ruby"]::before     {background:radial-gradient(circle,rgba(255,80,100,.32) 0%,transparent 65%);animation-duration:2.4s}
 :where(.die-wrap,.lo-dw,.tier-lo-die,.ds-slot)[data-mat="obsidian"]::before {background:radial-gradient(circle,rgba(180,80,220,.55) 0%,transparent 65%);animation-duration:2.8s}
@@ -4977,7 +5004,7 @@ body::before,body::after{display:none!important}
 .dtype-ruby   {--dborder:#a02030;--dborder2:#d04050;--dface:#5a0810;--dface2:#7a1018;--dface3:#3a0408;--dhigh:#c03040;--dpip:#ffd0c0;--dpip2:#e8a090;--dglow:rgba(220,40,60,.5);--ddither:rgba(255,80,100,.18);--tip-num-color:#ff80a0}
 .dtype-obsidian{--dborder:#181828;--dborder2:#3a3a52;--dface:#0a0a14;--dface2:#1a1a28;--dface3:#04040a;--dhigh:#4a4a66;--dpip:#a0a0c0;--dpip2:#7a7aa0;--dglow:rgba(60,60,90,.4);--ddither:rgba(120,100,180,.18);--tip-num-color:#c0a0ff}
 .dtype-starstone{--dborder:#5050a0;--dborder2:#7878d0;--dface:#10142a;--dface2:#1a1e3c;--dface3:#08081a;--dhigh:#9090e0;--dpip:#fff8c0;--dpip2:#e0d090;--dglow:rgba(140,120,255,.5);--ddither:rgba(200,180,255,.22);--tip-num-color:#fff080}
-.dtype-vagabond{--dborder:#b0602a;--dborder2:#d88838;--dface:#4a2a14;--dface2:#663818;--dface3:#2a1608;--dhigh:#e8a858;--dpip:#ffd890;--dpip2:#d8a050;--dglow:rgba(216,136,56,.5);--ddither:rgba(240,180,100,.22);--tip-num-color:#ffb860}
+.dtype-vagabond{--dborder:#a02030;--dborder2:#d04050;--dface:#5a0810;--dface2:#7a1018;--dface3:#3a0408;--dhigh:#c03040;--dpip:#ffd0c0;--dpip2:#e8a090;--dglow:rgba(220,40,60,.5);--ddither:rgba(255,80,100,.18);--tip-num-color:#ff80a0}
 .dtype-gold{--dborder:#a89882;--dborder2:#c8b898;--dface:#d8ccb4;--dface2:#efe4d0;--dface3:#c0b49a;--dhigh:#f5ece0;--dpip:#5a4a38;--dpip2:#3a2e20;--dglow:rgba(168,152,130,.3);--ddither:rgba(180,160,130,.18)}
 
 /* ── Dice Grid ── */
@@ -5913,19 +5940,27 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
    before — only the visual changed). */
 .rs-mult-badge{
   font-family:var(--font-px);
-  color:rgba(200,160,80,.85);letter-spacing:1.4px;
+  color:rgba(220,180,120,1);letter-spacing:1.4px;
   text-align:center;padding:6px 12px;
+  /* FIXED positioning anchored to the viewport tell-zone — was riding
+     #diceArea's flex flow and shifting up/down with the player dice
+     row. Same fix as the bounty strip + tell badge. */
+  position:fixed;
+  top:calc(var(--hud-h) + var(--tell-badge-y));
+  left:0;right:0;width:100%;
+  z-index:25;pointer-events:none;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
   transition:color .3s,text-shadow .3s;
-  /* Sharp dark-brown drop shadow so the badge lifts off the wood
-     background (same treatment as the parchment scroll). */
-  filter:drop-shadow(1px 2px 0 rgba(38,22,12,0.85));
 }
-.rs-mult-badge .rs-icon{font-size:22px;line-height:1;margin-bottom:1px;filter:drop-shadow(0 1px 0 rgba(0,0,0,.7))}
+/* No drop-shadow on the flame emoji itself (player feedback: "flame
+   emoji should not have a shadow"). The text elements carry their own
+   lighter text-shadows below. */
+.rs-mult-badge .rs-icon{font-size:22px;line-height:1;margin-bottom:1px}
 .rs-mult-badge .rs-name{
   font-size:13px;letter-spacing:2.5px;font-weight:bold;
-  color:rgba(220,180,120,.95);
-  text-shadow:0 1px 0 rgba(20,12,4,.85),0 0 6px rgba(20,12,4,.6);
+  color:rgba(235,200,140,1);
+  /* Lighter shadow than before (player: "shadow is too dark"). */
+  text-shadow:0 1px 2px rgba(40,24,12,.55);
   line-height:1.2;
 }
 .rs-mult-badge .rs-mult{
@@ -5935,29 +5970,28 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
 .rs-mult-badge .rs-val{
   font-size:28px;font-weight:bold;line-height:1;transition:all .25s;
   color:#ffd070;
-  text-shadow:0 2px 0 rgba(20,12,4,.85),0 0 10px rgba(255,200,80,.55);
+  text-shadow:0 1px 2px rgba(40,24,12,.55),0 0 10px rgba(255,200,80,.4);
 }
 .rs-mult-badge .rs-x{
   font-size:18px;vertical-align:baseline;
   color:#e8c074;
-  text-shadow:0 2px 0 rgba(20,12,4,.85);
+  text-shadow:0 1px 2px rgba(40,24,12,.55);
 }
 .rs-mult-badge .rs-desc{
-  font-size:9px;color:rgba(200,160,80,.7);letter-spacing:2px;
-  text-shadow:0 1px 0 rgba(20,12,4,.85);
+  font-size:9px;color:rgba(220,180,120,1);letter-spacing:2px;
+  text-shadow:0 1px 2px rgba(40,24,12,.5);
   line-height:1.2;transition:color .3s;
 }
 /* Heat-tier escalation: hotter colors + bigger multiplier as the
-   streak builds. Drop shadow stays so the brighter colors still
-   read against the wood. */
+   streak builds. Shadows kept light (player: "shadow too dark"). */
 .rs-mult-badge.rs-hot{color:#ffa050}
-.rs-mult-badge.rs-hot .rs-val{font-size:34px;color:#ffb060;text-shadow:0 2px 0 rgba(20,12,4,.85),0 0 14px rgba(255,150,60,.7)}
+.rs-mult-badge.rs-hot .rs-val{font-size:34px;color:#ffb060;text-shadow:0 1px 2px rgba(40,24,12,.55),0 0 14px rgba(255,150,60,.55)}
 .rs-mult-badge.rs-hot .rs-x{color:#ffa050}
-.rs-mult-badge.rs-hot .rs-desc{color:rgba(255,160,80,.85)}
+.rs-mult-badge.rs-hot .rs-desc{color:rgba(255,170,90,1)}
 .rs-mult-badge.rs-fire{color:#ff6020}
-.rs-mult-badge.rs-fire .rs-val{font-size:38px;color:#ff8030;text-shadow:0 2px 0 rgba(20,12,4,.9),0 0 16px rgba(255,96,32,.85),0 0 32px rgba(255,60,20,.5);animation:rsFire .4s infinite alternate}
+.rs-mult-badge.rs-fire .rs-val{font-size:38px;color:#ff8030;text-shadow:0 1px 2px rgba(40,24,12,.6),0 0 16px rgba(255,96,32,.7);animation:rsFire .4s infinite alternate}
 .rs-mult-badge.rs-fire .rs-x{color:#ff6020}
-.rs-mult-badge.rs-fire .rs-desc{color:rgba(255,120,60,.95)}
+.rs-mult-badge.rs-fire .rs-desc{color:rgba(255,130,70,1)}
 .rs-mult-badge.rs-lost .rs-val{color:#e05050;animation:rsLost .5s ease-out}
 .rs-mult-badge.rs-lost .rs-desc{color:rgba(224,80,80,.85)}
 .rs-mult-badge .rs-val.rs-pop{animation:rsPop .4s cubic-bezier(.2,.8,.3,1)}
@@ -6219,16 +6253,18 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
   font-family:var(--font-px);color:var(--text);
   text-align:center;letter-spacing:1px;line-height:1.1;
   background:transparent;border:0;box-shadow:none;
-  /* Lives in the dice-area's flex flow (between dialogue and the player
-     zone) so it naturally pushes the player dice down instead of floating
-     over them. Used to be position:absolute;top:50% pinned to the match
-     screen, which on small phones (height<700) landed the strip's bottom
-     edge inside the player dice row.
-     pointer-events:none keeps it click-through; dialog sits at z:90 so
-     it still covers the strip when a patron speaks. */
-  flex-shrink:0;width:100%;
+  /* FIXED positioning anchored to the viewport (same approach as the
+     tell-badge). It used to live in #diceArea's flex flow, which meant
+     the strip shifted up/down every time the player dice row appeared
+     or cleared. Pinning it to the viewport tell-zone kills the shift.
+     pointer-events:none keeps it click-through. */
+  position:fixed;
+  top:calc(var(--hud-h) + var(--tell-badge-y));
+  left:0;right:0;width:100%;
   pointer-events:none;
   z-index:25;
+  /* Sharp dark-brown drop shadow so it lifts off the wood background. */
+  filter:drop-shadow(1px 2px 0 rgba(38,22,12,0.85));
 }
 .bounty-strip .bs-title{display:none}
 .bs-row{display:contents}
@@ -6471,6 +6507,10 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
           <div class="rp-section">
             <div class="rp-sh">The Shop</div>
             <div class="rp-note">Open the <b style="color:var(--gold)">Shop</b> from the Gauntlet bottom nav between matches. Drag a die from the rack into your loadout to buy and equip it in one motion &mdash; the displaced die is sold back automatically.</div>
+          </div>
+          <div class="rp-section">
+            <div class="rp-sh">Renown</div>
+            <div class="rp-note">Earn <b style="color:var(--gold)">Renown</b> from feats &mdash; difficult plays, win streaks, milestones. Unlike gold and cards, <b style="color:var(--gold)">Renown is permanent: it carries across every run</b> and never resets. Hitting Renown thresholds unlocks lasting perks (extra card slots, the pouch, free reshuffles, and more).</div>
           </div>
         </div>
 
@@ -7448,6 +7488,10 @@ function showRenownInfo(tab){
   if(next){
     html+='<div class="rnk-info-bar"><div class="rnk-info-bar-fill" style="width:'+progress+'%"></div></div>';
   }
+  /* Thin reassurance line \u2014 renown is a permanent meta-progression track,
+     unlike gold/cards which reset each run. Player feedback asked for this
+     to be made explicit somewhere in the panel without disturbing layout. */
+  html+='<div class="rnk-info-persist">Renown is permanent \u2014 it carries across every run.</div>';
   /* Tab switcher */
   html+='<div class="rnk-tabs">';
   html+='<div class="rnk-tab'+(_renownTab==='perks'?' active':'')+'" onclick="SFX.nav();showRenownInfo(\'perks\')">PERKS</div>';
@@ -7938,6 +7982,14 @@ document.addEventListener('visibilitychange',function(){
       document.removeEventListener('touchstart',_resumeAudio);
     },{once:true});
   }
+  /* Also resume the BACKGROUND-MUSIC context (separate from SFX._ctx) and
+     re-sync both music + ambience — iOS suspends BG_CTX on background too,
+     which would leave the tavern track dead after an app switch. */
+  try{
+    if(typeof BG_CTX!=='undefined'&&BG_CTX&&BG_CTX.state==='suspended')BG_CTX.resume();
+    if(typeof _bgMusicSync==='function')_bgMusicSync();
+    if(typeof _ambienceSync==='function')_ambienceSync();
+  }catch(e){}
   /* If mid-match, re-render dice effects and scoring display */
   if(_currentScreen==='match'&&typeof G!=='undefined'&&G.pool&&G.phase==='choosing'){
     refreshSelUI();
@@ -8006,7 +8058,7 @@ const RUNGS=[
     agg:.68,cardRarity:'silver',wager:true,wagerCount:1,wagerMode:'best',minBank:300,diceStop:2,chaotic:false,adaptive:true,
     dice:['lead','amber','amber','jade','silver','silver'],
     cardPool:['hold_the_line','iron_gate_npc','campaign_veteran','steady_hands','old_partners_badge'],cardCount:3,
-    tell:{id:'drill_order',name:'DRILL ORDER',desc:'Max 3 rolls per turn — 4th busts',icon:'🛡️',maxRolls:3}},
+    tell:{id:'drill_order',name:'DRILL ORDER',desc:'Max 3 rolls per turn — roll locks after. Hot Dice always rolls free.',icon:'🛡️',maxRolls:3}},
   {id:5,name:'ALDRIC',key:'knight',icon:'🛡️',tier:'respected',target:17000,gold:700,buyIn:100,
     boss:null,bossDesc:null,
     agg:.72,cardRarity:'gold',wager:true,wagerCount:2,wagerMode:'best',minBank:350,diceStop:1,chaotic:false,adaptive:true,
@@ -8022,7 +8074,7 @@ const RUNGS=[
   {id:7,name:'AMBROSE',key:'bishop',icon:'✝️',tier:'renowned',target:28000,gold:1300,buyIn:200,
     boss:null,bossDesc:null,
     agg:.80,cardRarity:'gold',wager:true,wagerCount:3,wagerMode:'all',minBank:350,diceStop:1,chaotic:false,adaptive:true,
-    dice:['brass','silver','silver','crystal','crystal','ruby'],
+    dice:['brass','silver','silver','crystal','crystal','crystal'],
     cardPool:['communion_wine','blessed_dice','the_sermon','judgment_npc','never_saw_a_robe','blessed_confiscation'],cardCount:5,
     tell:{id:'reckoning',name:'THE RECKONING',desc:"Match my last bank — or score nothing",icon:'⚖️'}},
 ];
@@ -8051,7 +8103,9 @@ var DICE_STORE=[
   {mat:'brass',    price:350, stock:2, label:'Brass'},
   {mat:'silver',   price:380, stock:1, label:'Silver'},
   {mat:'obsidian', price:420, stock:2, label:'Obsidian'},
-  {mat:'ruby',     price:480, stock:2, label:'Ruby'},
+  /* Ruby removed from the store — faces 1/1/5/5/6/6 removed the gamble
+     entirely (stack a few and you literally can't bust). The red-gem
+     material was reskinned onto the Vagabond die instead. */
   {mat:'vagabond', price:650, stock:2, label:'Vagabond'},
   {mat:'crystal',  price:700, stock:1, label:'Crystal'},
   {mat:'starstone',price:620, stock:3, label:'Starstone'},
@@ -8305,23 +8359,17 @@ function _initHandicapHUD(){
       '<span class="rs-name">RISING STAKES</span>'+
       '<span class="rs-mult"><span class="rs-x">×</span><span class="rs-val">1.0</span></span>'+
       '<span class="rs-desc">BANK STREAKS MULTIPLY</span>';
-    /* Same mid-screen mount as Sudden Death counter (above). */
-    var _rsDA=document.getElementById('diceArea');
-    var _rsPZ=document.getElementById('playerZone');
-    if(_rsDA&&_rsPZ)_rsDA.insertBefore(badge,_rsPZ);
-    else if(_rsDA)_rsDA.appendChild(badge);
-    else ms.appendChild(badge);
+    /* Mount as a direct child of #screen-match — the badge is now
+       position:fixed (CSS) so it pins to the viewport tell-zone instead
+       of riding #diceArea's flex flow (which shifted it whenever the
+       player dice row appeared/cleared). */
+    ms.appendChild(badge);
   }
   if(G._handicap==='bounty_board'){
-    /* Bounty strip — insert as a regular flex child of #diceArea, just before
-       the player-zone, so the dice naturally sit below it (no overlap on
-       small phones). */
+    /* Bounty strip — position:fixed, mounted at the match root so it
+       pins to the viewport tell-zone and never shifts with the dice. */
     var strip=document.createElement('div');strip.id='bountyStrip';strip.className='bounty-strip';
-    var _da=document.getElementById('diceArea');
-    var _pz=document.getElementById('playerZone');
-    if(_da&&_pz)_da.insertBefore(strip,_pz);
-    else if(_da)_da.appendChild(strip);
-    else ms.appendChild(strip);
+    ms.appendChild(strip);
     _updateBountyHUD();
   }
   if(G._handicap==='mirror_match'){
@@ -8405,8 +8453,12 @@ function _initTellHUD(){
      player sees how much the tell has drained from their purse. Updated
      per-roll in afterRoll alongside the actual gold deduction. */
   var _arInlineVal=(t.id==='in_arrears')?' <span class="tb-val tb-val-inline tb-val-debt" id="arrearsVal">−0g</span>':'';
+  /* DRILL ORDER: roll counter inline next to the name (was appended as a
+     separate row below the desc, which overlapped the player score row).
+     Player feedback: "Put the 1/3 number next to DRILL ORDER". */
+  var _drillInlineVal=(t.id==='drill_order')?' <span class="tb-val tb-val-inline" id="drillVal">0/'+t.maxRolls+'</span>':'';
   badge.innerHTML='<span class="tb-icon">'+t.icon+'</span>'+
-    '<span class="tb-name">'+_tellNameHtml+_stedInlineVal+_arInlineVal+'</span>'+
+    '<span class="tb-name">'+_tellNameHtml+_stedInlineVal+_arInlineVal+_drillInlineVal+'</span>'+
     '<span class="tb-desc">'+t.desc+'</span>';
   /* Mount as a DIRECT child of #screen-match (not inside #diceArea).
      The badge is position:fixed and pinned to the viewport, but a CSS
@@ -8417,11 +8469,8 @@ function _initTellHUD(){
      the nested tell-badge sideways AND down. Mounting at the match
      root keeps the badge rock-steady through every shake/scatter. */
   ms.appendChild(badge);
-  /* Per-Tell extra HUD bits */
-  if(t.id==='drill_order'){
-    var dv=document.createElement('span');dv.className='tb-val';dv.id='drillVal';dv.textContent='0/'+t.maxRolls;
-    badge.appendChild(dv);
-  }
+  /* Per-Tell extra HUD bits. (drill_order's counter is now rendered
+     inline in the name span above — no separate appended row.) */
   if(t.id==='reckoning'){
     var rv=document.createElement('span');rv.className='tb-val';rv.id='reckoningVal';rv.textContent='≥0';
     badge.appendChild(rv);
@@ -8676,7 +8725,7 @@ const CARDS=[
   {id:'corvus_book',name:"CORVUS'S BOOK",icon:'📖',rarity:'gold',npc:'corvus',eff:'EACH BANK +75 INTEREST (PERMANENT)',desc:"Each bank adds +75 to a running interest line that applies to every future bank this match. Banks of 1000+ add +150 instead.",rewardQuote:'"Compounding. The lender\'s purest art."',arch:'hoarder'},
   {id:'aldrics_banner',name:"ALDRIC'S BANNER",icon:'🛡️',rarity:'gold',npc:'aldric',eff:'EACH UNIQUE COMBO TYPE: +150 ALL FUTURE BANKS',desc:"Each unique combo type you score this match (triple, straight, Hot Dice) permanently adds +150 to every subsequent bank.",rewardQuote:'"The banner remembers every blow struck beneath it."',arch:'collector'},
   {id:'finnicks_trick',name:"FINNICK'S TRICK",icon:'🎩',rarity:'gold',npc:'finnick',eff:'FIRST ROLL EACH TURN: 1 DIE = 1 OR 5',desc:"Each turn's very first roll: one random non-scoring die is automatically converted to a 1 or 5 (whichever scores higher).",rewardQuote:'"Watch this hand, mate. Now watch the other one."',arch:'sharp'},
-  {id:'ambrose_chalice',name:"AMBROSE'S CHALICE",icon:'🏆',rarity:'gold',npc:'ambrose',eff:'PURE-ARCH LOADOUT: +250 EVERY BANK',desc:"If your 3 regular loadout slots are all the same archetype (excluding your boss card), every bank gains +250 bonus. Reward for committing fully.",rewardQuote:'"Dedication is its own grace. Drink deep."',arch:'utility'},
+  {id:'ambrose_chalice',name:"AMBROSE'S CHALICE",icon:'🏆',rarity:'gold',npc:'ambrose',eff:'PURE-ARCH LOADOUT: +250 EVERY BANK',desc:"If your 3 regular loadout slots are all the same archetype (excluding your boss card), every bank gains +250 bonus. Reward for committing fully.",rewardQuote:'"Dedication is its own grace. Drink deep."',arch:'utility',dep:true},
   /* ── Phase 6 fun cards (passive flavor pieces) ── */
   {id:'bakers_dozen',name:"BAKER'S DOZEN",icon:'🍞',rarity:'gold',eff:'13TH BANK: +1300',desc:'Your 13th bank of the match earns a one-time +1300 bonus. A reward for the long haul.',arch:'safeBanker'},
   {id:'the_heir',name:'THE HEIR',icon:'🪙',rarity:'silver',eff:'AFTER TURN 3: BANKS +150/TURN (STACKS)',desc:'Starting on turn 4, each subsequent turn adds +150 to every bank you make for the rest of the match (turn 4 = +150, turn 5 = +300, turn 6 = +450…).',arch:'hoarder'},
@@ -8756,6 +8805,15 @@ const CARDS=[
   {id:'turncoat',name:'TURNCOAT',icon:'🎭',rarity:'tin',eff:'NEXT BANK +250 AFTER OPP BUST',desc:'When the opponent busts, your next bank gains +250.',arch:'saboteur'},
   {id:'anchor',name:'ANCHOR',icon:'⚓',rarity:'silver',eff:'LAST DIE 6: SCORES 600',desc:'The rightmost die in your row, if it shows a 6 and is committed, scores as a lone single worth 600.',arch:'collector'},
   {id:'sequence',name:'SEQUENCE',icon:'🎯',rarity:'gold',eff:'ROW IN STRICT ORDER: +1500',desc:'If the entire uncommitted row shows strictly ascending or descending values each differing by exactly 1 (e.g. 1-2-3-4-5-6 or 6-5-4-3-2), gain +1500. Fires on the first commit of the roll.',arch:'collector'},
+  {id:'flanks',name:'FLANKS',icon:'🛡️',rarity:'tin',eff:'COMMIT BOTH END DICE: +200',desc:'Commit a selection that includes both the leftmost AND rightmost die of your row: gain +200.',arch:'collector'},
+  /* ── Combo-opening cards (E2) — each unlocks a brand-new way to score
+     that the base game doesn't reward. All resolve inside scoreRoll so
+     they work identically for the player and every NPC. Kept dead simple:
+     no mental math, the bonus is a flat number. */
+  {id:'even_row',name:'EVEN ROW',icon:'⚖️',rarity:'silver',eff:'A 2, A 4 & A 6 TOGETHER: 400',desc:'Commit a 2, a 4, and a 6 together — they score 400 as a set. Like a straight, but evens only.',arch:'collector'},
+  {id:'odd_row',name:'ODD ROW',icon:'🎲',rarity:'tin',eff:'A 1, A 3 & A 5 TOGETHER: 300',desc:'Commit a 1, a 3, and a 5 together — they score 300 as a set. Turns a useless 3 into points.',arch:'collector'},
+  {id:'boxcars',name:'BOXCARS',icon:'🎰',rarity:'tin',eff:'A PAIR OF 6s: +300',desc:'A pair of 6s scores +300. Normally 6s are worthless unless you roll three — this makes a pair pay.',arch:'collector'},
+  {id:'full_house',name:'FULL HOUSE',icon:'🏠',rarity:'gold',eff:'TRIPLE + A PAIR: +500',desc:'Land a three-of-a-kind and a separate pair in the same commit: gain +500 on top.',arch:'collector'},
   /* ── Die-building Vanguard family (E1) — silver/gold cards that REWARD
      investing in upgraded dice. Each scales with the player's loadout
      composition, giving Vanguard a real progression curve at higher
@@ -8810,7 +8868,7 @@ const CARDS=[
   /* Gold */
   {id:'broken_lantern',name:'BROKEN LANTERN',icon:'🏮',rarity:'gold',type:'active',maxUses:1,timing:'yielding',eff:'OPP PLAYS BLIND 1 TURN',desc:'Opponent\'s next turn: their dice faces are hidden until committed. One use per match.',arch:'saboteur',dep:true},
   {id:'wild_die',name:'THE WILD DIE',icon:'🃏',rarity:'gold',type:'active',maxUses:1,timing:'choosing',eff:'PICK ANY DIE FACE',desc:'Choose any face value (1-6) for one non-scoring die. One use per match.',arch:'sharp',dep:true},
-  {id:'second_wind',name:'SECOND WIND',icon:'💨',rarity:'gold',type:'active',maxUses:1,timing:'idle|choosing|yielding',eff:'BUST → 3-DICE MINI TURN',desc:'If you bust this turn, immediately roll three dice for a rescue attempt. Score = banked. One use per match.',arch:'brinksman'},
+  {id:'second_wind',name:'SECOND WIND',icon:'💨',rarity:'gold',type:'active',maxUses:1,timing:'idle|choosing|yielding',eff:'BUST → 3-DICE RESCUE ROLL',desc:'Activate before you bust. If you bust this turn, you immediately roll 3 rescue dice once — whatever they score is banked automatically, then your turn ends. One use per match.',arch:'brinksman'},
   {id:'the_brewer',name:'THE BREWER',icon:'🍺',rarity:'gold',eff:'ACTIVE CARDS +1 USE',desc:'All your active cards get one extra use this match.',arch:'hoarder'},
   {id:'dead_mans_hand',name:"DEAD MAN'S HAND",icon:'🃏',rarity:'gold',eff:'ONCE-PER-MATCH → TWICE',desc:'Your once-per-match card effects can trigger twice instead of once.',arch:'hoarder'},
   {id:'the_pyre',name:'THE PYRE',icon:'🔥',rarity:'gold',type:'active',maxUses:1,timing:'choosing',eff:'BURN CARD → +500 BANK',desc:'Permanently disable one of your equipped cards this match to add +500 to your current bank. One use.',arch:'brinksman'},
@@ -8906,9 +8964,9 @@ const NPC_CARDS=[
   /* ── FINNICK ── */
   {id:'quick_hands',name:'QUICK HANDS',icon:'🤏',rarity:'npc',npcOnly:true,owner:'finnick',
    type:'active',maxUses:1,timing:'yielding',
-   eff:'YOUR HIGHEST DIE → 3',desc:'Once per match, Finnick swaps your highest-value die down to a 3.',
-   playerDesc:"Activate while yielding: on the opponent's next scoring roll, swap their highest-value die down to a 3.",
-   effect:{type:'once',mechanic:'swap_best_to_3'}},
+   eff:'YOUR 2 BEST DICE → 2',desc:'Once per match, Finnick swaps your two highest-value scoring dice down to 2s.',
+   playerDesc:"Activate while yielding: on the opponent's next scoring roll, swap their two highest-value scoring dice down to 2s.",
+   effect:{type:'once',mechanic:'swap_best_to_3',swapN:2,swapTo:2}},
   {id:'pocket_sand',name:'PICKPOCKET',icon:'✋',rarity:'npc',npcOnly:true,owner:'finnick',
    eff:'30% CHANCE: First roll = 5 dice',desc:'Thirty percent chance each turn — your opponent shaves a die from your first roll, leaving you with five instead of six.',
    playerDesc:"Thirty percent chance each turn that your opponent's first roll only uses five dice instead of six.",
@@ -8936,9 +8994,9 @@ const NPC_CARDS=[
    playerDesc:"The opponent's very first bank of the match is worth only half its normal value.",
    effect:{type:'on_player_bank',mechanic:'halve_first_bank'}},
   {id:'severance_npc',name:'SEVERANCE',icon:'📋',rarity:'npc',npcOnly:true,owner:'corvus',
-   eff:'Start +1500 pts',desc:'Corvus starts the match with 1,500 bonus points.',
-   playerDesc:'You start the match with 1,500 bonus points.',
-   effect:{type:'start_bonus',amount:1500}},
+   eff:'Start +900 pts',desc:'Corvus starts the match with 900 bonus points.',
+   playerDesc:'You start the match with 900 bonus points.',
+   effect:{type:'start_bonus',amount:900}},
   {id:'the_audit',name:'THE AUDIT',icon:'🧮',rarity:'npc',npcOnly:true,owner:'corvus',
    eff:'+300 per bank when winning',desc:'Each time Corvus banks while his total score is higher than yours, he gains an extra 300 points on top.',
    playerDesc:'Each time you bank while your total score is higher than the opponent\'s, you gain an extra 300 points on top.',
@@ -8956,9 +9014,9 @@ const NPC_CARDS=[
    playerDesc:'You cannot bust during your first two turns of the match.',
    effect:{type:'passive',mechanic:'bust_immune_turns',turns:2}},
   {id:'iron_gate_npc',name:'IRON GATE',icon:'⛓️',rarity:'npc',npcOnly:true,owner:'brutus',
-   eff:'Cancels your bank if under 200 (once)',desc:'Once per match, if you try to bank with fewer than 200 points, Brutus cancels your bank entirely. You gain nothing and your turn ends.',
-   playerDesc:'Once per match, if the opponent tries to bank with fewer than 200 points, you cancel their bank entirely. They gain nothing and their turn ends.',
-   effect:{type:'on_player_bank',mechanic:'block_low_bank',threshold:200}},
+   eff:'Steal their next bust (once)',desc:"Once per match, the next time you bust, Brutus seizes every turn point you lost — straight onto his own score.",
+   playerDesc:"Once per match, the next time the opponent busts, you seize every turn point they lost — straight onto your own score.",
+   effect:{type:'once',mechanic:'steal_on_bust'}},
   {id:'campaign_veteran',name:'CAMPAIGN VETERAN',icon:'⚔️',rarity:'npc',npcOnly:true,owner:'brutus',
    eff:'Start +2000 pts',desc:'Brutus starts the match with 2,000 bonus points.',
    playerDesc:'You start the match with 2,000 bonus points.',
@@ -9126,9 +9184,14 @@ const DICE_TYPES=[
    effect:{type:'scoring_boost',mechanic:'single1_bonus',amount:50},
    desc:'1s score 150.\n2x 1-face, 2x 5-face, no 4 or 6.'},
   /* ── Apr 2026 batch — fancy dice ── */
-  {id:'ruby',name:'RUBY',icon:'❤️',cost:600,
-   faces:[1,1,5,5,6,6],effect:null,
-   desc:'Only rolls 1, 5, or 6. Guaranteed scoring on every face.'},
+  /* RUBY — REMOVED. The 1/1/5/5/6/6 face set killed the gamble (stack a
+     few and busting becomes impossible). No longer sold or used by NPCs.
+     The def is kept with a standard 1-6 face spread ONLY so legacy saves
+     that still have a Ruby equipped fall back to a fair, normal die
+     instead of crashing. The red-gem visual was reskinned onto Vagabond. */
+  {id:'ruby',name:'RUBY',icon:'❤️',cost:600,dep:true,
+   faces:[1,2,3,4,5,6],effect:null,
+   desc:'(Retired die — now rolls a standard 1-6 spread.)'},
   {id:'obsidian',name:'OBSIDIAN',icon:'🖤',cost:500,
    faces:[1,2,3,4,5,6],
    effect:{type:'risk_reward',mechanic:'shatter_bonus',chance:0.06,amount:1000},
@@ -9512,6 +9575,33 @@ function scoreRoll(vals,cards,locked,context,dieMats){
         pts+=200;mark(pr[0],1);mark(pr[1],1);_bonusFiredFlag=true;
       }
     });
+  }
+  /* ── Combo-opening cards (E2) — all resolve here in scoreRoll so the
+     player and every NPC use them identically. They run AFTER triples
+     and use cnt()/mark() so they only ever claim dice a triple didn't,
+     never stranding a triple into an invalid commit. ── */
+  /* FULL HOUSE (gold): a triple already fired this roll AND a separate
+     pair remains → +500. Claims the leftover pair so it isn't double-
+     counted by singles/other pair cards. */
+  if(cards.includes('full_house')&&_triplesFired.length>=1){
+    for(var _fhF=6;_fhF>=1;_fhF--){
+      if(cnt(_fhF)>=2){pts+=500;mark(_fhF,2);_bonusFiredFlag=true;break;}
+    }
+  }
+  /* EVEN ROW (silver): one 2 + one 4 + one 6 committed together → 400. */
+  if(cards.includes('even_row')&&cnt(2)>=1&&cnt(4)>=1&&cnt(6)>=1){
+    pts+=400;mark(2,1);mark(4,1);mark(6,1);_bonusFiredFlag=true;
+  }
+  /* ODD ROW (tin): one 1 + one 3 + one 5 committed together → 300.
+     Runs before the singles loop so it claims the 1/3/5 itself. */
+  if(cards.includes('odd_row')&&cnt(1)>=1&&cnt(3)>=1&&cnt(5)>=1){
+    pts+=300;mark(1,1);mark(3,1);mark(5,1);_bonusFiredFlag=true;
+  }
+  /* BOXCARS (tin): a leftover pair of 6s → +300. After triples, any
+     surviving 6s number at most 2, so this naturally fires on a pure
+     pair and never eats into a triple-6/quad-6. */
+  if(cards.includes('boxcars')&&cnt(6)>=2){
+    pts+=300;mark(6,2);_bonusFiredFlag=true;
   }
 
   /* ── Singles ── */
@@ -10044,6 +10134,14 @@ document.addEventListener('click',function(e){
 
 function buildCBar(barId,cardIds,isOpp,label){
   const bar=document.getElementById(barId);bar.querySelectorAll('.mcard,.cchip').forEach(e=>e.remove());
+  /* Also sweep any stale .card-trig-label elements — the per-label 3s
+     removal timeout doesn't survive a match transition cleanly, so
+     trigger labels from a previous match would otherwise leak onto the
+     next match's board. Player feedback: "card text effects remain on
+     screen... sometimes they even remain on the next match". */
+  bar.querySelectorAll('.card-trig-label').forEach(e=>e.remove());
+  var _atz=document.getElementById('activateZone');
+  if(_atz)_atz.querySelectorAll('.card-trig-label').forEach(e=>e.remove());
   /* Clean up previous drag listeners */
   _dragCleanups.forEach(fn=>fn());_dragCleanups=[];
   const n=cardIds.length;if(!n)return;
@@ -10602,6 +10700,20 @@ function setBtns(r,b){
       setTimeout(function(){bankBtn.style.animation='';},300);
     }
   }else{bankBtn.classList.add('disabled');}
+  /* Re-assert the Drill Order lock after every setBtns call — otherwise a
+     valid selection (refreshSelUI → setBtns(true,...)) would re-enable a
+     roll button that Drill Order should keep locked. */
+  _updateDrillLock();
+}
+/* Drill Order tell: once the player hits the per-turn roll cap, the roll
+   button shows a locked/chain state (can't roll a 4th) — but Bank still
+   works, and Hot Dice still auto-rolls free (it bypasses handleRoll).
+   Replaces the old behaviour where a 4th roll force-busted the turn. */
+function _updateDrillLock(){
+  var rollBtn=document.getElementById('btnRoll');
+  if(!rollBtn)return;
+  var locked=!!(G&&G._tell&&G._tell.id==='drill_order'&&(G.turnRollCount||0)>=(G._tell.maxRolls||3));
+  rollBtn.classList.toggle('roll-locked',locked);
 }
 function setStatusMsg(m,c){
   const isOpp=G&&G.phase==='opp';
@@ -10848,6 +10960,33 @@ function spawnPixelSparks(el,count){
     (function(s){setTimeout(function(){s.remove();},280);})(sp);
   }
 }
+/* Sawdust particle burst — brown flecks that drift DOWN (gravity) from a
+   die that just got dampened by the Sawdust card. Distinct from
+   spawnPixelSparks (which radiates evenly) so the effect reads as dust
+   falling, not an explosion. */
+function spawnSawdust(el,count){
+  if(!el)return;
+  var rect=el.getBoundingClientRect();
+  var n=count||7;
+  for(var i=0;i<n;i++){
+    var sx=Math.round(rect.left+Math.random()*rect.width);
+    var sy=Math.round(rect.top+rect.height*0.35+Math.random()*rect.height*0.4);
+    var sp=document.createElement('div');
+    sp.className='px-spark';
+    /* brownish dust tint — override the default spark color */
+    var _shade=['#b89058','#9a7038','#caa468','#876030'][i%4];
+    sp.style.cssText='position:fixed;width:3px;height:3px;background:'+_shade+';z-index:60;pointer-events:none;image-rendering:pixelated;left:'+(sx-1)+'px;top:'+(sy-1)+'px';
+    var _drift=(Math.random()-0.5)*16;
+    var _fall=12+Math.random()*18;
+    sp.animate(
+      [{transform:'translate(0,0)',opacity:1},
+       {transform:'translate('+_drift+'px,'+_fall+'px)',opacity:0}],
+      {duration:380+Math.random()*220,easing:'steps(4,end)',fill:'forwards'}
+    );
+    document.body.appendChild(sp);
+    (function(s){setTimeout(function(){s.remove();},650);})(sp);
+  }
+}
 function spawnPop(txt,anchorEl){
   if(txt&&txt[0]==='+')SFX.coins();
   let x,y;
@@ -10958,6 +11097,12 @@ function showHot(){
      player legitimately rolled all six clean — which is misleading when
      a save rescued a real bust. */
   if(window.DLG&&!(G&&G._bustSavedThisTurn))DLG.trigger('PLAYER_HOT_DICE');
+  /* Drill Order: if Hot Dice fires AT/PAST the roll cap, the free
+     auto-roll is the "Hot Dice always rolls" exception — call it out
+     with an opponent line so the player understands the rule. */
+  if(window.DLG&&G&&G._tell&&G._tell.id==='drill_order'&&(G.turnRollCount||0)>=(G._tell.maxRolls||3)){
+    setTimeout(function(){try{DLG.show("Hot dice. Even my drill can't halt that. Roll it, recruit.");}catch(e){}},650);
+  }
   const ov=document.getElementById('hot-ov');
   _alignOverlayWord(ov.querySelector('.hot-word'));
   ov.classList.remove('flash');void ov.offsetWidth;ov.classList.add('flash');
@@ -11038,6 +11183,10 @@ function toggleDie(d){
 
 function startPTurn(){
   G.phase='idle';G.turnPts=0;G.kept=[];G.numDice=G.matchDice?G.matchDice.length:6;G.pool=[];G.turnRollCount=0;G._slowHandUsedThisTurn=false;G._warmHandsActive=false;G._lastHotDice=false;G._firstRollCommitted=0;G._bustSavedThisTurn=false;
+  /* Turn-boundary sweep: clear any leftover card-trigger labels so a
+     label from last turn (e.g. a slow per-turn fade) can't linger into
+     the new turn. The per-label 3s timeout still runs as backup. */
+  document.querySelectorAll('.card-trig-label').forEach(function(e){e.remove();});
   /* ── TELL: turn-start hooks ── */
   if(G._tell){
     /* Steeped: reset accumulated bonus each turn */
@@ -11245,13 +11394,17 @@ function handleRoll(){
     return;
   }
   if(G.phase!=='idle'&&G.phase!=='choosing')return;
-  /* ── TELL: Drill Order (Brutus) — 3 rolls max per turn, 4th force-busts ── */
+  /* ── TELL: Drill Order (Brutus) — roll cap per turn ──
+     REWORK: hitting the cap no longer force-busts the turn. The roll
+     button is locked (.roll-locked, see _updateDrillLock) so the player
+     simply can't roll a 4th time — but they keep whatever is on the
+     table and can still Bank. Hot Dice bypasses this entirely (it
+     auto-rolls without going through handleRoll). This block is just a
+     belt-and-braces refuse in case the locked button is somehow clicked. */
   if(G._tell&&G._tell.id==='drill_order'&&G.turnRollCount>=G._tell.maxRolls){
-    setStatusMsg("DRILL ORDER — TOO MANY ROLLS!",'red');
-    try{SFX.bust&&SFX.bust();}catch(e){}
-    try{Haptic.bust&&Haptic.bust();}catch(e){}
-    var _doFree=G.pool.filter(function(d){return !d.committed;});
-    setTimeout(function(){_delayedDoBust(_doFree);},400);
+    setStatusMsg("DRILL ORDER — ROLL LOCKED. BANK YOUR SCORE.",'red');
+    try{SFX.err&&SFX.err();}catch(e){}
+    _updateDrillLock();
     return;
   }
   /* Seven Dice (active): bump dice count by 1 for this roll only */
@@ -11354,6 +11507,17 @@ function handleRoll(){
           if(asc||desc){pts+=1500;triggerCard('sequence','SEQUENCE +1500',true);spawnPop('+1500 SEQUENCE');}
         }
       }
+      /* FLANKS (tin): committing a selection that includes BOTH the
+         leftmost and rightmost dice of the row → +200. Fires per commit.
+         NPC parity is handled separately in runOppTurn (search 'flanks'
+         near the oppBank+=total line) since the NPC scores via scoreRoll
+         which has no row-position context. */
+      if(cards.includes('flanks')&&rowLen>=2){
+        var _fL=G.pool[0],_fR=G.pool[rowLen-1];
+        if(_fL&&_fR&&_fL!==_fR&&selDice.indexOf(_fL)>=0&&selDice.indexOf(_fR)>=0){
+          pts+=200;triggerCard('flanks','FLANKS +200',true);
+        }
+      }
     })();
     /* HOT HAND (tin): chain bonus per commit within a turn — +75, +150, +225...
        Resets on bust (cleared in doBust). Encourages stringing scoring
@@ -11390,7 +11554,14 @@ function handleRoll(){
     G.pool=[];clearRow('playerDiceRow');G.numDice=G.matchDice?G.matchDice.length:6;G.phase='rolling';
     G._lastHotDice=true;
     G._featHotDiceCount=(G._featHotDiceCount||0)+1;
-    setBtns(false,false);setStatusMsg('🔥 HOT DICE','gold');SFX.hotDice();showHot();
+    /* Skip the hot-dice fanfare sound if a bust-save (Martyr / Iron
+       Stomach / Brutus's Grit) rescued the streak this turn — same
+       reasoning as the suppressed PLAYER_HOT_DICE dialogue in showHot.
+       The HOT DICE banner + bonus still apply; just the celebratory
+       sound is muted so it doesn't reward a rescued bust. */
+    setBtns(false,false);setStatusMsg('🔥 HOT DICE','gold');
+    if(!(G&&G._bustSavedThisTurn))SFX.hotDice();
+    showHot();
     var _hotBonus=250;
     /* Synergy: High Roller — Hot Dice bonus doubled */
     if(G.activeSynergies&&G.activeSynergies.includes('score_mates'))_hotBonus*=2;
@@ -11412,7 +11583,8 @@ function handleRoll(){
     return;
   }
   G.phase='rolling';setBtns(false,false);setStatusMsg('ROLLING...','active');
-  /* Sequence card arms on every roll; first commit action consumes it */
+  /* Sequence arms on every roll; the first commit action of the roll
+     consumes the flag (whole-row position card — see _positionBonuses). */
   G._sequenceArmedThisRoll=true;
   const useSpur=!!G.spurActive;if(typeof G.spurActive==='number'&&G.spurActive>0)G.spurActive--;else G.spurActive=0;
   const row=document.getElementById('playerDiceRow');
@@ -11503,14 +11675,13 @@ function handleRoll(){
   }
   /* Also force-reset any wrap-level styles that might have leaked in. */
   row.querySelectorAll('.die-wrap').forEach(function(w){w.style.visibility='visible';w.style.opacity='1';});
-  /* Insert the frozen die. Use the saved free-only visual index, capped
-     to the actual roll count — `pos` was set to free-die index at freeze
-     time (see activateFrozenDie). */
+  /* Insert the frozen die at the LEFTMOST slot (index 0). The old code
+     used a saved free-die index that didn't map cleanly to next turn's
+     fresh roll — it landed the die "centered" or off-position. Leftmost
+     is simple, predictable, and always valid. */
   if(_fdEntry){
-    var _fdPos=Math.max(0,Math.min(G._frozenDie.pos|0,newEntries.length));
-    newEntries.splice(_fdPos,0,_fdEntry);
-    var _refNode=row.children[_fdPos]||null;
-    _insertDie(row,_fdEntry.el,_refNode);
+    newEntries.unshift(_fdEntry);
+    _insertDie(row,_fdEntry.el,row.firstChild||null);
     G._frozenDie=null;/* consume — only pre-places once */
   }
   G.pool=[...G.pool,...newEntries];
@@ -11519,7 +11690,11 @@ function handleRoll(){
      (root cause was overlay-hiding, fixed in handleRoll's overlay
      dismissal). Reverted per player request. */
   var _rollDur=480;
-  setTimeout(()=>{G.pool.forEach(d=>{if(!d.committed){settleDie(d.el);d.el.onclick=()=>toggleDie(d);d.el.style.cursor='pointer';}});afterRoll();},_rollDur);
+  setTimeout(()=>{G.pool.forEach(d=>{if(!d.committed){settleDie(d.el);d.el.onclick=()=>toggleDie(d);d.el.style.cursor='pointer';
+    /* Sawdust/Blockade dampened dice — fade the brown tint back + puff
+       a sawdust particle burst once the die has landed. */
+    if(d.el.classList.contains('die-dampened')){d.el.classList.add('dampen-fade');try{spawnSawdust(d.el,7);}catch(e){}}
+  }});afterRoll();},_rollDur);
 }
 
 function afterRoll(){
@@ -11735,31 +11910,39 @@ function _afterRollImpl(){
   var _csDelayRoll=G.rung._coldShoulder?2:0;
   G.oCards.forEach(function(cid){
     var npc=getNpcCard(cid);if(!npc)return;var eff=npc.effect;
-    /* quick_hands / grogs_bump: swap highest scoring die to 3 (uses defaults to 1; grogs_bump uses 2) */
+    /* quick_hands / grogs_bump: swap the highest scoring dice down.
+       swapN = how many dice to swap (default 1; quick_hands swaps 2).
+       swapTo = the value to swap to (default 3; quick_hands uses 2).
+       grogs_bump keeps the legacy 1-die-to-3 behaviour. */
     var _sb3MaxUses=eff.uses||1;
     if(eff.mechanic==='swap_best_to_3'&&(G.npcCardState.usedOnce[cid]||0)<_sb3MaxUses&&G.turnNum>=(2+_csDelayRoll)){
       var scoring=free.filter(function(d){return d.val===1||d.val===5;});
       if(scoring.length>0){
-        /* WARDED shield: fizzle the swap-to-3 attempt. Use is consumed
+        /* WARDED shield: fizzle the swap attempt. Use is consumed
            to prevent infinite retries until next match. */
         if(_consumeWard((npc.name||'DICE SWAP'))){
           G.npcCardState.usedOnce[cid]=(G.npcCardState.usedOnce[cid]||0)+1;
           return;
         }
         G.npcCardState.usedOnce[cid]=(G.npcCardState.usedOnce[cid]||0)+1;
-        var victim=scoring.sort(function(a,b){return(a.val===1?100:50)-(b.val===1?100:50);}).pop();
-        victim.val=3;
-        if(victim.el){
-          var dots=victim.el.children;var nd=FACE_DOTS[3]||FACE_DOTS[1];
-          for(var i=0;i<49;i++){if(!dots[i])continue;dots[i].className=nd.includes(i)?'dc dot':'dc';}
-          /* Visible feedback — red flash + sparks on the affected die */
-          victim.el.classList.add('eff-glow-red');
-          spawnPixelSparks(victim.el,8);
-          setTimeout(function(){if(victim.el)victim.el.classList.remove('eff-glow-red');},900);
-        }
+        var _sbN=eff.swapN||1;
+        var _sbTo=eff.swapTo||3;
+        /* Sort highest-value first so we hit the best dice. */
+        var _sbSorted=scoring.slice().sort(function(a,b){return(b.val===1?100:50)-(a.val===1?100:50);});
+        var _sbVictims=_sbSorted.slice(0,_sbN);
+        _sbVictims.forEach(function(victim){
+          victim.val=_sbTo;
+          if(victim.el){
+            var dots=victim.el.children;var nd=FACE_DOTS[_sbTo]||FACE_DOTS[1];
+            for(var i=0;i<49;i++){if(!dots[i])continue;dots[i].className=nd.includes(i)?'dc dot':'dc';}
+            victim.el.classList.add('eff-glow-red');
+            spawnPixelSparks(victim.el,8);
+            (function(_v){setTimeout(function(){if(_v.el)_v.el.classList.remove('eff-glow-red');},900);})(victim);
+          }
+        });
         /* Pulse the NPC card so it's obvious which card fired */
         triggerCard(cid,npc.name+'!',false);
-        setStatusMsg(npc.name+' — DIE → 3!','red');
+        setStatusMsg(npc.name+(_sbN>1?' — '+_sbN+' DICE → '+_sbTo+'!':' — DIE → '+_sbTo+'!'),'red');
         try{SFX.err&&SFX.err();}catch(e){}
         try{Haptic.bust&&Haptic.bust();}catch(e){}
         (function(_cid){setTimeout(function(){if(window.DLG)DLG.triggerCard(_cid,false);},650);})(cid);
@@ -12038,14 +12221,48 @@ function doBust(){
     setTimeout(()=>{clearRow('playerDiceRow');G.pool=[];endPTurn();},1400);
     return;
   }
-  /* Second Wind: bust → mini-turn with 3 dice (active card) */
+  /* Second Wind: bust → roll 3 rescue dice ONCE, whatever scores is
+     auto-banked, then the turn ends. REWORK: the old version handed the
+     player a free 3-dice mini-turn (roll/score/bank freely) which didn't
+     match the card text ("Score = banked") OR the NPC version (which
+     rolls once and auto-banks). Player feedback: "Not sure how second
+     wind card works?" — now it's a clean, predictable one-shot rescue. */
   if(G.activeCardState&&G.activeCardState.secondWindActive){
     G.activeCardState.secondWindActive=false;clearCardLabel('second_wind');
     /* Apply bust to all visible dice in the row (not just G.pool — see comment in main bust path) */
     (function(){var _r=document.getElementById('playerDiceRow');if(_r)Array.prototype.forEach.call(_r.querySelectorAll('.die'),function(el){el.style.opacity='';el.style.filter='';el.classList.add('bust');});})();
-    setStatusMsg('BUST — SECOND WIND!','gold');triggerCard('second_wind','3-DICE RESCUE!',true);
-    G.safeTurnStreak=0;G.turnPts=0;G.kept=[];G.numDice=3;updHUD();refreshKeptTray();
-    setTimeout(()=>{clearRow('playerDiceRow');G.pool=[];G.phase='idle';setBtns(true,false);setStatusMsg('Second Wind — roll 3 dice!','gold');},1200);
+    setStatusMsg('SECOND WIND — 3-DICE RESCUE!','gold');triggerCard('second_wind','RESCUE ROLL!',true);
+    G.safeTurnStreak=0;G.turnPts=0;G.kept=[];updHUD();refreshKeptTray();setBtns(false,false);
+    setTimeout(function(){
+      clearRow('playerDiceRow');G.pool=[];
+      var _swRow=document.getElementById('playerDiceRow');
+      var _swMats=[],_swVals=[];
+      for(var _swi=0;_swi<3;_swi++){
+        var _swM=(G.matchDice&&G.matchDice[_swi])||'bone';
+        var _swV=rollFace(_swM);
+        _swMats.push(_swM);_swVals.push(_swV);
+        if(_swRow){var _swEl=mkDie(_swV,_swM);_swEl.classList.add('rolling');_appendDie(_swRow,_swEl);}
+      }
+      try{SFX.roll&&SFX.roll(3);}catch(e){}
+      setTimeout(function(){
+        if(_swRow)Array.prototype.forEach.call(_swRow.querySelectorAll('.die'),function(el){settleDie(el);});
+        var _swR=scoreRoll(_swVals,effectiveCards(),0,undefined,_swMats);
+        var _swPts=(_swR&&_swR.total)||0;
+        if(_swPts>0){
+          G.pPts+=_swPts;updHUD();
+          try{spawnBankPop&&spawnBankPop(_swPts);}catch(e){}
+          setStatusMsg('SECOND WIND — BANKED '+_swPts.toLocaleString()+'!','gold');
+          try{SFX.bank&&SFX.bank();}catch(e){}
+        }else{
+          setStatusMsg('SECOND WIND — NOTHING SCORED','red');
+        }
+        setTimeout(function(){
+          clearRow('playerDiceRow');G.pool=[];G.numDice=G.matchDice?G.matchDice.length:6;
+          if(G.pPts>=G.target){endMatch(true);return;}
+          endPTurn();
+        },1100);
+      },520);
+    },1000);
     return;
   }
   /* Thick Skin: first bust, bank half turn pts.
@@ -12107,6 +12324,19 @@ function doBust(){
   G._consecutiveBusts=(G._consecutiveBusts||0)+1;
   if(G.pCards.includes('loose_thread')&&G._consecutiveBusts>=2){
     G.pPts+=400;triggerCard('loose_thread','+400 LOOSE THREAD',true);G._consecutiveBusts=0;
+  }
+  /* IRON GATE (NPC-owned): once per match, when the player busts, the NPC
+     seizes the turn points the player just lost. "steal_on_bust". */
+  if(G.oCards&&G.oCards.indexOf('iron_gate_npc')>=0&&!(G.npcCardState&&G.npcCardState.usedOnce&&G.npcCardState.usedOnce['iron_gate_npc'])){
+    var _igLost=G.kept.reduce(function(a,k){return a+k.pts;},0)+(G._stakesRisingBonus||0);
+    if(_igLost>0){
+      if(!G.npcCardState.usedOnce)G.npcCardState.usedOnce={};
+      G.npcCardState.usedOnce['iron_gate_npc']=true;
+      G.oPts+=_igLost;updHUD();
+      triggerCard('iron_gate_npc','IRON GATE +'+_igLost,false);
+      setStatusMsg('IRON GATE — '+(G.rung?G.rung.name:'RIVAL')+' SEIZED '+_igLost+'!','red');
+      try{if(window.DLG)setTimeout(function(){DLG.triggerCard('iron_gate_npc',false);},700);}catch(e){}
+    }
   }
   /* Synergy: Last Resort — on bust, keep 25% of accumulated turn pts */
   if(G.activeSynergies&&G.activeSynergies.includes('safety_net')){var _lrPts=G.kept.reduce(function(a,k){return a+k.pts;},0);if(_lrPts>0){var _lrSave=Math.floor(_lrPts*0.25);G.pPts+=_lrSave;spawnPop('+'+_lrSave+' \uD83D\uDEE1\uFE0F');}}
@@ -13001,9 +13231,12 @@ function runOppTurn(){
         settleDie(d.el);
         if(G._lanternActive)d.el.classList.add('die-blind');
         /* Trigger dampened brightness fade-back now that the roll has
-           landed (CSS transition restores brightness to 1 over .5s). */
+           landed (CSS transition restores brightness to 1 over .5s).
+           Also puff a sawdust particle burst on the die so the Sawdust
+           card reads with a clear physical effect. */
         if(d.el.classList.contains('die-dampened')){
           d.el.classList.add('dampen-fade');
+          try{spawnSawdust(d.el,7);}catch(e){}
         }
       }});
       /* MASTER'S FORGE (sharp) — NPC mirror. Before scoring, convert one
@@ -13223,6 +13456,17 @@ function runOppTurn(){
           var _rcLoss=Math.min(200,G.oPts);
           if(_rcLoss>0){G.oPts-=_rcLoss;triggerCard('rats_in_cellar','RATS −'+_rcLoss,true);updHUD();}
         }
+        /* IRON GATE (player-owned): once per match, when the NPC busts,
+           the player seizes the turn points the NPC just lost (oppBank). */
+        if(G.pCards.includes('iron_gate_npc')){
+          if(!G.npcCardState.playerOnce)G.npcCardState.playerOnce={};
+          if(!G.npcCardState.playerOnce['iron_gate_npc']&&oppBank>0){
+            G.npcCardState.playerOnce['iron_gate_npc']=true;
+            G.pPts+=oppBank;updHUD();
+            triggerCard('iron_gate_npc','IRON GATE +'+oppBank,true);
+            setStatusMsg('IRON GATE — YOU SEIZED '+oppBank+'!','gold');
+          }
+        }
         /* TURNCOAT (tin): arm a +250 bonus on the player's next bank. */
         if(G.pCards.includes('turncoat')){G._turncoatArmed=true;}
         /* ── Handicap: Rising Stakes — opponent streak reset on bust ── */
@@ -13246,15 +13490,17 @@ function runOppTurn(){
       }
       /* NPC reckless die penalty (Brass): busts cost NPC extra from total */
       /* (handled in NPC bust path above — no forced bust, just extra penalty on natural bust) */
-      /* Player-armed Quick Hands: swap opp's highest scoring die down to a 3 */
+      /* Player-armed Quick Hands: swap opp's TWO highest scoring dice down
+         to 2s (buffed from one die → 3). */
       if(G._playerQuickHandsArmed){
         G._playerQuickHandsArmed=false;
         var _qhScoring=G.oppDice.filter(function(d){return !d.kept&&(d.val===1||d.val===5);});
         if(_qhScoring.length>0){
-          var _qhVic=_qhScoring.sort(function(a,b){return(a.val===1?100:50)-(b.val===1?100:50);}).pop();
-          _qhVic.val=3;reDrawDieFace(_qhVic);
-          triggerCard('quick_hands','QUICK HANDS → 3',true);
-          setStatusMsg("QUICK HANDS — "+G.rung.name+"'S DIE → 3",'gold');
+          /* Highest-value first, take up to 2. */
+          var _qhVics=_qhScoring.slice().sort(function(a,b){return(b.val===1?100:50)-(a.val===1?100:50);}).slice(0,2);
+          _qhVics.forEach(function(_qhVic){_qhVic.val=2;reDrawDieFace(_qhVic);});
+          triggerCard('quick_hands','QUICK HANDS → 2',true);
+          setStatusMsg("QUICK HANDS — "+G.rung.name+"'S "+(_qhVics.length>1?_qhVics.length+" DICE → 2":"DIE → 2"),'gold');
           /* Recompute scoring after swap */
           var _qhFV=G.oppDice.filter(function(d){return !d.kept;}).map(function(d){return d.val;});
           var _qhFM=G.oppDice.filter(function(d){return !d.kept;}).map(function(d){return d.mat;});
@@ -13362,6 +13608,64 @@ function runOppTurn(){
           G._snakeOilUses++;
           G._snakeOilActive=true;
           triggerCard('snake_oil','SNAKE OIL — NEXT ROLL 0!',true);
+        }
+      }
+      /* ── POSITION-CARD NPC PARITY ──
+         FLANKS / VANGUARD / SEQUENCE resolve for the player inside
+         _positionBonuses, which needs row-position context that scoreRoll
+         doesn't have. These blocks mirror those three for the NPC so the
+         cards behave identically no matter who holds them (the NPC can
+         pick them up via npcWonCards even if not in its base pool).
+         G.oppDice is this roll's full row — cleared each step — so [0] is
+         the leftmost die, [last] the rightmost, and the whole array is
+         the NPC's equivalent of the player's uncommitted row. */
+      /* FLANKS (tin): NPC kept BOTH flank dice this roll → +200. */
+      if(G.oCards.includes('flanks')&&G.oppDice.length>=2){
+        var _oFL=G.oppDice[0],_oFR=G.oppDice[G.oppDice.length-1];
+        if(_oFL&&_oFR&&_oFL!==_oFR&&_oFL.kept&&_oFR.kept){
+          total+=200;/* folded into oppBank by the oppBank+=total line below */
+          triggerCard('flanks','FLANKS +200',false);
+        }
+      }
+      /* VANGUARD (tin): NPC's leftmost die, kept and showing 1 or 5 → +300. */
+      if(G.oCards.includes('vanguard')&&G.oppDice.length>=1){
+        var _oVg=G.oppDice[0];
+        if(_oVg&&_oVg.kept&&(_oVg.val===1||_oVg.val===5)){
+          total+=300;
+          triggerCard('vanguard','VANGUARD +300',false);
+        }
+      }
+      /* SEQUENCE (gold): NPC's whole row this roll is a strict ±1 run
+         (ascending or descending) → +1500. One roll = one score for the
+         NPC, so this naturally fires once per roll like the player's. */
+      if(G.oCards.includes('sequence')&&G.oppDice.length>=3){
+        var _oSeqV=G.oppDice.map(function(d){return d.val;});
+        var _oAsc=true,_oDesc=true;
+        for(var _osi=1;_osi<_oSeqV.length;_osi++){
+          if(_oSeqV[_osi]-_oSeqV[_osi-1]!==1)_oAsc=false;
+          if(_oSeqV[_osi-1]-_oSeqV[_osi]!==1)_oDesc=false;
+        }
+        if(_oAsc||_oDesc){
+          total+=1500;
+          triggerCard('sequence','SEQUENCE +1500',false);
+        }
+      }
+      /* ANCHOR (silver): NPC's rightmost die showing a 6 scores 600 as a
+         lone single. If scoreRoll didn't already consume that 6 (it never
+         scores a lone 6), force-keep it so the row state stays correct.
+         Resolved here — after every re-score path (quick_hands /
+         slippery_table) — so the bonus can't be recomputed away. Known
+         minor gap vs the player's ANCHOR: it can't rescue a roll that
+         scored nothing else, since the NPC bust path resolves earlier. */
+      if(G.oCards.includes('anchor')&&G.oppDice.length>=1){
+        var _oAnD=G.oppDice[G.oppDice.length-1];
+        if(_oAnD&&_oAnD.val===6){
+          if(!_oAnD.kept){
+            _oAnD.kept=true;
+            if(_oAnD.el){_oAnD.el.style.outline='2px solid var(--green)';_oAnD.el.style.outlineOffset='2px';}
+          }
+          total+=600;
+          triggerCard('anchor','ANCHOR +600',false);
         }
       }
       oppBank+=total;setStatusMsg((G.rung?G.rung.name:'RIVAL')+' +'+total+' TOTAL: '+oppBank,'active');
@@ -14417,8 +14721,8 @@ function endMatch(win){
     var _allBC=[];
     var _ownedB=S.run.cards.filter(Boolean);
     if(_bossRung.cardPool&&_bossRung.cardPool.length)_bossRung.cardPool.forEach(function(cid){if(_ownedB.indexOf(cid)===-1){var cd=getNpcCard(cid);if(cd)_allBC.push(cd);}});
-    NPC_CARDS.forEach(function(c){if(c.owner===_bossName&&_ownedB.indexOf(c.id)===-1&&!_allBC.find(function(x){return x.id===c.id;}))_allBC.push(c);});
-    CARDS.forEach(function(c){if(c.npc===_bossName&&_ownedB.indexOf(c.id)===-1&&!_allBC.find(function(x){return x.id===c.id;}))_allBC.push(c);});
+    NPC_CARDS.forEach(function(c){if(c.owner===_bossName&&!c.dep&&_ownedB.indexOf(c.id)===-1&&!_allBC.find(function(x){return x.id===c.id;}))_allBC.push(c);});
+    CARDS.forEach(function(c){if(c.npc===_bossName&&!c.dep&&_ownedB.indexOf(c.id)===-1&&!_allBC.find(function(x){return x.id===c.id;}))_allBC.push(c);});
     /* Shuffle and pick up to 3 */
     for(var bi=_allBC.length-1;bi>0;bi--){var bj=Math.floor(Math.random()*(bi+1));var bt=_allBC[bi];_allBC[bi]=_allBC[bj];_allBC[bj]=bt;}
     var _bossDraftCards=_allBC.slice(0,3);
@@ -14621,8 +14925,18 @@ function exitMatch(){
   /* Music: crossfade back to tavern as the player leaves the match screen.
      Whether the match was patron or boss, the player ends up on the tier
      / gauntlet / shop screens — tavern is the right layer for all of
-     them. The crossfade no-ops if we were already on tavern. */
-  try{if(typeof _setMusicLayer==='function')_setMusicLayer('tavern');}catch(e){}
+     them. The crossfade no-ops if we were already on tavern.
+     ── ALSO re-sync directly ── _setMusicLayer early-returns when the
+     layer is unchanged (e.g. a lost patron match never left 'tavern'),
+     so it would skip _bgMusicSync entirely. Player feedback: "lost a
+     patron match, went back to loadout, music stopped." Calling
+     _bgMusicSync + _ambienceSync unconditionally guarantees playback is
+     alive on exit regardless of layer state. */
+  try{
+    if(typeof _setMusicLayer==='function')_setMusicLayer('tavern');
+    if(typeof _bgMusicSync==='function')_bgMusicSync();
+    if(typeof _ambienceSync==='function')_ambienceSync();
+  }catch(e){}
   /* Hard-cancel any in-flight feat-unlock splash so it can't bleed into the
      next match. Belt-and-braces: the splash now fires immediately on
      endMatch, so it should always be done by the time exitMatch runs, but
@@ -14630,6 +14944,8 @@ function exitMatch(){
      still be running when the player taps CONTINUE. */
   var _featOv=document.getElementById('feat-ov');
   if(_featOv)_featOv.classList.remove('flash');
+  /* Sweep all card-trigger labels so none leak into the next match. */
+  document.querySelectorAll('.card-trig-label').forEach(function(e){e.remove();});
   if(window._endTimers){window._endTimers.forEach(t=>clearTimeout(t));window._endTimers=[];}
   document.querySelectorAll('.coin-burst-p').forEach(el=>el.remove());
   var lov=document.getElementById('mLoadout-ov');if(lov)lov.classList.remove('show');
@@ -15168,7 +15484,13 @@ function jitterText(text,scale){
 
 /* ═══════ DIALOGUE ENGINE ═══════ */
 (function(){
-  const DLG={lastTime:0,cooldown:4000,hideTimer:null,active:false,oppKey:null,usedLines:{},cardFiredThisMatch:{},
+  /* busyUntil = timestamp when the currently-shown line finishes its
+     display window. gap = mandatory silence AFTER a line clears before
+     the next can trigger. Player feedback: lines were overlapping (a new
+     line overwrote the box mid-display because cooldown 4s < display
+     5-9s) and were too tightly spaced. trigger() now blocks until
+     busyUntil + gap. */
+  const DLG={lastTime:0,cooldown:4000,busyUntil:0,gap:1400,hideTimer:null,active:false,oppKey:null,usedLines:{},cardFiredThisMatch:{},
     prob:{MATCH_START:1,REMATCH_START:1,CARD_EFFECT:.8,RISKY_REROLL:.5,GREEDY_REROLL:.5,EARLY_BANK:.3,BIG_BANK:.6,PLAYER_BUST:.85,PLAYER_HOT_DICE:1,PLAYER_TRIPLE:.4,PLAYER_STRAIGHT:1,PLAYER_SIX_KIND:1,PLAYER_TAKES_LEAD:.45,PLAYER_NEAR_WIN:.7,OPP_BUST:.8,OPP_BIG_BANK:.6,OPP_TAKES_LEAD:.45,OPP_NEAR_WIN:.7,MATCH_CLOSE:.4,LOSING_BADLY:.35,WINNING_BADLY:.35,OPP_WINS:1,CARD_FIRE:1,PLAYER_CARD_REACT:1,TELL:1},
     init(rungName,rungKey){this.oppKey=rungName.toUpperCase();this.portraitKey=rungKey||rungName.toLowerCase();this.lastTime=0;this.active=false;this.usedLines={};this.cardFiredThisMatch={};if(this.hideTimer)clearTimeout(this.hideTimer);this.hide();},
     getLine(cat){const data=OPP_DIALOGUE[this.oppKey];if(!data)return null;
@@ -15184,7 +15506,13 @@ function jitterText(text,scale){
       /* Redirect MATCH_START to REMATCH_START when replaying a beaten opponent */
       if(cat==='MATCH_START'&&typeof _loIsRematch!=='undefined'&&_loIsRematch){const data=OPP_DIALOGUE[this.oppKey];if(data&&data.REMATCH_START)cat='REMATCH_START';}
       const p=this.prob[cat]||.5;if(Math.random()>p)return;
-      const now=Date.now();if(now-this.lastTime<this.cooldown&&cat!=='MATCH_START'&&cat!=='REMATCH_START'&&cat!=='PLAYER_SIX_KIND'&&cat!=='TELL')return;
+      const now=Date.now();
+      /* Priority cats can interrupt (match-open / big-payoff moments); all
+         others must wait until the current line has cleared + the buffer
+         gap. This kills the mid-display overwrite ("overlap") and spaces
+         lines out so they don't read as rapid-fire chatter. */
+      var _priority=(cat==='MATCH_START'||cat==='REMATCH_START'||cat==='PLAYER_SIX_KIND'||cat==='OPP_WINS');
+      if(!_priority&&now<this.busyUntil+this.gap)return;
       const line=this.getLine(cat);if(!line)return;this.show(line);this.lastTime=now;},
     /* triggerCard: patron reacts to a specific card firing.
        isPlayerCard=false → NPC card the patron just used (pool: OPP_DIALOGUE[oppKey].CARDS[cardId])
@@ -15228,6 +15556,9 @@ function jitterText(text,scale){
       // Redraw scroll canvas on show
       requestAnimationFrame(()=>requestAnimationFrame(()=>{const cv=document.getElementById('dlgCanvas');if(cv)drawPixelScroll(cv);}));
       const dur=Math.max(5000,Math.min(9000,text.length*100));
+      /* Mark the line's display window so trigger() can enforce the
+         no-overlap + post-line buffer rule. */
+      this.busyUntil=Date.now()+dur;
       if(this.hideTimer)clearTimeout(this.hideTimer);this.hideTimer=setTimeout(()=>this.hide(),dur);},
     hide(){const box=document.getElementById('dlgBox');if(!box)return;box.classList.remove('show');box.classList.add('hiding');this.active=false;}
   };
@@ -15698,28 +16029,27 @@ function activateFrozenDie(){
     G.activeCardState.usedCards['frozen_die']=(G.activeCardState.usedCards['frozen_die']||0)+1;
     var _chip=document.querySelector('.mcard-active[data-cid="frozen_die"]');if(_chip)_chip.classList.remove('used');
     return;}
-  /* Store the first selected die's value + material for restoration next turn.
-     pos = visual index among NON-COMMITTED dice. Using the raw G.pool index
-     was wrong: pool index includes committed/banked dice from earlier in
-     the turn, but next turn's row starts fresh with only free dice — so
-     the index would land too far right (showed up "centered" or beyond). */
+  /* REWORK: capture the die's value + material, then REMOVE it from the
+     current pool entirely. Previously the die was just marked
+     .die-frozen-mark but stayed in the live pool — so it could be
+     re-rolled (→ wrong face next turn), committed (→ double-dipped), or
+     left behind in a confusing state. Now "saving" a die genuinely
+     removes it from this turn; it returns next turn pre-placed at the
+     leftmost slot (no more stale free-index causing it to land
+     "centered" or off-position). */
   var savedDie=selDice[0];
-  var _fdPos=0;
-  for(var _i=0;_i<G.pool.length;_i++){
-    if(G.pool[_i]===savedDie)break;
-    if(!G.pool[_i].committed)_fdPos++;
-  }
-  G._frozenDie={val:savedDie.val,mat:savedDie.mat,pos:_fdPos};
-  /* Swap the selection outline from gold to blue so the saved die is
-     visually distinct, and add a chunky shake + strong haptic so the
-     freeze action lands physically. */
+  G._frozenDie={val:savedDie.val,mat:savedDie.mat};
+  /* Quick freeze flash on the die before it's pulled from the row. */
   if(savedDie.el){
-    savedDie.el.classList.add('die-frozen-mark');
-    savedDie.el.classList.remove('die-freeze-shake');void savedDie.el.offsetWidth;
     savedDie.el.classList.add('die-freeze-shake');
-    savedDie.el.addEventListener('animationend',function(){savedDie.el&&savedDie.el.classList.remove('die-freeze-shake');},{once:true});
-    spawnPixelSparks(savedDie.el,6);
+    try{spawnPixelSparks(savedDie.el,8);}catch(e){}
+    var _fdGone=savedDie.el;
+    setTimeout(function(){if(_fdGone&&_fdGone.parentNode)_fdGone.parentNode.removeChild(_fdGone);},420);
   }
+  /* Pull the die out of the live pool so it can't be re-rolled/committed
+     this turn. */
+  G.pool=G.pool.filter(function(d){return d!==savedDie;});
+  refreshSelUI();
   _haptic([25,30,25]);/* pattern: buzz-pause-buzz for "click" feel */
   setStatusMsg('SAVED A '+savedDie.val+' — IT RETURNS NEXT TURN','gold');
 }
@@ -16908,6 +17238,16 @@ function _endDraftActionsHtml(){
 /* Build the post-match card-draft offer pool. Pulls from current tier's
    draft rarities, with a chance of next/prev tier sprinkled in. Honored
    guest perk bumps the slice from 3 → 4. */
+/* Gold cards are heavily rationed until AFTER Brutus (tier 5+). Player
+   feedback: "I get offered gold cards too early. Gold cards give too
+   much money overall, makes the game too easy." Below tier 5, each gold
+   card only enters the offer pool ~12% of the time it otherwise would —
+   so gold becomes a rare treat at the lower tiers instead of common. */
+function _goldDraftOK(c){
+  if(!c||c.rarity!=='gold')return true;
+  if(S&&S.run&&S.run.tier>=5)return true;
+  return Math.random()<0.12;
+}
 function _buildDraftPool(excludeIds){
   _getS();
   excludeIds=excludeIds||[];
@@ -16917,13 +17257,13 @@ function _buildDraftPool(excludeIds){
   var _isBlocked=function(c){
     return _owned.indexOf(c.id)!==-1||excludeIds.indexOf(c.id)!==-1;
   };
-  tier.draftPool.forEach(function(rar){CARDS.forEach(function(c){if(c.rarity===rar&&!c.npcOnly&&!c.npc&&!c.dep&&!_isBlocked(c))pool.push(c);});});
+  tier.draftPool.forEach(function(rar){CARDS.forEach(function(c){if(c.rarity===rar&&!c.npcOnly&&!c.npc&&!c.dep&&!_isBlocked(c)&&_goldDraftOK(c))pool.push(c);});});
   /* Next-tier sampling: only include rarities that ALREADY exist in this tier's pool.
      Otherwise pre-Mabel players (T0/T1, tin-only) leak silver cards from T2 sampling. */
   var _curRars=tier.draftPool;
   var _nextT=TIERS[S.run.tier+1];
-  if(_nextT&&_nextT.draftPool){_nextT.draftPool.forEach(function(rar){if(_curRars.indexOf(rar)===-1)return;CARDS.forEach(function(c){if(c.rarity===rar&&!c.npcOnly&&!c.npc&&!c.dep&&!_isBlocked(c)&&pool.indexOf(c)===-1&&Math.random()<0.20)pool.push(c);});});}
-  if(S.run.tier>=2){var _prevT=TIERS[S.run.tier-1];if(_prevT&&_prevT.draftPool){_prevT.draftPool.forEach(function(rar){if(_curRars.indexOf(rar)===-1)return;CARDS.forEach(function(c){if(c.rarity===rar&&!c.npcOnly&&!c.npc&&!c.dep&&!_isBlocked(c)&&pool.indexOf(c)===-1&&Math.random()<0.10)pool.push(c);});});}}
+  if(_nextT&&_nextT.draftPool){_nextT.draftPool.forEach(function(rar){if(_curRars.indexOf(rar)===-1)return;CARDS.forEach(function(c){if(c.rarity===rar&&!c.npcOnly&&!c.npc&&!c.dep&&!_isBlocked(c)&&_goldDraftOK(c)&&pool.indexOf(c)===-1&&Math.random()<0.20)pool.push(c);});});}
+  if(S.run.tier>=2){var _prevT=TIERS[S.run.tier-1];if(_prevT&&_prevT.draftPool){_prevT.draftPool.forEach(function(rar){if(_curRars.indexOf(rar)===-1)return;CARDS.forEach(function(c){if(c.rarity===rar&&!c.npcOnly&&!c.npc&&!c.dep&&!_isBlocked(c)&&_goldDraftOK(c)&&pool.indexOf(c)===-1&&Math.random()<0.10)pool.push(c);});});}}
   for(var di=pool.length-1;di>0;di--){var dj=Math.floor(Math.random()*(di+1));var dt=pool[di];pool[di]=pool[dj];pool[dj]=dt;}
   var _draftN=(S&&S.renownPerks&&S.renownPerks.extraDraft)?4:3;
   /* If exclusions shrink the pool below what we want to offer, fall back
@@ -16945,10 +17285,21 @@ function reshuffleDraft(){
   _getS();
   if(!S.renownPerks||!S.renownPerks.freeRestock||S.run._restockUsed)return;
   S.run._restockUsed=true;
-  /* Detach the picked-element reference (its DOM is about to be deleted).
-     Keep the slot's content and _draftOriginals intact so the placed card
-     remains visible AND the underneath state is preserved for undo. */
-  if(_draftPickedCardId){_draftPickedEl=null;}
+  /* Reshuffle COMMITS the current pick as the slot's new baseline.
+     The offered card it came from is about to be deleted with the old
+     offer row, so it can never be "un-picked" back to the row. Update
+     _draftOriginals[slot] to the picked card itself so a later
+     change-of-mind (drag a new offer onto the slot, then drag THAT out)
+     restores to this committed pick — not the pre-pick empty slot.
+     Player feedback: "dragged one in an empty slot, reshuffled, then
+     another to replace it... dragged that one out, but the first one I
+     picked wasn't there anymore". The picked-element ref is detached
+     since its DOM is being rebuilt; pick state stays so the slot keeps
+     showing the card and the SKIP/CONTINUE button label is unchanged. */
+  if(_draftPickedCardId!==null&&_draftPickedSlotIdx>=0){
+    _draftOriginals[_draftPickedSlotIdx]=_draftPickedCardId;
+    _draftPickedEl=null;
+  }
   save();
   /* Regenerate offer excluding the previously shown cards so reshuffle
      always produces a genuinely different hand. */
@@ -17475,9 +17826,9 @@ function initBossRewardScreen(data){
     boss.cardPool.forEach(function(cid){var cd=getNpcCard(cid);if(cd)_allBossCards.push(cd);});
   }
   /* From NPC_CARDS by owner */
-  NPC_CARDS.forEach(function(c){if(c.owner===_bossName&&!_allBossCards.find(function(x){return x.id===c.id;}))_allBossCards.push(c);});
+  NPC_CARDS.forEach(function(c){if(c.owner===_bossName&&!c.dep&&!_allBossCards.find(function(x){return x.id===c.id;}))_allBossCards.push(c);});
   /* Also check for active player cards tagged to this NPC */
-  CARDS.forEach(function(c){if(c.npc===_bossName&&!_allBossCards.find(function(x){return x.id===c.id;}))_allBossCards.push(c);});
+  CARDS.forEach(function(c){if(c.npc===_bossName&&!c.dep&&!_allBossCards.find(function(x){return x.id===c.id;}))_allBossCards.push(c);});
   /* Guarantee the active player card appears in the 3 offered */
   var _activeCard=_allBossCards.find(function(c){return c.type==='active';});
   var _otherCards=_allBossCards.filter(function(c){return c!==_activeCard;});
