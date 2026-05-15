@@ -11307,6 +11307,11 @@ function toggleDie(d){
 
 function startPTurn(){
   G.phase='idle';G.turnPts=0;G.kept=[];G.numDice=G.matchDice?G.matchDice.length:6;G.pool=[];G.turnRollCount=0;G._slowHandUsedThisTurn=false;G._warmHandsActive=false;G._lastHotDice=false;G._firstRollCommitted=0;G._bustSavedThisTurn=false;
+  /* Safety reset: if a Finnick's Palm / Pickpocket animation crashed
+     mid-flight last turn, the lock would soft-block roll/bank/tap/
+     activation forever. Clearing it on every turn start guarantees the
+     player can never be stuck behind a stale flag. */
+  G._palmAnimating=false;
   /* Turn-boundary sweep: clear any leftover card-trigger labels so a
      label from last turn (e.g. a slow per-turn fade) can't linger into
      the new turn. The per-label 3s timeout still runs as backup. */
@@ -11473,6 +11478,10 @@ function handleRoll(){
      (phase==='rolling') so a second tap can't queue up a re-roll
      before the first settles. */
   if(!G||G.phase==='opp'||G.phase==='rolling'||G.phase==='yielding')return;
+  /* Block roll while a die-mutating active is mid-animation (Finnick's
+     Palm). Without this, hitting ROLL during the 840 ms swap re-rolls
+     the target die mid-flip and leaves it in a broken visual state. */
+  if(G._palmAnimating)return;
   /* Dismiss any board-covering overlays before rolling, so the new dice
      are visible immediately. Otherwise on a non-scoring first roll, the
      dice render hidden behind an overlay, bust fires, dice cleared —
@@ -12566,6 +12575,11 @@ function doBust(){
 }
 
 function handleBank(){
+  /* Same defense as handleRoll: don't bank while a die-mutating active
+     is mid-animation (Finnick's Palm). Banking commits selected dice
+     and ends the turn — doing that mid-swap traps the player in a
+     state where the swap was visually mid-flight when the turn ended. */
+  if(G&&G._palmAnimating)return;
   const selD=G.pool.filter(d=>d.sel&&!d.committed);
   if(selD.length){const selV=selD.map(d=>d.val);const selMats=selD.map(d=>d.mat);const locked=G.kept.reduce((a,k)=>a+k.pts,0);const cards=effectiveCards();
     let pts=scoreSelection(selV,cards,locked,undefined,selMats);
@@ -15927,6 +15941,11 @@ function miniCardHTML(c,idx){
 /* ═══════ ACTIVE CARD SYSTEM ═══════ */
 function canActivateCard(cardId){
   if(!G||!G.activeCardState)return false;
+  /* Block all activations while Finnick's Palm / Pickpocket TELL is
+     mid-animation. Lets the swap or palm finish before another card
+     mutates the same dice (which used to leave dangling animations and
+     stale selections). */
+  if(G._palmAnimating)return false;
   const uses=G.activeCardState.usedCards[cardId];
   if(!uses||uses<=0)return false;
   const cd=CARDS.find(c=>c.id===cardId)||NPC_CARDS_MAP[cardId];
@@ -16061,23 +16080,104 @@ function activateMabelsStitch(){
   setStatusMsg("STITCH ACTIVE — BUST PROTECTION",'gold');
 }
 
-/* Finnick's Palm: swap one non-scoring die → 1 or 5 (random) */
+/* Finnick's Palm: swap one non-scoring die → 1 or 5 (random).
+   Hardened version. The previous implementation bugged out because:
+     1. settleDie() at the end cancelled the card-reroll-settle animation
+        it was supposed to follow (settleDie cancels all el animations),
+        so the settle-glow never played.
+     2. Nothing locked the dice tray, letting taps / other actives race
+        the 800 ms swap.
+     3. If the target die was destroyed mid-animation (hot-dice clear,
+        bust scatter, Pickpocket palm) the pending setTimeout would
+        operate on a dead element.
+     4. Competing transient classes (die-tap-pop, die-sel-pop,
+        die-pos-pulse, eff-glow-*) weren't stripped, causing visible
+        animation collisions.
+     5. The "exclude selected dice" filter silently refunded if the
+        player happened to have a non-scoring die selected.
+     6. No status message / spawnPop — the swap was silent. */
 function activateFinnicksPalm(){
-  const free=G.pool.filter(d=>!d.committed&&!d.sel);
-  const nonScoring=free.filter(d=>d.val!==1&&d.val!==5);
-  if(!nonScoring.length){refundActiveCardUse('finnicks_palm');return;}
-  const target=nonScoring[Math.floor(Math.random()*nonScoring.length)];
-  /* Smart pick: a 1 is worth 100, a 5 is worth 50. Always pick 1 (more
-     value AND can complete triple-1s for 1000), UNLESS the player
-     already has 2 existing 5s + fewer than 2 existing 1s — then pick 5
-     to complete triple-5s (500) which beats a lone +100. */
-  const existing1s=free.filter(d=>d.val===1).length;
-  const existing5s=free.filter(d=>d.val===5).length;
-  target.val=(existing5s===2&&existing1s<2)?5:1;
-  if(target.el){target.el.classList.add('card-reroll');reDrawDieFace(target);
-    setTimeout(()=>{target.el.classList.remove('card-reroll');target.el.classList.add('card-reroll-settle');settleDie(target.el);
-      setTimeout(()=>{target.el.classList.remove('card-reroll-settle');},400);},400);}
-  SFX.commit();setTimeout(()=>{refreshSelUI();},500);
+  var pool=G.pool.filter(function(d){return !d.committed;});
+  var nonScoring=pool.filter(function(d){return d.val!==1&&d.val!==5;});
+  if(!nonScoring.length){
+    setStatusMsg('NO NON-SCORING DIE TO PALM','red');
+    refundActiveCardUse('finnicks_palm');
+    return;
+  }
+  var target=nonScoring[Math.floor(Math.random()*nonScoring.length)];
+  /* Smart pick: 1 is worth 100 AND can build to triple-1 (1000). 5 only
+     wins when there are already two 5s AND fewer than two 1s — then
+     completing triple-5 (500) beats a lone +100. */
+  var existing1s=pool.filter(function(d){return d.val===1;}).length;
+  var existing5s=pool.filter(function(d){return d.val===5;}).length;
+  var newVal=(existing5s===2&&existing1s<2)?5:1;
+  /* Lock the tray — same flag the Pickpocket TELL uses; they never
+     run concurrently (TELL fires post-roll, this active is choosing-
+     phase only). canActivateCard also reads this flag, so other actives
+     can't fire during the 840 ms animation either. */
+  G._palmAnimating=true;
+  /* Clear any prior selection on the target so the post-swap state isn't
+     a half-stale "selected with new value" combo. */
+  if(target.sel){
+    target.sel=false;
+    if(target.el)target.el.classList.remove('selected');
+  }
+  target.val=newVal;
+  var el=target.el;
+  /* Phase 1: spin + gold pulse (400 ms). Strip every competing transient
+     class first and cancel any in-flight Web Animations on the die so
+     card-reroll wins cleanly. */
+  if(el){
+    try{el.getAnimations().forEach(function(a){try{a.cancel();}catch(e){}});}catch(e){}
+    el.classList.remove('die-tap-pop','die-sel-pop','die-pos-pulse','eff-glow-gold','eff-glow-blue','eff-glow-red','rolling');
+    el.style.animation='';el.style.transform='';el.style.opacity='';el.style.transition='';el.style.boxShadow='';
+    void el.offsetWidth;/* force reflow so the next animation actually starts */
+    el.classList.add('card-reroll');
+    try{reDrawDieFace(target);}catch(e){}
+  }
+  /* Phase 2: settle glow (420 ms). Bail gracefully if the die was
+     destroyed in the meantime. NOT calling settleDie here — that was the
+     original bug; settleDie cancels animations and would kill the settle
+     class we just added. The die isn't rolling anyway, so settleDie's
+     job (clearing rolling state) is unnecessary.
+     Both setTimeout cleanup paths use try/finally so that ANY thrown
+     exception still releases G._palmAnimating — otherwise a single edge
+     case would soft-lock the player out of rolling, banking, and every
+     active card for the rest of the match. */
+  setTimeout(function(){
+    try{
+      var stillAlive=G&&G.pool&&G.pool.indexOf(target)>=0&&el&&el.isConnected;
+      if(stillAlive){
+        el.classList.remove('card-reroll');
+        void el.offsetWidth;
+        el.classList.add('card-reroll-settle');
+        setTimeout(function(){
+          try{
+            if(el&&el.isConnected)el.classList.remove('card-reroll-settle');
+          }finally{
+            if(G)G._palmAnimating=false;
+            try{refreshSelUI();}catch(e){}
+          }
+        },420);
+      }else{
+        /* Die was removed mid-animation (hot-dice clear, bust scatter,
+           Pickpocket palm, match exit). Strip leftover classes from the
+           orphan element (if any) and clear the lock. */
+        if(el){el.classList.remove('card-reroll','card-reroll-settle');}
+        if(G)G._palmAnimating=false;
+        try{refreshSelUI();}catch(e){}
+      }
+    }catch(e){
+      /* Unconditional release on any unexpected throw — prevents soft-
+         lock. Better to leave a stray class on a die than to brick the
+         player's whole turn. */
+      if(G)G._palmAnimating=false;
+    }
+  },420);
+  /* Audible / visual confirmation distinct from a generic die-tap. */
+  try{if(SFX.posCard)SFX.posCard();else SFX.commit();}catch(e){}
+  if(el){try{spawnPop('✋ '+newVal,el);}catch(e){}}
+  setStatusMsg("FINNICK'S PALM — DIE NOW "+newVal,'gold');
 }
 
 /* Corvus's Ledger: next bank +50% (lingering flag) */
