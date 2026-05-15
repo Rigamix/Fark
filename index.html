@@ -249,6 +249,17 @@ body{
    sparks + sound for scoring selections. */
 @keyframes pxDieTap{0%{transform:scale(.92)}50%{transform:scale(1.04)}100%{transform:scale(1)}}
 .die-tap-pop{animation:pxDieTap .14s ease-out forwards}
+/* Position-card primer pulse: a brief gold flash + bigger bounce when a
+   die-tap completes a Vanguard / Anchor / Flanks condition. Layers on
+   top of die-sel-pop via a separate transform-origin and outline-only
+   visual so it doesn't fight the regular sel pop animation. */
+@keyframes pxDiePosPulse{
+  0%  {transform:scale(1)        ;box-shadow:0 0 0 0 rgba(255,210,90,0)}
+  20% {transform:scale(1.18)     ;box-shadow:0 0 14px 6px rgba(255,210,90,.85),0 0 22px 10px rgba(255,180,40,.45)}
+  60% {transform:scale(1.06)     ;box-shadow:0 0 8px 4px rgba(255,210,90,.45)}
+  100%{transform:scale(1)        ;box-shadow:0 0 0 0 rgba(255,210,90,0)}
+}
+.die-pos-pulse{animation:pxDiePosPulse .42s ease-out forwards;z-index:6;position:relative}
 /* Freeze: chunky shake so the player feels the action land */
 @keyframes pxDieFreeze{0%{transform:translateX(0) scale(1)}15%{transform:translateX(-3px) scale(1.08)}30%{transform:translateX(3px) scale(1.08)}45%{transform:translateX(-2px) scale(1.06)}60%{transform:translateX(2px) scale(1.04)}80%{transform:translateX(-1px) scale(1.02)}100%{transform:translateX(0) scale(1)}}
 .die-freeze-shake{animation:pxDieFreeze .45s ease-out forwards}
@@ -303,6 +314,16 @@ body{
 .mcard .gc{display:none}
 .mcard .gcard-band{display:none}
 
+/* Armed-card pulse: a passive card whose effect is queued to fire on
+   the next trigger (e.g. Stakes Rising waiting on next bank, The Echo
+   waiting on next commit) gets a gentle gold glow so the player notices
+   "this is about to do something". Drop-shadow filter rather than
+   box-shadow so it follows the card's pixelWobble silhouette. */
+@keyframes cardArmedPulse{
+  0%,100%{filter:drop-shadow(0 0 0 rgba(255,210,90,0))}
+  50%    {filter:drop-shadow(0 0 6px rgba(255,210,90,.85)) drop-shadow(0 0 12px rgba(255,180,40,.55))}
+}
+.mcard.armed-pulse .gcard{animation:cardArmedPulse 1.6s ease-in-out infinite}
 /* Subtle idle wobble on all cards */
 @keyframes cardWobble{
   0%{transform:translateY(calc(var(--base-ty) - var(--lift,0px))) rotate(calc(var(--rot,0deg) + 0deg))}
@@ -5649,16 +5670,18 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
   flex:0 0 100%;height:100%;
   /* overflow-y:scroll forces the scrollbar to always show — was 'auto'
      which hides it when not actively scrolling, so players didn't
-     realize the page was longer. */
+     realize the page was longer. Bumped width + contrast so the bar
+     is clearly visible at a glance (was 6px / low-opacity). */
   overflow-y:scroll;
   scrollbar-gutter:stable;
+  scrollbar-color:#a8835a rgba(80,60,40,.35);/* Firefox */
   padding:8px 10px 16px;
   -webkit-overflow-scrolling:touch;overscroll-behavior:contain;
 }
-.rules-page::-webkit-scrollbar{width:6px}
-.rules-page::-webkit-scrollbar-track{background:rgba(80,60,40,.15);border-radius:3px}
-.rules-page::-webkit-scrollbar-thumb{background:rgba(140,110,70,.55);border-radius:3px;border:1px solid rgba(60,40,20,.4)}
-.rules-page::-webkit-scrollbar-thumb:hover{background:rgba(170,135,85,.7)}
+.rules-page::-webkit-scrollbar{width:10px;-webkit-appearance:none}
+.rules-page::-webkit-scrollbar-track{background:rgba(80,60,40,.32);border-radius:5px;box-shadow:inset 0 0 0 1px rgba(60,40,20,.35)}
+.rules-page::-webkit-scrollbar-thumb{background:linear-gradient(180deg,#c89968,#a8835a 50%,#8a6a40);border-radius:5px;border:1px solid rgba(60,40,20,.55);box-shadow:inset 0 1px 0 rgba(255,230,180,.35)}
+.rules-page::-webkit-scrollbar-thumb:hover{background:linear-gradient(180deg,#dcad7a,#bc8e60 50%,#9a7848)}
 
 /* Rules text — v15 style */
 .rp-section{margin-bottom:16px}
@@ -7067,7 +7090,10 @@ function _getS(){
     if(!S.run.diceStock)S.run.diceStock=null;
     if(!S.run.cardTarnish)S.run.cardTarnish={};
     /* Drop any equipped cards that no longer exist in the catalog (e.g. removed in an update) */
-    var _removedCards=['tyrants_gaze','the_hare','phoenix_ash','cracked_bell','drunkards_prayer','the_ledger_npc','the_collection_plate','rusty_spur','last_orders','iron_stomach','tavern_tales','bad_reputation','loaded_deck','the_alchemist','tab_at_bar','alchemist_touch','wild_die','brutus_fist','ambrose_grace','coin_flip','double_down_die'];
+    /* coin_flip restored as a tin active in this update — kept off the
+       _removedCards list so existing saves that have it equipped retain
+       the card instead of having it auto-stripped. */
+    var _removedCards=['tyrants_gaze','the_hare','phoenix_ash','cracked_bell','drunkards_prayer','the_ledger_npc','the_collection_plate','rusty_spur','last_orders','iron_stomach','tavern_tales','bad_reputation','loaded_deck','the_alchemist','tab_at_bar','alchemist_touch','wild_die','brutus_fist','ambrose_grace','double_down_die'];
     /* ID migration: card formerly known as 'last_call' was renamed 'closing_bell' to
        free up the 'LAST CALL' name for Grog's Tell. Remap any saved decks. */
     if(Array.isArray(S.run.cards))S.run.cards=S.run.cards.map(function(cid){return cid==='last_call'?'closing_bell':cid;});
@@ -7195,6 +7221,38 @@ const FEATS=[
     check:function(G){return !!G._featTrailedDeep;}},
   {id:'high_roller',    label:'High Roller',      desc:'Bank 1500+ in a single turn',    renown:5,
     check:function(G){return (G._featMaxBank||0)>=1500;}},
+  /* ── Drip-feed feats (regular renown payouts on common play patterns
+     and per-boss firsts). Each fires once per RUN since evaluateFeats
+     gates on S.run.feats[id], so repeat runs let players re-earn them
+     for steady progression. */
+  {id:'boss_crusher',   label:'Boss Crusher',     desc:'Beat a boss by 2000+ points',    renown:10,
+    check:function(G){return !!G._isBoss && ((G.pPts||0)-(G.oPts||0))>=2000;}},
+  {id:'five_banker',    label:'Five Banker',      desc:'Bank 5+ times in a single match',renown:5,
+    check:function(G){return (G._featBanks||0)>=5;}},
+  {id:'survivor',       label:'Survivor',         desc:'Win a match after busting at least once',renown:5,
+    check:function(G){return (G._featBusts||0)>=1;}},
+  {id:'quick_climb',    label:'Quick Climb',      desc:'Beat 3 or more bosses in one run',renown:15,
+    check:function(G){return (typeof S!=='undefined'&&S&&S.run&&Array.isArray(S.run.bossesBeaten))?S.run.bossesBeaten.length>=3:false;}},
+  {id:'card_collector', label:'Full Hand',        desc:'Win a match with 4+ cards equipped',renown:5,
+    check:function(G){return G&&Array.isArray(G.pCards)&&G.pCards.filter(function(c){return c;}).length>=4;}},
+  /* Per-boss firsts — one feat per matchup, fires once per run. Gives a
+     dependable +10 renown each time the player clears a new opponent. */
+  {id:'beat_grog',      label:'Drinking Buddy',   desc:'Beat Grog',                      renown:10,
+    check:function(G){return G&&G.rung&&G.rung.key==='drunkard';}},
+  {id:'beat_mabel',     label:'Peasant Wrangler', desc:'Beat Mabel',                     renown:10,
+    check:function(G){return G&&G.rung&&G.rung.key==='peasant';}},
+  {id:'beat_finnick',   label:'Trickster Tamer',  desc:'Beat Finnick',                   renown:10,
+    check:function(G){return G&&G.rung&&G.rung.key==='commoner';}},
+  {id:'beat_corvus',    label:'Merchant Mauler',  desc:'Beat Corvus',                    renown:10,
+    check:function(G){return G&&G.rung&&G.rung.key==='merchant';}},
+  {id:'beat_brutus',    label:'Soldier Slayer',   desc:'Beat Brutus',                    renown:10,
+    check:function(G){return G&&G.rung&&G.rung.key==='soldier';}},
+  {id:'beat_aldric',    label:'Knight Killer',    desc:'Beat Aldric',                    renown:10,
+    check:function(G){return G&&G.rung&&G.rung.key==='knight';}},
+  {id:'beat_whisper',   label:'Noble Toppler',    desc:'Beat Whisper',                   renown:10,
+    check:function(G){return G&&G.rung&&G.rung.key==='noble';}},
+  {id:'beat_ambrose',   label:'Bishop Breaker',   desc:'Beat Ambrose',                   renown:15,
+    check:function(G){return G&&G.rung&&G.rung.key==='bishop';}},
 ];
 
 /* ── Renown Perks (curated, threshold-based unlocks — never spent) ──
@@ -7318,14 +7376,26 @@ function _showPerkUnlock(perk,onClose){
     _btn.addEventListener('touchend',function(e){e.stopPropagation();e.preventDefault();try{SFX.nav&&SFX.nav();}catch(e){}_close();},{passive:false});
   }
 }
-/* Drain queued perk unlocks (one at a time, chained via Continue button) */
-function _drainPerkUnlockQueue(){
+/* Drain queued perk unlocks (one at a time, chained via Continue button).
+   Optional skipKeys: perks to leave in the queue this pass — used by the
+   end-draft drain to defer freeRestock until the gauntlet screen, where
+   the player will actually be able to use the reshuffle button on their
+   next match. Player feedback: "I'm shown the perk and I can't use it
+   right away and it's confusing." */
+function _drainPerkUnlockQueue(skipKeys){
   if(!S||!S.run||!S.run._pendingPerkUnlocks||!S.run._pendingPerkUnlocks.length)return;
-  var key=S.run._pendingPerkUnlocks.shift();save();
+  skipKeys=skipKeys||[];
+  /* Find the first queued perk that isn't in the skip list */
+  var idx=-1;
+  for(var i=0;i<S.run._pendingPerkUnlocks.length;i++){
+    if(skipKeys.indexOf(S.run._pendingPerkUnlocks[i])<0){idx=i;break;}
+  }
+  if(idx<0)return;/* every remaining perk is deferred for this drain pass */
+  var key=S.run._pendingPerkUnlocks.splice(idx,1)[0];save();
   var perk=RENOWN_PERKS.find(function(p){return p.key===key;});
-  if(!perk){_drainPerkUnlockQueue();return;}
+  if(!perk){_drainPerkUnlockQueue(skipKeys);return;}
   _showPerkUnlock(perk,function(){
-    setTimeout(_drainPerkUnlockQueue,250);
+    setTimeout(function(){_drainPerkUnlockQueue(skipKeys);},250);
   });
 }
 /* Returns an ordered list of rank suffixes for dialogue lookup —
@@ -7821,6 +7891,14 @@ const SFX={
     if(n>=3)this._tone(Math.round(f*1.5),'sine',0.025,0.003,0.05,0.03);
   },
   coins(){this._tone(660,'sine',0.05,0.003,0.07);this._click(1100,0.03,0.03,0.02);},
+  /* posCard — fired when a die-select primes a position-card (Vanguard /
+     Anchor / Flanks). Two ascending sine notes + a bright ping; brief
+     enough to layer on top of the regular commitAt without muddying. */
+  posCard(){
+    this._tone(660,'sine',0.07,0.003,0.10);
+    this._tone(990,'sine',0.06,0.002,0.12,0.06);
+    this._click(1600,0.03,0.04,0.02);
+  },
   coinLand(){/* big coin lands — metallic thud + ring */
     this._click(400,0.12,0.06);this._tone(880,'sine',0.06,0.003,0.12);this._tone(1320,'sine',0.03,0.002,0.08,0.02);
   },
@@ -8090,25 +8168,22 @@ var DICE_STORE=[
   {mat:'iron',     price:60,  stock:4, label:'Iron'},
   {mat:'amber',    price:120, stock:2, label:'Amber'},
   {mat:'lead',     price:140, stock:3, label:'Lead'},
-  /* Jade tiers: only ONE of each per match. The shop dynamically shows the
-     next-purchasable tier (jade → jade2 → jade3). After buying L1, the slot
-     is replaced with L2; after L2, with L3; after L3, the slot is hidden. */
-  /* Sharper progression: each Jade tier is meaningfully more expensive
-     than the last (was 180/380/760 → now 180/450/1100). Reflects the
-     compounding power of L2 (extends triples to quads) and L3 (also
-     fills straights). */
-  {mat:'jade',     price:180, stock:1, label:'Jade'},
-  {mat:'jade2',    price:450, stock:1, label:'Jade II'},
-  {mat:'jade3',    price:1100,stock:1, label:'Jade III'},
   {mat:'brass',    price:350, stock:2, label:'Brass'},
   {mat:'silver',   price:380, stock:1, label:'Silver'},
   {mat:'obsidian', price:420, stock:2, label:'Obsidian'},
   /* Ruby removed from the store — faces 1/1/5/5/6/6 removed the gamble
      entirely (stack a few and you literally can't bust). The red-gem
      material was reskinned onto the Vagabond die instead. */
+  {mat:'starstone',price:620, stock:3, label:'Starstone'},
   {mat:'vagabond', price:650, stock:2, label:'Vagabond'},
   {mat:'crystal',  price:700, stock:1, label:'Crystal'},
-  {mat:'starstone',price:620, stock:3, label:'Starstone'},
+  /* Jade tiers — only ONE of each per match, shop swaps L1→L2 after purchase.
+     Collapsed from 3 tiers (180/450/1100) to 2 (750/1800): L1 starts as
+     wild_quad (was the old L2 mechanic) so the first buy already feels
+     impactful, and L2 adds straight-fill on top. Pricier from the get-go
+     to gate the wild mechanic behind a real shop choice. */
+  {mat:'jade',     price:750, stock:1, label:'Jade'},
+  {mat:'jade2',    price:1800,stock:1, label:'Jade II'},
 ];
 function _initDiceStock(){var s={};DICE_STORE.forEach(function(d){s[d.mat]=d.stock;});return s;}
 function _dicePrice(mat){
@@ -8759,7 +8834,7 @@ const CARDS=[
   {id:'gamblers_ghost',name:"GAMBLER'S GHOST",icon:'👻',rarity:'tin',eff:'POST-BUST: NEXT TURN 1 DIE = 1',desc:'After you bust, one die on your next turn starts as a 1.',arch:'brinksman',dep:true},
   {id:'greedy_hands',name:'GREEDY HANDS',icon:'🤑',rarity:'tin',eff:'BANKS ≤ 250 DOUBLED',desc:'Banks of 250 points or less are doubled.',arch:'safeBanker'},
   {id:'the_grudge',name:'THE GRUDGE',icon:'😤',rarity:'tin',eff:'+150 PER OPP BANK (MAX +750)',desc:'Each time the opponent banks, your next bank gains +150 (stacks up to +750).',arch:'hoarder'},
-  {id:'lucky_seven',name:'LUCKY SEVEN',icon:'🍀',rarity:'tin',eff:'NON-SCORING DICE = 7 → +400',desc:'If your non-scoring dice total exactly 7, gain +400 bonus points.',arch:'sharp'},
+  {id:'lucky_seven',name:'LUCKY SEVEN',icon:'🍀',rarity:'silver',eff:'NON-SCORING DICE = 7 → +800',desc:'If your non-scoring dice total exactly 7, gain +800 bonus points.',arch:'sharp'},
   {id:'cold_shoulder',name:'COLD SHOULDER',icon:'🥶',rarity:'tin',eff:'OPP ONCE-CARDS DELAYED 2 TURNS',desc:"Opponent's once-per-match cards take 2 extra turns before they can activate.",arch:'saboteur'},
   {id:'warm_hands',name:'WARM HANDS',icon:'🔥',rarity:'silver',eff:'DICE EFFECTS EXTEND 3 ROLLS',desc:'Dice-manipulation card effects (Gambler\'s Thumb, Hot Streak, Ghost) that normally trigger on your first roll also trigger on rolls 2 and 3.',arch:'sharp'},
   {id:'gamblers_thumb',name:"GAMBLER'S THUMB",icon:'👍',rarity:'silver',eff:'FIRST ROLL: 75% 1 BLANK → 5',desc:'On your first roll each turn, 75% chance one random non-scoring die flips to a 5.',arch:'sharp'},
@@ -8783,13 +8858,17 @@ const CARDS=[
   {id:'frozen_die',name:'FROZEN DIE',icon:'🧊',rarity:'silver',type:'active',maxUses:2,timing:'choosing',eff:'SAVE A DIE FOR NEXT TURN',desc:"Save one selected scoring die. It reappears on your next turn pre-placed — still selectable, so you can score it alone or fold it into a triple. Clears on bust. Two uses per match.",arch:'sharp'},
   {id:'double_down',name:'DOUBLE DOWN',icon:'✌️',rarity:'silver',type:'active',maxUses:1,timing:'choosing',eff:'2× PTS, REROLL ALL 6',desc:'Double your current turn points, but all kept dice are released and you must roll all 6. One use per match.',arch:'brinksman'},
   /* ── Tactile active cards (select a die, then activate) ── */
-  {id:'coin_flip',name:'COIN FLIP',icon:'🪙',rarity:'silver',type:'active',maxUses:2,timing:'choosing',eff:'FLIP SELECTED DIE',desc:'Select a die, then activate — it flips to the opposite face (1↔6, 2↔5, 3↔4). Two uses per match.',arch:'sharp',dep:true},
+  /* COIN FLIP — restored as a tin active to fill out the interactive
+     dice-affecting tin pool (was silver/2-use, retired). One charge,
+     same flip mechanic. */
+  {id:'coin_flip',name:'COIN FLIP',icon:'🪙',rarity:'tin',type:'active',maxUses:1,timing:'choosing',eff:'FLIP SELECTED DIE',desc:'Select a die, then activate — it flips to the opposite face (1↔6, 2↔5, 3↔4). One use per match.',arch:'sharp'},
+  {id:'the_nudge',name:'THE NUDGE',icon:'👆',rarity:'tin',type:'active',maxUses:2,timing:'choosing',eff:'BUMP A DIE +1 (6→1)',desc:'Select a die, then activate — its face bumps up by 1 (6 wraps back to 1). Two uses per match.',arch:'sharp'},
   {id:'alchemist_touch',name:"ALCHEMIST'S TOUCH",icon:'🧪',rarity:'silver',type:'active',maxUses:1,timing:'choosing',eff:'SELECTED DIE → 5',desc:'Select a non-scoring die (2/3/4/6), then activate — it becomes a 5 (50 pts). One use per match.',arch:'sharp',dep:true},
   {id:'twinning_charm',name:'TWINNING CHARM',icon:'🧬',rarity:'silver',type:'active',maxUses:1,timing:'choosing',eff:'MIRROR SELECTED VALUE',desc:'Select a die, then activate — a random other unkept die changes to the same value. One use per match.',arch:'sharp'},
   {id:'double_down_die',name:'DOUBLE DOWN DIE',icon:'⚗️',rarity:'gold',type:'active',maxUses:1,timing:'choosing',eff:'SELECTED 2/3/4 → DOUBLED',desc:'Select a die showing 2, 3, or 4, then activate — its value doubles (capped at 6). One use per match.',arch:'sharp',dep:true},
   /* ── New scoring-pattern cards — unlock new combos ── */
   {id:'sevens_gift',name:"SEVEN'S GIFT",icon:'🎲',rarity:'tin',eff:'ANY PAIR SUMMING TO 7: +200',desc:'Pairs of dice that sum to 7 (1+6, 2+5, 3+4) score +200 per pair. Dice are consumed by the pair.',arch:'collector'},
-  {id:'twin_fury',name:'TWIN FURY',icon:'👯',rarity:'tin',eff:'TWO PAIRS IN ONE ROLL: +600',desc:'If your roll contains two separate pairs (any values), score +600 bonus. The four dice are consumed.',arch:'collector'},
+  {id:'twin_fury',name:'TWIN FURY',icon:'👯',rarity:'silver',eff:'TWO PAIRS IN ONE ROLL: +600',desc:'If your roll contains two separate pairs (any values), score +600 bonus. The four dice are consumed.',arch:'collector'},
   {id:'ascending',name:'ASCENDING',icon:'📈',rarity:'silver',eff:'3 CONSECUTIVE: +400',desc:'Three consecutive values in your roll (1-2-3, 2-3-4, 3-4-5, or 4-5-6) score +400. Full straights override this.',arch:'collector'},
   {id:'bookends',name:'BOOKENDS',icon:'📖',rarity:'silver',eff:'1ST + LAST DIE SAME: +500',desc:'If the leftmost and rightmost dice in your roll show the same value, gain +500 bonus.',arch:'collector'},
   {id:'six_serpents',name:'SIX SERPENTS',icon:'🐍',rarity:'gold',eff:'TRIPLE 6S SCORE 1000',desc:'Triple 6s score 1000 points instead of the standard 600.',arch:'collector'},
@@ -8892,7 +8971,7 @@ const CARD_BG={
   whispers_veil:'#7060A0',
   beggars_bowl:'#8A7560',loose_thread:'#9A6040',the_whetstone:'#6A7080',the_ladder:'#7A5A3A',snake_oil:'#405A30',fortunes_wheel:'#7A5A20',
   loaded_die:'#6A4A70',gamblers_ghost:'#5A5A70',greedy_hands:'#8A7A30',the_grudge:'#7A3030',lucky_seven:'#3A7A50',cold_shoulder:'#4A6A8A',
-  warm_hands:'#8A4A30',gamblers_thumb:'#6A6A40',chain_lightning:'#4A5A8A',hot_streak:'#8A3A20',underdog:'#5A6A50',twin_dice:'#6A5A80',sawdust:'#7A6A50',short_pour:'#6A5A40',
+  warm_hands:'#8A4A30',gamblers_thumb:'#6A6A40',chain_lightning:'#4A5A8A',hot_streak:'#8A3A20',underdog:'#5A6A50',twin_dice:'#6A5A80',sawdust:'#7A6A50',short_pour:'#6A5A40',the_nudge:'#7A8A40',
   the_collector:'#6A4A60',tavern_cheer:'#7A5A30',closing_bell:'#5A4A60',old_bones:'#4A4A50',
   the_jinx:'#4A5A6A',thick_skin:'#6A6A5A',blood_tithe:'#8A2A30',
   the_echo:'#5A6A7A',frozen_die:'#3A6A8A',double_down:'#7A5A30',slippery_table:'#4A7A6A',high_roller:'#8A6A20',the_fence:'#5A4A3A',the_alchemist:'#6A5A2A',twin_flames:'#8A4A20',
@@ -9154,23 +9233,28 @@ const DICE_TYPES=[
    faces:[1,2,3,4,5,6],
    effect:{type:'scoring_boost',mechanic:'triple_bonus',amount:100},
    desc:'Triples involving this die score +100.'},
-  {id:'jade',name:'JADE',icon:'🟢',cost:350,
-   faces:[1,2,3,4,5,6],
-   effect:{type:'rule_changer',mechanic:'wild_triple'},
-   desc:'6s count as any face for completing triples.'},
-  /* Jade L2 — once you own a Jade, the shop replaces it with this. Wild
-     for triples AND extends triples to 4-of-a-kind (the wild attaches to
-     an existing triple to double the score). Bluer-teal tint. */
-  {id:'jade2',name:'JADE II',icon:'💠',cost:900,
+  /* Jade L1 — wild for triples AND quads (extends a triple to 4-of-a-
+     kind to double the score). Was 3 levels at 350/900/2000; collapsed
+     to 2 levels because L1 (triples-only) was too weak to bother
+     buying. New L1 starts at the old L2's mechanic and a higher price. */
+  {id:'jade',name:'JADE',icon:'🟢',cost:750,
    faces:[1,2,3,4,5,6],
    effect:{type:'rule_changer',mechanic:'wild_quad'},
    desc:'6s are wild for triples AND attach to triples to make 4-of-a-kind (doubles the score).'},
-  /* Jade L3 — apex variant. Wild for triples, quads, and STRAIGHTS.
-     Golden-jade tint. */
-  {id:'jade3',name:'JADE III',icon:'✨',cost:2000,
+  /* Jade L2 — apex variant. Wild for triples, quads, AND straights.
+     Golden-jade tint. (Was the old L3 at 2000; now L2 at 1800.) */
+  {id:'jade2',name:'JADE II',icon:'💠',cost:1800,
    faces:[1,2,3,4,5,6],
    effect:{type:'rule_changer',mechanic:'wild_straight'},
    desc:'6s are wild for triples, 4-of-a-kind, AND fill any missing value in a straight.'},
+  /* Jade L3 — RETIRED. The 3-tier ramp was too gradual; collapsed into
+     the new 2-tier Jade above. dep:true keeps any existing player-owned
+     L3 die functional (still wild_straight) but removes it from all
+     drops/shop offers. */
+  {id:'jade3',name:'JADE III',icon:'✨',cost:2000,dep:true,
+   faces:[1,2,3,4,5,6],
+   effect:{type:'rule_changer',mechanic:'wild_straight'},
+   desc:'(Retired tier — kept functional for legacy saves only.)'},
   {id:'brass',name:'BRASS',icon:'🟤',cost:450,
    faces:[1,1,5,5,3,4],
    effect:{type:'risk_reward',mechanic:'reckless',penaltyPct:0.15},
@@ -9287,9 +9371,9 @@ function scoreRoll(vals,cards,locked,context,dieMats){
   /* ── Wild prep (Jade variants): 6s on wild_* dice become -1 (wild marker).
      Per-wild capability tracked in `wildLevel` so the scoring engine can
      gate which wilds can fill which patterns:
-       1 = triples only       (jade L1 — wild_triple)
-       2 = triples + quads    (jade L2 — wild_quad)
-       3 = triples + quads + straights (jade L3 — wild_straight) */
+       1 = triples only       (legacy wild_triple — no current die uses this)
+       2 = triples + quads    (jade L1 — wild_quad)
+       3 = triples + quads + straights (jade L2 — wild_straight, plus legacy jade3) */
   const eVals=[...vals];
   const wildLevel={};/* index → level (1/2/3) */
   for(let i=0;i<n;i++){
@@ -9634,7 +9718,7 @@ function scoreRoll(vals,cards,locked,context,dieMats){
   if(cards.includes('lucky_seven')){
     var _nonScoreSum=0;for(var _li=0;_li<n;_li++){if(!used[_li])_nonScoreSum+=vals[_li];}
     if(_nonScoreSum===7){
-      pts+=400;_bonusFiredFlag=true;
+      pts+=800;_bonusFiredFlag=true;
     }
   }
   return{total:pts,used,context,effects,_triplesFired,_bonusFired:_bonusFiredFlag};
@@ -9715,7 +9799,8 @@ function mkDie(val,mat,sizeClass){
   const div=document.createElement('div');
   div.className='die dtype-'+(mat||'bone')+(sizeClass?' '+sizeClass:'');
   /* Any jade variant rolling a 6 renders as a wild blank face. Covers
-     jade L1 (wild_triple), jade2 L2 (wild_quad), jade3 L3 (wild_straight). */
+     the new 2-tier Jade (jade L1 = wild_quad, jade2 L2 = wild_straight)
+     plus the retired-but-still-functional jade3 L3 (wild_straight). */
   const isWildJade=(/^jade\d?$/.test(mat||'')&&val===6);
   if(isWildJade)div.classList.add('die-wild');
   /* While the die is in the "rolling" state (CSS class added by handleRoll), show a
@@ -10894,6 +10979,22 @@ function _updatePlayerCardVisuals(){
     }
     mc.classList.toggle('used',exhausted);
   });
+  /* ── Armed-card pulse ──
+     Passive cards whose effect is queued to fire on the next trigger
+     get a soft gold glow so the player notices "this is about to do
+     something." Map: card id → boolean armed predicate. The Echo has
+     its own dedicated echo-armed class with a different colour, so
+     it's intentionally NOT in this map. */
+  var _armedMap={
+    'stakes_rising': !!G._stakesRisingNext,         /* fires on next turn start */
+    'turncoat':      !!G._turncoatArmed,            /* fires on next bank */
+    'aldrics_vow':   !!G._vowDoubleActive,          /* fires on next commit */
+    'quick_hands':   !!G._playerQuickHandsArmed     /* fires on next opp roll */
+  };
+  Object.keys(_armedMap).forEach(function(cid){
+    var mc=bar.querySelector('.mcard[data-cid="'+cid+'"]');
+    if(mc)mc.classList.toggle('armed-pulse',_armedMap[cid]);
+  });
 }
 /* ── Meta boost visuals: badges on cards boosted by Fence/Alchemist/Brewer/Dead Man ── */
 function _applyMetaBoostVisuals(){
@@ -11175,6 +11276,29 @@ function toggleDie(d){
     }else{
       SFX.commit();
     }
+    /* ── Position-card primer feedback ──
+       When the player selects a die that completes (or partially primes)
+       a position-card condition, layer an extra gold pulse + sparks +
+       chime on top of the regular feedback. Makes Vanguard / Anchor /
+       Flanks feel as satisfying to set up as their payoff at commit. */
+    try{
+      var _pcCards=effectiveCards()||[];
+      var _pFirst=G.pool[0],_pLast=G.pool[G.pool.length-1];
+      var _pcFire=false;
+      if(_pcCards.indexOf('vanguard')>=0&&d===_pFirst&&(d.val===1||d.val===5))_pcFire=true;
+      else if(_pcCards.indexOf('anchor')>=0&&d===_pLast&&d.val===6)_pcFire=true;
+      else if(_pcCards.indexOf('flanks')>=0&&_pFirst!==_pLast){
+        if((d===_pFirst&&_pLast&&_pLast.sel)||(d===_pLast&&_pFirst&&_pFirst.sel))_pcFire=true;
+      }
+      if(_pcFire){
+        d.el.classList.remove('die-pos-pulse');void d.el.offsetWidth;
+        d.el.classList.add('die-pos-pulse');
+        d.el.addEventListener('animationend',function(){d.el.classList.remove('die-pos-pulse');},{once:true});
+        spawnPixelSparks(d.el,8);
+        if(SFX.posCard)SFX.posCard();
+        _haptic(24);
+      }
+    }catch(e){}
   }else{
     SFX.commit();
   }
@@ -11475,7 +11599,7 @@ function handleRoll(){
     /* Reject if base scoring returned -1 (unused dice) OR returned 0 without anchor firing */
     if(pts<0||(pts===0&&!_anchorDie)){SFX.err();setStatusMsg('NO SCORE — TRY AGAIN','red');return;}
     pts+=_anchorPts;
-    if(_anchorDie)triggerCard('anchor','ANCHOR +600',true);
+    if(_anchorDie){triggerCard('anchor','ANCHOR +600',true);spawnPop('+600 ANCHOR');}
     /* ── POSITION-BASED CARD BONUSES (Vagabond synergy) ──
        Positions are read from G.pool (roll order, stable across commits). */
     (function _positionBonuses(){
@@ -11484,7 +11608,7 @@ function handleRoll(){
       if(cards.includes('vanguard')){
         var d0=G.pool[0];
         if(d0&&selDice.indexOf(d0)>=0&&(d0.val===1||d0.val===5)){
-          pts+=300;triggerCard('vanguard','VANGUARD +300',true);
+          pts+=300;triggerCard('vanguard','VANGUARD +300',true);spawnPop('+300 VANGUARD');
         }
       }
       /* SEQUENCE: on the FIRST commit of this roll, check if the whole uncommitted
@@ -11515,7 +11639,7 @@ function handleRoll(){
       if(cards.includes('flanks')&&rowLen>=2){
         var _fL=G.pool[0],_fR=G.pool[rowLen-1];
         if(_fL&&_fR&&_fL!==_fR&&selDice.indexOf(_fL)>=0&&selDice.indexOf(_fR)>=0){
-          pts+=200;triggerCard('flanks','FLANKS +200',true);
+          pts+=200;triggerCard('flanks','FLANKS +200',true);spawnPop('+200 FLANKS');
         }
       }
     })();
@@ -11885,6 +12009,7 @@ function _afterRollImpl(){
       /* We don't auto-commit, just double the value of whatever they pick this roll */
       G._vowDoubleActive=true;
       setStatusMsg('VOW: 300+ ROLL! PICKS DOUBLED','green');triggerCard('aldrics_vow','DOUBLED!',true);
+      if(typeof _updatePlayerCardVisuals==='function')_updatePlayerCardVisuals();
     }else{
       const lost=G.kept.reduce((a,k)=>a+k.pts,0)+(G._stakesRisingBonus||0);
       G.turnPts=0;G.kept=[];G._stakesRisingBonus=0;refreshKeptTray();updHUD();
@@ -12516,6 +12641,7 @@ function handleBank(){
   /* Stakes Rising: bank 500+ → arm bonus for next turn */
   if(G.pCards.includes('stakes_rising')&&total>=500){
     G._stakesRisingNext=true;
+    if(typeof _updatePlayerCardVisuals==='function')_updatePlayerCardVisuals();
   }
   /* The Ledger: persistent stack added to every bank, grows +75 per bank */
   if(G.pCards.includes('the_ledger')){
@@ -13347,6 +13473,35 @@ function runOppTurn(){
             _npcBlanks.slice(0,2).forEach(function(d){d.val=rollFaceExclude(d.mat,d.val);reDrawDieFace(d);if(d.el)spawnPixelSparks(d.el,3);});
             _rescueCid='grogs_flask';_rescueLabel="GROG'S FLASK — REROLLED";_rescued=true;
           }
+          /* coin_flip (tin): flip ONE blank to its opposite face. Useful
+             rescues: 6→1 (best, +100) or 2→5 (+50). Skip if no blank
+             flips into a 1 or 5 — the card has only one charge so we
+             don't waste it on a flip that still doesn't score. */
+          else if(!_rescued&&npcHasActive('coin_flip')){
+            var _cfMap={1:6,2:5,3:4,4:3,5:2,6:1};
+            var _cfPick=null;
+            /* Prefer a blank whose opposite is a 1 (val 6), then a 5 (val 2). */
+            for(var _cfi=0;_cfi<_npcBlanks.length;_cfi++){if(_npcBlanks[_cfi].val===6){_cfPick=_npcBlanks[_cfi];break;}}
+            if(!_cfPick){for(var _cfj=0;_cfj<_npcBlanks.length;_cfj++){if(_npcBlanks[_cfj].val===2){_cfPick=_npcBlanks[_cfj];break;}}}
+            if(_cfPick){
+              _cfPick.val=_cfMap[_cfPick.val];reDrawDieFace(_cfPick);if(_cfPick.el)spawnPixelSparks(_cfPick.el,3);
+              _rescueCid='coin_flip';_rescueLabel='COIN FLIP → '+_cfPick.val;_rescued=true;
+            }
+          }
+          /* the_nudge (tin): bump a blank by +1 (wraps 6→1). Useful
+             rescues: 4→5 (+50) or 6→1 (+100). Two charges per match,
+             but the rescue only consumes one charge here — same as
+             coin_flip's single-die mutation. */
+          else if(!_rescued&&npcHasActive('the_nudge')){
+            var _tnPick=null;
+            /* Prefer a 6 (wraps to 1, +100) then a 4 (bumps to 5, +50). */
+            for(var _tni=0;_tni<_npcBlanks.length;_tni++){if(_npcBlanks[_tni].val===6){_tnPick=_npcBlanks[_tni];break;}}
+            if(!_tnPick){for(var _tnj=0;_tnj<_npcBlanks.length;_tnj++){if(_npcBlanks[_tnj].val===4){_tnPick=_npcBlanks[_tnj];break;}}}
+            if(_tnPick){
+              _tnPick.val=_tnPick.val>=6?1:_tnPick.val+1;reDrawDieFace(_tnPick);if(_tnPick.el)spawnPixelSparks(_tnPick.el,3);
+              _rescueCid='the_nudge';_rescueLabel='THE NUDGE → '+_tnPick.val;_rescued=true;
+            }
+          }
           if(_rescued){
             npcUseActive(_rescueCid);
             triggerCard(_rescueCid,_rescueLabel,false);
@@ -13468,7 +13623,7 @@ function runOppTurn(){
           }
         }
         /* TURNCOAT (tin): arm a +250 bonus on the player's next bank. */
-        if(G.pCards.includes('turncoat')){G._turncoatArmed=true;}
+        if(G.pCards.includes('turncoat')){G._turncoatArmed=true;if(typeof _updatePlayerCardVisuals==='function')_updatePlayerCardVisuals();}
         /* ── Handicap: Rising Stakes — opponent streak reset on bust ── */
         if(G._handicap==='rising_stakes'){G._rsOppStreak=0;G._rsOppMultiplier=1.0;}
         if(G._handicap==='bounty_board')G._bountyOppBankStreak=0;
@@ -14689,7 +14844,12 @@ function endMatch(win){
        it without ever understanding why it became available. The drain is
        no-op if no perks are pending. */
     setTimeout(function(){
-      if(typeof _drainPerkUnlockQueue==='function')_drainPerkUnlockQueue();
+      /* Defer freeRestock to the gauntlet drain — its reshuffle button is
+         suppressed on this match anyway, so popping the alert here would
+         show the player a perk they can't immediately use. The gauntlet
+         drain at initGauntletScreen handles it once the next match's
+         draft (with the button visible) is one screen away. */
+      if(typeof _drainPerkUnlockQueue==='function')_drainPerkUnlockQueue(['freeRestock']);
     },1200);
     /* Attach tooltip + drag handlers + draw button canvases */
     setTimeout(function(){
@@ -15439,31 +15599,38 @@ const OPP_DIALOGUE={
      gentler than before. Lines are shorter and less repetitive
      (~12-16 per bucket) so they don't read as redundant. */
   PATRON:{
-    MATCH_START:["Oh! H-hello. Are we playing dice?","W-what? Oh. Yes. My turn? Your turn?","I sat down. ...Why did I sit down?","Hello, friend. Have we met?","Hoy. ...How did I get here?","Oh good. Bones. I love bones. ...I think.","Sit, sit. Mind the splinter — my wife says it's haunted.","My 247 kids need a winter coat. Roll!","Hoy. What about betting some grass on top of the gold?","Oh dear. The bones are looking at me again.","Sit. ...Wait. Are you Marvin? You look like Marvin.","Yes, dice. Right. Where's my cup gone?","H-hello! I brought a turnip. For luck. Pay no mind.","Sit, sit. The chair's warm. ...Was someone here?","Oh! You startled me. I was thinking about clouds.","Bones in hand! Bones in... oh. I had them a minute ago."],
-    MATCH_START_KNOWN:["Oh! You again. You look familiar. ...Or is it the hat?","Hoy. We've played before, haven't we? Twice, maybe four.","Hello, friend. You owe me a copper. Or I owe you. One.","Sit. The bones remember you. They told me.","Oh, the kind one! Sit, sit. My wife says hello.","Hoy. You're the one with the nice cloak. Or shoes. Something.","Back again? My eldest said you'd come back. He's never right.","Hello! ...Have we met? Yes? Hoy. Brilliant."],
-    MATCH_START_RESPECTED:["Oh! It's you. My wife said you were tall. You are not tall.","H-hoy. The famous one. Don't break me, please.","Oh dear. I heard about you. Was it good or bad? I forget.","Sit. I'll try not to weep if you win. I might weep.","Hello, friend! The bards mentioned you. Or my cousin did. Same thing.","Oh. The kind one with the reputation. Be gentle.","Hoy. You're the one. ...The one what? Sit anyway."],
-    MATCH_START_LEGEND:["Oh GOODNESS. It's you. ...Should I bow? I'll bow.","H-hello, legend! I am very small. Please be kind.","The bards sing about you. My wife hums it sometimes. Off-key.","Oh! Oh. Sit. I'll fetch my best dice. ...These are my only dice.","Hoy. The famous one at my little table. I might cry. Happily."],
-    RISKY_REROLL:["Oh dear. Was that wise?","H-hoy. Risky. I'd not have dared.","Brave one, you are. Brave as my cousin who climbed a roof.","Oh. ...Oh! That's bold.","Hoy. The bones blink at that.","My wife would scold you. Brave, though.","Oh dear. The little ones are watching. Mind your manners.","Risky! ...Risky's exciting. Or scary. One.","Hoy. Bold throw. My uncle did one of those. Broke his ankle.","Oh. ...Why'd you do that? Brave reason, surely.","Reckless. ...What's reckless mean? Sounds important.","Hoy. The missus'd faint at that. She faints a lot.","Bold! Or daft. The line's thin, you know.","Oh dear. The bones grumbled. I heard them."],
-    GREEDY_REROLL:["Oh! Another? Greedy, that.","Hoy. ...One more? My belly says yes, my coin says no.","Pushing it. Pushing it like the cart up the hill.","Oh dear. My wife says greed sours the milk.","One more, eh? The whole brood gasped just then.","Hoy. The bones don't like greed. They told me. Probably.","Another? ...Bold. Or hungry. Both?","Oh. ...You're hungry-eyed, friend. Eat first, then roll.","Greedy. Like the goat. The goat eats everything.","Hoy. Push, push. ...Was that a song? I sang it once.","One more, you say? My cousin said that once. He's still rolling, somewhere.","Oh dear. The bones are tired. They want a nap."],
-    EARLY_BANK:["Oh! Safe. That's nice.","Hoy. Cautious. My wife approves. I approve too, I suppose.","Banked already? ...Reasonable, that.","Oh, modest. Like my Sunday cloak.","Hoy. Small purse. Small purse buys a small pie.","Safe pour. My eldest would approve. He's a cautious lad.","Oh. Quick to bank. Like my cousin who runs from cats.","Hoy. ...Pittance, that. ...Is pittance a word? Sounds like one.","Banked! ...Already? Goodness. Quick fingers.","Oh dear. Boring. ...Sorry, that was rude. Was it rude?","Hoy. Cautious as the cat. Cat doesn't roll dice, mind."],
-    BIG_BANK:["Oh my. That's a lot. A real lot.","Hoy! Tidy. Tidier than my mantel, and that's saying.","Goodness. The bones love you today.","Oh! Bigger than my whole pie. And the pie was big.","Hoy. ...How did you do that? Magic, surely.","Big haul! Enough for new boots. For all of 'em. ...Almost.","Oh dear. That's more coin than I've seen in a moon.","Pretty number, that. ...Is it pretty? I think so.","Hoy. ...Was that real? Did I see it? I think I saw it.","Big! Big-big! ...Sorry, I got excited.","Oh. My wife'd be cross at the bones. They favor you so.","Hoy. A winter's worth. Maybe two winters'.","Goodness me. I'll need a moment."],
-    PLAYER_BUST:["Oh dear.","H-hoy. Bones turned. They do that sometimes.","Oh no. ...Was it me? No, you. Right, you.","Bust. ...Poor friend. Was it the dice or the gods?","Oh. ...My wife says bones have moods. Maybe today's a sad mood.","Hoy. Down you go. Up later, perhaps.","Oh dear. The little ones would cry at that. ...They cry easy.","Bust. ...Is that what we call it? Bust? Odd word.","Oh no. Pour, pour. A drink helps. Or so I'm told.","Hoy. ...The bones gave a little sigh just then. I heard it.","Bust. ...Brave try, friend. Brave try.","Oh. ...Did you mean to do that? No? Thought not.","Hoy. The cat'd have done better. Sorry. Was that mean?","Down. ...Down's not so bad. There's stuff down there. Soil. And worms."],
-    PLAYER_HOT_DICE:["Oh! Oh! All six? All SIX?","H-hoy! That's... that's... I have no words.","Goodness. The bones agreed. ALL of them. Hells.","Oh my. The little ones would scream at that. All of 'em. At once.","All six matched? Magic. Surely magic.","Hoy. ...How? How did that happen?","Oh dear. ...My wife won't believe me when I tell her.","Six! Six bones in love. I'm misty.","Hoy! I might faint. ...I have fainted before. It's pleasant."],
-    PLAYER_TRIPLE:["Oh! Three! Three of them!","Hoy. Three matched. Like my three favorite pies.","Goodness. A trio. Tidy.","Oh, pretty. The bones agreed on that one.","Three of a kind! ...Like my cousins. Three of them. All troublesome."],
-    PLAYER_STRAIGHT:["Oh! A line of bones! All in a row!","Hoy. Straight as my wife's broom. And she's strict.","Goodness. Like little soldiers, those.","Oh my. ...Did the bones plan that? Surely they did.","A straight! ...The triplets stood like that once. Briefly."],
-    PLAYER_SIX_KIND:["Oh! Oh! Six the same?","Goodness me. All six? I'll never forget.","Hoy. I'll tell the missus. She won't believe. But I'll tell.","Oh dear. The bones agreed too much. Suspicious. Lovely.","Six! Six! ...I might need to sit down. I am sitting down."],
-    PLAYER_TAKES_LEAD:["Oh. You're ahead now. ...Goodness.","Hoy. Past me. Briefly, surely. ...Surely?","Oh dear. The bones favor you.","Past me already? ...The kids will tease me forever.","Hoy. Ahead! ...That's good for you. ...Less good for me."],
-    PLAYER_NEAR_WIN:["Oh! Oh dear. You're nearly done.","H-hoy. One more bank? Goodness.","Oh. My purse trembles. ...Purses can't tremble, can they?","Almost won! ...The bones whisper your name. Maybe.","Hoy. Don't trip on the finish, friend. My uncle tripped on his."],
-    OPP_BUST:["Oh no. The bones turned on me.","Hoy. ...Did I just? Yes. Yes I did. Oh dear.","Goodness. Pour, pour. My wife'd weep.","The kids will go hungry if I lose more. ...Or so the missus warns me.","Oh. The bones don't love me today. Sad bones.","Hoy. ...Was I the one rolling? Yes. Right. ...Oh no.","Bust! Me. Me bust. ...Sorry, friend, talking to myself.","Oh dear. The bones have moods. Today is a bad mood.","Hoy. ...Lost. Again. ...My wife's going to laugh.","Oh. Pour me one. A small one. ...A big one.","Hoy. Bones, why? ...The bones don't answer.","Goodness. Down to nothing. ...Nothing's quite peaceful, actually."],
-    OPP_BIG_BANK:["Oh! Oh, look! I did a thing!","Hoy. Tidy! ...Did I do that? I think I did.","Goodness me. My wife will be pleased.","Oh dear. ...In a good way. A big purse is a good purse.","All my little ones! They'll have new boots! ...Or one new boot, shared.","Hoy. ...Was that mine? Mine. Yes. Mine.","Goodness. The bones smiled. At ME. ...Lovely.","Oh! I haven't seen coin like that since the harvest fair.","Hoy! ...I might dance. Quietly. In my head."],
-    OPP_TAKES_LEAD:["Oh. ...I'm ahead? Goodness.","Hoy. ...Past you, friend. Sorry. Not sorry. Sorry.","Goodness. The bones favor me. Just for a moment, surely.","Oh dear. ...In a good way. Wait, is it good?","The brood cheers in my head. They're loud, the lot of them.","Hoy. Ahead! ...Briefly. Probably."],
-    OPP_NEAR_WIN:["Oh! Almost done? Goodness.","Hoy. ...One more bank? Me? Goodness me.","Almost won. ...My wife won't believe it. I'll bring proof.","H-hoy. Nearly there. Don't faint, don't faint.","Oh. Closing time soon. ...Closing what? The match. Right."],
-    MATCH_CLOSE:["Oh dear. Close, this one.","Hoy. Tight as my belt after pie.","Goodness. The bones can't decide.","Oh. ...Sweating. Why am I sweating? It's not warm.","Knife-edge, this. ...What's knife-edge mean? Sounds dangerous.","Hoy. The missus'd be at the edge of her stool for this one.","Oh dear. I lost count of the kids years ago. They'd all be holding their breath."],
-    LOSING_BADLY:["Oh dear. Walloped, I am.","Hoy. ...The bones forgot me. They never write.","Goodness. The missus will fetch the consolation pie.","Oh. Down so far. ...Down's quiet. Peaceful, almost.","Hoy. The kids will console me. Loudly. Lovely chaos.","Oh dear. I should have stayed in bed. ...Was I in bed today? Can't remember.","Hoy. Battered as my second-best hat."],
-    WINNING_BADLY:["Oh! Look at me, dancing in my head.","Hoy. ...Up! Up! ...Briefly, surely.","Goodness me. The bones are kind today.","Oh dear. ...In a good way! A good way.","Hoy! Half my litter would whoop. ...That's a lot of whooping.","Oh. ...Am I winning? I think I am. Goodness."],
-    OPP_WINS:["Oh! I won? I won! ...Did I? Yes?","Hoy. My wife will fetch the special pie tonight. Or any pie.","Goodness. ...A win. For me. Imagine.","Oh dear. ...In a good way. A very good way.","Hoy! All the children will eat tonight. ...Even the twins. The twins eat a lot.","Oh. ...Thank you for playing, friend. Drinks on me. ...Or you.","Hoy. The bones loved me today. Briefly. Lovely.","Goodness. ...I'll tell the cat. The cat doesn't care."],
-    REMATCH_START:["Oh! You again? Goodness, twice in a night.","Hoy. ...Couldn't stay away? Or got lost coming back? Same thing.","Sit, sit. The chair missed you. ...Chairs can't miss. Or can they?","Oh! H-hello again. Have we played already today? Yes? Right.","Hoy. My youngest said you'd come back. She knows things, that one.","Oh dear. ...In a good way. Welcome, welcome."],
-    CARD_EFFECT:["Oh! Did you do something?","Hoy. ...The air went funny. Magic, probably.","Goodness. Bones twitched. ...Bones can twitch?","Oh dear. ...Was that a card? Cards do things, I'm told.","H-hoy. Felt that in my whiskers. ...I don't have whiskers.","Oh. ...Did the room shift? Just me, then.","Hoy. Magic-thing. ...My wife says I'm too credulous. What's credulous?","Goodness. ...The bones gave a little jump. I saw it. Maybe."]
+    /* ── Patron lines: kept LOTS of variety per category. The voice is the
+       same doddering kind drunk with many kids, but the angles rotate
+       (bones-talk, missus, eldest/twins/youngest, cousin/uncle, cat,
+       turnips, the cup, the chair, songs half-remembered) so the player
+       doesn't hear the same structural beat twice in a row. Mix of
+       1-3 word grunts, short observations, and the occasional rambling
+       tangent. ── */
+    MATCH_START:["Oh! H-hello. Dice?","Sit, sit.","I sat down. ...Why did I sit down?","Hoy.","Hello, friend. Have we met?","Oh good. Bones.","My 247 kids need a winter coat. Roll!","H-hello! Brought a turnip. For luck.","Yes, dice. Right. ...Where's my cup gone?","Oh! You startled me.","Bones in hand! ...I had them a minute ago.","Friend! Mind the splinter — chair's haunted.","...Was that the door? Oh. You. Welcome.","Dice? Right. Bones. Same thing.","Hoy. Chair's warm. ...Was someone here?","Oh dear. ...I mean hello. Hello!","H-hi! Had a song. Lost it now.","Sit. The missus packed a snack. ...I ate it.","Oh! My eldest said you'd come. He never says things.","Hoy. ...Whose cup is this? Mine, then.","Welcome. The bones are warm. They like you.","Dice on a Tuesday. Or Wednesday. ...What day is it?","Oh! ...Sorry. Was thinking about a goat.","Sit. ...Are you Marvin? You look like Marvin.","Hoy. The cat looked at me funny. Bad omen, that.","Oh good, a friend. ...Friend? Yes, friend.","H-hoy. Pull up the wonky stool. Builds character.","...Where was I? Oh. Hello. Right."],
+    MATCH_START_KNOWN:["Oh! You again. ...Or is it the hat?","Hoy. We've played before. Twice, maybe four.","Hello, friend. You owe me a copper. Or I owe you. One.","Sit. The bones remember you.","Oh, the kind one! The missus says hello.","Hoy. You're the one with the nice cloak. Or shoes.","Back again? My eldest said you'd come. He's never right.","Hello! ...Have we met? Yes? Hoy. Brilliant.","Oh! Familiar face. Or face-shape. Same thing.","Hoy. ...The cup remembers you, I think.","Friend. ...I told the missus about you. She nodded.","Sit. The chair's missed you.","Oh! Twice in a moon. Goodness.","Hoy. The bones perked up. They do that for friends.","...Wait. Yes. You. Welcome back.","Hoy. The youngest waved when I left. Means she knows."],
+    MATCH_START_RESPECTED:["Oh! It's you. The missus said you were tall. You are not tall.","H-hoy. The famous one. Don't break me.","Oh dear. I heard about you. Was it good or bad? I forget.","Sit. I'll try not to weep if you win.","Hello, friend! The bards mentioned you. Or my cousin did.","The kind one with the reputation. Be gentle.","Hoy. You're the one. ...The one what? Sit anyway.","Oh! ...Should I have polished the bones? They look fine.","Goodness. I told the kids you were coming. They cheered.","Hoy. ...I know you. Don't I? Yes? Hoy.","H-hello. ...The eldest practiced bowing this morning. Ridiculous boy.","Oh. The famous one. Brought my better cup, just in case."],
+    MATCH_START_LEGEND:["Oh GOODNESS. ...Should I bow? I'll bow.","H-hello, legend! I am very small. Please be kind.","The bards sing about you. The missus hums it. Off-key.","Oh! Sit. I'll fetch my best dice. ...These are my only dice.","Hoy. The famous one at my little table. I might cry. Happily.","Goodness me. The kids will never believe this.","Oh dear. ...In a good way. A great way.","H-hoy! ...The cat sat up straight. Even the cat.","Legend! ...I shall tell my grandchildren. ...I have grandchildren?"],
+    RISKY_REROLL:["Oh dear.","Hoy. Risky.","Bold!","Bones blinked at that.","Oh. ...Why'd you do that?","The missus would scold you.","Bold or daft. Thin line.","Hoy. Reckless.","Oh! Brave.","...Was that wise?","Hoy. My uncle did that once. Broke his ankle.","Oh dear. The bones grumbled.","Goodness. Bold throw.","...Daring.","Little ones are watching. Mind your manners.","Hoy. The cat'd not have done that.","Oh. ...Brave reason, surely.","Reckless. ...Sounds important.","...Whew.","Hoy. The bones are nervous now.","Oh! ...Living dangerously, you.","Hoy. The missus calls that 'tempting'.","Goodness. The cup tipped a little, just then."],
+    GREEDY_REROLL:["Greedy, that.","Hoy. One more?","Pushing it.","Another?","Oh dear. Bones get tired.","Push, push.","Hungry-eyed, you.","Hoy. Like the goat.","Oh! ...Belly says yes, coin says no.","Greed sours the milk, the missus says.","Another? ...Bold. Or hungry.","Hoy. The brood gasped just then.","...The bones sighed.","One more, eh? My cousin said that. Still rolling, somewhere.","Oh. ...Hungry, friend? Eat first.","Hoy. ...Push the cart up the hill.","Goodness. Greedy bones get crumbs.","Oh! ...The cat stopped grooming. Watching."],
+    EARLY_BANK:["Oh! Safe.","Hoy. Cautious.","Banked already?","Modest.","Pittance, that.","Safe pour.","Hoy. Quick fingers.","Oh, sensible.","...Reasonable.","Hoy. The missus approves. I think.","Small purse, small pie.","Oh. Banked. ...Already?","Hoy. Cautious as the cat.","...Dull. ...Was that rude?","Tidy little nip.","Oh! Tucked away. Like winter grain.","Hoy. ...Better than nothing. Just.","Goodness. ...Boring? Or wise? Both, maybe."],
+    BIG_BANK:["Oh my!","Tidy.","Goodness.","Big haul!","Hoy. ...Was that real?","A winter's worth. Maybe two.","Oh! That's a lot.","Goodness me.","Hoy! The bones love you.","Pretty number, that.","Big! Big-big!","...How? How?","Oh dear. ...In a good way.","New boots! For all of 'em! ...Almost.","Hoy. I'll need a moment.","The missus won't believe me.","Magic. Surely magic.","Oh! Did I see that?","Hoy. ...Bigger than my whole pie.","Goodness. ...The cat stared.","Oh! Coin like that — not since the harvest fair.","Hoy! ...I might dance. Quietly. In my head."],
+    PLAYER_BUST:["Oh dear.","Bust.","Hoy. Bones turned.","Oh no.","Down you go.","Brave try, friend.","Hoy. ...Bad bones today.","Oh. ...Was it the gods?","Pour, pour. A drink helps.","Hoy. The little ones'd cry at that.","Bust. ...Odd word.","Oh dear. Bones sighed.","Down. ...Down's not so bad.","Hoy. The cat'd have done better. ...Sorry.","...Walloped.","Oh no. Bones switched moods.","Hoy. Up later, perhaps.","Oh dear. ...The cup tipped over in sympathy.","...Brave, though. Brave's something.","Hoy. ...The eldest would've cried. He cries easy."],
+    PLAYER_HOT_DICE:["Oh! Oh! All six? All SIX?","H-hoy! I have no words.","Goodness. The bones agreed. ALL of them.","Oh my. The little ones would scream.","All six matched? Magic. Surely.","Hoy. ...How? How did that happen?","Oh dear. ...Missus won't believe me.","Six! Six bones in love. I'm misty.","Hoy! I might faint. ...I have fainted before. It's pleasant.","Goodness me!","Oh! ...Bones beaming.","Hoy. The cat'd be impressed. The cat impresses no one.","Six. ...SIX. ...Hoy.","Oh! ...Did the table just hum?"],
+    PLAYER_TRIPLE:["Oh! Three!","Hoy. Tidy.","Goodness. A trio.","Three matched.","Oh, pretty.","Like my three favorite pies.","Hoy. Three of a kind!","...Like my cousins. All troublesome.","Bones agreed on that.","Oh! Tidy little set.","Hoy. The triplets did that once.","...Three's a holy number, I'm told."],
+    PLAYER_STRAIGHT:["Oh! A line!","Hoy. All in a row!","Straight as the missus's broom.","Goodness. Like little soldiers.","Did the bones plan that?","A straight!","Oh my. ...Triplets stood like that. Briefly.","Hoy. Pretty parade.","Goodness me.","All lined up. Tidy.","Oh! ...March, march, march."],
+    PLAYER_SIX_KIND:["Oh! Six the same?","Goodness me. I'll never forget.","Hoy. The missus won't believe.","Bones agreed too much. Suspicious. Lovely.","Six! Six!","I'll need to sit down. ...I am sitting down.","Oh! ...Did I see that?","Hoy. Magic, surely.","Goodness. The cat blinked. The cat NEVER blinks."],
+    PLAYER_TAKES_LEAD:["Oh. You're ahead. ...Goodness.","Hoy. Past me. ...Briefly, surely?","Oh dear. The bones favor you.","Past me? The kids will tease me forever.","Hoy. Ahead! ...Less good for me.","Oh! ...When did that happen?","...The missus warned me.","Hoy. ...Catch up, catch up.","Goodness. Above me on the board.","Oh dear. ...In a bad way.","Hoy. The bones swung your way."],
+    PLAYER_NEAR_WIN:["Oh! You're nearly done.","H-hoy. One more bank?","Oh. My purse trembles.","Almost won! ...Bones whisper your name.","Hoy. Don't trip on the finish.","Oh dear.","...My uncle tripped on his finish. Lost a tooth.","Goodness. Close, this.","Hoy. ...One more push.","Oh! Nearly.","...Hoy. Don't blink, friend."],
+    OPP_BUST:["Oh no.","Bust!","Hoy. Lost.","Goodness.","Bones, why?","Oh dear. Bad mood, the bones.","Pour me one.","...Down to nothing.","Hoy. ...Was I rolling?","The kids'll go hungry.","Oh. ...The missus'll laugh.","Hoy. Bust. Me. Me bust.","...Sad bones today.","Pour. A small one. ...A big one.","Hoy. ...Bones don't answer.","Goodness. ...Quiet down there.","Oh no. ...The cat warned me. I ignored the cat.","Hoy. ...The eldest'll write a song. He writes terrible songs.","Bust. ...Means start again, doesn't it?","Oh dear. ...Bones up and walked off."],
+    OPP_BIG_BANK:["Oh, look!","Tidy!","Goodness me.","Hoy. ...Was that mine?","New boots for the little ones!","Bones smiled at me!","Oh! ...I did a thing!","Hoy. ...Mine. Yes. Mine.","Goodness. The missus will be pleased.","Big purse! ...Or one new boot, shared.","Hoy. ...I might dance. Quietly.","Coin like that — not since the harvest fair.","Oh! ...Lovely number.","Hoy! ...The cat looked impressed. Almost.","...Goodness. The brood'll wake up rich."],
+    OPP_TAKES_LEAD:["Oh. ...I'm ahead?","Hoy. Past you. Sorry. Not sorry. Sorry.","Goodness. The bones favor me.","Oh dear. ...In a good way.","The brood cheers in my head.","Hoy. Ahead! ...Briefly, probably.","Oh! ...Above you on the board.","Hoy. ...Don't tell the missus, she'll celebrate.","Goodness me. ...Look at that.","...The cat noticed.","Hoy. ...Surprised, even me.","Oh! ...Doesn't happen often. Savor it, savor it."],
+    OPP_NEAR_WIN:["Oh! Almost done?","Hoy. ...Me? Goodness me.","Almost won. ...The missus won't believe.","H-hoy. Don't faint.","Oh. Closing time soon.","Goodness. ...One bank more.","Hoy. ...The brood's holding breath.","Oh dear. ...In a great way.","Hoy. ...Steady hands now."],
+    MATCH_CLOSE:["Oh dear. Close.","Hoy. Tight as my belt after pie.","Goodness. Bones can't decide.","Oh. Sweating. Why?","Knife-edge.","The missus'd be at the edge of her stool.","...Lost count of the kids. They'd all be holding breath.","Hoy. ...Tense.","Oh dear. Bones flickered.","...Cup's shaking. ...Or my hand.","Hoy. ...Whew.","Goodness. ...Even the cat looked up.","...Bones are sweating. Bones can sweat?"],
+    LOSING_BADLY:["Oh dear. Walloped.","Hoy. Bones forgot me. They never write.","Missus'll fetch the consolation pie.","Down so far. ...Peaceful, almost.","Hoy. Kids'll console me. Loudly.","Oh dear. Should've stayed in bed.","Battered as my second-best hat.","Hoy. ...Hells.","Oh. ...Is the cup empty?","Bones ran off. ...Coward bones.","Hoy. ...The eldest'll have a smug face.","Goodness. ...Down's quiet down here. Lonely, but quiet."],
+    WINNING_BADLY:["Oh! Look at me, dancing in my head.","Hoy. ...Up! Up!","Goodness. Bones are kind today.","Oh dear. ...In a good way!","Hoy! Half my litter would whoop.","Oh. ...Am I winning?","Hoy. ...Tell the cat. The cat won't care.","Goodness me. ...Singing, almost.","Oh! ...Up here is sunny. Lovely.","Hoy. ...Best to keep quiet, missus says."],
+    OPP_WINS:["Oh! I won? I won! ...Did I?","Hoy. The missus'll fetch the special pie.","Goodness. ...A win. Imagine.","Oh dear. ...In a very good way.","Hoy! All the children eat tonight.","Oh. ...Drinks on me. ...Or you.","Hoy. The bones loved me today.","Goodness. ...I'll tell the cat. The cat won't care.","Oh! Won. ...The little ones'll cheer.","Hoy. ...The missus said I never win. Hah!","Goodness me. ...Not since the harvest fair.","Oh! ...Bones, I love you.","Hoy! ...The eldest'll be so confused. Lovely."],
+    REMATCH_START:["Oh! You again? Twice in a night.","Hoy. ...Couldn't stay away?","Sit, sit. The chair missed you.","Oh! H-hello again.","Hoy. My youngest said you'd come back.","Oh dear. ...In a good way. Welcome.","Friend! ...Have we played already? Yes? Right.","Hoy. Back so soon. ...Bones perked up.","Oh! Twice. Goodness.","H-hoy. The cup's already poured.","...Two rounds with the same friend. Lovely."],
+    CARD_EFFECT:["Oh!","Hoy. ...Magic?","Bones twitched.","Did you do something?","Felt that.","Goodness.","Oh dear. ...Was that a card?","Hoy. ...Air went funny.","Goodness. ...Did the room shift?","Magic-thing.","Oh! ...Whiskers tingling. ...I have no whiskers.","Bones gave a little jump. I saw it. Maybe.","Hoy. ...Heretical, the missus'd call that.","Oh! ...Felt that in my teeth.","Goodness. ...The cup hummed."]
   }
 };
 
@@ -15853,6 +16020,7 @@ function activateCard(cardId){
     case 'crown_authority': activateCrownAuthorityPlayer(); break;
     case 'blessed_dice': activateBlessedDicePlayer(); break;
     case 'coin_flip': activateCoinFlip(); break;
+    case 'the_nudge': activateTheNudge(); break;
     case 'alchemist_touch': activateAlchemistTouch(); break;
     case 'twinning_charm': activateTwinningCharm(); break;
     case 'double_down_die': activateDoubleDownDie(); break;
@@ -16255,6 +16423,7 @@ function activateBlessedConfiscationPlayer(){
 function activateQuickHandsPlayer(){
   G._playerQuickHandsArmed=true;
   setStatusMsg("QUICK HANDS ARMED — OPP'S NEXT BEST DIE → 3",'gold');
+  if(typeof _updatePlayerCardVisuals==='function')_updatePlayerCardVisuals();
 }
 
 /* Crown Authority / Blessed Dice: arm flag — opp's next turn, force reroll all kept */
@@ -16287,6 +16456,26 @@ function activateCoinFlip(){
   if(d.el){d.el.classList.add('eff-glow-gold');spawnPixelSparks(d.el,5);setTimeout(function(){if(d.el)d.el.classList.remove('eff-glow-gold');},700);}
   triggerCard('coin_flip','FLIPPED → '+oppositeFace,true);
   setStatusMsg('COIN FLIP — DIE NOW '+oppositeFace,'gold');
+  refreshSelUI();
+}
+
+/* THE NUDGE — bumps a selected die up by 1 (6 wraps to 1). Two charges
+   per match. Mirrors the COIN FLIP / DOUBLE DOWN DIE pattern. */
+function activateTheNudge(){
+  if(typeof _vgDragState!=='undefined'&&_vgDragState){
+    if(_vgDragState.clone&&_vgDragState.clone.parentNode)_vgDragState.clone.parentNode.removeChild(_vgDragState.clone);
+    if(_vgDragState.srcEl)_vgDragState.srcEl.classList.remove('vg-drag-origin');
+    _vgDragState=null;
+  }
+  var selDice=G.pool.filter(function(d){return d.sel&&!d.committed;});
+  if(!selDice.length){setStatusMsg('TAP A DIE FIRST, THEN TAP THE NUDGE','red');refundActiveCardUse('the_nudge');return;}
+  var d=selDice[0];
+  var newVal=d.val>=6?1:d.val+1;
+  d.val=newVal;
+  reDrawDieFace(d);
+  if(d.el){d.el.classList.add('eff-glow-gold');spawnPixelSparks(d.el,5);setTimeout(function(){if(d.el)d.el.classList.remove('eff-glow-gold');},700);}
+  triggerCard('the_nudge','NUDGED → '+newVal,true);
+  setStatusMsg('THE NUDGE — DIE NOW '+newVal,'gold');
   refreshSelUI();
 }
 
@@ -17410,19 +17599,17 @@ function _renderDiceStore(){
   var gold=S.run.gold||0;
   var stock=S.run.diceStock||{};
   /* Jade tier gating: at most ONE jade variant slot is visible at a time.
-     The visible slot is the lowest tier the player hasn't already bought
-     this run (i.e. doesn't have in their loadout). After buying L1, L2
-     becomes visible; after L2, L3; after L3, no jade slot. */
+     Collapsed to 2 tiers: after buying L1 (jade), the slot is replaced
+     with L2 (jade2); after L2, no jade slot. Legacy L3 (jade3) is
+     dep-flagged in DICE and removed from DICE_STORE entirely. */
   var _ownedDice=(S&&S.run&&S.run.dice)?S.run.dice:[];
   var _hasJade1=_ownedDice.indexOf('jade')!==-1;
   var _hasJade2=_ownedDice.indexOf('jade2')!==-1;
-  var _hasJade3=_ownedDice.indexOf('jade3')!==-1;
   DICE_STORE.forEach(function(d){
     if(d.mat==='bone')return;
     /* Hide jade variants that aren't the next-purchasable tier */
     if(d.mat==='jade'&&_hasJade1)return;
     if(d.mat==='jade2'&&(!_hasJade1||_hasJade2))return;
-    if(d.mat==='jade3'&&(!_hasJade2||_hasJade3))return;
     var left=stock[d.mat]!==undefined?stock[d.mat]:d.stock;
     var item=document.createElement('div');
     item.className='dice-store-item';
