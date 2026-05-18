@@ -2719,6 +2719,22 @@ body::before,body::after{display:none!important}
 .tier-loadout::before{content:'';position:absolute;top:0;left:10%;right:10%;height:2px;
   background:linear-gradient(90deg,transparent,rgba(200,160,80,.3),transparent)}
 .tier-lo-label{font-family:var(--font-px);font-size:10px;color:rgba(200,160,80,.35);letter-spacing:2px;margin-bottom:6px}
+/* Loadout dice drag-to-reorder visuals.
+   .lo-die-drag-origin : the source die during a drag (greyed/dimmed)
+   .lo-die-drop-target : a die the cursor is hovering over (highlight)
+   .lo-die-drag-clone  : the floating clone following the cursor
+   .tier-loadout-hint  : the discoverability nudge under the loadout    */
+.tier-lo-die.lo-die-drag-origin{opacity:.25;filter:grayscale(.6)}
+.tier-lo-die.lo-die-drop-target{outline:2px dashed var(--gold);outline-offset:3px;border-radius:4px;animation:loDropPulse .6s ease-in-out infinite}
+@keyframes loDropPulse{0%,100%{outline-color:rgba(224,180,40,.7)}50%{outline-color:rgba(255,220,80,1)}}
+.lo-die-drag-clone{pointer-events:none}
+.tier-loadout-hint{
+  font-family:'IM Fell English',serif;font-size:11px;
+  color:rgba(220,190,140,.7);
+  text-align:center;margin-top:6px;letter-spacing:.5px;
+  transition:opacity .8s ease;
+}
+.tier-loadout-hint.fade-out{opacity:0}
 /* ── Tier-screen renown pill: star + horizontal progress bar to next perk ── */
 .tier-renown-pill{
   position:absolute;top:50%;left:12px;transform:translateY(-50%);z-index:25;
@@ -6497,6 +6513,12 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
           <div class="rp-section">
             <div class="rp-sh">Dice types</div>
             <div class="rp-note">Different dice have different face biases. Heavier materials roll more scoring faces but cost more gold. Buy new dice at the <b style="color:var(--gold)">Shop</b>. Your loadout of 6 dice is set before each match.</div>
+          </div>
+          <div class="rp-section">
+            <div class="rp-sh">Reorder your dice</div>
+            <div class="rp-note"><b style="color:var(--gold)">Long-press</b> any die in your pre-match loadout and drag it onto another to swap their slot positions. Order matters &mdash; some cards care which slot a die sits in:
+              <span style="display:block;margin-top:6px;color:rgba(220,200,160,.85)">&bull; <b style="color:#b87a4a">Vanguard</b>, <b style="color:#b87a4a">Anchor</b>, <b style="color:#90b0d0">Bookends</b>, <b style="color:#90b0d0">Flanks</b>, <b style="color:#e0b428">Sequence</b> all read positional dice from your row.</span>
+              <span style="display:block;margin-top:4px;color:rgba(220,200,160,.85)">Tuck your <i>amber</i> in the leftmost slot to pair it with Vanguard, push a <i>6-leaning</i> die to the rightmost slot for Anchor, etc.</span></div>
           </div>
           <div class="rp-section">
             <div class="rp-sh">Tarnish</div>
@@ -15950,6 +15972,7 @@ function attachDieTooltipTap(dieEl,matId){
     if(typeof _draftDragging!=='undefined'&&_draftDragging)return;
     if(typeof _pcDrag!=='undefined'&&_pcDrag)return;
     if(typeof _vgDragState!=='undefined'&&_vgDragState)return;
+    if(window._loDieDragState)return;/* loadout reorder drag in flight */
     e.stopPropagation();
     var wasPeeked=dieEl.classList.contains('peeked');
     closeAllChips();
@@ -18739,6 +18762,7 @@ function _renderTierLoadout(){
       wrap.className='tier-lo-die dtype-'+(mat||'bone');
       wrap.dataset.dieType=mat;
       wrap.dataset.mat=mat||'bone';
+      wrap.dataset.loIdx=String(i);/* used by the long-press swap handler below */
       /* Use mkDie for proper pixel-art dice matching the match screen */
       var face=[1,5,3,6,4,2][i%6]||5;
       var die=mkDie(face,mat,'sm');
@@ -18748,8 +18772,172 @@ function _renderTierLoadout(){
       if(typeof attachDieTooltipTap==='function'){
         attachDieTooltipTap(wrap,mat);
       }
+      /* Attach long-press → drag-to-reorder. The long-press window
+         (~280 ms) is long enough that a quick tap still reaches the
+         tooltip handler above but a deliberate press-and-hold begins a
+         drag instead. */
+      if(typeof _attachLoadoutDieDrag==='function'){
+        _attachLoadoutDieDrag(wrap,i);
+      }
     });
+    /* Inline hint so players discover the reorder gesture. Shown once
+     per session — we don't want a permanent label cluttering the screen
+     once the player knows about it, but we do want the first-run nudge. */
+    if(!window._loDieReorderHintShown){
+      var hint=document.createElement('div');
+      hint.className='tier-loadout-hint';
+      hint.textContent='💡 Long-press a die to drag and swap its position.';
+      ld.parentNode&&ld.parentNode.insertBefore(hint,ld.nextSibling);
+      window._loDieReorderHintShown=true;
+      /* Fade out after a few seconds so it stops drawing the eye once
+         the player has read it. */
+      setTimeout(function(){hint.classList.add('fade-out');},6000);
+      setTimeout(function(){if(hint.parentNode)hint.parentNode.removeChild(hint);},7200);
+    }
   }
+}
+
+/* ── Loadout dice: long-press → drag-to-reorder ──
+   Lets the player rearrange their dice slot order in the gauntlet pre-
+   match loadout. Order matters because the leftmost die is read by
+   Vanguard, the rightmost by Anchor, the row by Sequence/Flanks, etc.
+   The actual swap mutates S.run.dice[i] ↔ S.run.dice[j] and re-renders
+   the loadout (which also reattaches handlers). */
+function _attachLoadoutDieDrag(srcEl,srcIdx){
+  var pressTimer=null;
+  var startX=0,startY=0;
+  function clearPress(){if(pressTimer){clearTimeout(pressTimer);pressTimer=null;}}
+  function onDown(e){
+    /* Don't start a press if a drag is already in flight elsewhere */
+    if(window._loDieDragState)return;
+    var t=(e.touches&&e.touches[0])?e.touches[0]:e;
+    startX=t.clientX;startY=t.clientY;
+    clearPress();
+    pressTimer=setTimeout(function(){
+      pressTimer=null;
+      _startLoadoutDieDrag(srcEl,srcIdx,startX,startY);
+    },280);
+  }
+  function onMove(e){
+    if(!pressTimer)return;
+    var t=(e.touches&&e.touches[0])?e.touches[0]:e;
+    /* Cancel the long-press timer if the pointer moved too far — that's
+       a swipe gesture, not a press-and-hold, and we don't want to grab
+       the die out from under a scroll attempt. */
+    if(Math.abs(t.clientX-startX)>8||Math.abs(t.clientY-startY)>8)clearPress();
+  }
+  function onUp(){clearPress();}
+  srcEl.addEventListener('pointerdown',onDown);
+  srcEl.addEventListener('pointermove',onMove);
+  srcEl.addEventListener('pointerup',onUp);
+  srcEl.addEventListener('pointercancel',onUp);
+  srcEl.addEventListener('touchstart',onDown,{passive:true});
+  srcEl.addEventListener('touchmove',onMove,{passive:true});
+  srcEl.addEventListener('touchend',onUp,{passive:true});
+}
+function _startLoadoutDieDrag(srcEl,srcIdx,initX,initY){
+  if(window._loDieDragState)return;
+  var srcRect=srcEl.getBoundingClientRect();
+  /* Build the floating clone that follows the cursor */
+  var clone=srcEl.cloneNode(true);
+  clone.classList.add('lo-die-drag-clone');
+  clone.style.cssText='position:fixed;z-index:9999;pointer-events:none;'+
+    'width:'+srcRect.width+'px;height:'+srcRect.height+'px;'+
+    'left:'+srcRect.left+'px;top:'+srcRect.top+'px;'+
+    'transform:scale(1.18) rotate(-3deg);opacity:.95;transition:none;'+
+    'animation:none;filter:drop-shadow(0 8px 12px rgba(0,0,0,.55));';
+  document.body.appendChild(clone);
+  srcEl.classList.add('lo-die-drag-origin');
+  try{_haptic(20);}catch(e){}
+  try{if(SFX.pop)SFX.pop();else if(SFX.commit)SFX.commit();}catch(e){}
+  window._loDieDragState={srcEl:srcEl,srcIdx:srcIdx,clone:clone,targetEl:null};
+  /* Position clone immediately under the initial press point */
+  function moveClone(x,y){
+    clone.style.left=(x-srcRect.width/2)+'px';
+    clone.style.top =(y-srcRect.height/2)+'px';
+  }
+  moveClone(initX,initY);
+  function onMove(e){
+    if(!window._loDieDragState)return;
+    if(e.cancelable)e.preventDefault();
+    var t=(e.touches&&e.touches[0])?e.touches[0]:e;
+    var x=t.clientX,y=t.clientY;
+    if(x==null||y==null)return;
+    moveClone(x,y);
+    /* Find which loadout die is under the cursor (hide clone briefly so
+       elementFromPoint sees through it). */
+    clone.style.display='none';
+    var hit=document.elementFromPoint(x,y);
+    clone.style.display='';
+    var target=(hit&&hit.closest)?hit.closest('.tier-lo-die'):null;
+    var st=window._loDieDragState;
+    if(st.targetEl&&st.targetEl!==target){
+      st.targetEl.classList.remove('lo-die-drop-target');
+    }
+    if(target&&target!==srcEl){
+      target.classList.add('lo-die-drop-target');
+      st.targetEl=target;
+    }else{
+      st.targetEl=null;
+    }
+  }
+  function cleanup(){
+    document.removeEventListener('pointermove',onMove);
+    document.removeEventListener('pointerup',onEnd);
+    document.removeEventListener('pointercancel',onEnd);
+    document.removeEventListener('touchmove',onMove);
+    document.removeEventListener('touchend',onEnd);
+    document.removeEventListener('touchcancel',onEnd);
+  }
+  function onEnd(){
+    /* Stamp the drag-end so any synthesized click/touchend can't pop the
+       tooltip immediately after the swap. attachDieTooltipTap gates on
+       window._dragEndedAt. */
+    window._dragEndedAt=Date.now();
+    var st=window._loDieDragState;
+    if(!st){cleanup();return;}
+    cleanup();
+    if(st.targetEl)st.targetEl.classList.remove('lo-die-drop-target');
+    st.srcEl.classList.remove('lo-die-drag-origin');
+    var swapped=false;
+    if(st.targetEl&&st.targetEl!==st.srcEl){
+      var tgtIdx=parseInt(st.targetEl.dataset.loIdx,10);
+      if(!isNaN(tgtIdx)&&S&&S.run&&Array.isArray(S.run.dice)&&tgtIdx!==st.srcIdx){
+        var tmp=S.run.dice[st.srcIdx];
+        S.run.dice[st.srcIdx]=S.run.dice[tgtIdx];
+        S.run.dice[tgtIdx]=tmp;
+        try{save();}catch(e){}
+        try{if(SFX.synergy)SFX.synergy();else if(SFX.commit)SFX.commit();}catch(e){}
+        try{_haptic(30);}catch(e){}
+        swapped=true;
+      }
+    }
+    /* Snap clone away (fade-out for swap, snap-back for cancel) */
+    st.clone.style.transition='transform .16s ease, opacity .16s ease, left .16s ease, top .16s ease';
+    if(swapped){
+      st.clone.style.transform='scale(.6)';
+      st.clone.style.opacity='0';
+    }else{
+      var sr=st.srcEl.getBoundingClientRect();
+      st.clone.style.left=sr.left+'px';
+      st.clone.style.top =sr.top+'px';
+      st.clone.style.transform='scale(1) rotate(0)';
+      st.clone.style.opacity='0';
+    }
+    setTimeout(function(){if(st.clone.parentNode)st.clone.parentNode.removeChild(st.clone);},180);
+    window._loDieDragState=null;
+    /* Re-render the loadout so the new order is visible. The render path
+       wipes ld.innerHTML and rebuilds, so handlers are re-attached. */
+    if(swapped){
+      setTimeout(function(){try{if(typeof _renderTierLoadout==='function')_renderTierLoadout();}catch(e){}},20);
+    }
+  }
+  document.addEventListener('pointermove',onMove,{passive:false});
+  document.addEventListener('pointerup',onEnd,{passive:true,once:true});
+  document.addEventListener('pointercancel',onEnd,{passive:true,once:true});
+  document.addEventListener('touchmove',onMove,{passive:false});
+  document.addEventListener('touchend',onEnd,{passive:true,once:true});
+  document.addEventListener('touchcancel',onEnd,{passive:true,once:true});
 }
 
 /* ══════════ POUCH — pre-match side-deck (floating FAB + modal) ══════════
