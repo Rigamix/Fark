@@ -2729,9 +2729,13 @@ body::before,body::after{display:none!important}
 @keyframes loDropPulse{0%,100%{outline-color:rgba(224,180,40,.7)}50%{outline-color:rgba(255,220,80,1)}}
 .lo-die-drag-clone{pointer-events:none}
 .tier-loadout-hint{
+  /* Spans all 3 columns of the .tier-lo-dice grid so text-align:center
+     centers the text under the dice column (not under the whole
+     cards+dice row). */
+  grid-column:1 / -1;
   font-family:var(--font-px);font-size:9px;
   color:rgba(200,160,80,.45);
-  text-align:center;margin-top:8px;letter-spacing:1.5px;
+  text-align:center;margin-top:4px;letter-spacing:1.5px;
   text-transform:uppercase;
 }
 /* ── Tier-screen renown pill: star + horizontal progress bar to next perk ── */
@@ -18779,20 +18783,18 @@ function _renderTierLoadout(){
         _attachLoadoutDieDrag(wrap,i);
       }
     });
-    /* Persistent "drag to swap" tip beneath the dice grid. The earlier
-       version was injected as a sibling of `ld` (the dice container),
-       but `ld.parentNode` is `.tier-lo-row` — a horizontal flex that
-       parks cards on the left and dice on the right, so the hint
-       landed to the SIDE of the dice instead of under them. Anchoring
-       to the column-flex `.tier-loadout` parent puts it where it
-       belongs. Append-once guard so re-renders don't stack copies. */
-    var loCol=ld.closest('.tier-loadout');
-    if(loCol&&!loCol.querySelector('.tier-loadout-hint')){
-      var hint=document.createElement('div');
-      hint.className='tier-loadout-hint';
-      hint.textContent='drag to swap';
-      loCol.appendChild(hint);
-    }
+    /* Persistent "drag to swap" tip directly beneath the dice grid.
+       Two earlier attempts missed: a sibling of `ld` landed beside the
+       grid (the parent .tier-lo-row is a horizontal flex), and a child
+       of .tier-loadout text-align-centered across the FULL loadout
+       width (cards + dice) which read as left-shifted relative to the
+       dice. Appending INSIDE ld (a CSS grid) and using grid-column:1/-1
+       makes the hint span the dice grid's exact width, so text-align
+       :center lands it under the dice column. */
+    var hint=document.createElement('div');
+    hint.className='tier-loadout-hint';
+    hint.textContent='drag to swap';
+    ld.appendChild(hint);
   }
 }
 
