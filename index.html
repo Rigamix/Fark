@@ -316,14 +316,16 @@ body{
 
 /* Armed-card pulse: a passive card whose effect is queued to fire on
    the next trigger (e.g. Stakes Rising waiting on next bank, The Echo
-   waiting on next commit) gets a gentle gold glow so the player notices
-   "this is about to do something". Drop-shadow filter rather than
-   box-shadow so it follows the card's pixelWobble silhouette. */
+   waiting on next commit) gets a thin pulse so the player notices
+   "this is about to do something". Uses the card's own --ctrim2 outline
+   colour so each rarity pulses in its native tone (tin = tan, silver =
+   blue-silver, gold = warm gold, npc = red). Drop-shadow filter rather
+   than box-shadow so it follows the card's pixelWobble silhouette. */
 @keyframes cardArmedPulse{
-  0%,100%{filter:drop-shadow(0 0 0 rgba(255,210,90,0))}
-  50%    {filter:drop-shadow(0 0 6px rgba(255,210,90,.85)) drop-shadow(0 0 12px rgba(255,180,40,.55))}
+  0%,100%{filter:drop-shadow(0 0 0 transparent)}
+  50%    {filter:drop-shadow(0 0 1.5px var(--ctrim2,#e0b428)) drop-shadow(0 0 3.5px var(--ctrim2,#e0b428))}
 }
-.mcard.armed-pulse .gcard{animation:cardArmedPulse 1.6s ease-in-out infinite}
+.mcard.armed-pulse .gcard{animation:cardArmedPulse 1.8s ease-in-out infinite}
 /* Subtle idle wobble on all cards */
 @keyframes cardWobble{
   0%{transform:translateY(calc(var(--base-ty) - var(--lift,0px))) rotate(calc(var(--rot,0deg) + 0deg))}
@@ -2163,9 +2165,14 @@ body:has(#mLoadout-ov.show) #dbgButtons{display:flex !important}
 .rnk-info-backdrop.show{pointer-events:auto;background:rgba(0,0,0,.6)}
 .rnk-info-panel{
   position:fixed;bottom:-100px;left:0;right:0;z-index:9551;
-  max-height:calc(85vh + 100px);overflow-y:auto;
+  /* Cap to viewport-height so the panel never extends past the bottom
+     nav; internal overflow-y handles long lists (e.g. the FEATS tab
+     after the latest round of feats was added). The earlier 85vh+100px
+     allowed the panel to grow past the visible region, which is why
+     long feat lists bled onto the Shop/Menu icons. */
+  max-height:90vh;overflow-y:auto;
   transform:translateY(calc(100% + 100px));transition:transform .35s cubic-bezier(.22,.68,.36,1);
-  padding:20px 16px 160px;
+  padding:20px 16px 200px;
   pointer-events:none;
   border-radius:12px 12px 0 0;
 }
@@ -6286,8 +6293,10 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
   left:0;right:0;width:100%;
   pointer-events:none;
   z-index:25;
-  /* Sharp dark-brown drop shadow so it lifts off the wood background. */
-  filter:drop-shadow(1px 2px 0 rgba(38,22,12,0.85));
+  /* Tight dark-brown drop shadow — close to text + 1px blur so it
+     reads as legible-on-wood without smearing. (Was 1px/2px hard
+     offset which felt detached from the letters.) */
+  filter:drop-shadow(1px 1px 1px rgba(38,22,12,0.9));
 }
 .bounty-strip .bs-title{display:none}
 .bs-row{display:contents}
@@ -7221,6 +7230,8 @@ const FEATS=[
     check:function(G){return !!G._featTrailedDeep;}},
   {id:'high_roller',    label:'High Roller',      desc:'Bank 1500+ in a single turn',    renown:5,
     check:function(G){return (G._featMaxBank||0)>=1500;}},
+  {id:'one_turn_wonder',label:'One-Turn Wonder',  desc:'Win the match in a single turn', renown:15,
+    check:function(G){return (G.turnNum||0)<=1;}},
   /* ── Drip-feed feats (regular renown payouts on common play patterns
      and per-boss firsts). Each fires once per RUN since evaluateFeats
      gates on S.run.feats[id], so repeat runs let players re-earn them
@@ -7682,6 +7693,9 @@ function showScreen(name, data) {
   document.getElementById('screen-' + name).classList.add('active');
   _currentScreen = name;
   window.scrollTo(0,0);
+  /* Re-sync ambience volume — it's screen-dependent (louder out of match,
+     quieter in match) so a screen change has to nudge it. */
+  if(typeof _ambienceSync==='function'){try{_ambienceSync();}catch(e){}}
   switch(name) {
     case 'menu': initMenuScreen(); break;
     case 'shop': initShopScreen(); break;
@@ -8788,8 +8802,8 @@ const CARDS=[
   /* ── ACTIVE CARDS (shop + NPC rewards, drag-to-activate) ── */
   {id:'gamblers_eye',name:"GAMBLER'S EYE",icon:'👁️‍🗨️',rarity:'gold',type:'active',maxUses:1,timing:'choosing',eff:'KEEP ANY DICE, REROLL REST',desc:'Choose any dice to keep — scoring or not — then reroll everything else. One use per match.',arch:'sharp'},
   {id:'grogs_flask',name:"GROG'S FLASK",icon:'🍺',rarity:'gold',type:'active',npc:'grog',maxUses:1,timing:'choosing',eff:'REROLL 2 NON-SCORING DICE',desc:'During dice selection, pick up to two dice that aren\'t scoring and reroll them. One use per match.',rewardQuote:'"Here… take thish. Won it fair an\' shquare."',arch:'sharp'},
-  {id:'mabels_stitch',name:"MABEL'S STITCH",icon:'🧵',rarity:'gold',type:'active',npc:'mabel',maxUses:1,timing:'idle|choosing|yielding',eff:'BUST → BANK PTS +300',desc:'Activate before rolling: if you bust this turn, bank your accumulated points AND gain +300 bonus. One use per match.',rewardQuote:'"Take this. May it mend thy fortune."',arch:'brinksman'},
-  {id:'finnicks_palm',name:"FINNICK'S PALM",icon:'🤏',rarity:'gold',type:'active',npc:'finnick',maxUses:1,timing:'choosing',eff:'SWAP 1 DIE → 1 OR 5',desc:'During dice selection, flip one non-scoring die to a 1 or 5. One use per match.',rewardQuote:'"Not bad, mate! Keep this, yeah?"',arch:'sharp'},
+  {id:'mabels_stitch',name:"MABEL'S STITCH",icon:'🧵',rarity:'gold',type:'active',npc:'mabel',maxUses:1,timing:'idle|choosing|yielding',eff:'BUST → BANK PTS + FREE REROLL',desc:'Activate before rolling: if you bust this turn, bank your accumulated points safely AND get a fresh 6-die reroll to keep going. One use per match.',rewardQuote:'"Take this. May it mend thy fortune."',arch:'brinksman'},
+  {id:'finnicks_palm',name:"FINNICK'S PALM",icon:'🤏',rarity:'gold',type:'active',npc:'finnick',maxUses:1,timing:'choosing',eff:'PALM 1 UNSELECTED DIE → 1 OR 5',desc:'During dice selection, flip one of your UNSELECTED non-scoring dice (not 1 or 5) to a 1 or 5. Selected dice are protected so you can set up combos safely. One use per match.',rewardQuote:'"Not bad, mate! Keep this, yeah?"',arch:'sharp'},
   {id:'corvus_ledger',name:"CORVUS'S LEDGER",icon:'📒',rarity:'gold',type:'active',npc:'corvus',maxUses:1,timing:'idle|choosing|yielding',eff:'NEXT BANK x2',desc:'Activate at any point during your turn — your next bank is doubled. One use per match.',rewardQuote:'"Take the ledger. Consider it… a dividend."',arch:'hoarder'},
   {id:'brutus_fist',name:"BRUTUS'S FIST",icon:'👊',rarity:'gold',type:'active',npc:'brutus',maxUses:1,timing:'choosing',eff:'FORCE 1 DIE → 1',desc:'During dice selection, force one non-scoring die to show a 1 (worth 100 pts). One use per match.',rewardQuote:'"Iron in thy bones. Take this, soldier."',arch:'sharp',dep:true},
   {id:'aldrics_vow',name:"ALDRIC'S VOW",icon:'⚔️',rarity:'gold',type:'active',npc:'aldric',maxUses:1,timing:'idle',eff:'DOUBLE OR NOTHING',desc:'Your next roll: score 300+ and it doubles; score less and you lose your accumulated turn points. One use.',rewardQuote:'"Thou hast proven worthy. Bear this vow."',arch:'brinksman'},
@@ -8826,7 +8840,7 @@ const CARDS=[
   {id:'beggars_bowl',name:"BEGGAR'S BOWL",icon:'🥣',rarity:'tin',eff:'+300 ON FIRST BANK',desc:'Your very first bank each match gains an extra 300 bonus points.',arch:'safeBanker'},
   {id:'loose_thread',name:'LOOSE THREAD',icon:'🧶',rarity:'tin',eff:'+400 AFTER DOUBLE BUST',desc:'If you bust twice in a row, gain 400 points automatically.',arch:'brinksman',dep:true},
   {id:'the_whetstone',name:'THE WHETSTONE',icon:'🪨',rarity:'tin',eff:'FIRST 3 ROLLS +250 EACH',desc:'Each of your first three rolls per turn adds +250 to that turn\'s bank (1st roll +250, 2nd +500, 3rd +750 max).',arch:'brinksman'},
-  {id:'the_ladder',name:'THE LADDER',icon:'🪜',rarity:'gold',eff:'3 IN A ROW = 400, 4 = 800',desc:'Partial straights score: 3 consecutive dice = 400, 4 consecutive = 800. Full / high / low straights override this.',arch:'collector'},
+  {id:'the_ladder',name:'THE LADDER',icon:'🪜',rarity:'gold',eff:'3 IN A ROW = 400, 4 = 800 (1/ROLL)',desc:'Partial straights score: 3 consecutive dice = 400, 4 consecutive = 800. Only one run scores per roll. Full / high / low straights override this.',arch:'collector'},
   {id:'snake_oil',name:'SNAKE OIL',icon:'🐍',rarity:'silver',eff:'RIVAL TRIPLE → NEXT ROLL = 0',desc:'Twice per match, when the opponent rolls a triple, their very next roll scores nothing (forced bust). Resets between triggers.',arch:'saboteur'},
   {id:'fortunes_wheel',name:"FORTUNE'S WHEEL",icon:'☸️',rarity:'gold',eff:'EVERY 3RD BANK DOUBLED',desc:'Every 3rd time you bank points in a match, that bank is doubled.',arch:'hoarder'},
   /* ── NEW CARDS — Dice-Focused Simple Cards ── */
@@ -8838,7 +8852,7 @@ const CARDS=[
   {id:'cold_shoulder',name:'COLD SHOULDER',icon:'🥶',rarity:'tin',eff:'OPP ONCE-CARDS DELAYED 2 TURNS',desc:"Opponent's once-per-match cards take 2 extra turns before they can activate.",arch:'saboteur'},
   {id:'warm_hands',name:'WARM HANDS',icon:'🔥',rarity:'silver',eff:'DICE EFFECTS EXTEND 3 ROLLS',desc:'Dice-manipulation card effects (Gambler\'s Thumb, Hot Streak, Ghost) that normally trigger on your first roll also trigger on rolls 2 and 3.',arch:'sharp'},
   {id:'gamblers_thumb',name:"GAMBLER'S THUMB",icon:'👍',rarity:'silver',eff:'FIRST ROLL: 75% 1 BLANK → 5',desc:'On your first roll each turn, 75% chance one random non-scoring die flips to a 5.',arch:'sharp'},
-  {id:'chain_lightning',name:'CHAIN LIGHTNING',icon:'⚡',rarity:'silver',eff:'+150 PER CONSECUTIVE SCORING ROLL',desc:'Each consecutive scoring roll in a turn adds a stacking +150 bonus when you bank.',arch:'hoarder'},
+  {id:'chain_lightning',name:'CHAIN LIGHTNING',icon:'⚡',rarity:'silver',eff:'+50 PER EXTRA SCORING ROLL',desc:'Each consecutive scoring roll past the first adds +50 to your next bank: 2nd = +50, 3rd = +100, 4th = +150… The chain resets on bust or bank.',arch:'hoarder'},
   {id:'hot_streak',name:'HOT STREAK',icon:'🔥',rarity:'silver',eff:'2 SAFE TURNS → 1 + 5 GUARANTEED',desc:'Bank two turns without busting and your next roll has one die as a 1 (100) and another as a 5 (50).',arch:'sharp'},
   {id:'underdog',name:'THE UNDERDOG',icon:'🐕',rarity:'silver',eff:'BEHIND 1000+ → BANKS +200',desc:'While behind by 1000+ points, all your banks gain +200.',arch:'hoarder',dep:true},
   {id:'twin_dice',name:'TWIN DICE',icon:'🎯',rarity:'silver',eff:'PAIR OF 1s = 500',desc:'A pair of 1s scores 500 points instead of the usual 200.',arch:'collector'},
@@ -8858,10 +8872,10 @@ const CARDS=[
   {id:'frozen_die',name:'FROZEN DIE',icon:'🧊',rarity:'silver',type:'active',maxUses:2,timing:'choosing',eff:'SAVE A DIE FOR NEXT TURN',desc:"Save one selected scoring die. It reappears on your next turn pre-placed — still selectable, so you can score it alone or fold it into a triple. Clears on bust. Two uses per match.",arch:'sharp'},
   {id:'double_down',name:'DOUBLE DOWN',icon:'✌️',rarity:'silver',type:'active',maxUses:1,timing:'choosing',eff:'2× PTS, REROLL ALL 6',desc:'Double your current turn points, but all kept dice are released and you must roll all 6. One use per match.',arch:'brinksman'},
   /* ── Tactile active cards (select a die, then activate) ── */
-  /* COIN FLIP — restored as a tin active to fill out the interactive
-     dice-affecting tin pool (was silver/2-use, retired). One charge,
-     same flip mechanic. */
-  {id:'coin_flip',name:'COIN FLIP',icon:'🪙',rarity:'tin',type:'active',maxUses:1,timing:'choosing',eff:'FLIP SELECTED DIE',desc:'Select a die, then activate — it flips to the opposite face (1↔6, 2↔5, 3↔4). One use per match.',arch:'sharp'},
+  /* COIN FLIP — restored from retired. Started at silver/2-use, briefly
+     tin/1-use, now silver/1-use: the flip mechanic is strong enough that
+     tin felt undertuned but two charges felt obnoxious. */
+  {id:'coin_flip',name:'COIN FLIP',icon:'🪙',rarity:'silver',type:'active',maxUses:1,timing:'choosing',eff:'FLIP SELECTED DIE',desc:'Select a die, then activate — it flips to the opposite face (1↔6, 2↔5, 3↔4). One use per match.',arch:'sharp'},
   {id:'the_nudge',name:'THE NUDGE',icon:'👆',rarity:'tin',type:'active',maxUses:2,timing:'choosing',eff:'BUMP A DIE +1 (6→1)',desc:'Select a die, then activate — its face bumps up by 1 (6 wraps back to 1). Two uses per match.',arch:'sharp'},
   {id:'alchemist_touch',name:"ALCHEMIST'S TOUCH",icon:'🧪',rarity:'silver',type:'active',maxUses:1,timing:'choosing',eff:'SELECTED DIE → 5',desc:'Select a non-scoring die (2/3/4/6), then activate — it becomes a 5 (50 pts). One use per match.',arch:'sharp',dep:true},
   {id:'twinning_charm',name:'TWINNING CHARM',icon:'🧬',rarity:'silver',type:'active',maxUses:1,timing:'choosing',eff:'MIRROR SELECTED VALUE',desc:'Select a die, then activate — a random other unkept die changes to the same value. One use per match.',arch:'sharp'},
@@ -8869,7 +8883,7 @@ const CARDS=[
   /* ── New scoring-pattern cards — unlock new combos ── */
   {id:'sevens_gift',name:"SEVEN'S GIFT",icon:'🎲',rarity:'tin',eff:'ANY PAIR SUMMING TO 7: +200',desc:'Pairs of dice that sum to 7 (1+6, 2+5, 3+4) score +200 per pair. Dice are consumed by the pair.',arch:'collector'},
   {id:'twin_fury',name:'TWIN FURY',icon:'👯',rarity:'silver',eff:'TWO PAIRS IN ONE ROLL: +600',desc:'If your roll contains two separate pairs (any values), score +600 bonus. The four dice are consumed.',arch:'collector'},
-  {id:'ascending',name:'ASCENDING',icon:'📈',rarity:'silver',eff:'3 CONSECUTIVE: +400',desc:'Three consecutive values in your roll (1-2-3, 2-3-4, 3-4-5, or 4-5-6) score +400. Full straights override this.',arch:'collector'},
+  {id:'ascending',name:'ASCENDING',icon:'📈',rarity:'silver',eff:'3 CONSECUTIVE: +400 (1/ROLL)',desc:'Three consecutive values in your roll (1-2-3, 2-3-4, 3-4-5, or 4-5-6) score +400. Only one run scores per roll, even if multiple are present. Full straights override this.',arch:'collector'},
   {id:'bookends',name:'BOOKENDS',icon:'📖',rarity:'silver',eff:'1ST + LAST DIE SAME: +500',desc:'If the leftmost and rightmost dice in your roll show the same value, gain +500 bonus.',arch:'collector'},
   {id:'six_serpents',name:'SIX SERPENTS',icon:'🐍',rarity:'gold',eff:'TRIPLE 6S SCORE 1000',desc:'Triple 6s score 1000 points instead of the standard 600.',arch:'collector'},
   /* ── Position-based cards — pair with Vagabond dice for reliable triggers ── */
@@ -8893,6 +8907,16 @@ const CARDS=[
   {id:'odd_row',name:'ODD ROW',icon:'🎲',rarity:'tin',eff:'A 1, A 3 & A 5 TOGETHER: 300',desc:'Commit a 1, a 3, and a 5 together — they score 300 as a set. Turns a useless 3 into points.',arch:'collector'},
   {id:'boxcars',name:'BOXCARS',icon:'🎰',rarity:'tin',eff:'A PAIR OF 6s: +300',desc:'A pair of 6s scores +300. Normally 6s are worthless unless you roll three — this makes a pair pay.',arch:'collector'},
   {id:'full_house',name:'FULL HOUSE',icon:'🏠',rarity:'gold',eff:'TRIPLE + A PAIR: +500',desc:'Land a three-of-a-kind and a separate pair in the same commit: gain +500 on top.',arch:'collector'},
+  /* ── Triple-leaning cards (E3) — make non-1 triples actually worth
+     chasing. Player feedback: "I don't play triples at all unless it's
+     1s." Pairs naturally with Amber's +200/triple buff. ── */
+  {id:'triple_threat',name:'TRIPLE THREAT',icon:'🎯',rarity:'tin',eff:'TRIPLES OF 2/3/4 DOUBLE',desc:"Triples of 2s, 3s, or 4s score double (200→400, 300→600, 400→800). 1s and 5s untouched.",arch:'collector'},
+  {id:'triple_hunter',name:'TRIPLE HUNTER',icon:'🏹',rarity:'silver',eff:'1ST TRIPLE/TURN: +500',desc:'The first three-of-a-kind you score each turn earns a +500 bonus on top of the triple.',arch:'collector'},
+  {id:'false_triple',name:'FALSE TRIPLE',icon:'🃏',rarity:'silver',eff:'PAIR + A 1 = TRIPLE',desc:'A pair of any face plus a 1 counts as a three-of-a-kind of that face (e.g. 4+4+1 = triple-4). The 1 is consumed. Once per roll.',arch:'collector'},
+  /* ── Die-material mutating cards (E4) — let players reshape their
+     loadout mid-run / mid-match. ── */
+  {id:'alchemists_chisel',name:"ALCHEMIST'S CHISEL",icon:'⚒️',rarity:'gold',type:'active',maxUses:1,timing:'choosing',eff:'LEFT DIE TAKES RIGHT DIE\'S MATERIAL',desc:'Select exactly two of your dice, then activate — the one further LEFT in the row adopts the RIGHT one\'s material for the rest of this match. Once per run.',arch:'sharp'},
+  {id:'forge_night',name:'FORGE NIGHT',icon:'🔥',rarity:'silver',eff:'WIN: 1 BONE → RANDOM TIER-1 DIE',desc:'After every match you win, one random Bone die in your loadout upgrades to a random tier-1 material (Iron, Flint, Lead, or Amber). Permanent for the run.',arch:'utility'},
   /* ── Die-building Vanguard family (E1) — silver/gold cards that REWARD
      investing in upgraded dice. Each scales with the player's loadout
      composition, giving Vanguard a real progression curve at higher
@@ -8971,7 +8995,7 @@ const CARD_BG={
   whispers_veil:'#7060A0',
   beggars_bowl:'#8A7560',loose_thread:'#9A6040',the_whetstone:'#6A7080',the_ladder:'#7A5A3A',snake_oil:'#405A30',fortunes_wheel:'#7A5A20',
   loaded_die:'#6A4A70',gamblers_ghost:'#5A5A70',greedy_hands:'#8A7A30',the_grudge:'#7A3030',lucky_seven:'#3A7A50',cold_shoulder:'#4A6A8A',
-  warm_hands:'#8A4A30',gamblers_thumb:'#6A6A40',chain_lightning:'#4A5A8A',hot_streak:'#8A3A20',underdog:'#5A6A50',twin_dice:'#6A5A80',sawdust:'#7A6A50',short_pour:'#6A5A40',the_nudge:'#7A8A40',
+  warm_hands:'#8A4A30',gamblers_thumb:'#6A6A40',chain_lightning:'#4A5A8A',hot_streak:'#8A3A20',underdog:'#5A6A50',twin_dice:'#6A5A80',sawdust:'#7A6A50',short_pour:'#6A5A40',the_nudge:'#7A8A40',triple_threat:'#9A6020',triple_hunter:'#6A4A30',false_triple:'#5A6A8A',alchemists_chisel:'#6A4A8A',forge_night:'#8A4A20',
   the_collector:'#6A4A60',tavern_cheer:'#7A5A30',closing_bell:'#5A4A60',old_bones:'#4A4A50',
   the_jinx:'#4A5A6A',thick_skin:'#6A6A5A',blood_tithe:'#8A2A30',
   the_echo:'#5A6A7A',frozen_die:'#3A6A8A',double_down:'#7A5A30',slippery_table:'#4A7A6A',high_roller:'#8A6A20',the_fence:'#5A4A3A',the_alchemist:'#6A5A2A',twin_flames:'#8A4A20',
@@ -9229,10 +9253,10 @@ const DICE_TYPES=[
   {id:'lead',name:'LEAD',icon:'🔩',cost:200,
    faces:[1,1,2,3,4,5],effect:null,
    desc:'Extra 1-face, no 6. Loaded for singles.'},
-  {id:'amber',name:'AMBER',icon:'🟡',cost:280,
+  {id:'amber',name:'AMBER',icon:'🟡',cost:180,
    faces:[1,2,3,4,5,6],
-   effect:{type:'scoring_boost',mechanic:'triple_bonus',amount:100},
-   desc:'Triples involving this die score +100.'},
+   effect:{type:'scoring_boost',mechanic:'triple_bonus',amount:200},
+   desc:'Triples involving this die score +200.'},
   /* Jade L1 — wild for triples AND quads (extends a triple to 4-of-a-
      kind to double the score). Was 3 levels at 350/900/2000; collapsed
      to 2 levels because L1 (triples-only) was too weak to bother
@@ -9563,6 +9587,12 @@ function scoreRoll(vals,cards,locked,context,dieMats){
       /* Six Serpents: triple 6s score 1000 instead of 600 */
       let base=f===1?SCORING_BASE.triple1:(f===6&&_hasSixSerpents?1000:f*SCORING_BASE.tripleMult);
       for(let x=0;x<setSize-3;x++)base*=SCORING_BASE.doubleMultiplier;
+      /* TRIPLE THREAT (tin): triples of 2/3/4 double in score (200→400,
+         300→600, 400→800). Gated on setSize===3 so it only buffs PURE
+         triples — quads/quints already get the doubleMultiplier and
+         stacking both would push 4-of-a-kind 3s to 1200, which feels
+         disproportionate for a tin card. */
+      if(cards.includes('triple_threat')&&setSize===3&&(f===2||f===3||f===4))base*=2;
       if(millersToll&&f>=2&&f<=4)base+=SCORING_BASE.millersTollTripleBonus;
       if(triplesPenalty&&f>=2)base=Math.max(0,base-SCORING_BASE.triplesPenalty);
       /* Amber triple_bonus: +amount for each amber die in this set */
@@ -9586,6 +9616,26 @@ function scoreRoll(vals,cards,locked,context,dieMats){
         markWild(wildsNeeded,_wildMin);
       }
       _triplesFired.push(f);
+    }
+  }
+  /* FALSE TRIPLE (silver): a pair of any face 2/3/4/6 plus a single 1
+     counts as a three-of-a-kind of that face. The 1 is consumed in the
+     fake triple. Scans HIGH→LOW to maximize value. Fires once per roll.
+     Skips face 1 (real triple-1 logic already handles it) and face 5
+     (single 5 already scores reasonably; doubling it via fake-triple
+     felt low-impact for the design point). */
+  if(cards.includes('false_triple')&&cnt(1)>=1){
+    for(var _ftF=6;_ftF>=2;_ftF--){
+      if(_ftF===5)continue;
+      if(cnt(_ftF)===2){
+        var _ftBase=_ftF===6&&_hasSixSerpents?1000:_ftF*SCORING_BASE.tripleMult;
+        if(cards.includes('triple_threat')&&(_ftF===2||_ftF===3||_ftF===4))_ftBase*=2;
+        pts+=_ftBase;
+        mark(_ftF,2);mark(1,1);
+        _triplesFired.push(_ftF);/* TRIPLE HUNTER + twin_flames count this */
+        _bonusFiredFlag=true;
+        break;
+      }
     }
   }
 
@@ -11312,6 +11362,9 @@ function startPTurn(){
      activation forever. Clearing it on every turn start guarantees the
      player can never be stuck behind a stale flag. */
   G._palmAnimating=false;
+  /* Triple Hunter: one fire per turn — reset its flag so the next turn
+     can earn the +500 bonus on its first triple. */
+  G._tripleHunterFiredThisTurn=false;
   /* Turn-boundary sweep: clear any leftover card-trigger labels so a
      label from last turn (e.g. a slow per-turn fade) can't linger into
      the new turn. The per-label 3s timeout still runs as backup. */
@@ -11664,6 +11717,20 @@ function handleRoll(){
     if(cards.includes('perfect_storm')&&selDice.length>=5){
       pts+=400;triggerCard('perfect_storm','PERFECT STORM +400',true);
     }
+    /* TRIPLE HUNTER (silver): first triple of each turn → +500. Counted
+       via selDice (committed this commit) — if any face appears 3+ times
+       in the commit, a triple was just scored. G._tripleHunterFiredThisTurn
+       gates one fire per turn; reset in startPTurn. */
+    if(cards.includes('triple_hunter')&&!G._tripleHunterFiredThisTurn){
+      var _thCount={};selDice.forEach(function(d){_thCount[d.val]=(_thCount[d.val]||0)+1;});
+      var _thFired=false;for(var _thF in _thCount){if(_thCount[_thF]>=3){_thFired=true;break;}}
+      if(_thFired){
+        G._tripleHunterFiredThisTurn=true;
+        pts+=500;
+        triggerCard('triple_hunter','TRIPLE HUNTER +500',true);
+        spawnPop('+500 HUNTER');
+      }
+    }
     if(G._vowDoubleActive){pts*=2;G._vowDoubleActive=false;spawnPop('VOW x2');}
     /* The Echo: previous roll scored → this selection gets +25% */
     if(G._echoReady&&G.pCards.includes('the_echo')){var _echoB=Math.floor(pts*0.35);if(_echoB>0){pts+=_echoB;spawnPop('+'+_echoB+' ECHO');triggerCard('the_echo','ECHO +'+_echoB,true);}G._echoReady=false;}
@@ -11993,12 +12060,24 @@ function _afterRollImpl(){
     }
     triggerCard('hot_streak','HOT STREAK!',true);if(window.DLG)setTimeout(function(){DLG.triggerCard('hot_streak',true);},800);
   }
-  /* Chain Lightning: track consecutive scoring rolls */
+  /* Chain Lightning: track consecutive scoring rolls. Surface the running
+     bank-bonus mid-turn so the player sees the chain build instead of
+     only learning about it at bank time. Player feedback: "Chain Lightning
+     card should show the number of points you get added each roll." */
   if(G.pCards.includes('chain_lightning')){
     var _clFreeV=free.map(function(d){return d.val;});
     var _clFreeMats=free.map(function(d){return d.mat;});
     if(scoreRoll(_clFreeV,cards,0,{},_clFreeMats).total>0){
       G._chainCount=(G._chainCount||0)+1;
+      /* Compute the bonus the player would currently earn on bank
+         (chainCount-1)*50, matching the bank-time formula at line ~12875. */
+      var _clRunning=Math.max(0,(G._chainCount-1))*50;
+      if(_clRunning>0){
+        triggerCard('chain_lightning','CHAIN x'+G._chainCount+' → +'+_clRunning+' ON BANK',true);
+      }else{
+        /* First scoring roll — no bonus yet, but show the chain is armed */
+        triggerCard('chain_lightning','CHAIN x1 — KEEP SCORING',true);
+      }
     }
   }
   /* The Echo: if previous roll scored, mark echo ready for this roll's commit bonus.
@@ -12431,21 +12510,44 @@ function doBust(){
     setTimeout(function(){clearRow('playerDiceRow');G.pool=[];endPTurn();},2200);
     return;
   }
-  /* Mabel's Stitch: bank turn pts instead of losing them, PLUS +300 bonus */
+  /* Mabel's Stitch: bank accumulated pts safely AND grant a fresh 6-die
+     reroll so the player keeps going on this turn. The bust is averted,
+     prior pts are locked into G.pPts (no longer at risk), and a clean
+     hot-dice-style reroll spawns. Previously gave +300 flat bonus that
+     felt tacked on — replaced with a "second chance" reroll that's more
+     decisive use of the one charge. */
   if(G.activeCardState&&G.activeCardState.stitchActive){
     G.activeCardState.stitchActive=false;clearCardLabel('mabels_stitch');
     const saved=G.kept.reduce((a,k)=>a+k.pts,0)+(G._stakesRisingBonus||0);
     G._stakesRisingBonus=0;
-    const _stitchBonus=300;
-    /* Apply bust to all visible dice in the row (not just G.pool — see comment in main bust path) */
+    /* Apply bust to all visible dice in the row */
     (function(){var _r=document.getElementById('playerDiceRow');if(_r)Array.prototype.forEach.call(_r.querySelectorAll('.die'),function(el){el.style.opacity='';el.style.filter='';el.classList.add('bust');});})();
-    const total=saved+_stitchBonus;
-    G.pPts+=total;
-    spawnPop('+'+total+' STITCHED');
-    triggerCard('mabels_stitch','STITCH +'+saved+' +'+_stitchBonus+' BONUS',true);
-    setStatusMsg('BUST — STITCH SAVED '+saved+' +'+_stitchBonus+' BONUS!','gold');
+    /* Bank the accumulated pts safely into G.pPts so they aren't at risk
+       on the upcoming reroll. */
+    G.pPts+=saved;
+    spawnPop('+'+saved+' STITCHED');
+    triggerCard('mabels_stitch','STITCH +'+saved+' • REROLL!',true);
+    setStatusMsg('BUST → STITCH SAVED '+saved+' • ROLLING FRESH','gold');
+    /* Reset turn state to a clean slate before the fresh roll. */
     G.safeTurnStreak=0;G.turnPts=0;G.kept=[];updHUD();refreshKeptTray();setBtns(false,false);
-    setTimeout(()=>{clearRow('playerDiceRow');G.pool=[];endPTurn();},1200);
+    G._bustSavedThisTurn=true;/* suppress hot-dice fanfare if the fresh roll happens to clear all 6 */
+    setTimeout(function(){
+      /* Hot-dice-style fresh roll. Mirrors the block at the top of the
+         hot-dice handler (search "Hot dice check"). */
+      clearRow('playerDiceRow');G.pool=[];G.numDice=G.matchDice?G.matchDice.length:6;G.phase='rolling';
+      setStatusMsg('ROLLING...','active');
+      const row=document.getElementById('playerDiceRow');
+      var hotN=G.numDice||6;
+      const useSpur=!!G.spurActive;if(typeof G.spurActive==='number'&&G.spurActive>0)G.spurActive--;else G.spurActive=0;
+      for(let i=0;i<hotN;i++){
+        const mat=G.matchDice[i%G.matchDice.length]||'bone';
+        const val=useSpur?rollFaceSpur(mat):rollFace(mat);
+        const el=mkDie(val,mat);el.classList.add('rolling');_appendDie(row,el);
+        G.pool.push({val,mat,sel:false,committed:false,el});
+      }
+      SFX.roll(hotN);
+      setTimeout(function(){G.pool.forEach(function(d){if(!d.committed)settleDie(d.el);});afterRoll();},480);
+    },1200);
     return;
   }
   /* Gambler's Ghost: set flag so next turn gets a free 1 */
@@ -13236,6 +13338,8 @@ function runOppTurn(){
   G._oTurnDiceCommitted=0;
   /* OPENING SHOT mirror for NPC: count dice kept on oppRollNum===1 only. */
   G._oFirstRollKept=0;
+  /* TRIPLE HUNTER NPC mirror: one fire per turn. */
+  G._oTripleHunterFiredThisTurn=false;
   /* ── Phase 1 NPC bank-bonus mirrors: per-turn trackers ── */
   G._oTurnTriples={};/* twin_flames: face → true */
   G._oTurnComboTypes={};/* the_collector: triple/straight/single1/single5 → true */
@@ -13837,6 +13941,22 @@ function runOppTurn(){
           triggerCard('anchor','ANCHOR +600',false);
         }
       }
+      /* TRIPLE HUNTER (silver) — NPC parity. First triple of the NPC's
+         turn earns +500. Counted from the kept dice this roll: if any
+         face appears 3+ times in the kept set, a triple just fired.
+         G._oTripleHunterFiredThisTurn gates one per turn (reset at NPC
+         turn start). */
+      if(G.oCards.includes('triple_hunter')&&!G._oTripleHunterFiredThisTurn){
+        var _othKept=G.oppDice.filter(function(d){return d.kept;});
+        var _othCount={};_othKept.forEach(function(d){_othCount[d.val]=(_othCount[d.val]||0)+1;});
+        var _othFired=false;
+        for(var _othF in _othCount){if(_othCount[_othF]>=3){_othFired=true;break;}}
+        if(_othFired){
+          G._oTripleHunterFiredThisTurn=true;
+          total+=500;
+          triggerCard('triple_hunter','TRIPLE HUNTER +500',false);
+        }
+      }
       oppBank+=total;setStatusMsg((G.rung?G.rung.name:'RIVAL')+' +'+total+' TOTAL: '+oppBank,'active');
       /* Accumulate the across-turn commit count (mirrors player's totalCommitted) */
       var _oRollKept=G.oppDice.filter(function(d){return d.kept;}).length;
@@ -14404,6 +14524,25 @@ function endMatch(win){
      win (boss or patron) so the feat fires exactly once on the first match
      win of a run. */
   if(win&&S&&S.run){S.run._matchWinsThisRun=(S.run._matchWinsThisRun||0)+1;}
+  /* FORGE NIGHT (silver, passive): after every match win, one random
+     Bone die in the player's loadout upgrades to a random tier-1
+     material (Iron, Flint, Lead, Amber). Permanent for the run. Skips
+     silently if no Bone dice remain (loadout fully upgraded). */
+  if(win&&G&&G.pCards&&G.pCards.includes('forge_night')&&S&&S.run&&Array.isArray(S.run.dice)){
+    var _fnTier1=['iron','flint','lead','amber'];
+    var _fnBoneIdxs=[];S.run.dice.forEach(function(m,i){if(m==='bone')_fnBoneIdxs.push(i);});
+    if(_fnBoneIdxs.length>0){
+      var _fnPickIdx=_fnBoneIdxs[Math.floor(Math.random()*_fnBoneIdxs.length)];
+      var _fnNewMat=_fnTier1[Math.floor(Math.random()*_fnTier1.length)];
+      S.run.dice[_fnPickIdx]=_fnNewMat;
+      try{save();}catch(e){}
+      /* Defer the user-facing notification until the end-overlay settles
+         so it doesn't fight the victory animations. */
+      setTimeout(function(){
+        try{setStatusMsg('FORGE NIGHT — A BONE DIE BECAME '+_fnNewMat.toUpperCase()+'!','gold');}catch(e){}
+      },1500);
+    }
+  }
 
   /* Show animated end overlay */
   var ov=document.getElementById('end-ov');
@@ -14970,8 +15109,10 @@ function endMatch(win){
 /* ═══════ BANK SUMMARY (tap-score popover) ═══════ */
 /* Mini SVG die in the same pip style as the rules page (dark face, gold stroke, cream pips) */
 function _bsMiniDie(val,mat){
-  /* Jade 6 is the wild face — render blank (matches in-game behaviour) */
-  var isWild=(mat==='jade'&&val===6);
+  /* Jade 6 is the wild face — render blank (matches in-game behaviour).
+     Covers all jade tiers via regex; was 'jade' literal which only
+     blanked L1 and left L2/L3 sixes showing real pips in this panel. */
+  var isWild=(/^jade\d?$/.test(mat||'')&&val===6);
   var pips={1:[[8.9,8.9]],2:[[3,3],[14.8,14.8]],3:[[3,3],[8.9,8.9],[14.8,14.8]],
     4:[[3,3],[14.8,3],[3,14.8],[14.8,14.8]],5:[[3,3],[14.8,3],[8.9,8.9],[3,14.8],[14.8,14.8]],
     6:[[3,3],[14.8,3],[3,8.9],[14.8,8.9],[3,14.8],[14.8,14.8]]};
@@ -15757,8 +15898,10 @@ function buildMiniCube(matId){
   for(var f=0;f<6;f++){
     var face=document.createElement('div');face.className='dice-face '+faceOrder[f];
     var val=dice.faces?dice.faces[f]:(f+1);
-    /* Jade 6 is a wildcard — render as a blank face with a star to match in-match rendering */
-    var isWildJadeFace=(matId==='jade'&&val===6);
+    /* Jade 6 is a wildcard — render as a blank face. Regex covers all
+       jade tiers (jade L1, jade2 L2, legacy jade3); was 'jade' literal
+       which only blanked L1's 6 in the loadout 3D preview. */
+    var isWildJadeFace=(/^jade\d?$/.test(matId||'')&&val===6);
     if(isWildJadeFace){
       face.classList.add('wild-face');
       /* Wild jade face is intentionally blank — no star, no pips */
@@ -15779,8 +15922,10 @@ function buildDieTooltipHTML(matId){
   var effHtml='';
   if(dice.effect){effHtml='<div class="dt-eff">'+_wnHtml(_dieEffectLabel(dice.effect))+'</div>';}
   var facesHtml=dice.faces.map(function(f){
-    /* Jade's 6 is a wildcard — render as a blank slot (no number, no star) */
-    if(matId==='jade'&&f===6)return '<b class="tip-num" style="color:rgba(180,220,180,.4)">·</b>';
+    /* Jade's 6 is a wildcard — render as a blank slot (no number, no
+       star). Regex covers all jade tiers; was 'jade' literal so L2/L3
+       tooltips showed "6" for the wild face. */
+    if(/^jade\d?$/.test(matId||'')&&f===6)return '<b class="tip-num" style="color:rgba(180,220,180,.4)">·</b>';
     return '<b class="tip-num">'+f+'</b>';
   }).join(' · ');
   return '<div class="die-tooltip dtype-'+matId+'">'+
@@ -16040,6 +16185,7 @@ function activateCard(cardId){
     case 'blessed_dice': activateBlessedDicePlayer(); break;
     case 'coin_flip': activateCoinFlip(); break;
     case 'the_nudge': activateTheNudge(); break;
+    case 'alchemists_chisel': activateAlchemistsChisel(); break;
     case 'alchemist_touch': activateAlchemistTouch(); break;
     case 'twinning_charm': activateTwinningCharm(); break;
     case 'double_down_die': activateDoubleDownDie(); break;
@@ -16097,17 +16243,31 @@ function activateMabelsStitch(){
         player happened to have a non-scoring die selected.
      6. No status message / spawnPop — the swap was silent. */
 function activateFinnicksPalm(){
+  /* Candidate dice MUST be: not committed, not currently selected by the
+     player, AND not already a 1/5. Player feedback: "it flips a scoring/
+     selected die rather than a non one. It doesn't understand a potential
+     straight (shorter ones made possible by other cards)."
+     Respecting the player's selection state is the cleanest fix — if the
+     player picked a die, it's intentionally part of a setup (straight,
+     False Triple pair, position-card trigger, etc.) and shouldn't be
+     touched by an automatic helper. */
   var pool=G.pool.filter(function(d){return !d.committed;});
-  var nonScoring=pool.filter(function(d){return d.val!==1&&d.val!==5;});
-  if(!nonScoring.length){
-    setStatusMsg('NO NON-SCORING DIE TO PALM','red');
+  var eligible=pool.filter(function(d){return !d.sel&&d.val!==1&&d.val!==5;});
+  if(!eligible.length){
+    /* Distinguish the two reasons so the player understands the refund:
+       all unselected dice are scoring vs. the only non-scoring dice are
+       already selected. */
+    var allUnselectedScoring=pool.filter(function(d){return !d.sel;}).every(function(d){return d.val===1||d.val===5;});
+    setStatusMsg(allUnselectedScoring?'NO NON-SCORING DIE TO PALM':'UNSELECT A DIE TO PALM IT','red');
     refundActiveCardUse('finnicks_palm');
     return;
   }
-  var target=nonScoring[Math.floor(Math.random()*nonScoring.length)];
+  var target=eligible[Math.floor(Math.random()*eligible.length)];
   /* Smart pick: 1 is worth 100 AND can build to triple-1 (1000). 5 only
      wins when there are already two 5s AND fewer than two 1s — then
-     completing triple-5 (500) beats a lone +100. */
+     completing triple-5 (500) beats a lone +100. Count from the WHOLE
+     free pool (selected dice included) so already-selected 1s/5s count
+     toward triple-completion logic. */
   var existing1s=pool.filter(function(d){return d.val===1;}).length;
   var existing5s=pool.filter(function(d){return d.val===5;}).length;
   var newVal=(existing5s===2&&existing1s<2)?5:1;
@@ -16116,12 +16276,6 @@ function activateFinnicksPalm(){
      phase only). canActivateCard also reads this flag, so other actives
      can't fire during the 840 ms animation either. */
   G._palmAnimating=true;
-  /* Clear any prior selection on the target so the post-swap state isn't
-     a half-stale "selected with new value" combo. */
-  if(target.sel){
-    target.sel=false;
-    if(target.el)target.el.classList.remove('selected');
-  }
   target.val=newVal;
   var el=target.el;
   /* Phase 1: spin + gold pulse (400 ms). Strip every competing transient
@@ -16579,6 +16733,56 @@ function activateTheNudge(){
   refreshSelUI();
 }
 
+/* Alchemist's Chisel: left selected die adopts right selected die's
+   material for the rest of the match. Once per RUN — gated by
+   S.run._chiselUsed (checked at initMatchScreen). Mutates G.pool[i].mat
+   AND G.matchDice[matchSlot] so the change survives in-turn rerolls,
+   hot-dice fresh rolls, and subsequent turns this match. */
+function activateAlchemistsChisel(){
+  if(typeof _vgDragState!=='undefined'&&_vgDragState){
+    if(_vgDragState.clone&&_vgDragState.clone.parentNode)_vgDragState.clone.parentNode.removeChild(_vgDragState.clone);
+    if(_vgDragState.srcEl)_vgDragState.srcEl.classList.remove('vg-drag-origin');
+    _vgDragState=null;
+  }
+  var selDice=G.pool.filter(function(d){return d.sel&&!d.committed;});
+  if(selDice.length!==2){
+    setStatusMsg('SELECT EXACTLY 2 OF YOUR DICE','red');
+    refundActiveCardUse('alchemists_chisel');return;
+  }
+  /* "Left" = lower pool index. Sort the two by their position in G.pool. */
+  var idx0=G.pool.indexOf(selDice[0]),idx1=G.pool.indexOf(selDice[1]);
+  var leftDie=idx0<idx1?selDice[0]:selDice[1];
+  var rightDie=idx0<idx1?selDice[1]:selDice[0];
+  var leftPoolIdx=G.pool.indexOf(leftDie);
+  if(leftDie.mat===rightDie.mat){
+    setStatusMsg('DICE ALREADY MATCH — PICK DIFFERENT MATERIALS','red');
+    refundActiveCardUse('alchemists_chisel');return;
+  }
+  var newMat=rightDie.mat;
+  var oldMat=leftDie.mat;
+  /* Apply the swap: in-pool mat + matchDice slot so future rolls inherit. */
+  leftDie.mat=newMat;
+  if(G.matchDice&&G.matchDice[leftPoolIdx]!==undefined)G.matchDice[leftPoolIdx]=newMat;
+  /* Visual update — swap the dtype-* class + redraw face dots. */
+  if(leftDie.el){
+    leftDie.el.classList.remove('dtype-'+oldMat);
+    leftDie.el.classList.add('dtype-'+newMat);
+    try{reDrawDieFace(leftDie);}catch(e){}
+    leftDie.el.classList.add('eff-glow-gold');
+    spawnPixelSparks(leftDie.el,8);
+    setTimeout(function(){if(leftDie.el)leftDie.el.classList.remove('eff-glow-gold');},900);
+  }
+  /* Clear selection so the swap reads as a clean act. */
+  selDice.forEach(function(d){d.sel=false;if(d.el)d.el.classList.remove('selected');});
+  /* Lock the card for the rest of the run. */
+  if(S&&S.run)S.run._chiselUsed=true;
+  try{save();}catch(e){}
+  triggerCard('alchemists_chisel','CHISEL → '+newMat.toUpperCase(),true);
+  setStatusMsg("CHISEL — DIE NOW "+newMat.toUpperCase(),'gold');
+  try{if(SFX.synergy)SFX.synergy();else SFX.commit();}catch(e){}
+  try{refreshSelUI();}catch(e){}
+}
+
 /* Alchemist's Touch: selected non-scoring die becomes a 5. */
 function activateAlchemistTouch(){
   var selDice=G.pool.filter(function(d){return d.sel&&!d.committed;});
@@ -16820,6 +17024,12 @@ function initMatchScreen(data){
   G._handicap=params.handicap||null;
   /* Init active card uses */
   pCards.forEach(cid=>{const cd=CARDS.find(c=>c.id===cid)||NPC_CARDS_MAP[cid];if(cd&&cd.type==='active')G.activeCardState.usedCards[cid]=cd.maxUses||1;});
+  /* Per-RUN once-only actives: if the player already spent the card this
+     run, mark it exhausted at match start so it can't fire again until
+     a fresh run. Currently: ALCHEMIST'S CHISEL. */
+  if(S&&S.run&&S.run._chiselUsed&&G.activeCardState.usedCards['alchemists_chisel']!==undefined){
+    G.activeCardState.usedCards['alchemists_chisel']=0;
+  }
   /* Init NPC-side active uses so mirror-match (and future boss loadouts) can wield them.
      Skip-list: gamblers_eye / frozen_die need multi-roll state plumbing the NPC AI
      doesn't have yet — leaving uses=0 means npcHasActive returns false and the AI
@@ -17537,6 +17747,17 @@ function _goldDraftOK(c){
   if(S&&S.run&&S.run.tier>=5)return true;
   return Math.random()<0.12;
 }
+/* Silver draft gating — mirror of _goldDraftOK. Silver first appears at
+   tier 2 (Finnick) which previously meant the T2/T3 draft pool was ~50%
+   silver right out of the gate. Player feedback: "I get offered too
+   many silver cards too soon." Until tier 4 (Brutus/Aldric), each silver
+   card has a 40% chance of being included in the pool. From tier 4 on,
+   silvers are always eligible. */
+function _silverDraftOK(c){
+  if(!c||c.rarity!=='silver')return true;
+  if(S&&S.run&&S.run.tier>=4)return true;
+  return Math.random()<0.40;
+}
 function _buildDraftPool(excludeIds){
   _getS();
   excludeIds=excludeIds||[];
@@ -17546,13 +17767,13 @@ function _buildDraftPool(excludeIds){
   var _isBlocked=function(c){
     return _owned.indexOf(c.id)!==-1||excludeIds.indexOf(c.id)!==-1;
   };
-  tier.draftPool.forEach(function(rar){CARDS.forEach(function(c){if(c.rarity===rar&&!c.npcOnly&&!c.npc&&!c.dep&&!_isBlocked(c)&&_goldDraftOK(c))pool.push(c);});});
+  tier.draftPool.forEach(function(rar){CARDS.forEach(function(c){if(c.rarity===rar&&!c.npcOnly&&!c.npc&&!c.dep&&!_isBlocked(c)&&_goldDraftOK(c)&&_silverDraftOK(c))pool.push(c);});});
   /* Next-tier sampling: only include rarities that ALREADY exist in this tier's pool.
      Otherwise pre-Mabel players (T0/T1, tin-only) leak silver cards from T2 sampling. */
   var _curRars=tier.draftPool;
   var _nextT=TIERS[S.run.tier+1];
-  if(_nextT&&_nextT.draftPool){_nextT.draftPool.forEach(function(rar){if(_curRars.indexOf(rar)===-1)return;CARDS.forEach(function(c){if(c.rarity===rar&&!c.npcOnly&&!c.npc&&!c.dep&&!_isBlocked(c)&&_goldDraftOK(c)&&pool.indexOf(c)===-1&&Math.random()<0.20)pool.push(c);});});}
-  if(S.run.tier>=2){var _prevT=TIERS[S.run.tier-1];if(_prevT&&_prevT.draftPool){_prevT.draftPool.forEach(function(rar){if(_curRars.indexOf(rar)===-1)return;CARDS.forEach(function(c){if(c.rarity===rar&&!c.npcOnly&&!c.npc&&!c.dep&&!_isBlocked(c)&&_goldDraftOK(c)&&pool.indexOf(c)===-1&&Math.random()<0.10)pool.push(c);});});}}
+  if(_nextT&&_nextT.draftPool){_nextT.draftPool.forEach(function(rar){if(_curRars.indexOf(rar)===-1)return;CARDS.forEach(function(c){if(c.rarity===rar&&!c.npcOnly&&!c.npc&&!c.dep&&!_isBlocked(c)&&_goldDraftOK(c)&&_silverDraftOK(c)&&pool.indexOf(c)===-1&&Math.random()<0.20)pool.push(c);});});}
+  if(S.run.tier>=2){var _prevT=TIERS[S.run.tier-1];if(_prevT&&_prevT.draftPool){_prevT.draftPool.forEach(function(rar){if(_curRars.indexOf(rar)===-1)return;CARDS.forEach(function(c){if(c.rarity===rar&&!c.npcOnly&&!c.npc&&!c.dep&&!_isBlocked(c)&&_goldDraftOK(c)&&_silverDraftOK(c)&&pool.indexOf(c)===-1&&Math.random()<0.10)pool.push(c);});});}}
   for(var di=pool.length-1;di>0;di--){var dj=Math.floor(Math.random()*(di+1));var dt=pool[di];pool[di]=pool[dj];pool[dj]=dt;}
   var _draftN=(S&&S.renownPerks&&S.renownPerks.extraDraft)?4:3;
   /* If exclusions shrink the pool below what we want to offer, fall back
@@ -19230,12 +19451,22 @@ function _bgMusicSync(){
     if(BG_BOSS.gain)BG_BOSS.gain.gain.value=0;
   }
 }
+/* Per-screen ambience volume. In-match the tavern hum stays quiet so
+   roll/commit/bank SFX cut through. On the lobby screens (gauntlet /
+   loadout, menu, shop, draft, etc.) the ambience comes up ~2.5× so the
+   pre-match tavern feels alive. Player feedback: "Make ambience sound
+   louder when in pre-match loadout." */
+function _ambienceTargetVol(){
+  if(typeof _currentScreen!=='undefined'&&_currentScreen==='match')return BG_AMB_VOL;
+  return BG_AMB_VOL*2.5;
+}
 function _ambienceSync(){
   var on=!S||!S.settings||S.settings.ambience!==false;
   _ensureBgCtx();
   if(BG_CTX&&BG_CTX.state==='suspended'){try{BG_CTX.resume();}catch(e){}}
   _ensureAmbience();
   if(on){
+    var vol=_ambienceTargetVol();
     var key=BG_AMB.active;
     var audio=BG_AMB['audio'+key];
     if(audio.paused){
@@ -19243,12 +19474,12 @@ function _ambienceSync(){
       var onReady=function(){
         _attachAmbGain(key);
         var g=BG_AMB['gain'+key];
-        if(g)g.gain.value=BG_AMB_VOL;
+        if(g)g.gain.value=vol;
       };
       if(p&&p.then){p.then(onReady).catch(function(){});}else{onReady();}
     }else{
       var g=BG_AMB['gain'+key];
-      if(g)g.gain.value=BG_AMB_VOL;
+      if(g)g.gain.value=vol;
     }
   }else{
     if(BG_AMB.gainA)BG_AMB.gainA.gain.value=0;
@@ -19266,7 +19497,7 @@ function _ambCrossfadeToOther(){
   var doFade=function(){
     _attachAmbGain(toKey);
     var on=!S||!S.settings||S.settings.ambience!==false;
-    var target=on?BG_AMB_VOL:0;
+    var target=on?_ambienceTargetVol():0;
     _fadeGain(BG_AMB['gain'+toKey],target,BG_AMB_CROSSFADE_MS);
     _fadeGain(BG_AMB['gain'+fromKey],0,BG_AMB_CROSSFADE_MS);
     setTimeout(function(){
