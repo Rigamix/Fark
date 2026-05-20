@@ -8216,8 +8216,10 @@ var DICE_STORE=[
   {mat:'bone',     price:0,   stock:99,label:'Bone'},
   {mat:'flint',    price:55,  stock:3, label:'Flint'},
   {mat:'iron',     price:60,  stock:4, label:'Iron'},
-  {mat:'amber',    price:120, stock:2, label:'Amber'},
   {mat:'lead',     price:140, stock:3, label:'Lead'},
+  /* Amber 120→180 to match DICE_TYPES.cost (and the +200 triple buff).
+     Re-sorted after Lead so the store stays cheap→expensive. */
+  {mat:'amber',    price:180, stock:2, label:'Amber'},
   {mat:'brass',    price:350, stock:2, label:'Brass'},
   {mat:'silver',   price:380, stock:1, label:'Silver'},
   {mat:'obsidian', price:420, stock:2, label:'Obsidian'},
@@ -9080,6 +9082,11 @@ const CARD_BG={
   /* New tactile + scoring-pattern cards */
   coin_flip:'#8A7A30',alchemist_touch:'#4A7060',twinning_charm:'#5A6080',double_down_die:'#7A5030',
   sevens_gift:'#6A5A40',twin_fury:'#8A4040',ascending:'#4A6A7A',bookends:'#6A5030',six_serpents:'#3A6A40',
+  /* Audit fill — cards that were falling back to the grey #444 default. */
+  bakers_dozen:'#8A6A40',the_heir:'#5A4A7A',rats_in_cellar:'#4A3A2A',seven_dice:'#3A7A50',loan:'#7A6020',
+  stakes_rising:'#9A5A20',bar_brawl:'#8A3A20',coin_jar:'#8A7A30',the_estate:'#5A5A4A',compound_interest:'#3A6A4A',
+  the_ledger:'#9A6A30',vanguard:'#6A5A3A',anchor:'#4A5A6A',sequence:'#8A7020',flanks:'#5A5A6A',
+  even_row:'#4A6A7A',odd_row:'#5A7A4A',boxcars:'#8A4A30',full_house:'#8A6A20',warded:'#4A6A8A',
   /* New tin cards (D21) — distinct hues so they don't fall back to default grey */
   hot_hand:'#9A4020',the_underdog:'#7A6A50',perfect_storm:'#4A5A70',turncoat:'#6A3A7A',
   /* Vanguard die-building cards (E1) — silvered cool-grey for Honor Guard,
@@ -16084,6 +16091,21 @@ function jitterText(text,scale){
   }).join(' ');
 }
 
+/* Patron CLASS lines — flavour the doddering-patron voice by the
+   persona (strategy) they were generated with. Used by DLG.getLine when
+   a PATRON opens a match: ~60% of the time it pulls a class-specific
+   intro instead of the generic one, so a triples patron mutters about
+   matching sets, an aggro one warns you he plays rough, etc. Kept in the
+   same short, rambling, kind register as the rest of the patron lines. */
+const PATRON_CLASS_LINES={
+  ones:["I keep it simple, friend. Ones and fives.","No imagination, the missus says. Just ones.","Singles, friend. Small and safe, like me.","Hoy. One at a time. That's my way."],
+  triples:["I like things in threes. Three pies. Three kids. ...More than three kids.","Three of a kind, friend. Matchy-matchy.","Hoy. I hunt for trios. The bones know.","Three the same! That's the dream, that is."],
+  straights:["All in a row, friend. Like fence posts. Or soldiers.","I like a tidy line. One, two, three, off we go.","Hoy. Straights. The bones marching home.","A proper row of bones. Lovely, that."],
+  aggro:["Hoy. I play a bit rough, friend. ...Sorry. Or not.","I'll pinch yer luck if I can. Nothin' personal.","Hoy. Watch yer dice round me. Just sayin'.","I fight dirty when cornered. The missus taught me."],
+  hoard:["I count every copper twice. Then once more.","Slow and steady, friend. I bank like a squirrel.","Hoy. I never waste a point. Never.","I save it all up. For winter. And the kids."],
+  combo:["Pairs and sets, friend. I collect things.","Buttons, mostly. And the odd lucky combo.","Hoy. I like a clever little pattern.","Bits that fit together. That's my joy."]
+};
+
 /* ═══════ DIALOGUE ENGINE ═══════ */
 (function(){
   /* busyUntil = timestamp when the currently-shown line finishes its
@@ -16096,6 +16118,18 @@ function jitterText(text,scale){
     prob:{MATCH_START:1,REMATCH_START:1,CARD_EFFECT:.8,RISKY_REROLL:.5,GREEDY_REROLL:.5,EARLY_BANK:.3,BIG_BANK:.6,PLAYER_BUST:.85,PLAYER_HOT_DICE:1,PLAYER_TRIPLE:.4,PLAYER_STRAIGHT:1,PLAYER_SIX_KIND:1,PLAYER_TAKES_LEAD:.45,PLAYER_NEAR_WIN:.7,OPP_BUST:.8,OPP_BIG_BANK:.6,OPP_TAKES_LEAD:.45,OPP_NEAR_WIN:.7,MATCH_CLOSE:.4,LOSING_BADLY:.35,WINNING_BADLY:.35,OPP_WINS:1,CARD_FIRE:1,PLAYER_CARD_REACT:1,TELL:1},
     init(rungName,rungKey){this.oppKey=rungName.toUpperCase();this.portraitKey=rungKey||rungName.toLowerCase();this.lastTime=0;this.active=false;this.usedLines={};this.cardFiredThisMatch={};if(this.hideTimer)clearTimeout(this.hideTimer);this.hide();},
     getLine(cat){const data=OPP_DIALOGUE[this.oppKey];if(!data)return null;
+      /* PATRON class flavour: on a match open, ~60% chance to use a
+         persona-specific intro (from PATRON_CLASS_LINES) instead of the
+         generic patron pool, so the patron's 'class' comes through. */
+      if((cat==='MATCH_START'||cat==='REMATCH_START')&&this.oppKey==='PATRON'){
+        try{
+          var _pk=(typeof G!=='undefined'&&G&&G.rung&&G.rung.persona)?G.rung.persona:null;
+          if(_pk&&PATRON_CLASS_LINES[_pk]&&Math.random()<0.6){
+            var _cl=PATRON_CLASS_LINES[_pk];
+            return _cl[Math.floor(Math.random()*_cl.length)];
+          }
+        }catch(e){}
+      }
       /* Rank-aware dialogue: try suffixed variants from highest unlocked rank down.
          e.g. MATCH_START_LEGEND > MATCH_START_LORD > … > MATCH_START. */
       const tags=(typeof _getRankTags==='function')?_getRankTags():[];
