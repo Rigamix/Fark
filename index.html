@@ -8761,9 +8761,31 @@ function generatePatron(tierIndex){
      escalation is more important than per-match variety. */
   var target=Math.round(((ps.targetMin+ps.targetMax)/2)/100)*100;
   var agg=ps.aggMin+Math.random()*(ps.aggMax-ps.aggMin);
-  var dice=[];for(var i=0;i<6;i++)dice.push(ps.dicePool[Math.floor(Math.random()*ps.dicePool.length)]);
-  /* 25% chance to splash in one die from next tier's pool for variety */
-  var _nt=TIERS[tierIndex+1];if(_nt&&_nt.patronStats&&_nt.patronStats.dicePool&&Math.random()<0.25){var _up=_nt.patronStats.dicePool;dice[Math.floor(Math.random()*6)]=_up[Math.floor(Math.random()*_up.length)];}
+  /* ── PERSONA: assign a strategy so the loadout is coherent. Low tiers
+     (T0-T1) keep it simple (ones/hoard/aggro); from T2 up, full spread.
+     Read by the loadout biasing below + the Phase-3 turn AI. ── */
+  var _personaKey=(tierIndex<=1)
+    ? ['ones','hoard','aggro'][Math.floor(Math.random()*3)]
+    : _PERSONA_KEYS[Math.floor(Math.random()*_PERSONA_KEYS.length)];
+  var _persona=PERSONAS[_personaKey]||PERSONAS.ones;
+  /* Dice: bias toward the persona's preferred materials when the tier
+     pool actually offers them (60% pull from the bias subset). */
+  var _biasPool=ps.dicePool.filter(function(m){return _persona.dieBias.indexOf(m)>=0;});
+  var dice=[];
+  for(var i=0;i<6;i++){
+    if(_biasPool.length&&Math.random()<0.6)dice.push(_biasPool[Math.floor(Math.random()*_biasPool.length)]);
+    else dice.push(ps.dicePool[Math.floor(Math.random()*ps.dicePool.length)]);
+  }
+  /* "One-up the player" splash: 35% chance (was 25%) to pull a die from
+     the NEXT tier's pool, preferring the persona's materials there too —
+     so NPCs occasionally out-gear the player within reason. */
+  var _nt=TIERS[tierIndex+1];
+  if(_nt&&_nt.patronStats&&_nt.patronStats.dicePool&&Math.random()<0.35){
+    var _up=_nt.patronStats.dicePool;
+    var _upBias=_up.filter(function(m){return _persona.dieBias.indexOf(m)>=0;});
+    var _upSrc=_upBias.length?_upBias:_up;
+    dice[Math.floor(Math.random()*6)]=_upSrc[Math.floor(Math.random()*_upSrc.length)];
+  }
   /* Patron cards scale by tier:
      T0: none. T1: 2 cards (was 1 — felt unfair vs the player's 2-3 cards at
      Mabel level). T2+ (Finnick onward): 3 cards, no tin allowed
@@ -8785,6 +8807,17 @@ function generatePatron(tierIndex){
     });
     /* Tier-down splash: only allow rarities also present in current pool, so no tin leakage at T2+ */
     if(tierIndex>0){var _pt=TIERS[tierIndex-1];if(_pt&&_pt.draftPool){_pt.draftPool.forEach(function(rar){if(_dp.indexOf(rar)===-1)return;CARDS.forEach(function(c){if(c.rarity===rar&&!c.npcOnly&&!c.type&&!c.dep&&!c.counter&&!pCardPool.includes(c.id))pCardPool.push(c.id);});});}}
+    /* Persona bias: narrow the pool to persona-matching cards (+2 random
+       off-persona picks for variety) when enough match. generateOppCards
+       re-shuffles & slices, so a persona-heavy POOL is what makes the
+       drawn hand reliably on-theme — front-loading order wouldn't survive
+       its shuffle. */
+    var _match=pCardPool.filter(function(id){return _cardMatchesPersona(id,_personaKey);});
+    if(_match.length>=pCardCount){
+      var _off=pCardPool.filter(function(id){return !_cardMatchesPersona(id,_personaKey);});
+      for(var oi=_off.length-1;oi>0;oi--){var oj=Math.floor(Math.random()*(oi+1));var ot=_off[oi];_off[oi]=_off[oj];_off[oj]=ot;}
+      pCardPool=_match.concat(_off.slice(0,2));
+    }
     /* Shuffle */
     for(var si=pCardPool.length-1;si>0;si--){var sj=Math.floor(Math.random()*(si+1));var st=pCardPool[si];pCardPool[si]=pCardPool[sj];pCardPool[sj]=st;}
   }
@@ -8795,6 +8828,7 @@ function generatePatron(tierIndex){
     agg:agg,cardRarity:null,wager:false,wagerCount:0,wagerMode:'none',
     minBank:ps.minBank||0,diceStop:ps.diceStop||2,
     chaotic:Math.random()<0.08,adaptive:tierIndex>=2,
+    persona:_personaKey,
     dice:dice,cardPool:pCardPool,cardCount:pCardCount,cardChance:1
   };
 }
@@ -8947,8 +8981,15 @@ const CARDS=[
      chasing. Player feedback: "I don't play triples at all unless it's
      1s." Pairs naturally with Amber's +200/triple buff. ── */
   {id:'triple_threat',name:'TRIPLE THREAT',icon:'🎯',rarity:'tin',eff:'TRIPLES OF 2/3/4 DOUBLE',desc:"Triples of 2s, 3s, or 4s score double (200→400, 300→600, 400→800). 1s and 5s untouched.",arch:'collector'},
+  {id:'heavy_set',name:'HEAVY SET',icon:'🧱',rarity:'tin',eff:'EACH TRIPLE: +100',desc:'Every three-of-a-kind you score gives a +100 bonus on top.',arch:'collector'},
+  {id:'lucky_threes',name:'LUCKY THREES',icon:'🎲',rarity:'tin',eff:'TRIPLE 3s SCORE 500',desc:'Triple 3s score 500 points instead of the usual 300.',arch:'collector'},
   {id:'triple_hunter',name:'TRIPLE HUNTER',icon:'🏹',rarity:'silver',eff:'1ST TRIPLE/TURN: +500',desc:'The first three-of-a-kind you score each turn earns a +500 bonus on top of the triple.',arch:'collector'},
   {id:'false_triple',name:'FALSE TRIPLE',icon:'🃏',rarity:'silver',eff:'PAIR + A 1 = TRIPLE',desc:'A pair of any face plus a 1 counts as a three-of-a-kind of that face (e.g. 4+4+1 = triple-4). The 1 is consumed. Once per roll.',arch:'collector'},
+  /* ── Early straight support (E5) — STRAIGHTS had only 1 tin card, so a
+     tier-2 player/NPC couldn't commit to the plan early. These two give
+     it a foothold. Both resolve in scoreRoll for NPC parity. ── */
+  {id:'the_climb',name:'THE CLIMB',icon:'🧗',rarity:'tin',eff:'3 CONSECUTIVE: +200 (1/ROLL)',desc:'Three consecutive values in your roll (1-2-3, 2-3-4, 3-4-5, or 4-5-6) score +200. Only one run per roll. A budget Ascending.',arch:'collector'},
+  {id:'the_troupe',name:'THE TROUPE',icon:'🎭',rarity:'tin',eff:'COMMIT 4+ DIFFERENT VALUES: +150',desc:'Commit four or more dice showing different values in one selection: gain +150. Rewards the spread that builds toward straights.',arch:'collector'},
   /* ── Die-material mutating cards (E4) — let players reshape their
      loadout mid-run / mid-match. ── */
   {id:'alchemists_chisel',name:"ALCHEMIST'S CHISEL",icon:'⚒️',rarity:'gold',type:'active',maxUses:1,timing:'choosing',eff:'LEFT DIE TAKES RIGHT DIE\'S MATERIAL',desc:'Select exactly two of your dice, then activate — the one further LEFT in the row adopts the RIGHT one\'s material for the rest of this match. Once per run.',arch:'sharp'},
@@ -9031,7 +9072,7 @@ const CARD_BG={
   whispers_veil:'#7060A0',
   beggars_bowl:'#8A7560',loose_thread:'#9A6040',the_whetstone:'#6A7080',the_ladder:'#7A5A3A',snake_oil:'#405A30',fortunes_wheel:'#7A5A20',
   loaded_die:'#6A4A70',gamblers_ghost:'#5A5A70',greedy_hands:'#8A7A30',the_grudge:'#7A3030',lucky_seven:'#3A7A50',cold_shoulder:'#4A6A8A',
-  warm_hands:'#8A4A30',gamblers_thumb:'#6A6A40',chain_lightning:'#4A5A8A',hot_streak:'#8A3A20',underdog:'#5A6A50',twin_dice:'#6A5A80',sawdust:'#7A6A50',short_pour:'#6A5A40',the_nudge:'#7A8A40',triple_threat:'#9A6020',triple_hunter:'#6A4A30',false_triple:'#5A6A8A',alchemists_chisel:'#6A4A8A',forge_night:'#8A4A20',
+  warm_hands:'#8A4A30',gamblers_thumb:'#6A6A40',chain_lightning:'#4A5A8A',hot_streak:'#8A3A20',underdog:'#5A6A50',twin_dice:'#6A5A80',sawdust:'#7A6A50',short_pour:'#6A5A40',the_nudge:'#7A8A40',triple_threat:'#9A6020',triple_hunter:'#6A4A30',false_triple:'#5A6A8A',alchemists_chisel:'#6A4A8A',forge_night:'#8A4A20',heavy_set:'#7A5A30',lucky_threes:'#8A6A30',the_climb:'#3A6A5A',the_troupe:'#6A4A6A',
   the_collector:'#6A4A60',tavern_cheer:'#7A5A30',closing_bell:'#5A4A60',old_bones:'#4A4A50',
   the_jinx:'#4A5A6A',thick_skin:'#6A6A5A',blood_tithe:'#8A2A30',
   the_echo:'#5A6A7A',frozen_die:'#3A6A8A',double_down:'#7A5A30',slippery_table:'#4A7A6A',high_roller:'#8A6A20',the_fence:'#5A4A3A',the_alchemist:'#6A5A2A',twin_flames:'#8A4A20',
@@ -9389,16 +9430,20 @@ function dieRank(id){var dt=getDie(id);return dt?dt.cost:0;}
    This keeps the data in one place and makes the gap report cheap to
    regenerate as cards change. No gameplay behaviour reads these yet —
    Phase 1 is purely informational. */
-const STRAT_TAGS=['ONES','TRIPLES','STRAIGHTS','AGGRO','HOARD'];
+const STRAT_TAGS=['ONES','TRIPLES','STRAIGHTS','AGGRO','HOARD','COMBO'];
 /* Curated overrides — the unambiguous members of each archetype. The
    heuristic below catches the rest; this list pins the cards we KNOW
-   belong (and rescues any the keyword scan would miss/misfile). */
+   belong (and rescues any the keyword scan would miss/misfile).
+   COMBO = pair/set/specific-pattern payoffs that don't fit the four
+   strategy lanes (added after the Phase 1 report flagged a big cluster
+   of these as 'untagged'). */
 const _STRAT_CURATED={
   ONES:['flintlock','copper_pincher','scavenger','twin_dice','vanguard','odd_row','gamblers_thumb','wild_die','brutus_fist','old_bones'],
-  TRIPLES:['triple_threat','triple_hunter','false_triple','six_serpents','twin_flames','double_down_die','the_pivot'],
-  STRAIGHTS:['the_ladder','ascending','sequence','bookends','flanks','even_row','mirror_row','the_march','tavern_cheer'],
-  AGGRO:['crows_luck','snake_oil','leaky_cup','taxing_breath','sooty_table','bar_brawl','rats_in_cellar','blockade','quick_hands','cold_shoulder','turncoat','the_jinx','short_pour','sawdust','slippery_table','pocket_sand','thieves_luck','blood_debt','snake_oil'],
-  HOARD:['the_estate','coin_jar','slow_burn','the_ledger','compound_interest','beggars_bowl','chain_lightning','hot_streak','closing_bell','the_underdog','greedy_hands','last_orders','fortunes_wheel','coin_flip','the_hearth','tab_at_bar']
+  TRIPLES:['triple_threat','triple_hunter','false_triple','six_serpents','twin_flames','double_down_die','the_pivot','heavy_set','lucky_threes'],
+  STRAIGHTS:['the_ladder','ascending','sequence','bookends','flanks','even_row','mirror_row','the_march','tavern_cheer','the_climb','the_troupe'],
+  AGGRO:['crows_luck','snake_oil','leaky_cup','taxing_breath','sooty_table','bar_brawl','rats_in_cellar','blockade','quick_hands','cold_shoulder','turncoat','the_jinx','short_pour','sawdust','slippery_table','pocket_sand','thieves_luck','blood_debt'],
+  HOARD:['the_estate','coin_jar','slow_burn','the_ledger','compound_interest','beggars_bowl','chain_lightning','hot_streak','closing_bell','the_underdog','greedy_hands','last_orders','fortunes_wheel','the_hearth','tab_at_bar','high_roller','the_whetstone'],
+  COMBO:['twin_fury','sevens_gift','boxcars','lucky_seven','perfect_storm','hot_hand','full_house','anchor']
 };
 /* Dice → strategy tags. Few dice, so a flat map is clearest. */
 const _STRAT_DICE={
@@ -9445,6 +9490,57 @@ function archetypeGapReport(){
     console.log('Untagged cards ('+untagged.length+'):',untagged);
   }catch(e){}
   return {cards:counts,dice:diceByTag,untagged:untagged};
+}
+
+/* ═══════ NPC PERSONAS (Phase 2: coherent loadouts) ═══════
+   A persona ties an NPC's loadout + behaviour to ONE strategy so it
+   plays a plan instead of a random pile. Each persona:
+     tags     — strategy archetypes whose cards it prefers to draw
+     dieBias  — die materials it prefers (when the tier pool allows them)
+     behavior — drives the Phase-3 turn AI ('chase' presses for combos,
+                'safe' banks earlier, 'normal' = baseline)
+   Bosses get a fixed persona (thematic). Patrons get one assigned at
+   generation time, then their dice + cards are biased to match. */
+const PERSONAS={
+  ones:     {tags:['ONES'],            dieBias:['iron','lead','brass','crystal'], behavior:'safe'},
+  triples:  {tags:['TRIPLES','COMBO'], dieBias:['amber','flint','jade'],          behavior:'chase'},
+  straights:{tags:['STRAIGHTS','COMBO'],dieBias:['jade','jade2','flint'],         behavior:'chase'},
+  aggro:    {tags:['AGGRO','ONES'],    dieBias:['iron','lead'],                   behavior:'normal'},
+  hoard:    {tags:['HOARD'],           dieBias:['silver','amber'],                behavior:'safe'},
+  combo:    {tags:['COMBO','TRIPLES'], dieBias:['amber','flint'],                 behavior:'normal'}
+};
+const _PERSONA_KEYS=Object.keys(PERSONAS);
+/* Fixed boss personas (by rung.key). Patrons assign their own. */
+const _BOSS_PERSONAS={
+  drunkard:'ones',   /* Grog — bone/iron, simple singles */
+  peasant:'hoard',   /* Mabel — every-bank stacking ward */
+  commoner:'aggro',  /* Finnick — pickpocket disruption */
+  merchant:'hoard',  /* Corvus — ledger / economy */
+  soldier:'triples', /* Brutus — brute-force triples */
+  knight:'straights',/* Aldric — order & discipline */
+  noble:'aggro',     /* Whisper — counterfeit disruption */
+  bishop:'combo'     /* Ambrose — blessings & sets */
+};
+/* Resolve the persona for any rung (boss key → fixed; patron → its
+   generated .persona; fallback derived from tier). */
+function _npcPersona(rung){
+  if(!rung)return PERSONAS.ones;
+  if(rung.persona&&PERSONAS[rung.persona])return PERSONAS[rung.persona];
+  if(rung.key&&_BOSS_PERSONAS[rung.key])return PERSONAS[_BOSS_PERSONAS[rung.key]];
+  return PERSONAS.ones;
+}
+function _npcPersonaKey(rung){
+  if(!rung)return 'ones';
+  if(rung.persona&&PERSONAS[rung.persona])return rung.persona;
+  if(rung.key&&_BOSS_PERSONAS[rung.key])return _BOSS_PERSONAS[rung.key];
+  return 'ones';
+}
+/* Does a card match a persona's preferred strategy tags? */
+function _cardMatchesPersona(cardId,personaKey){
+  var p=PERSONAS[personaKey];if(!p)return false;
+  var c=getCard(cardId);if(!c)return false;
+  var tags=_cardStrategyTags(c);
+  return tags.some(function(t){return p.tags.indexOf(t)>=0;});
 }
 const MAT_COLORS={
   bone:['#f6f5f0','#ffffff','#ccc8b8','#1c1408'],iron:['#8a8e98','#b0b4be','#5a5e68','#1a1c22'],
@@ -9695,6 +9791,10 @@ function scoreRoll(vals,cards,locked,context,dieMats){
          stacking both would push 4-of-a-kind 3s to 1200, which feels
          disproportionate for a tin card. */
       if(cards.includes('triple_threat')&&setSize===3&&(f===2||f===3||f===4))base*=2;
+      /* LUCKY THREES (tin): triple 3s score 500 (up from 300). Math.max
+         so it doesn't fight Triple Threat (which already makes triple-3
+         = 600). Pure triples only. */
+      if(cards.includes('lucky_threes')&&setSize===3&&f===3)base=Math.max(base,500);
       if(millersToll&&f>=2&&f<=4)base+=SCORING_BASE.millersTollTripleBonus;
       if(triplesPenalty&&f>=2)base=Math.max(0,base-SCORING_BASE.triplesPenalty);
       /* Amber triple_bonus: +amount for each amber die in this set */
@@ -9739,6 +9839,11 @@ function scoreRoll(vals,cards,locked,context,dieMats){
         break;
       }
     }
+  }
+  /* HEAVY SET (tin): +100 for every three-of-a-kind scored this roll
+     (counts fake triples too — _triplesFired includes False Triple). */
+  if(cards.includes('heavy_set')&&_triplesFired.length>0){
+    pts+=_triplesFired.length*100;
   }
 
   /* ── Ladder + Ascending: alternative position (AFTER triples).
@@ -9838,6 +9943,26 @@ function scoreRoll(vals,cards,locked,context,dieMats){
      pair and never eats into a triple-6/quad-6. */
   if(cards.includes('boxcars')&&cnt(6)>=2){
     pts+=300;mark(6,2);_bonusFiredFlag=true;
+  }
+  /* THE CLIMB (tin): one 3-consecutive run → +200. Runs AFTER triples
+     (claims only leftover dice) so it never strands a triple. One run
+     per roll. A budget Ascending (+400 silver). */
+  if(cards.includes('the_climb')&&!straightFound){
+    var _clRuns=[[1,2,3],[2,3,4],[3,4,5],[4,5,6]];
+    for(var _cli=0;_cli<_clRuns.length;_cli++){
+      var _clR=_clRuns[_cli];
+      if(cnt(_clR[0])>=1&&cnt(_clR[1])>=1&&cnt(_clR[2])>=1){
+        pts+=200;mark(_clR[0],1);mark(_clR[1],1);mark(_clR[2],1);_bonusFiredFlag=true;break;
+      }
+    }
+  }
+  /* THE TROUPE (tin): 4+ DIFFERENT values committed in this selection →
+     +150. Reads raw vals (positional), doesn't consume dice — it's a
+     property of the whole commit. Rewards the spread that builds toward
+     straights. */
+  if(cards.includes('the_troupe')){
+    var _trU={};for(var _tri=0;_tri<n;_tri++)_trU[vals[_tri]]=1;
+    if(Object.keys(_trU).length>=4){pts+=150;_bonusFiredFlag=true;}
   }
 
   /* ── Singles ── */
@@ -13401,6 +13526,25 @@ function oppShouldBank(rung,oppBank,diceLeft,oppTotal,playerTotal,target){
   if(oppBank>=2000&&!(diceLeft>=4&&_severelyBehind))return true;
   if(oppBank>=1500&&diceLeft<=3)return true;
   let agg=rung.agg;
+  /* ── PERSONA BEHAVIOUR (Phase 3): make the NPC play to its plan. ──
+     'safe'  (ones / hoard)      → bank earlier, lock in singles/economy.
+                                    Mirrors the player's winning 1s/5s
+                                    strategy so those NPCs finally compete.
+     'chase' (triples/straights) → press for combos; press EVEN harder
+                                    when a pair is sitting in the leftover
+                                    dice (a triple is one roll away). */
+  var _pBeh=(typeof _npcPersona==='function')?_npcPersona(rung).behavior:'normal';
+  if(_pBeh==='safe')agg=Math.max(0.10,agg-0.10);
+  else if(_pBeh==='chase'){
+    agg=Math.min(0.92,agg+0.10);
+    try{
+      if(G&&Array.isArray(G.oppDice)&&diceLeft>=2){
+        var _lv={},_pairSeen=false;
+        G.oppDice.forEach(function(d){if(!d.kept){_lv[d.val]=(_lv[d.val]||0)+1;if(_lv[d.val]>=2)_pairSeen=true;}});
+        if(_pairSeen)agg=Math.min(0.95,agg+0.12);
+      }
+    }catch(e){}
+  }
   /* Sudden Death: opponent plays much more aggressively — only 3 turns to score high */
   if(G&&G._handicap==='sudden_death'){agg=Math.max(agg,0.80);if(playerTotal>oppTotal+oppBank)agg=Math.max(agg,0.92);}
   /* Rising Stakes: NPC is streak-aware — bank to keep multiplier, push if player leads */
