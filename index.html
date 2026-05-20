@@ -7257,6 +7257,17 @@ const FEATS=[
     check:function(G){return (G._featMaxBank||0)>=1500;}},
   {id:'one_turn_wonder',label:'One-Turn Wonder',  desc:'Win the match in a single turn', renown:15,
     check:function(G){return (G.turnNum||0)<=1;}},
+  /* ── Risk-taking feats — reward gambling instead of safe banking. ── */
+  {id:'tempting_fate',  label:'Tempting Fate',    desc:'Roll again after scoring triple 1s, then bank that turn', renown:10,
+    check:function(G){return !!G._featTemptingFate;}},
+  {id:'brinksman_feat', label:'Brinksman',        desc:'Win on a turn that took 5+ rolls', renown:10,
+    check:function(G){return (G._featWinBankRolls||0)>=5;}},
+  {id:'naked_run',      label:'Naked Run',        desc:'Win using only plain dice (no special materials)', renown:15,
+    check:function(G){
+      var md=(G&&Array.isArray(G.matchDice))?G.matchDice:((typeof S!=='undefined'&&S&&S.run&&Array.isArray(S.run.dice))?S.run.dice:null);
+      if(!md||!md.length)return false;
+      return md.every(function(m){var d=(typeof getDie==='function')?getDie(m):null;return !d||!d.effect;});
+    }},
   /* ── Drip-feed feats (regular renown payouts on common play patterns
      and per-boss firsts). Each fires once per RUN since evaluateFeats
      gates on S.run.feats[id], so repeat runs let players re-earn them
@@ -8800,7 +8811,7 @@ function generateDiceLoadout(tierIndex){
 }
 
 const CARDS=[
-  {id:'flintlock',name:'THE FLINTLOCK',icon:'🔫',rarity:'silver',eff:'+300 EACH FIRST 1',desc:'Each turn: the first time a 1 appears on your roll, gain +300 bonus points.',arch:'safeBanker'},
+  {id:'flintlock',name:'THE FLINTLOCK',icon:'🔫',rarity:'silver',eff:'FIRST 1 EACH TURN: +200',desc:'The first 1 you roll each turn adds +200 to your turn score. Lost if you bust.',arch:'brinksman'},
   {id:'copper_pincher',name:'COPPER PINCHER',icon:'🪙',rarity:'silver',eff:'1s=200, 5s=100 PTS',desc:'Singles are worth more: 1s score 200 (not 100), 5s score 100 (not 50).',arch:'safeBanker'},
   {id:'half_measure',name:'HALF MEASURE',icon:'⚖️',rarity:'tin',eff:'+400 IF YOU BANK 3 DICE THIS TURN',desc:'Bank with exactly three dice committed across the entire turn (not per roll). Awards a flat +400 bonus.',arch:'safeBanker'},
   {id:'the_hearth',name:'THE HEARTH',icon:'🔥',rarity:'tin',eff:'BANK IN \u22642 ROLLS \u2192 +200',desc:'When you bank within your first 2 rolls of a turn, gain +200. Repeats every turn — rewards quick, cautious banking.',arch:'safeBanker'},
@@ -8861,7 +8872,7 @@ const CARDS=[
   {id:'coin_jar',name:'COIN JAR',icon:'🏺',rarity:'silver',eff:'EVERY 3RD BANK: +200, GROWING',desc:'Every 3rd bank you make in a match earns a stacking bonus: +200, +400, +600, etc.',arch:'hoarder'},
   {id:'the_estate',name:'THE ESTATE',icon:'🏛️',rarity:'silver',eff:'BANK +150, GROWS +100 EACH TIME',desc:'Your first bank gains +150. Each subsequent bank gains +100 more than the last (1st = +150, 2nd = +250, 3rd = +350…).',arch:'hoarder'},
   {id:'compound_interest',name:'COMPOUND INTEREST',icon:'💹',rarity:'gold',eff:'BANK GROWS +5% MULT (CAP +50%)',desc:'Each bank permanently increases your bank multiplier by 5% (caps at +50%). The bonus applies to the current bank before incrementing.',arch:'hoarder'},
-  {id:'the_ledger',name:'THE LEDGER',icon:'📒',rarity:'gold',eff:'EACH BANK +75 TO PERMANENT BONUS',desc:'Each bank adds +75 to a running total. That total is added to every future bank this match.',arch:'hoarder'},
+  {id:'the_ledger',name:'RUNNING TAB',icon:'🍺',rarity:'gold',eff:'EACH BANK +75 TO A GROWING BONUS',desc:'Every bank adds +75 to a running tab. That tab is paid on top of every future bank this match (1st adds nothing, 2nd +75, 3rd +150…).',arch:'hoarder'},
   {id:'beggars_bowl',name:"BEGGAR'S BOWL",icon:'🥣',rarity:'tin',eff:'+300 ON FIRST BANK',desc:'Your very first bank each match gains an extra 300 bonus points.',arch:'safeBanker'},
   {id:'loose_thread',name:'LOOSE THREAD',icon:'🧶',rarity:'tin',eff:'+400 AFTER DOUBLE BUST',desc:'If you bust twice in a row, gain 400 points automatically.',arch:'brinksman',dep:true},
   {id:'the_whetstone',name:'THE WHETSTONE',icon:'🪨',rarity:'tin',eff:'FIRST 3 ROLLS +250 EACH',desc:'Each of your first three rolls per turn adds +250 to that turn\'s bank (1st roll +250, 2nd +500, 3rd +750 max).',arch:'brinksman'},
@@ -9114,27 +9125,27 @@ const NPC_CARDS=[
 
   /* ── CORVUS ── */
   {id:'interest_due',name:'INTEREST DUE',icon:'📊',rarity:'npc',npcOnly:true,owner:'corvus',
-   eff:'Every 3rd turn, −400 from you',desc:'Every 3rd turn you take, Corvus drains 400 points from your score.',
-   playerDesc:'Every 3rd turn the opponent takes, you drain 400 points from their score.',
-   effect:{type:'passive',mechanic:'periodic_drain',interval:3,amount:400}},
+   eff:'Every 2nd turn, −500 from you',desc:'Every 2nd turn you take, Corvus drains 500 points from your score.',
+   playerDesc:'Every 2nd turn the opponent takes, you drain 500 points from their score.',
+   effect:{type:'passive',mechanic:'periodic_drain',interval:2,amount:500}},
   {id:'fine_print',name:'FINE PRINT',icon:'🔍',rarity:'npc',npcOnly:true,owner:'corvus',
    eff:"Opp's first bank halved",desc:"The opponent's very first bank of the match is worth only half its normal value.",
    playerDesc:"The opponent's very first bank of the match is worth only half its normal value.",
    effect:{type:'on_player_bank',mechanic:'halve_first_bank'}},
   {id:'severance_npc',name:'SEVERANCE',icon:'📋',rarity:'npc',npcOnly:true,owner:'corvus',
-   eff:'Start +900 pts',desc:'Corvus starts the match with 900 bonus points.',
-   playerDesc:'You start the match with 900 bonus points.',
-   effect:{type:'start_bonus',amount:900}},
+   eff:'Start +1200 pts',desc:'Corvus starts the match with 1200 bonus points.',
+   playerDesc:'You start the match with 1200 bonus points.',
+   effect:{type:'start_bonus',amount:1200}},
   {id:'the_audit',name:'THE AUDIT',icon:'🧮',rarity:'npc',npcOnly:true,owner:'corvus',
-   eff:'+300 per bank when winning',desc:'Each time Corvus banks while his total score is higher than yours, he gains an extra 300 points on top.',
-   playerDesc:'Each time you bank while your total score is higher than the opponent\'s, you gain an extra 300 points on top.',
-   effect:{type:'passive',mechanic:'gain_when_ahead',amount:300}},
+   eff:'+500 per bank when winning',desc:'Each time Corvus banks while his total score is higher than yours, he gains an extra 500 points on top.',
+   playerDesc:'Each time you bank while your total score is higher than the opponent\'s, you gain an extra 500 points on top.',
+   effect:{type:'passive',mechanic:'gain_when_ahead',amount:500}},
   {id:'corvus_writ',name:"CORVUS'S WRIT",icon:'📜',rarity:'npc',npcOnly:true,owner:'corvus',
    type:'active',maxUses:1,timing:'yielding',
    eff:'HALVES YOUR NEXT BIG BANK',
-   desc:'Once per match, Corvus invokes a writ — your next bank of 500+ is halved.',
-   playerDesc:"Activate while yielding: the opponent's next bank of 500+ is halved.",
-   effect:{type:'on_player_bank',mechanic:'halve_big_bank',threshold:500}},
+   desc:'Once per match, Corvus invokes a writ — your next bank of 400+ is halved.',
+   playerDesc:"Activate while yielding: the opponent's next bank of 400+ is halved.",
+   effect:{type:'on_player_bank',mechanic:'halve_big_bank',threshold:400}},
 
   /* ── BRUTUS ── */
   {id:'hold_the_line',name:'HOLD THE LINE',icon:'🛡️',rarity:'npc',npcOnly:true,owner:'brutus',
@@ -9369,6 +9380,72 @@ function _dieEffectLabel(eff){
 const DICE_MAP={};DICE_TYPES.forEach(function(d){DICE_MAP[d.id]=d;});
 function getDie(id){return DICE_MAP[id]||DICE_TYPES[0];}
 function dieRank(id){var dt=getDie(id);return dt?dt.cost:0;}
+
+/* ═══════ STRATEGY ARCHETYPES (Phase 1: tagging + gap analysis) ═══════
+   Goal: give every card & die a STRATEGY tag so NPC personas (Phase 2+)
+   can build coherent loadouts and play to a plan instead of randomly.
+   Tags are DERIVED (not hand-stamped on 200+ card defs) from a small
+   curated id-list plus the card's existing arch / effect / eff-text.
+   This keeps the data in one place and makes the gap report cheap to
+   regenerate as cards change. No gameplay behaviour reads these yet —
+   Phase 1 is purely informational. */
+const STRAT_TAGS=['ONES','TRIPLES','STRAIGHTS','AGGRO','HOARD'];
+/* Curated overrides — the unambiguous members of each archetype. The
+   heuristic below catches the rest; this list pins the cards we KNOW
+   belong (and rescues any the keyword scan would miss/misfile). */
+const _STRAT_CURATED={
+  ONES:['flintlock','copper_pincher','scavenger','twin_dice','vanguard','odd_row','gamblers_thumb','wild_die','brutus_fist','old_bones'],
+  TRIPLES:['triple_threat','triple_hunter','false_triple','six_serpents','twin_flames','double_down_die','the_pivot'],
+  STRAIGHTS:['the_ladder','ascending','sequence','bookends','flanks','even_row','mirror_row','the_march','tavern_cheer'],
+  AGGRO:['crows_luck','snake_oil','leaky_cup','taxing_breath','sooty_table','bar_brawl','rats_in_cellar','blockade','quick_hands','cold_shoulder','turncoat','the_jinx','short_pour','sawdust','slippery_table','pocket_sand','thieves_luck','blood_debt','snake_oil'],
+  HOARD:['the_estate','coin_jar','slow_burn','the_ledger','compound_interest','beggars_bowl','chain_lightning','hot_streak','closing_bell','the_underdog','greedy_hands','last_orders','fortunes_wheel','coin_flip','the_hearth','tab_at_bar']
+};
+/* Dice → strategy tags. Few dice, so a flat map is clearest. */
+const _STRAT_DICE={
+  iron:['ONES'],lead:['ONES'],brass:['ONES'],crystal:['ONES'],
+  amber:['TRIPLES'],
+  jade:['STRAIGHTS','TRIPLES'],jade2:['STRAIGHTS','TRIPLES'],jade3:['STRAIGHTS','TRIPLES'],
+  flint:['TRIPLES'],/* 4-leaning faces help triples */
+  silver:['HOARD'],/* defensive shield → safe banking */
+  bone:[],obsidian:[],starstone:[],vagabond:[],amber2:[]
+};
+function _cardStrategyTags(c){
+  if(!c)return [];
+  var tags=[];var id=c.id,eff=(c.eff||'').toUpperCase(),arch=c.arch;
+  function add(t){if(tags.indexOf(t)<0)tags.push(t);}
+  for(var k in _STRAT_CURATED){if(_STRAT_CURATED[k].indexOf(id)>=0)add(k);}
+  if(/TRIPLE|3 OF|THREE OF|QUAD|6S SCORE/.test(eff))add('TRIPLES');
+  if(/STRAIGHT|CONSECUTIVE|IN A ROW|LADDER|SEQUENCE|\bRUN\b/.test(eff))add('STRAIGHTS');
+  if(/1 OR 5|FIRST 1|\bSINGLE|\b1S\b|\b5S\b|PAIR OF 1/.test(eff))add('ONES');
+  if(arch==='saboteur'||/OPP|RIVAL|STEAL|DENY|HALVE|DRAIN|\bBUST\b/.test(eff))add('AGGRO');
+  if(arch==='hoarder'||arch==='safeBanker'||/EACH BANK|PER BANK|ON BANK|\bGOLD\b|EVERY .*BANK/.test(eff))add('HOARD');
+  return tags;
+}
+function _dieStrategyTags(mat){return _STRAT_DICE[mat]||[];}
+/* Dev/console only: dump a tag × rarity coverage table so we can SEE
+   which archetypes lack tools at which rarities (the gaps to fill).
+   Returns a structured object AND console.tables it. */
+function archetypeGapReport(){
+  var rarities=['tin','silver','gold'];
+  var counts={};STRAT_TAGS.forEach(function(t){counts[t]={tin:0,silver:0,gold:0,untagged:0};});
+  var untagged=[];
+  CARDS.forEach(function(c){
+    if(c.npcOnly||c.dep)return;
+    if(rarities.indexOf(c.rarity)<0)return;
+    var tags=_cardStrategyTags(c);
+    if(!tags.length){untagged.push(c.id+' ['+c.rarity+']');return;}
+    tags.forEach(function(t){if(counts[t])counts[t][c.rarity]++;});
+  });
+  var diceByTag={};STRAT_TAGS.forEach(function(t){diceByTag[t]=[];});
+  DICE_TYPES.forEach(function(d){if(d.dep)return;_dieStrategyTags(d.id).forEach(function(t){if(diceByTag[t])diceByTag[t].push(d.id);});});
+  try{
+    console.log('%c=== ARCHETYPE GAP REPORT ===','font-weight:bold');
+    console.table(counts);
+    console.log('Dice by archetype:',diceByTag);
+    console.log('Untagged cards ('+untagged.length+'):',untagged);
+  }catch(e){}
+  return {cards:counts,dice:diceByTag,untagged:untagged};
+}
 const MAT_COLORS={
   bone:['#f6f5f0','#ffffff','#ccc8b8','#1c1408'],iron:['#8a8e98','#b0b4be','#5a5e68','#1a1c22'],
   flint:['#7a7068','#a09488','#4a4038','#1c1610'],lead:['#6e7080','#9498a8','#484a58','#181a24'],
@@ -10694,6 +10771,7 @@ function newG(rung,pCards,oCards,pStake,oStake){
     _brewerBoosts:null,_deadManBoosts:null,
     /* Feat tracking — counters reset per match, evaluated at endMatch(win) */
     _featBanks:0,_featBusts:0,_featMaxBank:0,_featActivesUsed:false,_featFullStraight:false,_featHotDiceCount:0,
+    _featTemptingFate:false,_featWinBankRolls:0,_turnTriple1Scored:false,_rolledAfterTriple1:false,
     activeCardState:{usedCards:{},stitchActive:false,vowActive:false,hexActive:false,secondWindActive:false,allInActive:false,pyreBonus:0},
     crowsLuckCtx:{crowsLuck:oCards.includes('crows_luck'),crowsLuckRemaining:oCards.includes('crows_luck')?2:0,crowsLuckFiredThisRoll:false},
     /* Boss edict system removed — kept empty bossState object to avoid breaking
@@ -11390,6 +11468,9 @@ function startPTurn(){
   /* Triple Hunter: one fire per turn — reset its flag so the next turn
      can earn the +500 bonus on its first triple. */
   G._tripleHunterFiredThisTurn=false;
+  /* Tempting Fate feat: per-turn flags reset each turn (the achievement
+     flag G._featTemptingFate persists for the match once earned). */
+  G._turnTriple1Scored=false;G._rolledAfterTriple1=false;
   /* Turn-boundary sweep: clear any leftover card-trigger labels so a
      label from last turn (e.g. a slow per-turn fade) can't linger into
      the new turn. The per-label 3s timeout still runs as backup. */
@@ -11560,6 +11641,9 @@ function handleRoll(){
      Palm). Without this, hitting ROLL during the 840 ms swap re-rolls
      the target die mid-flip and leaves it in a broken visual state. */
   if(G._palmAnimating)return;
+  /* Tempting Fate feat: the player is choosing to roll AGAIN after
+     committing a triple of 1s this turn — the gamble the feat rewards. */
+  if(G._turnTriple1Scored)G._rolledAfterTriple1=true;
   /* Dismiss any board-covering overlays before rolling, so the new dice
      are visible immediately. Otherwise on a non-scoring first roll, the
      dice render hidden behind an overlay, bust fires, dice cleared —
@@ -11756,6 +11840,10 @@ function handleRoll(){
         spawnPop('+500 HUNTER');
       }
     }
+    /* Tempting Fate feat: note when a triple of 1s (three+ ones) is
+       committed this turn. If the player then rolls again (set in
+       handleRoll) and banks, the feat fires. */
+    (function(){var _ones=0;selDice.forEach(function(d){if(d.val===1)_ones++;});if(_ones>=3)G._turnTriple1Scored=true;})();
     if(G._vowDoubleActive){pts*=2;G._vowDoubleActive=false;spawnPop('VOW x2');}
     /* The Echo: previous roll scored → this selection gets +25% */
     if(G._echoReady&&G.pCards.includes('the_echo')){var _echoB=Math.floor(pts*0.35);if(_echoB>0){pts+=_echoB;spawnPop('+'+_echoB+' ECHO');triggerCard('the_echo','ECHO +'+_echoB,true);}G._echoReady=false;}
@@ -12000,7 +12088,17 @@ function _afterRollImpl(){
     G.pool=G.pool.filter(d=>!d._shattered);
   }
   const free=G.pool.filter(d=>!d.committed);let freeV=free.map(d=>d.val);const freeMats=free.map(d=>d.mat);const cards=effectiveCards();
-  if(!G.flintlockFired&&G.pCards.includes('flintlock')&&freeV.includes(1)){G.flintlockFired=true;G.pPts+=300;triggerCard('flintlock','+300 FLINTLOCK',true);updHUD();}
+  /* THE FLINTLOCK (nerfed): +200 into the TURN-bonus pool (was +300
+     straight to total score, which survived busts and fired nearly
+     every turn since a 1 almost always shows). Routing it through
+     _stakesRisingBonus — the shared "turn bonus that banks and is lost
+     on bust" pool — means a bust now wipes it, adding real risk. */
+  if(!G.flintlockFired&&G.pCards.includes('flintlock')&&freeV.includes(1)){
+    G.flintlockFired=true;
+    G._stakesRisingBonus=(G._stakesRisingBonus||0)+200;
+    G.turnPts=G.kept.reduce(function(a,k){return a+k.pts;},0)+(G._stakesRisingBonus||0);
+    triggerCard('flintlock','+200 FLINTLOCK',true);updHUD();
+  }
   /* Warm Hands: extend dice-manipulation effects to rolls 2 & 3 */
   var _warmRollLimit=G.pCards.includes('warm_hands')?3:1;
   /* Finnick's Trick (boss passive): first roll each turn — guarantee one
@@ -12733,8 +12831,14 @@ function handleBank(){
      bonus message so the player sees "+300 STAKES" in the bank pop and
      fire the trigger animation, then reset the carry-over flag. */
   if(G._stakesRisingBonus){
-    bonusMsg+=' +'+G._stakesRisingBonus+' STAKES';
-    triggerCard('stakes_rising','+'+G._stakesRisingBonus,true);
+    /* The pool can also hold Flintlock's +200, which already showed its
+       own label mid-turn. Only surface a STAKES label if the player
+       actually runs Stakes Rising, so a Flintlock-only player doesn't
+       see a phantom "STAKES" pop. The amount is banked either way. */
+    if(G.pCards.includes('stakes_rising')){
+      bonusMsg+=' +'+G._stakesRisingBonus+' STAKES';
+      triggerCard('stakes_rising','+'+G._stakesRisingBonus,true);
+    }
     G._stakesRisingBonus=0;
   }
   const totalCommitted=G.kept.reduce((a,k)=>a+k.vals.length,0);
@@ -13159,6 +13263,13 @@ function handleBank(){
   /* Feat tracking */
   G._featBanks=(G._featBanks||0)+1;
   if(total>(G._featMaxBank||0))G._featMaxBank=total;
+  /* Brinksman feat: remember how many rolls this banked turn took. The
+     winning bank is the last one before endMatch, so this holds the
+     winning turn's roll count at match end. */
+  G._featWinBankRolls=G.turnRollCount||0;
+  /* Tempting Fate feat: banked a turn in which the player committed a
+     triple of 1s AND chose to roll again afterward. */
+  if(G._rolledAfterTriple1)G._featTemptingFate=true;
   updHUD();refreshKeptTray();clearRow('playerDiceRow');G.pool=[];setBtns(false,false);
   if(G.pPts>=G.target){setTimeout(()=>endMatch(true),700);return;}
   if(G.oPts>=G.target){setTimeout(()=>endMatch(false),700);return;}
