@@ -7262,9 +7262,14 @@ const FEATS=[
     check:function(G){return !!G._featTemptingFate;}},
   {id:'brinksman_feat', label:'Brinksman',        desc:'Win on a turn that took 5+ rolls', renown:10,
     check:function(G){return (G._featWinBankRolls||0)>=5;}},
-  {id:'naked_run',      label:'Naked Run',        desc:'Win using only plain dice (no special materials)', renown:15,
+  {id:'naked_run',      label:'Naked Run',        desc:'From the 3rd tier on, win using only plain dice (no special materials)', renown:15,
     check:function(G){
-      var md=(G&&Array.isArray(G.matchDice))?G.matchDice:((typeof S!=='undefined'&&S&&S.run&&Array.isArray(S.run.dice))?S.run.dice:null);
+      /* Gated to tier 2+ (the 3rd tier onward). Winning bone-only is
+         trivial early but genuinely hard deeper in, so the feat only
+         counts where it means something — and it stops the easy early
+         matches from front-loading every feat at once. */
+      if(!(typeof S!=='undefined'&&S&&S.run)||(S.run.tier||0)<2)return false;
+      var md=(G&&Array.isArray(G.matchDice))?G.matchDice:(Array.isArray(S.run.dice)?S.run.dice:null);
       if(!md||!md.length)return false;
       return md.every(function(m){var d=(typeof getDie==='function')?getDie(m):null;return !d||!d.effect;});
     }},
@@ -7278,8 +7283,18 @@ const FEATS=[
     check:function(G){return (G._featBanks||0)>=5;}},
   {id:'survivor',       label:'Survivor',         desc:'Win a match after busting at least once',renown:5,
     check:function(G){return (G._featBusts||0)>=1;}},
+  /* ── Progressive run-milestone feats — fire at staggered points as the
+     run advances so renown keeps dripping mid-to-late instead of all
+     bunching up in the first couple of matches. Each fires once per run
+     when its threshold is first crossed. ── */
+  {id:'two_bosses',     label:'Up the Ranks',     desc:'Beat 2 bosses in one run',       renown:10,
+    check:function(G){return (typeof S!=='undefined'&&S&&S.run&&Array.isArray(S.run.bossesBeaten))?S.run.bossesBeaten.length>=2:false;}},
   {id:'quick_climb',    label:'Quick Climb',      desc:'Beat 3 or more bosses in one run',renown:15,
     check:function(G){return (typeof S!=='undefined'&&S&&S.run&&Array.isArray(S.run.bossesBeaten))?S.run.bossesBeaten.length>=3:false;}},
+  {id:'five_bosses',    label:'Gauntlet Veteran', desc:'Beat 5 bosses in one run',       renown:20,
+    check:function(G){return (typeof S!=='undefined'&&S&&S.run&&Array.isArray(S.run.bossesBeaten))?S.run.bossesBeaten.length>=5:false;}},
+  {id:'persistent',     label:'On a Roll',        desc:'Win 6 matches in one run',       renown:10,
+    check:function(G){return (typeof S!=='undefined'&&S&&S.run&&(S.run._matchWinsThisRun||0)>=6);}},
   {id:'card_collector', label:'Full Hand',        desc:'Win a match with 4+ cards equipped',renown:5,
     check:function(G){return G&&Array.isArray(G.pCards)&&G.pCards.filter(function(c){return c;}).length>=4;}},
   /* Per-boss firsts — one feat per matchup, fires once per run. Gives a
