@@ -2186,7 +2186,7 @@ body:has(#mLoadout-ov.show) #dbgButtons{display:flex !important}
   border-radius:12px 12px 0 0;
 }
 .rnk-info-panel.show{transform:translateY(0);pointer-events:auto}
-.rnk-info-panel canvas{position:absolute;top:0;left:0;right:0;height:calc(100% + 40px);width:100%;image-rendering:pixelated;z-index:0;border-radius:12px 12px 0 0}
+.rnk-info-panel canvas{position:absolute;top:0;left:0;right:0;width:100%;image-rendering:pixelated;z-index:0;border-radius:12px 12px 0 0}
 .rnk-info-inner{position:relative;z-index:2}
 .rnk-info-title{
   text-align:center;font-size:clamp(16px,4.5vw,20px);color:var(--gold);
@@ -6502,7 +6502,7 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
             <div class="rp-sh">Special combos <span class="rp-note-inline">(single throw only)</span></div>
             <div class="rp-row"><span style="flex:1;color:var(--ctxt,#e8d8b0);font-family:'IM Fell English',serif;font-size:14px">Three pairs <span class="rp-note-inline">(e.g. 2-2-4-4-6-6)</span></span><span class="rp-pts">1,500 pts</span></div>
             <div class="rp-row"><span style="flex:1;color:var(--ctxt,#e8d8b0);font-family:'IM Fell English',serif;font-size:14px">Two triplets <span class="rp-note-inline">(e.g. 2-2-2-3-3-3)</span></span><span class="rp-pts">2,500 pts</span></div>
-            <div class="rp-note">Two pairs and three-of-a-kind&nbsp;+&nbsp;a pair are rewarded by cards (Twin Fury, Full House).</div>
+            <div class="rp-note">Other combos &mdash; two pairs, a triple&nbsp;+&nbsp;a pair &mdash; can be rewarded by certain cards you'll discover along the way.</div>
           </div>
         </div>
 
@@ -7691,12 +7691,18 @@ function showRenownInfo(tab){
       }
     },{passive:true});
   }
-  /* Draw panel canvas */
+  /* Draw panel canvas — size it to the FULL scrollable content height
+     (scrollHeight), not just the visible viewport. Otherwise the
+     parchment only covers the top and scrolling the list down reveals a
+     flat dark band below it (player feedback: "darker color fill under
+     which I don't want"). Now the parchment texture spans the whole
+     panel top-to-bottom at any scroll position. */
   requestAnimationFrame(function(){
     var cv=document.getElementById('rnkInfoCanvas');
     if(cv){
-      cv.width=panel.offsetWidth;cv.height=panel.offsetHeight+40;
-      cv.style.width='100%';cv.style.height='';
+      var _h=Math.max(panel.scrollHeight,panel.offsetHeight)+40;
+      cv.width=panel.offsetWidth;cv.height=_h;
+      cv.style.width='100%';cv.style.height=_h+'px';
       drawPixelPanel(cv,'#4a3a28','#2a2018','#121010',9191,0.015);
     }
   });
@@ -8131,6 +8137,11 @@ var Haptic={
    draw attention to the score itself. */
 function showCritFlash(pts){
   try{SFX.crit&&SFX.crit();}catch(e){}
+  /* Always pair the bright crit chime with a clear visual — a sound on
+     its own reads as random/odd (player feedback). The 'CRITICAL' pop
+     fires even under reducedMotion (it's a static label, not motion) so
+     the sound is never orphaned. */
+  try{spawnPop('★ CRITICAL ★');}catch(e){}
   if(S&&S.settings&&S.settings.reducedMotion)return;
   var statusBot=document.getElementById('statusBot');
   if(statusBot){
