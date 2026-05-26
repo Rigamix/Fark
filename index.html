@@ -11402,85 +11402,275 @@ function _applyMetaBoostVisuals(){
     }
   }
 }
+/* ═══════════════════════════════════════════════════════════════════
+   FX — pooled canvas particle + sprite-sheet system
+   ───────────────────────────────────────────────────────────────────
+   One full-screen overlay <canvas> + ONE requestAnimationFrame loop +
+   a pre-allocated object pool. Replaces the old per-particle
+   <div> + Web-Animations approach (spawnPixelSparks / spawnShards /
+   spawnSawdust used to create, animate and destroy dozens of DOM nodes
+   per burst). Now every live particle is drawn in a single canvas pass
+   and the loop SLEEPS when nothing is active — no idle rAF, no GC churn.
+
+   Constraints (iOS Safari is the target device):
+   • devicePixelRatio capped at 2 (retina phones report 3 — wasteful for
+     chunky pixel art and murders fill-rate on a full-screen canvas)
+   • hard particle cap = pool size; emit() drops extras instead of growing
+   • dt clamped to 32 ms so a paused tab / slow frame can't fling
+     particles across the screen on the catch-up frame
+   • respects S.settings.reducedMotion (skips particle emission)
+   • clear() wipes everything on scene change (wired into exitMatch)
+
+   Sprite sheets (FX.loadSheet / FX.sprite): authored frame strips/grids
+   drawn one cell at a time — for hand-painted effects the procedural
+   particles can't express. Independent of the particle pool, same canvas.
+   ═══════════════════════════════════════════════════════════════════ */
+var FX=(function(){
+  var canvas=null, ctx=null, dpr=1, W=0, H=0;
+  var running=false, lastT=0, resizeWired=false;
+  var POOL_MAX=300;
+  var pool=[], active=0;
+  var sheets={};      /* name -> {img,fw,fh,frames,cols,fps,ready} */
+  var sprites=[];     /* live sprite playbacks */
+
+  function _reduced(){ try{ return !!(S&&S.settings&&S.settings.reducedMotion); }catch(e){ return false; } }
+
+  function _ensure(){
+    if(canvas) return;
+    canvas=document.createElement('canvas');
+    canvas.id='fxLayer';
+    canvas.style.cssText='position:fixed;inset:0;width:100%;height:100%;'+
+      'pointer-events:none;z-index:9500;image-rendering:pixelated';
+    (document.body||document.documentElement).appendChild(canvas);
+    ctx=canvas.getContext('2d');
+    _resize();
+    if(!resizeWired){ window.addEventListener('resize',_resize); resizeWired=true; }
+    for(var i=0;i<POOL_MAX;i++){
+      pool.push({a:false,x:0,y:0,vx:0,vy:0,life:0,max:0,size:4,color:'#fff',g:0,rot:0,vr:0,fade:true});
+    }
+  }
+
+  function _resize(){
+    if(!canvas) return;
+    dpr=Math.min(window.devicePixelRatio||1,2);
+    W=window.innerWidth; H=window.innerHeight;
+    canvas.width=Math.round(W*dpr);
+    canvas.height=Math.round(H*dpr);
+    canvas.style.width=W+'px';
+    canvas.style.height=H+'px';
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  function _start(){
+    if(running) return;
+    running=true; lastT=0;
+    requestAnimationFrame(_tick);
+  }
+
+  function _tick(t){
+    if(!lastT) lastT=t;
+    var dt=(t-lastT)/1000; lastT=t;
+    if(dt>0.032) dt=0.032;   /* clamp catch-up frames */
+    ctx.clearRect(0,0,W,H);
+    var anyAlive=false, i;
+
+    /* ── particles ── */
+    for(i=0;i<pool.length;i++){
+      var p=pool[i];
+      if(!p.a) continue;
+      p.life-=dt;
+      if(p.life<=0){ p.a=false; active--; continue; }
+      p.vy+=p.g*dt;
+      p.x+=p.vx*dt;
+      p.y+=p.vy*dt;
+      var k=p.fade?Math.max(0,p.life/p.max):1;
+      ctx.globalAlpha=k;
+      ctx.fillStyle=p.color;
+      if(p.vr){
+        p.rot+=p.vr*dt;
+        ctx.save();
+        ctx.translate(p.x,p.y);
+        ctx.rotate(p.rot);
+        ctx.fillRect(-p.size/2,-p.size/2,p.size,p.size);
+        ctx.restore();
+      } else {
+        ctx.fillRect(p.x-p.size/2,p.y-p.size/2,p.size,p.size);
+      }
+      anyAlive=true;
+    }
+    ctx.globalAlpha=1;
+
+    /* ── sprite-sheet playbacks ── */
+    for(i=sprites.length-1;i>=0;i--){
+      var sp=sprites[i];
+      var sheet=sheets[sp.name];
+      if(!sheet){ sprites.splice(i,1); continue; }
+      if(!sheet.ready){
+        /* Image still loading: keep the loop alive so playback starts the
+           moment it's ready (don't advance time / don't draw yet). Bail
+           after 5s so a missing/404 sheet can't spin the loop forever. */
+        sp.wait=(sp.wait||0)+dt;
+        if(sp.wait>5){ sprites.splice(i,1); continue; }
+        anyAlive=true;
+        continue;
+      }
+      sp.t+=dt;
+      var frame=Math.floor(sp.t*sp.fps);
+      if(frame>=sheet.frames){
+        if(sp.loop){ sp.t=0; frame=0; }
+        else { sprites.splice(i,1); continue; }
+      }
+      var col=frame%sheet.cols, row=Math.floor(frame/sheet.cols);
+      var dw=sheet.fw*sp.scale, dh=sheet.fh*sp.scale;
+      ctx.globalAlpha=sp.alpha;
+      ctx.drawImage(sheet.img, col*sheet.fw,row*sheet.fh,sheet.fw,sheet.fh,
+        sp.x-dw/2, sp.y-dh/2, dw, dh);
+      ctx.globalAlpha=1;
+      anyAlive=true;
+    }
+
+    if(anyAlive){ requestAnimationFrame(_tick); }
+    else { running=false; ctx.clearRect(0,0,W,H); }
+  }
+
+  function _spawn(o){
+    for(var i=0;i<pool.length;i++){
+      if(!pool[i].a){
+        var p=pool[i];
+        p.a=true; active++;
+        p.x=o.x; p.y=o.y;
+        p.vx=o.vx||0; p.vy=o.vy||0;
+        p.g=o.g||0;
+        p.max=p.life=o.life||0.5;
+        p.size=o.size||4;
+        p.color=o.color||'#fff';
+        p.rot=o.rot||0; p.vr=o.vr||0;
+        p.fade=o.fade!==false;
+        return true;
+      }
+    }
+    return false;   /* pool full — silently drop */
+  }
+
+  return {
+    /* emit({x,y,vx,vy,life,size,color,g,rot,vr,fade}) — one particle.
+       Coordinates are CSS pixels (page space); velocities px/sec; g px/sec². */
+    emit:function(o){
+      if(_reduced()) return;
+      _ensure();
+      _spawn(o);
+      _start();
+    },
+    /* loadSheet(name, src, frameW, frameH, frameCount, fps[, cols])
+       Loads a sprite sheet. Columns auto-detected from image width unless
+       `cols` is supplied (use it for a strip whose rows wrap). */
+    loadSheet:function(name,src,fw,fh,frames,fps,cols){
+      var img=new Image();
+      var sheet={img:img,fw:fw,fh:fh,frames:frames,cols:cols||1,fps:fps||12,ready:false};
+      img.onload=function(){
+        if(!cols) sheet.cols=Math.max(1,Math.floor(img.width/fw));
+        sheet.ready=true;
+      };
+      img.src=src;
+      sheets[name]=sheet;
+      return sheet;
+    },
+    /* sprite(name, x, y[, opts]) — play one instance at page-space (x,y).
+       opts: {fps, loop, scale, alpha}. Centered on (x,y). */
+    sprite:function(name,x,y,opts){
+      var sheet=sheets[name];
+      if(!sheet) return;
+      if(_reduced() && !(opts&&opts.force)) return;
+      opts=opts||{};
+      _ensure();
+      sprites.push({name:name,x:x,y:y,t:0,
+        fps:opts.fps||sheet.fps||12,
+        loop:!!opts.loop,
+        scale:opts.scale||1,
+        alpha:opts.alpha==null?1:opts.alpha});
+      _start();
+    },
+    /* clear() — kill all particles + sprites and blank the canvas.
+       Called on scene change so nothing bleeds into the next screen. */
+    clear:function(){
+      for(var i=0;i<pool.length;i++){ pool[i].a=false; }
+      active=0;
+      sprites.length=0;
+      if(ctx) ctx.clearRect(0,0,W,H);
+    }
+  };
+})();
+
+/* Gold spark burst — quick radial pop of pixel flecks off a die/element.
+   Same signature as before; now drawn on the FX canvas pool. The first
+   8 sparks fire in the fixed 8-direction pattern (preserves the original
+   look for the common small counts); any extra are scattered radially. */
 function spawnPixelSparks(el,count){
   if(!el||!count)return;
   var rect=el.getBoundingClientRect();
-  var cx=Math.round(rect.left+rect.width/2);
-  var cy=Math.round(rect.top+rect.height/2);
+  var cx=rect.left+rect.width/2;
+  var cy=rect.top+rect.height/2;
   /* 8 directions: cardinal first, then diagonal */
   var dirs=[[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,-1],[-1,1],[1,1]];
-  var n=Math.min(count,8);
-  for(var i=0;i<n;i++){
+  var life=0.26, per=14/life; /* travel ≈14px over the spark's lifetime */
+  var n=Math.min(count,8), i;
+  for(i=0;i<n;i++){
     var d=dirs[i];
-    var dist=14; /* 14px travel distance outside die edge */
-    var tx=d[0]*dist,ty=d[1]*dist;
-    /* Start each spark at the die's edge in its travel direction,
-       so sparks are immediately outside the die face — not on top of it */
-    var sx=d[0]===0?cx:(d[0]<0?Math.round(rect.left):Math.round(rect.right));
-    var sy=d[1]===0?cy:(d[1]<0?Math.round(rect.top):Math.round(rect.bottom));
-    var sp=document.createElement('div');
-    sp.className='px-spark';
-    sp.style.left=(sx-2)+'px';
-    sp.style.top=(sy-2)+'px';
-    sp.animate(
-      [{transform:'translate(0,0)',opacity:1},
-       {transform:'translate('+tx+'px,'+ty+'px)',opacity:0}],
-      {duration:240,easing:'steps(3,end)',fill:'forwards'}
-    );
-    document.body.appendChild(sp);
-    (function(s){setTimeout(function(){s.remove();},280);})(sp);
+    /* Start each spark at the die's edge in its travel direction */
+    var sx=d[0]===0?cx:(d[0]<0?rect.left:rect.right);
+    var sy=d[1]===0?cy:(d[1]<0?rect.top:rect.bottom);
+    FX.emit({x:sx,y:sy,vx:d[0]*per,vy:d[1]*per,life:life,size:4,color:'#c8a050'});
+  }
+  /* extra sparks (count>8) scatter from the edge at random angles */
+  for(i=8;i<count;i++){
+    var a=Math.random()*Math.PI*2;
+    FX.emit({x:cx+Math.cos(a)*rect.width*0.4,y:cy+Math.sin(a)*rect.height*0.4,
+      vx:Math.cos(a)*per,vy:Math.sin(a)*per,life:life+Math.random()*0.12,size:4,color:'#c8a050'});
   }
 }
-/* Shatter burst — angular chunks fly outward + tumble + fall, for a die
-   that physically breaks (Obsidian). Reads as "pieces flying off" rather
-   than the even radial spark burst. */
+/* Shatter burst — angular chunks pop outward + tumble + fall under
+   gravity, for a die that physically breaks (Obsidian). Reads as "pieces
+   flying off" rather than an even radial spark burst. */
 function spawnShards(el,color){
   if(!el)return;
   var rect=el.getBoundingClientRect();
   var cx=rect.left+rect.width/2, cy=rect.top+rect.height/2;
   var col=color||'#3a3a52';
   for(var i=0;i<11;i++){
-    var ang=Math.random()*Math.PI*2, dist=18+Math.random()*46;
-    var dx=Math.cos(ang)*dist, dy=Math.sin(ang)*dist+18;/* +gravity bias */
-    var sz=3+Math.floor(Math.random()*5);
-    var sh=document.createElement('div');
-    sh.style.cssText='position:fixed;z-index:9502;pointer-events:none;image-rendering:pixelated;'+
-      'width:'+sz+'px;height:'+sz+'px;left:'+(cx-sz/2)+'px;top:'+(cy-sz/2)+'px;'+
-      'background:'+col+';box-shadow:inset 0 0 0 1px rgba(0,0,0,.4);';
-    document.body.appendChild(sh);
-    sh.animate(
-      [{transform:'translate(0,0) rotate(0deg)',opacity:1},
-       {transform:'translate('+dx+'px,'+dy+'px) rotate('+(Math.random()*360-180)+'deg)',opacity:0}],
-      {duration:520+Math.random()*180,easing:'cubic-bezier(.2,.6,.4,1)',fill:'forwards'}
-    );
-    (function(s){setTimeout(function(){if(s.parentNode)s.remove();},720);})(sh);
+    var ang=Math.random()*Math.PI*2;
+    var speed=60+Math.random()*120;
+    FX.emit({
+      x:cx, y:cy,
+      vx:Math.cos(ang)*speed,
+      vy:Math.sin(ang)*speed-40,   /* slight upward pop before falling */
+      g:700,                        /* gravity → pieces drop */
+      life:0.55+Math.random()*0.25,
+      size:3+Math.floor(Math.random()*5),
+      color:col,
+      vr:(Math.random()*12-6)       /* tumble ±6 rad/s */
+    });
   }
 }
-/* Sawdust particle burst — brown flecks that drift DOWN (gravity) from a
-   die that just got dampened by the Sawdust card. Distinct from
-   spawnPixelSparks (which radiates evenly) so the effect reads as dust
-   falling, not an explosion. */
+/* Sawdust burst — brown flecks that drift DOWN from a die dampened by the
+   Sawdust card. Distinct from spawnPixelSparks (which radiates evenly) so
+   it reads as dust falling, not an explosion. */
 function spawnSawdust(el,count){
   if(!el)return;
   var rect=el.getBoundingClientRect();
   var n=count||7;
+  var shades=['#b89058','#9a7038','#caa468','#876030'];
   for(var i=0;i<n;i++){
-    var sx=Math.round(rect.left+Math.random()*rect.width);
-    var sy=Math.round(rect.top+rect.height*0.35+Math.random()*rect.height*0.4);
-    var sp=document.createElement('div');
-    sp.className='px-spark';
-    /* brownish dust tint — override the default spark color */
-    var _shade=['#b89058','#9a7038','#caa468','#876030'][i%4];
-    sp.style.cssText='position:fixed;width:3px;height:3px;background:'+_shade+';z-index:60;pointer-events:none;image-rendering:pixelated;left:'+(sx-1)+'px;top:'+(sy-1)+'px';
-    var _drift=(Math.random()-0.5)*16;
-    var _fall=12+Math.random()*18;
-    sp.animate(
-      [{transform:'translate(0,0)',opacity:1},
-       {transform:'translate('+_drift+'px,'+_fall+'px)',opacity:0}],
-      {duration:380+Math.random()*220,easing:'steps(4,end)',fill:'forwards'}
-    );
-    document.body.appendChild(sp);
-    (function(s){setTimeout(function(){s.remove();},650);})(sp);
+    var sx=rect.left+Math.random()*rect.width;
+    var sy=rect.top+rect.height*0.35+Math.random()*rect.height*0.4;
+    FX.emit({
+      x:sx, y:sy,
+      vx:(Math.random()-0.5)*40,
+      vy:30+Math.random()*50,
+      g:150,
+      life:0.5+Math.random()*0.25,
+      size:3,
+      color:shades[i%4]
+    });
   }
 }
 function spawnPop(txt,anchorEl){
@@ -15644,6 +15834,9 @@ function exitMatch(){
   if(_featOv)_featOv.classList.remove('flash');
   /* Sweep all card-trigger labels so none leak into the next match. */
   document.querySelectorAll('.card-trig-label').forEach(function(e){e.remove();});
+  /* Kill any in-flight FX particles/sprites so a burst from the final roll
+     can't keep drawing over the gauntlet/shop screen. */
+  try{ if(typeof FX!=='undefined' && FX.clear)FX.clear(); }catch(e){}
   if(window._endTimers){window._endTimers.forEach(t=>clearTimeout(t));window._endTimers=[];}
   document.querySelectorAll('.coin-burst-p').forEach(el=>el.remove());
   var lov=document.getElementById('mLoadout-ov');if(lov)lov.classList.remove('show');
