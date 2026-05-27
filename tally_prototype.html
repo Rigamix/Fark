@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Fark — Boss-Progress Tally Prototype</title>
+<style>
+  @font-face{font-family:'alagard';src:url('Fonts/Pixel/alagard.ttf');}
+  @font-face{font-family:'pixellari';src:url('Fonts/Pixel/Pixellari.ttf');}
+  :root{ --chalk:#f0ece0; --chalk-ghost:rgba(220,214,198,.16); }
+  *{box-sizing:border-box;}
+  body{margin:0;min-height:100vh;color:#e8dcc8;
+    font-family:'pixellari',system-ui,sans-serif;
+    background:
+      radial-gradient(120% 80% at 50% 0%, #2a1d12 0%, #1a1109 55%, #0d0805 100%);
+    display:flex;flex-direction:column;align-items:center;}
+  .stage{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    width:100%;padding:30px 16px 16px;gap:6px;}
+  /* stand-in boss so the tally is seen in context */
+  .boss{width:120px;height:120px;object-fit:contain;image-rendering:pixelated;
+    filter:drop-shadow(0 3px 0 rgba(0,0,0,.5));}
+  .boss-name{font-family:'alagard';font-size:30px;letter-spacing:5px;color:#e8b860;
+    text-shadow:0 2px 0 rgba(0,0,0,.6);margin:2px 0 12px;}
+
+  /* ── the slate "tab" ── */
+  .slate{position:relative;display:inline-block;
+    background:linear-gradient(#1e2622,#131915);
+    border:6px solid #4a3422;border-radius:9px;
+    box-shadow:0 7px 20px rgba(0,0,0,.55), inset 0 0 26px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.04);
+    padding:9px 20px 12px;}
+  .slate::after{/* faint chalk-dust haze on the slate */
+    content:'';position:absolute;inset:5px;border-radius:5px;pointer-events:none;
+    background:radial-gradient(80% 60% at 50% 40%, rgba(255,255,255,.05), transparent 70%);}
+  .slate-label{font-family:'alagard';font-size:14px;letter-spacing:3px;text-transform:uppercase;
+    text-align:center;color:#cfc7b6;opacity:.75;margin-bottom:5px;text-shadow:0 1px 2px rgba(0,0,0,.6);}
+  .slate svg{display:block;margin:0 auto;overflow:visible;}
+  .count{font-family:'pixellari';font-size:13px;color:#cdbfa6;text-align:center;margin-top:6px;letter-spacing:1px;opacity:.85;}
+
+  .stroke{fill:none;stroke-linecap:round;}
+  .stroke.ghost{stroke:var(--chalk-ghost);stroke-width:3;}
+  .stroke.on{stroke:var(--chalk);stroke-width:3.4;
+    filter:drop-shadow(0 0 3px rgba(245,240,225,.45));}
+
+  .puff{position:absolute;width:18px;height:18px;border-radius:50%;pointer-events:none;
+    background:radial-gradient(circle,rgba(245,240,225,.7),rgba(245,240,225,0) 70%);
+    transform:translate(-50%,-50%) scale(.4);opacity:0;}
+  .puff.go{animation:puff .5s ease-out forwards;}
+  @keyframes puff{0%{opacity:.9;transform:translate(-50%,-50%) scale(.4)}
+    100%{opacity:0;transform:translate(-50%,-50%) scale(1.6)}}
+
+  /* ── controls ── */
+  .controls{width:100%;max-width:420px;background:#1d140d;border-top:2px solid #3a2a1c;
+    padding:14px 16px calc(16px + env(safe-area-inset-bottom,0));display:flex;flex-direction:column;gap:12px;}
+  .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .row .lbl{font-size:12px;letter-spacing:1px;color:#9a8c78;text-transform:uppercase;width:64px;}
+  button{font-family:'pixellari',sans-serif;cursor:pointer;border:1px solid #5a4530;
+    background:#2a1e14;color:#e8dcc8;border-radius:6px;padding:9px 12px;font-size:14px;letter-spacing:.5px;}
+  button:active{transform:translateY(1px);}
+  button.sel{background:var(--chalk);color:#1a120a;border-color:#fff;}
+  button.win{background:#3a5a32;border-color:#5e8c4e;color:#eafbe0;flex:1;}
+  button.win2{background:#5a4a20;border-color:#8c7a3e;color:#fff6d8;flex:1;}
+  button.reset{background:#3a221c;border-color:#7a4a3a;color:#f0c0b0;}
+  .seg{display:flex;gap:6px;}
+  .seg button{min-width:38px;}
+  .note{font-size:11.5px;color:#857668;line-height:1.5;}
+  label.chk{display:flex;align-items:center;gap:7px;font-size:13px;color:#cdbfa6;cursor:pointer;}
+</style>
+</head>
+<body>
+  <div class="stage">
+    <img class="boss" id="bossImg" src="Characters_ART/Innkeeper.png" alt="">
+    <div class="boss-name" id="bossName">GROG</div>
+    <div class="slate" id="slate">
+      <div class="slate-label" id="slateLabel">The Tab</div>
+      <svg id="tally" height="52"></svg>
+      <div class="count" id="count"></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="row">
+      <span class="lbl">Target</span>
+      <div class="seg" id="targetSeg"></div>
+    </div>
+    <div class="row">
+      <button class="win"  id="win1">WIN  +1</button>
+      <button class="win2" id="win2">HANDICAP  +2</button>
+      <button class="reset" id="reset">RESET</button>
+    </div>
+    <div class="row">
+      <label class="chk"><input type="checkbox" id="showNum" checked> show <b>“3 / 5”</b> count under the tally</label>
+    </div>
+    <div class="row">
+      <label class="chk"><input type="checkbox" id="grp5" checked> group every 5th as a diagonal slash</label>
+    </div>
+  </div>
+
+<script>
+(function(){
+  var $=function(id){return document.getElementById(id);};
+  var svg=$('tally'), slate=$('slate');
+  var target=5, earned=0, prevEarned=0;
+
+  // stable per-slot jitter so re-renders don't wiggle
+  function jit(slot,seed){ return (Math.sin(slot*12.9898 + seed*78.233)*43758.5453 % 1) ; }
+
+  var GW=42, GAP=20, TOP=8, BOT=44; // group box geometry
+
+  function build(){
+    var grp5 = $('grp5').checked;
+    var perGroup = grp5 ? 5 : 1;            // when off, every stroke is its own "group" (plain row)
+    var groups = Math.ceil(target/perGroup);
+    var W = groups*GW + (groups-1)*GAP;
+    if(!grp5){ // plain row: tighter spacing
+      W = target*14 + (target-1)*6;
+    }
+    svg.setAttribute('width', W);
+    svg.setAttribute('viewBox','0 0 '+W+' 52');
+
+    var paths='';
+    for(var slot=0; slot<target; slot++){
+      var on = slot<earned;
+      var cls = 'stroke '+(on?'on':'ghost');
+      var d, cx;
+      if(grp5){
+        var g=Math.floor(slot/5), within=slot%5;
+        var ox=g*(GW+GAP);
+        if(within<4){
+          var x=ox+7+within*8 + jit(slot,1)*1.4;
+          d='M'+x+','+(TOP+jit(slot,2)*1.5)+' L'+(x+jit(slot,3)*2)+','+(BOT+jit(slot,4)*1.5);
+          cx=x;
+        }else{
+          // diagonal slash across the 4
+          var x1=ox+2, y1=BOT+2, x2=ox+34, y2=TOP-2;
+          d='M'+x1+','+y1+' L'+x2+','+y2;
+          cx=ox+18;
+        }
+      }else{
+        var x=slot*20 + 7 + jit(slot,1)*1.4;
+        d='M'+x+','+(TOP+jit(slot,2)*1.5)+' L'+(x+jit(slot,3)*2)+','+(BOT+jit(slot,4)*1.5);
+        cx=x;
+      }
+      paths+='<path class="'+cls+'" data-slot="'+slot+'" d="'+d+'"/>';
+    }
+    svg.innerHTML=paths;
+
+    // animate the newly chalked-in strokes
+    var fresh=[].slice.call(svg.querySelectorAll('.stroke.on')).filter(function(p){
+      var s=+p.getAttribute('data-slot'); return s>=prevEarned && s<earned;
+    });
+    fresh.forEach(function(p,i){
+      var len=p.getTotalLength();
+      p.style.strokeDasharray=len;
+      p.style.strokeDashoffset=len;
+      p.animate([{strokeDashoffset:len},{strokeDashoffset:0}],
+        {duration:300,delay:i*140,easing:'ease-out',fill:'forwards'});
+      setTimeout(function(){spawnPuff(p);}, i*140+220);
+    });
+
+    $('count').textContent = $('showNum').checked ? (earned+' / '+target) : '';
+  }
+
+  function spawnPuff(pathEl){
+    var bb=pathEl.getBoundingClientRect();
+    var sr=slate.getBoundingClientRect();
+    var puff=document.createElement('div');
+    puff.className='puff';
+    puff.style.left=(bb.left-sr.left + bb.width/2)+'px';
+    puff.style.top =(bb.top -sr.top  + bb.height*0.3)+'px';
+    slate.appendChild(puff);
+    requestAnimationFrame(function(){puff.classList.add('go');});
+    setTimeout(function(){puff.remove();}, 600);
+  }
+
+  // target segmented buttons 3..7
+  var seg=$('targetSeg');
+  [3,4,5,6,7].forEach(function(n){
+    var b=document.createElement('button');
+    b.textContent=n;
+    if(n===target)b.classList.add('sel');
+    b.onclick=function(){ target=n; if(earned>target)earned=target; prevEarned=earned;
+      [].forEach.call(seg.children,function(c){c.classList.toggle('sel',+c.textContent===n);});
+      build();
+    };
+    seg.appendChild(b);
+  });
+
+  $('win1').onclick=function(){ if(earned>=target)return; prevEarned=earned; earned=Math.min(target,earned+1); build(); };
+  $('win2').onclick=function(){ if(earned>=target)return; prevEarned=earned; earned=Math.min(target,earned+2); build(); };
+  $('reset').onclick=function(){ prevEarned=0; earned=0; build(); };
+  $('showNum').onchange=build;
+  $('grp5').onchange=function(){ prevEarned=earned; build(); };
+
+  build();
+})();
+</script>
+</body>
+</html>
