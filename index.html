@@ -8999,7 +8999,7 @@ const CARDS=[
   /* Silver */
   {id:'the_echo',name:'THE ECHO',icon:'🔊',rarity:'silver',eff:'SCORE → NEXT ROLL +35%',desc:'After a scoring roll, your next roll in the same turn gets a +35% score bonus.',arch:'sharp'},
   {id:'frozen_die',name:'FROZEN DIE',icon:'🧊',rarity:'silver',type:'active',maxUses:2,timing:'choosing',eff:'HOLD A DIE THROUGH REROLLS',desc:"Freeze a selected die — it keeps its face through your rerolls this turn (won't reroll). Hold a pair while you chase the third. Still scorable. Two uses per match.",arch:'sharp'},
-  {id:'double_down',name:'DOUBLE DOWN',icon:'✌️',rarity:'silver',type:'active',maxUses:1,timing:'choosing',eff:'2× TURN PTS, THEN REROLL ALL 6',desc:'Doubles the points you\'ve scored THIS turn, then frees all your kept dice for a fresh roll of all 6. Keep going from there — but a bust now loses the doubled total. One use.',arch:'brinksman'},
+  {id:'double_down',name:'DOUBLE DOWN',icon:'✌️',rarity:'silver',type:'active',maxUses:1,timing:'choosing',eff:'2× TURN PTS, THEN REROLL ALL',desc:'Doubles the points you\'ve scored THIS turn, then frees all your kept dice for a fresh roll. Keep going from there — but a bust now loses the doubled total. One use.',arch:'brinksman'},
   /* ── Tactile active cards (select a die, then activate) ── */
   /* COIN FLIP — restored from retired. Started at silver/2-use, briefly
      tin/1-use, now silver/1-use: the flip mechanic is strong enough that
@@ -14552,16 +14552,17 @@ function runOppTurn(){
       left=G.oppDice.filter(d=>!d.kept).length;
       if(left===0){G._oLastHotDice=true;left=6;setTimeout(step,1500);return;}
       /* DOUBLE DOWN NPC AI: when oppBank is solid (≥400) and reroll dice are
-         scarce (≤2 left), double oppBank and force re-roll all 6. Mirrors
-         player activateDoubleDown line ~15399. */
+         scarce (≤2 left), double oppBank and force a fresh reroll of the
+         opponent's whole hand. Mirrors player activateDoubleDown. */
       if(npcHasActive('double_down')&&oppBank>=400&&left<=2){
         npcUseActive('double_down');
         var _oddBefore=oppBank;oppBank*=2;
+        var _oFullHand=(G.matchOppDice&&G.matchOppDice.length)||6;
         triggerCard('double_down','×2 ('+_oddBefore+'→'+oppBank+')',false);
-        setStatusMsg(G.rung.name+': DOUBLE DOWN! '+oppBank+' — REROLL ALL 6','red');
+        setStatusMsg(G.rung.name+': DOUBLE DOWN! '+oppBank+' — REROLLING','red');
         /* Visual: scatter committed dice */
         G.oppDice.forEach(function(d){if(d.el){d.el.classList.add('opp-scatter');}});
-        setTimeout(function(){clearRow('oppDiceRow');G.oppDice=[];left=6;setTimeout(step,200);},900);return;
+        setTimeout(function(){clearRow('oppDiceRow');G.oppDice=[];left=_oFullHand;setTimeout(step,200);},900);return;
       }
       const bank=oppShouldBank(G.rung,oppBank,left,G.oPts,G.pPts,G.target);
       setTimeout(()=>{if(bank)finOpp(oppBank);else step();},1900);
@@ -17120,12 +17121,28 @@ function activateDoubleDown(){
   G.pool.forEach(function(d){if(d.committed&&d.el){d.el.classList.add('scatter');spawnPixelSparks(d.el,3);}});
   refreshKeptTray();updHUD();
   spawnPop('×2 DOUBLED');
-  /* Release all committed dice — force reroll of all 6 */
+  /* Release all committed dice — force a fresh reroll of the WHOLE hand. */
   setTimeout(function(){
-    G.pool.forEach(function(d){d.committed=false;d.sel=false;if(d.el){d.el.classList.remove('committed','selected','scatter');d.el.onclick=null;}});
-    clearRow('playerDiceRow');G.pool=[];G.numDice=6;
+    /* Roll the player's ACTUAL hand, not a hard-coded 6. matchDice.length
+       shrinks when a die is permanently removed (Obsidian shatter, a die
+       stolen by the opponent), so a hard 6 used to "resurrect" lost dice. */
+    var _fullHand=(G.matchDice&&G.matchDice.length)||6;
+    /* A held (frozen) die "holds through rerolls" — and Double Down IS a
+       reroll. Preserve frozen dice in place and only reroll the rest, so
+       the freeze isn't silently wiped and the count stays correct. */
+    var _frozenKeep=G.pool.filter(function(d){return d._frozen;});
+    G.pool.forEach(function(d){
+      if(d._frozen)return;/* leave the held die in the row + pool */
+      d.committed=false;d.sel=false;
+      if(d.el){d.el.classList.remove('committed','selected','scatter');d.el.onclick=null;d.el.remove();}
+    });
+    G.pool=_frozenKeep;
+    _frozenKeep.forEach(function(d){d.committed=false;d.sel=false;if(d.el){d.el.classList.remove('committed','selected','scatter');}});
+    /* handleRoll creates (numDice − pool.length) new dice and skips frozen
+       dice already in the pool, so total rolled = _fullHand. */
+    G.numDice=_fullHand;
     refreshKeptTray();updHUD();
-    setStatusMsg('DOUBLE DOWN! '+_ddNewPts+' PTS — ROLLING ALL 6','gold');
+    setStatusMsg('DOUBLE DOWN! '+_ddNewPts+' PTS — REROLLING','gold');
     /* Auto-roll: phase MUST be idle/choosing for handleRoll's gamblers_eye
        branch to skip cleanly. */
     G.phase='idle';
