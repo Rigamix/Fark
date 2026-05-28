@@ -19230,20 +19230,23 @@ function _wobblePts(x1,y1,x2,y2,seed){
   }
   return pts;
 }
-function _chalkDustCanvas(cv,pts,SCALE,padX,padY,delay,dur){
-  if(typeof FX==='undefined'||!FX||!FX.emit||!pts||pts.length<2)return;
+function _ptsToD(pts){
+  var d='M'+pts[0].x.toFixed(1)+','+pts[0].y.toFixed(1);
+  for(var i=1;i<pts.length;i++)d+=' L'+pts[i].x.toFixed(1)+','+pts[i].y.toFixed(1);
+  return d;
+}
+function _chalkDust(pathEl,svgEl,delay,dur){
+  if(typeof FX==='undefined'||!FX||!FX.emit||!pathEl.getPointAtLength)return;
+  var len; try{len=pathEl.getTotalLength();}catch(e){return;}
   var N=4;
   for(var i=0;i<=N;i++){
     (function(frac){
       setTimeout(function(){
         try{
-          var idx=frac*(pts.length-1), a=Math.floor(idx), f=idx-a;
-          var p0=pts[a], p1=pts[Math.min(a+1,pts.length-1)];
-          var gx=p0.x+(p1.x-p0.x)*f, gy=p0.y+(p1.y-p0.y)*f;
-          var r=cv.getBoundingClientRect();
-          var sx=r.left+(gx+padX)*SCALE, sy=r.top+(gy+padY)*SCALE;
+          var p=pathEl.getPointAtLength(len*frac), ctm=pathEl.getScreenCTM(); if(!ctm)return;
+          var pt=svgEl.createSVGPoint(); pt.x=p.x; pt.y=p.y; var sp=pt.matrixTransform(ctm);
           for(var k=0;k<2;k++){
-            FX.emit({x:sx+(Math.random()*2-1)*1.5, y:sy+(Math.random()*2-1)*1.5,
+            FX.emit({x:sp.x+(Math.random()*2-1)*1.5, y:sp.y+(Math.random()*2-1)*1.5,
               vx:(Math.random()*2-1)*12, vy:-(6+Math.random()*14),
               g:70, life:0.30+Math.random()*0.18, size:2, color:'#f4efe3'});
           }
@@ -19255,60 +19258,44 @@ function _chalkDustCanvas(cv,pts,SCALE,padX,padY,delay,dur){
 function _renderBossTally(container,target,earned,anim){
   target=Math.max(0,target|0); earned=Math.max(0,Math.min(target,earned|0));
   var animFrom=anim?anim.from:-1, animTo=anim?(anim.from+anim.earned):-1;
-  var SW=4, TOPY=4, ROWH=26, VS=8, ROWGAP=11;   /* stroke width, extents, spacing, row gap */
-  var GROUPSPAN=3*VS, padX=4, padY=6;
+  var SW=3, TOPY=4, ROWH=26, VS=8, ROWGAP=11;   /* stroke width, extents, spacing, row gap */
+  var GROUPSPAN=3*VS;
   var groups=Math.max(1,Math.ceil(target/5));
-  /* build strokes as wobble point-arrays; groups stack vertically (rows) */
+  /* groups stack VERTICALLY (rows) so the wider spacing still fits beside the boss */
   var strokes=[];
   for(var slot=0;slot<target;slot++){
     var g=Math.floor(slot/5), within=slot%5, roy=g*(ROWH+ROWGAP), on=slot<earned, pts, diag=false;
     if(within<4){ var x=within*VS+3; pts=_wobblePts(x,TOPY+roy,x,TOPY+ROWH+roy,slot*3+1); }
     else{ diag=true; pts=_wobblePts(-1,TOPY+ROWH+1+roy,GROUPSPAN+4,TOPY-1+roy,slot*3+2); }
-    strokes.push({pts:pts,on:on,slot:slot,diag:diag});
+    strokes.push({d:_ptsToD(pts),on:on,slot:slot,diag:diag});
   }
-  var Wv=GROUPSPAN+10, Hv=groups*ROWH+(groups-1)*ROWGAP+padY*2;
+  var Wv=GROUPSPAN+10, Hv=groups*ROWH+(groups-1)*ROWGAP+12;
   var SCALE=(window.innerWidth<=380)?1.15:1.5;
-  var dispW=Wv*SCALE, dispH=Hv*SCALE;
-  var UP=3;                                       /* pixel chunk: backing upscaled UP× */
-  var bw=Math.max(1,Math.round(dispW/UP)), bh=Math.max(1,Math.round(dispH/UP)), gsc=bw/Wv;
   var GHOST='#9c8c74', CHALK='#f2ede1';
-  var cv=document.createElement('canvas');
-  cv.className='boss-tally'; cv.width=bw; cv.height=bh;
-  cv.style.width=dispW+'px'; cv.style.height=dispH+'px'; cv.style.imageRendering='pixelated';
-  container.innerHTML=''; container.appendChild(cv);
-  var ctx=cv.getContext('2d'); ctx.lineCap='round'; ctx.lineJoin='round';
   /* verticals first, diagonals last → the opaque slash sits on top, no blend */
   var ordered=strokes.filter(function(s){return !s.diag;}).concat(strokes.filter(function(s){return s.diag;}));
-  function drawStroke(s,frac){
-    var p=s.pts, n=p.length; if(n<2)return;
-    ctx.strokeStyle=s.on?CHALK:GHOST; ctx.lineWidth=Math.max(1.2,SW*gsc);
-    ctx.beginPath(); ctx.moveTo((p[0].x+padX)*gsc,(p[0].y+padY)*gsc);
-    var lim=(n-1)*(frac==null?1:frac);
-    for(var i=1;i<n;i++){
-      if(i<=lim){ ctx.lineTo((p[i].x+padX)*gsc,(p[i].y+padY)*gsc); }
-      else{ var f=lim-(i-1); if(f>0){var qx=p[i-1].x+(p[i].x-p[i-1].x)*f, qy=p[i-1].y+(p[i].y-p[i-1].y)*f; ctx.lineTo((qx+padX)*gsc,(qy+padY)*gsc);} break; }
-    }
-    ctx.stroke();
-  }
-  function redraw(prog){
-    ctx.clearRect(0,0,cv.width,cv.height);
-    ordered.forEach(function(s){ var fr=(prog&&prog[s.slot]!=null)?prog[s.slot]:1; if(fr>0)drawStroke(s,fr); });
-  }
-  redraw(null);
+  var inner='';
+  ordered.forEach(function(s){
+    inner+='<path class="bt-stroke" data-slot="'+s.slot+'" data-on="'+(s.on?1:0)+'" d="'+s.d+'" '+
+      'fill="none" stroke="'+(s.on?CHALK:GHOST)+'" stroke-width="'+SW+'" stroke-linecap="round" stroke-linejoin="round"/>';
+  });
+  /* Full-resolution SVG with shape-rendering:crispEdges → anti-aliasing OFF,
+     so the strokes have hard, aliased edges (sharp — not smooth, not the
+     blurry chunky-upscale look). */
+  container.innerHTML='<svg class="boss-tally" width="'+(Wv*SCALE)+'" height="'+(Hv*SCALE)+'" viewBox="0 0 '+Wv+' '+Hv+'" shape-rendering="crispEdges" overflow="visible">'+
+    '<g transform="translate(4,6)">'+inner+'</g></svg>';
   if(anim){
-    var fresh=ordered.filter(function(s){return s.on&&s.slot>=animFrom&&s.slot<animTo;}).sort(function(a,b){return a.slot-b.slot;});
-    if(fresh.length){
-      var prog={}; fresh.forEach(function(s){prog[s.slot]=0;});
-      var t0=null, per=300, stag=170;
-      var loop=function(ts){
-        if(t0==null)t0=ts; var el=ts-t0, pending=false;
-        fresh.forEach(function(s,i){ var lp=(el-i*stag)/per; prog[s.slot]=Math.max(0,Math.min(1,lp)); if(prog[s.slot]<1)pending=true; });
-        redraw(prog);
-        if(pending)requestAnimationFrame(loop);
-      };
-      requestAnimationFrame(loop);
-      fresh.forEach(function(s,i){ _chalkDustCanvas(cv,s.pts,SCALE,padX,padY,i*stag+150,per); });
-    }
+    var svgEl=container.querySelector('svg');
+    var fresh=[].slice.call(container.querySelectorAll('.bt-stroke')).filter(function(p){
+      var sl=+p.getAttribute('data-slot'); return p.getAttribute('data-on')==='1'&&sl>=animFrom&&sl<animTo;
+    }).sort(function(a,b){return (+a.getAttribute('data-slot'))-(+b.getAttribute('data-slot'));});
+    fresh.forEach(function(p,i){
+      var len; try{len=p.getTotalLength();}catch(e){return;}
+      p.style.strokeDasharray=len; p.style.strokeDashoffset=len;
+      var delay=i*180+200;
+      p.animate([{strokeDashoffset:len},{strokeDashoffset:0}],{duration:300,delay:delay,easing:'ease-out',fill:'forwards'});
+      _chalkDust(p,svgEl,delay,300);
+    });
   }
 }
 
