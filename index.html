@@ -7756,6 +7756,7 @@ function saveMatchState(){
     dieShieldsPlayer:G.dieShieldsPlayer,dieShieldsOpp:G.dieShieldsOpp,
     activeCardState:JSON.parse(JSON.stringify(G.activeCardState||{})),
     crowsLuckCtx:{...G.crowsLuckCtx},
+    _pCrowsCtx:{...G._pCrowsCtx},
     bossState:{...G.bossState},
     npcCardState:JSON.parse(JSON.stringify(G.npcCardState||{})),
     dlgFlags:{pLead:G._dlgPLead,oLead:G._dlgOLead,pNear:G._dlgPNear,
@@ -10152,6 +10153,25 @@ function scoreSelection(selVals,cards,locked,context,dieMats){
   return _bestValid+_gc;
 }
 function anyScoring(vals,cards,dieMats){return scoreRoll(vals,cards||[],0,{},dieMats).total>0;}
+/* ── NPC-held Crow's Luck → downgrades the PLAYER's straights ──
+   Mirror of the player-held case (runOppTurn / G._pCrowsCtx). G.crowsLuckCtx is
+   built from the OPPONENT's cards in newG and persists for the whole match (two
+   charges). We thread it into the player's scoring so the NPC's card actually
+   bites. To keep charges honest across preview-then-commit, ALL scoring runs
+   against a COPY (downgrade is shown, no charge spent); only an accepted commit
+   syncs the copy's spend back onto the real per-match object via _pCrowsCommit. */
+function _pCrowsForScore(){
+  var c=G&&G.crowsLuckCtx;
+  if(!c||!c.crowsLuck)return undefined;
+  return Object.assign({},c,{crowsLuckFiredThisRoll:false});
+}
+function _pCrowsCommit(copyCtx){
+  var c=G&&G.crowsLuckCtx;
+  if(!c||!copyCtx||!copyCtx.crowsLuckFiredThisRoll)return;
+  c.crowsLuckRemaining=copyCtx.crowsLuckRemaining;
+  if(copyCtx.crowsLuckUsed!==undefined)c.crowsLuckUsed=copyCtx.crowsLuckUsed;
+  triggerCard('crows_luck',"CROW'S LUCK — STRAIGHT DOWNGRADED",false);
+}
 function isCombo(vals){
   if(vals.length<3)return false;
   /* Check for actual combos: triples+, straights, three pairs */
@@ -11018,6 +11038,11 @@ function newG(rung,pCards,oCards,pStake,oStake){
     _featTemptingFate:false,_featWinBankRolls:0,_turnTriple1Scored:false,_rolledAfterTriple1:false,
     activeCardState:{usedCards:{},stitchActive:false,vowActive:false,hexActive:false,secondWindActive:false,allInActive:false,pyreBonus:0},
     crowsLuckCtx:{crowsLuck:oCards.includes('crows_luck'),crowsLuckRemaining:oCards.includes('crows_luck')?2:0,crowsLuckFiredThisRoll:false},
+    /* Player-held Crow's Luck: "twice per match". Stored on G so the two charges
+       survive across NPC turns — runOppTurn reuses THIS object instead of
+       recreating a fresh one each turn (which used to reset remaining to 2,
+       giving the player 2 downgrades per NPC turn instead of per match). */
+    _pCrowsCtx:{crowsLuck:pCards.includes('crows_luck'),crowsLuckRemaining:pCards.includes('crows_luck')?2:0,crowsLuckFiredThisRoll:false},
     /* Boss edict system removed — kept empty bossState object to avoid breaking
        any legacy save-state payloads that reference it. */
     bossState:{
@@ -11870,7 +11895,7 @@ function toggleDie(d){
     /* Check if the current selection actually scores before any VFX */
     var selD=G.pool.filter(function(x){return x.sel&&!x.committed;});
     var pts=scoreSelection(selD.map(function(x){return x.val;}),effectiveCards(),
-      G.kept.reduce(function(a,k){return a+k.pts;},0),undefined,
+      G.kept.reduce(function(a,k){return a+k.pts;},0),_pCrowsForScore(),
       selD.map(function(x){return x.mat;}));
     if(pts>0){
       /* count: committed tray dice + currently selected */
@@ -12093,6 +12118,12 @@ function handleRoll(){
      (phase==='rolling') so a second tap can't queue up a re-roll
      before the first settles. */
   if(!G||G.phase==='opp'||G.phase==='rolling'||G.phase==='yielding')return;
+  /* Auto-roll lock: a bust-save (_runSave) and Double Down set phase='idle'
+     then schedule handleRoll after a delay. 'idle' is normally rollable, so
+     without this flag a manual ROLL tap during that 0.6–1.7s window fires a
+     second roll on top of the queued one. The scheduled callback clears the
+     flag right before it rolls, so only the manual tap is blocked. */
+  if(G._rollLocked)return;
   /* Block roll while a die-mutating active is mid-animation (Finnick's
      Palm). Without this, hitting ROLL during the 840 ms swap re-rolls
      the target die mid-flip and leaves it in a broken visual state. */
@@ -12206,26 +12237,28 @@ function handleRoll(){
     const selVals=_selVals,selMats=_selMats; // downstream compat (G.kept.push)
     var _scoreVals,_scoreMats;
     let pts;
+    var _cw=_pCrowsForScore();
     if(_anchorDie){
       /* Probe: is the 6 used by normal scoring (e.g. triple)? */
       var _probe=scoreRoll(_selVals,cards,locked,undefined,_selMats);
       if(_probe.used&&_probe.used[_anchorIdx]){
         /* 6 is consumed by pattern → keep full selection, just stack +150 */
-        pts=scoreSelection(_selVals,cards,locked,undefined,_selMats);
+        pts=scoreSelection(_selVals,cards,locked,_cw,_selMats);
         _anchorPts=600;
       }else{
         /* 6 not used → remove it from scoring pool so commit accepts, treat as lone 150 */
         _scoreVals=_selVals.filter(function(_,i){return i!==_anchorIdx;});
         _scoreMats=_selMats.filter(function(_,i){return i!==_anchorIdx;});
-        pts=_scoreVals.length?scoreSelection(_scoreVals,cards,locked,undefined,_scoreMats):0;
+        pts=_scoreVals.length?scoreSelection(_scoreVals,cards,locked,_cw,_scoreMats):0;
         _anchorPts=600;
       }
     }else{
-      pts=scoreSelection(_selVals,cards,locked,undefined,_selMats);
+      pts=scoreSelection(_selVals,cards,locked,_cw,_selMats);
     }
     /* Reject if base scoring returned -1 (unused dice) OR returned 0 without anchor firing */
     if(pts<0||(pts===0&&!_anchorDie)){SFX.err();setStatusMsg('NO SCORE — TRY AGAIN','red');return;}
     pts+=_anchorPts;
+    _pCrowsCommit(_cw);/* selection accepted → spend the NPC's Crow's Luck charge if a straight was downgraded */
     if(_anchorDie){triggerCard('anchor','ANCHOR +600',true);spawnPop('+600 ANCHOR');}
     /* ── POSITION-BASED CARD BONUSES (Vagabond synergy) ──
        Positions are read from G.pool (roll order, stable across commits). */
@@ -12831,7 +12864,7 @@ function refreshSelUI(){
   if(G&&G.phase!=='choosing'&&G.phase!=='idle'&&G.phase!=='gamblers_eye')return;
   const selD=G.pool.filter(d=>d.sel&&!d.committed);const selV=selD.map(d=>d.val);const selMats=selD.map(d=>d.mat);const locked=G.kept.reduce((a,k)=>a+k.pts,0);const cards=effectiveCards();
   if(!selV.length){G.turnPts=locked+(G._stakesRisingBonus||0);updHUD();setBtns(false,locked>0||(G._stakesRisingBonus||0)>0);setStatusMsg('','');_clearDieEffects();G.pool.forEach(d=>{d.el.classList.remove('combo-glow');d.el.style.removeProperty('--gd');});G._comboGlow=false;return;}
-  const _sr=scoreRoll(selV,cards,locked,undefined,selMats);
+  const _sr=scoreRoll(selV,cards,locked,_pCrowsForScore(),selMats);
   let pts=_sr.used.some(u=>!u)?-1:_sr.total;
   const ok=pts>0;G.turnPts=locked+(ok?pts:0)+(G._stakesRisingBonus||0);updHUD();
   /* Die effect visuals */
@@ -12903,7 +12936,8 @@ function _tryBustSave(free){
     G._bustSavedThisTurn=true;
     triggerCard(label,text,true);
     _updatePlayerCardVisuals();
-    setTimeout(handleRoll,1700);
+    G._rollLocked=true;
+    setTimeout(function(){G._rollLocked=false;handleRoll();},1700);
   }
   /* Brutus's Grit (boss passive): only the FIRST bust under 500 turn pts is saved
      per match — sim showed 3 saves stacked with Martyr/Iron Stomach pushed win rate
@@ -13253,8 +13287,10 @@ function handleBank(){
   if(G&&G._palmAnimating)return;
   const selD=G.pool.filter(d=>d.sel&&!d.committed);
   if(selD.length){const selV=selD.map(d=>d.val);const selMats=selD.map(d=>d.mat);const locked=G.kept.reduce((a,k)=>a+k.pts,0);const cards=effectiveCards();
-    let pts=scoreSelection(selV,cards,locked,undefined,selMats);
+    var _cw=_pCrowsForScore();
+    let pts=scoreSelection(selV,cards,locked,_cw,selMats);
     if(pts>0){
+      _pCrowsCommit(_cw);/* banked straight downgraded by NPC's Crow's Luck → spend a charge */
       var _cfBank=false;
       if(G._tell&&G._tell.id==='counterfeit'&&selD.some(function(d){return d.cursed;})){_cfBank=true;pts=Math.floor(pts/2);spawnPop('💀 −HALF');try{SFX.err&&SFX.err();}catch(e){}}
       selD.forEach(d=>{d.committed=true;if(d.el){d.el.classList.add('committed');d.el.onclick=null;}});
@@ -13844,6 +13880,10 @@ function oppShouldBank(rung,oppBank,diceLeft,oppTotal,playerTotal,target){
   if(oppBank>=2000&&!(diceLeft>=4&&_severelyBehind))return true;
   if(oppBank>=1500&&diceLeft<=3)return true;
   let agg=rung.agg;
+  /* Per-call effective min-bank. Must NOT mutate rung.minBank — rung is a
+     per-match copy reused every roll, so mutating it (e.g. the Rising Stakes
+     reduction below) would permanently ratchet the value down. */
+  var minBank=rung.minBank;
   /* ── PERSONA BEHAVIOUR (Phase 3): make the NPC play to its plan. ──
      'safe'  (ones / hoard)      → bank earlier, lock in singles/economy.
                                     Mirrors the player's winning 1s/5s
@@ -13875,7 +13915,7 @@ function oppShouldBank(rung,oppBank,diceLeft,oppTotal,playerTotal,target){
     /* Player on a hot streak: push harder to keep up */
     if(_rsPlM>=2.0)agg=Math.min(0.95,agg+0.15);
     /* Lower min-bank when on streak — even small banks are multiplied */
-    if(_rsOppM>1)rung.minBank=Math.max(50,Math.round(rung.minBank/_rsOppM));
+    if(_rsOppM>1)minBank=Math.max(50,Math.round(minBank/_rsOppM));
   }
   if(rung.chaotic)agg=Math.random()*0.5+0.4;/* Grog: random 0.4-0.9 — unpredictable but dangerous */
   if(rung.adaptive){const gap=playerTotal-oppTotal;const gapRatio=gap/target;
@@ -13900,7 +13940,7 @@ function oppShouldBank(rung,oppBank,diceLeft,oppTotal,playerTotal,target){
   var _behind=_gapRatio<-0.10;
   var _isSuddenDeath=G&&G._handicap==='sudden_death';
   /* Force-push below minBank: always at 3+ dice. At 1-2 dice, depends on score context. */
-  if(oppBank<rung.minBank){
+  if(oppBank<minBank){
     if(diceLeft>=3)return false;/* plenty of dice → standard push */
     if(_behind)return false;/* nothing to lose → push at 1-2 dice */
     if(_isSuddenDeath&&!_ahead)return false;/* SD pressure → push if not ahead */
@@ -13911,7 +13951,7 @@ function oppShouldBank(rung,oppBank,diceLeft,oppTotal,playerTotal,target){
     return true;
   }
   /* diceStop: strong banking pressure when few dice remain (above minBank — safe to bank) */
-  if(diceLeft<=rung.diceStop&&oppBank>=rung.minBank){
+  if(diceLeft<=rung.diceStop&&oppBank>=minBank){
     var stopChance=diceLeft===1?0.85:(1-agg*0.4);
     /* AHEAD: lock in even harder (raise stopChance). BEHIND: push more (lower it). */
     if(_ahead)stopChance=Math.min(0.98,stopChance+0.15);
@@ -13919,7 +13959,7 @@ function oppShouldBank(rung,oppBank,diceLeft,oppTotal,playerTotal,target){
     if(Math.random()<stopChance)return true;
   }
   /* Safety bank: scale threshold with minBank so Serpent's Whisper isn't bypassed */
-  var bankFloor=Math.max(300,rung.minBank);
+  var bankFloor=Math.max(300,minBank);
   if(Math.random()>agg&&oppBank>bankFloor)return true;
   /* Low-tier conservative banking: more willing to bank moderate scores */
   if(agg<0.6&&oppBank>=200&&diceLeft<=3&&Math.random()>agg)return true;
@@ -14005,7 +14045,12 @@ function runOppTurn(){
   if(G.pCards.includes('whispers_veil')&&G.oppTurnCount%2===1){left=Math.min(left,5);}
   /* Whisper's Hex: reduce starting dice by 1 (stacks with jinx) */
   if(G.activeCardState&&G.activeCardState.hexActive){G.activeCardState.hexActive=false;clearCardLabel('whispers_hex');left=Math.max(left-1,3);triggerCard('whispers_hex','HEX — '+left+' DICE',true);}
-  let crowsCtx={crowsLuck:G.pCards.includes('crows_luck'),crowsLuckRemaining:G.pCards.includes('crows_luck')?2:0,crowsLuckFiredThisRoll:false};
+  /* Reuse the persistent per-match context (see newG._pCrowsCtx) so charges
+     don't refill each NPC turn. scoreRoll mutates this object in place. */
+  let crowsCtx=G._pCrowsCtx||(G._pCrowsCtx={crowsLuck:G.pCards.includes('crows_luck'),crowsLuckRemaining:G.pCards.includes('crows_luck')?2:0,crowsLuckFiredThisRoll:false});
+  /* Re-derive "currently holds it" each turn in case the card was lost mid-match;
+     the remaining-charge count persists on the object across turns. */
+  crowsCtx.crowsLuck=G.pCards.includes('crows_luck');
   G.oppTurnCount=(G.oppTurnCount||0)+1;
   /* Synergy: The Sting — opponent loses 100 every 4th turn */
   if(G.activeSynergies&&G.activeSynergies.includes('dirty_pair')&&G.oppTurnCount%4===0){G.oPts=Math.max(0,G.oPts-100);spawnPop('-100 \uD83D\uDC1D');}
@@ -17184,8 +17229,8 @@ function activateDoubleDown(){
     setStatusMsg('DOUBLE DOWN! '+_ddNewPts+' PTS — REROLLING','gold');
     /* Auto-roll: phase MUST be idle/choosing for handleRoll's gamblers_eye
        branch to skip cleanly. */
-    G.phase='idle';
-    setTimeout(function(){handleRoll();},600);
+    G.phase='idle';G._rollLocked=true;
+    setTimeout(function(){G._rollLocked=false;handleRoll();},600);
   },450);
 }
 
@@ -17779,6 +17824,7 @@ function initMatchScreen(data){
     G.dieShieldsPlayer=rd.dieShieldsPlayer;G.dieShieldsOpp=rd.dieShieldsOpp;
     if(rd.activeCardState)G.activeCardState=rd.activeCardState;
     if(rd.crowsLuckCtx)G.crowsLuckCtx=rd.crowsLuckCtx;
+    if(rd._pCrowsCtx)G._pCrowsCtx=rd._pCrowsCtx;
     if(rd.bossState)G.bossState=rd.bossState;
     if(rd.npcCardState)G.npcCardState=rd.npcCardState;
     if(rd.dlgFlags){var f=rd.dlgFlags;G._dlgPLead=f.pLead;G._dlgOLead=f.oLead;G._dlgPNear=f.pNear;G._dlgONear=f.oNear;G._dlgClose=f.close;G._dlgLoseBad=f.loseBad;G._dlgWinBad=f.winBad;}
