@@ -2703,7 +2703,10 @@ body::before,body::after{display:none!important}
 .tier-coin.lose{animation:tierCoinLose .6s ease-in forwards}
 .tier-boss-preview{text-align:center;padding:4px 0 0;width:100%;margin-top:auto}
 .tier-boss-top{position:relative;width:100%;display:flex;align-items:center;justify-content:center}
-.tier-boss-top .tier-progress{position:absolute;left:36px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;align-items:center;gap:5px;z-index:3}
+/* Right-anchored just left of the centered boss portrait so the chalk
+   tally keeps a consistent gap to the boss and grows LEFTWARD as it widens
+   (wider tallies at higher tiers no longer push into the portrait). */
+.tier-boss-top .tier-progress{position:absolute;right:calc(50% + 62px);left:auto;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;align-items:flex-end;gap:5px;z-index:3}
 .tier-boss-name{font-family:var(--font-px);font-size:24px;color:#e06050;margin-top:-8px;letter-spacing:4px;text-shadow:0 2px 0 rgba(0,0,0,.5);position:relative;z-index:2}
 /* Boss "house rule" (Tell) badge — shown in advance so the player can
    prep their deck/dice/banking against it before committing to the boss. */
@@ -19253,8 +19256,10 @@ function _wobbleD(x1,y1,x2,y2,seed){
 function _renderBossTally(container,target,earned,anim){
   target=Math.max(0,target|0); earned=Math.max(0,Math.min(target,earned|0));
   var animFrom=anim?anim.from:-1, animTo=anim?(anim.from+anim.earned):-1;
-  var SW=3, TOPY=4, BOTY=30, VS=7;          /* stroke width / extents / spacing */
-  var GROUPSPAN=3*VS, GAP=12;               /* 4 verticals span 3*VS, then a gap */
+  var SW=3, TOPY=4, BOTY=30, VS=5;          /* stroke width / extents / spacing */
+  var GROUPSPAN=3*VS, GAP=8;                 /* 4 verticals span 3*VS, then a gap
+                                                (kept tight so the 50%-scaled 2-group
+                                                tally still fits beside the big boss) */
   var groups=Math.max(1,Math.ceil(target/5));
   var strokes=[];
   for(var slot=0;slot<target;slot++){
@@ -19264,6 +19269,7 @@ function _renderBossTally(container,target,earned,anim){
     strokes.push({d:d,on:on,slot:slot,diag:diag});
   }
   var W=groups*GROUPSPAN+(groups-1)*GAP+10, H=BOTY+12;
+  var SCALE=1.5;/* render 50% larger; viewBox stays so geometry + getScreenCTM still map */
   var GHOST='#9c8c74', CHALK='#f2ede1';
   /* verticals first, diagonals last → the opaque slash sits on top, no blend */
   var ordered=strokes.filter(function(s){return !s.diag;}).concat(strokes.filter(function(s){return s.diag;}));
@@ -19272,7 +19278,7 @@ function _renderBossTally(container,target,earned,anim){
     inner+='<path class="bt-stroke" data-slot="'+s.slot+'" data-on="'+(s.on?1:0)+'" d="'+s.d+'" '+
       'fill="none" stroke="'+(s.on?CHALK:GHOST)+'" stroke-width="'+SW+'" stroke-linecap="round" stroke-linejoin="round"/>';
   });
-  container.innerHTML='<svg class="boss-tally" width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" overflow="visible">'+
+  container.innerHTML='<svg class="boss-tally" width="'+(W*SCALE)+'" height="'+(H*SCALE)+'" viewBox="0 0 '+W+' '+H+'" overflow="visible">'+
     '<g transform="translate(4,6)">'+inner+'</g></svg>';
   if(anim){
     var svgEl=container.querySelector('svg');
@@ -19287,6 +19293,25 @@ function _renderBossTally(container,target,earned,anim){
       _chalkDust(p,svgEl,delay,300);
     });
   }
+}
+
+/* Place the chalk tally just left of the boss portrait's VISUAL edge. The
+   portrait is transform-scaled to a size that varies a lot by viewport
+   (≈92px on short screens up to ≈180px on tall ones), so a fixed CSS anchor
+   can't keep a steady gap — we measure the img and right-anchor the tally,
+   clamped so the (left-growing) strokes never run off the screen edge. */
+function _positionBossTally(){
+  var prog=document.querySelector('#screen-gauntlet .tier-boss-top .tier-progress');
+  var tbt=document.querySelector('#screen-gauntlet .tier-boss-top');
+  if(!prog||!tbt)return;
+  var svg=prog.querySelector('svg'); if(!svg)return;
+  var tw=svg.getBoundingClientRect().width, tr=tbt.getBoundingClientRect();
+  var img=document.querySelector('#tierBossPortrait img'), rightPx;
+  if(img){ var ir=img.getBoundingClientRect(); rightPx=tr.right-ir.left+10; }
+  else { rightPx=tr.width/2+64; }
+  var maxRight=tr.width-tw-4;
+  if(rightPx>maxRight)rightPx=Math.max(4,maxRight);
+  prog.style.right=rightPx+'px'; prog.style.left='auto';
 }
 
 /* ═══════ TIER SCREEN (replaces gauntlet) ═══════ */
@@ -19359,6 +19384,7 @@ function initTierScreen(data){
       var _tCount=Math.min(_coinAnim.earned,8);
       setTimeout(function(){if(SFX.coinScatter)SFX.coinScatter(_tCount);else if(SFX.coins)SFX.coins();},250);
     }
+    /* tally positioned synchronously below, once the portrait is rendered */
   }
   /* Boss preview */
   var bp=document.getElementById('tierBossPortrait');
@@ -19392,6 +19418,9 @@ function initTierScreen(data){
   })();
   /* Boss loadout preview (cards + dice) */
   _renderBossLoadout(tier);
+  /* Position the chalk tally just left of the now-rendered portrait
+     (synchronous — no rAF, so it's correct on first paint with no flash). */
+  _positionBossTally();
   /* Boss button — enabled when enough coins */
   var bw=document.getElementById('tierBossWrap');
   var bb=document.getElementById('tierBossBtn');
