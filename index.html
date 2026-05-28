@@ -19205,6 +19205,90 @@ function _showLegendDraft(){
   return true;
 }
 
+/* ═══════ BOSS-PROGRESS TALLY ═══════
+   Chalk tally drawn next to the boss. Ghost strokes (opaque light brown)
+   show the target up front; earned strokes are bright chalk-white. Every
+   5th in a group is a diagonal slash drawn over the prior four (drawn last
+   so the opaque overlap never blends). A subtle SVG turbulence filter gives
+   the strokes a hand-drawn wobble. New strokes draw on with chalk-dust
+   particles trailing the tip (via the FX pool). No box, no glow. */
+function _chalkDust(pathEl,svgEl,drawDelay,drawDur){
+  if(typeof FX==='undefined'||!FX||!FX.emit||!pathEl.getPointAtLength)return;
+  var len; try{len=pathEl.getTotalLength();}catch(e){return;}
+  var N=4;
+  for(var i=0;i<=N;i++){
+    (function(frac){
+      setTimeout(function(){
+        try{
+          var p=pathEl.getPointAtLength(len*frac);
+          var ctm=pathEl.getScreenCTM(); if(!ctm)return;
+          var pt=svgEl.createSVGPoint(); pt.x=p.x; pt.y=p.y;
+          var sp=pt.matrixTransform(ctm);
+          for(var k=0;k<2;k++){
+            FX.emit({x:sp.x+(Math.random()*2-1)*1.5, y:sp.y+(Math.random()*2-1)*1.5,
+              vx:(Math.random()*2-1)*12, vy:-(6+Math.random()*14),
+              g:70, life:0.30+Math.random()*0.18, size:2, color:'#f4efe3'});
+          }
+        }catch(e){}
+      }, drawDelay+frac*drawDur);
+    })(i/N);
+  }
+}
+/* Hand-drawn wobble baked into the path geometry (no SVG filter — cheaper
+   and renders identically everywhere). Samples a few points along the line
+   and nudges each perpendicular by a small, DETERMINISTIC amount (stable per
+   seed so it doesn't wiggle on re-render). Endpoints stay put for clean caps. */
+function _wobbleD(x1,y1,x2,y2,seed){
+  var segs=4, dx=x2-x1, dy=y2-y1, len=Math.hypot(dx,dy)||1;
+  var nx=-dy/len, ny=dx/len, d='M'+x1.toFixed(1)+','+y1.toFixed(1);
+  for(var i=1;i<=segs;i++){
+    var t=i/segs, px=x1+dx*t, py=y1+dy*t;
+    var r=Math.sin((seed+i)*12.9898)*43758.5453; r-=Math.floor(r); var j=r*2-1; /* -1..1 */
+    var amp=(i===segs)?0:1.2;
+    px+=nx*j*amp; py+=ny*j*amp;
+    d+=' L'+px.toFixed(1)+','+py.toFixed(1);
+  }
+  return d;
+}
+function _renderBossTally(container,target,earned,anim){
+  target=Math.max(0,target|0); earned=Math.max(0,Math.min(target,earned|0));
+  var animFrom=anim?anim.from:-1, animTo=anim?(anim.from+anim.earned):-1;
+  var SW=3, TOPY=4, BOTY=30, VS=7;          /* stroke width / extents / spacing */
+  var GROUPSPAN=3*VS, GAP=12;               /* 4 verticals span 3*VS, then a gap */
+  var groups=Math.max(1,Math.ceil(target/5));
+  var strokes=[];
+  for(var slot=0;slot<target;slot++){
+    var g=Math.floor(slot/5), within=slot%5, ox=g*(GROUPSPAN+GAP), on=slot<earned, d, diag=false;
+    if(within<4){ var x=ox+within*VS+3; d=_wobbleD(x,TOPY,x,BOTY,slot*3+1); }
+    else{ diag=true; d=_wobbleD(ox-1,BOTY+1,ox+GROUPSPAN+4,TOPY-1,slot*3+2); }
+    strokes.push({d:d,on:on,slot:slot,diag:diag});
+  }
+  var W=groups*GROUPSPAN+(groups-1)*GAP+10, H=BOTY+12;
+  var GHOST='#9c8c74', CHALK='#f2ede1';
+  /* verticals first, diagonals last → the opaque slash sits on top, no blend */
+  var ordered=strokes.filter(function(s){return !s.diag;}).concat(strokes.filter(function(s){return s.diag;}));
+  var inner='';
+  ordered.forEach(function(s){
+    inner+='<path class="bt-stroke" data-slot="'+s.slot+'" data-on="'+(s.on?1:0)+'" d="'+s.d+'" '+
+      'fill="none" stroke="'+(s.on?CHALK:GHOST)+'" stroke-width="'+SW+'" stroke-linecap="round" stroke-linejoin="round"/>';
+  });
+  container.innerHTML='<svg class="boss-tally" width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" overflow="visible">'+
+    '<g transform="translate(4,6)">'+inner+'</g></svg>';
+  if(anim){
+    var svgEl=container.querySelector('svg');
+    var fresh=[].slice.call(container.querySelectorAll('.bt-stroke')).filter(function(p){
+      var sl=+p.getAttribute('data-slot'); return p.getAttribute('data-on')==='1'&&sl>=animFrom&&sl<animTo;
+    }).sort(function(a,b){return (+a.getAttribute('data-slot'))-(+b.getAttribute('data-slot'));});
+    fresh.forEach(function(p,i){
+      var len; try{len=p.getTotalLength();}catch(e){return;}
+      p.style.strokeDasharray=len; p.style.strokeDashoffset=len;
+      var delay=i*180+200;
+      p.animate([{strokeDashoffset:len},{strokeDashoffset:0}],{duration:300,delay:delay,easing:'ease-out',fill:'forwards'});
+      _chalkDust(p,svgEl,delay,300);
+    });
+  }
+}
+
 /* ═══════ TIER SCREEN (replaces gauntlet) ═══════ */
 function initTierScreen(data){
   _getS();
@@ -19264,34 +19348,16 @@ function initTierScreen(data){
   })();
   /* Update header */
   var tn=document.getElementById('tierName');if(tn)tn.textContent=tier.name;
-  /* Render coin slots */
+  /* Render boss-progress as a chalk tally next to the boss (replaces the
+     old coin pips). Ghost strokes show the target up front; patron wins
+     chalk them in. */
   var tc=document.getElementById('tierCoins');
   var _coinAnim=data&&data.coinAnim?data.coinAnim:null;
   if(tc){
-    var coinHtml='';
-    for(var ci=0;ci<tier.pointsNeeded;ci++){
-      /* If animating, show coins up to 'from' as earned, new ones start empty and pop in */
-      var isEarned=ci<S.run.points;
-      var isNew=_coinAnim&&ci>=_coinAnim.from&&ci<_coinAnim.from+_coinAnim.earned;
-      coinHtml+='<div class="tier-coin '+(isEarned&&!isNew?'earned':'empty')+'" data-idx="'+ci+'"></div>';
-    }
-    tc.innerHTML=coinHtml;
-    /* Animate newly earned coins popping in. SFX.coinScatter fires ONCE
-       up-front (sounds like coins clinking together over ~0.5s) instead
-       of SFX.coins() per coin — the per-coin version was reading as
-       "victory audio repeating several times" (player feedback). */
-    if(_coinAnim){
-      var newCoins=tc.querySelectorAll('.tier-coin');
-      var _coinCount=Math.min(_coinAnim.earned,8);
-      if(_coinCount>0)setTimeout(function(){if(SFX.coinScatter)SFX.coinScatter(_coinCount);else if(SFX.coins)SFX.coins();},250);
-      for(var ai=_coinAnim.from;ai<_coinAnim.from+_coinAnim.earned&&ai<newCoins.length;ai++){
-        (function(coin,delay){
-          setTimeout(function(){
-            coin.classList.remove('empty');
-            coin.classList.add('earned','pop');
-          },delay);
-        })(newCoins[ai],(ai-_coinAnim.from)*350+300);
-      }
+    _renderBossTally(tc,tier.pointsNeeded,S.run.points,_coinAnim);
+    if(_coinAnim&&_coinAnim.earned>0){
+      var _tCount=Math.min(_coinAnim.earned,8);
+      setTimeout(function(){if(SFX.coinScatter)SFX.coinScatter(_tCount);else if(SFX.coins)SFX.coins();},250);
     }
   }
   /* Boss preview */
