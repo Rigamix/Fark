@@ -6566,6 +6566,15 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
             <div class="rp-note">Climb through 8 tiers, each with patron rivals and a boss. Win matches against patrons to earn tier points. Collect enough and the <b style="color:#2a5a8a">boss fight</b> unlocks. Beat the boss to advance.</div>
           </div>
           <div class="rp-section">
+            <div class="rp-sh">Lives &amp; death</div>
+            <div class="rp-note" style="display:flex;flex-direction:column;gap:4px">
+              <span>You start each run with <b style="color:#e05050">3 lives</b> &mdash; the <b style="color:#e05050">❤️</b> hearts at the top of the Gauntlet.</span>
+              <span><b style="color:#8a2020">Losing to a boss costs a life.</b> You keep your cards, gold and tier progress, and the boss stays unlocked &mdash; grind the patrons again, then rematch.</span>
+              <span>A <b style="color:#2a7a2a">patron win restores a life</b> &mdash; but only once per tier, so lives can't be farmed forever. Losing to a patron costs nothing.</span>
+              <span>Lose your <b style="color:#e05050">last life</b> and the run is over. Everything resets for the next run &mdash; except <b style="color:var(--gold)">Renown</b>, which is permanent.</span>
+            </div>
+          </div>
+          <div class="rp-section">
             <div class="rp-sh">Match types</div>
             <div class="rp-note" style="display:flex;flex-direction:column;gap:6px">
               <span><b style="color:#2a7a2a">Standard</b> &mdash; earn 1 tier point on win</span>
@@ -7641,7 +7650,10 @@ function dismissRenownLevelUp(){
 /* ── Renown Info Popup (tap renown bar) ── */
 var _renownTab='perks';/* 'perks' | 'feats' */
 function showRenownInfo(tab){
-  SFX.nav();
+  /* No SFX.nav() here — every caller (renown pill, loadout corner, the PERKS/
+     FEATS tab buttons) already plays it, so an internal call double-fired the
+     sound. Leaving it to the callers also lets the swipe gesture re-render
+     silently (player asked to remove the tab-swipe sound). */
   if(tab)_renownTab=tab;
   /* If the mid-match loadout panel is open, close it first so the renown
      panel (z-index 9551) isn't covered by the loadout (z-index 9600). */
@@ -7707,14 +7719,22 @@ function showRenownInfo(tab){
      persists across re-renders). Swipe left → FEATS, right → PERKS. */
   if(!panel._swipeWired){
     panel._swipeWired=true;
-    var _sx=0,_sy=0;
-    panel.addEventListener('touchstart',function(e){var t=e.touches&&e.touches[0];if(t){_sx=t.clientX;_sy=t.clientY;}},{passive:true});
+    var _sx=0,_sy=0,_sTop=0;
+    panel.addEventListener('touchstart',function(e){var t=e.touches&&e.touches[0];if(t){_sx=t.clientX;_sy=t.clientY;_sTop=panel.scrollTop;}},{passive:true});
     panel.addEventListener('touchend',function(e){
       var t=e.changedTouches&&e.changedTouches[0];if(!t)return;
       var dx=t.clientX-_sx,dy=t.clientY-_sy;
+      /* Horizontal swipe → switch tab. Silent: the tab buttons make the click
+         sound, and the player asked for no sound on a tab swipe. */
       if(Math.abs(dx)>55&&Math.abs(dx)>Math.abs(dy)*1.5){
-        try{SFX.nav&&SFX.nav();}catch(_e){}
         showRenownInfo(dx<0?'feats':'perks');
+        return;
+      }
+      /* Vertical swipe DOWN → close — but ONLY if the panel was already at the
+         very top when the gesture began. Otherwise a normal scroll-up-to-top
+         (which also moves the finger downward) would dismiss the panel. */
+      if(dy>70&&Math.abs(dy)>Math.abs(dx)*1.5&&_sTop<=0){
+        hideRenownInfo();
       }
     },{passive:true});
   }
@@ -7757,6 +7777,8 @@ function saveMatchState(){
     activeCardState:JSON.parse(JSON.stringify(G.activeCardState||{})),
     crowsLuckCtx:{...G.crowsLuckCtx},
     _pCrowsCtx:{...G._pCrowsCtx},
+    _tabArmedVsOpp:!!G._tabArmedVsOpp,_tabArmedVsPlayer:!!G._tabArmedVsPlayer,
+    _tabHeldOpp:G._tabHeldOpp||0,_tabHeldPlayer:G._tabHeldPlayer||0,
     bossState:{...G.bossState},
     npcCardState:JSON.parse(JSON.stringify(G.npcCardState||{})),
     dlgFlags:{pLead:G._dlgPLead,oLead:G._dlgOLead,pNear:G._dlgPNear,
@@ -8945,6 +8967,7 @@ const CARDS=[
   {id:'blood_debt',name:'BLOOD DEBT',icon:'🩸',rarity:'gold',eff:'-100 START; +400 PER OPP BUST',desc:'You start -100 points. Each time the opponent busts, you gain 400 points.',arch:'hoarder',dep:true},
   {id:'leaky_cup',name:'LEAKY CUP',icon:'🥛',rarity:'gold',eff:"RIVAL 5 DICE EVERY 4TH TURN",desc:"Every fourth turn the opponent takes, they start with only 5 dice on their first roll.",arch:'saboteur'},
   {id:'crows_luck',name:"CROW'S LUCK",icon:'🐦',rarity:'gold',eff:'DOWNGRADE RIVAL STRAIGHTS (2x)',desc:"Twice per match, downgrades any straight the opponent rolls by one tier: Full (1500) → High (750), High (750) → Low (500), Low (500) → nothing.",arch:'saboteur'},
+  {id:'the_tab',name:'THE TAB',icon:'🍺',rarity:'silver',type:'active',maxUses:1,timing:'idle|choosing|yielding',eff:"HOLD RIVAL'S NEXT BANK 1 TURN",desc:"Put your rival on the tab. Their next bank is held in escrow — those points (and any win they'd trigger) don't count until the start of their following turn, buying you a turn to answer. One use per match.",arch:'saboteur'},
   {id:'taxing_breath',name:'TAXING BREATH',icon:'💨',rarity:'gold',eff:'STEAL 400 ON RIVAL BANK',desc:'Each time the opponent banks any points, steal 400 of those points for yourself.',arch:'saboteur'},
   {id:'thieves_luck',name:"THIEF'S LUCK",icon:'🎭',rarity:'gold',eff:'STEAL RIVAL BANK <200',desc:"When the opponent banks less than 200 points in a turn, those points transfer to you instead.",arch:'saboteur',dep:true},
   {id:'plague_wind',name:'PLAGUE WIND',icon:'🌬️',rarity:'gold',eff:'RIVAL PLAYS SAFER',desc:"Reduces the opponent's tendency to keep re-rolling aggressively — they play safer.",arch:'saboteur',dep:true},
@@ -9026,7 +9049,7 @@ const CARDS=[
   {id:'blood_tithe',name:'BLOOD TITHE',icon:'🩸',rarity:'tin',eff:'-50/TURN, 1s = 150',desc:'Each turn costs 50 pts from your total, but single 1s score 150 instead of 100.',arch:'brinksman'},
   /* Silver */
   {id:'the_echo',name:'THE ECHO',icon:'🔊',rarity:'silver',eff:'SCORE → NEXT ROLL +35%',desc:'After a scoring roll, your next roll in the same turn gets a +35% score bonus.',arch:'sharp'},
-  {id:'frozen_die',name:'FROZEN DIE',icon:'🧊',rarity:'silver',type:'active',maxUses:2,timing:'choosing',eff:'HOLD A DIE THROUGH REROLLS',desc:"Freeze a selected die — it keeps its face through your rerolls this turn (won't reroll). Hold a pair while you chase the third. Still scorable. Two uses per match.",arch:'sharp'},
+  {id:'frozen_die',name:'FROZEN DIE',icon:'🧊',rarity:'silver',type:'active',maxUses:2,timing:'choosing',eff:'HOLD A DIE THROUGH REROLLS',desc:"Freeze one selected die — it keeps its face through your rerolls this turn (won't reroll) while you chase a match for it. Still scorable: re-select it and bank when ready. Two uses per match — spend both to hold a pair.",arch:'sharp'},
   {id:'double_down',name:'DOUBLE DOWN',icon:'✌️',rarity:'silver',type:'active',maxUses:1,timing:'choosing',eff:'2× TURN PTS, THEN REROLL ALL',desc:'Doubles the points you\'ve scored THIS turn, then frees all your kept dice for a fresh roll. Keep going from there — but a bust now loses the doubled total. One use.',arch:'brinksman'},
   /* ── Tactile active cards (select a die, then activate) ── */
   /* COIN FLIP — restored from retired. Started at silver/2-use, briefly
@@ -9162,7 +9185,7 @@ const CARD_BG={
   warm_hands:'#8A4A30',gamblers_thumb:'#6A6A40',chain_lightning:'#4A5A8A',hot_streak:'#8A3A20',underdog:'#5A6A50',twin_dice:'#6A5A80',sawdust:'#7A6A50',short_pour:'#6A5A40',the_nudge:'#7A8A40',triple_threat:'#9A6020',triple_hunter:'#6A4A30',false_triple:'#5A6A8A',alchemists_chisel:'#6A4A8A',forge_night:'#8A4A20',heavy_set:'#7A5A30',lucky_threes:'#8A6A30',the_climb:'#3A6A5A',the_troupe:'#6A4A6A',vanishing_act:'#4A4060',
   the_collector:'#6A4A60',tavern_cheer:'#7A5A30',closing_bell:'#5A4A60',old_bones:'#4A4A50',
   the_jinx:'#4A5A6A',thick_skin:'#6A6A5A',blood_tithe:'#8A2A30',
-  the_echo:'#5A6A7A',frozen_die:'#3A6A8A',double_down:'#7A5A30',slippery_table:'#4A7A6A',high_roller:'#8A6A20',the_fence:'#5A4A3A',the_alchemist:'#6A5A2A',twin_flames:'#8A4A20',
+  the_echo:'#5A6A7A',frozen_die:'#3A6A8A',double_down:'#7A5A30',slippery_table:'#4A7A6A',high_roller:'#8A6A20',the_fence:'#5A4A3A',the_alchemist:'#6A5A2A',twin_flames:'#8A4A20',the_tab:'#6A4A2A',
   broken_lantern:'#3A3A3A',wild_die:'#6A3A7A',second_wind:'#4A6A5A',the_brewer:'#7A5A20',dead_mans_hand:'#4A4A5A',the_pyre:'#9A3A20',all_in:'#5A3A6A',
   /* New tactile + scoring-pattern cards */
   coin_flip:'#8A7A30',alchemist_touch:'#4A7060',twinning_charm:'#5A6080',double_down_die:'#7A5030',
@@ -9787,6 +9810,12 @@ function scoreRoll(vals,cards,locked,context,dieMats){
      are mutually exclusive with straights by pattern, hence !straightFound.
      Raw-face counts (vals), not wild-aware — wild fills here are a rare
      edge the triples path still handles if these don't fire. */
+  /* _triplesFired is declared HERE (not after the triples loop) so the base
+     6-die combos below can record their triple faces. Once Two Triplets claims
+     all dice via used.fill(true), the triples loop finds nothing, so without
+     this the array stayed empty and every _triplesFired-based card (Heavy Set,
+     Full House) silently did nothing on a two-triplets roll. */
+  const _triplesFired=[];/* face values that produced a triple this roll (heavy_set/full_house/etc) */
   var _comboFound=false;
   if(!straightFound&&n>=6){
     var _fc=[0,0,0,0,0,0,0];for(var _fci=0;_fci<n;_fci++){if(!used[_fci])_fc[vals[_fci]]++;}
@@ -9797,6 +9826,11 @@ function scoreRoll(vals,cards,locked,context,dieMats){
       var _ttBase=2500;
       if(_tavernTales)_ttBase=Math.floor(_ttBase*1.25);else if(_tavernTalesPartial)_ttBase=Math.floor(_ttBase*1.10);
       pts+=_ttBase;used.fill(true);_comboFound=true;
+      /* Record both triple faces so _triplesFired-based cards (Heavy Set
+         +100/triple, Full House) still see the two triples the combo just
+         consumed. Full House stays correct — it needs a LEFTOVER pair, but
+         used.fill(true) leaves none, so cnt() finds nothing and it won't fire. */
+      _tripFaces.forEach(function(_tf){_triplesFired.push(_tf);});
       if(typeof G!=='undefined'&&G&&cards===G.pCards)G._featTwoTriplets=true;
     }
     /* Three Pairs: exactly three distinct faces each a clean pair. A quad
@@ -9887,7 +9921,8 @@ function scoreRoll(vals,cards,locked,context,dieMats){
          when both could complete.
      Jade L2+ wilds also extend the set — when realC>=3 and a level-2+ wild
      is unused, attach it to bump triple→quad (doubles base). */
-  const _triplesFired=[];/* track which face values produced triples for twin_flames */
+  /* _triplesFired declared above the 6-die combo block (so Two Triplets can
+     record into it). Do NOT redeclare here. */
   const _hasSixSerpents=cards.includes('six_serpents');
   for(const f of [6,4,3,2,1,5]){
     const realC=cnt(f);const wc=cntWild();const totalC=realC+wc;
@@ -11944,6 +11979,15 @@ function toggleDie(d){
 
 function startPTurn(){
   G.phase='idle';G.turnPts=0;G.kept=[];G.numDice=G.matchDice?G.matchDice.length:6;G.pool=[];G.turnRollCount=0;G._slowHandUsedThisTurn=false;G._warmHandsActive=false;G._lastHotDice=false;G._firstRollCommitted=0;G._bustSavedThisTurn=false;
+  /* THE TAB: release any bank the rival escrowed last turn. It was held for
+     one turn; credit it now and check the win it may complete (the rival
+     already had their answering turn while it was on the tab). */
+  if(G._tabHeldPlayer>0){
+    var _tabRel=G._tabHeldPlayer;G._tabHeldPlayer=0;
+    G.pPts+=_tabRel;updHUD();
+    spawnPop('+'+_tabRel.toLocaleString()+' OFF THE TAB');triggerCard('the_tab','+'+_tabRel.toLocaleString()+' OFF THE TAB',false);
+    if(G.pPts>=G.target){setTimeout(function(){endMatch(true);},700);return;}
+  }
   /* Safety reset: if a Finnick's Palm / Pickpocket animation crashed
      mid-flight last turn, the lock would soft-block roll/bank/tap/
      activation forever. Clearing it on every turn start guarantees the
@@ -12217,7 +12261,11 @@ function handleRoll(){
     if(uncommitted<=2&&uncommitted>0)DLG.trigger('RISKY_REROLL');
     else if(turnTotal>=600)DLG.trigger('GREEDY_REROLL');
   }
-  const selDice=G.pool.filter(d=>d.sel&&!d.committed);
+  /* Exclude FROZEN dice from the roll-time auto-commit. A frozen die is "held
+     through rerolls", never committed by a ROLL — committing it (then busting
+     on the rest) was the false-bust bug. It's still scorable via Bank, which
+     uses its own selection filter (see handleBank). */
+  const selDice=G.pool.filter(d=>d.sel&&!d.committed&&!d._frozen);
   if(selDice.length){
     var _selVals=selDice.map(d=>d.val);var _selMats=selDice.map(d=>d.mat);const locked=G.kept.reduce((a,k)=>a+k.pts,0);const cards=effectiveCards();
     /* ── ANCHOR pre-processing ──
@@ -13743,7 +13791,20 @@ function handleBank(){
   if(!G.pBankHistory)G.pBankHistory=[];
   G.pBankHistory.push({pts:total,turn:G.turnNum,bonus:(bonusMsg||'').trim(),
     dice:G.kept.map(function(k){return {vals:[].concat(k.vals),mat:k.mat,pts:k.pts};})});
-  G.pPts+=total;G._lastBankAmount=total;spawnBankPop(total);G.turnPts=0;G.kept=[];G.numDice=6;
+  if(G._tabArmedVsPlayer){
+    /* THE TAB: the rival put you on the tab. This bank is held in escrow
+       instead of credited — it's released at the START of your next turn
+       (see startPTurn), so a same-turn winning bank can't end the match now.
+       The points aren't lost, just delayed one turn. */
+    G._tabArmedVsPlayer=false;
+    G._tabHeldPlayer=(G._tabHeldPlayer||0)+total;
+    G._lastBankAmount=total;spawnBankPop(total);
+    triggerCard('the_tab','ON THE TAB — '+total.toLocaleString()+' HELD',false);
+    setStatusMsg('ON THE TAB — '+total.toLocaleString()+' POINTS HELD A TURN','red');
+  }else{
+    G.pPts+=total;G._lastBankAmount=total;spawnBankPop(total);
+  }
+  G.turnPts=0;G.kept=[];G.numDice=6;
   /* THE GRUDGE NPC mirror: increment opp's grudge stack when player banks
      (max 750). Consumed in finOpp at NPC's next bank. Mirrors the
      player-side increment in finOpp at line ~13141. */
@@ -13983,6 +14044,25 @@ function runOppTurn(){
   G._oTurnComboTypes={};/* the_collector: triple/straight/single1/single5 → true */
   G._oTurnRollScored=0;/* chain_lightning: count of consecutive scoring rolls this turn */
   G._oLastHotDice=false;/* aldrics_banner: this turn produced hot dice */
+  /* THE TAB: release the rival's escrowed bank (you held it one turn). Credit
+     it at the NPC's turn start and check the win it may complete — you already
+     had your answering turn while it was on the tab. */
+  if(G._tabHeldOpp>0){
+    var _tabRelO=G._tabHeldOpp;G._tabHeldOpp=0;
+    G.oPts+=_tabRelO;updHUD();
+    triggerCard('the_tab','RIVAL +'+_tabRelO.toLocaleString()+' OFF THE TAB',false);
+    if(G.oPts>=G.target){setTimeout(function(){endMatch(false);},700);return;}
+  }
+  /* THE TAB (NPC AI): when you're within striking distance of the win and
+     ahead, the rival puts YOU on the tab so your next (possibly lethal) bank
+     is held a turn — buying itself one more turn. Armed on the NPC's turn so
+     it bites your following bank. */
+  if(npcHasActive('the_tab')&&!G._tabArmedVsPlayer&&!(G._tabHeldPlayer>0)&&G.target&&G.pPts>=G.target*0.8&&G.pPts>G.oPts){
+    npcUseActive('the_tab');
+    G._tabArmedVsPlayer=true;
+    triggerCard('the_tab','RIVAL PUTS YOU ON THE TAB',false);
+    setStatusMsg((G.rung?G.rung.name:'RIVAL')+": YOU'RE ON THE TAB — NEXT BANK HELD",'red');
+  }
   /* stakes_rising NPC seed: previous turn banked 500+ → start with +300 turn pts.
      Mirrors player startPTurn at line ~10940. */
   G._oStakesRisingBonus=0;
@@ -15016,7 +15096,18 @@ function runOppTurn(){
           dice:(G.oppDice||[]).filter(function(d){return d.kept;}).map(function(d){return {vals:[d.val],mat:d.mat||'bone',pts:0};})});
       }
       var _npcActuallyBanked=false;
-      if(G.pCards.includes('thieves_luck')&&pts>0&&pts<250){G.pPts+=pts;triggerCard('thieves_luck','STOLE '+pts.toLocaleString(),true);}
+      if(G._tabArmedVsOpp){
+        /* THE TAB: you put the rival on the tab. Hold this bank in escrow
+           instead of crediting oPts — released at the rival's NEXT turn start
+           (see runOppTurn). Their win is deferred a turn, giving you a turn to
+           respond. Takes precedence over Thieves' Luck (the bank is held, not
+           stolen). */
+        G._tabArmedVsOpp=false;
+        G._tabHeldOpp=(G._tabHeldOpp||0)+pts;
+        triggerCard('the_tab','RIVAL ON THE TAB — '+pts.toLocaleString()+' HELD',true);
+        setStatusMsg("ON THE TAB — RIVAL'S "+pts.toLocaleString()+' HELD A TURN','gold');
+      }
+      else if(G.pCards.includes('thieves_luck')&&pts>0&&pts<250){G.pPts+=pts;triggerCard('thieves_luck','STOLE '+pts.toLocaleString(),true);}
       else{G.oPts+=pts;_npcActuallyBanked=true;setStatusMsg((G.rung?G.rung.name:'RIVAL')+' BANKED '+pts.toLocaleString(),'active');if(window.DLG&&pts>=600)DLG.trigger('OPP_BIG_BANK');}
       /* TELL: Reckoning (Ambrose) — record his last bank only if he actually scored it */
       if(_npcActuallyBanked&&G._tell&&G._tell.id==='reckoning'&&pts>0){
@@ -16857,6 +16948,7 @@ function activateCard(cardId){
     case 'gamblers_eye': activateGamblersEye(); break;
     case 'old_bones': activateOldBones(); break;
     case 'frozen_die': activateFrozenDie(); break;
+    case 'the_tab': activateTheTab(); break;
     case 'double_down': activateDoubleDown(); break;
     case 'broken_lantern': activateBrokenLantern(); break;
     case 'wild_die': activateWildDie(); break;
@@ -17174,7 +17266,15 @@ function activateFrozenDie(){
     return;}
   var d=selDice[0];
   d._frozen=true;
+  /* Held, NOT committed: deselect immediately. handleRoll auto-commits the
+     current selection before rerolling, so a still-selected frozen die would
+     be committed out of the free pool — then the rest reroll and can bust,
+     taking the held die's score with them (player report: "froze a 1, rolled
+     4/1/4, still busted"). Deselecting keeps it a held pool die that survives
+     rerolls and counts in the bust check. It stays scorable: re-select + Bank. */
+  d.sel=false;
   if(d.el){
+    d.el.classList.remove('selected');
     d.el.classList.add('die-frozen');
     d.el.classList.add('die-freeze-shake');
     try{spawnPixelSparks(d.el,6);}catch(e){}
@@ -17183,6 +17283,15 @@ function activateFrozenDie(){
   _haptic([25,30,25]);/* buzz-pause-buzz */
   setStatusMsg('FROZEN — IT KEEPS ITS FACE THROUGH REROLLS THIS TURN','gold');
   refreshSelUI();
+}
+
+/* THE TAB: arm escrow against the rival's NEXT bank. No immediate effect —
+   when the rival next banks (finOpp), those points are held instead of
+   credited, then released at the rival's following turn start (runOppTurn).
+   This defers any winning bank by a turn. */
+function activateTheTab(){
+  G._tabArmedVsOpp=true;
+  setStatusMsg("RIVAL ON THE TAB — THEIR NEXT BANK IS HELD A TURN",'gold');
 }
 
 /* Double Down: double turn pts, release all kept, must roll 6 */
@@ -17825,6 +17934,8 @@ function initMatchScreen(data){
     if(rd.activeCardState)G.activeCardState=rd.activeCardState;
     if(rd.crowsLuckCtx)G.crowsLuckCtx=rd.crowsLuckCtx;
     if(rd._pCrowsCtx)G._pCrowsCtx=rd._pCrowsCtx;
+    G._tabArmedVsOpp=!!rd._tabArmedVsOpp;G._tabArmedVsPlayer=!!rd._tabArmedVsPlayer;
+    G._tabHeldOpp=rd._tabHeldOpp||0;G._tabHeldPlayer=rd._tabHeldPlayer||0;
     if(rd.bossState)G.bossState=rd.bossState;
     if(rd.npcCardState)G.npcCardState=rd.npcCardState;
     if(rd.dlgFlags){var f=rd.dlgFlags;G._dlgPLead=f.pLead;G._dlgOLead=f.oLead;G._dlgPNear=f.pNear;G._dlgONear=f.oNear;G._dlgClose=f.close;G._dlgLoseBad=f.loseBad;G._dlgWinBad=f.winBad;}
@@ -19321,8 +19432,16 @@ function _renderBossTally(container,target,earned,anim){
   var Wv=GROUPSPAN+10, Hv=groups*ROWH+(groups-1)*ROWGAP+12;
   var SCALE=(window.innerWidth<=380)?1.15:1.5;
   var GHOST='#9c8c74', CHALK='#f2ede1';
-  /* verticals first, diagonals last → the opaque slash sits on top, no blend */
-  var ordered=strokes.filter(function(s){return !s.diag;}).concat(strokes.filter(function(s){return s.diag;}));
+  /* Paint order, low→high:
+       1) ghost (un-earned) strokes   2) earned WHITE strokes
+     and within each colour, verticals before the diagonal slash.
+     → earned white marks ALWAYS sit on top of ghost ones (a not-yet-earned
+       tan diagonal no longer paints over the white marks beneath it), and a
+       completed group's white slash still sits on top of its white verticals. */
+  var ordered=strokes.slice().sort(function(a,b){
+    if(a.on!==b.on)return a.on?1:-1;        /* ghost first, white last (on top) */
+    return (a.diag?1:0)-(b.diag?1:0);       /* vertical first, diagonal on top */
+  });
   var inner='';
   ordered.forEach(function(s){
     inner+='<path class="bt-stroke" data-slot="'+s.slot+'" data-on="'+(s.on?1:0)+'" d="'+s.d+'" '+
