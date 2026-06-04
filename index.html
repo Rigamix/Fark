@@ -7525,6 +7525,18 @@ function _drainPerkUnlockQueue(skipKeys){
     setTimeout(function(){_drainPerkUnlockQueue(skipKeys);},250);
   });
 }
+/* Defer feat-unlock splashes to the loadout/gauntlet screen, the same way perk
+   unlocks are queued. Firing the 2.4s splash at endMatch let it bleed over the
+   START of the next match (and it often played silent mid-transition). Shows all
+   queued feats in sequence, then runs onDone (used to chain the perk drain). */
+function _drainFeatUnlockQueue(onDone){
+  if(!S||!S.run||!S.run._pendingFeatUnlocks||!S.run._pendingFeatUnlocks.length){if(onDone)onDone();return;}
+  var ids=S.run._pendingFeatUnlocks.slice();
+  S.run._pendingFeatUnlocks=[];try{save();}catch(e){}
+  var feats=ids.map(function(id){return FEATS.find(function(f){return f.id===id;});}).filter(Boolean);
+  if(!feats.length){if(onDone)onDone();return;}
+  _showFeatUnlocksSequential(feats).then(function(){if(onDone)onDone();});
+}
 /* Returns an ordered list of rank suffixes for dialogue lookup —
    highest unlocked rank first. Empty list = below the first threshold. */
 function _getRankTags(){
@@ -11477,7 +11489,8 @@ function _updatePlayerCardVisuals(){
     'stakes_rising': !!G._stakesRisingNext,         /* fires on next turn start */
     'turncoat':      !!G._turncoatArmed,            /* fires on next bank */
     'aldrics_vow':   !!G._vowDoubleActive,          /* fires on next commit */
-    'quick_hands':   !!G._playerQuickHandsArmed     /* fires on next opp roll */
+    'quick_hands':   !!G._playerQuickHandsArmed,    /* fires on next opp roll */
+    'grogs_bump':    !!G._playerGrogsBumpArmed      /* fires on next opp roll */
   };
   Object.keys(_armedMap).forEach(function(cid){
     var mc=bar.querySelector('.mcard[data-cid="'+cid+'"]');
@@ -14535,6 +14548,23 @@ function runOppTurn(){
           total=_qhR.total;used=_qhR.used;
         }
       }
+      /* Player-armed Grog's Bump: knock the opp's TWO scoring dice (1s/5s) → 3s.
+         Mirrors Quick Hands (which swaps to 2s); auto-fires here on the NPC roll
+         so the player only had to arm it while yielding. */
+      if(G._playerGrogsBumpArmed){
+        G._playerGrogsBumpArmed=false;
+        var _gbScoring=G.oppDice.filter(function(d){return !d.kept&&(d.val===1||d.val===5);});
+        if(_gbScoring.length>0){
+          var _gbVics=_gbScoring.slice().sort(function(a,b){return(b.val===1?100:50)-(a.val===1?100:50);}).slice(0,2);
+          _gbVics.forEach(function(_gbVic){_gbVic.val=3;reDrawDieFace(_gbVic);});
+          triggerCard('grogs_bump',"GROG'S BUMP → 3",true);
+          setStatusMsg("GROG'S BUMP — "+G.rung.name+"'S "+(_gbVics.length>1?_gbVics.length+" DICE → 3":"DIE → 3"),'gold');
+          var _gbFV=G.oppDice.filter(function(d){return !d.kept;}).map(function(d){return d.val;});
+          var _gbFM=G.oppDice.filter(function(d){return !d.kept;}).map(function(d){return d.mat;});
+          var _gbR=scoreRoll(_gbFV,G.oCards,oppBank,crowsCtx,_gbFM);
+          total=_gbR.total;used=_gbR.used;
+        }
+      }
       G.oppDice.filter(d=>!d.kept).forEach((d,i)=>{if(used[i]){d.kept=true;if(d.el){d.el.style.outline='2px solid var(--green)';d.el.style.outlineOffset='0px';}}});
       /* Player-armed Crown Authority / Blessed Dice: force NPC reroll of all kept dice */
       if(G._playerRerollKeptArmed){
@@ -15522,8 +15552,14 @@ function endMatch(win){
      splash mid-new-match instead of as a reward for the match they just
      won. Player feedback: "check that this is happening when the feat
      happens. Seems like it happens later." */
+  /* Defer the fullscreen FEAT UNLOCKED splash to the loadout/gauntlet screen
+     (drained in initGauntletScreen), the same way perk unlocks are queued.
+     Firing it here let the 2.4s splash bleed over the START of the next match,
+     and it often played silent mid-transition. The win-result card below still
+     lists the earned feats in-context immediately. */
   if(win&&_featsEarned&&_featsEarned.length){
-    try{_showFeatUnlocksSequential(_featsEarned);}catch(e){}
+    S.run._pendingFeatUnlocks=(S.run._pendingFeatUnlocks||[]).concat(_featsEarned.map(function(f){return f.id;}));
+    try{save();}catch(e){}
   }
 
   /* 5. Prepare boss-loss card/dialogue data (before delay, while G is still available) */
@@ -16993,6 +17029,7 @@ function activateCard(cardId){
     case 'royal_seizure': activateRoyalSeizurePlayer(); break;
     case 'blessed_confiscation': activateBlessedConfiscationPlayer(); break;
     case 'quick_hands': activateQuickHandsPlayer(); break;
+    case 'grogs_bump': activateGrogsBumpPlayer(); break;
     case 'crown_authority': activateCrownAuthorityPlayer(); break;
     case 'blessed_dice': activateBlessedDicePlayer(); break;
     case 'coin_flip': activateCoinFlip(); break;
@@ -17542,6 +17579,17 @@ function activateBlessedConfiscationPlayer(){
 function activateQuickHandsPlayer(){
   G._playerQuickHandsArmed=true;
   setStatusMsg("QUICK HANDS ARMED — OPP'S NEXT BEST DIE → 3",'gold');
+  if(typeof _updatePlayerCardVisuals==='function')_updatePlayerCardVisuals();
+}
+
+/* Grog's Bump (player-side): arm a flag — on the opponent's next scoring roll,
+   knock their two scoring dice (1s/5s) down to 3s. Mirrors Quick Hands. It
+   AUTO-fires on the NPC roll, so the player doesn't have to act during the
+   (fast) NPC turn — they just arm it while yielding. Without this handler the
+   card (a Grog boss reward) did nothing when activated. */
+function activateGrogsBumpPlayer(){
+  G._playerGrogsBumpArmed=true;
+  setStatusMsg("GROG'S BUMP ARMED — OPP'S NEXT 2 SCORING DICE → 3",'gold');
   if(typeof _updatePlayerCardVisuals==='function')_updatePlayerCardVisuals();
 }
 
@@ -20388,9 +20436,14 @@ function launchBossMatch(){
 function initGauntletScreen(data) {
   _getS();
   initTierScreen(data);
-  /* Drain any pending perk-unlock celebrations now that we're on a stable screen.
-     Defer slightly so the gauntlet visual settles first. */
-  setTimeout(function(){if(typeof _drainPerkUnlockQueue==='function')_drainPerkUnlockQueue();},900);
+  /* Drain pending celebrations now that we're on a stable screen (the loadout).
+     Feats first (fullscreen splash), then perk-unlock modals. Deferred slightly
+     so the gauntlet visual settles first. */
+  setTimeout(function(){
+    if(typeof _drainFeatUnlockQueue==='function'){
+      _drainFeatUnlockQueue(function(){if(typeof _drainPerkUnlockQueue==='function')_drainPerkUnlockQueue();});
+    }else if(typeof _drainPerkUnlockQueue==='function'){_drainPerkUnlockQueue();}
+  },900);
 }
 
 
