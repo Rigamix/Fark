@@ -767,16 +767,32 @@ body{
   background:linear-gradient(118deg,transparent 30%,rgba(255,255,255,.18) 46%,rgba(255,255,255,.22) 50%,rgba(255,255,255,.18) 54%,transparent 70%);
   animation:none;opacity:0;
 }
-/* All instances of an active card show the sheen — match-hand bottom row,
-   mid-match loadout panel, and reward-screen draft slots if the card is
-   active type. Skip in-zone (spent) cards and .used cards. */
-.mcard-active:not(.in-zone):not(.used) .gcard::before,
+/* THE GLINT — in-match active cards animate ONLY when their moment is here.
+   Three states, driven by _updateCardGlints():
+     .card-ready   timing window OPEN and the card would DO something right
+                   now (e.g. Frozen Die only when a die is selected) → sheen
+                   + soft accent pulse. The glow is information, not décor.
+     (neither)     window open, nothing to act on → static accent, no motion.
+     .card-dormant wrong phase → slightly muted, clearly "not now".
+   The always-on sheen was retired in-match (3 cards = 3 perpetual loops of
+   meaningless motion); other surfaces (loadout panel, draft slots) keep it. */
+.mcard-active.card-ready:not(.in-zone):not(.used) .gcard::before,
 .lo-mini-card.is-active:not(.used) .gcard::before,
 .tier-lo-card.is-active:not(.used) .gcard::before{
   background:linear-gradient(105deg,transparent 25%,rgba(255,255,255,.25) 42%,rgba(255,255,255,.4) 50%,rgba(255,255,255,.25) 58%,transparent 75%);
   animation:gcSheen 2s ease-in-out infinite;opacity:1;
 }
 @keyframes gcSheen{0%,100%{transform:translateX(-180%);opacity:0}10%{opacity:1}75%{transform:translateX(180%);opacity:0}}
+.mcard-active.card-ready:not(.in-zone):not(.used) .gcard{
+  animation:cardReadyGlow 1.6s ease-in-out infinite;
+}
+@keyframes cardReadyGlow{
+  0%,100%{box-shadow:inset 0 0 0 1px var(--ctrim),inset 0 0 0 5px var(--cface),inset 0 0 0 6px var(--card-accent,rgba(255,215,0,.9))}
+  50%{box-shadow:inset 0 0 0 1px var(--ctrim),inset 0 0 0 5px var(--cface),inset 0 0 0 6px var(--card-accent,rgba(255,215,0,.9)),0 0 14px 3px var(--card-accent,rgba(255,215,0,.5))}
+}
+.mcard-active.card-dormant:not(.in-zone):not(.used) .gcard{
+  filter:url(#pixelWobbleLite) saturate(.65) brightness(.82);
+}
 .gcard-art{display:none}
 .gcard-cover{position:absolute;inset:0;z-index:0;display:flex;align-items:center;justify-content:center;pointer-events:none;font-size:32px;line-height:1;border-radius:4px}
 .mcard .gcard-cover{font-size:28px}
@@ -2749,6 +2765,27 @@ body::before,body::after{display:none!important}
   color:rgba(220,190,140,.75);margin-top:2px;position:relative;z-index:2;
   text-shadow:0 1px 0 rgba(0,0,0,.5);
 }
+/* THE INNKEEP'S BOOK — chalkboard wager strip on the boss prep */
+.innkeep-book{
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  margin:6px auto 0;padding:6px 12px;max-width:330px;
+  background:rgba(16,20,16,.78);border:1.5px solid rgba(140,150,130,.35);
+  border-radius:5px;position:relative;z-index:2;
+}
+.innkeep-book .ib-line{
+  font-family:var(--font-px);font-size:10px;letter-spacing:1px;line-height:1.5;
+  color:#cfd8c8;text-shadow:0 1px 0 rgba(0,0,0,.6);
+}
+.innkeep-book .ib-line b{color:#f2ede1}
+.innkeep-book .ib-btn{
+  font-family:var(--font-px);font-size:10px;letter-spacing:1px;
+  padding:6px 10px;background:rgba(60,48,22,.9);color:var(--gold);
+  border:1.5px solid rgba(180,140,70,.55);border-radius:4px;cursor:pointer;
+  transition:filter .1s, transform .05s;flex-shrink:0;
+}
+.innkeep-book .ib-btn:hover{filter:brightness(1.15)}
+.innkeep-book .ib-btn:active{transform:scale(.95)}
+.innkeep-book .ib-btn.ib-disabled{opacity:.45;cursor:default}
 /* Boss "house rule" (Tell) badge — shown in advance so the player can
    prep their deck/dice/banking against it before committing to the boss. */
 .tier-boss-tell{display:flex;flex-direction:column;align-items:center;
@@ -6703,6 +6740,8 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
     </div>
     <div class="tier-boss-name" id="tierBossName"></div>
     <div class="tier-boss-tell" id="tierBossTell" style="display:none"></div>
+    <!-- THE INNKEEP'S BOOK — chalkboard wager strip (odds from your ledger vs this boss) -->
+    <div class="innkeep-book" id="innkeepBook" style="display:none"></div>
   </div>
   <div class="tier-boss-loadout" id="tierBossLoadout" style="display:none">
     <div class="tier-lo-cards boss-lo" id="tierBossLoCards"></div>
@@ -11484,6 +11523,9 @@ function _applyScoreTier(el,pct){
 }
 function updHUD(){
   if(!G)return;
+  /* THE GLINT: re-evaluate card ready-states on every HUD refresh (fires on
+     every meaningful state change — selection, phase, commit, bank). */
+  if(typeof _updateCardGlints==='function')try{_updateCardGlints();}catch(e){}
   var pEl=document.getElementById('pScore');
   var oEl=document.getElementById('oScore');
   var tpEl=document.getElementById('turnPts');
@@ -16486,6 +16528,21 @@ function _settleEndRoute(route){
        re-call is a no-op via _settled). */
     var _lgMb=(typeof G!=='undefined'&&G&&G._featMaxBank)||0;
     if(_lgMb>(_lg.bestBank||0))_lg.bestBank=_lgMb;
+    /* THE INNKEEP'S BOOK: settle any standing wager on this boss fight, then
+       close the book for this tier — re-challenges are off the book. */
+    if(!S.run._bookClosed)S.run._bookClosed={};
+    var _bb=S.run._bookBet;
+    if(_bb&&_bb.bossKey===route.bossKey){
+      if(route.win){
+        var _ibPay=Math.round(_bb.stake*(1+_bb.profitMult));
+        S.run.gold=(S.run.gold||0)+_ibPay;
+        S.run._bookResult={paid:_ibPay,stake:_bb.stake};
+      }else{
+        S.run._bookResult={lost:_bb.stake};
+      }
+      delete S.run._bookBet;
+    }
+    S.run._bookClosed[S.run.tier]=true;
   }
   if(route.win&&route.isBoss&&!route.isGauntlet){
     S.run.bossesBeaten.push(S.run.tier);
@@ -17468,6 +17525,40 @@ function canActivateCard(cardId){
     if(npc.effect.mechanic==='limit_activations'&&G.npcCardState.playerTurnCount%npc.effect.interval!==0)blocked=true;
   });
   return!blocked;
+}
+
+/* ═══════ THE GLINT — ready-state glow for active cards ═══════
+   A card pulses ONLY when its timing window is open AND it would actually do
+   something right now. Replaces the old always-on sheen in-match, so total
+   motion goes DOWN and a glowing card means "this is usable, here, now". */
+var _GLINT_NEEDS_SELECTION=['frozen_die','coin_flip','the_nudge','twinning_charm','double_down_die','alchemist_touch','wild_die'];
+function _glintReady(cid){
+  if(!G)return false;
+  /* Selection-gated tools: matte until a die is actually selected. */
+  if(_GLINT_NEEDS_SELECTION.indexOf(cid)>=0)
+    return G.pool.some(function(d){return d.sel&&!d.committed;});
+  if(cid==='double_down')return G.kept.length>0;
+  if(cid==='gamblers_eye')return G.pool.filter(function(d){return !d.committed;}).length>1;
+  if(cid==='the_pyre')return G.pCards.filter(function(c){return c!=='the_pyre';}).length>0;
+  /* Dice-fixers want an unselected free die to operate on. */
+  if(cid==='grogs_flask'||cid==='old_bones'||cid==='finnicks_palm'||cid==='ambrose_grace'||cid==='brutus_fist'||cid==='sleight_of_hand')
+    return G.pool.some(function(d){return !d.committed&&!d.sel;});
+  /* Everything else (arm-style cards, yield-window cards): the open timing
+     window IS the moment. */
+  return true;
+}
+function _updateCardGlints(){
+  if(!G||!G.pCards)return;
+  var bar=document.getElementById('playerCards');if(!bar)return;
+  G.pCards.forEach(function(cid){
+    var cd=CARDS.find(function(c){return c.id===cid;})||getNpcCard(cid);
+    if(!cd||cd.type!=='active')return;
+    var mc=bar.querySelector('.mcard[data-cid="'+cid+'"]');
+    if(!mc||mc.classList.contains('in-zone')||mc.classList.contains('used'))return;
+    var winOpen=canActivateCard(cid);
+    mc.classList.toggle('card-dormant',!winOpen);
+    mc.classList.toggle('card-ready',winOpen&&_glintReady(cid));
+  });
 }
 
 function markActiveCardUsed(cardId){
@@ -20317,6 +20408,8 @@ function initTierScreen(data){
   if(tm)tm.style.display=_bossReady?'none':'';
   var tmh=document.querySelector('.tier-match-header');
   if(tmh)tmh.style.display=_bossReady?'none':'';
+  /* THE INNKEEP'S BOOK — wager strip, posted when the boss is challengeable */
+  if(typeof _renderInnkeepBook==='function')try{_renderInnkeepBook(tier,_bossReady);}catch(e){}
   /* Handicap offer — LOCKED per tier so the player can't game the system
      by going to the store and coming back to reroll. Player feedback:
      "Handicap match still changes type when I go to store and then come
@@ -21038,6 +21131,59 @@ function launchBossMatch(){
       isBoss:true,isGauntlet:false
     });
   },80);
+}
+
+/* ═══════ THE INNKEEP'S BOOK — chalkboard wager on boss fights ═══════
+   The tavern keeper posts odds ON YOU, read straight from your lifetime
+   ledger vs this boss: a winning record pays EVENS, first meeting or a tied
+   record pays 3:2, a losing record 2:1, a 3+ deficit 3:1. Fixed stake per
+   tier band, deducted when placed. One bet per boss per run; any boss
+   attempt (win or lose) closes the book for that tier — re-challenges are
+   off the book, so long odds can't be farmed. Settled in _settleEndRoute. */
+function _renderInnkeepBook(tier,bossReady){
+  var el=document.getElementById('innkeepBook');
+  if(!el)return;
+  if(!S.run._bookClosed)S.run._bookClosed={};
+  /* One-time result toast from the last settled wager */
+  if(S.run._bookResult){
+    var r=S.run._bookResult;delete S.run._bookResult;save();
+    el.style.display='';
+    el.innerHTML='<div class="ib-line">'+(r.paid?('🍺 THE BOOK PAYS <b>'+r.paid+'g</b>'):('THE BOOK KEEPS YOUR '+r.lost+'g'))+'</div>';
+    if(r.paid){try{SFX.coins&&SFX.coins();}catch(e){}}
+    return;
+  }
+  if(!bossReady||!tier.boss||S.run._bookClosed[S.run.tier]){el.style.display='none';el.innerHTML='';return;}
+  var lg=(S.npcLedger&&S.npcLedger[tier.boss.key])||{w:0,l:0,nights:0};
+  var profitMult,oddsLabel;
+  if(lg.nights===0||lg.w===lg.l){profitMult=1.5;oddsLabel='3:2';}
+  else if(lg.w>lg.l){profitMult=1.0;oddsLabel='EVENS';}
+  else if((lg.l-lg.w)>=3){profitMult=3.0;oddsLabel='3:1';}
+  else{profitMult=2.0;oddsLabel='2:1';}
+  var _ibStakes={regular:30,known:60,respected:120,renowned:240};
+  var stake=_ibStakes[tier.boss.tier]||30;
+  el.style.display='';
+  var bet=S.run._bookBet;
+  if(bet&&bet.bossKey===tier.boss.key){
+    el.innerHTML='<div class="ib-line">🍺 BET PLACED — <b>'+bet.stake+'g</b> AT '+bet.oddsLabel+'</div>';
+    return;
+  }
+  var canAfford=(S.run.gold||0)>=stake;
+  el.innerHTML='<div class="ib-line">THE INNKEEP\'S BOOK — odds on you: <b>'+oddsLabel+'</b></div>'
+    +'<button class="ib-btn'+(canAfford?'':' ib-disabled')+'" '
+    +(canAfford?('onclick="placeBookBet(\''+tier.boss.key+'\','+stake+','+profitMult+',\''+oddsLabel+'\')"'):'')
+    +'>'+(canAfford?('STAKE '+stake+'g'):('NEED '+stake+'g'))+'</button>';
+}
+function placeBookBet(bossKey,stake,profitMult,oddsLabel){
+  if(!S||!S.run||S.run._bookBet)return;
+  if((S.run.gold||0)<stake){try{SFX.err&&SFX.err();}catch(e){}return;}
+  S.run.gold-=stake;
+  S.run._bookBet={bossKey:bossKey,stake:stake,profitMult:profitMult,oddsLabel:oddsLabel,tier:S.run.tier};
+  save();
+  try{SFX.coins&&SFX.coins();}catch(e){}
+  try{_haptic(14);}catch(e){}
+  var g=document.getElementById('tierGold');if(g)g.textContent=(S.run.gold||0)+'g';
+  var t=TIERS[S.run.tier]||TIERS[0];
+  _renderInnkeepBook(t,true);
 }
 
 /* Legacy bridge — gauntlet screen now calls tier screen */
