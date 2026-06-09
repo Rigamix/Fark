@@ -892,16 +892,32 @@ body{
 }
 .dice-sep.show{opacity:.35}
 
+/* ─── DEAD AIR: match-point hush ─── */
+#screen-match.dead-air::after{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:80;
+  background:radial-gradient(ellipse at 50% 58%, transparent 36%, rgba(0,0,0,.5) 100%);
+  animation:deadAirIn 1.8s ease-out forwards;
+}
+@keyframes deadAirIn{0%{opacity:0}100%{opacity:1}}
+
 /* ─── DIALOGUE BOX ─── */
+/* FIXED to the viewport (same fix family as .tell-badge): the box must sit in
+   the exact same spot in every match — boss or patron, cards or no cards,
+   dice present or not. Floating in the dice-area flex flow made its position
+   depend on whatever happened to render above it. --dlg-y shrinks on short
+   screens so it never collides with the tell badge below it. */
 .dlg-box{
-  position:relative;z-index:90;display:flex;justify-content:center;
+  position:fixed;
+  top:calc(var(--hud-h) + var(--dlg-y,184px));
+  left:0;right:0;
+  z-index:90;display:flex;justify-content:center;
   pointer-events:none;opacity:0;transition:opacity .5s ease;
   height:0;overflow:visible;padding:0;
 }
+@media (max-height:700px){.dlg-box{--dlg-y:128px}}
+@media (max-height:580px){.dlg-box{--dlg-y:100px}}
 .dlg-box.show{opacity:1}
-/* Push the dialogue content down so it sits below the NPC status/scoring strip
-   (the parent .dlg-box is height:0, so this just shifts the floating content). */
-.dlg-inner{display:flex;align-items:center;gap:8px;padding:2px 4px;transform:translateY(36px);width:100%;max-width:100vw;justify-content:flex-start}
+.dlg-inner{display:flex;align-items:center;gap:8px;padding:2px 4px;width:100%;max-width:100vw;justify-content:flex-start}
 .dlg-portrait{
   /* Bumped 60→78 px (~30% larger) per player feedback. The 8px gap above
      and reduced .dlg-inner side padding (8→4) buys back the space so the
@@ -2727,6 +2743,12 @@ body::before,body::after{display:none!important}
    (wider tallies at higher tiers no longer push into the portrait). */
 .tier-boss-top .tier-progress{position:absolute;right:calc(50% + 62px);left:auto;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;align-items:flex-end;gap:5px;z-index:3}
 .tier-boss-name{font-family:var(--font-px);font-size:24px;color:#e06050;margin-top:-8px;letter-spacing:4px;text-shadow:0 2px 0 rgba(0,0,0,.5);position:relative;z-index:2}
+/* Lifetime head-to-head record vs this regular ("YOU 3 · GROG 5") */
+.tier-boss-record{
+  font-family:var(--font-px);font-size:10px;letter-spacing:2px;
+  color:rgba(220,190,140,.75);margin-top:2px;position:relative;z-index:2;
+  text-shadow:0 1px 0 rgba(0,0,0,.5);
+}
 /* Boss "house rule" (Tell) badge — shown in advance so the player can
    prep their deck/dice/banking against it before committing to the boss. */
 .tier-boss-tell{display:flex;flex-direction:column;align-items:center;
@@ -2909,6 +2931,24 @@ body::before,body::after{display:none!important}
 .pouch-fab:hover{transform:translateY(-1px);filter:drop-shadow(0 3px 4px rgba(0,0,0,.6)) brightness(1.08)}
 .pouch-fab:active{transform:scale(.92)}
 .pouch-fab-img{width:100%;height:100%;image-rendering:pixelated;object-fit:contain}
+/* Pouch button in the YOUR LOADOUT row (replaces the card fan — cards live
+   in the panel now). Count badge = equipped cards. */
+.tier-lo-pouch{
+  width:clamp(68px,19vw,88px);height:clamp(68px,19vw,88px);
+  display:flex;align-items:center;justify-content:center;cursor:pointer;
+  position:relative;
+  transition:transform .12s ease, filter .12s ease;
+  filter:drop-shadow(0 2px 3px rgba(0,0,0,.55));
+}
+.tier-lo-pouch:hover{transform:translateY(-1px);filter:drop-shadow(0 3px 4px rgba(0,0,0,.6)) brightness(1.08)}
+.tier-lo-pouch:active{transform:scale(.92)}
+.tier-lo-pouch img{width:100%;height:100%;image-rendering:pixelated;object-fit:contain;pointer-events:none}
+.tier-lo-pouch .tlp-count{
+  position:absolute;bottom:0;right:0;
+  font-family:var(--font-px);font-size:10px;line-height:1;color:var(--gold);
+  background:rgba(30,20,10,.92);border:1px solid rgba(180,140,70,.5);
+  border-radius:3px;padding:2px 5px;pointer-events:none;
+}
 /* (drag-and-drop is self-contained — no pending-swap indicator needed) */
 
 /* Pouch modal reuses the .rnk-info-panel container/canvas system for visual
@@ -2916,19 +2956,23 @@ body::before,body::after{display:none!important}
    need custom styling below. */
 .pouch-row-label{font-family:var(--font-px);font-size:9px;color:rgba(200,160,80,.4);letter-spacing:2px;margin-top:8px;text-align:center}
 .pouch-reserve-label{margin-top:22px}  /* extra breathing room between deck and pouch rows */
-/* Override the perks-panel defaults for the pouch — content is short, no scroll.
-   The base .rnk-info-panel anchors at bottom:-100px with 160px bottom padding to
-   hide its 40px canvas overhang. The pouch sits flush with viewport bottom instead. */
+/* Override the perks-panel defaults for the pouch — content is short, no
+   scroll. COMPACT CENTERED BOX: the old bottom-sheet inherited top:4vh/
+   bottom:0 and spanned the whole screen for two small card rows (player
+   feedback: "takes the whole screen when there is barely anything in it").
+   Height now hugs the content; the backdrop dims the rest. */
 #pouch-ov{
-  padding:48px 16px 26px;          /* top: portrait overlap space; bottom: small breathing */
-  max-height:none;overflow:visible; /* kill inherited overflow:auto — no scrolling */
-  bottom:0;                         /* flush with viewport */
-  /* Translate 100% of panel height PLUS the portrait's 44px overhang so nothing peeks
-     out the top of the closed panel (portrait is a child with top:-44px and moves
-     with the panel). */
-  transform:translateY(calc(100% + 44px));
+  top:50%;bottom:auto;left:50%;right:auto;
+  width:min(92vw,400px);
+  height:auto;max-height:none;overflow:visible;
+  padding:54px 16px 24px;          /* top: portrait overlap space */
+  border:2px solid rgba(180,140,70,.45);border-radius:10px;
+  box-shadow:0 12px 40px rgba(0,0,0,.65);
+  opacity:0;pointer-events:none;
+  transform:translate(-50%,-50%) scale(.94);
+  transition:opacity .25s ease, transform .25s cubic-bezier(.22,.68,.36,1);
 }
-#pouch-ov.show{transform:translateY(0)}
+#pouch-ov.show{transform:translate(-50%,-50%) scale(1);opacity:1;pointer-events:auto}
 #pouch-ov canvas{height:100%!important} /* no 40px overhang — canvas fits panel exactly */
 #pouch-ov .rnk-info-inner{padding-top:8px}
 /* Large pouch icon overlapping the top edge (like the mid-match loadout portrait) */
@@ -7190,6 +7234,9 @@ function _getS(){
     if(typeof S.run.coins!=='number')S.run.coins=3;
     if(typeof S.run._coinIncomeThisTier!=='number')S.run._coinIncomeThisTier=0;
     if(typeof S.run._renownAtStart!=='number')S.run._renownAtStart=S.renown||0;
+    /* THE REGULARS REMEMBER: lifetime per-boss ledger (persists across runs,
+       like renown). Keyed by rung.key (drunkard/peasant/.../bishop). */
+    if(!S.npcLedger)S.npcLedger={};
     /* Drop any equipped cards that no longer exist in the catalog (e.g. removed in an update) */
     /* coin_flip restored as a tin active in this update — kept off the
        _removedCards list so existing saves that have it equipped retain
@@ -8125,6 +8172,9 @@ const SFX={
   coinLand(){/* big coin lands — metallic thud + ring */
     this._click(400,0.12,0.06);this._tone(880,'sine',0.06,0.003,0.12);this._tone(1320,'sine',0.03,0.002,0.08,0.02);
   },
+  deadAir(){/* the room holds its breath — long low drone, barely there */
+    this._tone(110,'sine',0.07,0.02,1.4);this._tone(82,'sine',0.05,0.03,1.8,0.2);
+  },
   heartLose(){/* a life lost to a boss — soft, sad two-note descent + dull thud */
     this._tone(440,'sine',0.10,0.005,0.20);this._tone(311,'sine',0.12,0.006,0.26,0.10);this._click(180,0.10,0.07,0.05);
   },
@@ -9048,7 +9098,7 @@ const CARDS=[
   {id:'blood_debt',name:'BLOOD DEBT',icon:'🩸',rarity:'gold',eff:'-100 START; +400 PER OPP BUST',desc:'You start -100 points. Each time the opponent busts, you gain 400 points.',arch:'hoarder',dep:true},
   {id:'leaky_cup',name:'LEAKY CUP',icon:'🥛',rarity:'gold',eff:"RIVAL 5 DICE EVERY 4TH TURN",desc:"Every fourth turn the opponent takes, they start with only 5 dice on their first roll.",arch:'saboteur'},
   {id:'crows_luck',name:"CROW'S LUCK",icon:'🐦',rarity:'gold',eff:'DOWNGRADE RIVAL STRAIGHTS (2x)',desc:"Twice per match, downgrades any straight the opponent rolls by one tier: Full (1500) → High (750), High (750) → Low (500), Low (500) → nothing.",arch:'saboteur'},
-  {id:'the_tab',name:'THE TAB',icon:'🍺',rarity:'silver',type:'active',maxUses:1,timing:'idle|choosing|yielding',eff:"HOLD RIVAL'S NEXT BANK 1 TURN",desc:"Put your rival on the tab. Their next bank is held in escrow — those points (and any win they'd trigger) don't count until the start of their following turn, buying you a turn to answer. One use per match.",arch:'saboteur'},
+  {id:'the_tab',name:'THE TAB',icon:'🍺',rarity:'silver',type:'active',maxUses:1,timing:'idle|choosing|yielding',eff:"HOLD RIVAL'S NEXT BANK 1 TURN",desc:"Put your rival on the tab. Their next bank is held in escrow — those points (and any win they'd trigger) don't count until the start of their following turn, buying you a turn to answer.",arch:'saboteur'},
   {id:'taxing_breath',name:'TAXING BREATH',icon:'💨',rarity:'gold',eff:'STEAL 400 ON RIVAL BANK',desc:'Each time the opponent banks any points, steal 400 of those points for yourself.',arch:'saboteur'},
   {id:'thieves_luck',name:"THIEF'S LUCK",icon:'🎭',rarity:'gold',eff:'STEAL RIVAL BANK <200',desc:"When the opponent banks less than 200 points in a turn, those points transfer to you instead.",arch:'saboteur',dep:true},
   {id:'plague_wind',name:'PLAGUE WIND',icon:'🌬️',rarity:'gold',eff:'RIVAL PLAYS SAFER',desc:"Reduces the opponent's tendency to keep re-rolling aggressively — they play safer.",arch:'saboteur',dep:true},
@@ -9060,15 +9110,15 @@ const CARDS=[
   {id:'serpents_whisper',name:"SERPENT'S WHISPER",icon:'🐍',rarity:'silver',eff:"RIVAL MIN BANK +300",desc:"Raises the opponent's minimum banking threshold by 300 — they must keep rolling until they hit it or bust.",arch:'saboteur',dep:true},
   /* cowards_bell removed — effect was confusing, didn't impact play. */
   /* ── ACTIVE CARDS (shop + NPC rewards, drag-to-activate) ── */
-  {id:'gamblers_eye',name:"GAMBLER'S EYE",icon:'👁️‍🗨️',rarity:'gold',type:'active',maxUses:1,timing:'choosing',eff:'KEEP ANY DICE, REROLL REST',desc:'Choose any dice to keep — scoring or not — then reroll everything else. One use per match.',arch:'sharp'},
-  {id:'grogs_flask',name:"GROG'S FLASK",icon:'🍺',rarity:'gold',type:'active',npc:'grog',maxUses:1,timing:'choosing',eff:'REROLL 2 NON-SCORING DICE',desc:'During dice selection, pick up to two dice that aren\'t scoring and reroll them. One use per match.',rewardQuote:'"Here… take thish. Won it fair an\' shquare."',arch:'sharp'},
-  {id:'mabels_stitch',name:"MABEL'S STITCH",icon:'🧵',rarity:'gold',type:'active',npc:'mabel',maxUses:1,timing:'idle|choosing|yielding',eff:'BUST → BANK PTS + FREE REROLL',desc:'Activate before rolling: if you bust this turn, bank your accumulated points safely AND get a fresh 6-die reroll to keep going. One use per match.',rewardQuote:'"Take this. May it mend thy fortune."',arch:'brinksman'},
-  {id:'finnicks_palm',name:"FINNICK'S PALM",icon:'🤏',rarity:'gold',type:'active',npc:'finnick',maxUses:1,timing:'choosing',eff:'PALM 1 UNSELECTED DIE → 1 OR 5',desc:'Flips one of your unselected non-scoring dice to a 1 or 5. Selected dice stay safe. One use.',rewardQuote:'"Not bad, mate! Keep this, yeah?"',arch:'sharp'},
-  {id:'corvus_ledger',name:"CORVUS'S LEDGER",icon:'📒',rarity:'gold',type:'active',npc:'corvus',maxUses:1,timing:'idle|choosing|yielding',eff:'NEXT BANK x2',desc:'Activate at any point during your turn — your next bank is doubled. One use per match.',rewardQuote:'"Take the ledger. Consider it… a dividend."',arch:'hoarder'},
-  {id:'brutus_fist',name:"BRUTUS'S FIST",icon:'👊',rarity:'gold',type:'active',npc:'brutus',maxUses:1,timing:'choosing',eff:'FORCE 1 DIE → 1',desc:'During dice selection, force one non-scoring die to show a 1 (worth 100 pts). One use per match.',rewardQuote:'"Iron in thy bones. Take this, soldier."',arch:'sharp',dep:true},
-  {id:'aldrics_vow',name:"ALDRIC'S VOW",icon:'⚔️',rarity:'gold',type:'active',npc:'aldric',maxUses:1,timing:'idle',eff:'DOUBLE OR NOTHING',desc:'Your next roll: score 300+ and it doubles; score less and you lose your accumulated turn points. One use.',rewardQuote:'"Thou hast proven worthy. Bear this vow."',arch:'brinksman'},
-  {id:'whispers_hex',name:"WHISPER'S HEX",icon:'🔮',rarity:'gold',type:'active',npc:'whisper',maxUses:1,timing:'yielding',eff:'OPP −1 DIE NEXT TURN',desc:'Activate while yielding your turn — the opponent starts their next turn with only five dice. One use.',rewardQuote:'"This hex is yours. Use it wisely."',arch:'saboteur'},
-  {id:'ambrose_grace',name:"AMBROSE'S GRACE",icon:'✝️',rarity:'gold',type:'active',npc:'ambrose',maxUses:1,timing:'choosing',eff:'2 BLANKS → 5s',desc:'During dice selection, convert up to 2 non-scoring dice into 5s (50 pts each). One use per match.',rewardQuote:'"The heavens smiled upon thee. Accept this grace."',arch:'sharp',dep:true},
+  {id:'gamblers_eye',name:"GAMBLER'S EYE",icon:'👁️‍🗨️',rarity:'gold',type:'active',maxUses:1,timing:'choosing',eff:'KEEP ANY DICE, REROLL REST',desc:'Choose any dice to keep — scoring or not — then reroll everything else.',arch:'sharp'},
+  {id:'grogs_flask',name:"GROG'S FLASK",icon:'🍺',rarity:'gold',type:'active',npc:'grog',maxUses:1,timing:'choosing',eff:'REROLL 2 NON-SCORING DICE',desc:'During dice selection, pick up to two dice that aren\'t scoring and reroll them.',rewardQuote:'"Here… take thish. Won it fair an\' shquare."',arch:'sharp'},
+  {id:'mabels_stitch',name:"MABEL'S STITCH",icon:'🧵',rarity:'gold',type:'active',npc:'mabel',maxUses:1,timing:'idle|choosing|yielding',eff:'BUST → BANK PTS + FREE REROLL',desc:'Activate before rolling: if you bust this turn, bank your accumulated points safely AND get a fresh 6-die reroll to keep going.',rewardQuote:'"Take this. May it mend thy fortune."',arch:'brinksman'},
+  {id:'finnicks_palm',name:"FINNICK'S PALM",icon:'🤏',rarity:'gold',type:'active',npc:'finnick',maxUses:1,timing:'choosing',eff:'PALM 1 UNSELECTED DIE → 1 OR 5',desc:'Flips one of your unselected non-scoring dice to a 1 or 5. Selected dice stay safe.',rewardQuote:'"Not bad, mate! Keep this, yeah?"',arch:'sharp'},
+  {id:'corvus_ledger',name:"CORVUS'S LEDGER",icon:'📒',rarity:'gold',type:'active',npc:'corvus',maxUses:1,timing:'idle|choosing|yielding',eff:'NEXT BANK x2',desc:'Activate at any point during your turn — your next bank is doubled.',rewardQuote:'"Take the ledger. Consider it… a dividend."',arch:'hoarder'},
+  {id:'brutus_fist',name:"BRUTUS'S FIST",icon:'👊',rarity:'gold',type:'active',npc:'brutus',maxUses:1,timing:'choosing',eff:'FORCE 1 DIE → 1',desc:'During dice selection, force one non-scoring die to show a 1 (worth 100 pts).',rewardQuote:'"Iron in thy bones. Take this, soldier."',arch:'sharp',dep:true},
+  {id:'aldrics_vow',name:"ALDRIC'S VOW",icon:'⚔️',rarity:'gold',type:'active',npc:'aldric',maxUses:1,timing:'idle',eff:'DOUBLE OR NOTHING',desc:'Your next roll: score 300+ and it doubles; score less and you lose your accumulated turn points.',rewardQuote:'"Thou hast proven worthy. Bear this vow."',arch:'brinksman'},
+  {id:'whispers_hex',name:"WHISPER'S HEX",icon:'🔮',rarity:'gold',type:'active',npc:'whisper',maxUses:1,timing:'yielding',eff:'OPP −1 DIE NEXT TURN',desc:'Activate while yielding your turn — the opponent starts their next turn with only five dice.',rewardQuote:'"This hex is yours. Use it wisely."',arch:'saboteur'},
+  {id:'ambrose_grace',name:"AMBROSE'S GRACE",icon:'✝️',rarity:'gold',type:'active',npc:'ambrose',maxUses:1,timing:'choosing',eff:'2 BLANKS → 5s',desc:'During dice selection, convert up to 2 non-scoring dice into 5s (50 pts each).',rewardQuote:'"The heavens smiled upon thee. Accept this grace."',arch:'sharp',dep:true},
   /* ── Boss SIGNATURE passives (Phase 5) — alternative to one-use actives ── */
   {id:'mabels_ward',name:"MABEL'S WARD",icon:'🪡',rarity:'gold',npc:'mabel',eff:'EVERY BANK +200; 3RD BANK +600',desc:"Every bank gains +200. Your 3rd, 6th, 9th bank gains +600 instead.",rewardQuote:'"This thread holds firm. Take it, dear."',arch:'safeBanker'},
   {id:'corvus_book',name:"CORVUS'S BOOK",icon:'📖',rarity:'gold',npc:'corvus',eff:'EACH BANK +75 INTEREST (PERMANENT)',desc:"Each bank adds +75 to a running interest line that applies to every future bank this match. Banks of 1000+ add +150 instead.",rewardQuote:'"Compounding. The lender\'s purest art."',arch:'hoarder'},
@@ -9130,17 +9180,17 @@ const CARDS=[
   {id:'blood_tithe',name:'BLOOD TITHE',icon:'🩸',rarity:'tin',eff:'-50/TURN, 1s = 150',desc:'Each turn costs 50 pts from your total, but single 1s score 150 instead of 100.',arch:'brinksman'},
   /* Silver */
   {id:'the_echo',name:'THE ECHO',icon:'🔊',rarity:'silver',eff:'SCORE → NEXT ROLL +35%',desc:'After a scoring roll, your next roll in the same turn gets a +35% score bonus.',arch:'sharp'},
-  {id:'frozen_die',name:'FROZEN DIE',icon:'🧊',rarity:'silver',type:'active',maxUses:2,timing:'choosing',eff:'HOLD A DIE THROUGH REROLLS',desc:"Freeze one selected die — it keeps its face through your rerolls this turn (won't reroll) while you chase a match for it. Still scorable: re-select it and bank when ready. Two uses per match — spend both to hold a pair.",arch:'sharp'},
-  {id:'double_down',name:'DOUBLE DOWN',icon:'✌️',rarity:'silver',type:'active',maxUses:1,timing:'choosing',eff:'2× TURN PTS, THEN REROLL ALL',desc:'Doubles the points you\'ve scored THIS turn, then frees all your kept dice for a fresh roll. Keep going from there — but a bust now loses the doubled total. One use.',arch:'brinksman'},
+  {id:'frozen_die',name:'FROZEN DIE',icon:'🧊',rarity:'silver',type:'active',maxUses:2,timing:'choosing',eff:'HOLD A DIE THROUGH REROLLS',desc:"Freeze one selected die — it keeps its face through your rerolls this turn (won't reroll) while you chase a match for it. Still scorable: re-select it and bank when ready. Spend both uses to hold a pair.",arch:'sharp'},
+  {id:'double_down',name:'DOUBLE DOWN',icon:'✌️',rarity:'silver',type:'active',maxUses:1,timing:'choosing',eff:'2× TURN PTS, THEN REROLL ALL',desc:'Doubles the points you\'ve scored THIS turn, then frees all your kept dice for a fresh roll. Keep going from there — but a bust now loses the doubled total.',arch:'brinksman'},
   /* ── Tactile active cards (select a die, then activate) ── */
   /* COIN FLIP — restored from retired. Started at silver/2-use, briefly
      tin/1-use, now silver/1-use: the flip mechanic is strong enough that
      tin felt undertuned but two charges felt obnoxious. */
-  {id:'coin_flip',name:'COIN FLIP',icon:'🪙',rarity:'silver',type:'active',maxUses:1,timing:'choosing',eff:'FLIP SELECTED DIE',desc:'Select a die, then activate — it flips to the opposite face (1↔6, 2↔5, 3↔4). One use per match.',arch:'sharp'},
-  {id:'the_nudge',name:'THE NUDGE',icon:'👆',rarity:'silver',type:'active',maxUses:2,timing:'choosing',eff:'BUMP A DIE +1 (6→1)',desc:'Select a die, then activate — its face bumps up by 1 (6 wraps back to 1). Two uses per match.',arch:'sharp'},
-  {id:'alchemist_touch',name:"ALCHEMIST'S TOUCH",icon:'🧪',rarity:'silver',type:'active',maxUses:1,timing:'choosing',eff:'SELECTED DIE → 5',desc:'Select a non-scoring die (2/3/4/6), then activate — it becomes a 5 (50 pts). One use per match.',arch:'sharp',dep:true},
-  {id:'twinning_charm',name:'TWINNING CHARM',icon:'🧬',rarity:'silver',type:'active',maxUses:1,timing:'choosing',eff:'MIRROR SELECTED VALUE',desc:'Select a die, then activate — a random other unkept die changes to the same value. One use per match.',arch:'sharp'},
-  {id:'double_down_die',name:'DOUBLE DOWN DIE',icon:'⚗️',rarity:'gold',type:'active',maxUses:1,timing:'choosing',eff:'SELECTED 2/3/4 → DOUBLED',desc:'Select a die showing 2, 3, or 4, then activate — its value doubles (capped at 6). One use per match.',arch:'sharp',dep:true},
+  {id:'coin_flip',name:'COIN FLIP',icon:'🪙',rarity:'silver',type:'active',maxUses:1,timing:'choosing',eff:'FLIP SELECTED DIE',desc:'Select a die, then activate — it flips to the opposite face (1↔6, 2↔5, 3↔4).',arch:'sharp'},
+  {id:'the_nudge',name:'THE NUDGE',icon:'👆',rarity:'silver',type:'active',maxUses:2,timing:'choosing',eff:'BUMP A DIE +1 (6→1)',desc:'Select a die, then activate — its face bumps up by 1 (6 wraps back to 1).',arch:'sharp'},
+  {id:'alchemist_touch',name:"ALCHEMIST'S TOUCH",icon:'🧪',rarity:'silver',type:'active',maxUses:1,timing:'choosing',eff:'SELECTED DIE → 5',desc:'Select a non-scoring die (2/3/4/6), then activate — it becomes a 5 (50 pts).',arch:'sharp',dep:true},
+  {id:'twinning_charm',name:'TWINNING CHARM',icon:'🧬',rarity:'silver',type:'active',maxUses:1,timing:'choosing',eff:'MIRROR SELECTED VALUE',desc:'Select a die, then activate — a random other unkept die changes to the same value.',arch:'sharp'},
+  {id:'double_down_die',name:'DOUBLE DOWN DIE',icon:'⚗️',rarity:'gold',type:'active',maxUses:1,timing:'choosing',eff:'SELECTED 2/3/4 → DOUBLED',desc:'Select a die showing 2, 3, or 4, then activate — its value doubles (capped at 6).',arch:'sharp',dep:true},
   /* ── New scoring-pattern cards — unlock new combos ── */
   {id:'sevens_gift',name:"SEVEN'S GIFT",icon:'🎲',rarity:'tin',eff:'ANY PAIR SUMMING TO 7: +200',desc:'Pairs of dice that sum to 7 (1+6, 2+5, 3+4) score +200 per pair. Dice are consumed by the pair.',arch:'collector'},
   {id:'twin_fury',name:'TWIN FURY',icon:'👯',rarity:'silver',eff:'TWO PAIRS IN ONE ROLL: +600',desc:'If your roll contains two separate pairs (any values), score +600 bonus. The four dice are consumed.',arch:'collector'},
@@ -9237,13 +9287,13 @@ const CARDS=[
      ANY disruption gets fizzled. */
   {id:'warded',name:'WARDED',icon:'🛡️',rarity:'gold',eff:'FIZZLES NEXT OPP DISRUPTION',desc:'The first time the opponent tries to palm, swap, seize, or downgrade one of your dice this match, the effect fizzles harmlessly. One charge per match.',arch:'utility'},
   /* Gold */
-  {id:'broken_lantern',name:'BROKEN LANTERN',icon:'🏮',rarity:'gold',type:'active',maxUses:1,timing:'yielding',eff:'OPP PLAYS BLIND 1 TURN',desc:'Opponent\'s next turn: their dice faces are hidden until committed. One use per match.',arch:'saboteur',dep:true},
-  {id:'wild_die',name:'THE WILD DIE',icon:'🃏',rarity:'gold',type:'active',maxUses:1,timing:'choosing',eff:'PICK ANY DIE FACE',desc:'Choose any face value (1-6) for one non-scoring die. One use per match.',arch:'sharp',dep:true},
-  {id:'second_wind',name:'SECOND WIND',icon:'💨',rarity:'gold',type:'active',maxUses:1,timing:'idle|choosing|yielding',eff:'BUST → 3-DICE RESCUE ROLL',desc:'Activate before you bust. If you bust this turn, you immediately roll 3 rescue dice once — whatever they score is banked automatically, then your turn ends. One use per match.',arch:'brinksman'},
+  {id:'broken_lantern',name:'BROKEN LANTERN',icon:'🏮',rarity:'gold',type:'active',maxUses:1,timing:'yielding',eff:'OPP PLAYS BLIND 1 TURN',desc:'Opponent\'s next turn: their dice faces are hidden until committed.',arch:'saboteur',dep:true},
+  {id:'wild_die',name:'THE WILD DIE',icon:'🃏',rarity:'gold',type:'active',maxUses:1,timing:'choosing',eff:'PICK ANY DIE FACE',desc:'Choose any face value (1-6) for one non-scoring die.',arch:'sharp',dep:true},
+  {id:'second_wind',name:'SECOND WIND',icon:'💨',rarity:'gold',type:'active',maxUses:1,timing:'idle|choosing|yielding',eff:'BUST → 3-DICE RESCUE ROLL',desc:'Activate before you bust. If you bust this turn, you immediately roll 3 rescue dice once — whatever they score is banked automatically, then your turn ends.',arch:'brinksman'},
   {id:'the_brewer',name:'THE BREWER',icon:'🍺',rarity:'gold',eff:'ACTIVE CARDS +1 USE',desc:'All your active cards get one extra use this match.',arch:'hoarder'},
   {id:'dead_mans_hand',name:"DEAD MAN'S HAND",icon:'🃏',rarity:'gold',eff:'ONCE-PER-MATCH → TWICE',desc:'Your once-per-match card effects can trigger twice instead of once.',arch:'hoarder'},
-  {id:'the_pyre',name:'THE PYRE',icon:'🔥',rarity:'gold',type:'active',maxUses:1,timing:'choosing',eff:'BURN CARD → +500 BANK',desc:'Permanently disable one of your equipped cards this match to add +500 to your current bank. One use.',arch:'brinksman'},
-  {id:'all_in',name:'ALL IN',icon:'💎',rarity:'gold',type:'active',maxUses:1,timing:'idle',eff:'2× BANK OR −500',desc:'Double your next bank — but if it doesn\'t win the match, lose 500 points. One use.',arch:'brinksman'},
+  {id:'the_pyre',name:'THE PYRE',icon:'🔥',rarity:'gold',type:'active',maxUses:1,timing:'choosing',eff:'BURN CARD → +500 BANK',desc:'Permanently disable one of your equipped cards this match to add +500 to your current bank.',arch:'brinksman'},
+  {id:'all_in',name:'ALL IN',icon:'💎',rarity:'gold',type:'active',maxUses:1,timing:'idle',eff:'2× BANK OR −500',desc:'Double your next bank — but if it doesn\'t win the match, lose 500 points.',arch:'brinksman'},
 ];
 /* ── Card Synergy Sets ── */
 const CARD_BG={
@@ -12141,6 +12191,7 @@ function startPTurn(){
      not start a player turn (it used to re-create S.pendingMatch after
      endMatch deleted it, resurrecting a RESUME for a match already lost). */
   if(!G||G._endMatchFired)return;
+  if(typeof _checkDeadAir==='function')_checkDeadAir();
   G.phase='idle';G.turnPts=0;G.kept=[];G.numDice=G.matchDice?G.matchDice.length:6;G.pool=[];G.turnRollCount=0;G._slowHandUsedThisTurn=false;G._warmHandsActive=false;G._lastHotDice=false;G._firstRollCommitted=0;G._bustSavedThisTurn=false;
   /* THE TAB: release any bank the rival escrowed last turn. It was held for
      one turn; credit it now and check the win it may complete (the rival
@@ -14380,6 +14431,7 @@ function oppShouldBank(rung,oppBank,diceLeft,oppTotal,playerTotal,target){
 
 function runOppTurn(){
   if(!G||G._endMatchFired)return;
+  if(typeof _checkDeadAir==='function')_checkDeadAir();
   /* Capture the match's G: every step()/finOpp() timer callback bails if the
      global G has been swapped (new match started) or the match ended. Without
      this, an uncancelled 1.9s NPC "thinking" timer from a fled match rolled
@@ -16420,6 +16472,21 @@ function _settleEndRoute(route){
   if(!route||route._settled||route.practice)return route;
   route._settled=true;
   _getS();
+  /* THE REGULARS REMEMBER: update the lifetime per-boss ledger. Boss matches
+     only — patrons are anonymous one-night visitors; the eight named regulars
+     keep a real tally of every night you've sat at their table. */
+  if(route.isBoss&&route.bossKey){
+    if(!S.npcLedger)S.npcLedger={};
+    var _lg=S.npcLedger[route.bossKey]||(S.npcLedger[route.bossKey]={w:0,l:0,nights:0,bestBank:0,streak:0});
+    _lg.nights++;
+    if(route.win){_lg.w++;_lg.streak=Math.max(1,(_lg.streak||0)+1);}
+    else{_lg.l++;_lg.streak=Math.min(-1,(_lg.streak||0)-1);}
+    /* Remember the player's biggest single bank ever made at this table.
+       G is still alive at the endMatch-time settle (the defensive exitMatch
+       re-call is a no-op via _settled). */
+    var _lgMb=(typeof G!=='undefined'&&G&&G._featMaxBank)||0;
+    if(_lgMb>(_lg.bestBank||0))_lg.bestBank=_lgMb;
+  }
   if(route.win&&route.isBoss&&!route.isGauntlet){
     S.run.bossesBeaten.push(S.run.tier);
     S.run.points=0;
@@ -16465,6 +16532,7 @@ function exitMatch(){
      _bgMusicSync + _ambienceSync unconditionally guarantees playback is
      alive on exit regardless of layer state. */
   try{
+    if(typeof _setDeadAir==='function')_setDeadAir(false);
     if(typeof _setMusicLayer==='function')_setMusicLayer('tavern');
     if(typeof _bgMusicSync==='function')_bgMusicSync();
     if(typeof _ambienceSync==='function')_ambienceSync();
@@ -17009,6 +17077,64 @@ const PATRON_CLASS_LINES={
   combo:["Pairs and sets, friend. I collect things.","Buttons, mostly. And the odd lucky combo.","Hoy. I like a clever little pattern.","Bits that fit together. That's my joy."]
 };
 
+/* ═══════ THE REGULARS REMEMBER — per-boss ledger dialogue ═══════
+   Bosses quote the ACTUAL lifetime record against this player at match start.
+   Template slots: {w}=player wins, {l}=player losses (boss wins), {nights}=
+   matches played, {best}=player's biggest single bank at this table.
+   Situations: ahead (player leads), behind (boss leads), even, best (big bank
+   callback). New lines reference only the PLAYER and the other seated
+   regulars — never off-screen characters. */
+const LEDGER_LINES={
+  GROG:{
+    ahead:["Hells. {w} wins ye've taken off me now. Brutus laughs every time. BRUTUS.","{w} to {l}, yer way. The bones've turned traitor on their own barman."],
+    behind:["{l} times I've sent ye home light. Stool's startin' to like me better.","Me {l}, you {w}. The table knows its master, friend. Pour up."],
+    even:["{nights} nights at me table an' we're dead even. Tonight the bones pick a side.","All square, you an' me. Can't drink to a tie. Won't."],
+    best:["Still see that {best}-point throw of yers in me sleep. Cruel thing to do to a drunk.","Ye took {best} off me in one go once. I've not forgiven the dice."]
+  },
+  MABEL:{
+    ahead:["{w} wins to thee, sprout. I count every one while I knit, I do.","Thou'rt {w} and {l} against me. My needles know thy name by now."],
+    behind:["I've bested thee {l} times, dearie. The kettle remembers each one.","{l} to {w}, my way. Sit — losing's lighter with tea in thee."],
+    even:["{nights} evenings together and neither of us ahead. Cozy, that. Dangerous, too.","Dead level after {nights} nights, sprout. One of us blinks tonight."],
+    best:["That {best} thou banked against me — I knitted a whole row wrong over it.","I still tell Finnick of thy {best} throw. The fox refuses to believe me."]
+  },
+  FINNICK:{
+    ahead:["{w} wins on me, mate. Keep it quiet or Corvus'll charge me interest on the shame.","You're {w} and {l} up on me. I'm LETTING you win. Buildin' trust, see."],
+    behind:["{l} times I've cleaned you out now. It's gettin' too easy, mate.","Me {l}, you {w}. Funny how the house wins when the house is me."],
+    even:["{nights} games and we're even-steven. That's terrible business for a thief.","All square after {nights} nights. One of us is overdue a bad evening, mate."],
+    best:["That {best} bank of yours — I checked me own pockets after. Swear it.","{best} in one turn. You sure YOU'RE not the thief at this table?"]
+  },
+  CORVUS:{
+    ahead:["The ledger reads {w} to {l}, your favor. An unacceptable line item.","{w} losses to a single patron. The books demand correction tonight."],
+    behind:["{l} wins recorded against your {w}. The arithmetic favors the house.","My ledger says {l} to {w}. Numbers don't gloat. I handle that part."],
+    even:["{nights} entries, perfectly balanced. Tonight one of us goes into red ink.","Dead even after {nights} nights. Auditably dull. Let us correct it."],
+    best:["Your {best}-point bank is still flagged in my records. 'Anomaly,' I wrote.","I have been amortizing that {best} you took across every game since."]
+  },
+  BRUTUS:{
+    ahead:["{w} wins, recruit. You've earned the notches on this table.","You stand {w} and {l} against me. Acceptable soldiering. Barely."],
+    behind:["{l} defeats I've handed you now. Drill it until you get it right.","Mine {l}, yours {w}. The line holds. Yours keeps breaking."],
+    even:["{nights} bouts and no victor between us. Tonight we settle the field.","An even record. A stalemate is a slow loss, recruit. For one of us."],
+    best:["That {best}-point strike of yours — I use it as a training example now.","{best} in one push. Even Aldric saluted when he heard."]
+  },
+  ALDRIC:{
+    ahead:["Thou hast bested me {w} times, friend. The banner dips to none — but it remembers.","{w} victories to thy name against my {l}. Worthy steel, well struck."],
+    behind:["I have taken the field {l} times to thy {w}. The standard holds.","{l} to {w}, my favor. Honor compels the warning: I intend to widen it."],
+    even:["{nights} contests and the field lies level. Tonight decides the campaign.","Neither banner has fallen in {nights} meetings. Glorious. Unbearable."],
+    best:["Thy {best}-point charge is still spoken of at this table.","I watched thee bank {best} in a single turn. I have not underestimated thee since."]
+  },
+  WHISPER:{
+    ahead:["{w} to {l}, your favor. I keep quieter books than Corvus — but I keep them.","You have slipped past me {w} times now. I remember every door you used."],
+    behind:["{l} times the night has ended my way. It tends to.","My {l} to your {w}. The dark deals kindly with its own."],
+    even:["{nights} meetings and no debt either way. How rare. How fragile.","Even, after {nights} nights. Someone tips the scale before last call."],
+    best:["That {best} you banked — I heard it from three rooms away.","{best} in a single turn. Even the shadows took notes."]
+  },
+  AMBROSE:{
+    ahead:["{w} times thou hast humbled me, child. I confess it. It stings.","The record reads {w} to {l} in thy favor. Pride is a sin. So, apparently, is losing."],
+    behind:["{l} times the verdict has gone my way. Tonight I make a sermon of it.","My {l} to thy {w}. The collection plate sends its regards."],
+    even:["{nights} meetings and the scales sit level. Tonight: judgment.","Even, child, after {nights} nights. Heaven abhors a tie."],
+    best:["Thy {best}-point bank — I very nearly wrote a psalm about it.","{best} in one turn. I prayed on that for a week."]
+  }
+};
+
 /* ═══════ DIALOGUE ENGINE ═══════ */
 (function(){
   /* busyUntil = timestamp when the currently-shown line finishes its
@@ -17021,6 +17147,25 @@ const PATRON_CLASS_LINES={
     prob:{MATCH_START:1,REMATCH_START:1,CARD_EFFECT:.8,RISKY_REROLL:.5,GREEDY_REROLL:.5,EARLY_BANK:.3,BIG_BANK:.6,PLAYER_BUST:.85,PLAYER_HOT_DICE:1,PLAYER_TRIPLE:.4,PLAYER_STRAIGHT:1,PLAYER_SIX_KIND:1,PLAYER_TAKES_LEAD:.45,PLAYER_NEAR_WIN:.7,OPP_BUST:.8,OPP_BIG_BANK:.6,OPP_TAKES_LEAD:.45,OPP_NEAR_WIN:.7,MATCH_CLOSE:.4,LOSING_BADLY:.35,WINNING_BADLY:.35,OPP_WINS:1,CARD_FIRE:1,PLAYER_CARD_REACT:1,TELL:1},
     init(rungName,rungKey){this.oppKey=rungName.toUpperCase();this.portraitKey=rungKey||rungName.toLowerCase();this.lastTime=0;this.active=false;this.usedLines={};this.cardFiredThisMatch={};if(this.hideTimer)clearTimeout(this.hideTimer);this.hide();},
     getLine(cat){const data=OPP_DIALOGUE[this.oppKey];if(!data)return null;
+      /* THE REGULARS REMEMBER: when a boss has real shared history with this
+         player (S.npcLedger), ~65% of match opens quote the ACTUAL record —
+         "{w} to {l}, your favor" — instead of a generic greeting. */
+      if((cat==='MATCH_START'||cat==='REMATCH_START')&&typeof LEDGER_LINES!=='undefined'&&LEDGER_LINES[this.oppKey]){
+        try{
+          var _lg=S&&S.npcLedger&&S.npcLedger[this.portraitKey];
+          if(_lg&&_lg.nights>0&&Math.random()<0.65){
+            var _lp=LEDGER_LINES[this.oppKey];
+            var _sit=(_lg.bestBank>=1500&&Math.random()<0.3)?'best':(_lg.w>_lg.l?'ahead':(_lg.l>_lg.w?'behind':'even'));
+            var _ls=_lp[_sit];
+            if(_ls&&_ls.length){
+              var _ll=_ls[Math.floor(Math.random()*_ls.length)];
+              return _ll.replace(/\{w\}/g,_lg.w).replace(/\{l\}/g,_lg.l)
+                        .replace(/\{nights\}/g,_lg.nights)
+                        .replace(/\{best\}/g,(_lg.bestBank||0).toLocaleString());
+            }
+          }
+        }catch(e){}
+      }
       /* PATRON class flavour: on a match open, ~60% chance to use a
          persona-specific intro (from PATRON_CLASS_LINES) instead of the
          generic patron pool, so the patron's 'class' comes through. */
@@ -18282,6 +18427,7 @@ function matchCloseDiceZoom(){
 function initMatchScreen(data){
   /* Nuclear reset — ensure no stale match state bleeds through */
   G=null;
+  if(typeof _setDeadAir==='function')_setDeadAir(false);
   if(S&&S.pendingMatch&&!(data&&data._resumeData)){
     /* Starting a NEW match while an unfinished BOSS match is pending = walking
        away from the boss table. Charge the heart the abandon would cost —
@@ -20119,7 +20265,22 @@ function initTierScreen(data){
     var _pSize=_short?92:120;
     bp.innerHTML=portrait?'<img src="'+portrait+'" alt="'+tier.boss.name+'" style="width:'+_pSize+'px;height:'+_pSize+'px;object-fit:contain;image-rendering:pixelated;filter:drop-shadow(0 3px 0 rgba(0,0,0,.5));transform:scale('+_pScale+');transform-origin:bottom center">':'';
   }
-  if(bn){bn.textContent=tier.boss.name;var _ba=BOSS_ACCENT[(tier.boss.name||'').toLowerCase()];if(_ba)bn.style.color=_ba;}
+  if(bn){
+    bn.textContent=tier.boss.name;var _ba=BOSS_ACCENT[(tier.boss.name||'').toLowerCase()];if(_ba)bn.style.color=_ba;
+    /* THE REGULARS REMEMBER: lifetime head-to-head under the boss name —
+       "YOU 3 · GROG 5". Only once there's actual history. */
+    var _bLg=S.npcLedger&&S.npcLedger[tier.boss.key];
+    var _recEl=document.getElementById('tierBossRecord');
+    if(_bLg&&_bLg.nights>0){
+      if(!_recEl){
+        _recEl=document.createElement('div');
+        _recEl.id='tierBossRecord';_recEl.className='tier-boss-record';
+        bn.parentNode.insertBefore(_recEl,bn.nextSibling);
+      }
+      _recEl.textContent='YOU '+_bLg.w+' · '+tier.boss.name.toUpperCase()+' '+_bLg.l;
+      _recEl.style.display='';
+    }else if(_recEl){_recEl.style.display='none';}
+  }
   /* Boss "house rule" (Tell) — shown in advance so the player can prep
      their deck/dice/banking before committing. Reads from the same
      tell data the in-match badge uses. */
@@ -20210,49 +20371,27 @@ function _renderTierLoadout(){
   var lc=document.getElementById('tierLoCards');
   var ld=document.getElementById('tierLoDice');
   if(lc){
-    var html='';
-    /* 4 slots, fixed: slot 0 is the boss/signature slot, slots 1..3 are regular. */
+    /* The card fan is GONE from the prep screen (player feedback: dice only).
+       In its place: the pouch button — tap to open the compact deck/reserve
+       panel. A small count badge shows how many cards are equipped. */
     var _slotN=_loadoutSlotCount();
-    S.run.cards.slice(0,_slotN).forEach(function(cid,i){
-      html+='<div class="tier-lo-wrap" data-lo-kind="active" data-lo-idx="'+i+'">';
-      if(cid){
-        var cd=CARDS.find(function(c){return c.id===cid;})||getNpcCard(cid);
-        if(cd){
-          var _tRar=cd.npc?'boss-'+cd.npc:(cd.npcOnly&&cd.owner?'boss-'+cd.owner:(cd.npcOnly?'npc':cd.rarity));
-          html+='<div class="tier-lo-card'+(i===0?' boss':'')+'">';
-          html+='<div class="gcard rarity-'+_tRar+'" style="position:absolute;inset:0;width:100%;height:100%;border-radius:4px">';
-          html+='<div class="gcard-cover" style="background:'+(CARD_BG[cid]||'#444')+'">'+cd.icon+'</div>';
-          html+='<div class="gcard-frame"></div>'+gcCorners()+'</div></div>';
-          html+=mkCardTooltipHTML(cd,null,{showFlavor:false});
-        }else{
-          html+='<div class="tier-lo-card'+(i===0?' boss':'')+'"></div>';
-        }
-      }else{
-        var _lockCls=_isSlotUnlocked(i)?'':' locked';
-        html+='<div class="tier-lo-card empty'+(i===0?' boss':'')+_lockCls+'"></div>';
-      }
-      html+='</div>';
-    });
-    lc.innerHTML=html;
-    /* Attach tooltips to filled card wrappers */
-    lc.querySelectorAll('.tier-lo-wrap').forEach(function(w){
-      if(w.querySelector('.tier-lo-card:not(.empty)'))attachTooltipTap(w);
-    });
-    /* Celebrate any newly-unlocked slot from the boss-win flow */
+    var _equipped=S.run.cards.slice(0,_slotN).filter(function(c){return !!c;}).length;
+    lc.innerHTML='<div class="tier-lo-pouch" onclick="togglePouchPanel()" title="Your cards">'
+      +'<img src="Menu_Art/pouch.png?v=231" alt="Cards">'
+      +'<span class="tlp-count">'+_equipped+'</span></div>';
+    /* Celebrate newly-unlocked slots on the pouch (the slots themselves now
+       live inside the panel) */
     if(S.run._slotsToCelebrate&&S.run._slotsToCelebrate.length){
-      var _toCelebrate=S.run._slotsToCelebrate.slice();
       S.run._slotsToCelebrate=[];save();
-      _toCelebrate.forEach(function(slotIdx,i){
-        setTimeout(function(){
-          var slotEl=lc.querySelector('.tier-lo-wrap[data-lo-idx="'+slotIdx+'"] .tier-lo-card');
-          if(!slotEl)return;
-          slotEl.classList.add('slot-unlock-pop');
-          try{spawnPixelSparks(slotEl,18);}catch(e){}
-          try{SFX.coins?SFX.coins():(SFX.bank&&SFX.bank());}catch(e){}
-          try{Haptic.bank&&Haptic.bank();}catch(e){}
-          setTimeout(function(){slotEl&&slotEl.classList.remove('slot-unlock-pop');},2400);
-        },800+i*350);
-      });
+      setTimeout(function(){
+        var pEl=lc.querySelector('.tier-lo-pouch');
+        if(!pEl)return;
+        pEl.classList.add('slot-unlock-pop');
+        try{spawnPixelSparks(pEl,18);}catch(e){}
+        try{SFX.coins?SFX.coins():(SFX.bank&&SFX.bank());}catch(e){}
+        try{Haptic.bank&&Haptic.bank();}catch(e){}
+        setTimeout(function(){pEl&&pEl.classList.remove('slot-unlock-pop');},2400);
+      },800);
     }
   }
   /* ── Pouch FAB visibility + badge — actual swap UI lives in the modal ── */
@@ -20452,8 +20591,10 @@ function _startLoadoutDieDrag(srcEl,srcIdx,initX,initY){
 function _updatePouchFab(){
   var fab=document.getElementById('pouchFab');
   if(!fab)return;
-  /* FAB shows whenever any pouch tier is unlocked. No badge — just the icon. */
-  fab.style.display = getPouchCapacity()===0 ? 'none' : 'flex';
+  /* The floating top-right FAB is RETIRED — the pouch now lives in the
+     YOUR LOADOUT row where the card fan used to be (player feedback:
+     "I don't like where the pouch icon is right now"). */
+  fab.style.display='none';
 }
 function togglePouchPanel(){
   var ov=document.getElementById('pouch-ov');
@@ -20470,7 +20611,9 @@ function togglePouchPanel(){
     try{SFX.nav&&SFX.nav();}catch(e){}
     return;
   }
-  if(getPouchCapacity()===0)return;
+  /* The panel doubles as the DECK VIEWER now (the loadout-row pouch button
+     opens it) — open it even with 0 pouch capacity; locked pouch slots
+     render padlocked, teasing the renown unlock. */
   _renderPouchPanel();
   ov.classList.add('show');if(bd)bd.classList.add('show');
   /* Draw the pixel-art panel background (same pattern as perks panel) */
@@ -21154,6 +21297,45 @@ function _bgMusicSync(){
 function _ambienceTargetVol(){
   if(typeof _currentScreen!=='undefined'&&_currentScreen==='match')return BG_AMB_VOL;
   return BG_AMB_VOL*2.5;
+}
+/* ═══════ DEAD AIR — the match-point hush ═══════
+   When either side gets within striking distance of the target, the tavern
+   goes quiet: music+ambience duck to a murmur, a slow vignette pools the
+   light on the table, and the rival's NEAR_WIN line lands in the silence.
+   Push-your-luck drama deserves a stage — the last bank used to render
+   exactly like turn 1. Ratchets ON once per match; cleared on match init. */
+var _deadAirOn=false;
+function _setDeadAir(on){
+  if(_deadAirOn===on)return;
+  _deadAirOn=on;
+  var ms=document.getElementById('screen-match');
+  if(ms)ms.classList.toggle('dead-air',on);
+  /* Duck (or restore) music + ambience */
+  try{
+    var duck=on?0.22:1;
+    if(!S||!S.settings||S.settings.music!==false){
+      if(typeof _bgCurrentLayer!=='undefined'&&_bgCurrentLayer==='boss'){if(BG_BOSS.gain)_fadeGain(BG_BOSS.gain,BG_BOSS_VOL*duck,1100);}
+      else{if(BG_TAVERN.gain)_fadeGain(BG_TAVERN.gain,BG_TAVERN_VOL*duck,1100);}
+    }
+    if(!S||!S.settings||S.settings.ambience!==false){
+      var _dag=BG_AMB['gain'+BG_AMB.active];
+      if(_dag)_fadeGain(_dag,_ambienceTargetVol()*duck,1100);
+    }
+  }catch(e){}
+  if(on){
+    try{SFX.deadAir&&SFX.deadAir();}catch(e){}
+    try{_haptic(12);}catch(e){}
+    setStatusMsg('THE TAVERN GOES QUIET…','gold');
+    try{
+      if(window.DLG&&typeof G!=='undefined'&&G)DLG.trigger(G.pPts>=G.oPts?'PLAYER_NEAR_WIN':'OPP_NEAR_WIN');
+    }catch(e){}
+  }
+}
+/* Called at every turn boundary — enters Dead Air when someone nears the line. */
+function _checkDeadAir(){
+  if(typeof G==='undefined'||!G||_deadAirOn||!G.target)return;
+  if(G._handicap==='sudden_death')return;/* no fixed target to near */
+  if(G.pPts>=G.target*0.85||G.oPts>=G.target*0.85)_setDeadAir(true);
 }
 function _ambienceSync(){
   var on=!S||!S.settings||S.settings.ambience!==false;
