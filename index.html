@@ -504,6 +504,11 @@ body{
   font-size:10px;color:var(--gold);letter-spacing:.5px;
   padding:3px 10px 2px;z-index:3;position:relative;
 }
+/* Uses-remaining numbers get the card's rarity accent so they pop against the
+   gold "USES PER MATCH" label (e.g. 2/2 → 1/2 → 0/2 as the card is spent). */
+.mcard-tooltip .tip-uses .tu-cur,.mcard-tooltip .tip-uses .tu-max{
+  color:var(--ctrim2,#ffe480);font-weight:bold;font-size:12px;
+}
 .mcard-tooltip .tip-timing{
   font-size:9px;color:var(--textdim);letter-spacing:.5px;
   padding:0 10px 6px;z-index:3;position:relative;
@@ -1872,6 +1877,13 @@ body:has(#mLoadout-ov.show) #dbgButtons{display:flex !important}
 }
 .res-coin-big.burst{animation:coinBurst .25s ease-out forwards}
 @keyframes coinBurst{0%{transform:scale(1.18);opacity:1}100%{transform:scale(2);opacity:0}}
+/* Boss-loss end screen: the big coin becomes the HEART you just lost. Coin
+   face/gradient/sheen are suppressed and ::after shows the heart; it cracks to
+   a broken heart on the burst. Reuses the spin/drain/burst animations. */
+.res-coin-big.as-heart{background:none!important;border:none!important;box-shadow:none!important;overflow:visible!important;filter:drop-shadow(0 4px 8px rgba(180,40,60,.55))}
+.res-coin-big.as-heart .res-coin-sheen{display:none!important}
+.res-coin-big.as-heart::after{content:'❤️'!important;inset:0!important;border:none!important;background:none!important;border-radius:0!important;display:flex;align-items:center;justify-content:center;font-size:74px;line-height:1}
+.res-coin-big.as-heart.drain-burst::after{content:'💔'!important}
 .res-gold-text{
   font-family:var(--font-px);
   font-size:clamp(20px,6vw,32px);color:var(--gold);letter-spacing:2px;
@@ -2670,6 +2682,12 @@ body::before,body::after{display:none!important}
 .tier-lives .life-heart{font-size:13px;line-height:1;display:inline-block;filter:drop-shadow(0 1px 1px rgba(0,0,0,.55))}
 .tier-lives .life-heart.empty{opacity:.5;filter:grayscale(.7) drop-shadow(0 1px 1px rgba(0,0,0,.55))}
 .tier-lives .life-more{font-family:var(--font-px);font-size:11px;color:#e0545c;margin-left:2px}
+/* Heart-change juice on returning to the tier screen after a boss match:
+   a lost heart shatters out (boss loss), the recovered one pops in (boss win). */
+@keyframes heartShatter{0%{transform:scale(1) rotate(0);opacity:1}30%{transform:scale(1.35) rotate(-10deg)}100%{transform:scale(.3) translateY(12px) rotate(8deg);opacity:0}}
+.tier-lives .life-heart.heart-shatter{animation:heartShatter .65s ease-in forwards}
+@keyframes heartPop{0%{transform:scale(0);opacity:0}55%{transform:scale(1.45)}100%{transform:scale(1);opacity:1}}
+.tier-lives .life-heart.heart-pop{animation:heartPop .5s cubic-bezier(.2,1.6,.4,1) both}
 .tier-coin{
   width:16px;height:16px;border-radius:50%;position:relative;
   transition:transform .3s ease,filter .3s ease,opacity .3s ease;
@@ -6570,8 +6588,8 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
             <div class="rp-sh">Lives &amp; death</div>
             <div class="rp-note" style="display:flex;flex-direction:column;gap:4px">
               <span>You start each run with <b style="color:#e05050">3 lives</b> &mdash; the <b style="color:#e05050">❤️</b> hearts at the top of the Gauntlet.</span>
-              <span><b style="color:#8a2020">Losing to a boss costs a life.</b> You keep your cards, gold and tier progress, and the boss stays unlocked &mdash; grind the patrons again, then rematch.</span>
-              <span>A <b style="color:#2a7a2a">patron win restores a life</b> &mdash; but only once per tier, so lives can't be farmed forever. Losing to a patron costs nothing.</span>
+              <span><b style="color:#8a2020">Losing to a boss costs a life.</b> You keep your cards, gold and tier progress, and the boss stays unlocked &mdash; regroup and rematch.</span>
+              <span><b style="color:#2a7a2a">Beating a boss restores a life</b>, up to your starting 3 &mdash; so a life lost to one boss can be won back by clearing the next. Patron matches give points, gold and cards, but don't restore lives. Losing to a patron costs nothing.</span>
               <span>Lose your <b style="color:#e05050">last life</b> and the run is over. Everything resets for the next run &mdash; except <b style="color:var(--gold)">Renown</b>, which is permanent.</span>
             </div>
           </div>
@@ -8065,6 +8083,12 @@ const SFX={
   },
   coinLand(){/* big coin lands — metallic thud + ring */
     this._click(400,0.12,0.06);this._tone(880,'sine',0.06,0.003,0.12);this._tone(1320,'sine',0.03,0.002,0.08,0.02);
+  },
+  heartLose(){/* a life lost to a boss — soft, sad two-note descent + dull thud */
+    this._tone(440,'sine',0.10,0.005,0.20);this._tone(311,'sine',0.12,0.006,0.26,0.10);this._click(180,0.10,0.07,0.05);
+  },
+  heartGain(){/* a life recovered by beating a boss — warm ascending triad */
+    this._tone(523,'sine',0.08,0.004,0.16);this._tone(659,'sine',0.08,0.004,0.18,0.08);this._tone(784,'sine',0.07,0.003,0.18,0.16);
   },
   coinExplode(){/* coin shatters — burst of metallic clinks */
     for(let i=0;i<6;i++){const t=i*0.04;this._click(800+Math.random()*600,0.05,0.04,t);this._tone(600+Math.random()*800,'sine',0.03,0.002,0.06,t);}
@@ -10603,12 +10627,29 @@ function mkCardTooltipHTML(card,bandOverride,opts){
   var effText=_wnHtml(_descSrc);
   /* Tarnish dots removed — mechanic no longer shown in tooltips */
   var tarnishLine='';
+  /* Uses-remaining line for active cards. Shows current/effective-max with
+     accent-coloured numbers, e.g. "2/2 USES" → "1/2" → "0/2" as it's spent.
+     Effective-max includes The Brewer (+1) and Dead Man's Hand (+1), so a
+     boosted 2-use card reads 3/3. In-match it reflects live uses; elsewhere
+     (loadout/draft) it shows the full count. */
+  var usesLine='';
+  if(card.type==='active'){
+    var _bw=(typeof G!=='undefined'&&G&&G._brewerBoosts&&G._brewerBoosts[card.id])?1:0;
+    var _dm=(typeof G!=='undefined'&&G&&G._deadManBoosts&&G._deadManBoosts[card.id])?1:0;
+    var _umax=(card.maxUses||1)+_bw+_dm;
+    var _ucur=_umax;
+    if(typeof G!=='undefined'&&G&&G.activeCardState&&G.activeCardState.usedCards&&G.activeCardState.usedCards[card.id]!==undefined){
+      _ucur=G.activeCardState.usedCards[card.id];
+    }
+    usesLine='<div class="tip-uses" data-cid="'+card.id+'"><span class="tu-cur">'+_ucur+'</span>/<span class="tu-max">'+_umax+'</span> USES PER MATCH</div>';
+  }
   return '<div class="mcard-tooltip rarity-'+rarity+'"'+cbgStyle+'>'+
     gcCorners()+
     '<div class="tip-band">'+band+'</div>'+
     '<div class="tip-name">'+_tc(card.name)+'</div>'+
     tarnishLine+
     '<div class="tip-eff">'+effText+'</div>'+
+    usesLine+
     flavorLine+
   '</div>';
 }
@@ -11070,8 +11111,8 @@ function _commitActivation(mcardEl,cardId,savedState){
   var usesLeft=(G&&G.activeCardState&&G.activeCardState.usedCards)?(G.activeCardState.usedCards[cardId]||0):0;
   if(usesLeft>0)returnCardToHand(mcardEl,savedState);
   else placeCardInZone(mcardEl,savedState);
-  var tipUses=mcardEl.querySelector('.tip-uses');
-  if(tipUses){var cd=CARDS.find(function(c){return c.id===cardId;})||NPC_CARDS_MAP[cardId];tipUses.textContent=usesLeft+'/'+((cd&&cd.maxUses)||1)+' USES';}
+  /* The tooltip "X/Y USES" counter is updated centrally by markActiveCardUsed
+     (via _refreshCardUsesDisplay), which preserves the accent-coloured spans. */
 }
 
 /* ═══════ GAME STATE ═══════ */
@@ -12292,11 +12333,12 @@ function handleRoll(){
     if(uncommitted<=2&&uncommitted>0)DLG.trigger('RISKY_REROLL');
     else if(turnTotal>=600)DLG.trigger('GREEDY_REROLL');
   }
-  /* Exclude FROZEN dice from the roll-time auto-commit. A frozen die is "held
-     through rerolls", never committed by a ROLL — committing it (then busting
-     on the rest) was the false-bust bug. It's still scorable via Bank, which
-     uses its own selection filter (see handleBank). */
-  const selDice=G.pool.filter(d=>d.sel&&!d.committed&&!d._frozen);
+  /* Frozen dice ARE committable here. The false-bust they once caused is
+     prevented by deselecting the die on freeze (see activateFrozenDie) — so a
+     freshly frozen die isn't in the selection when you ROLL, and stays held.
+     But if you deliberately RE-select it to score it, it must commit like any
+     other die; excluding it here used to silently drop it ("NO SCORE"). */
+  const selDice=G.pool.filter(d=>d.sel&&!d.committed);
   if(selDice.length){
     var _selVals=selDice.map(d=>d.val);var _selMats=selDice.map(d=>d.mat);const locked=G.kept.reduce((a,k)=>a+k.pts,0);const cards=effectiveCards();
     /* ── ANCHOR pre-processing ──
@@ -12421,7 +12463,7 @@ function handleRoll(){
       _cfHit=true;pts=Math.floor(pts/2);spawnPop('💀 −HALF');
       try{SFX.err&&SFX.err();}catch(e){}
     }
-    selDice.forEach(d=>{d.committed=true;d.el.classList.remove('selected');d.el.classList.add('committed');d.el.onclick=null;d.el.style.cursor='default';});
+    selDice.forEach(d=>{d.committed=true;d._frozen=false;d.el.classList.remove('selected','die-frozen');d.el.classList.add('committed');d.el.onclick=null;d.el.style.cursor='default';});
     SFX.commit();Haptic.commit();G.kept.push({vals:selVals,mat:selDice[0].mat,pts,cursed:_cfHit});G.turnPts=G.kept.reduce((a,k)=>a+k.pts,0)+(G._stakesRisingBonus||0);refreshKeptTray();
     /* OPENING SHOT (opener): track scoring dice committed on roll 1 only.
        turnRollCount === 1 means this commit happened during the very first
@@ -15516,7 +15558,11 @@ function endMatch(win){
       if(typeof SFX!=='undefined'&&SFX.coinLand)SFX.coinLand();
     },1600);
   }else{
-    /* Loss: coin appears then drains and shrinks away */
+    /* Loss: the token appears then drains/shrinks away. On a BOSS loss it's the
+       HEART you just lost (a boss loss costs a life) rather than a coin — the
+       .as-heart class swaps the coin face for ❤️, then 💔 on the burst. */
+    var _lossIsHeart=isBoss;
+    if(_lossIsHeart)allCoins.forEach(function(c){c.classList.add('as-heart');});
     setTimeout(function(){
       if(resGoldWrap){resGoldWrap.style.display='flex';resGoldWrap.classList.add('fade-in');}
       allCoins.forEach(function(c){c.style.opacity='1';c.classList.add('spin');});
@@ -15526,6 +15572,7 @@ function endMatch(win){
     },1400);
     setTimeout(function(){
       allCoins.forEach(function(c){c.classList.add('drain-burst');});
+      if(_lossIsHeart){try{SFX.heartLose&&SFX.heartLose();}catch(e){}}
     },2200);
   }
 
@@ -16073,7 +16120,14 @@ function exitMatch(){
     /* Boss win — record, advance tier, go straight to gauntlet (dice already chosen inline) */
     S.run.bossesBeaten.push(S.run.tier);
     S.run.points=0;
-    /* New tier → reset the per-tier patron coin allowance */
+    /* Beating a boss restores ONE heart, capped at the starting 3. This is now
+       the only way to recover a lost heart (patron wins no longer heal), so a
+       heart lost to a boss can be earned back by clearing the next one — but a
+       player who keeps losing bosses still drains to 0 and dies. */
+    var _coinsBefore=S.run.coins||0;
+    S.run.coins=Math.min(3,(S.run.coins||0)+1);
+    var _bossHealed=S.run.coins>_coinsBefore;/* false if already at the 3 cap */
+    /* New tier → reset the per-tier coin allowance (legacy field, now unused) */
     S.run._coinIncomeThisTier=0;
     /* Detect newly-unlocked slots so the loadout can celebrate them on next render */
     var _prevTier=S.run.tier;
@@ -16092,24 +16146,19 @@ function exitMatch(){
       S.totalWins++;save();
       showScreen('gameover');
     }else{
-      showScreen('gauntlet');
+      showScreen('gauntlet',{heartAnim:_bossHealed?'gain':null});
     }
   }else if(route.win&&!route.isBoss){
-    /* Patron win — award points, go to tier screen with coin animation */
+    /* Patron win — award tier points only. Patron wins NO LONGER restore a
+       heart: a patron heal meant every tier handed you a "free" boss loss (you
+       beat a patron to unlock the boss anyway), so the run was near-impossible
+       to lose. Hearts now recover only by beating a boss (see boss-win branch).
+       Patrons still give points, gold, and cards. */
     var _prevPts=S.run.points;
     var _earned=route.pointsEarned||1;
     S.run.points+=_earned;
-    /* Patron coin income — a small lifeline trickle, capped at 1 per tier
-       so the unlimited patron grind can't be farmed for infinite coins.
-       Recovers ~one boss loss per tier; dries up after that. */
-    var _coinGained=0;
-    if((S.run._coinIncomeThisTier||0)<1){
-      S.run.coins=(S.run.coins||0)+1;
-      S.run._coinIncomeThisTier=(S.run._coinIncomeThisTier||0)+1;
-      _coinGained=1;
-    }
     save();
-    showScreen('gauntlet',{coinAnim:{from:_prevPts,earned:_earned},coinGained:_coinGained});
+    showScreen('gauntlet',{coinAnim:{from:_prevPts,earned:_earned},coinGained:0});
   }else if(!route.win&&route.isBoss){
     /* Boss loss — the boss eats a coin (the lifeline). No card loss and no
        progress loss any more: the coin IS the stake, and stacking a card
@@ -16125,7 +16174,7 @@ function exitMatch(){
       showScreen('gameover');
     }else{
       save();
-      showScreen('gauntlet');
+      showScreen('gauntlet',{heartAnim:'lose'});
     }
   }else if(!route.win&&route.isHandicap){
     /* Handicap loss — lose 1 point */
@@ -16945,6 +16994,16 @@ function markActiveCardUsed(cardId){
   G.activeCardState.usedCards[cardId]=Math.max(0,(G.activeCardState.usedCards[cardId]||0)-1);
   const chip=document.querySelector('.mcard-active[data-cid="'+cardId+'"]');
   if(chip&&G.activeCardState.usedCards[cardId]<=0)chip.classList.add('used');
+  _refreshCardUsesDisplay(cardId);
+}
+/* Update the "X/Y USES" counter in a card's tooltip after its remaining uses
+   change. Queries by data-cid so it finds the tooltip whether it's nested in
+   the card or temporarily promoted to <body> by clampTooltip. */
+function _refreshCardUsesDisplay(cardId){
+  if(!G||!G.activeCardState||!G.activeCardState.usedCards)return;
+  var cur=G.activeCardState.usedCards[cardId];
+  if(cur===undefined)return;
+  document.querySelectorAll('.tip-uses[data-cid="'+cardId+'"] .tu-cur').forEach(function(e){e.textContent=cur;});
 }
 /* Refund a card use — call from inside an active-card handler when the
    card couldn't actually do anything (no valid dice, etc.). Reverses
@@ -16958,6 +17017,7 @@ function refundActiveCardUse(cardId){
   document.querySelectorAll('[data-cid="'+cardId+'"]').forEach(function(el){el.classList.remove('used');});
   /* Refresh card visuals so any chip that was greyed gets restored */
   if(typeof _updatePlayerCardVisuals==='function')_updatePlayerCardVisuals();
+  _refreshCardUsesDisplay(cardId);
 }
 
 /* Helper: redraw die face dots from d.val */
@@ -17375,19 +17435,18 @@ function activateDoubleDown(){
        shrinks when a die is permanently removed (Obsidian shatter, a die
        stolen by the opponent), so a hard 6 used to "resurrect" lost dice. */
     var _fullHand=(G.matchDice&&G.matchDice.length)||6;
-    /* A held (frozen) die "holds through rerolls" — and Double Down IS a
-       reroll. Preserve frozen dice in place and only reroll the rest, so
-       the freeze isn't silently wiped and the count stays correct. */
-    var _frozenKeep=G.pool.filter(function(d){return d._frozen;});
+    /* Double Down is a full fresh reroll of the WHOLE hand — release
+       EVERYTHING, including any held (frozen) dice. Preserving a frozen die
+       through Double Down desynced the row (the held die jumped to slot 0 on
+       the rebuilt pool, so it "moved position" and muddled scoring). Since
+       Double Down already wipes every kept die, clearing the freeze too keeps
+       it a clean reset. */
     G.pool.forEach(function(d){
-      if(d._frozen)return;/* leave the held die in the row + pool */
-      d.committed=false;d.sel=false;
-      if(d.el){d.el.classList.remove('committed','selected','scatter');d.el.onclick=null;d.el.remove();}
+      d.committed=false;d.sel=false;d._frozen=false;
+      if(d.el){d.el.classList.remove('committed','selected','scatter','die-frozen');d.el.onclick=null;d.el.remove();}
     });
-    G.pool=_frozenKeep;
-    _frozenKeep.forEach(function(d){d.committed=false;d.sel=false;if(d.el){d.el.classList.remove('committed','selected','scatter');}});
-    /* handleRoll creates (numDice − pool.length) new dice and skips frozen
-       dice already in the pool, so total rolled = _fullHand. */
+    G.pool=[];
+    /* handleRoll creates (numDice − pool.length) new dice → a full fresh hand. */
     G.numDice=_fullHand;
     refreshKeptTray();updHUD();
     setStatusMsg('DOUBLE DOWN! '+_ddNewPts+' PTS — REROLLING','gold');
@@ -19568,16 +19627,30 @@ function initTierScreen(data){
   /* Update gold display */
   var _tierGoldEl=document.getElementById('tierGold');
   if(_tierGoldEl)_tierGoldEl.textContent=(S.run.gold||0)+'g';
-  /* Update lifeline-coins display (top-bar pill) */
+  /* Update lifeline-hearts display (top-bar pill). After a boss match, animate
+     the change: a heart shatters out (loss) or the newest one pops in (win),
+     with a heart sound. The flag is passed once via showScreen('gauntlet',…). */
+  var _heartAnim=(data&&data.heartAnim)||null;
   (function _updateLives(){
     var lv=document.getElementById('tierLives');
     if(!lv)return;
     var c=Math.max(0,S.run.coins||0);
     var show=Math.min(c,6),html='';
-    for(var li=0;li<show;li++)html+='<span class="life-heart">❤️</span>';
+    for(var li=0;li<show;li++){
+      var _pop=(_heartAnim==='gain'&&li===show-1)?' heart-pop':'';
+      html+='<span class="life-heart'+_pop+'">❤️</span>';
+    }
     if(c>6)html+='<span class="life-more">+'+(c-6)+'</span>';
     if(c===0)html='<span class="life-heart empty">🤍</span>';
+    /* Boss loss: append the just-lost heart (broken) so it can shatter out of
+       the row, then remove it once the animation finishes. */
+    if(_heartAnim==='lose')html+='<span class="life-heart heart-shatter">💔</span>';
     lv.innerHTML=html;
+    if(_heartAnim==='gain'){setTimeout(function(){try{SFX.heartGain&&SFX.heartGain();}catch(e){}},260);}
+    else if(_heartAnim==='lose'){
+      setTimeout(function(){try{SFX.heartLose&&SFX.heartLose();}catch(e){}},260);
+      setTimeout(function(){var sh=lv.querySelector('.heart-shatter');if(sh)sh.remove();},950);
+    }
   })();
   /* Update renown display + progress-bar fill toward next perk threshold */
   var _tierRenownEl=document.getElementById('tierRenown');
