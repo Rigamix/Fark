@@ -7792,9 +7792,22 @@ function hideRenownInfo(){
 
 /* ── Mid-match save / resume ── */
 function saveMatchState(){
-  if(!G||!LO)return;
+  /* Never snapshot a practice match, and never re-create the snapshot after
+     endMatch already settled the outcome (a ghost startPTurn from an
+     uncancelled timer used to resurrect S.pendingMatch and offer RESUME on a
+     match already recorded as a loss). */
+  if(!G||!LO||G._practice||G._endMatchFired)return;
   S.pendingMatch={
     rungId:G.rung.id,rungName:G.rung.name,
+    /* Full opponent snapshot. Patrons are GENERATED (id:-1) — they cannot be
+       reconstructed from an id, and RUNGS[-1] used to yield an empty rung
+       whose undefined target crashed the resume. Bosses also carry launch-time
+       handicap mutations (target ×1.5 etc.) only this object knows. */
+    rung:JSON.parse(JSON.stringify(G.rung)),
+    /* Match-type flags — without these a resumed boss match was silently
+       routed as a patron match at endMatch (no tier advance on win, no heart
+       loss on defeat) and a handicap match resumed with no handicap rules. */
+    isBoss:!!G._isBoss,isGauntlet:!!G._isGauntlet,handicap:G._handicap||null,
     pCards:[...G.pCards],oCards:[...G.oCards],
     pStake:G.pStake,oStake:G.oStake,
     buyIn:LO.buyIn||0,effectiveWager:LO.effectiveWager||false,
@@ -7810,6 +7823,21 @@ function saveMatchState(){
     _pCrowsCtx:{...G._pCrowsCtx},
     _tabArmedVsOpp:!!G._tabArmedVsOpp,_tabArmedVsPlayer:!!G._tabArmedVsPlayer,
     _tabHeldOpp:G._tabHeldOpp||0,_tabHeldPlayer:G._tabHeldPlayer||0,
+    /* Cross-turn counters — absent from the snapshot these silently reset on
+       resume: unpaid Loan installments vanished (free points), Grudge stacks
+       and Iron Crown escalation were lost, the spent Warded charge re-granted. */
+    _loanRemaining:G._loanRemaining||0,_oLoanRemaining:G._oLoanRemaining||0,
+    _grudgeStack:G._grudgeStack||0,_oGrudgeStack:G._oGrudgeStack||0,
+    _ironCrownHits:G._ironCrownHits||0,_wardCharges:G._wardCharges||0,
+    _oStakesRisingNext:!!G._oStakesRisingNext,
+    /* Live handicap state (rising-stakes streaks, bounties, sudden-death round) */
+    handicapState:{
+      rsBankStreak:G._rsBankStreak||0,rsMultiplier:G._rsMultiplier||1,
+      rsOppStreak:G._rsOppStreak||0,rsOppMultiplier:G._rsOppMultiplier||1,
+      bounties:G._bounties?JSON.parse(JSON.stringify(G._bounties)):null,
+      bountyBankStreak:G._bountyBankStreak||0,
+      suddenDeathTurns:G._suddenDeathTurns||0,sdDisplayRound:G._sdDisplayRound||0
+    },
     bossState:{...G.bossState},
     npcCardState:JSON.parse(JSON.stringify(G.npcCardState||{})),
     dlgFlags:{pLead:G._dlgPLead,oLead:G._dlgOLead,pNear:G._dlgPNear,
@@ -7823,14 +7851,27 @@ function resumeMatch(){
   var snap=S&&S.pendingMatch;if(!snap)return;
   SFX.nav();
   setTimeout(function(){showScreen('match',{
-    rungId:snap.rungId,pCards:snap.pCards||[],oCards:snap.oCards||[],
+    rungId:snap.rungId,rung:snap.rung||null,
+    isBoss:!!snap.isBoss,isGauntlet:!!snap.isGauntlet,handicap:snap.handicap||null,
+    pCards:snap.pCards||[],oCards:snap.oCards||[],
     pStake:snap.pStake,oStake:snap.oStake,
     buyIn:snap.buyIn||0,effectiveWager:snap.effectiveWager||false,
     _resumeData:snap
   });},80);
 }
 function abandonMatch(){
-  if(S&&S.pendingMatch){delete S.pendingMatch;save();}
+  /* Abandoning a BOSS match counts as the boss loss it is escaping — without
+     this, force-closing mid-boss-fight and tapping ABANDON dodged the -1 heart
+     / run-death entirely, neutering the death mechanic at zero cost. */
+  if(S&&S.pendingMatch){
+    var _abSnap=S.pendingMatch;
+    delete S.pendingMatch;
+    if(_abSnap.isBoss){
+      S.run.coins=Math.max(0,(S.run.coins||0)-1);
+      if(S.run.coins<=0){S.run._died=true;save();showScreen('gameover');return;}
+    }
+    save();
+  }
   _refreshResumeBanners();
 }
 function _refreshResumeBanners(){
@@ -8880,8 +8921,11 @@ function _maybeFireCutpurse(){
        scoring option remains after a single palm. This re-check is a
        belt-and-braces guard for edge cases (e.g. weird die materials). */
     var fv=G.pool.filter(function(d){return !d.committed;});
-    if(fv.length===0||!anyScoring(fv.map(function(d){return d.val;}),effectiveCards(),fv.map(function(d){return d.mat;}))){
-      setTimeout(function(){_delayedDoBust(fv);},200);
+    if(fv.length===0||(!anyScoring(fv.map(function(d){return d.val;}),effectiveCards(),fv.map(function(d){return d.mat;}))&&!_anchorRescues(effectiveCards()))){
+      /* Offer the bust saves (Martyr/Iron Stomach/Grit) here too — every
+         bust path must, or a save-holder loses the turn to a palm-induced
+         bust with the save never offered. */
+      if(fv.length===0||!_tryBustSave(fv))setTimeout(function(){_delayedDoBust(fv);},200);
     }
   },650);
   setStatusMsg('PICKPOCKET — DIE PALMED!','red');
@@ -9809,9 +9853,16 @@ function scoreRoll(vals,cards,locked,context,dieMats){
 
   /* ── Straights first (highest priority — worth more than scavenger) ── */
   let straightFound=false;
-  /* Crow's Luck: each stored use downgrades the opponent's straight by one tier */
-  var _crowsCanFire=context.crowsLuck&&(context.crowsLuckRemaining===undefined?!context.crowsLuckUsed:context.crowsLuckRemaining>0);
+  /* Crow's Luck: each stored use downgrades the opponent's straight by one
+     tier. A roll already downgraded THIS roll (crowsLuckFiredThisRoll) keeps
+     its downgrade on RESCORES of the same roll (NPC-rescue / quick-hands /
+     slippery rescoring paths reuse the same persistent ctx) WITHOUT burning a
+     second charge — and without un-downgrading when remaining hit 0 between
+     passes. */
+  var _crowsCanFire=context.crowsLuck&&(context.crowsLuckFiredThisRoll||
+    (context.crowsLuckRemaining===undefined?!context.crowsLuckUsed:context.crowsLuckRemaining>0));
   function _consumeCrows(){
+    if(context.crowsLuckFiredThisRoll)return;/* same-roll rescore — no extra charge */
     if(context.crowsLuckRemaining===undefined)context.crowsLuckUsed=true;
     else context.crowsLuckRemaining=Math.max(0,context.crowsLuckRemaining-1);
     context.crowsLuckFiredThisRoll=true;
@@ -9971,7 +10022,15 @@ function scoreRoll(vals,cards,locked,context,dieMats){
       if(realC>=3){
         let _extWc=cntWild(2);/* level-2+ wilds available */
         let _maxExt=Math.min(_extWc,6-realC);/* cap at all 6 dice */
-        wildsNeeded=_maxExt;
+        /* RESERVE a wild when an unfilled pair elsewhere completes a triple
+           worth MORE than this extension. Extension gain = current base
+           (f×100; 600 for face 6), vs triple-1 = 1000 / triple-5 = 500.
+           [2,2,2,jade,1,1] used to extend to quad-2 (400) + two singles
+           (600 total) instead of triple-2 + wild→triple-1 (1200). */
+        var _extGain=f===1?SCORING_BASE.triple1:(f===6&&_hasSixSerpents?1000:f*SCORING_BASE.tripleMult);
+        var _reserve=((f!==1&&cnt(1)===2&&SCORING_BASE.triple1>_extGain)||
+                      (f!==5&&cnt(5)===2&&(5*SCORING_BASE.tripleMult)>_extGain))?1:0;
+        wildsNeeded=Math.max(0,_maxExt-_reserve);
       }
       const setSize=realC+wildsNeeded;/* total dice consumed: all real + wilds needed */
       /* Six Serpents: triple 6s score 1000 instead of 600 */
@@ -10072,8 +10131,13 @@ function scoreRoll(vals,cards,locked,context,dieMats){
   /* ── Bookends (silver): leftmost + rightmost die in the roll show the
      same value → +500 once. Works on raw vals (positional). Runs AFTER
      triples so a quad/quint of the same face (which triples already claim
-     positionally) doesn't get its positional dice double-claimed. */
-  if(cards.includes('bookends')&&n>=2){
+     positionally) doesn't get its positional dice double-claimed.
+     PLAYER selections must stamp context._bookendsEligible (computed from
+     the actual ROW ends — see _bookendsEligible): scoreRoll only sees the
+     selection array, so ANY selected matching pair used to land at
+     vals[0]/vals[n-1] and farm +500 every roll. NPC full-roll calls leave
+     the flag undefined (their vals ARE the row). */
+  if(cards.includes('bookends')&&n>=2&&context._bookendsEligible!==false){
     var _vFirst=vals[0],_vLast=vals[n-1];
     if(_vFirst===_vLast){
       if(!used[0]&&!used[n-1]){
@@ -10225,6 +10289,26 @@ function scoreSelection(selVals,cards,locked,context,dieMats){
   return _bestValid+_gc;
 }
 function anyScoring(vals,cards,dieMats){return scoreRoll(vals,cards||[],0,{},dieMats).total>0;}
+/* BOOKENDS player-side eligibility: true only when the selection contains
+   BOTH actual row-end dice (G.pool first/last) and they match — the card text
+   is "leftmost and rightmost dice in your ROLL". Stamped onto the scoring
+   context by every player selection path; scoreRoll skips its positional
+   check when the stamp says false. */
+function _bookendsEligible(selDice){
+  if(!G||!G.pool||G.pool.length<2)return false;
+  var L=G.pool[0],R=G.pool[G.pool.length-1];
+  return !!(L&&R&&L!==R&&!L.committed&&!R.committed&&L.val===R.val&&
+    selDice.indexOf(L)>=0&&selDice.indexOf(R)>=0);
+}
+/* ANCHOR bust rescue: with Anchor equipped, the position-last die showing a 6
+   is always committable for 600 — so a roll containing it is never a bust,
+   even when anyScoring (value-only, no positional knowledge) says so. Used by
+   every player bust check; mirrors the NPC-side anchor handling in step(). */
+function _anchorRescues(cards){
+  if(!cards||cards.indexOf('anchor')<0||!G||!G.pool||!G.pool.length)return false;
+  var _ad=G.pool[G.pool.length-1];
+  return !!_ad&&!_ad.committed&&_ad.val===6;
+}
 /* ── NPC-held Crow's Luck → downgrades the PLAYER's straights ──
    Mirror of the player-held case (runOppTurn / G._pCrowsCtx). G.crowsLuckCtx is
    built from the OPPONENT's cards in newG and persists for the whole match (two
@@ -11109,7 +11193,9 @@ function _commitActivation(mcardEl,cardId,savedState){
   SFX.nav();
   activateCard(cardId);
   var usesLeft=(G&&G.activeCardState&&G.activeCardState.usedCards)?(G.activeCardState.usedCards[cardId]||0):0;
-  if(usesLeft>0)returnCardToHand(mcardEl,savedState);
+  /* The Pyre opens an async picker — keep the card in hand until it resolves
+     (a Cancel refunds the use; parking it in the zone stranded it there). */
+  if(usesLeft>0||(G&&G._pyrePickerOpen))returnCardToHand(mcardEl,savedState);
   else placeCardInZone(mcardEl,savedState);
   /* The tooltip "X/Y USES" counter is updated centrally by markActiveCardUsed
      (via _refreshCardUsesDisplay), which preserves the accent-coloured spans. */
@@ -12001,8 +12087,9 @@ function toggleDie(d){
   if(d.sel){
     /* Check if the current selection actually scores before any VFX */
     var selD=G.pool.filter(function(x){return x.sel&&!x.committed;});
+    var _tdCtx=_pCrowsForScore()||{};_tdCtx._bookendsEligible=_bookendsEligible(selD);
     var pts=scoreSelection(selD.map(function(x){return x.val;}),effectiveCards(),
-      G.kept.reduce(function(a,k){return a+k.pts;},0),_pCrowsForScore(),
+      G.kept.reduce(function(a,k){return a+k.pts;},0),_tdCtx,
       selD.map(function(x){return x.mat;}));
     if(pts>0){
       /* count: committed tray dice + currently selected */
@@ -12050,6 +12137,10 @@ function toggleDie(d){
 }
 
 function startPTurn(){
+  /* Ghost-timer guard: a scheduled callback from a fled/finished match must
+     not start a player turn (it used to re-create S.pendingMatch after
+     endMatch deleted it, resurrecting a RESUME for a match already lost). */
+  if(!G||G._endMatchFired)return;
   G.phase='idle';G.turnPts=0;G.kept=[];G.numDice=G.matchDice?G.matchDice.length:6;G.pool=[];G.turnRollCount=0;G._slowHandUsedThisTurn=false;G._warmHandsActive=false;G._lastHotDice=false;G._firstRollCommitted=0;G._bustSavedThisTurn=false;
   /* THE TAB: release any bank the rival escrowed last turn. It was held for
      one turn; credit it now and check the win it may complete (the rival
@@ -12268,13 +12359,18 @@ function handleRoll(){
   /* Gambler's Eye special reroll */
   if(G.phase==='gamblers_eye'&&G._gamblersEyeActive){
     var geSelected=G.pool.filter(function(d){return d.sel&&!d.committed;});
-    var geFree=G.pool.filter(function(d){return !d.committed;});
+    var geFree=G.pool.filter(function(d){return !d.committed&&!d._frozen;});
     if(geSelected.length===0||geSelected.length>=geFree.length)return;
     G._gamblersEyeActive=false;G.phase='choosing';
-    /* Commit selected dice as kept (they don't score yet, just preserved) */
-    geSelected.forEach(function(d){d.committed=true;d.sel=false;if(d.el)d.el.classList.remove('selected');if(d.el)d.el.classList.add('committed');});
-    /* Reroll non-selected free dice */
-    var toReroll=geFree.filter(function(d){return !d.committed;});
+    /* HOLD the chosen dice via the frozen mechanic, NOT committed=true.
+       Committed dice can never be selected or scored again (toggleDie rejects
+       them, scoring only sees uncommitted dice), so "keep two 6s and chase
+       the triple" — the card's printed use — was IMPOSSIBLE: the kept faces
+       were pure loss. A frozen die survives the reroll, stays selectable,
+       counts in bust checks, and scores with new matches. */
+    geSelected.forEach(function(d){d._frozen=true;d.sel=false;if(d.el){d.el.classList.remove('selected');d.el.classList.add('die-frozen');}});
+    /* Reroll non-held free dice */
+    var toReroll=geFree.filter(function(d){return !d._frozen;});
     G.numDice=toReroll.length;
     toReroll.forEach(function(d){
       d.val=rollFaceExclude(d.mat,d.val);d.sel=false;
@@ -12285,7 +12381,7 @@ function handleRoll(){
     SFX.roll();G.turnRollCount++;
     setTimeout(function(){
       var free2=G.pool.filter(function(d){return !d.committed;});var fv=free2.map(function(d){return d.val;});var fm=free2.map(function(d){return d.mat;});var cards=effectiveCards();
-      if(!anyScoring(fv,cards,fm)){_delayedDoBust(free2);return;}
+      if(!anyScoring(fv,cards,fm)&&!_anchorRescues(cards)){if(_tryBustSave(free2))return;_delayedDoBust(free2);return;}
       free2.forEach(function(d){d.el.onclick=function(){toggleDie(d);};});
       G.phase='choosing';refreshSelUI();
     },600);
@@ -12358,16 +12454,22 @@ function handleRoll(){
     const selVals=_selVals,selMats=_selMats; // downstream compat (G.kept.push)
     var _scoreVals,_scoreMats;
     let pts;
-    var _cw=_pCrowsForScore();
+    var _cw=_pCrowsForScore()||{};
+    /* Bookends is ROW-positional — stamp eligibility computed from the actual
+       row ends so scoreRoll can't fire it on an arbitrary selected pair. */
+    _cw._bookendsEligible=_bookendsEligible(selDice);
     if(_anchorDie){
       /* Probe: is the 6 used by normal scoring (e.g. triple)? */
-      var _probe=scoreRoll(_selVals,cards,locked,undefined,_selMats);
+      var _probe=scoreRoll(_selVals,cards,locked,{_bookendsEligible:_cw._bookendsEligible},_selMats);
       if(_probe.used&&_probe.used[_anchorIdx]){
         /* 6 is consumed by pattern → keep full selection, just stack +150 */
         pts=scoreSelection(_selVals,cards,locked,_cw,_selMats);
         _anchorPts=600;
       }else{
-        /* 6 not used → remove it from scoring pool so commit accepts, treat as lone 150 */
+        /* 6 not used → remove it from scoring pool so commit accepts, treat as lone 150.
+           The anchor die was the row-last die, so the remainder can't be a
+           legal bookends pair. */
+        _cw._bookendsEligible=false;
         _scoreVals=_selVals.filter(function(_,i){return i!==_anchorIdx;});
         _scoreMats=_selMats.filter(function(_,i){return i!==_anchorIdx;});
         pts=_scoreVals.length?scoreSelection(_scoreVals,cards,locked,_cw,_scoreMats):0;
@@ -12381,82 +12483,10 @@ function handleRoll(){
     pts+=_anchorPts;
     _pCrowsCommit(_cw);/* selection accepted → spend the NPC's Crow's Luck charge if a straight was downgraded */
     if(_anchorDie){triggerCard('anchor','ANCHOR +600',true);spawnPop('+600 ANCHOR');}
-    /* ── POSITION-BASED CARD BONUSES (Vagabond synergy) ──
-       Positions are read from G.pool (roll order, stable across commits). */
-    (function _positionBonuses(){
-      var rowLen=G.pool.length;
-      /* VANGUARD: leftmost die (pool index 0), when committed as a 1 or 5, +300 */
-      if(cards.includes('vanguard')){
-        var d0=G.pool[0];
-        if(d0&&selDice.indexOf(d0)>=0&&(d0.val===1||d0.val===5)){
-          pts+=300;triggerCard('vanguard','VANGUARD +300',true);spawnPop('+300 VANGUARD');
-        }
-      }
-      /* SEQUENCE: on the FIRST commit of this roll, check if the whole uncommitted
-         row (pool[0..rowLen-1]) shows strictly ±1 ascending or descending values.
-         Fires once per roll via G._sequenceArmedThisRoll flag.
-         Defensive double-check against S.run.cards: if G.pCards somehow has
-         a stale 'sequence' entry from a previous match but the player's
-         persistent loadout doesn't, we suppress the bonus. Player feedback:
-         "Card effect still shows even though I don't have that card". */
-      var _sequenceEquipped=cards.includes('sequence')&&(!S||!S.run||!Array.isArray(S.run.cards)||S.run.cards.includes('sequence'));
-      if(_sequenceEquipped&&G._sequenceArmedThisRoll){
-        G._sequenceArmedThisRoll=false;
-        if(rowLen>=3){
-          var vals=G.pool.map(function(d){return d.val;});
-          var asc=true,desc=true;
-          for(var i=1;i<rowLen;i++){
-            if(vals[i]-vals[i-1]!==1)asc=false;
-            if(vals[i-1]-vals[i]!==1)desc=false;
-          }
-          if(asc||desc){pts+=1500;triggerCard('sequence','SEQUENCE +1500',true);spawnPop('+1500 SEQUENCE');}
-        }
-      }
-      /* FLANKS (tin): committing a selection that includes BOTH the
-         leftmost and rightmost dice of the row → +200. Fires per commit.
-         NPC parity is handled separately in runOppTurn (search 'flanks'
-         near the oppBank+=total line) since the NPC scores via scoreRoll
-         which has no row-position context. */
-      if(cards.includes('flanks')&&rowLen>=2){
-        var _fL=G.pool[0],_fR=G.pool[rowLen-1];
-        if(_fL&&_fR&&_fL!==_fR&&selDice.indexOf(_fL)>=0&&selDice.indexOf(_fR)>=0){
-          pts+=200;triggerCard('flanks','FLANKS +200',true);spawnPop('+200 FLANKS');
-        }
-      }
-    })();
-    /* HOT HAND (tin): chain bonus per commit within a turn — +75, +150, +225...
-       Resets on bust (cleared in doBust). Encourages stringing scoring
-       commits together rather than committing one big set. */
-    if(cards.includes('hot_hand')){
-      G._hotHandChain=(G._hotHandChain||0)+1;
-      var _hhBonus=G._hotHandChain*75;
-      pts+=_hhBonus;triggerCard('hot_hand','HOT HAND +'+_hhBonus,true);
-    }
-    /* PERFECT STORM (tin): committing 5+ scoring dice in one selection: +400 */
-    if(cards.includes('perfect_storm')&&selDice.length>=5){
-      pts+=400;triggerCard('perfect_storm','PERFECT STORM +400',true);
-    }
-    /* TRIPLE HUNTER (silver): first triple of each turn → +500. Counted
-       via selDice (committed this commit) — if any face appears 3+ times
-       in the commit, a triple was just scored. G._tripleHunterFiredThisTurn
-       gates one fire per turn; reset in startPTurn. */
-    if(cards.includes('triple_hunter')&&!G._tripleHunterFiredThisTurn){
-      var _thCount={};selDice.forEach(function(d){_thCount[d.val]=(_thCount[d.val]||0)+1;});
-      var _thFired=false;for(var _thF in _thCount){if(_thCount[_thF]>=3){_thFired=true;break;}}
-      if(_thFired){
-        G._tripleHunterFiredThisTurn=true;
-        pts+=500;
-        triggerCard('triple_hunter','TRIPLE HUNTER +500',true);
-        spawnPop('+500 HUNTER');
-      }
-    }
-    /* Tempting Fate feat: note when a triple of 1s (three+ ones) is
-       committed this turn. If the player then rolls again (set in
-       handleRoll) and banks, the feat fires. */
-    (function(){var _ones=0;selDice.forEach(function(d){if(d.val===1)_ones++;});if(_ones>=3)G._turnTriple1Scored=true;})();
-    if(G._vowDoubleActive){pts*=2;G._vowDoubleActive=false;spawnPop('VOW x2');}
-    /* The Echo: previous roll scored → this selection gets +25% */
-    if(G._echoReady&&G.pCards.includes('the_echo')){var _echoB=Math.floor(pts*0.35);if(_echoB>0){pts+=_echoB;spawnPop('+'+_echoB+' ECHO');triggerCard('the_echo','ECHO +'+_echoB,true);}G._echoReady=false;}
+    /* Per-commit card bonuses (Vanguard/Sequence/Flanks/Hot Hand/Perfect
+       Storm/Triple Hunter/Tempting Fate/Vow/Echo) — extracted into
+       _applyCommitBonuses, shared with handleBank's selection commit. */
+    pts=_applyCommitBonuses(selDice,pts,cards);
     /* TELL: Counterfeit (Whisper) — halve groups containing cursed dice + skull puff */
     var _cfHit=false;
     if(G._tell&&G._tell.id==='counterfeit'&&selDice.some(function(d){return d.cursed;})){
@@ -12704,7 +12734,7 @@ function _afterRollImpl(){
   /* Finnick's Trick (boss passive): first roll each turn — guarantee one
      non-scoring die becomes a 5 (1 if no blanks). Always fires on roll 1. */
   if(G.pCards.includes('finnicks_trick')&&G.turnRollCount===1&&free.length>0){
-    var _ftBlanks=free.filter(function(d){return d.val!==1&&d.val!==5;});
+    var _ftBlanks=free.filter(function(d){return d.val!==1&&d.val!==5&&!d._frozen;});
     if(_ftBlanks.length>0){
       var _ftVic=_ftBlanks[Math.floor(Math.random()*_ftBlanks.length)];
       _ftVic.val=5;reDrawDieFace(_ftVic);
@@ -12717,7 +12747,7 @@ function _afterRollImpl(){
   if(G.pCards.includes('loaded_die')&&G.turnRollCount===1&&Math.random()<0.4&&free.length>0){
     var _ldHits=(G.pCards.includes('loaded_deck')&&_archCount('sharp')>=3)?2:1;
     for(var _ldI=0;_ldI<_ldHits;_ldI++){
-      var _ldCandidates=free.filter(function(d){return d.val!==1;});
+      var _ldCandidates=free.filter(function(d){return d.val!==1&&!d._frozen;});
       if(_ldCandidates.length===0)break;
       var _ldVic=_ldCandidates[Math.floor(Math.random()*_ldCandidates.length)];
       _ldVic.val=1;reDrawDieFace(_ldVic);
@@ -12728,7 +12758,7 @@ function _afterRollImpl(){
   /* Gambler's Ghost: after bust, next turn one die starts as 1 */
   if(G._ghostDieNext&&free.length>0){
     G._ghostDieNext=false;
-    var _ggCandidates=free.filter(function(d){return d.val!==1;});
+    var _ggCandidates=free.filter(function(d){return d.val!==1&&!d._frozen;});
     if(_ggCandidates.length>0){
       var _ggVic=_ggCandidates[Math.floor(Math.random()*_ggCandidates.length)];
       _ggVic.val=1;reDrawDieFace(_ggVic);
@@ -12741,7 +12771,7 @@ function _afterRollImpl(){
   if(G.pCards.includes('gamblers_thumb')&&G.turnRollCount<=1&&Math.random()<0.75){
     var _gtHits=(G.pCards.includes('loaded_deck')&&_archCount('sharp')>=3)?2:1;
     for(var _gtI=0;_gtI<_gtHits;_gtI++){
-      var _gtBlanks=free.filter(function(d){return d.val!==1&&d.val!==5;});
+      var _gtBlanks=free.filter(function(d){return d.val!==1&&d.val!==5&&!d._frozen;});
       if(_gtBlanks.length===0)break;
       var _gtVic=_gtBlanks[Math.floor(Math.random()*_gtBlanks.length)];
       _gtVic.val=5;reDrawDieFace(_gtVic);
@@ -12752,7 +12782,7 @@ function _afterRollImpl(){
   /* MASTER'S FORGE (sharp): each roll, convert one random non-scoring
      die to a 5. Fires every roll (not just first) — that's why it's gold. */
   if(G.pCards.includes('masters_forge')){
-    var _mfBlanks=free.filter(function(d){return d.val!==1&&d.val!==5;});
+    var _mfBlanks=free.filter(function(d){return d.val!==1&&d.val!==5&&!d._frozen;});
     if(_mfBlanks.length>0){
       var _mfVic=_mfBlanks[Math.floor(Math.random()*_mfBlanks.length)];
       _mfVic.val=5;reDrawDieFace(_mfVic);
@@ -12768,7 +12798,7 @@ function _afterRollImpl(){
     G._hotStreakReady=false;
     G.safeTurnStreak=0;
     /* Pick a non-1 die for the 1 conversion */
-    var _hsC1=free.filter(function(d){return d.val!==1;});
+    var _hsC1=free.filter(function(d){return d.val!==1&&!d._frozen;});
     if(_hsC1.length>0){
       var _hsV1=_hsC1[Math.floor(Math.random()*_hsC1.length)];
       _hsV1.val=1;reDrawDieFace(_hsV1);
@@ -12815,7 +12845,11 @@ function _afterRollImpl(){
   /* Aldric's Vow: double roll score if 300+, else lose turn pts */
   if(G.activeCardState&&G.activeCardState.vowActive){
     G.activeCardState.vowActive=false;clearCardLabel('aldrics_vow');
-    const rollScore=scoreRoll(freeV,cards,0,{},freeMats).total||0;
+    /* Judge the dice the player actually SEES — the entry snapshot (freeV) is
+       stale here: Finnick's Trick / Loaded Die / Thumb / Forge / Hot Streak
+       mutate d.val above, so the vow used to falsely fail a Forge-improved
+       roll (silently wiping the whole turn) or falsely pass a broken one. */
+    const rollScore=scoreRoll(free.map(d=>d.val),cards,0,{},free.map(d=>d.mat)).total||0;
     if(rollScore>=300){
       /* We don't auto-commit, just double the value of whatever they pick this roll */
       G._vowDoubleActive=true;
@@ -12830,7 +12864,7 @@ function _afterRollImpl(){
   /* Re-read freeV — Loaded Die / Gambler's Ghost / Gambler's Thumb / Hot Streak above
      mutate d.val in place, so the snapshot taken at function entry would be stale. */
   freeV=free.map(d=>d.val);
-  if(!anyScoring(freeV,cards,freeMats)){
+  if(!anyScoring(freeV,cards,freeMats)&&!_anchorRescues(cards)){
     if(_tryBustSave(free))return;
     _delayedDoBust(free);return;
   }
@@ -12852,7 +12886,7 @@ function _afterRollImpl(){
        grogs_bump keeps the legacy 1-die-to-3 behaviour. */
     var _sb3MaxUses=eff.uses||1;
     if(eff.mechanic==='swap_best_to_3'&&(G.npcCardState.usedOnce[cid]||0)<_sb3MaxUses&&G.turnNum>=(2+_csDelayRoll)){
-      var scoring=free.filter(function(d){return d.val===1||d.val===5;});
+      var scoring=free.filter(function(d){return (d.val===1||d.val===5)&&!d._frozen;});
       if(scoring.length>0){
         /* WARDED shield: fizzle the swap attempt. Use is consumed
            to prevent infinite retries until next match. */
@@ -12886,7 +12920,7 @@ function _afterRollImpl(){
     }
     /* iron_gate_npc: reroll one scoring die (uses:2) */
     if(eff.mechanic==='reroll_scoring'&&(G.npcCardState.usedOnce[cid]||0)<eff.uses&&free.length>1){
-      var scoring2=free.filter(function(d){return d.val===1||d.val===5;});
+      var scoring2=free.filter(function(d){return (d.val===1||d.val===5)&&!d._frozen;});
       if(scoring2.length>0){
         G.npcCardState.usedOnce[cid]=(G.npcCardState.usedOnce[cid]||0)+1;
         var v2=scoring2[Math.floor(Math.random()*scoring2.length)];
@@ -12938,7 +12972,7 @@ function _afterRollImpl(){
   var freeVN=free.map(function(d){return d.val;});
   var freeMatsN=free.map(function(d){return d.mat;});
   var cardsN=effectiveCards();
-  if(!anyScoring(freeVN,cardsN,freeMatsN)){setTimeout(function(){_delayedDoBust(free);},150);return;}
+  if(!anyScoring(freeVN,cardsN,freeMatsN)&&!_anchorRescues(cardsN)){if(_tryBustSave(free))return;setTimeout(function(){_delayedDoBust(free);},150);return;}
 
   /* Reckless die tracking (Brass): busts cost extra from banked total */
   /* (penalty applied in doBust, no forced bust here) */
@@ -12985,8 +13019,37 @@ function refreshSelUI(){
   if(G&&G.phase!=='choosing'&&G.phase!=='idle'&&G.phase!=='gamblers_eye')return;
   const selD=G.pool.filter(d=>d.sel&&!d.committed);const selV=selD.map(d=>d.val);const selMats=selD.map(d=>d.mat);const locked=G.kept.reduce((a,k)=>a+k.pts,0);const cards=effectiveCards();
   if(!selV.length){G.turnPts=locked+(G._stakesRisingBonus||0);updHUD();setBtns(false,locked>0||(G._stakesRisingBonus||0)>0);setStatusMsg('','');_clearDieEffects();G.pool.forEach(d=>{d.el.classList.remove('combo-glow');d.el.style.removeProperty('--gd');});G._comboGlow=false;return;}
-  const _sr=scoreRoll(selV,cards,locked,_pCrowsForScore(),selMats);
-  let pts=_sr.used.some(u=>!u)?-1:_sr.total;
+  /* Bookends row-eligibility stamp (see handleRoll) — preview must agree
+     with the commit/bank paths. */
+  var _beE=_bookendsEligible(selD);
+  var _srCtx=_pCrowsForScore()||{};_srCtx._bookendsEligible=_beE;
+  const _sr=scoreRoll(selV,cards,locked,_srCtx,selMats);
+  /* Validity + total via scoreSelection — the SAME function the commit (ROLL)
+     and bank paths use. The old raw-scoreRoll check ("every selected die
+     used") rejected selections the engine accepts: Lucky Seven's 7-sum
+     extras (its +800 was unreachable), the ladder/ascending dual-pass
+     (underreported totals), gilded-pair's +10%. _sr is kept only for the
+     die-effect visuals below. */
+  var _selCtx=_pCrowsForScore()||{};_selCtx._bookendsEligible=_beE;
+  let pts=scoreSelection(selV,cards,locked,_selCtx,selMats);
+  /* ANCHOR preview: mirror handleRoll's commit pre-processing so the
+     documented "lone last-row 6 commits for 600" is actually offerable.
+     Without this the preview showed NO SCORE and dead buttons for a
+     selection the commit path accepts. */
+  if(cards.includes('anchor')){
+    var _aLast=G.pool[G.pool.length-1];
+    var _aIdx=(_aLast&&_aLast.val===6)?selD.indexOf(_aLast):-1;
+    if(_aIdx>=0){
+      var _aProbe=scoreRoll(selV,cards,locked,{_bookendsEligible:_beE},selMats);
+      if(_aProbe.used&&_aProbe.used[_aIdx]){ if(pts>0)pts+=600; }
+      else{
+        var _aVals=selV.filter(function(_,i){return i!==_aIdx;});
+        var _aMats=selMats.filter(function(_,i){return i!==_aIdx;});
+        var _aPts=_aVals.length?scoreSelection(_aVals,cards,locked,{_bookendsEligible:false},_aMats):0;
+        if(_aPts>=0&&(_aPts+600)>pts)pts=_aPts+600;
+      }
+    }
+  }
   const ok=pts>0;G.turnPts=locked+(ok?pts:0)+(G._stakesRisingBonus||0);updHUD();
   /* Die effect visuals */
   _clearDieEffects();
@@ -13046,6 +13109,12 @@ function refreshSelUI(){
    stack). Returns true if a save fired. Both saves wipe the dice in front of
    the player, keep the kept tray, and re-enter the roll phase. */
 function _tryBustSave(free){
+  /* Drill Order cap + empty tray: a save here would leave NO legal action —
+     the scheduled roll gets refused by the drill guard and there's nothing to
+     bank — a hard softlock. Let the bust proceed instead of burning the save. */
+  var _drillCapped=G._tell&&G._tell.id==='drill_order'&&G.turnRollCount>=(G._tell.maxRolls||3);
+  var _bankable=G.kept.length>0||(G._stakesRisingBonus||0)>0;
+  if(_drillCapped&&!_bankable)return false;
   function _runSave(label,text){
     free.forEach(d=>{if(d.el){d.el.classList.add('bust');setTimeout(()=>{if(d.el)d.el.remove();},380);}});
     G.pool=G.pool.filter(d=>d.committed);G.phase='idle';
@@ -13057,12 +13126,34 @@ function _tryBustSave(free){
     G._bustSavedThisTurn=true;
     triggerCard(label,text,true);
     _updatePlayerCardVisuals();
+    /* Drill Order cap: the busting roll was the turn's last allowed roll, so
+       the auto-roll below would be refused with both buttons dead. Restore a
+       bankable state instead — the save preserves the tray, the player banks. */
+    if(_drillCapped){
+      G.phase='choosing';
+      setBtns(false,_bankable);
+      setStatusMsg('SAVED — BANK YOUR SCORE','gold');
+      return;
+    }
     G._rollLocked=true;
-    setTimeout(function(){G._rollLocked=false;handleRoll();},1700);
+    var _bsG=G;
+    setTimeout(function(){if(G!==_bsG||!G||G._endMatchFired)return;G._rollLocked=false;handleRoll();},1700);
   }
   /* Brutus's Grit (boss passive): only the FIRST bust under 500 turn pts is saved
      per match — sim showed 3 saves stacked with Martyr/Iron Stomach pushed win rate
      to 93%, which trivialized late-game. */
+  /* Player-held NPC bust-defense cards (boss-draft rewards). Their handlers
+     only ever scanned G.oCards — the draft offered them to the player with a
+     playerDesc promising the effect, but they were dead in the player's hand. */
+  G.npcCardState.playerOnce=G.npcCardState.playerOnce||{};
+  /* Hold the Line / Sunday's Rest: cannot bust during the first N turns. */
+  for(var _biI=0;_biI<G.pCards.length;_biI++){
+    var _biC=getNpcCard(G.pCards[_biI]);
+    if(_biC&&_biC.effect&&_biC.effect.mechanic==='bust_immune_turns'&&G.turnNum<=(_biC.effect.turns||2)){
+      _runSave(G.pCards[_biI],_biC.name.toUpperCase()+' — NO BUST');
+      return true;
+    }
+  }
   if(G.pCards.includes('brutus_grit')&&(G.turnPts||0)<500){
     G._gritUses=G._gritUses||0;
     if(G._gritUses<1){
@@ -13087,6 +13178,19 @@ function _tryBustSave(free){
       return true;
     }
   }
+  /* One More Round (Grog reward): survive once, turn points halved — costly,
+     so it's tried LAST after every free save. */
+  for(var _omrI=0;_omrI<G.pCards.length;_omrI++){
+    var _omrC=getNpcCard(G.pCards[_omrI]);
+    if(_omrC&&_omrC.effect&&_omrC.effect.mechanic==='bust_survive'&&!G.npcCardState.playerOnce[G.pCards[_omrI]]){
+      G.npcCardState.playerOnce[G.pCards[_omrI]]=true;
+      G.kept.forEach(function(k){k.pts=Math.floor(k.pts/2);});
+      G.turnPts=G.kept.reduce(function(a,k){return a+k.pts;},0)+(G._stakesRisingBonus||0);
+      refreshKeptTray();updHUD();
+      _runSave(G.pCards[_omrI],_omrC.name.toUpperCase()+' — SAVED (½ PTS)');
+      return true;
+    }
+  }
   return false;
 }
 
@@ -13100,6 +13204,8 @@ function _delayedDoBust(_freeArr){
   setTimeout(doBust,BUST_PAUSE_MS);
 }
 function doBust(){
+  /* Ghost-timer guard (see startPTurn) */
+  if(!G||G._endMatchFired)return;
   /* Feat tracking: count player busts for "Untouchable" feat */
   G._featBusts=(G._featBusts||0)+1;
   /* Rusty Spur: bias was earned by banking — a bust resets it so the bias doesn't carry past failure */
@@ -13230,8 +13336,41 @@ function doBust(){
       setStatusMsg('THICK SKIN SAVED '+_tsSaved+'!','gold');
       updHUD();
     },1000);
-    /* Then end the turn after the save flash */
-    setTimeout(function(){clearRow('playerDiceRow');G.pool=[];endPTurn();},2200);
+    /* Then end the turn after the save flash — unless the saved half just
+       won the match (Thick Skin can push pPts past the target). */
+    setTimeout(function(){clearRow('playerDiceRow');G.pool=[];
+      if(G.pPts>=G.target){endMatch(true);return;}
+      endPTurn();},2200);
+    return;
+  }
+  /* THE LAST STITCH (Mabel boss reward, player-held): once per match a bust
+     banks HALF the turn points instead of losing them. Same shape as Thick
+     Skin above. The mechanic only ever scanned G.oCards — dead in the
+     player's hand despite the draft offering it with that exact promise. */
+  var _lsCid=G.pCards.find(function(cid){var c=getNpcCard(cid);return c&&c.effect&&c.effect.mechanic==='bust_bank_half';});
+  if(_lsCid&&!(G.npcCardState.playerOnce&&G.npcCardState.playerOnce[_lsCid])){
+    G.npcCardState.playerOnce=G.npcCardState.playerOnce||{};
+    G.npcCardState.playerOnce[_lsCid]=true;
+    var _lsTurnPts=G.kept.reduce((a,k)=>a+k.pts,0)+(G._stakesRisingBonus||0);
+    var _lsSaved=Math.floor(_lsTurnPts/2);
+    G._stakesRisingBonus=0;
+    (function(){var _r=document.getElementById('playerDiceRow');if(_r)Array.prototype.forEach.call(_r.querySelectorAll('.die'),function(el){el.style.opacity='';el.style.filter='';el.classList.add('bust');});})();
+    G.safeTurnStreak=0;G.turnPts=0;G.kept=[];updHUD();refreshKeptTray();setBtns(false,false);
+    var _lsBov=document.getElementById('bust-ov');
+    if(_lsBov){_alignOverlayWord(_lsBov.querySelector('.bust-word'));_lsBov.classList.add('flash');setTimeout(function(){_lsBov.classList.remove('flash');},1100);}
+    try{SFX.bust&&SFX.bust();}catch(e){}
+    try{Haptic.bust&&Haptic.bust();}catch(e){}
+    _bustImpact();
+    if(window.DLG)DLG.trigger('PLAYER_BUST');
+    setTimeout(function(){
+      if(_lsSaved>0){G.pPts+=_lsSaved;spawnPop('+'+_lsSaved+' LAST STITCH');}
+      triggerCard(_lsCid,'STITCHED '+_lsSaved,true);
+      setStatusMsg('THE LAST STITCH SAVED '+_lsSaved+'!','gold');
+      updHUD();
+    },1000);
+    setTimeout(function(){clearRow('playerDiceRow');G.pool=[];
+      if(G.pPts>=G.target){endMatch(true);return;}
+      endPTurn();},2200);
     return;
   }
   /* Mabel's Stitch: bank accumulated pts safely AND grant a fresh 6-die
@@ -13255,6 +13394,9 @@ function doBust(){
     /* Reset turn state to a clean slate before the fresh roll. */
     G.safeTurnStreak=0;G.turnPts=0;G.kept=[];updHUD();refreshKeptTray();setBtns(false,false);
     G._bustSavedThisTurn=true;/* suppress hot-dice fanfare if the fresh roll happens to clear all 6 */
+    /* The stitched bank can itself complete the win — don't hand out a
+       pointless fresh reroll when the match is already over. */
+    if(G.pPts>=G.target){setTimeout(function(){endMatch(true);},900);return;}
     setTimeout(function(){
       /* Hot-dice-style fresh roll. Mirrors the block at the top of the
          hot-dice handler (search "Hot dice check"). */
@@ -13396,11 +13538,93 @@ function doBust(){
     /* Extended to 1100ms so the bustPop keyframe (1s) gets to complete its
        full scale+fade arc instead of being cut off mid-animation. */
     setTimeout(()=>document.getElementById('bust-ov').classList.remove('flash'),1100);
-    setTimeout(()=>{clearRow('playerDiceRow');G.pool=[];endPTurn();},1300);
+    setTimeout(()=>{clearRow('playerDiceRow');G.pool=[];
+      /* Bust-save credits (Loose Thread, Safety Net, Aegis) can push the
+         player to/past the target. Check the win HERE — after every bust
+         mutation (incl. NPC penalties / Brass) — instead of handing the NPC
+         a turn it can use to win a match the player already crossed the
+         line on. Mirrors Second Wind's check. */
+      if(G.pPts>=G.target){endMatch(true);return;}
+      endPTurn();},1300);
   },20);
 }
 
+/* ── Shared per-commit card bonuses ──
+   Applied whenever a SELECTION is accepted — whether the player commits via
+   ROLL or banks it directly via BANK. handleBank used to skip every one of
+   these (Vanguard, Sequence, Flanks, Hot Hand, Perfect Storm, Triple Hunter,
+   Aldric's Vow doubling, The Echo), silently shorting the turn's final
+   selection vs. the printed card text. Returns the adjusted pts. */
+function _applyCommitBonuses(selDice,pts,cards){
+  /* POSITION-BASED CARD BONUSES (Vagabond synergy) — positions are read from
+     G.pool (roll order, stable across commits). */
+  var rowLen=G.pool.length;
+  /* VANGUARD: leftmost die (pool index 0), when committed as a 1 or 5, +300 */
+  if(cards.includes('vanguard')){
+    var d0=G.pool[0];
+    if(d0&&selDice.indexOf(d0)>=0&&(d0.val===1||d0.val===5)){
+      pts+=300;triggerCard('vanguard','VANGUARD +300',true);spawnPop('+300 VANGUARD');
+    }
+  }
+  /* SEQUENCE: on the FIRST commit of this roll, whole row strictly ±1 run. */
+  var _sequenceEquipped=cards.includes('sequence')&&(!S||!S.run||!Array.isArray(S.run.cards)||S.run.cards.includes('sequence'));
+  if(_sequenceEquipped&&G._sequenceArmedThisRoll){
+    G._sequenceArmedThisRoll=false;
+    if(rowLen>=3){
+      var vals=G.pool.map(function(d){return d.val;});
+      var asc=true,desc=true;
+      for(var i=1;i<rowLen;i++){
+        if(vals[i]-vals[i-1]!==1)asc=false;
+        if(vals[i-1]-vals[i]!==1)desc=false;
+      }
+      if(asc||desc){pts+=1500;triggerCard('sequence','SEQUENCE +1500',true);spawnPop('+1500 SEQUENCE');}
+    }
+  }
+  /* FLANKS (tin): selection includes BOTH row-end dice → +200. */
+  if(cards.includes('flanks')&&rowLen>=2){
+    var _fL=G.pool[0],_fR=G.pool[rowLen-1];
+    if(_fL&&_fR&&_fL!==_fR&&selDice.indexOf(_fL)>=0&&selDice.indexOf(_fR)>=0){
+      pts+=200;triggerCard('flanks','FLANKS +200',true);spawnPop('+200 FLANKS');
+    }
+  }
+  /* HOT HAND (tin): chain bonus per commit within a turn — +75, +150, +225… */
+  if(cards.includes('hot_hand')){
+    G._hotHandChain=(G._hotHandChain||0)+1;
+    var _hhBonus=G._hotHandChain*75;
+    pts+=_hhBonus;triggerCard('hot_hand','HOT HAND +'+_hhBonus,true);
+  }
+  /* PERFECT STORM (tin): committing 5+ scoring dice in one selection: +400 */
+  if(cards.includes('perfect_storm')&&selDice.length>=5){
+    pts+=400;triggerCard('perfect_storm','PERFECT STORM +400',true);
+  }
+  /* TRIPLE HUNTER (silver): first triple of each turn → +500. */
+  if(cards.includes('triple_hunter')&&!G._tripleHunterFiredThisTurn){
+    var _thCount={};selDice.forEach(function(d){_thCount[d.val]=(_thCount[d.val]||0)+1;});
+    var _thFired=false;for(var _thF in _thCount){if(_thCount[_thF]>=3){_thFired=true;break;}}
+    if(_thFired){
+      G._tripleHunterFiredThisTurn=true;
+      pts+=500;
+      triggerCard('triple_hunter','TRIPLE HUNTER +500',true);
+      spawnPop('+500 HUNTER');
+    }
+  }
+  /* Tempting Fate feat: triple of 1s committed this turn */
+  var _tfOnes=0;selDice.forEach(function(d){if(d.val===1)_tfOnes++;});if(_tfOnes>=3)G._turnTriple1Scored=true;
+  if(G._vowDoubleActive){pts*=2;G._vowDoubleActive=false;spawnPop('VOW x2');}
+  /* The Echo: previous roll scored → this selection gets +35% */
+  if(G._echoReady&&G.pCards.includes('the_echo')){var _echoB=Math.floor(pts*0.35);if(_echoB>0){pts+=_echoB;spawnPop('+'+_echoB+' ECHO');triggerCard('the_echo','ECHO +'+_echoB,true);}G._echoReady=false;}
+  return pts;
+}
+
 function handleBank(){
+  /* Phase guard, mirroring handleRoll. Banking is only legal during the
+     player's decision phases — without this, a tap during an auto-roll
+     window (Double Down's 450ms doubling, a bust-save's 1.7s delay) banked
+     points the player should have been risking, and a tap during the NPC
+     turn could corrupt the turn machine. _rollLocked covers those scheduled
+     windows explicitly. */
+  if(!G||G.phase==='opp'||G.phase==='rolling'||G.phase==='yielding')return;
+  if(G._rollLocked)return;
   /* Same defense as handleRoll: don't bank while a die-mutating active
      is mid-animation (Finnick's Palm). Banking commits selected dice
      and ends the turn — doing that mid-swap traps the player in a
@@ -13408,13 +13632,39 @@ function handleBank(){
   if(G&&G._palmAnimating)return;
   const selD=G.pool.filter(d=>d.sel&&!d.committed);
   if(selD.length){const selV=selD.map(d=>d.val);const selMats=selD.map(d=>d.mat);const locked=G.kept.reduce((a,k)=>a+k.pts,0);const cards=effectiveCards();
-    var _cw=_pCrowsForScore();
+    var _cw=_pCrowsForScore()||{};
+    /* Bookends row-eligibility stamp (see handleRoll) */
+    _cw._bookendsEligible=_bookendsEligible(selD);
     let pts=scoreSelection(selV,cards,locked,_cw,selMats);
+    /* ANCHOR mirror (see handleRoll's pre-processing): a selection containing
+       the last-row 6 is valid via the +600 anchor bonus even when base
+       scoring rejects it — the preview offers it, so BANK must accept it. */
+    var _bkAnchorFired=false;
+    if(cards.includes('anchor')){
+      var _bkLast=G.pool[G.pool.length-1];
+      var _bkIdx=(_bkLast&&_bkLast.val===6)?selD.indexOf(_bkLast):-1;
+      if(_bkIdx>=0){
+        var _bkProbe=scoreRoll(selV,cards,locked,{_bookendsEligible:_cw._bookendsEligible},selMats);
+        if(_bkProbe.used&&_bkProbe.used[_bkIdx]){
+          if(pts>0){pts+=600;_bkAnchorFired=true;}
+        }else{
+          _cw._bookendsEligible=false;/* remainder excludes the row-last die */
+          var _bkVals=selV.filter(function(_,i){return i!==_bkIdx;});
+          var _bkMats=selMats.filter(function(_,i){return i!==_bkIdx;});
+          var _bkBase=_bkVals.length?scoreSelection(_bkVals,cards,locked,_cw,_bkMats):0;
+          if(_bkBase>=0){pts=_bkBase+600;_bkAnchorFired=true;}
+        }
+      }
+    }
     if(pts>0){
       _pCrowsCommit(_cw);/* banked straight downgraded by NPC's Crow's Luck → spend a charge */
+      if(_bkAnchorFired){triggerCard('anchor','ANCHOR +600',true);spawnPop('+600 ANCHOR');}
+      /* Per-commit card bonuses — same helper as the ROLL commit path.
+         handleBank used to skip all of them (Vanguard, Hot Hand, etc.). */
+      pts=_applyCommitBonuses(selD,pts,cards);
       var _cfBank=false;
       if(G._tell&&G._tell.id==='counterfeit'&&selD.some(function(d){return d.cursed;})){_cfBank=true;pts=Math.floor(pts/2);spawnPop('💀 −HALF');try{SFX.err&&SFX.err();}catch(e){}}
-      selD.forEach(d=>{d.committed=true;if(d.el){d.el.classList.add('committed');d.el.onclick=null;}});
+      selD.forEach(d=>{d.committed=true;d._frozen=false;if(d.el){d.el.classList.remove('selected','die-frozen');d.el.classList.add('committed');d.el.onclick=null;}});
       G.kept.push({vals:selV,mat:selD[0].mat,pts,cursed:_cfBank});
     }}
   let total=G.kept.reduce((a,k)=>a+k.pts,0);
@@ -13575,6 +13825,21 @@ function handleBank(){
       bonusMsg+=' +'+_mtGain+' '+npc.name;
       triggerCard(cid,npc.name+' ×2!',true);
     }
+    /* Player-owned Old Partner's Badge: +250 on every bank. Was NPC-only —
+       the boss-reward draft offered the card to the player with a playerDesc
+       promising the effect, but no player-side handler existed. */
+    if(eff&&eff.mechanic==='flat_bonus'&&(eff.amount||0)>0){
+      total+=eff.amount;
+      bonusMsg+=' +'+eff.amount+' '+npc.name;
+      triggerCard(cid,npc.name+' +'+eff.amount,true);
+    }
+    /* Player-owned The Audit: banking while AHEAD pays +500. Same dead-card
+       gap as the badge above. */
+    if(eff&&eff.mechanic==='gain_when_ahead'&&G.pPts>G.oPts){
+      total+=(eff.amount||500);
+      bonusMsg+=' +'+(eff.amount||500)+' '+npc.name;
+      triggerCard(cid,npc.name+' +'+(eff.amount||500),true);
+    }
   });
   /* Corvus's Book: each bank adds +75 (or +150 if bank>=1000) to permanent interest */
   if(G.pCards.includes('corvus_book')){
@@ -13683,7 +13948,14 @@ function handleBank(){
      patron-side disruption. ── */
 
   /* ── NPC CARD EFFECTS ON PLAYER BANK ── */
+  /* Abort sentinel: the steal/block branches end the player's turn themselves
+     (they schedule endPTurn). Their `return` only exits the forEach CALLBACK —
+     without this flag, execution fell through to the credit line below and the
+     player was paid the very bank that was just stolen/blocked, plus a second
+     endPTurn via the YIELD button (double turn-advance). */
+  var _bankAborted=false;
   G.oCards.forEach(function(cid){
+    if(_bankAborted)return;
     var npc=getNpcCard(cid);if(!npc)return;
     var eff=npc.effect;
     /* Percentage steal (the_skim, the_quiet_decree, the_oath_npc) */
@@ -13721,6 +13993,7 @@ function handleBank(){
       spawnPop('STOLEN!');
       (function(_cid){setTimeout(function(){if(window.DLG)DLG.triggerCard(_cid,false);},800);})(cid);
       G.turnPts=0;G.kept=[];G.numDice=6;updHUD();refreshKeptTray();clearRow('playerDiceRow');G.pool=[];setBtns(false,false);
+      _bankAborted=true;
       if(G.oPts>=G.target){setTimeout(function(){endMatch(false)},700);return;}
       G.npcCardState.firstBankDone=true;
       setTimeout(endPTurn,1200);return;
@@ -13733,6 +14006,7 @@ function handleBank(){
       spawnPop('⛓️ BLOCKED');
       (function(_cid){setTimeout(function(){if(window.DLG)DLG.triggerCard(_cid,false);},800);})(cid);
       G.turnPts=0;G.kept=[];G.numDice=6;updHUD();refreshKeptTray();clearRow('playerDiceRow');G.pool=[];setBtns(false,false);
+      _bankAborted=true;
       G.npcCardState.firstBankDone=true;
       setTimeout(endPTurn,1200);return;
     }
@@ -13746,6 +14020,8 @@ function handleBank(){
       }else{bonusMsg+=' CHALLENGE MET!';}
     }
   });
+  /* Turn ended inside the steal/block branch — nothing left to credit. */
+  if(_bankAborted)return;
   G.npcCardState.firstBankDone=true;
 
   /* ── Periodic drain (interest_due) — check on player turn count ── */
@@ -13945,6 +14221,8 @@ function restoreRollButton(){
 }
 
 function endPTurn(){
+  /* Ghost-timer guard (see startPTurn) */
+  if(!G||G._endMatchFired)return;
   restoreRollButton();
   /* TELL: Confession — restore the sealed card to G.pCards now that turn ends */
   if(G._tell&&G._tell.id==='confession'&&G._tellState&&G._tellState.sealedRemovedCard){
@@ -14101,6 +14379,12 @@ function oppShouldBank(rung,oppBank,diceLeft,oppTotal,playerTotal,target){
 }
 
 function runOppTurn(){
+  if(!G||G._endMatchFired)return;
+  /* Capture the match's G: every step()/finOpp() timer callback bails if the
+     global G has been swapped (new match started) or the match ended. Without
+     this, an uncancelled 1.9s NPC "thinking" timer from a fled match rolled
+     ghost dice into the NEXT match and could even end it as a loss. */
+  var _matchG=G;
   let oppBank=0,left=6,oppRollNum=0,sootyActive=false;
   /* Reset cross-roll commit counter at NPC turn start. G.oppDice is wiped
      each roll, so a per-roll count of kept dice doesn't capture what
@@ -14209,6 +14493,7 @@ function runOppTurn(){
   if(G.activeSynergies&&G.activeSynergies.includes('dirty_pair')&&G.oppTurnCount%4===0){G.oPts=Math.max(0,G.oPts-100);spawnPop('-100 \uD83D\uDC1D');}
   clearRow('oppDiceRow');G.oppDice=[];
   function step(){
+    if(G!==_matchG||!G||G._endMatchFired)return;/* ghost-timer guard */
     clearRow('oppDiceRow');G.oppDice=[];oppRollNum++;
     const leakyActive=G.pCards.includes('leaky_cup')&&G.oppTurnCount%4===0&&G.oppTurnCount>0;
     /* Player-side reduce_first_roll cards (Pocket Sand 70%, Mabel's Pinch 50%):
@@ -14504,6 +14789,14 @@ function runOppTurn(){
           var _swPts=_swR.total||0;
           setTimeout(function(){clearRow('oppDiceRow');finOpp(_swPts);},900);return;
         }
+        _oppBustOut();return;
+      }
+      /* Final bust-out: NPC aegis save, the player's on-bust card payouts,
+         streak resets, and the scatter visuals → finOpp(0). Extracted so the
+         post-resolution zero-checks below (player disruption that zeroes a
+         scoring roll) can route to a REAL bust instead of silently handing
+         the NPC a free reroll with its bank intact. */
+      function _oppBustOut(){
         /* AEGIS (guardian) — mirror for NPC. NPC keeps half their oppBank
            on bust instead of losing it all. */
         if(G.oCards.includes('aegis')&&oppBank>0){
@@ -14538,6 +14831,26 @@ function runOppTurn(){
         }
         /* TURNCOAT (tin): arm a +250 bonus on the player's next bank. */
         if(G.pCards.includes('turncoat')){G._turncoatArmed=true;if(typeof _updatePlayerCardVisuals==='function')_updatePlayerCardVisuals();}
+        /* Player-held boss-reward on-NPC-bust cards (were dead in the
+           player's hand — handlers only scanned G.oCards): Nightshift pays
+           +500 per opponent bust; Judgment docks them 1500 on their 2nd. */
+        G.npcCardState.oppBustCount=(G.npcCardState.oppBustCount||0)+1;
+        G.pCards.forEach(function(cid){
+          var _obNpc=getNpcCard(cid);if(!_obNpc||!_obNpc.effect)return;
+          if(_obNpc.effect.type==='on_player_bust'&&_obNpc.effect.mechanic==='gain_pts'){
+            G.pPts+=(_obNpc.effect.amount||500);updHUD();
+            triggerCard(cid,_obNpc.name+' +'+(_obNpc.effect.amount||500),true);
+          }
+          if(_obNpc.effect.type==='on_player_bust'&&_obNpc.effect.mechanic==='punish_busts'&&
+             G.npcCardState.oppBustCount>=(_obNpc.effect.threshold||2)){
+            G.npcCardState.playerOnce=G.npcCardState.playerOnce||{};
+            if(!G.npcCardState.playerOnce[cid]){
+              G.npcCardState.playerOnce[cid]=true;
+              G.oPts=Math.max(0,G.oPts-(_obNpc.effect.penalty||1500));updHUD();
+              triggerCard(cid,_obNpc.name+' −'+(_obNpc.effect.penalty||1500),true);
+            }
+          }
+        });
         /* ── Handicap: Rising Stakes — opponent streak reset on bust ── */
         if(G._handicap==='rising_stakes'){G._rsOppStreak=0;G._rsOppMultiplier=1.0;}
         if(G._handicap==='bounty_board')G._bountyOppBankStreak=0;
@@ -14555,7 +14868,7 @@ function runOppTurn(){
         if(G._lanternActive)G._lanternActive=false;
         if(window.DLG)DLG.trigger('OPP_BUST');
         setTimeout(function(){G.oppDice.forEach(d=>{if(d.el)d.el.classList.add('opp-scatter');});},120);
-        setTimeout(function(){clearRow('oppDiceRow');finOpp(0);},900);return;
+        setTimeout(function(){clearRow('oppDiceRow');finOpp(0);},900);
       }
       /* NPC reckless die penalty (Brass): busts cost NPC extra from total */
       /* (handled in NPC bust path above — no forced bust, just extra penalty on natural bust) */
@@ -14594,6 +14907,11 @@ function runOppTurn(){
           total=_gbR.total;used=_gbR.used;
         }
       }
+      /* Player disruption (Quick Hands / Grog's Bump) zeroed the roll → it's
+         a BUST. The main bust resolution already ran above, so without this
+         the NPC neither busted nor lost oppBank and freely rerolled — the
+         player's own disruption cards actively backfired. */
+      if(total===0){_oppBustOut();return;}
       G.oppDice.filter(d=>!d.kept).forEach((d,i)=>{if(used[i]){d.kept=true;if(d.el){d.el.style.outline='2px solid var(--green)';d.el.style.outlineOffset='0px';}}});
       /* Player-armed Crown Authority / Blessed Dice: force NPC reroll of all kept dice */
       if(G._playerRerollKeptArmed){
@@ -14623,6 +14941,19 @@ function runOppTurn(){
       var _optionalSingles=_skKept.filter(function(d){
         return (d.val===1||d.val===5)&&_skValCounts[d.val]<3;
       });
+      /* The release below refunds a FLAT 100/50 per die — only safe when the
+         singles really scored at base value. With singles-modifying cards in
+         the NPC's hand (Copper Pincher 200/100, Blood Tithe 150, Miller's
+         Toll 75) or combo cards that consume 1s/5s (Scavenger, Odd Row,
+         Bookends, Full House, Seven's Gift, Twin Fury), or single-bonus die
+         materials, the flat refund drifted oppBank (phantom points that then
+         re-scored on the reroll — double counting). Skip releasing then. */
+      if(_optionalSingles.length>0){
+        var _relMods=['copper_pincher','blood_tithe','millers_toll','scavenger','odd_row','bookends','full_house','sevens_gift','twin_fury'];
+        var _relUnsafe=_relMods.some(function(c){return G.oCards.includes(c);})||
+          _skKept.some(function(d){var dt=getDie(d.mat);return dt&&dt.effect&&(dt.effect.mechanic==='single1_bonus'||dt.effect.mechanic==='single5_bonus');});
+        if(_relUnsafe)_optionalSingles=[];
+      }
       /* Only consider releasing if we'd gain meaningful reroll dice (want 4+ total unkept) */
       if(_optionalSingles.length>0&&_skKept.length>1){
         var _wantUnkept=4;/* ideal minimum unkept dice for good combo odds */
@@ -14670,14 +15001,24 @@ function runOppTurn(){
           /* Re-roll the slipped die */
           var _stMat=_stVic.mat||'bone';_stVic.val=rollFace(_stMat);reDrawDieFace(_stVic);
           if(_stVic.el){_stVic.el.classList.add('eff-glow-red');spawnPixelSparks(_stVic.el,4);setTimeout(function(){if(_stVic.el)_stVic.el.classList.remove('eff-glow-red');},700);}
-          oppBank-=total;/* remove this roll's contribution, recalculate */
-          var _stFV=G.oppDice.filter(function(d){return!d.kept;}).map(function(d){return d.val;});
-          var _stFM=G.oppDice.filter(function(d){return!d.kept;}).map(function(d){return d.mat;});
+          /* Re-score this roll's ENTIRE dice set fresh and re-keep from the
+             result. The old code did `oppBank-=total` first — but this roll's
+             total was never added to oppBank (the single accumulation happens
+             later), so each slip deducted the roll's score from EARLIER banked
+             points (or drove oppBank negative on roll 1). It also rescored
+             only the unkept dice, silently dropping the points of dice still
+             kept from this roll. G.oppDice is per-roll, so the full set is
+             exactly "this roll". */
+          G.oppDice.forEach(function(d){d.kept=false;if(d.el){d.el.style.outline='';d.el.style.outlineOffset='';}});
+          var _stFV=G.oppDice.map(function(d){return d.val;});
+          var _stFM=G.oppDice.map(function(d){return d.mat;});
           var _stR=scoreRoll(_stFV,G.oCards,oppBank,crowsCtx,_stFM);
           total=_stR.total;used=_stR.used;
           /* Re-keep based on new scoring */
-          G.oppDice.filter(function(d){return!d.kept;}).forEach(function(d,i){if(_stR.used[i]){d.kept=true;if(d.el){d.el.style.outline='2px solid var(--green)';d.el.style.outlineOffset='0px';}}});
+          G.oppDice.forEach(function(d,i){if(_stR.used[i]){d.kept=true;if(d.el){d.el.style.outline='2px solid var(--green)';d.el.style.outlineOffset='0px';}}});
           triggerCard('slippery_table','SLIPPED!',true);
+          /* The slip turned this roll scoreless → bust (see the swap zero-check) */
+          if(total===0){_oppBustOut();return;}
         }
       }
       if(G.pCards.includes('sooty_table')){const _sc={};fV.forEach(v=>{_sc[v]=(_sc[v]||0)+1;});if(Object.values(_sc).some(c=>c>=3)){sootyActive=true;triggerCard('sooty_table','NO 1s NEXT ROLL',true);}}
@@ -14813,6 +15154,7 @@ function runOppTurn(){
   G.npcCardState.oppTurnCount++;
   step();
   function finOpp(pts){
+    if(G!==_matchG||!G||G._endMatchFired)return;/* ghost-timer guard */
     if(pts>0){
       /* STAKES RISING NPC mirror: surface the +300 seed bonus (already in
          oppBank/pts). Reset the carry-over flag. Mirrors player handleScore
@@ -14863,6 +15205,14 @@ function runOppTurn(){
           triggerCard('all_in','ALL IN ×2!',false);
           setStatusMsg(G.rung.name+': ALL IN ×2!','red');
         }
+      }
+      /* Player-armed Corvus's Writ: halve the NPC's next bank of 400+.
+         Stays armed through smaller banks ("next bank of 400+"). */
+      if(G._playerWritArmed&&pts>=400){
+        G._playerWritArmed=false;
+        var _pwHalf=Math.floor(pts/2);pts-=_pwHalf;
+        triggerCard('corvus_writ','WRIT — −'+_pwHalf,true);
+        setStatusMsg("CORVUS'S WRIT — "+(G.rung?G.rung.name:'RIVAL')+"'S BANK HALVED!",'gold');
       }
       /* Synergy: Silver Tongue — halve opponent's first bank */
       if(!G._silverTongueUsed&&G.activeSynergies&&G.activeSynergies.includes('silver_set')){
@@ -15221,7 +15571,7 @@ function runOppTurn(){
       G.oppDice.forEach(function(d){if(d.el){d.el.classList.remove('die-blind');d.el.classList.add('die-reveal');}});
       setTimeout(function(){clearRow('oppDiceRow');G.oppDice=[];
         if(G.oPts>=G.target){if(window.DLG)DLG.trigger('OPP_WINS');setTimeout(()=>endMatch(false),3000);return;}
-        if(G._handicap==='sudden_death'&&G.turnNum>G._suddenDeathTurns){setTimeout(()=>endMatch(G.pPts>=G.oPts),700);return;}
+        if(G._handicap==='sudden_death'&&G.turnNum>G._suddenDeathTurns){setTimeout(()=>endMatch((G.pPts+(G._tabHeldPlayer||0))>=(G.oPts+(G._tabHeldOpp||0))),700);return;}
         flashYourTurn();setTimeout(()=>{setTurnMode(false);startPTurn();},800);
       },600);return;
     }
@@ -15230,9 +15580,12 @@ function runOppTurn(){
       if(window.DLG)DLG.trigger('OPP_WINS');
       setTimeout(()=>endMatch(false),3000);return;
     }
-    /* ── Handicap: Sudden Death — check if opponent just finished final turn ── */
+    /* ── Handicap: Sudden Death — check if opponent just finished final turn.
+       Count TAB-escrowed points on both sides: an escrowed final-turn bank is
+       never released after the last turn, so without these terms the NPC's
+       tabbed bank silently vanished from the comparison. ── */
     if(G._handicap==='sudden_death'&&G.turnNum>G._suddenDeathTurns){
-      setTimeout(()=>endMatch(G.pPts>=G.oPts),700);return;
+      setTimeout(()=>endMatch((G.pPts+(G._tabHeldPlayer||0))>=(G.oPts+(G._tabHeldOpp||0))),700);return;
     }
     /* ── NPC end-of-turn disruption via active cards ── */
     _npcEndOfTurnActives();
@@ -15596,60 +15949,27 @@ function endMatch(win){
     try{save();}catch(e){}
   }
 
-  /* 5. Prepare boss-loss card/dialogue data (before delay, while G is still available) */
+  /* 5. Prepare boss-loss dialogue (before delay, while G is still available).
+     The old "CARD LOST" reveal is GONE: card loss was removed from the boss-
+     loss penalty long ago (the coin/heart IS the stake — see exitMatch), but
+     the end screen kept rendering a random card as "LOST" that the player in
+     fact still owned — a flat lie that could drive bad decisions. Only the
+     boss's gloat dialogue remains. */
   var _bossLossData=null;
   if(!win&&isBoss){
-    _getS();
-    var _filledSlots=[];
-    /* Explicit slot-0 protection — boss slot is reserved for boss cards
-       and must NEVER be eligible for loss-card selection regardless of
-       what's in it. Also exclude any card with .npc OR .npcOnly OR an
-       owner field (covers all boss-tier reward cards) so a regular
-       loss-card draft can't accidentally take a boss reward. Player
-       feedback: "Finick stole my boss cards. Boss cards should be safe." */
-    S.run.cards.forEach(function(c,i){
-      if(i===0)return;
-      if(!c)return;
-      var cd=getCard(c);
-      if(!cd)return;
-      if(cd.npc||cd.npcOnly||cd.owner)return;
-      _filledSlots.push(i);
-    });
-    if(_filledSlots.length){
-      var _ri=_filledSlots[Math.floor(Math.random()*_filledSlots.length)];
-      var _lostCardId=S.run.cards[_ri];
-      var _lostCard=getCard(_lostCardId);
-      var _bKey=G.rung?G.rung.key:'';
-      var _bName=G.rung?G.rung.name:'';
-      var _bUpper=_bName.toUpperCase();
-      var _portrait=PORTRAITS[_bKey]||GAUNTLET_PORTRAITS[_bKey]||'';
-      var _dlgPool=OPP_DIALOGUE[_bUpper]&&OPP_DIALOGUE[_bUpper].OPP_WINS?OPP_DIALOGUE[_bUpper].OPP_WINS:['You lose.'];
-      var _dlgText=_dlgPool[Math.floor(Math.random()*_dlgPool.length)];
-      var _cardHTML='';
-      if(_lostCard){
-        var _rar=_lostCard.npc?'boss-'+_lostCard.npc:(_lostCard.npcOnly&&_lostCard.owner?'boss-'+_lostCard.owner:(_lostCard.npcOnly?'npc':(_lostCard.rarity||'tin')));
-        var _sd=(Math.random()*8).toFixed(1);
-        var _lostTarnish=0;
-        var _lostSc=S.cards?S.cards.find(function(c){return c.id===_lostCardId;}):null;
-        if(_lostSc)_lostTarnish=_lostSc.tarnish||0;
-        _cardHTML='<div class="res-card-inner" style="text-align:center">';
-        _cardHTML+='<div style="font-family:var(--font-px);font-size:16px;color:var(--red);letter-spacing:2px;margin-bottom:10px;text-shadow:0 2px 0 rgba(0,0,0,.5)">CARD LOST</div>';
-        _cardHTML+='<div class="res-card-glow"></div>';
-        _cardHTML+='<div class="card-outer" data-aging="'+_lostTarnish+'" data-cid="'+_lostCardId+'" style="width:clamp(90px,25vw,120px);margin:0 auto;aspect-ratio:2/3">';
-        _cardHTML+='<div class="gcard rarity-'+_rar+'" style="--sheen-delay:-'+_sd+'s">';
-        _cardHTML+='<div class="gcard-cover" style="background:'+(CARD_BG[_lostCardId]||'#444')+'">'+_lostCard.icon+'</div>';
-        _cardHTML+='<div class="gcard-frame"></div>'+gcCorners()+'</div></div>';
-        _cardHTML+='<div style="font-family:var(--font-px);font-size:12px;color:var(--textdim);letter-spacing:1px;margin-top:6px">'+_lostCard.name+'</div>';
-        _cardHTML+='</div>';
-      }
-      var _dlgHTML='';
-      if(_portrait||_dlgText){
-        _dlgHTML='<div class="dlg-portrait">';
-        if(_portrait)_dlgHTML+='<img src="'+_portrait+'" style="width:100%;height:100%;object-fit:cover;image-rendering:pixelated">';
-        _dlgHTML+='</div><div class="dlg-scroll"><canvas class="res-dlg-canvas"></canvas><div class="dlg-text">'+_dlgText+'</div></div>';
-      }
-      _bossLossData={cardHTML:_cardHTML,dlgHTML:_dlgHTML,lostSlotIdx:_ri,lostCardId:_lostCardId};
+    var _bKey=G.rung?G.rung.key:'';
+    var _bName=G.rung?G.rung.name:'';
+    var _bUpper=_bName.toUpperCase();
+    var _portrait=PORTRAITS[_bKey]||GAUNTLET_PORTRAITS[_bKey]||'';
+    var _dlgPool=OPP_DIALOGUE[_bUpper]&&OPP_DIALOGUE[_bUpper].OPP_WINS?OPP_DIALOGUE[_bUpper].OPP_WINS:['You lose.'];
+    var _dlgText=_dlgPool[Math.floor(Math.random()*_dlgPool.length)];
+    var _dlgHTML='';
+    if(_portrait||_dlgText){
+      _dlgHTML='<div class="dlg-portrait">';
+      if(_portrait)_dlgHTML+='<img src="'+_portrait+'" style="width:100%;height:100%;object-fit:cover;image-rendering:pixelated">';
+      _dlgHTML+='</div><div class="dlg-scroll"><canvas class="res-dlg-canvas"></canvas><div class="dlg-text">'+_dlgText+'</div></div>';
     }
+    _bossLossData={cardHTML:'',dlgHTML:_dlgHTML};
   }
 
   /* Show draft (wins) or CONTINUE button (losses) after animation */
@@ -15766,9 +16086,12 @@ function endMatch(win){
          dialog well below with a clear visual beat. */
       setTimeout(function(){
         var cv=dlgDiv.querySelector('.res-dlg-canvas');if(cv)drawPixelScroll(cv);
-        if(_rde && resCard){
-          var _rcRect=resCard.getBoundingClientRect();
-          if(_rcRect.bottom>0)_rde.style.top=(_rcRect.bottom+100)+'px';
+        if(_rde){
+          /* Anchor below the lost-card panel when one was rendered; with the
+             CARD LOST reveal removed, fall back to the scores row. */
+          var _anchorEl=(_bossLossData.cardHTML&&resCard)?resCard:document.querySelector('#end-ov .res-scores');
+          var _rcRect=_anchorEl?_anchorEl.getBoundingClientRect():null;
+          if(_rcRect&&_rcRect.bottom>0)_rde.style.top=(_rcRect.bottom+100)+'px';
         }
         /* Reveal text + portrait after the parchment is drawn — small delay
            so the parchment lands first. */
@@ -15940,7 +16263,11 @@ function endMatch(win){
   _endScreenData=_bossLossData?{pFinal:G.pPts,oFinal:G.oPts,cardHTML:_bossLossData.cardHTML,dlgHTML:_bossLossData.dlgHTML,isCardLost:true}:null;
 
   /* Store navigation data for handleContinue */
-  G._endRoute={win:win,isBoss:isBoss,isGauntlet:isGauntlet,isHandicap:isHandicap,pointsEarned:pointsEarned,bossName:G.rung?G.rung.name:'',bossKey:G.rung?G.rung.key:'',_bossLossData:_bossLossData||null};
+  G._endRoute={win:win,isBoss:isBoss,isGauntlet:isGauntlet,isHandicap:isHandicap,practice:!!G._practice,pointsEarned:pointsEarned,bossName:G.rung?G.rung.name:'',bossKey:G.rung?G.rung.key:'',_bossLossData:_bossLossData||null};
+  /* Settle the outcome into S.run NOW (tier/hearts/points/death), not at the
+     CONTINUE tap — closing the app on the end screen must not drop a boss
+     win or dodge a boss loss. Skipped for practice matches (nothing at stake). */
+  _settleEndRoute(G._endRoute);
   save();
 }
 /* OLD endMatch code deleted — see gambit_pre_restructure_backup.html */
@@ -16020,6 +16347,13 @@ function doFlee(){
   if(G&&G._practice){
     if(window.DLG)DLG.hide();clearRow('playerDiceRow');clearRow('oppDiceRow');
     hideGoldFloat();playerGold=(S.run&&S.run.gold)||0;
+    /* Kill the abandoned match properly: mark it ended (all match timers
+       check this and bail) and drop any snapshot, then null G. Without this,
+       pending NPC step()/finOpp/bust chains kept executing on the gauntlet
+       screen and could roll ghost dice into the NEXT match. */
+    G._endMatchFired=true;
+    if(S&&S.pendingMatch){delete S.pendingMatch;save();}
+    G=null;
     showScreen('gauntlet');
     return;
   }
@@ -16074,6 +16408,51 @@ function handleContinue(){
   // Second tap (or first if already ready): navigate away
   exitMatch();
 }
+/* Settle the match outcome into S.run IMMEDIATELY — called from endMatch the
+   moment the result is known. Previously tier advance / heart heal+loss /
+   points / death were applied only in exitMatch (the CONTINUE tap) from
+   in-memory state, so killing or reloading the app on the end screen silently
+   dropped the outcome: a boss WIN kept its gold but lost the tier/heart/
+   bossesBeaten (re-fight required), and a boss LOSS skipped the heart
+   deduction entirely — a one-gesture death-dodge. exitMatch now only
+   navigates. Mutates `route` with navigation hints; idempotent via _settled. */
+function _settleEndRoute(route){
+  if(!route||route._settled||route.practice)return route;
+  route._settled=true;
+  _getS();
+  if(route.win&&route.isBoss&&!route.isGauntlet){
+    S.run.bossesBeaten.push(S.run.tier);
+    S.run.points=0;
+    /* Beating a boss restores ONE heart, capped at the starting 3. */
+    var _coinsBefore=S.run.coins||0;
+    S.run.coins=Math.min(3,(S.run.coins||0)+1);
+    route._heartAnim=(S.run.coins>_coinsBefore)?'gain':null;
+    S.run._coinIncomeThisTier=0;
+    /* Detect newly-unlocked slots so the loadout can celebrate them */
+    var _wasUnlocked=[];for(var _us=0;_us<4;_us++){if(_isSlotUnlocked(_us))_wasUnlocked.push(_us);}
+    S.run.tier=Math.min(S.run.tier+1,TIERS.length);
+    var _nowUnlocked=[];for(var _ns=0;_ns<4;_ns++){if(_isSlotUnlocked(_ns))_nowUnlocked.push(_ns);}
+    var _newlyUnlocked=_nowUnlocked.filter(function(s){return _wasUnlocked.indexOf(s)<0;});
+    if(_newlyUnlocked.length){S.run._slotsToCelebrate=(S.run._slotsToCelebrate||[]).concat(_newlyUnlocked);}
+    if(S.run.tier>S.bestTier)S.bestTier=S.run.tier;
+    if(S.run._bossCardPicks)delete S.run._bossCardPicks[S.run.tier-1];
+    if(S.run.tier>=TIERS.length)S.totalWins++;/* beat the final boss */
+  }else if(route.win&&!route.isBoss){
+    /* Patron win — tier points only (no heart heal; see boss-win branch). */
+    route._prevPts=S.run.points;
+    route._earned=route.pointsEarned||1;
+    S.run.points+=route._earned;
+  }else if(!route.win&&route.isBoss){
+    /* Boss loss — the boss eats a heart; at 0 the run dies. */
+    S.run.coins=Math.max(0,(S.run.coins||0)-1);
+    if(S.run.coins<=0)S.run._died=true;
+    else route._heartAnim='lose';
+  }else if(!route.win&&route.isHandicap){
+    S.run.points=Math.max(0,S.run.points-1);
+  }
+  save();
+  return route;
+}
 function exitMatch(){
   /* Music: crossfade back to tavern as the player leaves the match screen.
      Whether the match was patron or boss, the player ends up on the tier
@@ -16112,77 +16491,33 @@ function exitMatch(){
   var _endRoute=G&&G._endRoute?{...G._endRoute}:{};
   G=null;/* Critical: prevent stale G from persisting */
 
-  /* Route based on match result (captured before G=null) */
+  /* Route based on match result (captured before G=null). The S.run
+     mutations were applied at endMatch via _settleEndRoute — the call here is
+     a defensive no-op for already-settled routes (and covers any legacy path
+     that built a route without settling). These branches ONLY navigate. */
   var route=_endRoute;
   _getS();
+  _settleEndRoute(route);
 
+  if(route.practice){showScreen('gauntlet');return;}/* nothing at stake, no anims */
   if(route.win&&route.isBoss&&!route.isGauntlet){
-    /* Boss win — record, advance tier, go straight to gauntlet (dice already chosen inline) */
-    S.run.bossesBeaten.push(S.run.tier);
-    S.run.points=0;
-    /* Beating a boss restores ONE heart, capped at the starting 3. This is now
-       the only way to recover a lost heart (patron wins no longer heal), so a
-       heart lost to a boss can be earned back by clearing the next one — but a
-       player who keeps losing bosses still drains to 0 and dies. */
-    var _coinsBefore=S.run.coins||0;
-    S.run.coins=Math.min(3,(S.run.coins||0)+1);
-    var _bossHealed=S.run.coins>_coinsBefore;/* false if already at the 3 cap */
-    /* New tier → reset the per-tier coin allowance (legacy field, now unused) */
-    S.run._coinIncomeThisTier=0;
-    /* Detect newly-unlocked slots so the loadout can celebrate them on next render */
-    var _prevTier=S.run.tier;
-    var _wasUnlocked=[];for(var _us=0;_us<4;_us++){if(_isSlotUnlocked(_us))_wasUnlocked.push(_us);}
-    S.run.tier=Math.min(S.run.tier+1,TIERS.length);
-    var _nowUnlocked=[];for(var _ns=0;_ns<4;_ns++){if(_isSlotUnlocked(_ns))_nowUnlocked.push(_ns);}
-    var _newlyUnlocked=_nowUnlocked.filter(function(s){return _wasUnlocked.indexOf(s)<0;});
-    if(_newlyUnlocked.length){S.run._slotsToCelebrate=(S.run._slotsToCelebrate||[]).concat(_newlyUnlocked);}
-    if(S.run.tier>S.bestTier)S.bestTier=S.run.tier;
-    /* Drop the cached boss-card preview for the tier we just left so a
-       future replay/new tier rerolls fresh. */
-    if(S.run._bossCardPicks)delete S.run._bossCardPicks[S.run.tier-1];
-    save();
     if(S.run.tier>=TIERS.length){
       /* Beat final boss — victory! */
-      S.totalWins++;save();
       showScreen('gameover');
     }else{
-      showScreen('gauntlet',{heartAnim:_bossHealed?'gain':null});
+      showScreen('gauntlet',{heartAnim:route._heartAnim||null});
     }
   }else if(route.win&&!route.isBoss){
-    /* Patron win — award tier points only. Patron wins NO LONGER restore a
-       heart: a patron heal meant every tier handed you a "free" boss loss (you
-       beat a patron to unlock the boss anyway), so the run was near-impossible
-       to lose. Hearts now recover only by beating a boss (see boss-win branch).
-       Patrons still give points, gold, and cards. */
-    var _prevPts=S.run.points;
-    var _earned=route.pointsEarned||1;
-    S.run.points+=_earned;
-    save();
-    showScreen('gauntlet',{coinAnim:{from:_prevPts,earned:_earned},coinGained:0});
+    showScreen('gauntlet',{coinAnim:{from:route._prevPts||0,earned:route._earned||route.pointsEarned||1},coinGained:0});
   }else if(!route.win&&route.isBoss){
-    /* Boss loss — the boss eats a coin (the lifeline). No card loss and no
-       progress loss any more: the coin IS the stake, and stacking a card
-       wipe + pip loss on top made losing too deflating. The boss stays
-       unlocked so you can re-grind patrons (gold/cards) and try again. */
-    S.run.coins=Math.max(0,(S.run.coins||0)-1);
-    if(S.run.coins<=0){
-      /* Out of coins — the run is over. Renown persists; everything else
-         resets on the next run. Flag the death so the gameover screen
-         shows the run summary instead of the victory flourish. */
-      S.run._died=true;
-      save();
+    if(S.run._died){
+      /* Out of hearts — the run is over. Renown persists. */
       showScreen('gameover');
     }else{
-      save();
-      showScreen('gauntlet',{heartAnim:'lose'});
+      showScreen('gauntlet',{heartAnim:route._heartAnim||'lose'});
     }
-  }else if(!route.win&&route.isHandicap){
-    /* Handicap loss — lose 1 point */
-    S.run.points=Math.max(0,S.run.points-1);
-    save();
-    showScreen('gauntlet');
   }else{
-    /* Patron loss or fallback — back to tier */
+    /* Handicap/patron loss or fallback — back to tier */
     showScreen('gauntlet');
   }
 }
@@ -17077,6 +17412,7 @@ function activateCard(cardId){
     case 'blessed_confiscation': activateBlessedConfiscationPlayer(); break;
     case 'quick_hands': activateQuickHandsPlayer(); break;
     case 'grogs_bump': activateGrogsBumpPlayer(); break;
+    case 'corvus_writ': activateCorvusWritPlayer(); break;
     case 'crown_authority': activateCrownAuthorityPlayer(); break;
     case 'blessed_dice': activateBlessedDicePlayer(); break;
     case 'coin_flip': activateCoinFlip(); break;
@@ -17112,7 +17448,7 @@ function activateGrogsFlask(){
   SFX.roll();
   setTimeout(()=>{
     const newFree=G.pool.filter(d=>!d.committed);const newFV=newFree.map(d=>d.val);const newFMats=newFree.map(d=>d.mat);
-    if(!anyScoring(newFV,cards,newFMats)){_delayedDoBust(newFree);return;}
+    if(!anyScoring(newFV,cards,newFMats)&&!_anchorRescues(cards)){if(_tryBustSave(newFree))return;_delayedDoBust(newFree);return;}
     G.phase='choosing';refreshSelUI();
   },600);
 }
@@ -17319,7 +17655,12 @@ function activateSleightOfHand(){
 /* Gambler's Eye: select ANY dice to keep, reroll the rest */
 function activateGamblersEye(){
   const free=G.pool.filter(d=>!d.committed);
-  if(free.length<=1){setStatusMsg('NOT ENOUGH DICE','red');return;}
+  if(free.length<=1){
+    setStatusMsg('NOT ENOUGH DICE','red');
+    /* Refund — every sibling activator refunds on its no-op path; this one
+       didn't, destroying the one-use gold card with zero effect. */
+    refundActiveCardUse('gamblers_eye');
+    return;}
   /* Deselect all current selections */
   G.pool.forEach(d=>{d.sel=false;if(d.el)d.el.classList.remove('selected');});
   _clearDieEffects();
@@ -17429,8 +17770,17 @@ function activateDoubleDown(){
   G.pool.forEach(function(d){if(d.committed&&d.el){d.el.classList.add('scatter');spawnPixelSparks(d.el,3);}});
   refreshKeptTray();updHUD();
   spawnPop('×2 DOUBLED');
+  /* Lock the turn SYNCHRONOUSLY. The lock used to be set only inside the
+     450ms timer below, leaving a window where BANK was still live — tapping
+     it banked the doubled total with zero bust risk (defeating the card's
+     whole gamble) and the scheduled callbacks then corrupted the phase
+     machine (free extra hand after banking / roll firing mid-NPC-turn).
+     handleBank now also checks _rollLocked. */
+  G._rollLocked=true;setBtns(false,false);
+  var _ddG=G;/* bail if the match ended/changed before the timers fire */
   /* Release all committed dice — force a fresh reroll of the WHOLE hand. */
   setTimeout(function(){
+    if(G!==_ddG||!G||G._endMatchFired)return;
     /* Roll the player's ACTUAL hand, not a hard-coded 6. matchDice.length
        shrinks when a die is permanently removed (Obsidian shatter, a die
        stolen by the opponent), so a hard 6 used to "resurrect" lost dice. */
@@ -17453,7 +17803,10 @@ function activateDoubleDown(){
     /* Auto-roll: phase MUST be idle/choosing for handleRoll's gamblers_eye
        branch to skip cleanly. */
     G.phase='idle';G._rollLocked=true;
-    setTimeout(function(){G._rollLocked=false;handleRoll();},600);
+    setTimeout(function(){
+      if(G!==_ddG||!G||G._endMatchFired)return;
+      G._rollLocked=false;handleRoll();
+    },600);
   },450);
 }
 
@@ -17505,7 +17858,11 @@ function activateThePyre(){
     G.activeCardState.usedCards['the_pyre']=(G.activeCardState.usedCards['the_pyre']||0)+1;
     var _chip=document.querySelector('.mcard-active[data-cid="the_pyre"]');if(_chip)_chip.classList.remove('used');
     return;}
-  /* Show card picker */
+  /* Show card picker. While it's open, _commitActivation must NOT park the
+     card in the activation zone — the picker resolves ASYNCHRONOUSLY, and a
+     Cancel used to refund the use while the card sat stranded in the zone
+     (in-zone cards aren't draggable → the Pyre became unusable all match). */
+  G._pyrePickerOpen=true;
   var picker=document.createElement('div');picker.className='pyre-picker';
   picker.innerHTML='<h3>Burn a Card (+300)</h3>';
   burnableCards.forEach(function(cid){
@@ -17513,6 +17870,7 @@ function activateThePyre(){
     var btn=document.createElement('div');btn.className='pyre-card';
     btn.innerHTML=cd.icon+' '+cd.name+'<br><small>'+cd.eff+'</small>';
     btn.onclick=function(){
+      G._pyrePickerOpen=false;
       /* Remove card from player's active cards */
       var idx=G.pCards.indexOf(cid);if(idx>=0)G.pCards.splice(idx,1);
       /* Disable any active card state */
@@ -17528,8 +17886,9 @@ function activateThePyre(){
   });
   var cancelBtn=document.createElement('div');cancelBtn.className='pyre-cancel';cancelBtn.textContent='Cancel';
   cancelBtn.onclick=function(){picker.remove();
-    G.activeCardState.usedCards['the_pyre']=(G.activeCardState.usedCards['the_pyre']||0)+1;
-    var _chip=document.querySelector('.mcard-active[data-cid="the_pyre"]');if(_chip)_chip.classList.remove('used');};
+    G._pyrePickerOpen=false;
+    refundActiveCardUse('the_pyre');
+    _refreshCardUsesDisplay('the_pyre');};
   picker.appendChild(cancelBtn);
   document.body.appendChild(picker);
 }
@@ -17636,6 +17995,16 @@ function activateQuickHandsPlayer(){
 function activateGrogsBumpPlayer(){
   G._playerGrogsBumpArmed=true;
   setStatusMsg("GROG'S BUMP ARMED — OPP'S NEXT 2 SCORING DICE → 3",'gold');
+  if(typeof _updatePlayerCardVisuals==='function')_updatePlayerCardVisuals();
+}
+
+/* Corvus's Writ (player-side): arm — the opponent's NEXT bank of 400+ is
+   halved (resolves in finOpp). Dragging it used to burn the single use with
+   ZERO effect: no activator case existed, only the NPC-held path — while the
+   activation splash still flashed "it worked". */
+function activateCorvusWritPlayer(){
+  G._playerWritArmed=true;
+  setStatusMsg("WRIT FILED — OPP'S NEXT BANK OF 400+ IS HALVED",'gold');
   if(typeof _updatePlayerCardVisuals==='function')_updatePlayerCardVisuals();
 }
 
@@ -17913,7 +18282,17 @@ function matchCloseDiceZoom(){
 function initMatchScreen(data){
   /* Nuclear reset — ensure no stale match state bleeds through */
   G=null;
-  if(S&&S.pendingMatch&&!(data&&data._resumeData)){delete S.pendingMatch;save();}
+  if(S&&S.pendingMatch&&!(data&&data._resumeData)){
+    /* Starting a NEW match while an unfinished BOSS match is pending = walking
+       away from the boss table. Charge the heart the abandon would cost —
+       otherwise "force-close mid-boss-loss, then start a patron match" dodged
+       the death mechanic without even touching the ABANDON button. */
+    if(S.pendingMatch.isBoss){
+      S.run.coins=Math.max(0,(S.run.coins||0)-1);
+      if(S.run.coins<=0)S.run._died=true;/* surfaces at the next tier screen */
+    }
+    delete S.pendingMatch;save();
+  }
   /* Clear any lingering end-screen overlay */
   var _eov=document.getElementById('end-ov');if(_eov)_eov.classList.remove('show');
   var _bov=document.getElementById('bust-ov');if(_bov)_bov.classList.remove('flash');
@@ -17956,21 +18335,25 @@ function initMatchScreen(data){
   }
   /* The Fence: mark fence active for opponent disruption amplification */
   if(pCards.includes('the_fence'))G._fenceActive=true;
-  /* The Brewer: +1 maxUses to all active cards */
+  /* The Brewer: +1 maxUses to all active cards. The Alchemist's Chisel is
+     excluded — it's once per RUN (not per match), and the boost re-granted a
+     fresh use every match after exhaustion (the +=1 ran after the
+     _chiselUsed zeroing), letting it fire repeatedly across the run. */
   if(pCards.includes('the_brewer')){
     pCards.forEach(function(cid){
       var c=CARDS.find(function(x){return x.id===cid;})||NPC_CARDS_MAP[cid];
-      if(c&&c.type==='active'&&cid!=='the_brewer'){
+      if(c&&c.type==='active'&&cid!=='the_brewer'&&cid!=='alchemists_chisel'){
         if(!G._brewerBoosts)G._brewerBoosts={};
         G._brewerBoosts[cid]=1;/* track extra use */
       }
     });
   }
-  /* Dead Man's Hand: once-per-match cards can trigger twice */
+  /* Dead Man's Hand: once-per-match cards can trigger twice (Chisel excluded
+     — once per RUN; see The Brewer note above) */
   if(pCards.includes('dead_mans_hand')){
     pCards.forEach(function(cid){
       var c=CARDS.find(function(x){return x.id===cid;})||NPC_CARDS_MAP[cid];
-      if(c&&c.type==='active'&&(c.maxUses||1)===1&&cid!=='dead_mans_hand'){
+      if(c&&c.type==='active'&&(c.maxUses||1)===1&&cid!=='dead_mans_hand'&&cid!=='alchemists_chisel'){
         if(!G._deadManBoosts)G._deadManBoosts={};
         G._deadManBoosts[cid]=1;/* track extra use */
       }
@@ -18050,6 +18433,9 @@ function initMatchScreen(data){
   if(params._resumeData){
     var rd=params._resumeData;
     G.pPts=rd.pPts;G.oPts=rd.oPts;G.turnNum=rd.turnNum;G.numDice=rd.numDice;
+    /* Target was saved but never restored — for generated patrons (and
+       handicap-modified targets) the fresh rung can't supply it. */
+    if(typeof rd.target==='number'&&rd.target>0)G.target=rd.target;
     G.matchDice=[...rd.matchDice];G.matchOppDice=[...rd.matchOppDice];
     G.originalPlayerDice=[...rd.originalPlayerDice];
     G.thriftyBonus=rd.thriftyBonus||0;G.spurActive=(typeof rd.spurActive==='number'?rd.spurActive:(rd.spurActive?1:0));
@@ -18061,6 +18447,12 @@ function initMatchScreen(data){
     if(rd._pCrowsCtx)G._pCrowsCtx=rd._pCrowsCtx;
     G._tabArmedVsOpp=!!rd._tabArmedVsOpp;G._tabArmedVsPlayer=!!rd._tabArmedVsPlayer;
     G._tabHeldOpp=rd._tabHeldOpp||0;G._tabHeldPlayer=rd._tabHeldPlayer||0;
+    /* Cross-turn counters (loan installments, grudge stacks, iron crown, ward) */
+    G._loanRemaining=rd._loanRemaining||0;G._oLoanRemaining=rd._oLoanRemaining||0;
+    G._grudgeStack=rd._grudgeStack||0;G._oGrudgeStack=rd._oGrudgeStack||0;
+    G._ironCrownHits=rd._ironCrownHits||0;
+    if(typeof rd._wardCharges==='number')G._wardCharges=rd._wardCharges;
+    G._oStakesRisingNext=!!rd._oStakesRisingNext;
     if(rd.bossState)G.bossState=rd.bossState;
     if(rd.npcCardState)G.npcCardState=rd.npcCardState;
     if(rd.dlgFlags){var f=rd.dlgFlags;G._dlgPLead=f.pLead;G._dlgOLead=f.oLead;G._dlgPNear=f.pNear;G._dlgONear=f.oNear;G._dlgClose=f.close;G._dlgLoseBad=f.loseBad;G._dlgWinBad=f.winBad;}
@@ -18068,24 +18460,32 @@ function initMatchScreen(data){
     if(rd.tellState)G._tellState=rd.tellState;
   }
 
-  /* Apply handicap modifiers */
+  /* Apply handicap modifiers. On RESUME, restore the saved live state instead
+     of re-initializing — re-randomized bounties / reset rising-stakes streaks
+     / a restarted sudden-death round counter would silently rewrite the match. */
+  var _rdHs=params._resumeData&&params._resumeData.handicapState;
   if(G._handicap==='last_call'){
     G._lastCallDrop=Math.floor(G.target*0.08);
   }
   if(G._handicap==='sudden_death'){
-    G._suddenDeathTurns=3;
-    G._sdDisplayRound=1;
+    G._suddenDeathTurns=(_rdHs&&_rdHs.suddenDeathTurns)||3;
+    G._sdDisplayRound=(_rdHs&&_rdHs.sdDisplayRound)||1;
   }
   if(G._handicap==='rising_stakes'){
-    G._rsBankStreak=0;G._rsMultiplier=1.0;
-    G._rsOppStreak=0;G._rsOppMultiplier=1.0;
+    G._rsBankStreak=(_rdHs&&_rdHs.rsBankStreak)||0;G._rsMultiplier=(_rdHs&&_rdHs.rsMultiplier)||1.0;
+    G._rsOppStreak=(_rdHs&&_rdHs.rsOppStreak)||0;G._rsOppMultiplier=(_rdHs&&_rdHs.rsOppMultiplier)||1.0;
   }
   if(G._handicap==='bounty_board'){
-    /* Pick 3 random bounties */
-    var _bp=[...BOUNTY_POOL];
-    for(var bi=_bp.length-1;bi>0;bi--){var bj=Math.floor(Math.random()*(bi+1));var bt=_bp[bi];_bp[bi]=_bp[bj];_bp[bj]=bt;}
-    G._bounties=_bp.slice(0,3).map(function(b){return{id:b.id,desc:b.desc,reward:b.reward,icon:b.icon,claimed:false};});
-    G._bountyBankStreak=0;
+    if(_rdHs&&_rdHs.bounties){
+      G._bounties=_rdHs.bounties;
+      G._bountyBankStreak=_rdHs.bountyBankStreak||0;
+    }else{
+      /* Pick 3 random bounties */
+      var _bp=[...BOUNTY_POOL];
+      for(var bi=_bp.length-1;bi>0;bi--){var bj=Math.floor(Math.random()*(bi+1));var bt=_bp[bi];_bp[bi]=_bp[bj];_bp[bj]=bt;}
+      G._bounties=_bp.slice(0,3).map(function(b){return{id:b.id,desc:b.desc,reward:b.reward,icon:b.icon,claimed:false};});
+      G._bountyBankStreak=0;
+    }
   }
   if(G._handicap==='mirror_match'){
     /* Swap dice arrays — patron._mirrorOppDice has patron's original dice for player */
@@ -19614,6 +20014,11 @@ function _positionBossTally(){
 /* ═══════ TIER SCREEN (replaces gauntlet) ═══════ */
 function initTierScreen(data){
   _getS();
+  /* Run already ended (e.g. final heart lost via match abandon) — route to
+     the death summary instead of showing a tier screen for a dead run. */
+  if(S.run&&S.run._died){showScreen('gameover');return;}
+  /* Offer RESUME/ABANDON for an unfinished match (see initMenuScreen). */
+  try{_refreshResumeBanners();}catch(e){}
   var endOv=document.getElementById('end-ov');if(endOv)endOv.classList.remove('show');
   /* Legend renown perk: present a boss-signature draft at run start */
   if(S.run._legendDraftPending){
@@ -21101,6 +21506,10 @@ function showGameOver(){
 /* ═══════ MENU SCREEN INIT ═══════ */
 function initMenuScreen() {
   _getS();
+  /* Offer RESUME/ABANDON for an unfinished match. The banner machinery
+     existed but was never invoked from any screen init — saveMatchState
+     snapshotted every turn while resume was silently never offered. */
+  try{_refreshResumeBanners();}catch(e){}
   // Update gold display
   var mg = document.getElementById('menuGold');
   if(mg) mg.textContent = S.run?S.run.gold:0;
