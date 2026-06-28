@@ -798,6 +798,16 @@ body{
    so the art fills the whole frame (the rarity trim border stays). The sibling
    combinator keeps frame/corners on cards that fall back to the emoji. */
 .gcard-art ~ .gcard-frame, .gcard-art ~ .gc{display:none!important}
+/* seat the art into the rarity trim: soft dark vignette + faint pixel dither at the edges */
+.gcard:has(.gcard-art){position:relative}
+.gcard:has(.gcard-art)::after{
+  content:'';position:absolute;inset:0;z-index:2;pointer-events:none;border-radius:inherit;
+  box-shadow:inset 0 0 6px 2px rgba(16,9,4,.6), inset 0 0 0 1px rgba(16,9,4,.5);
+  background:repeating-conic-gradient(rgba(16,9,4,.55) 0% 25%, transparent 0% 50%) 0 0/3px 3px;
+  -webkit-mask-image:radial-gradient(ellipse 76% 76% at 50% 50%, transparent 56%, #000 100%);
+  mask-image:radial-gradient(ellipse 76% 76% at 50% 50%, transparent 56%, #000 100%);
+  image-rendering:pixelated;mix-blend-mode:multiply;opacity:.7;
+}
 .gcard-cover{position:absolute;inset:0;z-index:0;display:flex;align-items:center;justify-content:center;pointer-events:none;font-size:32px;line-height:1;border-radius:4px}
 .mcard .gcard-cover{font-size:28px}
 .res-card .gcard-cover{font-size:40px}
@@ -10897,7 +10907,7 @@ document.addEventListener('click',function(e){
 
 /* Card face art: Card_ART/<id>.png drawn over the colour swatch; the onerror
    fallback removes it so cards without an art file keep their emoji. */
-function _cardArtImg(id){return (id===undefined||id===null)?'':'<img class="gcard-art" src="Card_ART/'+id+'.png?v=art1" onerror="this.remove()" style="display:block;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1;image-rendering:pixelated;pointer-events:none">';}
+function _cardArtImg(id){return (id===undefined||id===null)?'':'<img class="gcard-art" src="Card_ART/'+id+'.png?v=art1" onerror="this.remove()" style="display:block;position:absolute;inset:1px;object-fit:cover;z-index:1;image-rendering:pixelated;pointer-events:none">';}
 function buildCBar(barId,cardIds,isOpp,label){
   const bar=document.getElementById(barId);bar.querySelectorAll('.mcard,.cchip').forEach(e=>e.remove());
   /* Also sweep any stale .card-trig-label elements — the per-label 3s
@@ -19419,6 +19429,7 @@ function reshuffleDraft(){
     var sd=(Math.random()*8).toFixed(1);
     html+='<div class="draft-card-wrap" data-card-id="'+card.id+'">';
     html+='<div class="gcard rarity-'+card.rarity+'" style="--sheen-delay:-'+sd+'s">';
+    html+=_cardArtImg(card.id);
     html+='<div class="gcard-cover" style="background:'+(CARD_BG[card.id]||'#444')+'">'+card.icon+'</div>';
     html+='<div class="gcard-frame"></div>'+gcCorners()+'</div>';
     html+=mkCardTooltipHTML(card,null,{showFlavor:false,asPlayer:true});
@@ -19736,7 +19747,7 @@ function _renderEndDraftSlots(){
         var _oRar=ocd.npc?'boss-'+ocd.npc:(ocd.npcOnly&&ocd.owner?'boss-'+ocd.owner:(ocd.npcOnly?'npc':ocd.rarity));
         var ghost=document.createElement('div');
         ghost.className='draft-ghost-underneath';
-        ghost.innerHTML='<div class="gcard rarity-'+_oRar+'"><div class="gcard-cover" style="background:'+(CARD_BG[origCid]||'#444')+'">'+ocd.icon+'</div><div class="gcard-frame"></div>'+gcCorners()+'</div>';
+        ghost.innerHTML='<div class="gcard rarity-'+_oRar+'">'+_cardArtImg(origCid)+'<div class="gcard-cover" style="background:'+(CARD_BG[origCid]||'#444')+'">'+ocd.icon+'</div><div class="gcard-frame"></div>'+gcCorners()+'</div>';
         wrap.appendChild(ghost);
       }
     }
@@ -19752,7 +19763,7 @@ function _renderEndDraftSlots(){
            weathered look (boss/npc cards always render at level 3). Without
            this wrap, the observer never sees the slot's card and the boss
            tarnish silently no-ops on the victory screen's loadout slots. */
-        slot.innerHTML='<div class="card-outer" data-cid="'+cid+'" style="position:absolute;inset:0;width:100%;height:100%"><div class="gcard rarity-'+_sRar+'" style="position:absolute;inset:0;width:100%;height:100%;border-radius:4px"><div class="gcard-cover" style="background:'+(CARD_BG[cid]||'#444')+'">'+cd.icon+'</div><div class="gcard-frame"></div>'+gcCorners()+'</div></div>';
+        slot.innerHTML='<div class="card-outer" data-cid="'+cid+'" style="position:absolute;inset:0;width:100%;height:100%"><div class="gcard rarity-'+_sRar+'" style="position:absolute;inset:0;width:100%;height:100%;border-radius:4px">'+_cardArtImg(cid)+'<div class="gcard-cover" style="background:'+(CARD_BG[cid]||'#444')+'">'+cd.icon+'</div><div class="gcard-frame"></div>'+gcCorners()+'</div></div>';
       }
     }else{
       slot.style.pointerEvents='none';
@@ -19828,6 +19839,7 @@ function initDraftScreen(data){
     wrap.dataset.cardId=card.id;
     var sheenDelay=(Math.random()*8).toFixed(1);
     wrap.innerHTML='<div class="gcard rarity-'+card.rarity+'" style="--sheen-delay:-'+sheenDelay+'s">'+
+      _cardArtImg(card.id)+
       '<div class="gcard-cover" style="background:'+(CARD_BG[card.id]||'#444')+'">'+card.icon+'</div>'+
       '<div class="gcard-frame"></div>'+gcCorners()+'</div>'+
       mkCardTooltipHTML(card,null,{showFlavor:false});
@@ -19958,6 +19970,7 @@ function initBossRewardScreen(data){
        reward signature cards rendered without their tarnish/torn-edge. */
     wrap.innerHTML='<div class="card-outer" data-aging="3" data-cid="'+card.id+'">'+
       '<div class="gcard rarity-npc" style="--sheen-delay:-'+sheenDelay+'s">'+
+        _cardArtImg(card.id)+
         '<div class="gcard-cover" style="background:'+(CARD_BG[card.id]||'#600')+'">'+card.icon+'</div>'+
         '<div class="gcard-frame"></div>'+gcCorners()+
       '</div>'+
@@ -20726,6 +20739,7 @@ function _renderPouchPanel(){
       if(cd){
         var rar=cd.npc?'boss-'+cd.npc:(cd.npcOnly&&cd.owner?'boss-'+cd.owner:(cd.npcOnly?'npc':cd.rarity));
         inner='<div class="gcard rarity-'+rar+'">'
+             +_cardArtImg(cid)
              +'<div class="gcard-cover" style="background:'+(CARD_BG[cid]||'#444')+'">'+cd.icon+'</div>'
              +'<div class="gcard-frame"></div></div>';
       }
@@ -21013,6 +21027,7 @@ function _renderBossLoadout(tier){
         var _bRar=cd.npc?'boss-'+cd.npc:(cd.npcOnly&&cd.owner?'boss-'+cd.owner:(cd.npcOnly?'npc':cd.rarity));
         html+='<div class="tier-lo-card boss" style="--boss-accent:'+_bossAcc+';border-color:'+_bossAcc+'">';
         html+='<div class="gcard rarity-'+_bRar+'" style="position:absolute;inset:0;width:100%;height:100%;border-radius:4px">';
+        html+=_cardArtImg(cid);
         html+='<div class="gcard-cover" style="background:'+(CARD_BG[cid]||'#444')+'">'+cd.icon+'</div>';
         html+='<div class="gcard-frame"></div>'+gcCorners()+'</div></div>';
         html+=mkCardTooltipHTML(cd,null,{showFlavor:false});
