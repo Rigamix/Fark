@@ -272,17 +272,7 @@ body{
 @keyframes pxVigPulse{0%{opacity:.55}100%{opacity:.9}}
 #matchVignette.on{opacity:.7;animation:pxVigPulse .5s steps(1,end) infinite alternate}
 
-/* ─── RESUME MATCH BANNER ─── */
-.resume-banner{display:flex;align-items:center;gap:10px;margin:0 12px 12px;padding:10px 12px;
-  background:rgba(20,14,8,.88);border:1px solid rgba(180,140,60,.4);border-radius:4px;
-  font-family:var(--font-px);image-rendering:pixelated}
-.resume-banner .rb-info{flex:1;min-width:0}
-.resume-banner .rb-lbl{font-size:8px;letter-spacing:1.5px;color:var(--textdim);margin-bottom:3px}
-.resume-banner .rb-score{font-size:11px;color:var(--gold);letter-spacing:.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.resume-banner .rb-btn{flex-shrink:0;font-family:var(--font-px);font-size:10px;letter-spacing:1px;
-  padding:7px 11px;border:1px solid;border-radius:3px;cursor:pointer;touch-action:manipulation}
-.resume-banner .rb-btn.go{background:rgba(40,80,40,.9);border-color:rgba(80,160,80,.5);color:#a8e0a8}
-.resume-banner .rb-btn.drop{background:rgba(60,20,20,.7);border-color:rgba(140,60,60,.4);color:var(--reddim);margin-left:4px}
+/* (Resume-match banner removed — resume now lives as a button in Settings.) */
 
 /* ─── EDICT BAR ─── */
 .edict-bar{
@@ -7204,10 +7194,10 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
     <div id="settingsResume" style="display:none;width:100%;margin:8px 0 4px">
       <div style="font-size:8px;letter-spacing:1.5px;color:var(--textdim);text-align:center;margin-bottom:8px" id="settingsResumeLabel"></div>
       <div style="display:flex;gap:8px;justify-content:center">
-        <!-- RESUME MATCH button removed: state was never persisted on Settings open
-             so the button never had anything to resume to. The Resume banner on
-             the menu (if pendingMatch DOES exist via some other code path) keeps
-             working — this only drops the broken Settings entry point. -->
+        <!-- Resume lives here in Settings (no on-screen banner). S.pendingMatch is
+             reliably persisted, so resumeMatch() always has a snapshot to restore;
+             closeSettings() first so we leave the sheet before entering the match. -->
+        <button onclick="closeSettings();resumeMatch()" style="font-family:var(--font-px);font-size:11px;letter-spacing:1px;padding:9px 16px;background:rgba(28,56,30,.92);border:1px solid rgba(90,170,90,.4);border-radius:3px;color:#a8e0a8;cursor:pointer;touch-action:manipulation">RESUME MATCH</button>
         <button onclick="abandonMatch();initSettingsUI()" style="font-family:var(--font-px);font-size:11px;letter-spacing:1px;padding:9px 16px;background:rgba(50,18,18,.9);border:1px solid rgba(140,60,60,.35);border-radius:3px;color:var(--reddim);cursor:pointer;touch-action:manipulation">ABANDON MATCH</button>
       </div>
     </div>
@@ -7985,25 +7975,11 @@ function abandonMatch(){
   _refreshResumeBanners();
 }
 function _refreshResumeBanners(){
+  /* The on-screen resume banner is gone — resume now lives ONLY as a button in
+     Settings (see #settingsResume / initSettingsUI). This stays as a cleanup
+     no-op so any banner left in a cached older build gets cleared, and existing
+     callers (abandonMatch, initTierScreen, initMenuScreen) keep working. */
   document.querySelectorAll('.resume-banner').forEach(function(b){b.remove();});
-  if(S&&S.pendingMatch){
-    var snap=S.pendingMatch;
-    var html='<div class="rb-info"><div class="rb-lbl">MATCH IN PROGRESS — '+snap.rungName.toUpperCase()+'</div>'+
-      '<div class="rb-score">YOU '+snap.pPts.toLocaleString()+' &nbsp;·&nbsp; TARGET '+snap.target.toLocaleString()+'&nbsp; (TURN '+snap.turnNum+')</div></div>'+
-      '<button class="rb-btn go" onclick="resumeMatch()">RESUME</button>'+
-      '<button class="rb-btn drop" onclick="abandonMatch()">ABANDON</button>';
-    /* Only on the gauntlet (in-run) screen — keep it OFF the menu so it's not
-       in the way every time you come back to the game. Resume stays reachable
-       by entering the Gauntlet. */
-    ['gauntlet'].forEach(function(scr){
-      var sc=document.getElementById('screen-'+scr);if(!sc)return;
-      var banner=document.createElement('div');banner.className='resume-banner';
-      banner.innerHTML=html;
-      /* Insert at top of the scrollable area / after top-bar */
-      var ins=sc.querySelector('.grid-wrap,.menu-content,.menu-buttons');
-      if(ins)ins.insertBefore(banner,ins.firstChild);else sc.insertBefore(banner,sc.children[1]||sc.firstChild);
-    });
-  }
 }
 
 _getS(); // Initialize on load
