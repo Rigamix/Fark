@@ -798,16 +798,23 @@ body{
    so the art fills the whole frame (the rarity trim border stays). The sibling
    combinator keeps frame/corners on cards that fall back to the emoji. */
 .gcard-art ~ .gcard-frame, .gcard-art ~ .gc{display:none!important}
-/* seat the art into the rarity trim: soft dark vignette + faint pixel dither at the edges */
+/* seat the art into the rarity trim: SUBTLE dark edge + faint pixel dither so the
+   art melts into the frame without a heavy black halo (kept light on purpose). */
 .gcard:has(.gcard-art){position:relative}
 .gcard:has(.gcard-art)::after{
   content:'';position:absolute;inset:0;z-index:2;pointer-events:none;border-radius:inherit;
-  box-shadow:inset 0 0 6px 2px rgba(16,9,4,.6), inset 0 0 0 1px rgba(16,9,4,.5);
-  background:repeating-conic-gradient(rgba(16,9,4,.55) 0% 25%, transparent 0% 50%) 0 0/3px 3px;
-  -webkit-mask-image:radial-gradient(ellipse 76% 76% at 50% 50%, transparent 56%, #000 100%);
-  mask-image:radial-gradient(ellipse 76% 76% at 50% 50%, transparent 56%, #000 100%);
-  image-rendering:pixelated;mix-blend-mode:multiply;opacity:.7;
+  box-shadow:inset 0 0 5px 1px rgba(16,9,4,.4);
+  background:repeating-conic-gradient(rgba(16,9,4,.3) 0% 25%, transparent 0% 50%) 0 0/3px 3px;
+  -webkit-mask-image:radial-gradient(ellipse 82% 82% at 50% 50%, transparent 64%, #000 100%);
+  mask-image:radial-gradient(ellipse 82% 82% at 50% 50%, transparent 64%, #000 100%);
+  image-rendering:pixelated;mix-blend-mode:multiply;opacity:.42;
 }
+/* The thumbnail contexts (pouch + gauntlet/mid-match loadout) dropped the rarity
+   trim and leaned on the CARD_BG colour swatch to signal rarity. The art now
+   covers that swatch, so restore a bright rarity-coloured border on art cards. */
+.tier-lo-card:has(.gcard-art){border-color:transparent}
+.tier-lo-card .gcard:has(.gcard-art){border:2px solid var(--ctrim2)}
+.lo-mini-card .gcard:has(.gcard-art){border-color:var(--ctrim2)}
 .gcard-cover{position:absolute;inset:0;z-index:0;display:flex;align-items:center;justify-content:center;pointer-events:none;font-size:32px;line-height:1;border-radius:4px}
 .mcard .gcard-cover{font-size:28px}
 .res-card .gcard-cover{font-size:40px}
@@ -3068,6 +3075,9 @@ body::before,body::after{display:none!important}
    at smaller size). Outer .tier-lo-card border becomes the dashed-empty frame
    when empty, otherwise hidden so the card floats free. */
 #pouch-ov .tier-lo-card:not(.empty){border:none}
+/* Tap-to-peek tooltip on pouch cards (drag is still the swap interaction) */
+.pouch-slot-wrap .mcard-tooltip{position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);z-index:10500}
+.pouch-slot-wrap.peeked .mcard-tooltip{opacity:1!important;pointer-events:auto;animation:tipGrow .25s ease-out}
 .pouch-actions{display:flex;gap:10px;margin-top:10px}
 .pouch-btn{
   font-family:var(--font-px);font-size:11px;letter-spacing:2px;
@@ -7982,7 +7992,10 @@ function _refreshResumeBanners(){
       '<div class="rb-score">YOU '+snap.pPts.toLocaleString()+' &nbsp;·&nbsp; TARGET '+snap.target.toLocaleString()+'&nbsp; (TURN '+snap.turnNum+')</div></div>'+
       '<button class="rb-btn go" onclick="resumeMatch()">RESUME</button>'+
       '<button class="rb-btn drop" onclick="abandonMatch()">ABANDON</button>';
-    ['gauntlet','menu'].forEach(function(scr){
+    /* Only on the gauntlet (in-run) screen — keep it OFF the menu so it's not
+       in the way every time you come back to the game. Resume stays reachable
+       by entering the Gauntlet. */
+    ['gauntlet'].forEach(function(scr){
       var sc=document.getElementById('screen-'+scr);if(!sc)return;
       var banner=document.createElement('div');banner.className='resume-banner';
       banner.innerHTML=html;
@@ -10902,7 +10915,7 @@ function closeAllChips(){
 /* Global dismiss — tap anywhere closes all tooltips, unless tapping a card to toggle */
 document.addEventListener('click',function(e){
   if(e.target.closest('.mcard-tooltip')){closeAllChips();return;}
-  if(!e.target.closest('.mcard,.shop-card,.lo-mini-card,.lo-hand-slot,.res-card,.lo-wager-slot,.cchip,.dice-expand-popup'))closeAllChips();
+  if(!e.target.closest('.mcard,.shop-card,.lo-mini-card,.lo-hand-slot,.res-card,.lo-wager-slot,.cchip,.dice-expand-popup,.pouch-slot-wrap'))closeAllChips();
 });
 
 /* Card face art: Card_ART/<id>.png drawn over the colour swatch; the onerror
@@ -20744,8 +20757,11 @@ function _renderPouchPanel(){
              +'<div class="gcard-frame"></div></div>';
       }
     }
+    /* Tooltip so a tap reveals the card's name/effect (matches the gauntlet
+       loadout). cd is function-scoped via var; undefined for empty/locked slots. */
+    var tip=(cid&&typeof cd!=='undefined'&&cd)?mkCardTooltipHTML(cd):'';
     return '<div class="pouch-slot-wrap" data-lo-kind="'+kind+'" data-lo-idx="'+idx+'">'
-         + '<div class="'+cardClass+'">'+inner+'</div></div>';
+         + '<div class="'+cardClass+'">'+inner+'</div>'+tip+'</div>';
   }
   /* Active deck row */
   var aHtml='';
@@ -20769,6 +20785,9 @@ function _renderPouchPanel(){
   document.querySelectorAll('#pouch-ov .pouch-slot-wrap').forEach(function(el){
     el.addEventListener('pointerdown', _onPouchDragStart);
     el.addEventListener('touchstart', _onPouchDragStart, {passive:false});
+    /* Tap (no drag) reveals the tooltip. attachTooltipTap already gates on the
+       _pcDrag flag, so it won't fire mid-swap. */
+    attachTooltipTap(el);
   });
 }
 /* ── Drag-to-swap implementation for pouch modal ──
