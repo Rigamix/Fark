@@ -9307,10 +9307,6 @@ const CARDS=[
     eff:'OPP ROLL 1: 25% AUTO-BUST',
     desc:'Each opponent turn: their very first roll has a 25% chance to score nothing — they bust before they begin. Denies momentum to aggressive rivals.',
     arch:'guardian'},
-  {id:'masters_forge',name:"MASTER'S FORGE",icon:'⚒️',rarity:'gold',
-    eff:'EACH ROLL: 1 BLANK → 5',
-    desc:'Passive: after every roll settles, one random non-scoring die is forged into a 5. Steady scoring uplift across the whole match.',
-    arch:'sharp'},
   {id:'the_harmony',name:'THE HARMONY',icon:'🎼',rarity:'gold',
     eff:'3+ ARCHETYPES: BANK +250',
     desc:'When your equipped cards span at least three different archetypes (sharp, saboteur, collector, hoarder, brinksman, safeBanker, opener, guardian), every bank gains +250. Rewards balanced builds.',
@@ -9374,7 +9370,7 @@ const CARD_BG={
      blue/grey), sharp (forge red), utility harmony (purple-gold). */
   opening_shot:'#C0803A',prompt_hand:'#E0A050',
   aegis:'#5A7090',blockade:'#4A5A6A',
-  masters_forge:'#8B4530',the_harmony:'#7A4A8A',
+  the_harmony:'#7A4A8A',
   /* NPC-only card backgrounds */
   her_lucky_coin:'#7A6A50',one_more_round:'#8A6030',grogs_bump:'#9A6028',
   the_last_stitch_npc:'#8B6080',measure_twice:'#706050',worn_thimble:'#9A7A60',the_nightshift:'#5A4A60',mabels_pinch:'#9A5070',
@@ -10895,6 +10891,9 @@ document.addEventListener('click',function(e){
   if(!e.target.closest('.mcard,.shop-card,.lo-mini-card,.lo-hand-slot,.res-card,.lo-wager-slot,.cchip,.dice-expand-popup'))closeAllChips();
 });
 
+/* Card face art: Card_ART/<id>.png drawn over the colour swatch; the onerror
+   fallback removes it so cards without an art file keep their emoji. */
+function _cardArtImg(id){return (id===undefined||id===null)?'':'<img class="gcard-art" src="Card_ART/'+id+'.png?v=art1" onerror="this.remove()" style="display:block;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1;image-rendering:pixelated;pointer-events:none">';}
 function buildCBar(barId,cardIds,isOpp,label){
   const bar=document.getElementById(barId);bar.querySelectorAll('.mcard,.cchip').forEach(e=>e.remove());
   /* Also sweep any stale .card-trig-label elements — the per-label 3s
@@ -10929,6 +10928,7 @@ function buildCBar(barId,cardIds,isOpp,label){
     w.innerHTML=
       '<div class="card-outer"'+(c.id!==undefined?' data-aging="'+_tarnish+'" data-cid="'+c.id+'"':'')+'>'+
         '<div class="gcard rarity-'+_mRar+'">'+
+          _cardArtImg(c.id)+
           '<div class="gcard-cover" style="background:'+(CARD_BG[c.id]||'#444')+'">'+c.icon+'</div>'+
           '<div class="gcard-frame"></div>'+gcCorners()+
         '</div>'+
@@ -12872,17 +12872,6 @@ function _afterRollImpl(){
       triggerCard('gamblers_thumb',_gtHits>1?'THUMB ×'+(_gtI+1)+' → 5!':'THUMB → 5!',true);
     }
   }
-  /* MASTER'S FORGE (sharp): each roll, convert one random non-scoring
-     die to a 5. Fires every roll (not just first) — that's why it's gold. */
-  if(G.pCards.includes('masters_forge')){
-    var _mfBlanks=free.filter(function(d){return d.val!==1&&d.val!==5&&!d._frozen;});
-    if(_mfBlanks.length>0){
-      var _mfVic=_mfBlanks[Math.floor(Math.random()*_mfBlanks.length)];
-      _mfVic.val=5;reDrawDieFace(_mfVic);
-      if(_mfVic.el){_mfVic.el.classList.add('eff-glow-gold');spawnPixelSparks(_mfVic.el,5);setTimeout(function(){if(_mfVic.el)_mfVic.el.classList.remove('eff-glow-gold');},800);}
-      triggerCard('masters_forge','FORGED → 5!',true);
-    }
-  }
   /* Hot Streak: after 2 safe banks, force one die to 1 AND another to 5.
      Resets the safe-turn counter so the player has to build up another
      2-streak before it fires again (was looping every turn after the
@@ -14658,19 +14647,6 @@ function runOppTurn(){
           try{spawnSawdust(d.el,7);}catch(e){}
         }
       }});
-      /* MASTER'S FORGE (sharp) — NPC mirror. Before scoring, convert one
-         random non-scoring NPC die to a 5 so the NPC's roll benefits from
-         the same passive die-shaping the player gets. */
-      if(G.oCards.includes('masters_forge')){
-        var _omfFree=G.oppDice.filter(function(d){return !d.kept;});
-        var _omfBlanks=_omfFree.filter(function(d){return d.val!==1&&d.val!==5;});
-        if(_omfBlanks.length>0){
-          var _omfVic=_omfBlanks[Math.floor(Math.random()*_omfBlanks.length)];
-          _omfVic.val=5;reDrawDieFace(_omfVic);
-          if(_omfVic.el){_omfVic.el.classList.add('eff-glow-gold');setTimeout(function(){if(_omfVic.el)_omfVic.el.classList.remove('eff-glow-gold');},800);}
-          triggerCard('masters_forge','FORGED → 5!',false);
-        }
-      }
       /* TWINNING CHARM NPC AI: if there's an existing 1 or 5 in the unkept
          pool plus a non-scoring die, mirror the 1/5 to the non-scoring die
          (gain 100/50 pts). Fires before scoreRoll so the new value scores. */
@@ -16218,6 +16194,7 @@ function endMatch(win){
       var sd=(Math.random()*8).toFixed(1);
       draftHtml+='<div class="draft-card-wrap" data-card-id="'+card.id+'">';
       draftHtml+='<div class="gcard rarity-'+card.rarity+'" style="--sheen-delay:-'+sd+'s">';
+      draftHtml+=_cardArtImg(card.id);
       draftHtml+='<div class="gcard-cover" style="background:'+(CARD_BG[card.id]||'#444')+'">'+card.icon+'</div>';
       draftHtml+='<div class="gcard-frame"></div>'+gcCorners()+'</div>';
       draftHtml+=mkCardTooltipHTML(card,null,{showFlavor:false,asPlayer:true});
@@ -16310,6 +16287,7 @@ function endMatch(win){
          + canvas grunge) via the aging MutationObserver. */
       bossHtml+='<div class="card-outer" data-cid="'+card.id+'">';
       bossHtml+='<div class="gcard '+_bossRarClass+'" style="--sheen-delay:-'+sd+'s">';
+      bossHtml+=_cardArtImg(card.id);
       bossHtml+='<div class="gcard-cover" style="background:'+(CARD_BG[card.id]||'#444')+'">'+card.icon+'</div>';
       bossHtml+='<div class="gcard-frame"></div>'+gcCorners()+'</div>';
       bossHtml+='</div>';/* /card-outer */
@@ -17497,6 +17475,7 @@ function miniCardHTML(c,idx){
   return '<div class="lo-mini-card rarity-'+_rar+_activeCls+'" style="--lo-dur:'+dur+'s;--lo-del:'+del+'s;cursor:pointer">'+
     '<div class="card-outer" data-aging="'+tarnish+'" data-cid="'+c.id+'">'+
       '<div class="gcard rarity-'+_rar+'" style="--sheen-delay:-'+sheenDel+'s">'+
+        _cardArtImg(c.id)+
         '<div class="gcard-cover" style="background:'+(CARD_BG[c.id]||'#444')+'">'+c.icon+'</div>'+
         '<div class="gcard-frame"></div>'+gcCorners()+
       '</div>'+
