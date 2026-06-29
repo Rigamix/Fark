@@ -799,12 +799,10 @@ body{
   mask-image:radial-gradient(ellipse 82% 82% at 50% 50%, transparent 64%, #000 100%);
   image-rendering:pixelated;mix-blend-mode:multiply;opacity:.42;
 }
-/* The thumbnail contexts (pouch + gauntlet/mid-match loadout) dropped the rarity
-   trim and leaned on the CARD_BG colour swatch to signal rarity. The art now
-   covers that swatch, so restore a bright rarity-coloured border on art cards. */
-.tier-lo-card:has(.gcard-art){border-color:transparent}
-.tier-lo-card .gcard:has(.gcard-art){border:2px solid var(--ctrim2)}
-.lo-mini-card .gcard:has(.gcard-art){border-color:var(--ctrim2)}
+/* Filled thumbnail cards carry their rarity trim on the inner .gcard (a bright
+   --ctrim2 border, set per-context below). Drop the .tier-lo-card's own faint
+   outer border on filled cards so it doesn't double up into a smudgy frame. */
+.tier-lo-card:has(.gcard){border-color:transparent}
 .gcard-cover{position:absolute;inset:0;z-index:0;display:flex;align-items:center;justify-content:center;pointer-events:none;font-size:32px;line-height:1;border-radius:4px}
 .mcard .gcard-cover{font-size:28px}
 .res-card .gcard-cover{font-size:40px}
@@ -3140,9 +3138,9 @@ body::before,body::after{display:none!important}
 .end-draft-slots .draft-slot.locked{border-color:rgba(120,100,90,.35);background:rgba(28,22,16,.4)}
 .end-draft-slots .draft-slot.locked::after{content:'\1F512';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:rgba(150,130,90,.5);font-size:18px;pointer-events:none}
 .tier-lo-card .gcard{position:absolute;inset:0;width:100%;height:100%;border-radius:4px;
-  /* Thumbnail: drop the gcard's own border + inset rim. The parent .tier-lo-card
-     already frames it — extra outlines just look noisy at this size. */
-  border:none;box-shadow:0 2px 6px rgba(0,0,0,.6)}
+  /* Thumbnail rarity trim: the card art covers the CARD_BG colour swatch, so the
+     rarity now has to read from the frame. Bright --ctrim2 to match the hand. */
+  border:2px solid var(--ctrim2);box-shadow:0 2px 6px rgba(0,0,0,.6)}
 .tier-lo-card .gcard-cover{font-size:16px}
 .tier-lo-card .gcard-frame{display:none}
 .tier-lo-card .gc{display:none}
@@ -3974,7 +3972,9 @@ body::before,body::after{display:none!important}
   width:100%;height:100%;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   position:relative;isolation:isolate;
-  border:2px solid var(--ctrim);border-radius:4px;
+  /* Bright rarity trim (was dark --ctrim) so the rarity reads now that card art
+     covers the colour swatch — matches the hand + pouch thumbnails. */
+  border:2px solid var(--ctrim2);border-radius:4px;
   background:linear-gradient(165deg,var(--cface2) 0%,var(--cface) 100%);
   box-shadow:inset 0 0 0 1px var(--ctrim2);
   overflow:hidden;
@@ -6062,8 +6062,9 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
   opacity:.55;pointer-events:none;z-index:-1;
 }
 .hs-name{
-  font-family:var(--font-px);font-size:36px;letter-spacing:4px;
+  font-family:var(--font-px);font-size:clamp(42px,13vw,58px);letter-spacing:3px;
   color:var(--hs-color,#e8a030);
+  text-align:center;line-height:1.05;max-width:94vw;
   text-shadow:0 0 20px var(--hs-color,#e8a030),0 2px 0 rgba(0,0,0,.8);
   animation:hsSlide .5s .15s both cubic-bezier(.2,.8,.3,1);
 }
@@ -7318,6 +7319,13 @@ function _getS(){
     while(S.run.pouch.length<3)S.run.pouch.push(null);
     /* Drop any pouch cards that were in the removed-cards list */
     S.run.pouch=S.run.pouch.map(function(cid){return cid&&_removedCards.indexOf(cid)===-1?cid:null;});
+    /* Clear any stale perk-unlock celebrations left over from a previous session.
+       The perk itself is already recorded in S.renownPerks (persists); this queue
+       is only the "show the splash" list, drained on the loadout screen. If the
+       app was closed before it drained, we must NOT re-celebrate on relaunch —
+       that's the "it shows me perks I've already seen" bug. (This block runs once
+       per load, inside the !S guard, so in-session queueing is unaffected.) */
+    if(S.run._pendingPerkUnlocks)S.run._pendingPerkUnlocks=[];
   }
   return S;
 }
@@ -7395,7 +7403,9 @@ const FEATS=[
   {id:'crushing_win',   label:'Crushing Win',     desc:'Beat opponent by 1000+ points',  renown:5,
     check:function(G){return (G.pPts||0)-(G.oPts||0)>=1000;}},
   {id:'lightning_round',label:'Lightning Round',  desc:'Win in 3 banks or fewer',        renown:5,
-    check:function(G){return (G._featBanks||0)<=3;}},
+    /* Excludes Sudden Death — that handicap is only 3 turns, so "win in ≤3 banks"
+       is the default there and the feat would be meaningless. */
+    check:function(G){return (G._featBanks||0)<=3 && G._handicap!=='sudden_death';}},
   {id:'big_turn',       label:'Big Turn',         desc:'Score 3000+ in a single turn',   renown:10,
     check:function(G){return (G._featMaxBank||0)>=3000;}},
   {id:'no_busts',       label:'Untouchable',      desc:'Win the match without busting',  renown:10,
@@ -10896,7 +10906,7 @@ document.addEventListener('click',function(e){
 
 /* Card face art: Card_ART/<id>.png drawn over the colour swatch; the onerror
    fallback removes it so cards without an art file keep their emoji. */
-function _cardArtImg(id){return (id===undefined||id===null)?'':'<img class="gcard-art" src="Card_ART/'+id+'.png?v=art1" onerror="this.remove()" style="display:block;position:absolute;inset:1px;object-fit:cover;z-index:1;image-rendering:pixelated;pointer-events:none">';}
+function _cardArtImg(id){return (id===undefined||id===null)?'':'<img class="gcard-art" src="Card_ART/'+id+'.png?v=art1" onerror="this.remove()" style="display:block;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1;image-rendering:pixelated;pointer-events:none">';}
 function buildCBar(barId,cardIds,isOpp,label){
   const bar=document.getElementById(barId);bar.querySelectorAll('.mcard,.cchip').forEach(e=>e.remove());
   /* Also sweep any stale .card-trig-label elements — the per-label 3s
@@ -15849,8 +15859,10 @@ function endMatch(win){
   /* Coin element */
   var resCoinBig=document.getElementById('resCoinBig');
   if(resCoinBig){resCoinBig.className='res-coin-big';resCoinBig.style.opacity='0';}
-  /* Gold-text reset — will be animated in below with a count-up */
-  if(resGoldText){resGoldText.className='res-gold-text';resGoldText.textContent='';}
+  /* Gold-text reset — will be animated in below with a count-up. Clear the inline
+     colour too: a boss-loss forfeited-stake shows a red "−Xg", and without this
+     the red would carry into the next match's green +gold count-up. */
+  if(resGoldText){resGoldText.className='res-gold-text';resGoldText.textContent='';resGoldText.style.color='';}
   /* Animate a numeric count-up from 0 → final, updating at ~60fps.
      Adds a "pop" bounce when it lands so the final number feels earned. */
   function _tweenGold(target,duration){
@@ -15983,24 +15995,46 @@ function endMatch(win){
       allCoins.forEach(function(c){c.classList.add('charge');c.classList.add('sheen');});
       if(typeof SFX!=='undefined'&&SFX.coinLand)SFX.coinLand();
     },1600);
-  }else{
-    /* Loss: the token appears then drains/shrinks away. On a BOSS loss it's the
-       HEART you just lost (a boss loss costs a life) rather than a coin — the
-       .as-heart class swaps the coin face for ❤️, then 💔 on the burst. */
-    var _lossIsHeart=isBoss;
-    if(_lossIsHeart)allCoins.forEach(function(c){c.classList.add('as-heart');});
+  }else if(isBoss){
+    /* BOSS loss: you lose a life — the token drains away as the HEART you just
+       lost (.as-heart swaps the coin face for ❤️, then 💔 on the burst). If you'd
+       also staked gold on the Innkeep's Book, that stake is forfeit, so a second
+       GOLD coin drains beside the heart with a red "−Xg" — the player sees both
+       the life AND the money leave. The forfeited stake (S.run._bookResult.lost)
+       is set by _settleEndRoute, which runs later in this same synchronous
+       endMatch pass — so it's read inside the timeout below, not up here. */
+    if(resCoinBig)resCoinBig.classList.add('as-heart');
+    var _lossCoins=resCoinBig?[resCoinBig]:[];
     setTimeout(function(){
+      var _lostStake=(S&&S.run&&S.run._bookResult&&S.run._bookResult.lost)||0;
+      if(_lostStake>0&&resGoldWrap&&resCoinBig){
+        /* Lay heart + coin in a row (same pattern as the multi-coin win layout). */
+        resGoldWrap.style.flexDirection='column';resGoldWrap.style.gap='6px';
+        var _row=document.createElement('div');
+        _row.className='res-coin-row';
+        _row.style.cssText='display:flex;flex-direction:row;gap:16px;justify-content:center';
+        resGoldWrap.insertBefore(_row,resGoldText);
+        _row.appendChild(resCoinBig);
+        var _stakeCoin=resCoinBig.cloneNode(true);
+        _stakeCoin.id='';_stakeCoin.className='res-coin-big';/* drop .as-heart → stays a gold coin */
+        _row.appendChild(_stakeCoin);
+        _lossCoins.push(_stakeCoin);
+        if(resGoldText){resGoldText.textContent='−'+_lostStake+'g';resGoldText.style.color='#e0606a';resGoldText.classList.add('show');}
+      }
       if(resGoldWrap){resGoldWrap.style.display='flex';resGoldWrap.classList.add('fade-in');}
-      allCoins.forEach(function(c){c.style.opacity='1';c.classList.add('spin');});
+      _lossCoins.forEach(function(c){c.style.opacity='1';c.classList.add('spin');});
     },700);
     setTimeout(function(){
-      allCoins.forEach(function(c){c.classList.add('drain');});
+      _lossCoins.forEach(function(c){c.classList.add('drain');});
     },1400);
     setTimeout(function(){
-      allCoins.forEach(function(c){c.classList.add('drain-burst');});
-      if(_lossIsHeart){try{SFX.heartLose&&SFX.heartLose();}catch(e){}}
+      _lossCoins.forEach(function(c){c.classList.add('drain-burst');});
+      try{SFX.heartLose&&SFX.heartLose();}catch(e){}
     },2200);
   }
+  /* PATRON loss: nothing is lost — no life, no gold — so NO coin/token drain
+     animation plays at all (it used to falsely imply lost coins). The result
+     screen just shows the score + title. */
 
   /* Feats: evaluate now (writes renown to S), reveal later in the post-coin
      setTimeout block so feats fade in exactly where coins faded out. */
@@ -20262,13 +20296,16 @@ function initTierScreen(data){
     var lv=document.getElementById('tierLives');
     if(!lv)return;
     var c=Math.max(0,S.run.coins||0);
-    var show=Math.min(c,6),html='';
-    for(var li=0;li<show;li++){
-      var _pop=(_heartAnim==='gain'&&li===show-1)?' heart-pop':'';
-      html+='<span class="life-heart'+_pop+'">❤️</span>';
+    /* Always render the three life slots so the lifeline reads as "X of 3" —
+       filled (❤️) up to the current count, empty (🤍, dimmed) for the rest. Any
+       coins beyond the base 3 show as a +N tag. */
+    var html='';
+    for(var li=0;li<3;li++){
+      var _filled=li<c;
+      var _pop=(_heartAnim==='gain'&&_filled&&li===c-1)?' heart-pop':'';
+      html+='<span class="life-heart'+(_filled?'':' empty')+_pop+'">'+(_filled?'❤️':'🤍')+'</span>';
     }
-    if(c>6)html+='<span class="life-more">+'+(c-6)+'</span>';
-    if(c===0)html='<span class="life-heart empty">🤍</span>';
+    if(c>3)html+='<span class="life-more">+'+(c-3)+'</span>';
     /* Boss loss: append the just-lost heart (broken) so it can shatter out of
        the row, then remove it once the animation finishes. */
     if(_heartAnim==='lose')html+='<span class="life-heart heart-shatter">💔</span>';
