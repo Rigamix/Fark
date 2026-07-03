@@ -70,10 +70,23 @@ Brief: FARK_LOOP_BRIEF.md (P1..P9). Status:
     coin-pile sprite exists).
 - M3 next: retune targets/buy-ins/dice prices via sim acceptance (60-70% patron,
   45-55% boss, 5-7 median turns at intended gear).
-- UI addendum remaining: step 5 room/store reskin (painted plates + portrait
-  sprites + innkeep-at-the-bar as shop/book tap target) once assets land;
-  patron NAMES (frames expect names — needs species/portrait direction);
-  heraldic card art direction supersedes the pixel deck eventually.
+- ROOM ART PASS (addendum step 5, first cut): Night_Art/ asset folder created
+  (P9 naming). Generated via Higgsfield: plate_room.png (tavern room plate,
+  referenced off Environment_ART/gauntlet.png), six per-persona patron
+  portraits char_patron_{ones,hoard,aggro,triples,straights,combo}.png
+  (magpie/badger/hare/raccoon/weasel/owl busts, style-anchored on the Whisper
+  framed-portrait job), obj_stool.png (GONE HOME), obj_seal.png (purple wax,
+  die-face emblem). Copied from the mockup props: ui_board_chalk, char_innkeep,
+  ui_btn_plank(+green), obj_coins. Wired: room plate + dither on
+  #screen-gauntlet; chalkboard rides the slate prop (cb-inner zone); roster is
+  a 2-up grid of hanging CSS-framed portraits (busts came back frameless from
+  bg-removal, uniform sign-frame wrapper solves it) with stake tags + seal;
+  GONE HOME = stool art + handwritten tag; peek card gets the portrait + green
+  plank SIT DOWN; innkeep sprite at the left edge ("THE BAR") opens the store.
+- UI addendum remaining: boss-zone composition on the plate (Grog placement),
+  patron NAMES, Innkeep's Book folded into the bar tap (currently store only),
+  match-screen plate/sprites (P9 layers), heraldic card art direction
+  supersedes the pixel deck eventually.
 - M3: retune targets/buy-ins/dice prices via sim acceptance (60-70% patron,
   45-55% boss, 5-7 median turns at intended gear).
 
