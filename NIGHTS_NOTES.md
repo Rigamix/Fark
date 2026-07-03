@@ -17,10 +17,37 @@ Brief: FARK_LOOP_BRIEF.md (P1..P9). Status:
     by extraSeat "House Favourite" (+1 seat, consumed by M2); migration grants
     extraSeat to old secondBoss holders. Nobody loses a slot.
   - P7: draft SKIP -> "DECLINE +Xg" (5 + tier*5), gold awarded in draftSkip.
-- M2 next: P3 pointsNeeded [2,2,2,3,3,3,3,4] + turn caps (HUD pips) ->
-  P1 night roster/seats -> P2 buy-ins -> LAST ORDERS fail -> migrations ->
-  turn-structure card audit (sudden_death, Steeped, The Tab, delayed-bank
-  saboteur, Leaky Cup, Dead Air, last-licks).
+- M2 THE NIGHT: DONE in dev copy (P3+P1+P2).
+  - P3: pointsNeeded now [2,2,2,3,3,3,3,4]; TURN_CAP_PATRON=8 / TURN_CAP_BOSS=10;
+    G.pTurns/G.oTurns (bank AND bust count); cap resolves in _handBackOrCap when
+    the rival hands back (both sides equal turns -> trailing side always answers);
+    tie -> extra full rounds until broken; HUD "TURN n/8" + OVERTIME.
+  - P1: S.run.night {tier, roster, seatsPlayed, results, handicapSeat} built once
+    per tier (_ensureNight, seats = pointsNeeded+2 +extraSeat perk); roster UI in
+    #nightRoster (persona word, 6 dice chips, target, buy-in, WIN gold, handicap
+    seat marked, WON/LOST stamps); old standard/handicap buttons hidden but kept
+    for legacy canvas wiring; boss unlock leaves leftover seats playable;
+    _checkNightFail in the settle path: all seats spent + points short -> -1 heart,
+    points 0, roster reroll, LAST ORDERS splash on the tier screen (death at 0).
+  - P2: NIGHT_BUYINS [10,15,25,35,50,65,80,100], clamped to purse (broke player
+    pays what they have — no seat is ever locked); deduct + seat-consume ATOMIC at
+    launch (pessimistic 'lost' result, so force-close/abandon can't refund or
+    unspend); win pot = reward + buy-in back, folded into the coin count-up;
+    pendingMatch snapshot carries seatIdx/pTurns/oTurns for resume.
+  - Turn-boundary audit (vs cap): sudden_death runs its own 3-turn clock under
+    target=inf (cap never binds); steeped/in_arrears/drill_order are per-roll or
+    per-turn (neutral); leaky_cup every-4th-turn fires twice in 8 (fine);
+    the_heir/turn-gated NPC actives all use early-turn gates (<=3) (fine);
+    rising_stakes streaks neutral; The Tab escrow settles through the same
+    endMatch path the cap uses. No blockers found.
+  - Checklist verified live: fresh roster (4 seats T0), buy-in 100->90, seat
+    consumed + LOST stamp on loss, win => +1 pt / WON stamp / +25 pot, night fail
+    => heart 3->2 + LAST ORDERS + fresh roster + points reset, boss ready with 4
+    seats still playable, cap unit tests (ahead/behind/tie/under-cap), legacy
+    170-renown save => extraSeat granted + 5-seat roster + points kept, abandon
+    mid-seat => no refund, seat stays spent, no heart.
+- M3 next: retune targets/buy-ins/dice prices via sim acceptance (60-70% patron,
+  45-55% boss, 5-7 median turns at intended gear).
 - M3: retune targets/buy-ins/dice prices via sim acceptance (60-70% patron,
   45-55% boss, 5-7 median turns at intended gear).
 

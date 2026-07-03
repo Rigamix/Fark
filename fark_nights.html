@@ -274,6 +274,29 @@ body{
 
 /* (Resume-match banner removed — resume now lives as a button in Settings.) */
 
+/* ─── NIGHT ROSTER (P1 seats) ─── */
+#nightRoster{width:100%;max-width:340px;display:flex;flex-direction:column;gap:8px;margin-bottom:18px}
+.nr-head{font-family:var(--font-px);font-size:11px;letter-spacing:2px;color:var(--gold);text-align:center;margin-bottom:2px}
+.nr-head .nr-sub{color:var(--textdim);letter-spacing:1px;margin-left:6px}
+.seat-row{position:relative;padding:9px 12px 10px;border-radius:5px;cursor:pointer;
+  background:rgba(20,14,8,.82);border:1px solid rgba(180,140,60,.35);
+  font-family:var(--font-px);transition:transform .06s}
+.seat-row:active{transform:scale(.985)}
+.seat-row.hc{border-color:var(--hc-color,#c0a050);box-shadow:inset 0 0 14px rgba(200,140,40,.12)}
+.seat-row.spent{cursor:default;opacity:.55;filter:saturate(.6)}
+.seat-row.spent:active{transform:none}
+.seat-main{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.seat-name{font-size:13px;letter-spacing:1.5px;color:#e8e0d0}
+.seat-dice{display:flex;gap:3px}
+.seat-die{width:13px;height:13px;border-radius:2px;background:var(--dface,#888);
+  border:1.5px solid var(--dborder,#666);image-rendering:pixelated}
+.seat-meta{display:flex;gap:14px;margin-top:6px;font-size:9px;letter-spacing:1px;color:var(--textdim)}
+.seat-meta b{color:var(--gold);font-weight:normal;font-size:11px;letter-spacing:.5px}
+.seat-hc{margin-top:6px;font-size:9px;letter-spacing:1.5px;color:var(--hc-color,#e0a040)}
+.seat-stamp{position:absolute;top:50%;right:14px;transform:translateY(-50%) rotate(-8deg);
+  font-size:15px;letter-spacing:3px;padding:2px 8px;border:2px solid;border-radius:3px;opacity:.9}
+.seat-stamp.won{color:#7ddc84;border-color:rgba(90,180,90,.7)}
+.seat-stamp.lost{color:#e0868e;border-color:rgba(180,80,90,.7)}
 /* ─── EDICT BAR ─── */
 .edict-bar{
   display:none;font-family:'Enchanted Land',serif;font-size:16px;letter-spacing:1px;
@@ -7328,6 +7351,9 @@ function _getS(){
        +1 night seat. Anyone who had it keeps a granted extraSeat; slot 3 now
        rides the 60-renown perk, and slot 2 is base — nobody can LOSE a slot. */
     if(S.renownPerks&&S.renownPerks.secondBoss&&!S.renownPerks.extraSeat)S.renownPerks.extraSeat=true;
+    /* P1 migration: pre-Nights saves get a lazy night — the roster is built
+       on the next tier-screen render, current points are kept. */
+    if(S.run.night===undefined)S.run.night=null;
     /* Clear any stale perk-unlock celebrations left over from a previous session.
        The perk itself is already recorded in S.renownPerks (persists); this queue
        is only the "show the splash" list, drained on the loadout screen. If the
@@ -7930,7 +7956,9 @@ function saveMatchState(){
     pCards:[...G.pCards],oCards:[...G.oCards],
     pStake:G.pStake,oStake:G.oStake,
     buyIn:LO.buyIn||0,effectiveWager:LO.effectiveWager||false,
+    seatIdx:(LO&&LO.seatIdx!=null)?LO.seatIdx:null,
     pPts:G.pPts,oPts:G.oPts,target:G.target,turnNum:G.turnNum,numDice:G.numDice,
+    pTurns:G.pTurns||0,oTurns:G.oTurns||0,
     matchDice:[...G.matchDice],matchOppDice:[...G.matchOppDice],
     originalPlayerDice:[...G.originalPlayerDice],
     thriftyBonus:G.thriftyBonus||0,spurActive:G.spurActive||0,
@@ -7975,6 +8003,7 @@ function resumeMatch(){
     pCards:snap.pCards||[],oCards:snap.oCards||[],
     pStake:snap.pStake,oStake:snap.oStake,
     buyIn:snap.buyIn||0,effectiveWager:snap.effectiveWager||false,
+    seatIdx:(snap.seatIdx!=null)?snap.seatIdx:null,
     _resumeData:snap
   });},80);
 }
@@ -7988,6 +8017,11 @@ function abandonMatch(){
     if(_abSnap.isBoss){
       S.run.coins=Math.max(0,(S.run.coins||0)-1);
       if(S.run.coins<=0){S.run._died=true;save();showScreen('gameover');return;}
+    }else{
+      /* Patron seat abandoned: it was consumed (and the buy-in paid) at
+         launch — no refunds, no re-rolls. The night may now be over. */
+      _checkNightFail();
+      if(S.run._died){save();showScreen('gameover');return;}
     }
     save();
   }
@@ -8440,6 +8474,10 @@ const CHAR_COLORS={
   noble:{bevel:'#8e837a',face:'#2f2b28',shadow:'#1c1a18'},
   bishop:{bevel:'#a09280',face:'#35302a',shadow:'#201d19'},
 };
+/* ── NIGHTS rework consts (brief P1/P2/P3) ── */
+var TURN_CAP_PATRON=8;  /* banked turns per side; bank AND bust both count */
+var TURN_CAP_BOSS=10;
+var NIGHT_BUYINS=[10,15,25,35,50,65,80,100]; /* per-tier seat buy-in, clamped to purse */
 const RUNGS=[
   /* OPPONENT DICE bumped one step above the player's typical loadout at each tier so
      they always feel slightly out-of-reach. The progression: bone→iron→lead→amber
@@ -8547,44 +8585,44 @@ function _dicePrice(mat){
    like a continuous progression instead of a calm patron run + a
    cliff-jump boss. Patron range sits at ~55-80% of the tier boss target. */
 const TIERS=[
-  {id:0,name:'THE DREG',pointsNeeded:3,
+  {id:0,name:'THE DREG',pointsNeeded:2,
     boss:RUNGS[0],/* Grog @ 4000 */
     patronStats:{targetMin:2500,targetMax:3500,aggMin:.50,aggMax:.62,dicePool:['bone'],minBank:150,diceStop:3},
     /* Tier 0/1: tin-only draft so the player commits to tins before
        silvers start showing up. */
     draftPool:['tin'],
     diceWeights:{bone:6}},
-  {id:1,name:'THE HEARTH',pointsNeeded:4,
+  {id:1,name:'THE HEARTH',pointsNeeded:2,
     boss:RUNGS[1],/* Mabel @ 5500 */
     patronStats:{targetMin:3500,targetMax:4500,aggMin:.55,aggMax:.65,dicePool:['bone','bone','bone','iron'],minBank:200,diceStop:2},
     draftPool:['tin'],
     diceWeights:{bone:4,iron:2}},
-  {id:2,name:'THE PIT',pointsNeeded:4,
+  {id:2,name:'THE PIT',pointsNeeded:2,
     boss:RUNGS[2],/* Finnick @ 7500 */
     patronStats:{targetMin:4500,targetMax:6000,aggMin:.58,aggMax:.68,dicePool:['bone','bone','iron','iron','lead'],minBank:250,diceStop:2},
     draftPool:['tin','silver'],
     diceWeights:{bone:3,iron:2,lead:1}},
-  {id:3,name:'THE LEDGER',pointsNeeded:5,
+  {id:3,name:'THE LEDGER',pointsNeeded:3,
     boss:RUNGS[3],/* Corvus @ 10000 */
     patronStats:{targetMin:6500,targetMax:8500,aggMin:.62,aggMax:.72,dicePool:['iron','lead','amber'],minBank:300,diceStop:2},
     draftPool:['tin','silver'],
     diceWeights:{iron:2,lead:2,amber:1,flint:1}},
-  {id:4,name:'THE FORGE',pointsNeeded:5,
+  {id:4,name:'THE FORGE',pointsNeeded:3,
     boss:RUNGS[4],/* Brutus @ 13000 */
     patronStats:{targetMin:8500,targetMax:11000,aggMin:.66,aggMax:.76,dicePool:['lead','flint','amber'],minBank:350,diceStop:2},
     draftPool:['silver','gold'],
     diceWeights:{lead:1,amber:2,jade:2,brass:1}},
-  {id:5,name:'THE COURT',pointsNeeded:6,
+  {id:5,name:'THE COURT',pointsNeeded:3,
     boss:RUNGS[5],/* Aldric @ 17000 */
     patronStats:{targetMin:11000,targetMax:14000,aggMin:.70,aggMax:.80,dicePool:['flint','amber','jade'],minBank:400,diceStop:1},
     draftPool:['silver','gold'],
     diceWeights:{amber:2,jade:2,brass:1,silver:1}},
-  {id:6,name:'THE PARLOUR',pointsNeeded:6,
+  {id:6,name:'THE PARLOUR',pointsNeeded:3,
     boss:RUNGS[6],/* Whisper @ 22000 */
     patronStats:{targetMin:14500,targetMax:18000,aggMin:.74,aggMax:.84,dicePool:['amber','jade','brass'],minBank:450,diceStop:1},
     draftPool:['gold'],
     diceWeights:{jade:2,brass:2,silver:1,crystal:1}},
-  {id:7,name:'THE SANCTUM',pointsNeeded:7,
+  {id:7,name:'THE SANCTUM',pointsNeeded:4,
     boss:RUNGS[7],/* Ambrose @ 28000 */
     patronStats:{targetMin:18500,targetMax:23500,aggMin:.78,aggMax:.88,dicePool:['jade','brass','silver','crystal'],minBank:400,diceStop:1},
     draftPool:['gold'],
@@ -11321,7 +11359,7 @@ function newG(rung,pCards,oCards,pStake,oStake){
   /* Count shield dice in NPC loadout */
   const _oShields=(function(){let c=0;((rung&&rung.dice)||[]).forEach(function(m){var dt=getDie(m);if(dt&&dt.effect&&dt.effect.mechanic==='shield')c++;});return c;})();
   return{rung,pCards,oCards,pStake,oStake,pPts:0,oPts:0,target:rung.target,
-    turnPts:0,numDice:6,phase:'waiting',turnNum:1,pool:[],kept:[],oppDice:[],
+    turnPts:0,numDice:6,phase:'waiting',turnNum:1,pTurns:0,oTurns:0,pool:[],kept:[],oppDice:[],
     martyrUsed:false,flintlockFired:false,safeTurnStreak:0,turnRollCount:0,oppTurnCount:0,
     /* Strategic-path tracking (opener cards): counts dice committed on
        roll 1 of each turn for player/NPC, reset in startPTurn/runOppTurn. */
@@ -11580,7 +11618,9 @@ function updHUD(){
       sdC.style.setProperty('--sd-glow',_sdGlow);
     }
   }else{
-    document.getElementById('turnNum').textContent='TURN '+G.turnNum;
+    var _tcap=G.turnCap||0;
+    if(_tcap&&G.turnNum>_tcap)document.getElementById('turnNum').textContent='OVERTIME';
+    else document.getElementById('turnNum').textContent='TURN '+G.turnNum+(_tcap?'/'+_tcap:'');
   }
   /* ── Handicap: Last Call — pulse target ── */
   if(G._handicap==='last_call'){
@@ -14324,6 +14364,24 @@ function restoreRollButton(){
   setTimeout(function(){btn.style.animation='';},200);
 }
 
+/* P3 cap resolution — runs when the rival hands the turn back, i.e. exactly
+   when both sides have completed the same number of turns. If the cap is
+   reached and nobody crossed the target: higher total wins. Dead even: one
+   more full round, repeating until broken (sudden death). Because the check
+   only fires after the SECOND mover finishes, the trailing side always gets
+   its answer turn — a leader can't stall-bank the clock out mid-round. */
+function _handBackOrCap(){
+  var cap=G.turnCap||TURN_CAP_PATRON;
+  if((G.pTurns||0)>=cap&&(G.oTurns||0)>=cap&&G.pPts<G.target&&G.oPts<G.target){
+    if(G.pPts!==G.oPts){
+      setStatusMsg('THE CAP — '+(G.pPts>G.oPts?'YOU HOLD THE HIGHER TALLY':'THE TABLE TURNS')+'!','gold');
+      setTimeout(function(){endMatch(G.pPts>G.oPts);},_oppDelay(900));
+      return;
+    }
+    setStatusMsg('DEAD EVEN AT THE CAP — ONE MORE ROUND','gold');
+  }
+  flashYourTurn();setTimeout(()=>{setTurnMode(false);startPTurn();},_oppDelay(800));
+}
 function endPTurn(){
   /* Ghost-timer guard (see startPTurn) */
   if(!G||G._endMatchFired)return;
@@ -14338,6 +14396,7 @@ function endPTurn(){
     try{document.querySelectorAll('#playerCards .mcard').forEach(function(el){el.classList.remove('card-sealed');});}catch(e){}
   }
   G.phase='opp';G.turnPts=0;G.kept=[];G.numDice=6;G.turnNum++;
+  G.pTurns=(G.pTurns||0)+1;/* P3: a completed player turn (bank or bust) */
   /* Reset per-turn flags so they re-trigger on the next player turn */
   G.flintlockFired=false;
   /* ── Handicap: Last Call — drop target each turn ── */
@@ -14375,7 +14434,7 @@ function endPTurn(){
      The check lives in finOpp() after opponent banks/busts. */
   setBtns(false,false);updHUD();refreshKeptTray();setTurnMode(true);
   setStatusMsg((G&&G.rung?G.rung.name:'RIVAL')+"'S TURN...",'active');
-  setTimeout(runOppTurn,1050);
+  setTimeout(runOppTurn,_oppDelay(1050));
 }
 /* (Frozen Die reworked to a within-turn hold — the old cross-turn
    persistent-preview helper is gone.) */
@@ -15273,6 +15332,7 @@ function runOppTurn(){
       setStatusMsg(_ln+(pts>0?(' banked '+pts):' busted')+' \u00b7 '+oppRollNum+' roll'+(oppRollNum===1?'':'s'),'');
     }catch(e){}
     if(G!==_matchG||!G||G._endMatchFired)return;/* ghost-timer guard */
+    G.oTurns=(G.oTurns||0)+1;/* P3: a completed rival turn (bank or bust) */
     if(pts>0){
       /* STAKES RISING NPC mirror: surface the +300 seed bonus (already in
          oppBank/pts). Reset the carry-over flag. Mirrors player handleScore
@@ -15690,7 +15750,7 @@ function runOppTurn(){
       setTimeout(function(){clearRow('oppDiceRow');G.oppDice=[];
         if(G.oPts>=G.target){if(window.DLG)DLG.trigger('OPP_WINS');setTimeout(()=>endMatch(false),3000);return;}
         if(G._handicap==='sudden_death'&&G.turnNum>G._suddenDeathTurns){setTimeout(()=>endMatch((G.pPts+(G._tabHeldPlayer||0))>=(G.oPts+(G._tabHeldOpp||0))),700);return;}
-        flashYourTurn();setTimeout(()=>{setTurnMode(false);startPTurn();},_oppDelay(800));
+        _handBackOrCap();
       },_oppDelay(600));return;
     }
     clearRow('oppDiceRow');G.oppDice=[];
@@ -15707,7 +15767,7 @@ function runOppTurn(){
     }
     /* ── NPC end-of-turn disruption via active cards ── */
     _npcEndOfTurnActives();
-    flashYourTurn();setTimeout(()=>{setTurnMode(false);startPTurn();},_oppDelay(800));
+    _handBackOrCap();
   }
 }
 
@@ -15975,6 +16035,9 @@ function endMatch(win){
     var _tier=(S&&S.run&&typeof S.run.tier==='number')?S.run.tier:0;
     _patronGold=15+_tier*10;
     if(isHandicap)_patronGold*=2;
+    /* P2 pot: the seat buy-in returns on a win, folded into one number so
+       the payout reads bigger than the old flat reward (it is). */
+    _patronGold+=((typeof LO!=='undefined'&&LO&&LO.buyIn)?LO.buyIn:0);
     _getS();S.run.gold=(S.run.gold||0)+_patronGold;save();
   }
   /* B3: Corvus In-Arrears refund — beating Corvus refunds every gold piece
@@ -16407,7 +16470,7 @@ function endMatch(win){
   _endScreenData=_bossLossData?{pFinal:G.pPts,oFinal:G.oPts,cardHTML:_bossLossData.cardHTML,dlgHTML:_bossLossData.dlgHTML,isCardLost:true}:null;
 
   /* Store navigation data for handleContinue */
-  G._endRoute={win:win,isBoss:isBoss,isGauntlet:isGauntlet,isHandicap:isHandicap,practice:!!G._practice,pointsEarned:pointsEarned,bossName:G.rung?G.rung.name:'',bossKey:G.rung?G.rung.key:'',_bossLossData:_bossLossData||null};
+  G._endRoute={win:win,isBoss:isBoss,seatIdx:((typeof LO!=='undefined'&&LO&&LO.seatIdx!=null)?LO.seatIdx:null),isGauntlet:isGauntlet,isHandicap:isHandicap,practice:!!G._practice,pointsEarned:pointsEarned,bossName:G.rung?G.rung.name:'',bossKey:G.rung?G.rung.key:'',_bossLossData:_bossLossData||null};
   /* Settle the outcome into S.run NOW (tier/hearts/points/death), not at the
      CONTINUE tap — closing the app on the end screen must not drop a boss
      win or dodge a boss loss. Skipped for practice matches (nothing at stake). */
@@ -16616,6 +16679,9 @@ function _settleEndRoute(route){
     route._prevPts=S.run.points;
     route._earned=route.pointsEarned||1;
     S.run.points+=route._earned;
+    _markSeatResult(route);
+    /* a WIN can still end the night short — last seat, points under */
+    _checkNightFail();
   }else if(!route.win&&route.isBoss){
     /* Boss loss — the boss eats a heart; at 0 the run dies. */
     S.run.coins=Math.max(0,(S.run.coins||0)-1);
@@ -16623,6 +16689,13 @@ function _settleEndRoute(route){
     else route._heartAnim='lose';
   }else if(!route.win&&route.isHandicap){
     S.run.points=Math.max(0,S.run.points-1);
+    _markSeatResult(route);
+    _checkNightFail();
+  }else if(!route.win&&!route.isBoss){
+    /* Plain patron loss — seat + buy-in already spent at launch; the loss
+       stamp is already pessimistically set. Just see if the night is over. */
+    _markSeatResult(route);
+    _checkNightFail();
   }
   save();
   return route;
@@ -18606,6 +18679,8 @@ function initMatchScreen(data){
   if(pCards.includes('the_jinx'))rung._jinx=true;
 
   G=newG(rung,pCards,params.oCards||[],params.pStake,params.oStake);
+  /* P3 turn cap: patron 8 / boss 10 banked turns per side */
+  G.turnCap=params.isBoss?TURN_CAP_BOSS:TURN_CAP_PATRON;
   /* Per-boss background swap — apply boss-{name} modifier class to
      #screen-match so the ::before's background-image picks up that
      boss's custom art. Falls back to match.png if no override. */
@@ -18721,6 +18796,8 @@ function initMatchScreen(data){
   if(params._resumeData){
     var rd=params._resumeData;
     G.pPts=rd.pPts;G.oPts=rd.oPts;G.turnNum=rd.turnNum;G.numDice=rd.numDice;
+    G.pTurns=(typeof rd.pTurns==='number')?rd.pTurns:Math.max(0,(rd.turnNum||1)-1);
+    G.oTurns=(typeof rd.oTurns==='number')?rd.oTurns:Math.max(0,(rd.turnNum||1)-1);
     /* Target was saved but never restored — for generated patrons (and
        handicap-modified targets) the fresh rung can't supply it. */
     if(typeof rd.target==='number'&&rd.target>0)G.target=rd.target;
@@ -20313,6 +20390,10 @@ function _positionBossTally(){
 /* ═══════ TIER SCREEN (replaces gauntlet) ═══════ */
 function initTierScreen(data){
   _getS();
+  if(S.run._died){showScreen('gameover');return;}
+  _ensureNight();
+  if(S.run._lastOrders){delete S.run._lastOrders;save();setTimeout(_showLastOrders,150);}
+  _getS();
   /* Run already ended (e.g. final heart lost via match abandon) — route to
      the death summary instead of showing a tier screen for a dead run. */
   if(S.run&&S.run._died){showScreen('gameover');return;}
@@ -20468,11 +20549,13 @@ function initTierScreen(data){
       if(_bossReady)requestAnimationFrame(function(){drawTierBtn('tierBossBtn');});
     }
   }
-  /* Hide standard/handicap buttons when boss is ready */
+  /* P1: the roster replaces the old standard/handicap buttons. They stay in
+     the DOM (hidden) so legacy canvas wiring keeps its targets. Seats stay
+     playable after the boss unlocks — bounded greed, by design. */
   var tm=document.getElementById('tierMatches');
-  if(tm)tm.style.display=_bossReady?'none':'';
+  if(tm)tm.style.display='none';
   var tmh=document.querySelector('.tier-match-header');
-  if(tmh)tmh.style.display=_bossReady?'none':'';
+  if(tmh)tmh.style.display='none';
   /* THE INNKEEP'S BOOK — wager strip, posted when the boss is challengeable */
   if(typeof _renderInnkeepBook==='function')try{_renderInnkeepBook(tier,_bossReady);}catch(e){}
   /* Handicap offer — LOCKED per tier so the player can't game the system
@@ -20517,6 +20600,8 @@ function initTierScreen(data){
       if(hb)hb.style.display='none';
     }
   }
+  /* P1 seat roster */
+  _renderNightRoster();
   /* Loadout preview */
   _renderTierLoadout();
   /* Draw tier button canvases after layout is ready */
@@ -21151,15 +21236,114 @@ function _renderBossLoadout(tier){
   }
 }
 
-function launchPatronMatch(isHandicap){
-  _getS();
-  var tier=TIERS[S.run.tier]||TIERS[0];
-  var patron=generatePatron(S.run.tier);
-  var pCards=(S.run.cards||[]).filter(function(c){return !!c;});
+/* ══ P1 THE NIGHT: finite seat roster per tier ══
+   Each tier is one night at the tavern. The roster is generated ONCE per
+   night (pointsNeeded+2 seats, +1 with the House Favourite perk) and
+   persisted, so restarting the app can't reroll opponents. The ONLY paths
+   that refill seats are night-fail (costs a heart) and beating the boss
+   (new tier) — grinding patrons forever is gone by construction. */
+var _PERSONA_WORDS={ones:'PENNY-WISE',hoard:'HOARDER',aggro:'RECKLESS',triples:'GAMBLER',straights:'RUNNER',combo:'SCHEMER'};
+function _nightSeats(){
+  var t=TIERS[S.run.tier]||TIERS[0];
+  return t.pointsNeeded+2+((S.renownPerks&&S.renownPerks.extraSeat)?1:0);
+}
+function _ensureNight(){
+  if(S.run.night&&S.run.night.tier===S.run.tier&&Array.isArray(S.run.night.roster)&&S.run.night.roster.length)return;
+  var n=_nightSeats(),roster=[];
+  for(var i=0;i<n;i++)roster.push(generatePatron(S.run.tier));
+  S.run.night={tier:S.run.tier,roster:roster,
+    seatsPlayed:roster.map(function(){return false;}),
+    results:roster.map(function(){return null;}),
+    handicapSeat:Math.floor(Math.random()*n)};
+  save();
+}
+function _markSeatResult(route){
+  if(route.seatIdx==null)return;
+  var n=S.run.night;
+  if(!n||n.tier!==S.run.tier||!n.results||route.seatIdx>=n.results.length)return;
+  n.results[route.seatIdx]=route.win?'won':'lost';
+}
+function _checkNightFail(){
+  /* All seats spent and still short of the boss: the night fails. One heart
+     pays for it (same lifeline as a boss loss), the roster re-rolls, points
+     reset. Runs inside the crash-safe settle path so a force-close can't
+     dodge it. */
+  var n=S&&S.run&&S.run.night;if(!n||n.tier!==S.run.tier)return;
+  var t=TIERS[S.run.tier]||TIERS[0];
+  if(S.run.points>=t.pointsNeeded)return;
+  if(!n.seatsPlayed.length)return;
+  for(var i=0;i<n.seatsPlayed.length;i++)if(!n.seatsPlayed[i])return;
+  S.run.coins=Math.max(0,(S.run.coins||0)-1);
+  if(S.run.coins<=0)S.run._died=true;
+  S.run.points=0;S.run.night=null;S.run._lastOrders=true;
+}
+function _showLastOrders(){
+  /* Must be impossible to misread: full-screen, one idea, tap to continue. */
+  var ov=document.createElement('div');
+  ov.className='handicap-splash';ov.style.pointerEvents='auto';ov.style.cursor='pointer';
+  ov.style.setProperty('--hs-color','#c05050');
+  ov.innerHTML='<div class="hs-bg"></div><div class="hs-icon">\ud83d\udd6f\ufe0f</div>'
+    +'<div class="hs-name">LAST ORDERS</div>'
+    +'<div class="hs-desc">The night ran out before you earned the boss\'s table. The innkeep takes a heart for the lodging.</div>'
+    +'<div class="hs-desc" style="margin-top:12px;color:#e88a92">\u22121 \u2764\ufe0f &nbsp;\u00b7&nbsp; POINTS RESET &nbsp;\u00b7&nbsp; A NEW CROWD ROLLS IN</div>';
+  document.body.appendChild(ov);
+  var _done=false;
+  ov.addEventListener('pointerdown',function(){
+    if(_done)return;_done=true;
+    ov.classList.add('hs-out');
+    setTimeout(function(){ov.remove();if(S.run._died)showScreen('gameover');else showScreen('gauntlet');},450);
+  });
+}
+function _renderNightRoster(){
+  var tm=document.getElementById('tierMatches');if(!tm)return;
+  var host=document.getElementById('nightRoster');
+  if(!host){host=document.createElement('div');host.id='nightRoster';tm.parentNode.insertBefore(host,tm.nextSibling);}
+  var n=S.run.night;
+  if(!n){host.innerHTML='';return;}
+  var reward=15+(S.run.tier||0)*10;
+  var buy=NIGHT_BUYINS[S.run.tier]||0;
+  var offer=(S.run.handicapOffer&&S.run._handicapTier===S.run.tier&&typeof HANDICAPS!=='undefined')
+    ?HANDICAPS.find(function(h){return h.id===S.run.handicapOffer;}):null;
+  var open=0;n.seatsPlayed.forEach(function(b){if(!b)open++;});
+  var html='<div class="nr-head">TONIGHT\'S TABLES<span class="nr-sub">'+open+' SEAT'+(open===1?'':'S')+' OPEN</span></div>';
+  n.roster.forEach(function(pat,i){
+    var spent=n.seatsPlayed[i],res=n.results[i];
+    var isHc=(i===n.handicapSeat)&&!!offer;
+    html+='<div class="seat-row'+(spent?' spent':'')+(isHc?' hc':'')+'"'
+      +(spent?'':' onclick="launchSeat('+i+')"')
+      +(isHc?' style="--hc-color:'+((offer&&offer.color)||'#c0a050')+'"':'')+'>'
+      +'<div class="seat-main"><span class="seat-name">'+(_PERSONA_WORDS[pat.persona]||'PATRON')+'</span>'
+      +'<span class="seat-dice">'+(pat.dice||[]).map(function(m){return '<span class="seat-die dtype-'+m+'"></span>';}).join('')+'</span></div>'
+      +'<div class="seat-meta"><span>TARGET <b>'+(pat.target||0).toLocaleString()+'</b></span>'
+      +'<span>BUY-IN <b>'+buy+'g</b></span>'
+      +'<span>WIN <b>+'+(isHc?reward*2:reward)+'g</b></span></div>'
+      +(isHc?'<div class="seat-hc">'+offer.icon+' '+offer.name+' \u2014 2 PTS \u00b7 DOUBLE GOLD</div>':'')
+      +(spent?'<div class="seat-stamp '+(res==='won'?'won':'lost')+'">'+(res==='won'?'WON':'LOST')+'</div>':'')
+      +'</div>';
+  });
+  host.innerHTML=html;
+}
+function launchSeat(seatIdx){
+  _getS();_ensureNight();
+  var night=S.run.night;
+  if(!night||seatIdx<0||seatIdx>=night.roster.length)return;
+  if(night.seatsPlayed[seatIdx])return;/* seat already spent */
+  /* clone — handicap target mutations must never touch the persisted roster */
+  var patron=JSON.parse(JSON.stringify(night.roster[seatIdx]));
+  var isHandicap=(seatIdx===night.handicapSeat)&&!!S.run.handicapOffer&&S.run._handicapTier===S.run.tier;
   var handicap=isHandicap?S.run.handicapOffer:null;
-  /* Patron cards from tier scaling */
+  /* P2 buy-in: clamped to the purse (a player with 3g pays 3g — being broke
+     is already the punishment, never soft-lock a seat). Deduct + mark the
+     seat spent ATOMICALLY before the match starts so a force-close can
+     neither refund the stake nor un-spend the seat. Result is pessimistic
+     'lost' until the settle flips it — abandoning keeps the loss. */
+  var buy=Math.min((S.run.gold||0),(NIGHT_BUYINS[S.run.tier]||0));
+  S.run.gold=(S.run.gold||0)-buy;
+  night.seatsPlayed[seatIdx]=true;
+  night.results[seatIdx]='lost';
+  save();
+  var pCards=(S.run.cards||[]).filter(function(c){return !!c;});
   var oCards=generateOppCards(patron);
-  /* Apply handicap modifiers at launch */
   if(handicap==='last_call')patron.target=Math.floor(patron.target*1.5);
   if(handicap==='sudden_death')patron.target=999999;
   /* Rising Stakes: target +80% so the streak multiplier matters — without
@@ -21167,13 +21351,11 @@ function launchPatronMatch(isHandicap){
      multiplier ever kicks in, defeating the strategic point of the mode. */
   if(handicap==='rising_stakes')patron.target=Math.floor(patron.target*1.8);
   if(handicap==='mirror_match'){
-    /* Swap cards */
     var _tmpC=pCards;pCards=oCards;oCards=_tmpC;
-    /* Swap dice */
     var _tmpD=[...((S.run&&S.run.dice)||_boneDice)];
     var _pDice=patron.dice||_boneDice;
-    patron._mirrorPlayerDice=_pDice;/* patron keeps player's original dice */
-    patron._mirrorOppDice=_tmpD;/* player gets patron's dice */
+    patron._mirrorPlayerDice=_pDice;
+    patron._mirrorOppDice=_tmpD;
   }
   SFX.nav();
   setTimeout(function(){
@@ -21181,11 +21363,18 @@ function launchPatronMatch(isHandicap){
       rung:patron,
       pCards:pCards,
       oCards:oCards,
-      pStake:[],oStake:null,buyIn:0,effectiveWager:false,
+      pStake:[],oStake:null,buyIn:buy,effectiveWager:false,
       isBoss:false,isGauntlet:false,
-      handicap:handicap
+      handicap:handicap,
+      seatIdx:seatIdx
     });
   },80);
+}
+/* legacy entry (debug paths) — delegates to the first open seat */
+function launchPatronMatch(isHandicap){
+  _getS();_ensureNight();
+  var n=S.run.night;
+  for(var i=0;i<n.seatsPlayed.length;i++)if(!n.seatsPlayed[i])return launchSeat(i);
 }
 
 function launchBossMatch(){
