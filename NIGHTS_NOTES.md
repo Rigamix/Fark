@@ -46,8 +46,34 @@ Brief: FARK_LOOP_BRIEF.md (P1..P9). Status:
     seats still playable, cap unit tests (ahead/behind/tie/under-cap), legacy
     170-renown save => extraSeat granted + 5-seat roster + points kept, abandon
     mid-seat => no refund, seat stays spent, no heart.
+- UI ADDENDUM pass 1 (FARK_UI_ADDENDUM.md, build order steps 1-4): DONE rough
+  (structure + copy; painted assets come later from Denis).
+  - The chalkboard replaces ALL numeric progression: "[BOSS] PLAYS WINNERS" +
+    pointsNeeded circles in #tierCoins; wins chalk a face (chalk-in animation
+    on return via the existing coinAnim hook); handicap's 2nd circle takes a
+    crown; full board -> "[BOSS] WILL PLAY YOU NOW" + boss button .lit glow.
+    _chalkMeta bookkeeping wherever points move (win push / handicap-loss pop /
+    resets), migration rebuilds from points.
+  - GONE HOME frames: spent patrons empty to stool + handwritten "gone home"
+    (win or lose, same visual). No stamps, no counters. Room copy scrubbed of
+    system words (TONIGHT'S CROWD header, parchment stake tag, purple wax seal
+    on the handicap seat).
+  - Peek card: frame tap -> bottom sheet (trait, dice chips, TARGET/STAKE/POT,
+    handicap note, SIT DOWN). Second tap on the peeked patron sits immediately.
+  - Defeat overlay: per-persona EXIT_LINES parchment quote, stake slides off
+    as a red -Xg tag, button reads BACK TO THE ROOM (CONTINUE elsewhere).
+  - LAST ORDERS locked: heart visibly breaking of three, "The room empties.
+    A new crowd tomorrow.", NEXT NIGHT button (no tap-anywhere).
+  - Hearts reframe: game over title is BARRED (innkeep portrait already there).
+  - Victory: draft decline reads SKIP +Xg; pot already a single number (M2).
+  - Match: POT tag ON the table (rough parchment tag over .dice-area until the
+    coin-pile sprite exists).
 - M3 next: retune targets/buy-ins/dice prices via sim acceptance (60-70% patron,
   45-55% boss, 5-7 median turns at intended gear).
+- UI addendum remaining: step 5 room/store reskin (painted plates + portrait
+  sprites + innkeep-at-the-bar as shop/book tap target) once assets land;
+  patron NAMES (frames expect names — needs species/portrait direction);
+  heraldic card art direction supersedes the pixel deck eventually.
 - M3: retune targets/buy-ins/dice prices via sim acceptance (60-70% patron,
   45-55% boss, 5-7 median turns at intended gear).
 
