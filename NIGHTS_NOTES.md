@@ -116,3 +116,41 @@ Findings:
    the M3 pass; brief's "compress the top" holds.
 4. Bone-dice T7 reality check: 5% win over 23-median-turn matches — the 4-hour
    run diagnosis, quantified.
+
+## Room v2 — concept-board grammar (2026-07-03, Denis's five boards)
+
+Denis supplied five concept boards (crowd/roster/victory/store/last-orders)
+that SUPERSEDE the night_card_tally mockup skin for the NIGHTS screens. The
+shared grammar, now live on the Room:
+
+- Hanging wooden sign = screen title (Night_Art/ui_sign_hang.png, blank
+  center, text overlaid in HTML .room-sign .rs-txt).
+- Patrons = busts inside carved chained frames (ui_frame_port.png; bust
+  clipped by .sf-hole at 14%/24.5%/13.5% insets), parchment stake tag
+  pinned to frame bottom, parchment name plate + mini dice row below.
+- GONE HOME = ui_frame_gone.png (chair-shadow interior) + faded plate;
+  a diagonal WON stamp (.sf-stamp) when that seat's match was won.
+  (Concept boards override the earlier "no stamps" addendum note.)
+- The boss = black silhouette with red eyes by the hearth
+  (char_boss_shadow.png, .boss-shadow, breathing anim). Tap = scout sheet
+  (openBossPeek: framed bust, name, ledger record, tell, SIT DOWN when
+  ready / "beat N more of the crowd" when locked).
+- Marks plaque (ui_plaque_marks.png, 520x209) = the ONE action; hidden
+  until chalk is full, then appears lit + pulsing in the hearth row
+  ("GROG WAITS", tap -> launchBossMatch). Progress itself lives on the
+  chalkboard alone — one voice.
+- Plate v2 (plate_room2.png): teal window left, hearth right, empty
+  center wall for the frames. Innkeep (THE BAR -> store) bottom-left.
+- Legacy tier chrome (portrait/name/tell/loadout strips/nav SHOP/boss
+  plank) hidden via #screen-gauntlet CSS; nodes stay so initTierScreen
+  keeps its targets. Loadout strip left the Room by design — kit lives
+  at the bar/store.
+
+Asset pipeline note: magenta-bg generations need `colorkey=0xFF00FF:0.30`
+BEFORE trim/palette or chains keep pink fringe (remove_background alone
+leaves AA edge + enclosed holes).
+
+NEXT (same grammar, waiting on review): Victory (wordmark + pot + card
+fan), Dice Store (counter scene + shelf stands + SOLD tags), Last Orders
+(night-blue closing plate), Night Roster variant (dice-pool plaque strips
++ trait stamps + occupation names).
