@@ -375,9 +375,9 @@ body{
   font-family:var(--font-px);font-size:20px;letter-spacing:5px;text-align:center;
   color:#ece8de;border:3px solid #ece8de;border-radius:3px;padding:5px 0;opacity:.9}
 /* hearth row: the board does the counting, the boss does the waiting */
-.hearth-row{width:100%;max-width:330px;display:flex;align-items:flex-end;
-  justify-content:space-between;margin:6px auto 0;position:relative;z-index:1}
-#roomChalk .chalkboard{margin:0;width:148px}
+.hearth-row{width:100%;max-width:344px;display:flex;align-items:flex-end;
+  justify-content:space-between;margin:6px auto 0;padding-left:72px;position:relative;z-index:1}
+#roomChalk .chalkboard{margin:0;width:140px}
 .boss-shadow{width:100px;flex:0 0 auto;cursor:pointer;margin-bottom:-2px;transition:transform .07s}
 .boss-shadow:active{transform:scale(.96)}
 .boss-shadow img{width:100%;display:block;image-rendering:pixelated;
@@ -21606,6 +21606,13 @@ function openBossPeek(){
   document.getElementById('peekScrim').classList.add('on');
   sh.classList.add('on');
 }
+var _PERSONA_JOBS={ones:['PEDDLER','SCRIBE','LAMPLIGHTER'],hoard:['PAWNBROKER','MISER','RAG-MERCHANT'],
+  aggro:['SELLSWORD','POACHER','BRAWLER'],triples:['CARDSHARP','DICER','TRICKSTER'],
+  straights:['COURIER','SMUGGLER','PILGRIM'],combo:['BROKER','SPY','ALMONER']};
+function _seatJob(persona,i){
+  var pool=_PERSONA_JOBS[persona]||['PATRON'];
+  return pool[(i+(S.run&&S.run.tier||0))%pool.length];
+}
 function _renderNightRoster(){
   var tm=document.getElementById('tierMatches');if(!tm)return;
   var host=document.getElementById('nightRoster');
@@ -21617,9 +21624,12 @@ function _renderNightRoster(){
   var offer=(S.run.handicapOffer&&S.run._handicapTier===S.run.tier&&typeof HANDICAPS!=='undefined')
     ?HANDICAPS.find(function(h){return h.id===S.run.handicapOffer;}):null;
   var open=0;n.seatsPlayed.forEach(function(b){if(!b)open++;});
+  var _seen={};
   var html='';
   n.roster.forEach(function(pat,i){
     var spent=n.seatsPlayed[i];
+    _seen[pat.persona]=(_seen[pat.persona]||0);
+    if(!spent)_seen[pat.persona]++;
     var isHc=(i===n.handicapSeat)&&!!offer;
     if(spent){
       /* addendum: a played patron GOES HOME — win or lose, same visual. The
@@ -21633,11 +21643,11 @@ function _renderNightRoster(){
     }
     html+='<div class="seat-frame" onclick="openPeek('+i+')"><span class="sf-wrap">'
       +'<img class="sf-art" src="Night_Art/ui_frame_port.png" alt="">'
-      +'<span class="sf-hole"><img class="seat-port" src="Night_Art/char_patron_'+(pat.persona||'aggro')+'.png" alt="" onerror="this.style.display=\'none\'"></span>'
+      +'<span class="sf-hole"><img class="seat-port" src="Night_Art/char_patron_'+(pat.persona||'aggro')+'.png" alt="" style="'+(_seen[pat.persona]%2===0?'transform:scaleX(-1)':'')+'" onerror="this.style.display=\'none\'"></span>'
       +(isHc?'<img class="seat-seal" src="Night_Art/obj_seal.png" alt="" onerror="this.style.display=\'none\'">':'')
       +'<span class="seat-stake"><span class="coin-i" style="width:10px;height:10px"></span>'+buy+'g</span>'
       +'</span>'
-      +'<span class="seat-name">'+(_PERSONA_WORDS[pat.persona]||'PATRON')+'</span>'
+      +'<span class="seat-name">'+_seatJob(pat.persona,(_seen[pat.persona]||1)-1)+'</span>'
       +'<span class="seat-dice">'+(pat.dice||[]).map(function(m){return '<span class="seat-die dtype-'+m+'"></span>';}).join('')+'</span>'
       +'</div>';
   });
