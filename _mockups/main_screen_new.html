@@ -13,67 +13,64 @@
 @font-face{font-family:'Old Englished Boots';src:url('new_main/Old_Englished_Boots.ttf') format('truetype')}
 @font-face{font-family:'Black Castle';src:url('new_main/BlackCastleMF.ttf') format('truetype')}
 @font-face{font-family:'Gothica';src:url('new_main/gothica class 2.ttf') format('truetype')}
-
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%;background:#0a0806;overflow:hidden}
 body{display:flex;align-items:center;justify-content:center}
 
 /* ── the stage: a 9:16 canvas, everything positioned in % of it ── */
-#stage{position:relative;height:100vh;aspect-ratio:9/16;max-width:100vw;overflow:hidden;background:#0a0806;--u:1vh;--bodyFont:'Schwabacher',serif}
+#stage{position:relative;height:100vh;aspect-ratio:9/16;max-width:100vw;overflow:hidden;
+  background:#0a0806;--u:1vh;--bodyFont:'Schwabacher',serif}
 #stage>img.env{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;pointer-events:none}
+#bgL{z-index:0}
+#fgL{z-index:1}  /* the boss + his table live in this layer */
 
-/* scene sandwich: bg → grog → table-front → frames → foreground → chips */
-#grog{position:absolute;left:6%;top:18.4%;width:66%;z-index:2;pointer-events:none;
-  transform:scaleX(-1);filter:drop-shadow(0 10px 24px rgba(0,0,0,.45))}
-#tableL{z-index:3}
-#fgL{z-index:6;transform:translateY(4%) scale(1.04)}
+/* ── patron cards: separated layers with per-layer parallax.
+   The outer .card owns position + static z-rotation + the entry wave;
+   .cwrap layers consume --wx/--wy (driven by JS) scaled by --f so the
+   chrome leads and the backdrop lags — a little depth per card. ── */
+.card{position:absolute;width:24.5%;aspect-ratio:443/802;z-index:3;cursor:pointer;
+  transform:rotate(var(--rot,0deg));transition:filter .12s}
+.card:active{filter:brightness(1.12)}
+.card.enter{animation:cardIn .85s cubic-bezier(.26,1.25,.42,1) var(--d,0s) both}
+@keyframes cardIn{
+  0%{transform:translateY(115%) rotate(var(--rot,0deg))}
+  62%{transform:translateY(-3.2%) rotate(var(--rot,0deg))}
+  82%{transform:translateY(1.4%) rotate(var(--rot,0deg))}
+  100%{transform:translateY(0) rotate(var(--rot,0deg))}}
+.card .ly{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;
+  pointer-events:none;transform:translate(calc(var(--wx,0px)*var(--f)),calc(var(--wy,0px)*var(--f)))}
+.card .lbg{--f:.35}
+.card .lback{--f:.5}
+.card .lwho{--f:.75}
+.card .lffg{--f:1.1;filter:drop-shadow(0 8px 14px rgba(0,0,0,.5))}
+.card .cname{position:absolute;left:12%;right:12%;top:63.5%;height:11%;
+  display:flex;align-items:center;justify-content:center;pointer-events:none;
+  font-family:var(--bodyFont);font-size:calc(var(--u)*2.4);color:#3a2712;letter-spacing:.5px;
+  transform:translate(calc(var(--wx,0px)*1.1),calc(var(--wy,0px)*1.1))}
+.card .cprice{position:absolute;left:34%;top:76.5%;height:9%;display:flex;align-items:center;
+  pointer-events:none;font-family:var(--bodyFont);font-size:calc(var(--u)*2.5);color:#2e1c0b;
+  transform:translate(calc(var(--wx,0px)*1.1),calc(var(--wy,0px)*1.1))}
+.card .cseal{position:absolute;right:7%;top:74%;width:27%;pointer-events:none;
+  filter:drop-shadow(0 3px 5px rgba(0,0,0,.4));
+  transform:translate(calc(var(--wx,0px)*1.15),calc(var(--wy,0px)*1.15)) rotate(6deg)}
+.c1{left:2.2%;top:61.8%;--rot:-3.5deg;--d:.05s}
+.c2{left:26.6%;top:62.9%;--rot:-1deg;--d:.16s}
+.c3{left:50.8%;top:62.3%;--rot:1.4deg;--d:.27s}
+.c4{left:74.8%;top:63.3%;--rot:3.6deg;--d:.38s}
+@media (prefers-reduced-motion:reduce){.card.enter{animation:none}}
 
-/* ── patron frames (2×2) ── */
-.pframe{position:absolute;width:37.5%;aspect-ratio:2290/2462;z-index:5;cursor:pointer;
-  transition:transform .09s;transform:rotate(var(--rot,0deg))}
-.pframe:active{transform:rotate(var(--rot,0deg)) scale(.975)}
-.pframe .sway{position:absolute;inset:0;transform-origin:50% -2%;
-  animation:frameBob var(--swayT,6.5s) ease-in-out var(--swayD,0s) infinite}
-@keyframes frameBob{
-  0%,100%{transform:translate(0,0)}
-  30%{transform:translate(.4%,-1.3%)}
-  60%{transform:translate(-.35%,1%)}
-  82%{transform:translate(.25%,-.45%)}}
-.pframe img{position:absolute;display:block;pointer-events:none}
-.pframe .who{inset:0;width:100%;height:100%;object-fit:contain}
-.pframe .fr{inset:0;width:100%;height:100%;object-fit:contain;
-  filter:drop-shadow(0 10px 18px rgba(0,0,0,.55))}
-/* the price tag hangs off the left-post hook */
-.tagwrap{position:absolute;left:-9.4%;top:44.5%;width:26.5%;aspect-ratio:560/1041;
-  transform-origin:52% 0;
-  animation:tagSwing var(--tagT,3.8s) ease-in-out var(--tagD,0s) infinite alternate}
-@keyframes tagSwing{from{transform:rotate(calc(var(--trot,-3deg) - 3.4deg))}
-  to{transform:rotate(calc(var(--trot,-3deg) + 3.4deg))}}
-.tagwrap img{width:100%;filter:drop-shadow(0 6px 10px rgba(0,0,0,.5))}
-.tagwrap .tagtxt{position:absolute;left:10%;right:10%;top:32%;bottom:4%;
-  display:flex;align-items:center;justify-content:center;
-  font-family:var(--bodyFont);font-size:calc(var(--u)*2.1);color:#4a3115;pointer-events:none}
-@media (prefers-reduced-motion:reduce){.pframe .sway,.tagwrap{animation:none}}
-/* name strip (baked into the frame art, text overlays it) */
-.pframe .strap{position:absolute;left:14%;right:14%;bottom:4%;height:12%;display:flex;
-  align-items:center;justify-content:center;pointer-events:none;
-  font-family:var(--bodyFont);font-size:calc(var(--u)*2.2);color:#4a3115;letter-spacing:.5px}
-.f1{left:9.5%;top:44.2%;--rot:-1.1deg;--swayT:4.6s;--swayD:-2.1s;--tagT:2.9s;--tagD:-1.2s;--trot:-3deg}
-.f2{left:53%;top:45.4%;--rot:.9deg;--swayT:5.4s;--swayD:-3.4s;--tagT:3.3s;--tagD:-2.2s;--trot:-2deg}
-.f3{left:10.3%;top:67.6%;--rot:-.6deg;--swayT:4.2s;--swayD:-1.3s;--tagT:3.1s;--tagD:-.5s;--trot:-4deg}
-.f4{left:53.4%;top:68.4%;width:36.2%;aspect-ratio:2131/2393;--rot:1.2deg;--swayT:5.1s;--swayD:-3.2s}
+/* ── top chips (kept from the previous version) ── */
+#hearts{position:absolute;left:3.6%;top:1.8%;z-index:8;display:flex;gap:3.5%;width:27%}
+#hearts img{width:30%;filter:drop-shadow(0 3px 5px rgba(0,0,0,.55))}
+#goldplate{position:absolute;right:3.2%;top:1.8%;width:27.5%;z-index:8}
+#goldplate .pl{width:100%;display:block;filter:drop-shadow(0 3px 6px rgba(0,0,0,.55))}
+#goldplate .co{position:absolute;left:6.5%;top:50%;width:17.5%;transform:translateY(-50%);
+  filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))}
+#goldplate .amt{position:absolute;left:26%;right:8%;top:0;bottom:0;display:flex;align-items:center;justify-content:center;
+  font-family:var(--bodyFont);font-size:calc(var(--u)*2.8);color:#f3dfa6;letter-spacing:1px;
+  text-shadow:0 2px 3px rgba(0,0,0,.7)}
 
-/* ── the blackboard behind the boss: chalk line + marks that fill on wins ── */
-#chalk{position:absolute;left:53%;top:11.5%;width:42%;z-index:1;transform:rotate(-1.6deg);
-  font-family:'Chalk Paint',cursive;color:rgba(198,226,204,.5);pointer-events:none;text-align:center}
-#chalk .ck-line{font-size:calc(var(--u)*3.7);line-height:1.1}
-#chalk .ck-marks{display:flex;gap:10%;margin-top:4%;justify-content:center}
-#chalk .ck-o{position:relative;font-size:calc(var(--u)*4.2);line-height:1}
-#chalk .ck-o .ck-x{position:absolute;left:6%;top:0;font-size:92%;color:rgba(198,226,204,.57)}
-
-/* ── patron panel: slides up over the room. Text carved into the wood
-   (dark fill, light catch under each stroke); values + the action read as
-   PAINTED ink instead — not everything engraved. ── */
+/* ── patron panel (unchanged bones): engraved labels, painted values ── */
 #scrim{position:absolute;inset:0;background:rgba(6,4,2,.5);opacity:0;pointer-events:none;
   transition:opacity .28s;z-index:9}
 #scrim.on{opacity:1;pointer-events:auto}
@@ -88,9 +85,12 @@ body{display:flex;align-items:center;justify-content:center}
 .engr{font-family:var(--bodyFont);color:#5b3a15;
   text-shadow:0 1px 0 rgba(255,242,205,.55),0 -1px 1px rgba(52,30,9,.4)}
 .ink{font-family:var(--bodyFont);color:#2e1c0b}
-#pnPort{width:52%;margin-top:1%;border:2px solid rgba(90,58,26,.55);border-radius:4px;
+#pnPortWrap{position:relative;width:50%;aspect-ratio:1/1;margin-top:1%;overflow:hidden;
+  border:2px solid rgba(90,58,26,.55);border-radius:4px;
   box-shadow:inset 0 0 12px rgba(0,0,0,.25),0 4px 8px rgba(60,35,10,.25)}
-#pnName{margin-top:3.5%;font-family:'Deutsch Gothic',serif;font-size:calc(var(--u)*3);letter-spacing:1px}
+#pnPortWrap img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:top}
+#pnName{margin-top:3.5%;font-family:'Deutsch Gothic',serif;font-size:calc(var(--u)*3);letter-spacing:1px;color:#5b3a15;
+  text-shadow:0 1px 0 rgba(255,242,205,.55),0 -1px 1px rgba(52,30,9,.4)}
 #pnTraitRow{display:flex;align-items:center;gap:6%;margin-top:2.5%}
 #pnTraitRow img{width:calc(var(--u)*4.2);filter:drop-shadow(0 2px 2px rgba(60,35,10,.35))}
 #pnTrait{font-size:calc(var(--u)*1.9)}
@@ -117,76 +117,28 @@ body{display:flex;align-items:center;justify-content:center}
   font-family:var(--bodyFont);font-size:calc(var(--u)*1.7);color:rgba(240,224,190,.85);
   background:rgba(12,8,5,.62);border:1px solid rgba(160,130,90,.4);border-radius:5px;
   padding:.6% 1.6%;user-select:none}
-/* ── top chips ── */
-#hearts{position:absolute;left:3.6%;top:1.8%;z-index:8;display:flex;gap:3.5%;width:27%}
-#hearts img{width:30%;filter:drop-shadow(0 3px 5px rgba(0,0,0,.55))}
-#goldplate{position:absolute;right:3.2%;top:1.8%;width:27.5%;z-index:8}
-#goldplate .pl{width:100%;display:block;filter:drop-shadow(0 3px 6px rgba(0,0,0,.55))}
-#goldplate .co{position:absolute;left:6.5%;top:50%;width:17.5%;transform:translateY(-50%);
-  filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))}
-#goldplate .amt{position:absolute;left:26%;right:8%;top:0;bottom:0;display:flex;align-items:center;justify-content:center;
-  font-family:var(--bodyFont);font-size:calc(var(--u)*2.8);color:#f3dfa6;letter-spacing:1px;
-  text-shadow:0 2px 3px rgba(0,0,0,.7)}
 </style>
 </head>
 <body>
 <div id="stage">
-  <img class="env" id="bgL" src="new_main/bg.png" alt="">
-  <img id="grog" src="new_main/grog.png" alt="">
-  <div id="chalk">
-    <div class="ck-line">Grog is<br>waiting...</div>
-    <div class="ck-marks">
-      <span class="ck-o">O<span class="ck-x">X</span></span>
-      <span class="ck-o">O</span>
-      <span class="ck-o">O</span>
-    </div>
-  </div>
-  <img class="env" id="tableL" src="new_main/table.png" alt="">
+  <img class="env" id="bgL" src="new_main/bg3.png" alt="">
+  <img class="env" id="fgL" src="new_main/fg3.png" alt="">
 
-  <!-- four seats: three patrons in, one gone home -->
-  <div class="pframe f1">
-    <div class="sway">
-      <img class="who" src="new_main/patron_hog.png" alt="">
-      <img class="fr" src="new_main/frame_v1.png" alt="">
-      <div class="tagwrap"><img src="new_main/tag.png" alt=""><span class="tagtxt"></span></div>
-      <span class="strap"></span>
-    </div>
-  </div>
-  <div class="pframe f2">
-    <div class="sway">
-      <img class="who" src="new_main/patron_toucan.png" alt="">
-      <img class="fr" src="new_main/frame_v2.png" alt="">
-      <div class="tagwrap"><img src="new_main/tag.png" alt=""><span class="tagtxt"></span></div>
-      <span class="strap"></span>
-    </div>
-  </div>
-  <div class="pframe f3">
-    <div class="sway">
-      <img class="who" src="new_main/patron_lizard.png" alt="">
-      <img class="fr" src="new_main/frame_v2.png" alt="">
-      <div class="tagwrap"><img src="new_main/tag.png" alt=""><span class="tagtxt"></span></div>
-      <span class="strap"></span>
-    </div>
-  </div>
-  <div class="pframe f4">
-    <div class="sway"><img class="fr" src="new_main/frame_gone.png" alt=""></div>
-  </div>
-
-  <img class="env" id="fgL" src="new_main/fg.png" alt="">
+  <div id="cards"></div>
 
   <!-- patron panel -->
   <div id="scrim" onclick="closePanel()"></div>
   <div id="panel">
     <img class="bgimg" src="new_main/panel_main.png" alt="">
     <div class="in">
-      <img id="pnPort" src="new_main/patron_hog.png" alt="">
-      <div id="pnName" class="engr">Bristletusk</div>
-      <div id="pnTraitRow"><img id="pnTraitIcon" src="new_main/trait_strong.png" alt=""><span id="pnTrait" class="engr">STRONG</span></div>
+      <div id="pnPortWrap"><img id="pnPortBg" src="new_main/card_green_bg.png" alt=""><img id="pnPort" src="new_main/who_krox.png" alt=""></div>
+      <div id="pnName">Krox</div>
+      <div id="pnTraitRow"><img id="pnTraitIcon" src="new_main/Strong_green.png" alt=""><span id="pnTrait" class="engr">STRONG</span></div>
       <div id="pnDice"></div>
       <div id="pnStats">
         <div class="st"><span class="lb engr">TARGET</span><span class="vl ink" id="pnTarget">3,000</span></div>
-        <div class="st"><span class="lb engr">STAKE</span><span class="vl ink" id="pnStake"><img src="new_main/coin.png" alt="">10g</span></div>
-        <div class="st"><span class="lb engr">POT</span><span class="vl ink" id="pnPot"><img src="new_main/coin.png" alt="">+40g</span></div>
+        <div class="st"><span class="lb engr">STAKE</span><span class="vl ink" id="pnStake"></span></div>
+        <div class="st"><span class="lb engr">POT</span><span class="vl ink" id="pnPot"></span></div>
       </div>
       <div id="pnSit" onclick="closePanel()">SIT DOWN</div>
     </div>
@@ -196,33 +148,98 @@ body{display:flex;align-items:center;justify-content:center}
   <div id="hearts">
     <img src="new_main/heart_full.png" alt=""><img src="new_main/heart_full.png" alt=""><img src="new_main/heart_full.png" alt="">
   </div>
-  <div id="fontChip" onclick="cycleFont()">Aa</div>
   <div id="goldplate">
     <img class="pl" src="new_main/plate_goldCounter.png" alt="">
     <img class="co" src="new_main/coin.png" alt="">
     <div class="amt">120g</div>
   </div>
+  <div id="fontChip" onclick="cycleFont()">Aa</div>
 </div>
+
 <script>
-var PATRONS={
-  hog:{name:'Bristletusk',trait:'STRONG',icon:'trait_strong',dice:6,target:'3,000',stake:'10g',pot:'+40g',img:'patron_hog'},
-  toucan:{name:'Longbill',trait:'CUNNING',icon:'trait_cunning',dice:6,target:'2,600',stake:'15g',pot:'+55g',img:'patron_toucan'},
-  lizard:{name:'Slyscale',trait:'GREEDY',icon:'trait_greedy',dice:7,target:'3,400',stake:'20g',pot:'+70g',img:'patron_lizard'}
-};
-function openPanel(key){
-  var d=PATRONS[key];if(!d)return;
-  document.getElementById('pnPort').src='new_main/'+d.img+'.png';
-  document.getElementById('pnName').textContent=d.name;
-  document.getElementById('pnTraitIcon').src='new_main/'+d.icon+'.png';
-  document.getElementById('pnTrait').textContent=d.trait;
-  var dc='';for(var i=0;i<d.dice;i++)dc+='<span class="pd"></span>';
+/* colors are bound to the frame; traits always wear the frame's color;
+   characters can sit in any frame. Double-click a card to demo GONE HOME. */
+var SEATS=[
+  {key:'krox', name:'Krox', color:'green', trait:'Strong', price:15, target:'3,000', pot:'+40g', dice:6, gone:false},
+  {key:'eira', name:'Eira', color:'purple',trait:'Cunning',price:20, target:'2,600', pot:'+55g', dice:6, gone:false},
+  {key:'nebb', name:'Nebb', color:'blue',  trait:'Lucky',  price:10, target:'2,200', pot:'+30g', dice:5, gone:false},
+  {key:'regis',name:'Regis',color:'red',   trait:'Greedy', price:25, target:'3,400', pot:'+70g', dice:7, gone:false}
+];
+
+function renderCards(){
+  var host=document.getElementById('cards');host.innerHTML='';
+  SEATS.forEach(function(st,i){
+    var d=document.createElement('div');
+    d.className='card c'+(i+1)+' enter';
+    d.innerHTML=
+      '<div class="cwrap">'+
+      '<img class="ly lbg" src="new_main/card_'+st.color+'_bg.png" alt="">'+
+      '<img class="ly lback" src="new_main/card_'+st.color+'_back.png" alt="">'+
+      '<img class="ly lwho" src="new_main/who_'+(st.gone?'gonehome':st.key)+'.png" alt="">'+
+      '<img class="ly lffg" src="new_main/card_'+st.color+'_fg.png" alt="">'+
+      '<div class="cname">'+st.name+'</div>'+
+      '<div class="cprice">'+st.price+'</div>'+
+      '<img class="cseal" src="new_main/'+st.trait+'_'+st.color+'.png" alt="">'+
+      '</div>';
+    d.onclick=function(){if(!st.gone)openPanel(st);};
+    d.ondblclick=function(e){e.preventDefault();st.gone=!st.gone;renderCards();};
+    host.appendChild(d);
+  });
+}
+
+/* entry wave replay = re-entering the room (also dblclick the scene) */
+function replayWave(){
+  document.querySelectorAll('.card').forEach(function(c){
+    c.classList.remove('enter');void c.offsetWidth;c.classList.add('enter');
+  });
+}
+document.getElementById('fgL');
+document.getElementById('stage').addEventListener('dblclick',function(e){
+  if(!e.target.closest('.card')&&!e.target.closest('#panel'))replayWave();
+});
+
+/* wiggle + parallax: one rAF loop drives --wx/--wy per card; layers scale
+   the motion by --f so the chrome floats over the backdrop. Pointer adds a
+   soft parallax lean. */
+var _px=0,_py=0,_sx=0,_sy=0;
+addEventListener('pointermove',function(e){
+  _px=(e.clientX/innerWidth-.5)*2;_py=(e.clientY/innerHeight-.5)*2;
+});
+var REDUCED=matchMedia('(prefers-reduced-motion:reduce)').matches;
+function loop(t){
+  _sx+=(_px-_sx)*.04;_sy+=(_py-_sy)*.04;
+  document.querySelectorAll('.card').forEach(function(c,i){
+    var ph=i*1.9,s=t/1000;
+    var wx=Math.sin(s*.85+ph)*1.6+Math.sin(s*1.55+ph*1.7)*.8+_sx*5;
+    var wy=Math.cos(s*.7+ph*1.3)*1.4+Math.sin(s*1.3+ph)*.7+_sy*4;
+    c.style.setProperty('--wx',wx.toFixed(2)+'px');
+    c.style.setProperty('--wy',wy.toFixed(2)+'px');
+  });
+  requestAnimationFrame(loop);
+}
+if(!REDUCED)requestAnimationFrame(loop);
+
+/* panel */
+function openPanel(st){
+  document.getElementById('pnPortBg').src='new_main/card_'+st.color+'_bg.png';
+  document.getElementById('pnPort').src='new_main/who_'+st.key+'.png';
+  document.getElementById('pnName').textContent=st.name;
+  document.getElementById('pnTraitIcon').src='new_main/'+st.trait+'_'+st.color+'.png';
+  document.getElementById('pnTrait').textContent=st.trait.toUpperCase();
+  var dc='';for(var i=0;i<st.dice;i++)dc+='<span class="pd"></span>';
   document.getElementById('pnDice').innerHTML=dc;
-  document.getElementById('pnTarget').textContent=d.target;
-  document.getElementById('pnStake').innerHTML='<img src="new_main/coin.png" alt="">'+d.stake;
-  document.getElementById('pnPot').innerHTML='<img src="new_main/coin.png" alt="">'+d.pot;
+  document.getElementById('pnTarget').textContent=st.target;
+  document.getElementById('pnStake').innerHTML='<img src="new_main/coin.png" alt="">'+st.price+'g';
+  document.getElementById('pnPot').innerHTML='<img src="new_main/coin.png" alt="">'+st.pot;
   document.getElementById('scrim').classList.add('on');
   document.getElementById('panel').classList.add('on');
 }
+function closePanel(){
+  document.getElementById('scrim').classList.remove('on');
+  document.getElementById('panel').classList.remove('on');
+}
+
+/* mockup-only: body-font audition */
 var BODY_FONTS=['Schwabacher','Requiem','Old Englished Boots','Black Castle','Gothica','Britannia'];
 function cycleFont(){
   var st=document.getElementById('stage');
@@ -235,17 +252,8 @@ function cycleFont(){
   clearTimeout(chip._t);chip._t=setTimeout(function(){chip.textContent='Aa';},1600);
 }
 if(localStorage.bodyFont)document.getElementById('stage').style.setProperty('--bodyFont',"'"+localStorage.bodyFont+"',serif");
-function closePanel(){
-  document.getElementById('scrim').classList.remove('on');
-  document.getElementById('panel').classList.remove('on');
-}
-/* seats: wire clicks + fill tag stakes and strap names */
-[['f1','hog'],['f2','toucan'],['f3','lizard']].forEach(function(pair){
-  var el=document.querySelector('.'+pair[0]);
-  el.onclick=function(){openPanel(pair[1]);};
-  el.querySelector('.tagtxt').textContent=PATRONS[pair[1]].stake;
-  el.querySelector('.strap').textContent=PATRONS[pair[1]].name;
-});
+
+renderCards();
 </script>
 </body>
 </html>
