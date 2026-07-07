@@ -22,10 +22,11 @@ body{display:flex;align-items:center;justify-content:center}
 
 /* ── the stage: a 9:16 canvas, everything positioned in % of it ── */
 #stage{position:relative;height:100vh;aspect-ratio:9/16;max-width:100vw;overflow:hidden;
-  background:#0a0806;--u:1vh;--bodyFont:'Schwabacher',serif}
+  background:#0a0806;--u:1vh;--bodyFont:'JMH Beda',serif}
 #stage>img.env{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;pointer-events:none}
 #bgL{z-index:0}
-#fgL{z-index:1}  /* the boss + his table live in this layer */
+#fgL{z-index:1;transition:transform .5s cubic-bezier(.4,0,.25,1)}
+#stage.panel-open #fgL{transform:translateY(9%)}
 
 /* ── patron cards: separated layers with per-layer parallax.
    The outer .card owns position + static z-rotation + the entry wave;
@@ -41,6 +42,7 @@ body{display:flex;align-items:center;justify-content:center}
   to{transform:translate3d(0,0,0) rotate(var(--rot,0deg))}}
 /* tap: the picked card glides to the panel's crown; the rest drop out */
 .card.drag{z-index:7;transition:filter .12s;cursor:grabbing}
+.card.home{transition:filter .12s,transform .5s cubic-bezier(.22,.75,.28,1)}
 .card.sel{z-index:11;transition:transform .6s cubic-bezier(.55,0,.18,1)}
 .card.drop{transition:transform .5s cubic-bezier(.55,.06,.75,.4) var(--dd,0s);
   transform:translate3d(0,170%,0) rotate(var(--rot,0deg))}
@@ -49,17 +51,17 @@ body{display:flex;align-items:center;justify-content:center}
 .card .lbg{--f:.35}
 .card .lback{--f:.5}
 .card .lwho{--f:.75}
-.card .lffg{--f:1.1;filter:drop-shadow(0 8px 14px rgba(0,0,0,.5))}
-.card .cname{position:absolute;left:12%;right:12%;top:63.5%;height:11%;
-  display:flex;align-items:center;justify-content:center;pointer-events:none;
-  font-family:var(--bodyFont);font-size:calc(var(--u)*2.4);color:#3a2712;letter-spacing:.5px;
+.card .lfront{position:absolute;inset:0;pointer-events:none;
   transform:translate(calc(var(--wx,0px)*1.1),calc(var(--wy,0px)*1.1))}
-.card .cprice{position:absolute;left:34%;top:76.5%;height:9%;display:flex;align-items:center;
-  pointer-events:none;font-family:var(--bodyFont);font-size:calc(var(--u)*2.5);color:#2e1c0b;
-  transform:translate(calc(var(--wx,0px)*1.1),calc(var(--wy,0px)*1.1))}
-.card .cseal{position:absolute;right:7%;top:74%;width:27%;pointer-events:none;
-  filter:drop-shadow(0 3px 5px rgba(0,0,0,.4));
-  transform:translate(calc(var(--wx,0px)*1.15),calc(var(--wy,0px)*1.15)) rotate(6deg)}
+.card .lfront .lffg{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;
+  filter:drop-shadow(0 8px 14px rgba(0,0,0,.5))}
+.card .cname{position:absolute;left:12%;right:12%;top:61.3%;height:11%;
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--bodyFont);font-size:calc(var(--u)*2.4);color:#3a2712;letter-spacing:.5px}
+.card .cprice{position:absolute;left:37.5%;top:76.5%;height:9%;display:flex;align-items:center;
+  font-family:var(--bodyFont);font-size:calc(var(--u)*2.5);color:#2e1c0b}
+.card .cseal{position:absolute;right:7%;top:76.5%;width:27%;
+  filter:drop-shadow(0 3px 5px rgba(0,0,0,.4));transform:rotate(6deg)}
 .c1{left:4.1%;top:62%;--rot:-3.5deg;--d:.05s}
 .c2{left:27.1%;top:63%;--rot:-1deg;--d:.16s}
 .c3{left:50.8%;top:62.5%;--rot:1.4deg;--d:.27s}
@@ -184,10 +186,12 @@ function renderCards(){
       '<img class="ly lbg" src="new_main/card_'+st.color+'_bg.png" alt="">'+
       '<img class="ly lback" src="new_main/card_'+st.color+'_back.png" alt="">'+
       '<img class="ly lwho" src="new_main/who_'+(st.gone?'gonehome':st.key)+'.png" alt="">'+
-      '<img class="ly lffg" src="new_main/card_'+st.color+'_fg.png" alt="">'+
-      '<div class="cname">'+st.name+'</div>'+
-      '<div class="cprice">'+st.price+'</div>'+
-      '<img class="cseal" src="new_main/'+st.trait+'_'+st.color+'.png" alt="">'+
+      '<div class="lfront">'+
+        '<img class="lffg" src="new_main/card_'+st.color+'_fg.png" alt="">'+
+        '<div class="cname">'+st.name+'</div>'+
+        '<div class="cprice">'+st.price+'</div>'+
+        '<img class="cseal" src="new_main/'+st.trait+'_'+st.color+'.png" alt="">'+
+      '</div>'+
       '</div>';
     d.onclick=function(){if(d._sup){d._sup=false;return;}if(!st.gone)selectCard(st,d);};
     d.ondblclick=function(e){e.preventDefault();st.gone=!st.gone;renderCards();};
@@ -217,6 +221,7 @@ var REDUCED=matchMedia('(prefers-reduced-motion:reduce)').matches;
 var dragX=[0,0,0,0],dragY=[0,0,0,0],lagX=[0,0,0,0],lagY=[0,0,0,0];
 function loop(t){
   document.querySelectorAll('.card').forEach(function(c,i){
+    if(c.classList.contains('sel')){c.style.setProperty('--wx','0px');c.style.setProperty('--wy','0px');return;}
     var ph=i*1.9,s=t/1000;
     lagX[i]+=(dragX[i]-lagX[i])*.12;
     lagY[i]+=(dragY[i]-lagY[i])*.12;
@@ -249,8 +254,12 @@ document.addEventListener('pointermove',function(e){
 document.addEventListener('pointerup',function(e){
   if(!_dg.el)return;
   var el=_dg.el,i=_dg.i,moved=_dg.moved;_dg.el=null;
-  el.classList.remove('drag');
-  el.style.transform='';           /* the overshoot bezier floats it home */
+  el.classList.remove('drag');el.classList.add('home');
+  el.style.transform='';           /* eases straight home, no overshoot */
+  el.addEventListener('transitionend',function h(e){
+    if(e.propertyName!=='transform')return;
+    el.classList.remove('home');el.removeEventListener('transitionend',h);
+  });
   dragX[i]=0;dragY[i]=0;           /* layers wobble-settle via the spring */
   if(moved)el._sup=true;           /* a drag is not a tap */
 });
@@ -291,10 +300,12 @@ function openPanel(st){
   document.getElementById('pnPot').innerHTML='<img src="new_main/coin.png" alt="">'+st.pot;
   document.getElementById('scrim').classList.add('on');
   document.getElementById('panel').classList.add('on');
+  document.getElementById('stage').classList.add('panel-open');
 }
 function closePanel(){
   document.getElementById('scrim').classList.remove('on');
   document.getElementById('panel').classList.remove('on');
+  document.getElementById('stage').classList.remove('panel-open');
   if(_selCard){
     var el=_selCard;_selCard=null;
     el.style.transform='';
@@ -309,10 +320,10 @@ function closePanel(){
 }
 
 /* mockup-only: body-font audition */
-var BODY_FONTS=['Schwabacher','Requiem','Old Englished Boots','Black Castle','Gothica','Britannia','JMH Beda','Pirata One','Seagram'];
+var BODY_FONTS=['JMH Beda','Schwabacher','Requiem','Old Englished Boots','Black Castle','Gothica','Britannia','Pirata One','Seagram'];
 function cycleFont(){
   var st=document.getElementById('stage');
-  var cur=(localStorage.bodyFont||'Schwabacher');
+  var cur=(localStorage.bodyFont||'JMH Beda');
   var nxt=BODY_FONTS[(BODY_FONTS.indexOf(cur)+1)%BODY_FONTS.length];
   localStorage.bodyFont=nxt;
   st.style.setProperty('--bodyFont',"'"+nxt+"',serif");
@@ -320,7 +331,7 @@ function cycleFont(){
   chip.textContent=nxt;
   clearTimeout(chip._t);chip._t=setTimeout(function(){chip.textContent='Aa';},1600);
 }
-if(localStorage.bodyFont)document.getElementById('stage').style.setProperty('--bodyFont',"'"+localStorage.bodyFont+"',serif");
+localStorage.bodyFont='JMH Beda'; /* reset audition to the chosen default */
 
 renderCards();
 setTimeout(function(){document.querySelectorAll('.card.enter').forEach(function(c){c.classList.remove('enter');});},1400);
