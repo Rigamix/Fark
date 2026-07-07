@@ -40,6 +40,7 @@ body{display:flex;align-items:center;justify-content:center}
   from{transform:translate3d(0,118%,0) rotate(var(--rot,0deg))}
   to{transform:translate3d(0,0,0) rotate(var(--rot,0deg))}}
 /* tap: the picked card glides to the panel's crown; the rest drop out */
+.card.drag{z-index:7;transition:filter .12s;cursor:grabbing}
 .card.sel{z-index:11;transition:transform .6s cubic-bezier(.55,0,.18,1)}
 .card.drop{transition:transform .5s cubic-bezier(.55,.06,.75,.4) var(--dd,0s);
   transform:translate3d(0,170%,0) rotate(var(--rot,0deg))}
@@ -188,7 +189,7 @@ function renderCards(){
       '<div class="cprice">'+st.price+'</div>'+
       '<img class="cseal" src="new_main/'+st.trait+'_'+st.color+'.png" alt="">'+
       '</div>';
-    d.onclick=function(){if(!st.gone)selectCard(st,d);};
+    d.onclick=function(){if(d._sup){d._sup=false;return;}if(!st.gone)selectCard(st,d);};
     d.ondblclick=function(e){e.preventDefault();st.gone=!st.gone;renderCards();};
     host.appendChild(d);
   });
@@ -209,17 +210,50 @@ document.getElementById('stage').addEventListener('dblclick',function(e){
    the motion by --f so the chrome floats over the backdrop. Pointer adds a
    soft parallax lean. */
 var REDUCED=matchMedia('(prefers-reduced-motion:reduce)').matches;
+/* drag toy: grab a card, sling it around, let go — it floats home.
+   dragX/Y is where the card IS; lagX/Y is where its inner layers THINK
+   they are (a lazy spring), so the layers trail the chrome while you
+   drag and settle with a soft wobble after release. */
+var dragX=[0,0,0,0],dragY=[0,0,0,0],lagX=[0,0,0,0],lagY=[0,0,0,0];
 function loop(t){
   document.querySelectorAll('.card').forEach(function(c,i){
     var ph=i*1.9,s=t/1000;
-    var wx=Math.sin(s*.85+ph)*1.6+Math.sin(s*1.55+ph*1.7)*.8;
-    var wy=Math.cos(s*.7+ph*1.3)*1.4+Math.sin(s*1.3+ph)*.7;
+    lagX[i]+=(dragX[i]-lagX[i])*.12;
+    lagY[i]+=(dragY[i]-lagY[i])*.12;
+    var wx=Math.sin(s*.85+ph)*1.6+Math.sin(s*1.55+ph*1.7)*.8+(lagX[i]-dragX[i])*.55;
+    var wy=Math.cos(s*.7+ph*1.3)*1.4+Math.sin(s*1.3+ph)*.7+(lagY[i]-dragY[i])*.55;
     c.style.setProperty('--wx',wx.toFixed(2)+'px');
     c.style.setProperty('--wy',wy.toFixed(2)+'px');
   });
   requestAnimationFrame(loop);
 }
 if(!REDUCED)requestAnimationFrame(loop);
+var _dg={el:null,i:-1,x0:0,y0:0,rot:0,moved:false};
+document.addEventListener('pointerdown',function(e){
+  var el=e.target.closest('.card');
+  if(!el||_selCard||el.classList.contains('drop'))return;
+  _dg.el=el;_dg.i=[].indexOf.call(el.parentNode.children,el);
+  _dg.x0=e.clientX;_dg.y0=e.clientY;_dg.moved=false;
+  _dg.rot=parseFloat(getComputedStyle(el).getPropertyValue('--rot'))||0;
+  el.classList.remove('enter');el.classList.add('drag');
+  el.setPointerCapture(e.pointerId);
+});
+document.addEventListener('pointermove',function(e){
+  if(!_dg.el)return;
+  var dx=e.clientX-_dg.x0,dy=e.clientY-_dg.y0;
+  if(Math.abs(dx)+Math.abs(dy)>7)_dg.moved=true;
+  dragX[_dg.i]=dx;dragY[_dg.i]=dy;
+  var tilt=Math.max(-9,Math.min(9,dx*.045));
+  _dg.el.style.transform='translate3d('+dx.toFixed(1)+'px,'+dy.toFixed(1)+'px,0) rotate('+(_dg.rot+tilt).toFixed(2)+'deg)';
+});
+document.addEventListener('pointerup',function(e){
+  if(!_dg.el)return;
+  var el=_dg.el,i=_dg.i,moved=_dg.moved;_dg.el=null;
+  el.classList.remove('drag');
+  el.style.transform='';           /* the overshoot bezier floats it home */
+  dragX[i]=0;dragY[i]=0;           /* layers wobble-settle via the spring */
+  if(moved)el._sup=true;           /* a drag is not a tap */
+});
 /* the entry animation hands control back to transitions once it lands */
 document.addEventListener('animationend',function(e){
   if(e.target.classList&&e.target.classList.contains('card'))e.target.classList.remove('enter');
