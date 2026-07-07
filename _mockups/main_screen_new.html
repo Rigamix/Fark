@@ -47,13 +47,8 @@ body{display:flex;align-items:center;justify-content:center}
 .card.drop{transition:transform .5s cubic-bezier(.55,.06,.75,.4) var(--dd,0s);
   transform:translate3d(0,170%,0) rotate(var(--rot,0deg))}
 .card .ly{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;
-  pointer-events:none;will-change:transform;
-  transform:translate(0,calc(var(--wy,0px)*var(--f)))}
-.card .lbg{--f:.35;transform:translate(0,max(calc(var(--wy,0px)*.35),-3px))}
-.card .lback{--f:.5;transform:translate(0,max(calc(var(--wy,0px)*.5),-4px))}
-.card .lwho{--f:.75}
-.card .lfront{position:absolute;inset:0;pointer-events:none;will-change:transform;
-  transform:translate(0,var(--fy,0px))}
+  pointer-events:none;will-change:transform}
+.card .lfront{position:absolute;inset:0;pointer-events:none;will-change:transform}
 .card .lfront .lffg{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;
   filter:drop-shadow(0 8px 14px rgba(0,0,0,.5))}
 .card .cname{position:absolute;left:12%;right:12%;top:61.7%;height:11%;
@@ -197,6 +192,8 @@ function renderCards(){
     d.onclick=function(){if(d._sup){d._sup=false;return;}if(!st.gone)selectCard(st,d);};
     d.ondblclick=function(e){e.preventDefault();st.gone=!st.gone;renderCards();};
     host.appendChild(d);
+    d._layers={lbg:d.querySelector('.lbg'),lback:d.querySelector('.lback'),
+      lwho:d.querySelector('.lwho'),lfront:d.querySelector('.lfront')};
   });
 }
 
@@ -220,20 +217,25 @@ var REDUCED=matchMedia('(prefers-reduced-motion:reduce)').matches;
    they are (a lazy spring), so the layers trail the chrome while you
    drag and settle with a soft wobble after release. */
 var dragX=[0,0,0,0],dragY=[0,0,0,0],lagX=[0,0,0,0],lagY=[0,0,0,0],rel=[false,false,false,false];
+/* depth factors: backdrop lags low (and can barely rise — its paint edge
+   shows), character tracks the chrome closely, chrome leads a touch */
 function loop(t){
   document.querySelectorAll('.card').forEach(function(c,i){
-    if(c.classList.contains('sel')){c.style.setProperty('--wx','0px');c.style.setProperty('--wy','0px');c.style.setProperty('--fy','0px');return;}
+    var L=c._layers;if(!L)return;
+    if(c.classList.contains('sel')){
+      L.lbg.style.transform=L.lback.style.transform=L.lwho.style.transform=L.lfront.style.transform='';
+      return;
+    }
     var ph=i*1.9,s=t/1000;
     if(rel[i]){dragX[i]*=.8;dragY[i]*=.8;
       if(Math.abs(dragX[i])+Math.abs(dragY[i])<.5){dragX[i]=0;dragY[i]=0;rel[i]=false;}}
-    lagX[i]+=(dragX[i]-lagX[i])*.12;
     lagY[i]+=(dragY[i]-lagY[i])*.12;
     var ry=Math.max(-14,Math.min(14,(lagY[i]-dragY[i])*.55));
-    var wx=Math.sin(s*.85+ph)*1.6+Math.sin(s*1.55+ph*1.7)*.8;
     var wy=Math.cos(s*.7+ph*1.3)*1.4+Math.sin(s*1.3+ph)*.7+ry;
-    c.style.setProperty('--wx',wx.toFixed(2)+'px');
-    c.style.setProperty('--wy',wy.toFixed(2)+'px');
-    c.style.setProperty('--fy',Math.round(wy*1.1)+'px');
+    L.lbg.style.transform='translate3d(0,'+Math.max(wy*.35,-3).toFixed(2)+'px,0)';
+    L.lback.style.transform='translate3d(0,'+Math.max(wy*.5,-4).toFixed(2)+'px,0)';
+    L.lwho.style.transform='translate3d(0,'+(wy*.92).toFixed(2)+'px,0)';
+    L.lfront.style.transform='translate3d(0,'+(wy*1.06).toFixed(2)+'px,0)';
   });
   requestAnimationFrame(loop);
 }
