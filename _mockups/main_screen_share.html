@@ -27,9 +27,9 @@ body{display:flex;align-items:center;justify-content:center}
 #bgL{z-index:0;transition:filter .45s}
 #fgL{z-index:1;transform-origin:50% 92%;transition:transform .5s cubic-bezier(.4,0,.25,1),filter .45s}
 #stage.panel-open #fgL{transform:translateY(2.5%) scale(1.04)}
-#cards{position:absolute;inset:0;transition:filter .45s}
+#cards{position:absolute;inset:0}
 #hearts,#goldplate{transition:filter .45s}
-#stage.panel-open #bgL,#stage.panel-open #fgL,#stage.panel-open #cards,
+#stage.panel-open #bgL,#stage.panel-open #fgL,
 #stage.panel-open #hearts,#stage.panel-open #goldplate{filter:blur(6px) brightness(.55)}
 
 /* ── patron cards: separated layers with per-layer parallax.
@@ -42,13 +42,15 @@ body{display:flex;align-items:center;justify-content:center}
 .card:active{filter:brightness(1.12)}
 .card.enter{animation:cardIn .72s cubic-bezier(.3,1.18,.36,1) var(--d,0s) both}
 @keyframes cardIn{
-  from{transform:translate3d(0,118%,0) rotate(var(--rot,0deg))}
+  from{transform:translate3d(0,260%,0) rotate(var(--rot,0deg))}
   to{transform:translate3d(0,0,0) rotate(var(--rot,0deg))}}
 /* tap: the picked card glides to the panel's crown; the rest drop out */
 .card.drag{z-index:7;transition:filter .12s;cursor:grabbing}
 .card.home{transition:filter .12s,transform .55s cubic-bezier(.3,1.3,.36,1)}
-.card.drop{transition:transform .5s cubic-bezier(.55,.06,.75,.4) var(--dd,0s);
-  transform:translate3d(0,170%,0) rotate(var(--rot,0deg))}
+.card.drop{animation:cardOut .36s cubic-bezier(.5,.05,.7,.35) var(--dd,0s) both}
+@keyframes cardOut{
+  from{transform:translate3d(0,0,0) rotate(var(--rot,0deg))}
+  to{transform:translate3d(0,260%,0) rotate(var(--rot,0deg))}}
 .card .ly{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;
   pointer-events:none;will-change:transform}
 .card .lfront{position:absolute;inset:0;pointer-events:none;will-change:transform}
@@ -81,9 +83,9 @@ body{display:flex;align-items:center;justify-content:center}
 #scrim{position:absolute;inset:0;background:rgba(6,4,2,.5);opacity:0;pointer-events:none;
   transition:opacity .28s;z-index:9}
 #scrim.on{opacity:1;pointer-events:auto}
-#panel{position:absolute;inset:0;z-index:10;transform:translateY(103%);pointer-events:none;
-  transition:transform .5s cubic-bezier(.3,1,.3,1)}
-#panel.on{transform:translateY(0);pointer-events:auto}
+#panel{position:absolute;inset:0;z-index:10;transform:translateY(103%);opacity:0;pointer-events:none;
+  transition:transform .5s cubic-bezier(.3,1,.3,1),opacity .2s}
+#panel.on{transform:translateY(0);opacity:1;pointer-events:auto}
 #panel .bgimg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .pv{position:absolute;right:14%;font-family:var(--bodyFont);color:#2e1c0b;
   font-size:calc(var(--u)*3.9);text-align:right}
@@ -282,7 +284,7 @@ function selectCard(st,el){
   if(_open)return;_open=true;
   document.querySelectorAll('.card').forEach(function(c,i){
     c.classList.remove('enter');
-    c.style.setProperty('--dd',(i*0.05)+'s');
+    c.style.setProperty('--dd',(i*0.04)+'s');
     c.classList.add('drop');
   });
   document.getElementById('stage').classList.add('panel-open');
@@ -303,13 +305,11 @@ function closePanel(){
   document.getElementById('panel').classList.remove('on');
   document.getElementById('stage').classList.remove('panel-open');
   _open=false;
-  /* the crowd re-enters exactly like the opening wave: stagger + bounce */
-  setTimeout(function(){
-    document.querySelectorAll('.card').forEach(function(c){
-      c.classList.remove('drop');c.classList.remove('enter');
-      void c.offsetWidth;c.classList.add('enter');
-    });
-  },200);
+  /* the crowd re-enters immediately; the sheet fades off above them */
+  document.querySelectorAll('.card').forEach(function(c){
+    c.classList.remove('drop');c.classList.remove('enter');
+    void c.offsetWidth;c.classList.add('enter');
+  });
 }
 
 /* mockup-only: body-font audition */
