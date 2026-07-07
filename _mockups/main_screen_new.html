@@ -51,11 +51,7 @@ body{display:flex;align-items:center;justify-content:center}
 .card .lfront{position:absolute;inset:0;pointer-events:none;will-change:transform}
 .card .lfront .lffg{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;
   filter:drop-shadow(0 8px 14px rgba(0,0,0,.5))}
-.card .cname{position:absolute;left:12%;right:12%;top:61.7%;height:11%;
-  display:flex;align-items:center;justify-content:center;
-  font-family:var(--bodyFont);font-size:calc(var(--u)*2.4);color:#3a2712;letter-spacing:.5px}
-.card .cprice{position:absolute;left:45%;top:75.7%;height:9%;display:flex;align-items:center;
-  font-family:var(--bodyFont);font-size:calc(var(--u)*2.5);color:#2e1c0b}
+.card .ctext{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 .card .cseal{position:absolute;right:7%;top:79%;width:27%;
   filter:drop-shadow(0 3px 5px rgba(0,0,0,.4));transform:rotate(6deg)}
 .c1{left:4.1%;top:62%;--rot:-3.5deg;--d:.05s}
@@ -184,8 +180,7 @@ function renderCards(){
       '<img class="ly lwho" src="new_main/who_'+(st.gone?'gonehome':st.key)+'.png" alt="">'+
       '<div class="lfront">'+
         '<img class="lffg" src="new_main/card_'+st.color+'_fg.png" alt="">'+
-        '<div class="cname">'+st.name+'</div>'+
-        '<div class="cprice">'+st.price+'</div>'+
+        '<canvas class="ctext"></canvas>'+
         '<img class="cseal" src="new_main/'+st.trait+'_'+st.color+'.png" alt="">'+
       '</div>'+
       '</div>';
@@ -194,8 +189,30 @@ function renderCards(){
     host.appendChild(d);
     d._layers={lbg:d.querySelector('.lbg'),lback:d.querySelector('.lback'),
       lwho:d.querySelector('.lwho'),lfront:d.querySelector('.lfront')};
+    d._seat=st;drawCardText(d);
   });
 }
+
+/* names + prices are painted into a bitmap so they glide subpixel-smooth
+   in every browser (Firefox pixel-snaps live glyphs vertically) */
+function _bodyFontName(){return (localStorage.bodyFont||'JMH Beda');}
+function drawCardText(card){
+  var st=card._seat,cv=card.querySelector('.ctext');if(!st||!cv)return;
+  var w=card.offsetWidth,h=card.offsetHeight;if(!w)return;
+  var dpr=window.devicePixelRatio||1,u=innerHeight/100;
+  cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr);
+  var x=cv.getContext('2d');x.scale(dpr,dpr);
+  var fam='"'+_bodyFontName()+'",serif';
+  x.fillStyle='#3a2712';x.textAlign='center';x.textBaseline='middle';
+  x.font=(u*2.4)+'px '+fam;
+  x.fillText(st.name,w/2,h*.672);
+  x.fillStyle='#2e1c0b';x.textAlign='left';
+  x.font=(u*2.5)+'px '+fam;
+  x.fillText(st.price,w*.45,h*.802);
+}
+function redrawAllCardText(){document.querySelectorAll('.card').forEach(drawCardText);}
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(redrawAllCardText);
+addEventListener('resize',redrawAllCardText);
 
 /* entry wave replay = re-entering the room (also dblclick the scene) */
 function replayWave(){
@@ -336,6 +353,7 @@ function cycleFont(){
   var nxt=BODY_FONTS[(BODY_FONTS.indexOf(cur)+1)%BODY_FONTS.length];
   localStorage.bodyFont=nxt;
   st.style.setProperty('--bodyFont',"'"+nxt+"',serif");
+  document.fonts.load("20px '"+nxt+"'").then(redrawAllCardText);
   var chip=document.getElementById('fontChip');
   chip.textContent=nxt;
   clearTimeout(chip._t);chip._t=setTimeout(function(){chip.textContent='Aa';},1600);
