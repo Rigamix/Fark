@@ -47,20 +47,21 @@ body{display:flex;align-items:center;justify-content:center}
 .card.drop{transition:transform .5s cubic-bezier(.55,.06,.75,.4) var(--dd,0s);
   transform:translate3d(0,170%,0) rotate(var(--rot,0deg))}
 .card .ly{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;
-  pointer-events:none;transform:translate(calc(var(--wx,0px)*var(--f)),calc(var(--wy,0px)*var(--f)))}
-.card .lbg{--f:.35}
-.card .lback{--f:.5}
+  pointer-events:none;will-change:transform;
+  transform:translate(0,calc(var(--wy,0px)*var(--f)))}
+.card .lbg{--f:.35;transform:translate(0,max(calc(var(--wy,0px)*.35),-3px))}
+.card .lback{--f:.5;transform:translate(0,max(calc(var(--wy,0px)*.5),-4px))}
 .card .lwho{--f:.75}
-.card .lfront{position:absolute;inset:0;pointer-events:none;
-  transform:translate(calc(var(--wx,0px)*1.1),calc(var(--wy,0px)*1.1))}
+.card .lfront{position:absolute;inset:0;pointer-events:none;will-change:transform;
+  transform:translate(0,calc(var(--wy,0px)*1.1))}
 .card .lfront .lffg{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;
   filter:drop-shadow(0 8px 14px rgba(0,0,0,.5))}
 .card .cname{position:absolute;left:12%;right:12%;top:61.3%;height:11%;
   display:flex;align-items:center;justify-content:center;
   font-family:var(--bodyFont);font-size:calc(var(--u)*2.4);color:#3a2712;letter-spacing:.5px}
-.card .cprice{position:absolute;left:37.5%;top:76.5%;height:9%;display:flex;align-items:center;
+.card .cprice{position:absolute;left:41%;top:76.5%;height:9%;display:flex;align-items:center;
   font-family:var(--bodyFont);font-size:calc(var(--u)*2.5);color:#2e1c0b}
-.card .cseal{position:absolute;right:7%;top:76.5%;width:27%;
+.card .cseal{position:absolute;right:7%;top:79%;width:27%;
   filter:drop-shadow(0 3px 5px rgba(0,0,0,.4));transform:rotate(6deg)}
 .c1{left:4.1%;top:62%;--rot:-3.5deg;--d:.05s}
 .c2{left:27.1%;top:63%;--rot:-1deg;--d:.16s}
@@ -218,15 +219,18 @@ var REDUCED=matchMedia('(prefers-reduced-motion:reduce)').matches;
    dragX/Y is where the card IS; lagX/Y is where its inner layers THINK
    they are (a lazy spring), so the layers trail the chrome while you
    drag and settle with a soft wobble after release. */
-var dragX=[0,0,0,0],dragY=[0,0,0,0],lagX=[0,0,0,0],lagY=[0,0,0,0];
+var dragX=[0,0,0,0],dragY=[0,0,0,0],lagX=[0,0,0,0],lagY=[0,0,0,0],rel=[false,false,false,false];
 function loop(t){
   document.querySelectorAll('.card').forEach(function(c,i){
     if(c.classList.contains('sel')){c.style.setProperty('--wx','0px');c.style.setProperty('--wy','0px');return;}
     var ph=i*1.9,s=t/1000;
+    if(rel[i]){dragX[i]*=.8;dragY[i]*=.8;
+      if(Math.abs(dragX[i])+Math.abs(dragY[i])<.5){dragX[i]=0;dragY[i]=0;rel[i]=false;}}
     lagX[i]+=(dragX[i]-lagX[i])*.12;
     lagY[i]+=(dragY[i]-lagY[i])*.12;
-    var wx=Math.sin(s*.85+ph)*1.6+Math.sin(s*1.55+ph*1.7)*.8+(lagX[i]-dragX[i])*.55;
-    var wy=Math.cos(s*.7+ph*1.3)*1.4+Math.sin(s*1.3+ph)*.7+(lagY[i]-dragY[i])*.55;
+    var ry=Math.max(-14,Math.min(14,(lagY[i]-dragY[i])*.55));
+    var wx=Math.sin(s*.85+ph)*1.6+Math.sin(s*1.55+ph*1.7)*.8;
+    var wy=Math.cos(s*.7+ph*1.3)*1.4+Math.sin(s*1.3+ph)*.7+ry;
     c.style.setProperty('--wx',wx.toFixed(2)+'px');
     c.style.setProperty('--wy',wy.toFixed(2)+'px');
   });
@@ -237,7 +241,7 @@ var _dg={el:null,i:-1,x0:0,y0:0,rot:0,moved:false};
 document.addEventListener('pointerdown',function(e){
   var el=e.target.closest('.card');
   if(!el||_selCard||el.classList.contains('drop'))return;
-  _dg.el=el;_dg.i=[].indexOf.call(el.parentNode.children,el);
+  _dg.el=el;_dg.i=[].indexOf.call(el.parentNode.children,el);rel[_dg.i]=false;
   _dg.x0=e.clientX;_dg.y0=e.clientY;_dg.moved=false;
   _dg.rot=parseFloat(getComputedStyle(el).getPropertyValue('--rot'))||0;
   el.classList.remove('enter');el.classList.add('drag');
@@ -260,7 +264,7 @@ document.addEventListener('pointerup',function(e){
     if(e.propertyName!=='transform')return;
     el.classList.remove('home');el.removeEventListener('transitionend',h);
   });
-  dragX[i]=0;dragY[i]=0;           /* layers wobble-settle via the spring */
+  rel[i]=true;                     /* drag offset decays smoothly in the loop */
   if(moved)el._sup=true;           /* a drag is not a tap */
 });
 /* the entry animation hands control back to transitions once it lands */
