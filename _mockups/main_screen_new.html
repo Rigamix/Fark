@@ -13,6 +13,9 @@
 @font-face{font-family:'Old Englished Boots';src:url('new_main/Old_Englished_Boots.ttf') format('truetype')}
 @font-face{font-family:'Black Castle';src:url('new_main/BlackCastleMF.ttf') format('truetype')}
 @font-face{font-family:'Gothica';src:url('new_main/gothica class 2.ttf') format('truetype')}
+@font-face{font-family:'JMH Beda';src:url('new_main/JMH Beda.ttf') format('truetype')}
+@font-face{font-family:'Pirata One';src:url('new_main/PirataOne-Regular.ttf') format('truetype')}
+@font-face{font-family:'Seagram';src:url('new_main/Seagram tfb.ttf') format('truetype')}
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%;background:#0a0806;overflow:hidden}
 body{display:flex;align-items:center;justify-content:center}
@@ -28,15 +31,18 @@ body{display:flex;align-items:center;justify-content:center}
    The outer .card owns position + static z-rotation + the entry wave;
    .cwrap layers consume --wx/--wy (driven by JS) scaled by --f so the
    chrome leads and the backdrop lags — a little depth per card. ── */
-.card{position:absolute;width:24.5%;aspect-ratio:443/802;z-index:3;cursor:pointer;
-  transform:rotate(var(--rot,0deg));transition:filter .12s}
+.card{position:absolute;width:23%;aspect-ratio:443/802;z-index:3;cursor:pointer;will-change:transform;
+  transform:rotate(var(--rot,0deg));
+  transition:filter .12s,transform .55s cubic-bezier(.3,1.15,.35,1)}
 .card:active{filter:brightness(1.12)}
-.card.enter{animation:cardIn .85s cubic-bezier(.26,1.25,.42,1) var(--d,0s) both}
+.card.enter{animation:cardIn .72s cubic-bezier(.3,1.18,.36,1) var(--d,0s) both}
 @keyframes cardIn{
-  0%{transform:translateY(115%) rotate(var(--rot,0deg))}
-  62%{transform:translateY(-3.2%) rotate(var(--rot,0deg))}
-  82%{transform:translateY(1.4%) rotate(var(--rot,0deg))}
-  100%{transform:translateY(0) rotate(var(--rot,0deg))}}
+  from{transform:translate3d(0,118%,0) rotate(var(--rot,0deg))}
+  to{transform:translate3d(0,0,0) rotate(var(--rot,0deg))}}
+/* tap: the picked card glides to the panel's crown; the rest drop out */
+.card.sel{z-index:11;transition:transform .6s cubic-bezier(.55,0,.18,1)}
+.card.drop{transition:transform .5s cubic-bezier(.55,.06,.75,.4) var(--dd,0s);
+  transform:translate3d(0,170%,0) rotate(var(--rot,0deg))}
 .card .ly{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;
   pointer-events:none;transform:translate(calc(var(--wx,0px)*var(--f)),calc(var(--wy,0px)*var(--f)))}
 .card .lbg{--f:.35}
@@ -53,10 +59,10 @@ body{display:flex;align-items:center;justify-content:center}
 .card .cseal{position:absolute;right:7%;top:74%;width:27%;pointer-events:none;
   filter:drop-shadow(0 3px 5px rgba(0,0,0,.4));
   transform:translate(calc(var(--wx,0px)*1.15),calc(var(--wy,0px)*1.15)) rotate(6deg)}
-.c1{left:2.2%;top:61.8%;--rot:-3.5deg;--d:.05s}
-.c2{left:26.6%;top:62.9%;--rot:-1deg;--d:.16s}
-.c3{left:50.8%;top:62.3%;--rot:1.4deg;--d:.27s}
-.c4{left:74.8%;top:63.3%;--rot:3.6deg;--d:.38s}
+.c1{left:4.1%;top:62%;--rot:-3.5deg;--d:.05s}
+.c2{left:27.1%;top:63%;--rot:-1deg;--d:.16s}
+.c3{left:50.8%;top:62.5%;--rot:1.4deg;--d:.27s}
+.c4{left:73.9%;top:63.4%;--rot:3.6deg;--d:.38s}
 @media (prefers-reduced-motion:reduce){.card.enter{animation:none}}
 
 /* ── top chips (kept from the previous version) ── */
@@ -80,11 +86,12 @@ body{display:flex;align-items:center;justify-content:center}
 #panel.on{transform:translate(-50%,-50%) scale(1);opacity:1;pointer-events:auto}
 #panel .bgimg{position:absolute;inset:0;width:100%;height:100%;
   filter:drop-shadow(0 18px 40px rgba(0,0,0,.6))}
-#panel .in{position:absolute;left:11%;right:11%;top:11.5%;bottom:16%;display:flex;
+#panel .in{position:absolute;left:11%;right:11%;top:37%;bottom:16%;display:flex;
   flex-direction:column;align-items:center}
 .engr{font-family:var(--bodyFont);color:#5b3a15;
   text-shadow:0 1px 0 rgba(255,242,205,.55),0 -1px 1px rgba(52,30,9,.4)}
 .ink{font-family:var(--bodyFont);color:#2e1c0b}
+#pnPortWrap,#pnName{display:none} /* the tapped card docks here instead */
 #pnPortWrap{position:relative;width:50%;aspect-ratio:1/1;margin-top:1%;overflow:hidden;
   border:2px solid rgba(90,58,26,.55);border-radius:4px;
   box-shadow:inset 0 0 12px rgba(0,0,0,.25),0 4px 8px rgba(60,35,10,.25)}
@@ -181,7 +188,7 @@ function renderCards(){
       '<div class="cprice">'+st.price+'</div>'+
       '<img class="cseal" src="new_main/'+st.trait+'_'+st.color+'.png" alt="">'+
       '</div>';
-    d.onclick=function(){if(!st.gone)openPanel(st);};
+    d.onclick=function(){if(!st.gone)selectCard(st,d);};
     d.ondblclick=function(e){e.preventDefault();st.gone=!st.gone;renderCards();};
     host.appendChild(d);
   });
@@ -201,24 +208,41 @@ document.getElementById('stage').addEventListener('dblclick',function(e){
 /* wiggle + parallax: one rAF loop drives --wx/--wy per card; layers scale
    the motion by --f so the chrome floats over the backdrop. Pointer adds a
    soft parallax lean. */
-var _px=0,_py=0,_sx=0,_sy=0;
-addEventListener('pointermove',function(e){
-  _px=(e.clientX/innerWidth-.5)*2;_py=(e.clientY/innerHeight-.5)*2;
-});
 var REDUCED=matchMedia('(prefers-reduced-motion:reduce)').matches;
 function loop(t){
-  _sx+=(_px-_sx)*.04;_sy+=(_py-_sy)*.04;
   document.querySelectorAll('.card').forEach(function(c,i){
     var ph=i*1.9,s=t/1000;
-    var wx=Math.sin(s*.85+ph)*1.6+Math.sin(s*1.55+ph*1.7)*.8+_sx*5;
-    var wy=Math.cos(s*.7+ph*1.3)*1.4+Math.sin(s*1.3+ph)*.7+_sy*4;
+    var wx=Math.sin(s*.85+ph)*1.6+Math.sin(s*1.55+ph*1.7)*.8;
+    var wy=Math.cos(s*.7+ph*1.3)*1.4+Math.sin(s*1.3+ph)*.7;
     c.style.setProperty('--wx',wx.toFixed(2)+'px');
     c.style.setProperty('--wy',wy.toFixed(2)+'px');
   });
   requestAnimationFrame(loop);
 }
 if(!REDUCED)requestAnimationFrame(loop);
+/* the entry animation hands control back to transitions once it lands */
+document.addEventListener('animationend',function(e){
+  if(e.target.classList&&e.target.classList.contains('card'))e.target.classList.remove('enter');
+});
 
+/* tap a card: it glides up to the panel's crown (scale up, straighten),
+   the others drop off-screen, then the panel slides in beneath it */
+var _selCard=null;
+function selectCard(st,el){
+  if(_selCard)return;
+  _selCard=el;
+  document.querySelectorAll('.card').forEach(function(c){c.classList.remove('enter');});
+  var stage=document.getElementById('stage').getBoundingClientRect();
+  var w=el.offsetWidth,h=el.offsetHeight;
+  var targetW=stage.width*.30,scale=targetW/w;
+  var tx=(stage.width/2)-(el.offsetLeft+w/2);
+  var ty=(stage.height*.075)-el.offsetTop;
+  el.classList.add('sel');
+  el.style.transform='translate3d('+tx.toFixed(1)+'px,'+ty.toFixed(1)+'px,0) rotate(0deg) scale('+scale.toFixed(3)+')';
+  var others=[].filter.call(document.querySelectorAll('.card'),function(c){return c!==el;});
+  others.forEach(function(c,i){c.style.setProperty('--dd',(i*0.06)+'s');c.classList.add('drop');});
+  setTimeout(function(){openPanel(st);},220);
+}
 /* panel */
 function openPanel(st){
   document.getElementById('pnPortBg').src='new_main/card_'+st.color+'_bg.png';
@@ -237,10 +261,21 @@ function openPanel(st){
 function closePanel(){
   document.getElementById('scrim').classList.remove('on');
   document.getElementById('panel').classList.remove('on');
+  if(_selCard){
+    var el=_selCard;_selCard=null;
+    el.style.transform='';
+    el.addEventListener('transitionend',function h(e){
+      if(e.propertyName!=='transform')return;
+      el.classList.remove('sel');el.removeEventListener('transitionend',h);
+    });
+    setTimeout(function(){
+      document.querySelectorAll('.card.drop').forEach(function(c){c.classList.remove('drop');});
+    },160);
+  }
 }
 
 /* mockup-only: body-font audition */
-var BODY_FONTS=['Schwabacher','Requiem','Old Englished Boots','Black Castle','Gothica','Britannia'];
+var BODY_FONTS=['Schwabacher','Requiem','Old Englished Boots','Black Castle','Gothica','Britannia','JMH Beda','Pirata One','Seagram'];
 function cycleFont(){
   var st=document.getElementById('stage');
   var cur=(localStorage.bodyFont||'Schwabacher');
@@ -254,6 +289,7 @@ function cycleFont(){
 if(localStorage.bodyFont)document.getElementById('stage').style.setProperty('--bodyFont',"'"+localStorage.bodyFont+"',serif");
 
 renderCards();
+setTimeout(function(){document.querySelectorAll('.card.enter').forEach(function(c){c.classList.remove('enter');});},1400);
 </script>
 </body>
 </html>
