@@ -27,7 +27,8 @@ body{display:flex;align-items:center;justify-content:center}
 #bgL{z-index:0;transition:filter .45s}
 #fgL{z-index:1;transform-origin:50% 92%;transition:transform .5s cubic-bezier(.4,0,.25,1),filter .45s}
 #stage.panel-open #fgL{transform:translateY(2.5%) scale(1.04)}
-#cards{position:absolute;inset:0;transition:filter .45s}
+#cards{position:absolute;inset:0;transition:filter .12s}
+#stage.reenter #cards{z-index:12}
 #hearts,#goldplate{transition:filter .45s}
 #stage.panel-open #bgL,#stage.panel-open #fgL,#stage.panel-open #cards,
 #stage.panel-open #hearts,#stage.panel-open #goldplate{filter:blur(6px) brightness(.55)}
@@ -47,8 +48,10 @@ body{display:flex;align-items:center;justify-content:center}
 /* tap: the picked card glides to the panel's crown; the rest drop out */
 .card.drag{z-index:7;transition:filter .12s;cursor:grabbing}
 .card.home{transition:filter .12s,transform .55s cubic-bezier(.3,1.3,.36,1)}
-.card.drop{transition:transform .5s cubic-bezier(.55,.06,.75,.4) var(--dd,0s);
-  transform:translate3d(0,170%,0) rotate(var(--rot,0deg))}
+.card.drop{animation:cardOut .36s cubic-bezier(.5,.05,.7,.35) var(--dd,0s) both}
+@keyframes cardOut{
+  from{transform:translate3d(0,0,0) rotate(var(--rot,0deg))}
+  to{transform:translate3d(0,145%,0) rotate(var(--rot,0deg))}}
 .card .ly{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;
   pointer-events:none;will-change:transform}
 .card .lfront{position:absolute;inset:0;pointer-events:none;will-change:transform}
@@ -281,7 +284,7 @@ function selectCard(st,el){
   if(_open)return;_open=true;
   document.querySelectorAll('.card').forEach(function(c,i){
     c.classList.remove('enter');
-    c.style.setProperty('--dd',(i*0.05)+'s');
+    c.style.setProperty('--dd',(i*0.04)+'s');
     c.classList.add('drop');
   });
   document.getElementById('stage').classList.add('panel-open');
@@ -302,11 +305,15 @@ function closePanel(){
   document.getElementById('panel').classList.remove('on');
   document.getElementById('stage').classList.remove('panel-open');
   _open=false;
-  /* the crowd re-enters immediately, overlapping the unblur */
+  /* the crowd re-enters immediately, in front of the departing sheet */
+  var stage=document.getElementById('stage');
+  stage.classList.add('reenter');
   document.querySelectorAll('.card').forEach(function(c){
     c.classList.remove('drop');c.classList.remove('enter');
     void c.offsetWidth;c.classList.add('enter');
   });
+  clearTimeout(stage._reT);
+  stage._reT=setTimeout(function(){stage.classList.remove('reenter');},1250);
 }
 
 /* mockup-only: body-font audition */
