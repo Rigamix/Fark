@@ -334,6 +334,10 @@ body{
 .cb-c.chalk-in{animation:chalkIn .55s cubic-bezier(.2,1.2,.4,1) both}
 #tierBossBtn.lit{box-shadow:0 0 18px rgba(106,184,255,.55),0 0 40px rgba(106,184,255,.25);border-radius:8px}
 /* ═══ PROTO GREYBOX SKIN ═══ */
+#screen-shop{background:#0e0e0e !important}
+#screen-shop>*:not(#gbShop){display:none !important}
+#gbShop{position:absolute;inset:0;overflow:auto;font-family:monospace;color:#ddd;padding:14px}
+
 #screen-gauntlet{background:#0e0e0e !important}
 #screen-gauntlet::before{display:none !important}
 #screen-gauntlet>*:not(#gbRoom){display:none !important}
@@ -7465,6 +7469,26 @@ function _freshRun(){
      the patron grind can't be farmed for infinite lives. */
   return{tier:0,points:0,coins:3,_coinIncomeThisTier:0,cards:[null,null,null,null],pouch:[null,null,null],dice:[..._boneDice],bossesBeaten:[],diceRerolls:1,handicapOffer:null,inGauntlet:false,gauntletIndex:0,gold:100,diceStock:null,cardTarnish:{}};
 }
+function _famDiceMigrate(){
+  if(!S||!S.run||S.run._diceMigrated)return;
+  var refund={brass:350,crystal:700,ruby:400,jade3:1100};
+  var got=0;
+  ['dice'].forEach(function(k){
+    if(!Array.isArray(S.run[k]))return;
+    S.run[k]=S.run[k].map(function(m){
+      if(refund[m]){got+=refund[m];return 'bone';}
+      return m;
+    });
+  });
+  if(Array.isArray(S.run.diceInv)){
+    S.run.diceInv=S.run.diceInv.filter(function(m){
+      if(refund[m]){got+=refund[m];return false;}
+      return true;
+    });
+  }
+  if(got>0)S.run.gold=(S.run.gold||0)+got;
+  S.run._diceMigrated=true;
+}
 function _getS(){
   if(!S){
     try{S=JSON.parse(localStorage.getItem('gambit4_proto'))}catch(e){}
@@ -8719,21 +8743,19 @@ var BOSS_ACCENT={grog:'#ffc070',mabel:'#90b8ff',finnick:'#b0d070',corvus:'#c090e
 /* Sorted ascending by price so the shop reads left-to-right cheap→expensive */
 var DICE_STORE=[
   {mat:'bone',     price:0,   stock:99,label:'Bone'},
-  {mat:'flint',    price:55,  stock:3, label:'Flint'},
-  {mat:'iron',     price:60,  stock:4, label:'Iron'},
-  {mat:'lead',     price:140, stock:3, label:'Lead'},
+  {mat:'flint',    price:150, stock:3, label:'Flint'},
+  {mat:'iron',     price:100, stock:4, label:'Iron'},
+  {mat:'lead',     price:200, stock:3, label:'Lead'},
   /* Amber 120→180 to match DICE_TYPES.cost (and the +200 triple buff).
      Re-sorted after Lead so the store stays cheap→expensive. */
   {mat:'amber',    price:180, stock:2, label:'Amber'},
-  {mat:'brass',    price:350, stock:2, label:'Brass'},
-  {mat:'silver',   price:380, stock:1, label:'Silver'},
-  {mat:'obsidian', price:420, stock:2, label:'Obsidian'},
+  {mat:'silver',   price:580, stock:1, label:'Silver'},
+  {mat:'obsidian', price:500, stock:2, label:'Obsidian'},
   /* Ruby removed from the store — faces 1/1/5/5/6/6 removed the gamble
      entirely (stack a few and you literally can't bust). The red-gem
      material was reskinned onto the Vagabond die instead. */
-  {mat:'starstone',price:620, stock:3, label:'Starstone'},
-  {mat:'vagabond', price:650, stock:2, label:'Vagabond'},
-  {mat:'crystal',  price:700, stock:1, label:'Crystal'},
+  {mat:'starstone',price:700, stock:3, label:'Starstone'},
+  {mat:'vagabond', price:700, stock:2, label:'Vagabond'},
   /* Jade tiers — only ONE of each per match, shop swaps L1→L2 after purchase.
      Collapsed from 3 tiers (180/450/1100) to 2 (750/1800): L1 starts as
      wild_quad (was the old L2 mechanic) so the first buy already feels
@@ -8743,6 +8765,18 @@ var DICE_STORE=[
   {mat:'jade2',    price:1800,stock:1, label:'Jade II'},
 ];
 function _initDiceStock(){var s={};DICE_STORE.forEach(function(d){s[d.mat]=d.stock;});return s;}
+function _shopRollNight(){
+  _getS();
+  if(S.run._shopRoll&&S.run._shopRoll.tier===S.run.tier)return S.run._shopRoll;
+  var fams=['amber','jade','jade2','silver','obsidian','starstone','vagabond'];
+  var sold={},availCount=0;
+  fams.forEach(function(m){var a=Math.random()<0.55;sold[m]=!a;if(a)availCount++;});
+  if(availCount<2){/* never a fully dry night */
+    for(var i=0;i<2;i++){var m=fams[Math.floor(Math.random()*fams.length)];sold[m]=false;}
+  }
+  S.run._shopRoll={tier:S.run.tier,sold:sold};save();
+  return S.run._shopRoll;
+}
 function _dicePrice(mat){
   var d=DICE_STORE.find(function(x){return x.mat===mat;});
   if(!d)return 0;
@@ -9262,7 +9296,13 @@ function _maybeFireCutpurse(){
 }
 
 /* Generate a faceless patron for a given tier */
+var LUCKY_NAMES=['Old Bess','Matilda','The Splinter','Knuckle','Widow\'s Tooth','Pip','The Vicar','Bad Penny','Grandfather','The Last Word'];
 function generatePatron(tierIndex){
+  var _gp=_generatePatronInner(tierIndex);
+  _gp.lucky={name:LUCKY_NAMES[Math.floor(Math.random()*LUCKY_NAMES.length)]};
+  return _gp;
+}
+function _generatePatronInner(tierIndex){
   var t=TIERS[tierIndex];if(!t)t=TIERS[0];
   var ps=t.patronStats;
   /* Target is now FIXED at the midpoint of the tier's range so the same patron
@@ -9281,8 +9321,8 @@ function generatePatron(tierIndex){
   /* Dice: bias toward the persona's preferred materials when the tier
      pool actually offers them (60% pull from the bias subset). */
   var _biasPool=ps.dicePool.filter(function(m){return _persona.dieBias.indexOf(m)>=0;});
-  var dice=[];
-  for(var i=0;i<6;i++){
+  var dice=['lucky'];/* brief §2: every patron carries one named lucky die */
+  for(var i=1;i<6;i++){
     if(_biasPool.length&&Math.random()<0.6)dice.push(_biasPool[Math.floor(Math.random()*_biasPool.length)]);
     else dice.push(ps.dicePool[Math.floor(Math.random()*ps.dicePool.length)]);
   }
@@ -9831,6 +9871,9 @@ function getNpcCard(id){return NPC_CARDS_MAP[id]||null;}
 /* Build CARD_COVERS from CARD_BG+CARDS for gauntlet compatibility */
 const CARD_COVERS=(function(){var cc={};CARDS.forEach(function(c){cc[c.id]={bg:CARD_BG[c.id]||'#444',icon:c.icon||'?'};});NPC_CARDS.forEach(function(c){cc[c.id]={bg:CARD_BG[c.id]||'#444',icon:c.icon||'?'};});return cc;})();
 const DICE_TYPES=[
+  {id:'lucky',name:'LUCKY',icon:'✦',cost:0,
+   faces:[1,2,3,4,5,5],effect:null,hidden:true,
+   desc:'A patron\'s named die — bone with an extra 5. Winnable at For Keeps.'},
   {id:'bone',name:'BONE',icon:'🦴',cost:0,
    faces:[1,2,3,4,5,6],effect:null,
    desc:'Standard faces. Reliable starter.'},
@@ -10489,16 +10532,21 @@ function famCommitBonus(selD,pts){
   if((inst=famInst('short_fuse'))&&(G.turnRollCount||0)>=3){
     pts*=2;inst.state.lit=true;_famPop('x2 SHORT FUSE');
   }
-  if((inst=famInst('bloom'))){
-    var counts={};selD.forEach(function(d){counts[d.val]=(counts[d.val]||0)+1;});
-    var isTriple=Object.keys(counts).some(function(v){return counts[v]>=3;});
-    var uv=Object.keys(counts).map(Number).sort(function(a,b){return a-b;});
-    var run=1,best=1;for(var i=1;i<uv.length;i++){run=(uv[i]===uv[i-1]+1)?run+1:1;if(run>best)best=run;}
-    var isStraight=best>=5;
-    var hasJade=selD.some(function(d){return (d.mat||'').indexOf('jade')===0;});
-    if((isTriple||isStraight)&&hasJade){
-      var P=famDef('bloom').p[inst.tier-1];pts+=P;_famPop('+'+P+' BLOOM');
-    }
+  var _counts={};selD.forEach(function(d){_counts[d.val]=(_counts[d.val]||0)+1;});
+  var _isTriple=Object.keys(_counts).some(function(v){return _counts[v]>=3;});
+  var _uv=Object.keys(_counts).map(Number).sort(function(a,b){return a-b;});
+  var _run=1,_best=1;for(var _i=1;_i<_uv.length;_i++){_run=(_uv[_i]===_uv[_i-1]+1)?_run+1:1;if(_run>_best)_best=_run;}
+  var _isStraight=_best>=5;
+  var _jadeDice=selD.filter(function(d){return (d.mat||'').indexOf('jade')===0;});
+  if((inst=famInst('bloom'))&&(_isTriple||_isStraight)&&_jadeDice.length){
+    var P=famDef('bloom').p[inst.tier-1];pts+=P;_famPop('+'+P+' BLOOM');
+  }
+  if((inst=famInst('cultivate'))&&(_isTriple||_isStraight)&&_jadeDice.length){
+    /* the jade wild fired: those dice grow, and their growth pays now */
+    var grown=0;
+    _jadeDice.forEach(function(d){grown+=(d._cult||0);d._cult=(d._cult||0)+50;});
+    if(grown>0){pts+=grown;_famPop('+'+grown+' CULTIVATE');}
+    else _famPop('CULTIVATE GROWS');
   }
   var first=G.pool[0],last=G.pool[G.pool.length-1];
   var hitFirst=first&&selD.indexOf(first)>=0,hitLast=last&&selD.indexOf(last)>=0;
@@ -10680,6 +10728,65 @@ CFX.preserve={
 };
 /* update the live set */
 ['transmute','fools_gold_f','bloom','preserve','honeytrap','tar_pit','ward','powder_keg','sacrifice','short_fuse','stargazer','ill_omen','sleight','vanguard_f','anchor_f','bookends_f'].forEach(function(id){FAM_LIVE[id]=1;});
+FAM_LIVE.cultivate=1;/* P2: jade dice exist */
+/* ── PROTO greybox loadout: six dice, reorder + swap ── */
+function famLoadoutShow(){
+  _getS();S.run.diceInv=S.run.diceInv||[];
+  var old=document.getElementById('gbLoadout');if(old)old.remove();
+  var ov=document.createElement('div');ov.id='gbLoadout';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9400;overflow:auto;font-family:monospace;color:#ddd;padding:16px';
+  var col=function(m){return {amber:'#d89a20',jade:'#2f9e5f',jade2:'#2f9e5f',silver:'#b9c2cc',obsidian:'#e2582f',starstone:'#4f74e3',vagabond:'#c4404f',lucky:'#dd6'}[m]||'#777';};
+  var h='<div style="max-width:460px;margin:0 auto">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center">'
+    +'<b style="letter-spacing:2px">LOADOUT — DICE</b>'
+    +'<span onclick="document.getElementById(\'gbLoadout\').remove()" style="cursor:pointer;color:#f66;padding:4px 10px;border:1px solid #666">CLOSE</span></div>'
+    +'<div style="color:#777;font-size:10px;margin:6px 0">order matters: first and last spots feed Vagabond cards</div>'
+    +'<div style="display:flex;gap:5px;margin:10px 0">';
+  (S.run.dice||[]).forEach(function(m,i){
+    h+='<div style="flex:1;text-align:center">'
+      +'<div style="height:54px;background:#191919;border:2px solid '+col(m)+';display:flex;align-items:center;justify-content:center;font-size:9px;color:'+col(m)+'">'+getDie(m).name+'</div>'
+      +'<div style="display:flex;gap:2px;margin-top:3px">'
+      +'<span onclick="famDieShift('+i+',-1)" style="flex:1;cursor:pointer;background:#222;border:1px solid #555;font-size:11px">&#9664;</span>'
+      +'<span onclick="famDieShift('+i+',1)" style="flex:1;cursor:pointer;background:#222;border:1px solid #555;font-size:11px">&#9654;</span>'
+      +'</div>'
+      +'<span onclick="famDieStash('+i+')" style="display:block;margin-top:3px;cursor:pointer;background:#222;border:1px solid #555;font-size:9px;color:#8cf">STASH</span>'
+      +'</div>';
+  });
+  h+='</div>';
+  h+='<div style="color:#999;font-size:11px;margin:12px 0 4px">SATCHEL — tap to swap in</div><div style="display:flex;gap:5px;flex-wrap:wrap">';
+  S.run.diceInv.forEach(function(m,i){
+    h+='<div onclick="famDieEquip('+i+')" style="width:50px;height:50px;cursor:pointer;background:#131313;border:1px dashed '+col(m)+';display:flex;align-items:center;justify-content:center;font-size:9px;color:'+col(m)+'">'+getDie(m).name+'</div>';
+  });
+  if(!S.run.diceInv.length)h+='<span style="color:#555;font-size:11px">— empty —</span>';
+  h+='</div><div id="gbSleeveZone"></div></div>';
+  ov.innerHTML=h;
+  document.body.appendChild(ov);
+  if(typeof _gbRenderSleeve==='function')_gbRenderSleeve();
+}
+function famDieShift(i,dir){
+  _getS();var d=S.run.dice;var j=i+dir;
+  if(j<0||j>=d.length)return;
+  var t=d[i];d[i]=d[j];d[j]=t;save();famLoadoutShow();
+}
+function famDieStash(i){
+  _getS();
+  if((S.run.dice||[]).length<=1){famLog('THE TABLE NEEDS DICE');return;}
+  S.run.diceInv=S.run.diceInv||[];
+  S.run.diceInv.push(S.run.dice.splice(i,1)[0]);
+  if(S.run.dice.length<6)S.run.dice.push('bone');/* never roll short */
+  save();famLoadoutShow();
+}
+function famDieEquip(i){
+  _getS();S.run.diceInv=S.run.diceInv||[];
+  var m=S.run.diceInv.splice(i,1)[0];
+  /* swap with the last bone if the row is full */
+  var bi=S.run.dice.lastIndexOf('bone');
+  if(bi<0)bi=S.run.dice.length-1;
+  var outMat=S.run.dice[bi];
+  S.run.dice[bi]=m;
+  if(outMat&&outMat!=='bone')S.run.diceInv.push(outMat);
+  save();famLoadoutShow();
+}
 /* ── PROTO greybox Room: same composition as the real screen, but
    rectangles + words only. Boss up top with the chalkboard, patron
    frames in a 2x2 grid, action row at the bottom. ── */
@@ -10745,7 +10852,7 @@ function _gbRenderRoom(tier,bossReady){
   h+='<div style="display:flex;gap:8px;margin-top:14px">'
     +act('CARDS','famPanelShow()')
     +act('DICE STORE',"SFX.nav();showScreen('shop')")
-    +act('LOADOUT',"SFX.nav();showScreen('loadout')")
+    +act('LOADOUT','famLoadoutShow()')
     +act('MENU',"SFX.nav();showScreen('menu')")
     +'</div>';
   host.innerHTML=h;
@@ -20420,6 +20527,74 @@ function _endDraftDone(){
 
 /* Standalone shop screen — same dice-store renderer that the boss-reward overlay uses */
 function initShopScreen(){
+  return _gbShop();
+}
+function _gbDieCard(mat,opts){
+  opts=opts||{};
+  var dt=getDie(mat);
+  var famColor={amber:'#d89a20',jade:'#2f9e5f',jade2:'#2f9e5f',silver:'#b9c2cc',obsidian:'#e2582f',starstone:'#4f74e3',vagabond:'#c4404f',lucky:'#dd6'}[mat]||'#777';
+  return '<div style="aspect-ratio:2/3;display:flex;flex-direction:column;background:#191919;'
+    +'border:2px solid '+famColor+';padding:6px;box-sizing:border-box;position:relative;'
+    +(opts.dim?'opacity:.45;':'')+'">'
+    +'<div style="font-size:12px;font-weight:bold;color:#eee">'+dt.name+'</div>'
+    +'<div style="width:44px;height:44px;background:'+famColor+'33;border:1px solid '+famColor+';margin:8px auto;'
+      +'display:flex;align-items:center;justify-content:center;font-size:11px;color:'+famColor+'">'+(dt.faces||[]).join('')+'</div>'
+    +'<div style="flex:1;font-size:9px;color:#aaa;line-height:1.4;overflow:hidden">'+(dt.desc||'')+'</div>'
+    +(opts.footer||'')
+    +'</div>';
+}
+function _gbShop(){
+  _getS();_famDiceMigrate();
+  var scr=document.getElementById('screen-shop');if(!scr)return;
+  var host=document.getElementById('gbShop');
+  if(!host){host=document.createElement('div');host.id='gbShop';scr.appendChild(host);}
+  if(!S.run.diceStock)S.run.diceStock=_initDiceStock();
+  var roll=_shopRollNight();
+  var h='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
+    +'<b style="letter-spacing:2px">DICE STORE</b>'
+    +'<span style="background:#453a10;border:1px solid #a90;color:#fd6;padding:3px 10px;font-size:13px">'+(S.run.gold||0)+'g</span></div>'
+    +'<div style="color:#777;font-size:10px;margin-bottom:8px">stock turns over each night</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">';
+  DICE_STORE.forEach(function(d){
+    if(d.mat==='bone')return;
+    var soldOut=(S.run.diceStock[d.mat]||0)<=0;
+    var rotated=roll.sold[d.mat];
+    var price=_dicePrice(d.mat);
+    var canBuy=!soldOut&&!rotated&&(S.run.gold||0)>=price;
+    var foot;
+    if(rotated||soldOut)foot='<div style="text-align:center;font-size:11px;padding:5px 0;background:#222;color:#777;border:1px solid #444">SOLD</div>';
+    else foot='<div onclick="_gbBuyDie(\''+d.mat+'\')" style="text-align:center;font-size:11px;padding:5px 0;cursor:pointer;'
+      +'background:'+(canBuy?'#1d2d1d':'#222')+';color:'+(canBuy?'#8e8':'#a66')+';border:1px solid '+(canBuy?'#4a4':'#633')+'">'+price+'g</div>';
+    h+=_gbDieCard(d.mat,{footer:foot,dim:(rotated||soldOut)});
+  });
+  h+='</div>';
+  var inv=S.run.diceInv||[];
+  h+='<div style="color:#999;font-size:11px;margin:14px 0 4px">YOUR DICE — table row</div>'
+    +'<div style="display:flex;gap:5px">';
+  (S.run.dice||[]).forEach(function(m){
+    var col={amber:'#d89a20',jade:'#2f9e5f',jade2:'#2f9e5f',silver:'#b9c2cc',obsidian:'#e2582f',starstone:'#4f74e3',vagabond:'#c4404f',lucky:'#dd6'}[m]||'#777';
+    h+='<div style="width:44px;height:44px;background:#191919;border:2px solid '+col+';display:flex;align-items:center;justify-content:center;font-size:9px;color:'+col+'">'+getDie(m).name+'</div>';
+  });
+  h+='</div>';
+  if(inv.length){
+    h+='<div style="color:#999;font-size:11px;margin:10px 0 4px">SATCHEL</div><div style="display:flex;gap:5px;flex-wrap:wrap">';
+    inv.forEach(function(m){h+='<div style="width:44px;height:44px;background:#131313;border:1px dashed #666;display:flex;align-items:center;justify-content:center;font-size:9px;color:#999">'+getDie(m).name+'</div>';});
+    h+='</div>';
+  }
+  h+='<div onclick="SFX.nav();showScreen(\'gauntlet\')" style="margin-top:16px;text-align:center;padding:12px 0;background:#1a1a1a;border:2px solid #555;cursor:pointer;letter-spacing:1px">BACK TO THE ROOM</div>';
+  host.innerHTML=h;
+}
+function _gbBuyDie(mat){
+  _getS();
+  var price=_dicePrice(mat);
+  if((S.run.gold||0)<price){famLog('NOT ENOUGH GOLD');return;}
+  if((S.run.diceStock[mat]||0)<=0)return;
+  S.run.gold-=price;S.run.diceStock[mat]--;
+  S.run.diceInv=S.run.diceInv||[];S.run.diceInv.push(mat);
+  save();_gbShop();
+  famLog(getDie(mat).name+' BOUGHT — swap it in at the loadout');
+}
+function _legacyInitShopScreen(){
   _getS();
   if(!S.run.diceStock)S.run.diceStock=_initDiceStock();
   save();
