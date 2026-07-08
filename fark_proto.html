@@ -8681,7 +8681,7 @@ const RUNGS=[
   /* OPPONENT DICE bumped one step above the player's typical loadout at each tier so
      they always feel slightly out-of-reach. The progression: bone→iron→lead→amber
      →jade→brass→silver→crystal/ruby. Bossier patrons mix in more premium materials. */
-  {id:0,name:'GROG',key:'drunkard',icon:'🍺',tier:'regular',target:4000,gold:100,buyIn:10,
+  {id:0,name:'GROG',key:'drunkard',icon:'🍺',tier:'regular',target:3700,gold:100,buyIn:10,
     boss:null,bossDesc:null,
     agg:.56,cardRarity:null,wager:false,wagerCount:0,wagerMode:'none',minBank:150,diceStop:2,chaotic:true,adaptive:false,
     dice:['bone','bone','bone','iron','iron','iron'],
@@ -8796,7 +8796,7 @@ function _dicePrice(mat){
 const TIERS=[
   {id:0,name:'THE DREG',pointsNeeded:2,
     boss:RUNGS[0],/* Grog @ 4000 */
-    patronStats:{targetMin:2500,targetMax:3500,aggMin:.50,aggMax:.62,dicePool:['bone'],minBank:150,diceStop:3},
+    patronStats:{targetMin:2400,targetMax:3200,aggMin:.50,aggMax:.62,dicePool:['bone'],minBank:150,diceStop:3},
     /* Tier 0/1: tin-only draft so the player commits to tins before
        silvers start showing up. */
     draftPool:['tin'],
@@ -9071,6 +9071,9 @@ function _applySleeve(){
   if(!G)return;
   G._sleeve=(S&&S.run&&S.run.sleeve)||null;
   if(!G._sleeve)return;
+  if(!G._tellState)G._tellState={};
+  if(G._sleeve==='reckoning'&&G._tellState.lastNpcBank==null)G._tellState.lastNpcBank=0;
+  if(G._sleeve==='steeped'&&G._tellState.bonus==null)G._tellState.bonus=0;
   /* patron matches: the sleeve occupies the tell machinery so every
      player-side rule site fires; boss matches keep the boss tell there
      (double rule: sleeve still binds both via _ruleActive checks). */
@@ -11022,8 +11025,23 @@ function famDieEquip(i){
 /* ── PROTO greybox Room: same composition as the real screen, but
    rectangles + words only. Boss up top with the chalkboard, patron
    frames in a 2x2 grid, action row at the bottom. ── */
+function _gbRunWon(){
+  var scr=document.getElementById('screen-gauntlet');if(!scr)return;
+  var host=document.getElementById('gbRoom');
+  if(!host){host=document.createElement('div');host.id='gbRoom';scr.appendChild(host);}
+  _getS();
+  host.innerHTML='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;line-height:2.2">'
+    +'<div style="font-size:22px;letter-spacing:4px;color:#dc5;border:2px solid #dc5;padding:14px 26px">RUN WON</div>'
+    +'<div style="margin-top:14px;color:#ca8">'+(playerTitle()!=='nobody'?playerTitle():'')+'</div>'
+    +'<div style="color:#999;font-size:12px">eight nights survived · '+(S.run.gold||0)+'g in the purse</div>'
+    +'<div style="color:#999;font-size:12px">renown '+(S.renown||0)+' · feats '+(Object.keys(S.featsDone||{}).length)+'</div>'
+    +'<div style="margin-top:8px">'+((S.trophies||[]).map(function(t){return '<span style="border:1px solid #dd6;color:#dd6;font-size:10px;padding:4px 8px;margin:2px">🏆 '+getDie(t).name+'</span>';}).join(''))+'</div>'
+    +'<div onclick="startNewRun();showScreen(\'gauntlet\')" style="margin-top:22px;cursor:pointer;padding:12px 30px;background:#1d2d1d;border:2px solid #4a4;color:#8e8;letter-spacing:2px">A NEW RUN</div>'
+    +'</div>';
+}
 function _gbRenderRoom(tier,bossReady){
   var scr=document.getElementById('screen-gauntlet');if(!scr)return;
+  if(S&&S.run&&S.run.tier>=TIERS.length){_gbRunWon();return;}
   var host=document.getElementById('gbRoom');
   if(!host){host=document.createElement('div');host.id='gbRoom';scr.appendChild(host);}
   var n=S.run.night||{roster:[],seatsPlayed:[],results:[]};
@@ -13546,7 +13564,7 @@ function startPTurn(){
     /* Steeped: reset accumulated bonus each turn */
     if(G._tell.id==='steeped'&&G._tellState){G._tellState.bonus=0;_updateTellHUD();}
     /* Drill Order: refresh roll counter HUD */
-    if(G._tell.id==='drill_order'){_updateTellHUD();}
+    if(_ruleActive('drill_order','p')&&G._tell&&G._tell.id==='drill_order'){_updateTellHUD();}
     /* Reckoning: refresh floor display */
     if(G._tell.id==='reckoning'){_updateTellHUD();}
     /* Confession: pick a random equipped card to seal this turn */
@@ -13770,7 +13788,7 @@ function handleRoll(){
      table and can still Bank. Hot Dice bypasses this entirely (it
      auto-rolls without going through handleRoll). This block is just a
      belt-and-braces refuse in case the locked button is somehow clicked. */
-  if(G._tell&&G._tell.id==='drill_order'&&G.turnRollCount>=G._tell.maxRolls){
+  if(_ruleActive('drill_order','p')&&G.turnRollCount>=(((G._tell&&G._tell.id==='drill_order')?G._tell:_tellById('drill_order')||{}).maxRolls||3)){
     setStatusMsg("DRILL ORDER — ROLL LOCKED. BANK YOUR SCORE.",'red');
     try{SFX.err&&SFX.err();}catch(e){}
     _updateDrillLock();
@@ -14030,13 +14048,13 @@ function _afterRollImpl(){
   if(typeof famApplyRollForces==='function'&&G&&G.phase!=='opp')famApplyRollForces();
   if(typeof famFire==='function'&&G&&G.phase!=='opp')famFire('roll',{actor:'p',rolls:G.turnRollCount||0});
   G.turnRollCount++;
-  /* ── TELL HOOKS (post-roll) ── */
-  if(G._tell){
+  /* ── TELL HOOKS (post-roll) — a sleeved rule binds the player too ── */
+  if(G._tell||G._sleeve){
     /* Steeped (Mabel): +X per roll past the first this turn. The per-die
        spawnPop badge was removed — _updateTellHUD now ticks the running
        total up directly on the badge (next to STEEPED) which is more
        readable and avoids two separate "+X" popups racing on screen. */
-    if(G._tell.id==='steeped'&&G.turnRollCount>1){
+    if(_ruleActive('steeped','p')&&G.turnRollCount>1){
       if(!G._tellState)G._tellState={bonus:0};
       G._tellState.bonus=(G._tellState.bonus||0)+(G._tell.perRoll||50);
       _updateTellHUD();
@@ -14044,7 +14062,7 @@ function _afterRollImpl(){
     }
     /* In Arrears (Corvus): −Xg per roll, gold can go negative.
        Also ticks the inline HUD value next to the Tell title. */
-    if(G._tell.id==='in_arrears'&&S&&S.run){
+    if(_ruleActive('in_arrears','p')&&S&&S.run){
       if(!G._tellState)G._tellState={totalRollCost:0};
       var _iaCost=G._tell.perRoll||15;
       S.run.gold=(S.run.gold||0)-_iaCost;
@@ -14060,11 +14078,11 @@ function _afterRollImpl(){
       try{save();}catch(e){}
     }
     /* Drill Order: update HUD counter */
-    if(G._tell.id==='drill_order'){_updateTellHUD();}
+    if(_ruleActive('drill_order','p')&&G._tell&&G._tell.id==='drill_order'){_updateTellHUD();}
     /* Counterfeit: re-mark cursed dice after each roll (pool re-rendered) */
-    if(G._tell.id==='counterfeit'){setTimeout(_markCounterfeitDice,500);}
+    if(_ruleActive('counterfeit','p')){setTimeout(_markCounterfeitDice,500);}
     /* Cutpurse: maybe palm a die after the roll settles */
-    if(G._tell.id==='pickpocket'){setTimeout(_maybeFireCutpurse,650);}
+    if(_ruleActive('pickpocket','p')){setTimeout(_maybeFireCutpurse,650);}
   }
   /* ── Obsidian shatter check — each rolled obsidian die has a small
      chance to shatter, granting bonus points and removing the die from
@@ -15496,7 +15514,7 @@ function handleBank(){
       G._tellState.bonus=0;_updateTellHUD();
     }
     /* The Reckoning (Ambrose): bank must ≥ Ambrose's last bank or score 0 */
-    if(G._tell.id==='reckoning'&&G._tellState&&G._tellState.lastNpcBank>0&&total<G._tellState.lastNpcBank){
+    if(_ruleActive('reckoning','p')&&G._tellState&&G._tellState.lastNpcBank>0&&total<G._tellState.lastNpcBank){
       var _rkFloor=G._tellState.lastNpcBank;
       total=0;bonusMsg=' RECKONING — BANK <'+_rkFloor;
       setStatusMsg("RECKONING — BANK BELOW "+_rkFloor+'!','red');
@@ -15505,8 +15523,8 @@ function handleBank(){
       _flashTellRule();
     }
     /* Last Call (Grog): bank below threshold scores 0 */
-    if(G._tell.id==='last_call'&&total<G._tell.threshold){
-      var _lcT=G._tell.threshold;
+    if(_ruleActive('last_call','p')&&total<(((G._tell&&G._tell.id==='last_call')?G._tell:_tellById('last_call')||{}).threshold||500)){
+      var _lcT=((G._tell&&G._tell.id==='last_call')?G._tell:_tellById('last_call')||{}).threshold||500;
       total=0;bonusMsg=' LAST CALL <'+_lcT;
       setStatusMsg("LAST CALL — UNDER "+_lcT+'!','red');
       /* Distinct harsh sound — was reusing SFX.bust which felt like a
@@ -15888,6 +15906,11 @@ function runOppTurn(){
      ghost dice into the NEXT match and could even end it as a loss. */
   var _matchG=G;
   let oppBank=0,left=6,oppRollNum=0,sootyActive=false;
+  if(G._oPreserve){
+    oppBank+=G._oPreserve;
+    setStatusMsg(G.rung.name+': AMBER CRACKS — '+G._oPreserve+' ALREADY KEPT','red');
+    G._oPreserve=0;
+  }
   /* Reset cross-roll commit counter at NPC turn start. G.oppDice is wiped
      each roll, so a per-roll count of kept dice doesn't capture what
      "totalCommitted across the turn" actually means. Player feedback B4:
@@ -16038,6 +16061,19 @@ function runOppTurn(){
       if(G._lanternActive)el.classList.add('die-blind');
       G.oppDice.push({val,el,kept:false,mat:dieMat});}
     sootyActive=false;
+    /* BULLISH honeytrap: pull one fresh die into the modal face (P5/P9) */
+    (function(){
+      var c=_npcFamCard('honeytrap');
+      if(!c||oppRollNum<2||Math.random()>=0.5)return;
+      var fresh=G.oppDice.filter(function(d){return !d.kept;});
+      if(fresh.length<3)return;
+      var cnt={};fresh.forEach(function(d){cnt[d.val]=(cnt[d.val]||0)+1;});
+      var modal=Object.keys(cnt).sort(function(a,b){return cnt[b]-cnt[a];})[0];
+      var vic=fresh.filter(function(d){return d.val!==Number(modal);})[0];
+      if(!vic)return;
+      c.charges--;vic.val=Number(modal);try{reDrawDieFace(vic);}catch(e){}
+      setStatusMsg(G.rung.name+': HONEYTRAP — A DIE IS PULLED TO '+modal,'red');
+    })();
     /* HOT STREAK NPC mirror: after 2 safe banked turns, NPC's next first-roll
        gets one die forced to 1 and another to 5. Consume the armed flag here. */
     if(G._oHotStreakReady&&oppRollNum===1&&G.oCards.includes('hot_streak')){
@@ -16129,6 +16165,19 @@ function runOppTurn(){
       }
       /* ── NPC bust-prevention via active cards (mirror-match loadouts) ──
          If the roll would score 0, try converting blanks to scorers before resolving the bust. */
+      if(total===0){
+        var _oEnc=_npcFamCard('encore')||_npcFamCard('stargazer');
+        if(_oEnc){
+          _oEnc.charges--;
+          var _encFree=G.oppDice.filter(function(d){return !d.kept;});
+          _encFree.forEach(function(d){d.val=rollFace(d.mat);try{reDrawDieFace(d);}catch(e){}});
+          setStatusMsg(G.rung.name+': '+(_oEnc.id==='encore'?'ENCORE':'THE OMEN')+' — THEY ROLL AGAIN','red');
+          var _encV=_encFree.map(function(d){return d.val;}),_encM=_encFree.map(function(d){return d.mat;});
+          var _encRs=scoreRoll(_encV,G.oCards,oppBank,crowsCtx,_encM);
+          total=_encRs.total;used=_encRs.used;
+          try{famRenderRow();}catch(e){}
+        }
+      }
       if(total===0){
         var _npcFree=G.oppDice.filter(function(d){return !d.kept;});
         var _npcBlanks=_npcFree.filter(function(d){return d.val!==1&&d.val!==5;});
@@ -16674,6 +16723,10 @@ function runOppTurn(){
     /* ── NPC family cards fire on their own turns (P5) ── */
     (function(){
       var c;
+      if(pts>0&&(c=_npcFamCard('preserve'))){
+        c.charges--;G._oPreserve=100;
+        setStatusMsg(G.rung.name+' TRAPS A DIE IN AMBER FOR NEXT TURN','red');
+      }
       if(pts>0&&(c=_npcFamCard('slow_cook'))&&oppRollNum>2){
         var sb=(oppRollNum-2)*famDef('slow_cook').p[c.tier-1];pts+=sb;
         setStatusMsg('THEIR POT SIMMERS — +'+sb+' SLOW COOK','red');
@@ -17101,7 +17154,7 @@ function runOppTurn(){
       else{G.oPts+=pts;_npcActuallyBanked=true;setStatusMsg((G.rung?G.rung.name:'RIVAL')+' BANKED '+pts.toLocaleString(),'active');if(window.DLG&&pts>=600)DLG.trigger('OPP_BIG_BANK');}
       famFire('bank',{actor:'o',amt:pts});
       /* TELL: Reckoning (Ambrose) — record his last bank only if he actually scored it */
-      if(_npcActuallyBanked&&G._tell&&G._tell.id==='reckoning'&&pts>0){
+      if(_npcActuallyBanked&&_ruleActive('reckoning','p')&&pts>0){
         G._tellState.lastNpcBank=pts;
         _updateTellHUD();
         setStatusMsg("RECKONING — NEXT BANK ≥ "+pts,'red');
@@ -17741,8 +17794,23 @@ function endMatch(win){
     if(endBtns)endBtns.style.display='none';
   }
 
-  /* Boss wins: SPOILS — his table, pick exactly one, final (brief §6) */
-  if(win&&isBoss){
+  /* Night 8 (Ambrose): renown payout, his die is a trophy — no spoils */
+  if(win&&isBoss&&G.rung&&G.rung.key==='ambrose'){
+    _getS();
+    if(!S.run._n8Paid){
+      S.run._n8Paid=true;
+      S.renown=(S.renown||0)+150;
+      S.trophies=S.trophies||[];if(S.trophies.indexOf('ambrose_weight')<0)S.trophies.push('ambrose_weight');
+      save();
+    }
+    if(resCard){resCard.innerHTML='<div style="font-family:monospace;color:#dc5;padding:24px 10px;text-align:center;line-height:2">'
+      +'THE HOUSE REMEMBERS YOUR NAME<br>'
+      +'<span style="color:#ca8">TITLE: '+playerTitle().toUpperCase()+'</span><br>'
+      +'<span style="color:#999;font-size:11px">+150 renown · his weight sits on your shelf</span></div>';
+      resCard.classList.add('show');}
+    if(endBtns)endBtns.style.display='';_endScreenPhase='ready';
+  }
+  else if(win&&isBoss){
     var _spKey=(G.rung&&G.rung.key)||'';
     var _spRelic={grog:'grogs_tooth',mabel:'mabels_thimble',finnick:'finnicks_palm',corvus:'corvus_ledger_d',
       brutus:'brutus_shield',aldric:'aldrics_square',whisper:'whispers_fang',ambrose:'ambrose_weight'}[_spKey];
@@ -20210,6 +20278,9 @@ function initMatchScreen(data){
 
   /* ── Apply patron Tell (signature passive rule) ── */
   _applyTellAndSleeve();
+  if(typeof playerTitle==='function'&&playerTitle()!=='nobody'){
+    setTimeout(function(){try{setStatusMsg((G&&G.rung?G.rung.name:'')+': “WELL MET, '+playerTitle().toUpperCase()+'.”','');}catch(e){}},400);
+  }
 
   // Update gold display
   var _goldEl=document.getElementById('goldAmt');

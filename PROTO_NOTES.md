@@ -123,3 +123,22 @@ Not done (needs your call / later): NPC use of self-dice actives
   (encore/stargazer/preserve/honeytrap for NPCs), night-8 renown-payout
   ceremony, run-won screen, dialogue title address, old-code physical
   deletion sweep.
+
+## P9 gaps closed (done)
+
+- Dual rules for real: every player-side tell site converted to
+  _ruleActive(id,'p') — a sleeved rule now binds the player even in boss
+  fights (boss tell + sleeve = two live rules both sides). Thresholds/
+  maxRolls resolve from _tellById when the boss tell differs.
+- NPC self-dice actives: encore/stargazer = they reroll a dead roll
+  instead of busting; honeytrap pulls a fresh die to their modal face
+  (50% from roll 2); preserve banks 100 into their next turn's start.
+- Night 8: Ambrose win pays renown (+150) + trophy, no spoils; RUN WON
+  screen (title, gold, renown, feats, trophies, A NEW RUN).
+- NPCs greet the player by title at match start.
+- Tuning notch: T0 patrons 2400-3200, Grog 3700. Sim T0: 56% patron /
+  5 med turns / 44% boss (bands: 60-70 / 45-55; sim plays cardless
+  bank300 — real play sits higher, revisit after playtests).
+- DEFERRED on purpose: physical deletion of the old card code (~330
+  inert sites). Zero behavior now; deleting mid-proto risks breakage for
+  no gain. Belongs in the final port to the real UI build.
