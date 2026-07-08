@@ -9352,6 +9352,14 @@ function generatePatron(tierIndex){
     fc.push({id:pick.id,tier:t});
   }
   _gp.fcards=fc;
+  if(S&&S.run&&S.run._grudges&&S.run._grudges[_gp.persona]){
+    _gp.grudge=true;_gp.agg=Math.min(0.95,(_gp.agg||0.5)+0.12);
+    if(fc.length<3&&Math.random()<0.5){/* +1 aggression tier: an extra card */
+      var gPool=FAM_CARDS.filter(function(d){return FAM_LIVE[d.id]&&!d.unique;});
+      var gp2=gPool[Math.floor(Math.random()*gPool.length)];
+      fc.push({id:gp2.id,tier:1});
+    }
+  }
   return _gp;
 }
 function _generatePatronInner(tierIndex){
@@ -10497,6 +10505,9 @@ function famOwnTier(id){
 function famOffer(forceTier1){
   var night=(S.run.tier||0)+1;
   var pool=FAM_CARDS.filter(function(d){return FAM_LIVE[d.id]&&!d.unique&&famOwnTier(d.id)<3;});
+  if(night>=4&&!forceTier1&&famOwnTier('for_keeps')===0&&Math.random()<0.25){
+    pool=pool.concat([famDef('for_keeps')]);/* the dice wager enters late drafts */
+  }
   var ownedFams={};famOwnedAll().forEach(function(c){var d=famDef(c.id);if(d)ownedFams[d.fam]=1;});
   function draw(){
     var cands=pool;
@@ -10566,6 +10577,23 @@ function famDraftPick(i){
   var d=famDef(o.id);
   if(rc)rc.innerHTML='<div style="font-family:monospace;color:#8e8;padding:30px 10px;text-align:center">TAKEN: '
     +d.name.toUpperCase()+' '+['I','II','III'][o.tier-1]+'</div>';
+  _famEndReady();
+}
+function famFkTake(i){
+  var pool=window._fkPool;if(!pool)return;
+  var m=pool[i];if(!m)return;
+  _getS();S.run.diceInv=S.run.diceInv||[];
+  S.run.diceInv.push(m);
+  var msg;
+  if(m==='lucky'){
+    S.run.luckyNames=S.run.luckyNames||[];S.run.luckyNames.push(window._fkLucky);
+    S.run._grudges=S.run._grudges||{};
+    if(window._fkPersona)S.run._grudges[window._fkPersona]=true;/* the archetype remembers */
+    msg='✦ '+window._fkLucky+' IS YOURS — ITS OWNER WILL REMEMBER';
+  }else msg=getDie(m).name+' IS YOURS';
+  window._fkPool=null;save();
+  var rc=document.querySelector('#end-ov .res-card');
+  if(rc)rc.innerHTML='<div style="font-family:monospace;color:#f8a;padding:30px 10px;text-align:center">'+msg+'</div>';
   _famEndReady();
 }
 function famSpoilsPick(kind){
@@ -10877,7 +10905,7 @@ CFX.preserve={
   }
 };
 /* update the live set */
-['transmute','fools_gold_f','bloom','preserve','honeytrap','tar_pit','ward','powder_keg','sacrifice','short_fuse','stargazer','ill_omen','sleight','vanguard_f','anchor_f','bookends_f'].forEach(function(id){FAM_LIVE[id]=1;});
+['transmute','fools_gold_f','bloom','preserve','honeytrap','tar_pit','ward','powder_keg','sacrifice','short_fuse','stargazer','ill_omen','sleight','vanguard_f','anchor_f','bookends_f','for_keeps'].forEach(function(id){FAM_LIVE[id]=1;});
 FAM_LIVE.cultivate=1;/* P2: jade dice exist */
 FAM_LIVE.tamper=1;/* P5: opponent cards visible */
 /* ── PROTO greybox loadout: six dice, reorder + swap ── */
@@ -11009,6 +11037,7 @@ function _gbRenderRoom(tier,bossReady){
     }else{
       inner='<div style="height:120px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#242424;border:2px solid #777;position:relative">'
         +(hc?'<div style="position:absolute;top:4px;right:4px;background:#639;color:#dcf;font-size:9px;padding:2px 6px">HANDICAP x2</div>':'')
+        +(pat.grudge?'<div style="position:absolute;top:4px;left:4px;background:#611;color:#f99;font-size:9px;padding:2px 6px">GRUDGE</div>':'')
         +'<div style="width:52px;height:52px;background:#3a3a3a;border:1px solid #666;margin-bottom:8px"></div>'
         +'<div style="font-size:12px;letter-spacing:1px;color:#eee">'+disp+'</div>'
         +'<div style="font-size:10px;color:#a86">'+(_TRAIT_SYMBOL[pat.persona]||'')+' '+word
@@ -11021,6 +11050,14 @@ function _gbRenderRoom(tier,bossReady){
   });
   h+='</div>';
 
+  /* FOR KEEPS: arm the dice wager before sitting down (patron tables only) */
+  if(famOwnTier('for_keeps')>0){
+    var fk=!!S.run._fkArmed;
+    h+='<div onclick="_getS();S.run._fkArmed=!S.run._fkArmed;save();showScreen(&quot;gauntlet&quot;)" '
+      +'style="cursor:pointer;margin-top:10px;padding:9px;text-align:center;font-size:12px;letter-spacing:1px;'
+      +'border:2px '+(fk?'solid #c4404f':'dashed #644')+';color:'+(fk?'#f8a':'#a77')+';background:#181114">'
+      +(fk?'FOR KEEPS ARMED — NEXT MATCH IS FOR DICE':'FOR KEEPS — TAP TO PLAY IT ON THE NEXT SEAT')+'</div>';
+  }
   /* action row */
   function act(label,fn,color){return '<div onclick="'+fn+'" style="flex:1;text-align:center;padding:12px 0;background:#1a1a1a;'
     +'border:2px solid '+(color||'#555')+';cursor:pointer;font-size:12px;letter-spacing:1px;color:#ddd">'+label+'</div>';}
@@ -17644,7 +17681,24 @@ function endMatch(win){
   }
 
   /* For patron wins: family draft, greybox (P1 cutover) */
-  if(win&&!isBoss){
+  if(win&&!isBoss&&G&&G._forKeeps){
+    var _fkDice=(G.rung&&G.rung.dice)||[];
+    var _fkName=(G.rung&&G.rung.lucky&&G.rung.lucky.name)||'their lucky die';
+    var fkh='<div style="font-family:monospace;color:#eee;padding:10px 6px">'
+      +'<div style="font-size:12px;letter-spacing:2px;color:#f8a;margin-bottom:10px">FOR KEEPS — TAKE ONE OF THEIRS</div>'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap">';
+    _fkDice.forEach(function(m,i){
+      var nm=m==='lucky'?('✦ '+_fkName):getDie(m).name;
+      fkh+='<div onclick="famFkTake('+i+')" style="cursor:pointer;width:64px;height:64px;background:#191919;'
+        +'border:2px solid '+(m==='lucky'?'#dd6':'#777')+';display:flex;align-items:center;justify-content:center;'
+        +'font-size:9px;color:#ddd;text-align:center">'+nm+'</div>';
+    });
+    fkh+='</div></div>';
+    window._fkPool=_fkDice.slice();window._fkLucky=_fkName;window._fkPersona=G.rung&&G.rung.persona;
+    if(resCard){resCard.innerHTML=fkh;resCard.classList.add('show');}
+    if(endBtns)endBtns.style.display='none';
+  }
+  else if(win&&!isBoss){
     _famOffer=famOffer(false);
     var _dg=5+((S.run.tier||0)+1)*5;
     if(resCard){resCard.innerHTML=famOfferHtml(_famOffer,'famDraftPick',_dg);resCard.classList.add('show');}
@@ -17680,7 +17734,10 @@ function endMatch(win){
     if(endBtns)endBtns.style.display='none';
   }
   /* Show CONTINUE for losses — mark phase ready since animation is done */
-  if(!win){if(endBtns)endBtns.style.display='';_endScreenPhase='ready';}
+  if(!win){
+    if(G&&G._forKeeps)setStatusMsg('FOR KEEPS — THEY TAKE THEIR PICK OF YOUR DICE','red');
+    if(endBtns)endBtns.style.display='';_endScreenPhase='ready';
+  }
   /* Draw button canvases */
   requestAnimationFrame(function(){
     var cvCont=document.getElementById('cvBtnContinue');
@@ -17696,7 +17753,7 @@ function endMatch(win){
   _endScreenData=_bossLossData?{pFinal:G.pPts,oFinal:G.oPts,cardHTML:_bossLossData.cardHTML,dlgHTML:_bossLossData.dlgHTML,isCardLost:true}:null;
 
   /* Store navigation data for handleContinue */
-  G._endRoute={win:win,isBoss:isBoss,seatIdx:((typeof LO!=='undefined'&&LO&&LO.seatIdx!=null)?LO.seatIdx:null),isGauntlet:isGauntlet,isHandicap:isHandicap,practice:!!G._practice,pointsEarned:pointsEarned,bossName:G.rung?G.rung.name:'',bossKey:G.rung?G.rung.key:'',_bossLossData:_bossLossData||null};
+  G._endRoute={_forKeeps:!!G._forKeeps,win:win,isBoss:isBoss,seatIdx:((typeof LO!=='undefined'&&LO&&LO.seatIdx!=null)?LO.seatIdx:null),isGauntlet:isGauntlet,isHandicap:isHandicap,practice:!!G._practice,pointsEarned:pointsEarned,bossName:G.rung?G.rung.name:'',bossKey:G.rung?G.rung.key:'',_bossLossData:_bossLossData||null};
   /* Settle the outcome into S.run NOW (tier/hearts/points/death), not at the
      CONTINUE tap — closing the app on the end screen must not drop a boss
      win or dodge a boss loss. Skipped for practice matches (nothing at stake). */
@@ -17924,8 +17981,18 @@ function _settleEndRoute(route){
     _markSeatResult(route);
     _checkNightFail();
   }else if(!route.win&&!route.isBoss){
-    /* Plain patron loss — seat + buy-in already spent at launch; the loss
-       stamp is already pessimistically set. Just see if the night is over. */
+    if(route._forKeeps){
+      /* they take one of YOURS — their pick: relics first, then family, then mundane */
+      var rank=function(m){var dt=getDie(m);if(dt.relic)return 3;if(dt.effect)return 2;if(m!=='bone')return 1;return 0;};
+      var pool2=(S.run.dice||[]).slice().concat(S.run.diceInv||[]);
+      if(pool2.length){
+        var best=pool2.sort(function(a,b){return rank(b)-rank(a);})[0];
+        var di=(S.run.dice||[]).indexOf(best);
+        if(di>=0){S.run.dice.splice(di,1);if(S.run.dice.length<6)S.run.dice.push('bone');}
+        else{var ii=(S.run.diceInv||[]).indexOf(best);if(ii>=0)S.run.diceInv.splice(ii,1);}
+        route._fkLost=best;
+      }
+    }
     _markSeatResult(route);
     _checkNightFail();
   }
@@ -22822,6 +22889,7 @@ function launchSeat(seatIdx){
      'lost' until the settle flips it — abandoning keeps the loss. */
   var buy=Math.min((S.run.gold||0),(NIGHT_BUYINS[S.run.tier]||0));
   S.run.gold=(S.run.gold||0)-buy;
+  var _fkPlay=!!S.run._fkArmed;S.run._fkArmed=false;
   night.seatsPlayed[seatIdx]=true;
   night.results[seatIdx]='lost';
   save();
@@ -22851,6 +22919,7 @@ function launchSeat(seatIdx){
       handicap:handicap,
       seatIdx:seatIdx
     });
+    if(_fkPlay&&G){G._forKeeps=true;famLog('FOR KEEPS — THIS MATCH IS FOR DICE');}
   },80);
 }
 /* legacy entry (debug paths) — delegates to the first open seat */
