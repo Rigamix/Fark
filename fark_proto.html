@@ -9052,6 +9052,39 @@ function _initHandicapHUD(){
    match-long passive that warps play (Balatro-style boss blind).
    _applyTell() sets up G-side state. _initTellHUD() builds a persistent
    badge near the player dice. _showTellSplash() does the match-start reveal. */
+function _tellById(id){
+  for(var i=0;i<RUNGS.length;i++)if(RUNGS[i].tell&&RUNGS[i].tell.id===id)return RUNGS[i].tell;
+  return null;
+}
+/* is a table rule live for this side? boss tell binds the player only;
+   a sleeved tell binds BOTH sides (brief §7) */
+function _ruleActive(id,side){
+  if(!G)return false;
+  if(G._sleeve===id)return true;
+  if(side==='p'&&G._tell&&G._tell.id===id)return true;
+  return false;
+}
+function _applySleeve(){
+  if(!G)return;
+  G._sleeve=(S&&S.run&&S.run.sleeve)||null;
+  if(!G._sleeve)return;
+  /* patron matches: the sleeve occupies the tell machinery so every
+     player-side rule site fires; boss matches keep the boss tell there
+     (double rule: sleeve still binds both via _ruleActive checks). */
+  if(!G._tell){
+    var t=_tellById(G._sleeve);
+    if(t){G._tell=t;G._tellState={};
+      if(t.id==='steeped')G._tellState.bonus=0;
+      if(t.id==='in_arrears')G._tellState.totalRollCost=0;
+      if(t.id==='counterfeit'){G._tellState.cursedDice=[];G._tellState.lastCurseTurn=0;}
+      if(t.id==='reckoning')G._tellState.lastNpcBank=0;
+    }
+  }
+  famLog('SLEEVED RULE: '+G._sleeve.toUpperCase().replace('_',' ')+' — BINDS BOTH SIDES');
+}
+function tellGive(id){_getS();S.run.tells=S.run.tells||[];
+  if(S.run.tells.indexOf(id)<0)S.run.tells.push(id);save();return S.run.tells;}
+function _applyTellAndSleeve(){_applyTell();_applySleeve();}
 function _applyTell(){
   if(!G||!G.rung||!G.rung.tell)return;
   G._tell=G.rung.tell;
@@ -10353,15 +10386,24 @@ function famRenderRow(){
     var col=(FAMILIES[d.fam]||{}).color||'#888';
     var chg=d.charges?(' ['+inst.charges+']'):'';
     var usable=d.kind==='active'&&inst.charges>0&&CFX[inst.id]&&CFX[inst.id].use;
+    var sealed=(typeof _ruleActive==='function'&&_ruleActive('confession','p')&&G._fSealIdx===i);
     html+='<div onclick="famUse('+i+')" style="cursor:'+(usable?'pointer':'default')+';padding:3px 7px;background:#111;color:#eee;'
-      +'border:1px solid #555;border-left:4px solid '+col+';opacity:'+((d.kind==='active'&&inst.charges<=0)?0.35:1)+'" '
+      +'border:1px solid #555;border-left:4px solid '+col+';opacity:'+((sealed||(d.kind==='active'&&inst.charges<=0))?0.35:1)+'" '
       +'title="'+d.text[inst.tier-1].replace(/"/g,'&quot;')+'">'
-      +d.name.toUpperCase()+' '+['I','II','III'][inst.tier-1]+chg+(inst.state.armed?' ⚡':'')+'</div>';
+      +(sealed?'⛪ ':'')+d.name.toUpperCase()+' '+['I','II','III'][inst.tier-1]+chg+(inst.state.armed?' ⚡':'')+'</div>';
   });
+  if(G&&G._tell)html+='<div style="padding:2px 7px;background:#221;color:#ca6;border:1px dashed #653;font-size:10px">RULE: '
+    +G._tell.name+(G.isBoss?' (you)':' (both)')+'</div>';
+  if(G&&G._sleeve&&(!G._tell||G._tell.id!==G._sleeve)){
+    var _st=_tellById(G._sleeve);
+    html+='<div style="padding:2px 7px;background:#122;color:#6bc;border:1px dashed #365;font-size:10px">SLEEVED: '
+      +(_st?_st.name:G._sleeve)+' (both)</div>';
+  }
   host.innerHTML=html;
 }
 function famUse(i){
   if(!G||!G.pF||!G.pF[i])return;
+  if(_ruleActive('confession','p')&&G._fSealIdx===i){famLog('SEALED SHUT THIS TURN');return;}
   var inst=G.pF[i],d=famDef(inst.id),fx=CFX[inst.id];
   if(!d||d.kind!=='active'||!fx||!fx.use)return;
   if(inst.charges<=0)return;
@@ -10761,8 +10803,28 @@ function famLoadoutShow(){
   h+='</div><div id="gbSleeveZone"></div></div>';
   ov.innerHTML=h;
   document.body.appendChild(ov);
-  if(typeof _gbRenderSleeve==='function')_gbRenderSleeve();
+  _gbRenderSleeve();
 }
+function _gbRenderSleeve(){
+  var host=document.getElementById('gbSleeveZone');if(!host)return;
+  _getS();S.run.tells=S.run.tells||[];
+  var h='<div style="color:#999;font-size:11px;margin:16px 0 4px">THE SLEEVE — one claimed tell, a rule for the whole table</div>';
+  if(!S.run.tells.length){
+    h+='<div style="color:#555;font-size:11px;border:1px dashed #444;padding:10px;text-align:center">no tells claimed yet — beat a boss and choose his tell as spoils</div>';
+  }else{
+    h+='<div onclick="famSleeveSet(null)" style="cursor:pointer;display:inline-block;margin:3px;padding:6px 10px;font-size:11px;'
+      +'border:2px solid '+(S.run.sleeve?'#444':'#8e8')+';color:'+(S.run.sleeve?'#888':'#8e8')+';background:#151515">EMPTY</div>';
+    S.run.tells.forEach(function(id){
+      var t=_tellById(id);if(!t)return;
+      var on=S.run.sleeve===id;
+      h+='<div onclick="famSleeveSet(\''+id+'\')" style="cursor:pointer;display:inline-block;margin:3px;padding:6px 10px;font-size:11px;'
+        +'border:2px solid '+(on?'#6bc':'#444')+';color:'+(on?'#6bc':'#aaa')+';background:#151515" title="'+t.desc.replace(/"/g,'&quot;')+'">'
+        +t.icon+' '+t.name+'</div>';
+    });
+  }
+  host.innerHTML=h;
+}
+function famSleeveSet(id){_getS();S.run.sleeve=id;save();_gbRenderSleeve();}
 function famDieShift(i,dir){
   _getS();var d=S.run.dice;var j=i+dir;
   if(j<0||j>=d.length)return;
@@ -13248,6 +13310,13 @@ function toggleDie(d){
 
 function startPTurn(){
   if(typeof famFire==='function'&&G){famFire('turnStart',{actor:'p'});try{famRenderRow();}catch(e){}}
+  /* CONFESSION v2 (Aldric): ONE card sealed at a time, the seal moves
+     every turn (old stacking seal is dead — it emptied a 3-slot loadout). */
+  if(G&&_ruleActive('confession','p')&&G.pF&&G.pF.length){
+    G._fSealIdx=((typeof G._fSealIdx==='number'?G._fSealIdx:-1)+1)%G.pF.length;
+    famLog('THE SEAL MOVES — '+(famDef(G.pF[G._fSealIdx].id).name.toUpperCase())+' IS SHUT');
+    try{famRenderRow();}catch(e){}
+  }
   if(G&&G._famPreserve){
     var _fp=G._famPreserve;G._famPreserve=null;
     G.kept=[{vals:[_fp.val],mat:'bone',pts:_fp.pts+(_fp.crack||0)}];
@@ -15437,6 +15506,8 @@ function endPTurn(){
 /* ═══════ OPPONENT AI ═══════ */
 function oppShouldBank(rung,oppBank,diceLeft,oppTotal,playerTotal,target){
   if((oppTotal+oppBank)>=target)return true;
+  if(typeof _ruleActive==='function'&&_ruleActive('last_call','o')&&oppBank<500&&diceLeft>=2)return false;
+  if(typeof _ruleActive==='function'&&_ruleActive('reckoning','o')&&typeof G!=='undefined'&&G&&(G._lastBankAmount||0)>0&&oppBank<G._lastBankAmount&&diceLeft>=2)return false;
   /* Huge bank protection — even when behind, an NPC banking 2500+ in a
      single turn risks too much by pushing further. Player feedback:
      "NPC had rolled like 4000 points and still kept rolling to his last
@@ -15679,7 +15750,10 @@ function runOppTurn(){
   clearRow('oppDiceRow');G.oppDice=[];
   function step(){
     if(G!==_matchG||!G||G._endMatchFired)return;/* ghost-timer guard */
+    if(_ruleActive('drill_order','o')&&oppRollNum>=3){finOpp(oppBank);return;}
     clearRow('oppDiceRow');G.oppDice=[];oppRollNum++;
+    if(_ruleActive('in_arrears','o')){G._arrearsPot=(G._arrearsPot||0)+5;}
+    if(_ruleActive('pickpocket','o')&&Math.random()<0.3&&left>1){left--;setStatusMsg('A DIE PALMED FROM THEIR HAND','gold');}
     const leakyActive=G.pCards.includes('leaky_cup')&&G.oppTurnCount%4===0&&G.oppTurnCount>0;
     /* Player-side reduce_first_roll cards (Pocket Sand 70%, Mabel's Pinch 50%):
        opp's first roll uses 5 dice with the same chance the NPC version would use. */
@@ -16335,6 +16409,22 @@ function runOppTurn(){
     }catch(e){}
     if(G!==_matchG||!G||G._endMatchFired)return;/* ghost-timer guard */
     G.oTurns=(G.oTurns||0)+1;/* P3: a completed rival turn (bank or bust) */
+    /* ── sleeved rules bind the rival too (brief §7) ── */
+    if(pts>0){
+      if(_ruleActive('steeped','o')&&oppRollNum>1){
+        var _stB=(oppRollNum-1)*100;pts+=_stB;
+        setStatusMsg('STEEPED — THEIR BANK BREWS +'+_stB,'gold');
+      }
+      if(_ruleActive('last_call','o')&&pts<500){
+        setStatusMsg('LAST CALL — THEIR BANK UNDER 500 DOES NOT COUNT','gold');pts=0;
+      }
+      if(pts>0&&_ruleActive('reckoning','o')&&(G._lastBankAmount||0)>0&&pts<G._lastBankAmount){
+        setStatusMsg('THE RECKONING — THEY FALL SHORT OF YOUR '+G._lastBankAmount,'gold');pts=0;
+      }
+      if(pts>0&&_ruleActive('counterfeit','o')&&Math.random()<0.3){
+        pts=Math.floor(pts/2);setStatusMsg('COUNTERFEIT — THEIR CURSED BANK HALVES','gold');
+      }
+    }
     /* ILL OMEN resolution: declared before this rival turn */
     if(G._famIllOmen){
       var _ioT=G._famIllOmen.tier||1,_ioP=famDef('ill_omen').p[_ioT-1];
@@ -16858,6 +16948,11 @@ function _spawnCoinParticles(coinEl,goldAmt,gravDir){
   }
 }
 function endMatch(win){
+  if(G&&win&&G._arrearsPot>0){
+    _getS();S.run.gold=(S.run.gold||0)+G._arrearsPot;
+    famLog('IN ARREARS — THEIR ROLLS FED THE POT: +'+G._arrearsPot+'g');
+    G._arrearsPot=0;try{save();}catch(e){}
+  }
   /* Idempotency guard: multiple win/loss-condition checks can race
      (player bank crosses target, then NPC's parallel finOpp also crosses,
      etc.) and end up calling endMatch twice — duplicating SFX.win()/lose()
@@ -19787,7 +19882,7 @@ function initMatchScreen(data){
   }
 
   /* ── Apply patron Tell (signature passive rule) ── */
-  _applyTell();
+  _applyTellAndSleeve();
 
   // Update gold display
   var _goldEl=document.getElementById('goldAmt');
