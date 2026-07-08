@@ -9904,6 +9904,30 @@ function getNpcCard(id){return NPC_CARDS_MAP[id]||null;}
 /* Build CARD_COVERS from CARD_BG+CARDS for gauntlet compatibility */
 const CARD_COVERS=(function(){var cc={};CARDS.forEach(function(c){cc[c.id]={bg:CARD_BG[c.id]||'#444',icon:c.icon||'?'};});NPC_CARDS.forEach(function(c){cc[c.id]={bg:CARD_BG[c.id]||'#444',icon:c.icon||'?'};});return cc;})();
 const DICE_TYPES=[
+  {id:'grogs_tooth',name:"GROG'S TOOTH",icon:'🦷',cost:0,hidden:true,relic:'grog',
+   faces:[1,3,4,5,6,6],effect:{type:'risk_reward',mechanic:'shatter_bonus',chance:0.10,amount:1500},
+   desc:'No 2-face. 10% a roll it shatters — the shatter pays +1500.'},
+  {id:'mabels_thimble',name:"MABEL'S THIMBLE",icon:'🪡',cost:0,hidden:true,relic:'mabel',
+   faces:[1,2,3,4,5,6],effect:{type:'scoring_boost',mechanic:'triple_bonus',amount:400},
+   desc:'Triples using it score +400.'},
+  {id:'finnicks_palm',name:"FINNICK'S PALM",icon:'🫳',cost:0,hidden:true,relic:'finnick',
+   faces:[1,2,3,4,5,6],effect:{type:'utility',mechanic:'palm_adjacent',amount:100},
+   desc:'Sits anywhere in the row. Scorers beside it take +100.'},
+  {id:'corvus_ledger_d',name:"CORVUS'S LEDGER",icon:'📒',cost:0,hidden:true,relic:'corvus',
+   faces:[1,2,3,4,5,6],effect:{type:'scoring_boost',mechanic:'starstone_bonus',amount:300},
+   desc:'Every bank +300, and +5g besides.'},
+  {id:'brutus_shield',name:"BRUTUS'S SHIELD",icon:'🛡',cost:0,hidden:true,relic:'brutus',
+   faces:[1,2,3,4,5,6],effect:{type:'defense',mechanic:'shield',shieldCount:2},
+   desc:'Two bust saves per match.'},
+  {id:'aldrics_square',name:"ALDRIC'S SQUARE",icon:'⬜',cost:0,hidden:true,relic:'aldric',
+   faces:[1,2,3,4,5,6],effect:{type:'rule_changer',mechanic:'wild_straight'},
+   desc:'Its 6s go wild for triples AND straights.'},
+  {id:'whispers_fang',name:"WHISPER'S FANG",icon:'🗡',cost:0,hidden:true,relic:'whisper',
+   faces:[1,2,3,4,5,6],effect:{type:'risk_reward',mechanic:'fang'},
+   desc:'Scores it joins pay +200. Bust while it sits kept: 200 more burns.'},
+  {id:'ambrose_weight',name:"AMBROSE'S WEIGHT",icon:'⚖️',cost:0,hidden:true,relic:'ambrose',
+   faces:[1,2,3,4,5,6],effect:{type:'scoring_boost',mechanic:'weight_bank',amount:500},
+   desc:'Any bank that beats your previous bank pays +500.'},
   {id:'lucky',name:'LUCKY',icon:'✦',cost:0,
    faces:[1,2,3,4,5,5],effect:null,hidden:true,
    desc:'A patron\'s named die — bone with an extra 5. Winnable at For Keeps.'},
@@ -10493,6 +10517,17 @@ function famDraftPick(i){
     +d.name.toUpperCase()+' '+['I','II','III'][o.tier-1]+'</div>';
   _famEndReady();
 }
+function famSpoilsPick(kind){
+  var sp=window._spoils;if(!sp)return;
+  _getS();var msg='';
+  if(kind==='relic'&&sp.relic){S.run.diceInv=S.run.diceInv||[];S.run.diceInv.push(sp.relic);msg='THE RELIC IS YOURS: '+getDie(sp.relic).name;}
+  else if(kind==='tell'&&sp.tell){S.run.tells=S.run.tells||[];if(S.run.tells.indexOf(sp.tell)<0)S.run.tells.push(sp.tell);msg='HIS RULE GOES TO YOUR SHELF: '+sp.tellName;}
+  else{S.run.gold=(S.run.gold||0)+sp.purse;msg='THE PURSE: +'+sp.purse+'g';}
+  window._spoils=null;save();
+  var rc=document.querySelector('#end-ov .res-card');
+  if(rc)rc.innerHTML='<div style="font-family:monospace;color:#dc5;padding:30px 10px;text-align:center">'+msg+'</div>';
+  _famEndReady();
+}
 function famDraftDecline(){
   _getS();var g=5+((S.run.tier||0)+1)*5;
   S.run.gold=(S.run.gold||0)+g;save();
@@ -10595,6 +10630,14 @@ function famCommitBonus(selD,pts){
   if((inst=famInst('vanguard_f'))&&hitFirst){var P1=famDef('vanguard_f').p[inst.tier-1];pts+=P1;_famPop('+'+P1+' VANGUARD');}
   if((inst=famInst('anchor_f'))&&hitLast){var P2=famDef('anchor_f').p[inst.tier-1];pts+=P2;_famPop('+'+P2+' ANCHOR');}
   if((inst=famInst('bookends_f'))&&hitFirst&&hitLast){var P3=famDef('bookends_f').p[inst.tier-1];pts+=P3;_famPop('+'+P3+' BOOKENDS');}
+  /* relic commit effects */
+  var _palm=G.pool.filter(function(d){return d.mat==='finnicks_palm';})[0];
+  if(_palm){
+    var pi=G.pool.indexOf(_palm),adj=0;
+    selD.forEach(function(d){var di=G.pool.indexOf(d);if(Math.abs(di-pi)===1)adj+=100;});
+    if(adj>0){pts+=adj;_famPop('+'+adj+' THE PALM');}
+  }
+  if(selD.some(function(d){return d.mat==='whispers_fang';})){pts+=200;_famPop('+200 THE FANG');}
   return pts;
 }
 CFX.short_fuse={
@@ -12372,9 +12415,9 @@ let G=null,LO=null;
 function newG(rung,pCards,oCards,pStake,oStake){
   /* Count shield dice in player loadout */
   var _playerDice=(S.run&&S.run.dice)||S.dice||_boneDice;
-  const _pShields=(function(){let c=0;_playerDice.forEach(function(m){var dt=getDie(m);if(dt&&dt.effect&&dt.effect.mechanic==='shield')c++;});return c;})();
+  const _pShields=(function(){let c=0;_playerDice.forEach(function(m){var dt=getDie(m);if(dt&&dt.effect&&dt.effect.mechanic==='shield')c+=(dt.effect.shieldCount||1);});return c;})();
   /* Count shield dice in NPC loadout */
-  const _oShields=(function(){let c=0;((rung&&rung.dice)||[]).forEach(function(m){var dt=getDie(m);if(dt&&dt.effect&&dt.effect.mechanic==='shield')c++;});return c;})();
+  const _oShields=(function(){let c=0;((rung&&rung.dice)||[]).forEach(function(m){var dt=getDie(m);if(dt&&dt.effect&&dt.effect.mechanic==='shield')c+=(dt.effect.shieldCount||1);});return c;})();
   return{rung,pCards,oCards,pStake,oStake,pPts:0,oPts:0,target:rung.target,
     turnPts:0,numDice:6,phase:'waiting',turnNum:1,pTurns:0,oTurns:0,pool:[],kept:[],oppDice:[],
     martyrUsed:false,flintlockFired:false,safeTurnStreak:0,turnRollCount:0,oppTurnCount:0,
@@ -13876,12 +13919,12 @@ function _afterRollImpl(){
      chance to shatter, granting bonus points and removing the die from
      the rest of the match. Fires once per roll per die. */
   var _preFree=G.pool.filter(d=>!d.committed);
-  if(_preFree.some(d=>d.mat==='obsidian')){
+  if(_preFree.some(function(d){var e=getDie(d.mat).effect;return e&&e.mechanic==='shatter_bonus';})){
     _preFree.forEach(function(d){
-      if(d.mat!=='obsidian'||d._shattered)return;
-      var _odt=getDie('obsidian');var _ofx=_odt&&_odt.effect;
-      var _oc=(_ofx&&_ofx.chance)||0.06;
-      var _ob=(_ofx&&_ofx.amount)||500;
+      var _odt=getDie(d.mat);var _ofx=_odt&&_odt.effect;
+      if(!_ofx||_ofx.mechanic!=='shatter_bonus'||d._shattered)return;
+      var _oc=_ofx.chance||0.06;
+      var _ob=_ofx.amount||500;
       if(Math.random()<_oc){
         d._shattered=true;
         G.pPts+=_ob;
@@ -13898,8 +13941,8 @@ function _afterRollImpl(){
            is genuinely gone for the rest of the match — previously only
            pool + numDice dropped, but matchDice still held 'obsidian', so
            a fresh obsidian die rolled in next turn ("it reappeared"). */
-        if(Array.isArray(G.matchDice)){var _omi=G.matchDice.indexOf('obsidian');if(_omi>=0)G.matchDice.splice(_omi,1);}
-        triggerCard('obsidian','OBSIDIAN SHATTERED +'+_ob,true);
+        if(Array.isArray(G.matchDice)){var _omi=G.matchDice.indexOf(d.mat);if(_omi>=0)G.matchDice.splice(_omi,1);}
+        triggerCard('obsidian',_odt.name+' SHATTERED +'+_ob,true);
         spawnPop('+'+_ob+' SHATTER');
         updHUD();
       }
@@ -14397,9 +14440,9 @@ function doBust(){
      re-derive the count. Player feedback "Die that saves you from busting
      didn't work" — most likely cause is state drift between matches. */
   if(G.dieShieldsPlayer===undefined&&G.matchDice){
-    G.dieShieldsPlayer=G.matchDice.filter(function(m){
-      var dt=getDie(m);return dt&&dt.effect&&dt.effect.mechanic==='shield';
-    }).length;
+    G.dieShieldsPlayer=G.matchDice.reduce(function(a,m){
+      var dt=getDie(m);return a+((dt&&dt.effect&&dt.effect.mechanic==='shield')?(dt.effect.shieldCount||1):0);
+    },0);
     G._shieldUses=G._shieldUses||0;
     G.dieShieldsPlayer=Math.max(0,G.dieShieldsPlayer-G._shieldUses);
   }
@@ -14441,6 +14484,9 @@ function doBust(){
     spawnPop('🛡️ SHIELD');
     G.safeTurnStreak=0;G.turnPts=0;G.kept=[];updHUD();refreshKeptTray();setBtns(false,false);
     famFire('bust',{actor:'p',lost:G.kept.reduce(function(a,k){return a+k.pts;},0)});
+    if(G.kept.some(function(k){return k.mat==='whispers_fang';})||G.pool.some(function(d){return d.committed&&d.mat==='whispers_fang';})){
+      G.pPts=Math.max(0,G.pPts-200);famLog('THE FANG BITES — 200 MORE GONE');
+    }
     setTimeout(()=>{clearRow('playerDiceRow');G.pool=[];endPTurn();},1400);
     return;
   }
@@ -15333,7 +15379,18 @@ function handleBank(){
     setStatusMsg('ON THE TAB — '+total.toLocaleString()+' POINTS HELD A TURN','red');
   }else{
     total+=famFire('bankBonus',{actor:'p',total:total});
+    /* relic: Ambrose's Weight — beat your previous bank for +500 */
+    if(Array.isArray(G.matchDice)&&G.matchDice.indexOf('ambrose_weight')>=0
+       &&(G._prevBankAmt||0)>0&&total>G._prevBankAmt){
+      total+=500;_famPop('+500 THE WEIGHT');
+    }
+    G._prevBankAmt=total;
     G.pPts+=total;G._lastBankAmount=total;spawnBankPop(total);
+    /* relic: Corvus's Ledger — +5g on every bank (the +300 rides the
+       starstone_bonus mechanic in scoring) */
+    if(Array.isArray(G.matchDice)&&G.matchDice.indexOf('corvus_ledger_d')>=0){
+      S.run.gold=(S.run.gold||0)+5;try{save();}catch(e){}
+    }
     famFire('bank',{actor:'p',amt:total});try{famRenderRow();}catch(e){}
   }
   G.turnPts=0;G.kept=[];G.numDice=6;
@@ -17452,9 +17509,33 @@ function endMatch(win){
     if(endBtns)endBtns.style.display='none';
   }
 
-  /* Boss wins: no draft — spoils overlay lands in P4 */
+  /* Boss wins: SPOILS — his table, pick exactly one, final (brief §6) */
   if(win&&isBoss){
-    if(endBtns)endBtns.style.display='';_endScreenPhase='ready';
+    var _spKey=(G.rung&&G.rung.key)||'';
+    var _spRelic={grog:'grogs_tooth',mabel:'mabels_thimble',finnick:'finnicks_palm',corvus:'corvus_ledger_d',
+      brutus:'brutus_shield',aldric:'aldrics_square',whisper:'whispers_fang',ambrose:'ambrose_weight'}[_spKey];
+    var _spTell=G.rung&&G.rung.tell;
+    var _spPurse=500+((S.run.tier||0))*60;
+    window._spoils={relic:_spRelic,tell:_spTell?_spTell.id:null,purse:_spPurse,tellName:_spTell?_spTell.name:'',tellDesc:_spTell?_spTell.desc:''};
+    var sh='<div style="font-family:monospace;color:#eee;text-align:left;padding:10px 6px">'
+      +'<div style="font-size:12px;letter-spacing:2px;color:#dc5;margin-bottom:10px">SPOILS — TAKE ONE, IT IS FINAL</div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">';
+    var rd=_spRelic?getDie(_spRelic):null;
+    sh+='<div onclick="famSpoilsPick(\'relic\')" style="cursor:pointer;aspect-ratio:2/3;display:flex;flex-direction:column;background:#191919;border:2px solid #dc5;padding:7px">'
+      +'<div style="font-size:11px;font-weight:bold;color:#eee">'+(rd?rd.name:'RELIC')+'</div>'
+      +'<div style="font-size:10px;color:#dc5;margin:2px 0">HIS DIE</div>'
+      +'<div style="flex:1;font-size:10px;color:#bbb;line-height:1.45;margin-top:4px">'+(rd?rd.desc:'')+'</div></div>';
+    sh+='<div onclick="famSpoilsPick(\'tell\')" style="cursor:pointer;aspect-ratio:2/3;display:flex;flex-direction:column;background:#191919;border:2px solid #6bc;padding:7px">'
+      +'<div style="font-size:11px;font-weight:bold;color:#eee">'+(_spTell?_spTell.name:'TELL')+'</div>'
+      +'<div style="font-size:10px;color:#6bc;margin:2px 0">HIS RULE — TO THE SHELF</div>'
+      +'<div style="flex:1;font-size:10px;color:#bbb;line-height:1.45;margin-top:4px">'+(_spTell?_spTell.desc:'')+'</div></div>';
+    sh+='<div onclick="famSpoilsPick(\'purse\')" style="cursor:pointer;aspect-ratio:2/3;display:flex;flex-direction:column;background:#191919;border:2px solid #8e8;padding:7px">'
+      +'<div style="font-size:11px;font-weight:bold;color:#eee">HIS PURSE</div>'
+      +'<div style="font-size:10px;color:#8e8;margin:2px 0">'+_spPurse+'g</div>'
+      +'<div style="flex:1;font-size:10px;color:#bbb;line-height:1.45;margin-top:4px">Coin in hand. No questions.</div></div>';
+    sh+='</div></div>';
+    if(resCard){resCard.innerHTML=sh;resCard.classList.add('show');}
+    if(endBtns)endBtns.style.display='none';
   }
   /* Show CONTINUE for losses — mark phase ready since animation is done */
   if(!win){if(endBtns)endBtns.style.display='';_endScreenPhase='ready';}
