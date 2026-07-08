@@ -333,6 +333,14 @@ body{
 .cb-c.chalk-in .cb-face{animation:chalkIn .55s cubic-bezier(.2,1.2,.4,1) both}
 .cb-c.chalk-in{animation:chalkIn .55s cubic-bezier(.2,1.2,.4,1) both}
 #tierBossBtn.lit{box-shadow:0 0 18px rgba(106,184,255,.55),0 0 40px rgba(106,184,255,.25);border-radius:8px}
+/* ═══ PROTO GREYBOX SKIN ═══ */
+#screen-gauntlet{background:#0e0e0e !important}
+#screen-gauntlet::before{display:none !important}
+#screen-gauntlet>*:not(#gbRoom){display:none !important}
+#gbRoom{position:absolute;inset:0;overflow:auto;font-family:monospace;color:#ddd;padding:14px}
+.gb-btn{display:block;cursor:pointer;background:#161616;border:1px solid #555;padding:9px 10px;margin:6px 0}
+.gb-btn:active{background:#222}
+#screen-match{background:#141414 !important}
 /* ─── ROOM V2 (concept boards): hanging sign, chained frames + parchment
    plates, boss silhouette by the hearth, marks plaque as the one action ─── */
 .room-sign{position:relative;width:min(236px,72%);margin:0 auto 6px;z-index:2;
@@ -10659,6 +10667,76 @@ CFX.preserve={
 };
 /* update the live set */
 ['transmute','fools_gold_f','bloom','preserve','honeytrap','tar_pit','ward','powder_keg','sacrifice','short_fuse','stargazer','ill_omen','sleight','vanguard_f','anchor_f','bookends_f'].forEach(function(id){FAM_LIVE[id]=1;});
+/* ── PROTO greybox Room: same composition as the real screen, but
+   rectangles + words only. Boss up top with the chalkboard, patron
+   frames in a 2x2 grid, action row at the bottom. ── */
+function _gbRenderRoom(tier,bossReady){
+  var scr=document.getElementById('screen-gauntlet');if(!scr)return;
+  var host=document.getElementById('gbRoom');
+  if(!host){host=document.createElement('div');host.id='gbRoom';scr.appendChild(host);}
+  var n=S.run.night||{roster:[],seatsPlayed:[],results:[]};
+  var buy=Math.min(S.run.gold||0,NIGHT_BUYINS[S.run.tier]||0);
+  var pts=S.run.points||0,need=tier.pointsNeeded||0;
+  var bossName=(tier.boss?tier.boss.name:'BOSS').toUpperCase();
+
+  /* top bar */
+  var hearts='';for(var i=0;i<3;i++)
+    hearts+='<span style="display:inline-block;width:18px;height:18px;margin-right:4px;background:'+(i<(S.run.coins||0)?'#c33':'#333')+'"></span>';
+  var h='<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 2px 10px">'
+    +'<span>'+hearts+'</span>'
+    +'<span style="font-size:13px;color:#999">NIGHT '+((S.run.tier||0)+1)+' / 8</span>'
+    +'<span style="background:#453a10;border:1px solid #a90;color:#fd6;padding:3px 10px;font-size:13px">'+(S.run.gold||0)+'g</span></div>';
+
+  /* boss zone: big block + chalkboard */
+  var circles='';for(var c=0;c<need;c++)
+    circles+='<span style="display:inline-block;width:22px;height:22px;border-radius:50%;margin:0 4px;'
+      +'border:2px solid #cde;background:'+(c<pts?'#cde':'transparent')+'"></span>';
+  h+='<div style="display:flex;gap:8px;height:110px;margin-bottom:12px">'
+    +'<div '+(bossReady?'onclick="launchBossMatch()"':'')+' style="flex:1.2;display:flex;flex-direction:column;align-items:center;justify-content:center;'
+      +'background:#1c1c1c;border:2px solid '+(bossReady?'#5c5':'#555')+';cursor:'+(bossReady?'pointer':'default')+'">'
+      +'<div style="font-size:17px;letter-spacing:2px;'+(bossReady?'color:#8e8':'color:#ccc')+'">'+bossName+'</div>'
+      +'<div style="font-size:11px;color:#888;margin-top:6px">'+(bossReady?'SIT DOWN':'THE BOSS')+'</div></div>'
+    +'<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#15281a;border:2px solid #384;color:#bdc">'
+      +'<div style="font-size:10px;letter-spacing:1px;margin-bottom:8px">'+(bossReady?bossName+' WILL PLAY YOU NOW':bossName+' PLAYS WINNERS')+'</div>'
+      +'<div>'+circles+'</div></div>'
+    +'</div>';
+
+  /* patron grid 2x2 */
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+  n.roster.forEach(function(pat,i){
+    var spent=n.seatsPlayed[i];
+    var word=(_PERSONA_WORDS[pat.persona]||'PATRON');
+    var hc=(i===n.handicapSeat&&S.run.handicapOffer&&S.run._handicapTier===S.run.tier);
+    var inner;
+    if(spent){
+      var won=n.results[i]==='won';
+      inner='<div style="height:120px;display:flex;align-items:center;justify-content:center;background:#181818;border:2px solid #444;position:relative">'
+        +'<div style="font-size:16px;letter-spacing:3px;color:'+(won?'#8e8':'#777')+';transform:rotate(-12deg);border:2px solid;padding:4px 14px">'+(won?'WON':'GONE HOME')+'</div></div>'
+        +'<div style="text-align:center;font-size:11px;color:#666;padding:5px 0;background:#101010;border:2px solid #333;border-top:none">'+word+'</div>';
+      h+='<div style="opacity:.6">'+inner+'</div>';
+    }else{
+      inner='<div style="height:120px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#242424;border:2px solid #777;position:relative">'
+        +(hc?'<div style="position:absolute;top:4px;right:4px;background:#639;color:#dcf;font-size:9px;padding:2px 6px">HANDICAP x2</div>':'')
+        +'<div style="width:52px;height:52px;background:#3a3a3a;border:1px solid #666;margin-bottom:8px"></div>'
+        +'<div style="font-size:13px;letter-spacing:1px;color:#eee">'+word+'</div></div>'
+        +'<div style="display:flex;justify-content:space-between;font-size:11px;padding:5px 8px;background:#181818;border:2px solid #555;border-top:none">'
+        +'<span style="color:#fd6">'+buy+'g</span><span style="color:#999">tgt '+(pat.target||0).toLocaleString()+'</span></div>';
+      h+='<div onclick="launchSeat('+i+')" style="cursor:pointer">'+inner+'</div>';
+    }
+  });
+  h+='</div>';
+
+  /* action row */
+  function act(label,fn,color){return '<div onclick="'+fn+'" style="flex:1;text-align:center;padding:12px 0;background:#1a1a1a;'
+    +'border:2px solid '+(color||'#555')+';cursor:pointer;font-size:12px;letter-spacing:1px;color:#ddd">'+label+'</div>';}
+  h+='<div style="display:flex;gap:8px;margin-top:14px">'
+    +act('CARDS','famPanelShow()')
+    +act('DICE STORE',"SFX.nav();showScreen('shop')")
+    +act('LOADOUT',"SFX.nav();showScreen('loadout')")
+    +act('MENU',"SFX.nav();showScreen('menu')")
+    +'</div>';
+  host.innerHTML=h;
+}
 /* ═══════════════ end family engine ═══════════════ */
 
 function scoreRoll(vals,cards,locked,context,dieMats){
@@ -21279,19 +21357,9 @@ function initTierScreen(data){
   }
   /* ROOM V2: silhouette + marks plaque mirror the boss state */
   _renderRoomV2(tier,_bossReady);
-  /* P1: greybox card entry points */
-  (function(){
-    var scr=document.getElementById('screen-gauntlet');if(!scr)return;
-    var b=document.getElementById('famRoomBtn');
-    if(!b){
-      b=document.createElement('div');b.id='famRoomBtn';
-      b.style.cssText='position:absolute;left:8px;top:64px;z-index:30;font-family:monospace;font-size:12px;color:#eee;background:#111;border:1px solid #666;padding:5px 10px;cursor:pointer';
-      b.textContent='CARDS';
-      b.onclick=function(){famPanelShow();};
-      scr.appendChild(b);
-    }
-    if(S.run&&S.run._famFirstDraft)famRunDraftShow();
-  })();
+  /* PROTO: greybox Room — plain data view of the night */
+  _gbRenderRoom(tier,_bossReady);
+  if(S.run&&S.run._famFirstDraft)famRunDraftShow();
   /* P1: the roster replaces the old standard/handicap buttons. They stay in
      the DOM (hidden) so legacy canvas wiring keeps its targets. Seats stay
      playable after the boss unlocks — bounded greed, by design. */
