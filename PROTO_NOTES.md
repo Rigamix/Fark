@@ -79,3 +79,47 @@ chalk, cap final-answer code path present.
 NEXT (P2): dice v2 — mundane four + family dice defs, Brass/Crystal/Ruby
 removal + refunds, shop rotation with SOLD slots, lucky dice on patrons,
 jade wilds (enables cultivate + bloom fully).
+
+## P2-P8 — full brief implementation, greybox (done)
+
+P2 dice: brief prices; brass/crystal/ruby retired w/ gold refunds at _getS;
+  shop rotation per night (55% family availability, min 2, SOLD tags);
+  lucky die on every patron (named, bone+extra-5, shown in Room);
+  cultivate live (jade growth pays at commit). Greybox DICE STORE +
+  LOADOUT (reorder arrows, stash/swap, satchel).
+P3 rules: _ruleActive(id,side); sleeve = claimed tell bound to BOTH sides
+  (S.run.sleeve; slot in loadout); patron matches: sleeve occupies the
+  tell machinery player-side; boss matches run tell+sleeve (two badges in
+  famRow). NPC-side enforcement for all 8 tells at their roll/bank seams.
+  ALDRIC = rotating single seal on the 3 card slots. CORVUS sleeved side
+  feeds +5g/roll into your winning pot. Known gap: player-side sleeve in
+  BOSS fights only binds at the flat sites (nested tell-block sites take
+  the boss tell) — full dual-rule needs the rules refactor.
+P4 spoils: boss win -> pick ONE of relic/tell/purse (final). 8 relics
+  wired (tooth shatter 10%/+1500 via generalized shatter, thimble +400
+  triples, palm adjacency +100, ledger +300/bank +5g, shield x2 saves,
+  square wild straights, fang +200/-200, weight +500 over-previous-bank).
+P5 opponents: traits = STEADY/GREEDY/RECKLESS/BULLISH/ORDERLY/CUNNING
+  (+symbols); trait->family loadouts by night (0-1 early, 3 late, II from
+  n3, III from n6, off-diagonal 15% n3+); boss family pools; NPC cards
+  VISIBLE in famRow (THEIRS chips); NPC AI: tar pit after your 800+ bank,
+  sleight when trailing 800+, ill omen vs 3+ roll turns, DoN when behind,
+  slow-cook/pickpocket/retort/insurance mirrors; Tamper live (breaks their
+  best card, III steals 300); period titles Goodman->Sir by night band.
+P6 For Keeps: drafts n4+ (25%), arm toggle in Room, patron-only; win =
+  pick any of their dice incl the named lucky; loss = they take your best
+  (relic>family>mundane); lucky steals seed grudges: that archetype
+  returns meaner (agg+0.12, extra card, GRUDGE tag).
+P7 renown v2: perk ladder wiped at load (slots/seats baseline); renown
+  invisible; player title ladder (nobody/Goodman/Master/Sir/a Name) shown
+  in Room header; 5 family feats grant renown w/ toast; cosmetics shelf
+  stub + lucky-die trophies in loadout.
+P8: targets compressed to brief bands (patron mids 3000->14000 by n8,
+  bosses 4000->19000); T0 sim after compression: 51% patron / 5 med
+  turns / 34% boss (n=80). Full acceptance pass still owed (boss rates
+  low band-wide; economy knobs untouched pending playtest).
+
+Not done (needs your call / later): NPC use of self-dice actives
+  (encore/stargazer/preserve/honeytrap for NPCs), night-8 renown-payout
+  ceremony, run-won screen, dialogue title address, old-code physical
+  deletion sweep.
