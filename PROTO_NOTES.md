@@ -28,3 +28,25 @@ Old card system map (for P1 cutover):
 
 - Proto keeps existing Room/match UI as scaffolding; new systems render
   as plain overlays/panels until the loop is proven.
+
+## P1a — family card engine (done)
+
+- Engine before scoreRoll: FAMILIES, FAM_CARDS (27 defs, brief copy
+  verbatim), CFX effect hooks (renamed from FX — old particle system owns
+  that name), famFire event bus, famGive() dev helper, famRow B&W chips.
+- Seams wired: match init (G.pF/G.oF), startPTurn, _afterRollImpl,
+  handleBank (bankBonus delta + bank event), doBust, finOpp opp bank,
+  endPTurn (Falling Star extra turn).
+- Live effects (unit-tested, 10/10 pass): slow_cook, insurance, retort
+  (bust half), reprisal, pickpocket, falling_star, encore, double_or_nothing
+  (armed-style: arm during turn, next bank flips — flow never pauses).
+- Interpretations flagged: pickpocket lifts from opp TOTAL (brief says
+  unbanked, which is empty at player bank time); sacrifice will bank its
+  points (safe), not add to turn.
+- Sim parity holds (40%/5 vs 45%/5 baseline, n=60 noise).
+
+NEXT (P1b): draft v2 + run-start draft, loadout equip/sell panel,
+remaining actives (transmute, powder_keg, sacrifice, ward, stargazer,
+ill_omen, sleight, tar_pit, preserve, honeytrap, fools_gold), scoring-
+internal passives (bloom, short_fuse, positional trio), then old-pool
+offer cutover.

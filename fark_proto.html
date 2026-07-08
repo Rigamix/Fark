@@ -10067,6 +10067,257 @@ const SCORING_BASE={
   copperPincherSingle1:200,copperPincherSingle5:100,scavengerBonus:300,
   triplesPenalty:50
 };
+
+/* ═══════════════ P1: FAMILY CARD ENGINE (master brief §3) ═══════════════
+   Data-driven cards. Events fire at fixed seams in the turn machine;
+   effects live in CFX[id] keyed by hook name. Zero cards equipped = zero
+   behavior change (shadow-safe). NPC usage lands in P5 (G.oF stays []).
+   UI is deliberately bare: monochrome chips, family colour accent only. */
+var FAMILIES={
+  jade:{name:'JADE',color:'#2f9e5f'},
+  amber:{name:'AMBER',color:'#d89a20'},
+  silver:{name:'SILVER',color:'#b9c2cc'},
+  obsidian:{name:'OBSIDIAN',color:'#e2582f'},
+  starstone:{name:'STARSTONE',color:'#4f74e3'},
+  vagabond:{name:'VAGABOND',color:'#c4404f'}
+};
+/* text = brief copy verbatim, per tier. kind: active | passive.
+   Implemented flag tracks build progress; unimplemented cards are never
+   offered in drafts. */
+var FAM_CARDS=[
+ /* JADE */
+ {id:'transmute',fam:'jade',kind:'active',name:'Transmute',charges:[1,2,3],
+  text:['Tap a rolled die and turn it into any face you want. Once per match.',
+        'Tap a rolled die and turn it into any face you want. Twice per match.',
+        'Tap a rolled die and turn it into any face you want. Three times per match.']},
+ {id:'fools_gold_f',fam:'jade',kind:'active',name:"Fool's Gold",charges:[1,2,3],
+  text:['Rolled nothing? Reroll everything. But if the second roll fails too, the bust burns your turn AND the same amount from your banked points. Once per match.',
+        'As tier one, twice per match.','As tier one, three times per match.']},
+ {id:'cultivate',fam:'jade',kind:'passive',name:'Cultivate',
+  text:['Each time a jade wild fires, that die grows: +50 to its scores for the rest of the match. Stacks.','','']},
+ {id:'bloom',fam:'jade',kind:'passive',name:'Bloom',p:[300,600,1000],
+  text:['Straights and triples that use a jade die score +300.',
+        'Straights and triples that use a jade die score +600.',
+        'Straights and triples that use a jade die score +1000.']},
+ /* AMBER */
+ {id:'preserve',fam:'amber',kind:'active',name:'Preserve',charges:[1,2,2],
+  text:['Trap one scoring die in amber at the end of your turn. It is still there next turn, already kept and scored. Once per match.',
+        'As tier one, twice per match.','As tier two, and it cracks free with +100.']},
+ {id:'honeytrap',fam:'amber',kind:'active',name:'Honeytrap',charges:[1,2,2],
+  text:['Tap a kept pair. Your next roll pulls one die into matching it. Guaranteed triple. Once per match.',
+        'As tier one, twice per match.','As tier two, and it stretches kept triples into four-of-a-kinds.']},
+ {id:'tar_pit',fam:'amber',kind:'active',name:'Tar Pit',charges:[1,1,1],
+  text:["Trap one of the opponent's dice for their next turn. They roll five. Once per match.",
+        'As tier one, and it holds for two turns.','Trap two of their dice for one turn. Once per match.']},
+ {id:'slow_cook',fam:'amber',kind:'passive',name:'Slow Cook',p:[150,250,400],
+  text:['Every roll past your second adds +150 to your turn total. Bust and it all spills.',
+        'Every roll past your second adds +250 to your turn total. Bust and it all spills.',
+        'Every roll past your second adds +400 to your turn total. Bust and it all spills.']},
+ /* SILVER */
+ {id:'ward',fam:'silver',kind:'active',name:'Ward',charges:[1,2,2],
+  text:["A visible shield over your dice. Absorbs your next bust, or the opponent's next trick.",
+        'As tier one, two charges.','As tier two, and absorbed tricks rebound: the attacker loses 300.']},
+ {id:'retort',fam:'silver',kind:'passive',name:'Retort',p:[400,700,1000],
+  text:['When you bust or are hit by an opponent card, they lose 400.',
+        'When you bust or are hit by an opponent card, they lose 700.',
+        'When you bust or are hit by an opponent card, they lose 1000.']},
+ {id:'reprisal',fam:'silver',kind:'passive',name:'Reprisal',p:[0.25,0.40,0.60],
+  text:['While trailing by 1000 or more, your banks TAKE their points instead of just gaining. A quarter of each bank is stolen from them.',
+        'As tier one, but two fifths.','As tier one, but three fifths.']},
+ {id:'insurance',fam:'silver',kind:'passive',name:'Insurance',p:[0.25,0.45,0.75],
+  text:['When you bust, keep a quarter of the points you would have lost.',
+        'When you bust, keep nearly half of the points you would have lost.',
+        'When you bust, keep most of the points you would have lost.']},
+ /* OBSIDIAN */
+ {id:'powder_keg',fam:'obsidian',kind:'active',name:'Powder Keg',charges:[1,2,2],
+  text:['Blow up your whole roll: every die rerolls, kept ones included. Once per match.',
+        'As tier one, twice per match.','As tier two, and detonations that land a triple score double.']},
+ {id:'double_or_nothing',fam:'obsidian',kind:'active',name:'Double or Nothing',charges:[1,1,1],p:[0.5,1/3,0.25],
+  text:['After banking, flip for it: double the bank or lose half.',
+        'After banking, flip for it: double the bank or lose a third.',
+        'After banking, flip for it: double the bank or lose a quarter.']},
+ {id:'sacrifice',fam:'obsidian',kind:'active',name:'Sacrifice',charges:[1,1,1],p:[800,1200,2000],
+  text:['Shatter one of your own dice, gone for the match, for +800 right now.',
+        'Shatter one of your own dice, gone for the match, for +1200 right now.',
+        'Shatter one of your own dice, gone for the match, for +2000 right now.']},
+ {id:'short_fuse',fam:'obsidian',kind:'passive',name:'Short Fuse',
+  text:['From your third roll each turn, everything scores double. But bust after that and the fire spreads to your banked points.','','']},
+ /* STARSTONE */
+ {id:'encore',fam:'starstone',kind:'active',name:'Encore',charges:[1,2,3],
+  text:['Do not like a roll? Roll it again. Once per match.',
+        'Do not like a roll? Roll it again. Twice per match.',
+        'Do not like a roll? Roll it again. Three times per match.']},
+ {id:'stargazer',fam:'starstone',kind:'active',name:'Stargazer',charges:[1,2,3],
+  text:['Peek at your next roll before deciding to take it. Once per match.',
+        'Peek at your next roll before deciding to take it. Twice per match.',
+        'Peek at your next roll before deciding to take it. Three times per match.']},
+ {id:'ill_omen',fam:'starstone',kind:'active',name:'Ill Omen',charges:[1,1,1],p:[[800,400],[1200,400],[1600,300]],
+  text:["At your turn's end, declare they will bust this turn. Right: take 800 from them. Wrong: they gain 400.",
+        "At your turn's end, declare they will bust this turn. Right: take 1200 from them. Wrong: they gain 400.",
+        "At your turn's end, declare they will bust this turn. Right: take 1600 from them. Wrong: they gain 300."]},
+ {id:'falling_star',fam:'starstone',kind:'passive',name:'Falling Star',p:[1500,1200,1000],
+  text:['Bank 1500 or more in a single turn and take another full turn immediately, opponent skipped.',
+        'Bank 1200 or more in a single turn and take another full turn immediately, opponent skipped.',
+        'Bank 1000 or more in a single turn and take another full turn immediately, opponent skipped.']},
+ /* VAGABOND */
+ {id:'sleight',fam:'vagabond',kind:'active',name:'Sleight',charges:[1,2,2],
+  text:['Force your opponent to reroll everything they just rolled. Once per match.',
+        'As tier one, twice per match.','As tier two, plus once whenever the table rule triggers.']},
+ {id:'pickpocket',fam:'vagabond',kind:'passive',name:'Pickpocket',p:[100,200,300],
+  text:["Every time you bank, lift 100 of the opponent's points.",
+        "Every time you bank, lift 200 of the opponent's points.",
+        "Every time you bank, lift 300 of the opponent's points."]},
+ {id:'tamper',fam:'vagabond',kind:'active',name:'Tamper',charges:[1,1,1],
+  text:["Break one of the opponent's cards for the night.",
+        'As tier one, also usable once mid-match.','As tier two, and breaking it steals 300.']},
+ {id:'vanguard_f',fam:'vagabond',kind:'passive',name:'Vanguard',p:[200,350,500],
+  text:['A scorer in the FIRST spot scores +200.','A scorer in the FIRST spot scores +350.','A scorer in the FIRST spot scores +500.']},
+ {id:'anchor_f',fam:'vagabond',kind:'passive',name:'Anchor',p:[200,350,500],
+  text:['A scorer in the LAST spot scores +200.','A scorer in the LAST spot scores +350.','A scorer in the LAST spot scores +500.']},
+ {id:'bookends_f',fam:'vagabond',kind:'passive',name:'Bookends',p:[400,700,1200],
+  text:['Scorers in BOTH end spots: +400.','Scorers in BOTH end spots: +700.','Scorers in BOTH end spots: +1200.']},
+ {id:'for_keeps',fam:'vagabond',kind:'active',name:'For Keeps',charges:[1],unique:true,
+  text:['Play as you sit down: this match is for dice. Win, take one of theirs. Lose, they take one of yours — their pick. Patron tables only.','','']}
+];
+function famDef(id){for(var i=0;i<FAM_CARDS.length;i++)if(FAM_CARDS[i].id===id)return FAM_CARDS[i];return null;}
+/* implemented set — only these are offered/equipped-usable (grows per phase) */
+var FAM_LIVE={slow_cook:1,insurance:1,retort:1,reprisal:1,pickpocket:1,falling_star:1,
+              encore:1,double_or_nothing:1};
+/* per-match instances from the run loadout */
+function _famInit(){
+  var out=[];
+  try{
+    (S.run.fcards||[]).forEach(function(c){
+      if(!c||!famDef(c.id))return;
+      var d=famDef(c.id),t=Math.min(c.tier||1,3);
+      out.push({id:c.id,tier:t,charges:(d.charges?d.charges[t-1]:0),state:{}});
+    });
+  }catch(e){}
+  return out;
+}
+/* fire a hook; effects may ev.add(n) to contribute a numeric delta */
+function famFire(hook,ev){
+  if(typeof G==='undefined'||!G)return 0;
+  ev=ev||{};ev._delta=0;ev.add=function(n){ev._delta+=n;};
+  ['p','o'].forEach(function(owner){
+    var list=owner==='p'?(G.pF||[]):(G.oF||[]);
+    for(var i=0;i<list.length;i++){
+      var inst=list[i],fx=CFX[inst.id];
+      if(!fx||!fx[hook])continue;
+      ev.owner=owner;ev.mine=(ev.actor===owner);ev.me=inst;
+      ev.P=(function(inst){var d=famDef(inst.id);return (d.p?d.p[inst.tier-1]:0);})(inst);
+      try{fx[hook](ev);}catch(e){console.error('famFX',inst.id,hook,e);}
+    }
+  });
+  return ev._delta;
+}
+function famLog(msg,color){try{setStatusMsg(msg,color||'gold');}catch(e){}}
+function _famPop(msg){try{spawnPop(msg);}catch(e){}}
+/* dev helper: famGive('slow_cook',2) from console */
+function famGive(id,tier){_getS();S.run.fcards=S.run.fcards||[];
+  if(S.run.fcards.length>=3)S.run.fcards.shift();
+  S.run.fcards.push({id:id,tier:tier||1});save();return S.run.fcards;}
+
+/* ── effects ── */
+var CFX={};
+CFX.slow_cook={
+  roll:function(ev){if(!ev.mine||ev.owner!=='p')return;
+    if((G.turnRollCount||0)>=3){ev.me.state.acc=(ev.me.state.acc||0)+ev.P;_famPop('+'+ev.P+' SLOW COOK');}},
+  bankBonus:function(ev){if(!ev.mine||ev.owner!=='p')return;
+    var a=ev.me.state.acc||0;if(a>0){ev.add(a);famLog('SLOW COOK +'+a);}ev.me.state.acc=0;},
+  turnStart:function(ev){if(ev.owner==='p')ev.me.state.acc=0;},
+  bust:function(ev){if(ev.owner==='p')ev.me.state.acc=0;}
+};
+CFX.insurance={
+  bust:function(ev){if(!ev.mine||ev.owner!=='p')return;
+    var k=Math.round((ev.lost||0)*ev.P);
+    if(k>0){G.pPts+=k;famLog('INSURANCE SAVES '+k);_famPop('+'+k+' INSURANCE');try{updHUD();}catch(e){}}}
+};
+CFX.retort={
+  bust:function(ev){if(!ev.mine||ev.owner!=='p')return;
+    G.oPts=Math.max(0,G.oPts-ev.P);famLog('RETORT — THEY LOSE '+ev.P);try{updHUD();}catch(e){}}
+};
+CFX.reprisal={
+  bank:function(ev){if(!ev.mine||ev.owner!=='p')return;
+    var trailing=(G.oPts-(G.pPts-ev.amt))>=1000; /* judged before this bank landed */
+    if(!trailing)return;
+    var steal=Math.min(Math.round(ev.amt*ev.P),G.oPts);
+    if(steal>0){G.oPts-=steal;famLog('REPRISAL TAKES '+steal+' FROM THEM');try{updHUD();}catch(e){}}}
+};
+CFX.pickpocket={
+  bank:function(ev){if(!ev.mine||ev.owner!=='p')return;
+    var lift=Math.min(ev.P,G.oPts);
+    if(lift>0){G.oPts-=lift;G.pPts+=lift;famLog('PICKPOCKET LIFTS '+lift);try{updHUD();}catch(e){}}}
+};
+CFX.falling_star={
+  bank:function(ev){if(!ev.mine||ev.owner!=='p')return;
+    if(ev.amt>=ev.P&&!G._fExtraTurn){G._fExtraTurn=true;famLog('FALLING STAR — ANOTHER TURN COMES');}}
+};
+CFX.encore={
+  canUse:function(inst){return G&&G.phase==='choosing'&&G.pool&&G.pool.some(function(d){return !d.committed;});},
+  use:function(inst){
+    var free=G.pool.filter(function(d){return !d.committed&&!d._frozen;});
+    if(!free.length)return false;
+    free.forEach(function(d){
+      d.val=rollFace(d.mat);d.sel=false;
+      if(d.el){d.el.classList.remove('selected');d.el.classList.add('card-reroll');reDrawDieFace(d);
+        setTimeout(function(){d.el.classList.remove('card-reroll');},400);}
+    });
+    try{SFX.roll();}catch(e){}
+    G.turnRollCount++;
+    famLog('ENCORE — ROLL IT AGAIN');
+    setTimeout(function(){
+      var fv=free.map(function(d){return d.val;}),fm=free.map(function(d){return d.mat;});
+      var cards=effectiveCards();
+      if(!anyScoring(fv,cards,fm)){if(_tryBustSave(free))return;_delayedDoBust(free);return;}
+      free.forEach(function(d){if(d.el)d.el.onclick=function(){toggleDie(d);};});
+      G.phase='choosing';refreshSelUI();
+    },500);
+    return true;
+  }
+};
+CFX.double_or_nothing={
+  canUse:function(inst){return G&&(G.phase==='choosing'||G.phase==='idle')&&!inst.state.armed;},
+  use:function(inst){inst.state.armed=true;famLog('DOUBLE OR NOTHING ARMED — NEXT BANK FLIPS');return true;},
+  bank:function(ev){if(!ev.mine||ev.owner!=='p'||!ev.me.state.armed)return;
+    ev.me.state.armed=false;
+    var winFlip=Math.random()<0.5;
+    if(winFlip){G.pPts+=ev.amt;famLog('THE FLIP LANDS — BANK DOUBLED (+'+ev.amt+')');_famPop('x2 BANK');}
+    else{var lose=Math.round(ev.amt*ev.P);G.pPts=Math.max(0,G.pPts-lose);famLog('THE FLIP FAILS — '+lose+' GONE');_famPop('-'+lose);}
+    try{updHUD();}catch(e){}}
+};
+
+/* ── bare match UI: chip row (B&W, family colour accent) ── */
+function famRenderRow(){
+  var host=document.getElementById('famRow');
+  if(!host){
+    host=document.createElement('div');host.id='famRow';
+    host.style.cssText='position:absolute;left:4px;top:34%;z-index:40;display:flex;flex-direction:column;gap:4px;font-family:monospace;font-size:11px;';
+    var ms=document.getElementById('screen-match');(ms||document.body).appendChild(host);
+  }
+  var html='';
+  (G&&G.pF||[]).forEach(function(inst,i){
+    var d=famDef(inst.id);if(!d)return;
+    var col=(FAMILIES[d.fam]||{}).color||'#888';
+    var chg=d.charges?(' ['+inst.charges+']'):'';
+    var usable=d.kind==='active'&&inst.charges>0&&CFX[inst.id]&&CFX[inst.id].use;
+    html+='<div onclick="famUse('+i+')" style="cursor:'+(usable?'pointer':'default')+';padding:3px 7px;background:#111;color:#eee;'
+      +'border:1px solid #555;border-left:4px solid '+col+';opacity:'+((d.kind==='active'&&inst.charges<=0)?0.35:1)+'" '
+      +'title="'+d.text[inst.tier-1].replace(/"/g,'&quot;')+'">'
+      +d.name.toUpperCase()+' '+['I','II','III'][inst.tier-1]+chg+(inst.state.armed?' ⚡':'')+'</div>';
+  });
+  host.innerHTML=html;
+}
+function famUse(i){
+  if(!G||!G.pF||!G.pF[i])return;
+  var inst=G.pF[i],d=famDef(inst.id),fx=CFX[inst.id];
+  if(!d||d.kind!=='active'||!fx||!fx.use)return;
+  if(inst.charges<=0)return;
+  if(fx.canUse&&!fx.canUse(inst)){famLog('NOT NOW');return;}
+  if(fx.use(inst)){inst.charges--;famRenderRow();}
+}
+/* ═══════════════ end family engine ═══════════════ */
+
 function scoreRoll(vals,cards,locked,context,dieMats){
   cards=cards||[];locked=locked||0;context=context||{};dieMats=dieMats||null;
   /* Multi-pass scoring flag — when set, ladder/ascending blocks run AFTER
@@ -11540,6 +11791,7 @@ function newG(rung,pCards,oCards,pStake,oStake){
     /* Feat tracking — counters reset per match, evaluated at endMatch(win) */
     _featBanks:0,_featBusts:0,_featMaxBank:0,_featActivesUsed:false,_featFullStraight:false,_featHotDiceCount:0,
     _featTemptingFate:false,_featWinBankRolls:0,_turnTriple1Scored:false,_rolledAfterTriple1:false,
+    pF:_famInit(),oF:[],/* P1 family cards */
     activeCardState:{usedCards:{},stitchActive:false,vowActive:false,hexActive:false,secondWindActive:false,allInActive:false,pyreBonus:0},
     crowsLuckCtx:{crowsLuck:oCards.includes('crows_luck'),crowsLuckRemaining:oCards.includes('crows_luck')?2:0,crowsLuckFiredThisRoll:false},
     /* Player-held Crow's Luck: "twice per match". Stored on G so the two charges
@@ -12454,6 +12706,7 @@ function toggleDie(d){
 }
 
 function startPTurn(){
+  if(typeof famFire==='function'&&G){famFire('turnStart',{actor:'p'});try{famRenderRow();}catch(e){}}
   /* Ghost-timer guard: a scheduled callback from a fled/finished match must
      not start a player turn (it used to re-create S.pendingMatch after
      endMatch deleted it, resurrecting a RESUME for a match already lost). */
@@ -12964,6 +13217,7 @@ function afterRoll(){
   }
 }
 function _afterRollImpl(){
+  if(typeof famFire==='function'&&G&&G.phase!=='opp')famFire('roll',{actor:'p',rolls:G.turnRollCount||0});
   G.turnRollCount++;
   /* ── TELL HOOKS (post-roll) ── */
   if(G._tell){
@@ -13568,6 +13822,7 @@ function doBust(){
     setStatusMsg('SILVER SHIELD — BUST BLOCKED!','silver');
     spawnPop('🛡️ SHIELD');
     G.safeTurnStreak=0;G.turnPts=0;G.kept=[];updHUD();refreshKeptTray();setBtns(false,false);
+    famFire('bust',{actor:'p',lost:G.kept.reduce(function(a,k){return a+k.pts;},0)});
     setTimeout(()=>{clearRow('playerDiceRow');G.pool=[];endPTurn();},1400);
     return;
   }
@@ -14458,7 +14713,9 @@ function handleBank(){
     triggerCard('the_tab','ON THE TAB — '+total.toLocaleString()+' HELD',false);
     setStatusMsg('ON THE TAB — '+total.toLocaleString()+' POINTS HELD A TURN','red');
   }else{
+    total+=famFire('bankBonus',{actor:'p',total:total});
     G.pPts+=total;G._lastBankAmount=total;spawnBankPop(total);
+    famFire('bank',{actor:'p',amt:total});try{famRenderRow();}catch(e){}
   }
   G.turnPts=0;G.kept=[];G.numDice=6;
   /* THE GRUDGE NPC mirror: increment opp's grudge stack when player banks
@@ -14607,6 +14864,12 @@ function endPTurn(){
   }
   /* Sudden Death check removed from endPTurn — opponent must finish their turn first.
      The check lives in finOpp() after opponent banks/busts. */
+  if(G._fExtraTurn&&G.pPts<G.target&&G.oPts<G.target){
+    G._fExtraTurn=false;
+    setStatusMsg('FALLING STAR — YOU GO AGAIN','gold');
+    flashYourTurn();setTimeout(()=>{setTurnMode(false);startPTurn();},900);
+    return;
+  }
   var _fCap=G.turnCap||TURN_CAP_PATRON;
   if(G._finalAnswerUsed&&(G.pTurns||0)>=_fCap&&(G.oTurns||0)>=_fCap
      &&G.pPts<G.target&&G.oPts<G.target&&G.pPts!==G.oPts){
@@ -15909,6 +16172,7 @@ function runOppTurn(){
       }
       else if(G.pCards.includes('thieves_luck')&&pts>0&&pts<250){G.pPts+=pts;triggerCard('thieves_luck','STOLE '+pts.toLocaleString(),true);}
       else{G.oPts+=pts;_npcActuallyBanked=true;setStatusMsg((G.rung?G.rung.name:'RIVAL')+' BANKED '+pts.toLocaleString(),'active');if(window.DLG&&pts>=600)DLG.trigger('OPP_BIG_BANK');}
+      famFire('bank',{actor:'o',amt:pts});
       /* TELL: Reckoning (Ambrose) — record his last bank only if he actually scored it */
       if(_npcActuallyBanked&&G._tell&&G._tell.id==='reckoning'&&pts>0){
         G._tellState.lastNpcBank=pts;
