@@ -10360,19 +10360,30 @@ function famOffer(forceTier1){
   return offer;
 }
 var _famOffer=[];
+function famCardHtml(id,tier,opts){
+  opts=opts||{};
+  var d=famDef(id),col=FAMILIES[d.fam].color;
+  return '<div '+(opts.onclick?'onclick="'+opts.onclick+'"':'')
+    +' style="cursor:'+(opts.onclick?'pointer':'default')+';aspect-ratio:2/3;display:flex;flex-direction:column;'
+    +'background:#191919;border:2px solid '+col+';padding:7px;box-sizing:border-box;position:relative">'
+    +'<div style="font-size:12px;font-weight:bold;color:#eee;line-height:1.25">'+d.name.toUpperCase()+'</div>'
+    +'<div style="font-size:15px;color:'+col+';margin:1px 0 5px">'+['I','II','III'][tier-1]+'</div>'
+    +'<div style="width:100%;height:34px;background:'+col+'22;border:1px solid '+col+'55;'
+      +'display:flex;align-items:center;justify-content:center;font-size:9px;letter-spacing:1px;color:'+col+'">'
+      +FAMILIES[d.fam].name+' · '+(d.kind==='active'?'ACTIVE':'PASSIVE')+'</div>'
+    +'<div style="flex:1;font-size:10px;color:#bbb;line-height:1.45;margin-top:6px;overflow:hidden">'+d.text[tier-1]+'</div>'
+    +(opts.badge?'<div style="position:absolute;top:5px;right:5px;background:#fd6;color:#210;font-size:9px;padding:1px 5px">'+opts.badge+'</div>':'')
+    +(opts.footer||'')
+    +'</div>';
+}
 function famOfferHtml(offer,pickFn,declineGold){
   var h='<div style="font-family:monospace;color:#eee;text-align:left;padding:10px 6px">'
-    +'<div style="font-size:12px;letter-spacing:2px;color:#999;margin-bottom:8px">CHOOSE A CARD</div>';
+    +'<div style="font-size:12px;letter-spacing:2px;color:#999;margin-bottom:10px">CHOOSE A CARD</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">';
   offer.forEach(function(o,i){
-    var d=famDef(o.id),col=FAMILIES[d.fam].color;
-    h+='<div onclick="'+pickFn+'('+i+')" style="cursor:pointer;margin:5px 0;padding:7px 9px;'
-      +'border:1px solid #555;border-left:5px solid '+col+';background:#161616">'
-      +'<b>'+d.name.toUpperCase()+' '+['I','II','III'][o.tier-1]+'</b>'
-      +' <span style="color:'+col+';font-size:10px">'+FAMILIES[d.fam].name+'</span>'
-      +' <span style="color:#888;font-size:10px">'+(d.kind==='active'?'ACTIVE':'PASSIVE')+'</span>'
-      +(o.upgrade?' <span style="color:#fd6;font-size:10px">UPGRADE</span>':'')
-      +'<div style="color:#aaa;font-size:11px;margin-top:3px;line-height:1.4">'+d.text[o.tier-1]+'</div></div>';
+    h+=famCardHtml(o.id,o.tier,{onclick:pickFn+'('+i+')',badge:(o.upgrade?'UPGRADE':null)});
   });
+  h+='</div>';
   if(declineGold!=null){
     h+='<div onclick="famDraftDecline()" style="cursor:pointer;margin-top:9px;padding:8px;'
       +'border:1px dashed #776;color:#dc5;text-align:center">DECLINE — TAKE '+declineGold+'g</div>';
@@ -10434,21 +10445,23 @@ function famPanelShow(){
   var ov=document.createElement('div');ov.id='famPanel';
   ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:9400;overflow:auto;font-family:monospace;color:#eee';
   function row(c,where,idx){
-    var d=famDef(c.id),col=FAMILIES[d.fam].color;
-    return '<div style="margin:4px 0;padding:6px 8px;border:1px solid #555;border-left:5px solid '+col+';background:#151515">'
-      +'<b>'+d.name.toUpperCase()+' '+['I','II','III'][c.tier-1]+'</b> <span style="font-size:10px;color:'+col+'">'+FAMILIES[d.fam].name+'</span>'
-      +'<div style="font-size:11px;color:#aaa;margin:2px 0">'+d.text[c.tier-1]+'</div>'
-      +'<span onclick="famPanelMove(\''+where+'\','+idx+')" style="cursor:pointer;color:#8cf;margin-right:12px">['+(where==='eq'?'UNEQUIP':'EQUIP')+']</span>'
-      +'<span onclick="famPanelSell(\''+where+'\','+idx+')" style="cursor:pointer;color:#f88">[SELL 15g]</span></div>';
+    var foot='<div style="display:flex;gap:4px;margin-top:5px">'
+      +'<span onclick="event.stopPropagation();famPanelMove(&quot;'+where+'&quot;,'+idx+')" style="cursor:pointer;flex:1;text-align:center;font-size:9px;padding:4px 0;background:#123;color:#8cf;border:1px solid #357">'+(where==='eq'?'UNEQUIP':'EQUIP')+'</span>'
+      +'<span onclick="event.stopPropagation();famPanelSell(&quot;'+where+'&quot;,'+idx+')" style="cursor:pointer;flex:1;text-align:center;font-size:9px;padding:4px 0;background:#311;color:#f99;border:1px solid #733">SELL 15g</span></div>';
+    return famCardHtml(c.id,c.tier,{footer:foot});
   }
   var h='<div style="max-width:460px;margin:20px auto;padding:0 10px">'
     +'<div style="display:flex;justify-content:space-between;align-items:center">'
     +'<b style="letter-spacing:2px">CARDS</b><span onclick="document.getElementById(\'famPanel\').remove()" style="cursor:pointer;color:#f66;padding:4px 10px;border:1px solid #666">CLOSE</span></div>'
-    +'<div style="color:#999;font-size:11px;margin:8px 0 2px">EQUIPPED ('+S.run.fcards.length+'/3)</div>';
+    +'<div style="color:#999;font-size:11px;margin:8px 0 4px">EQUIPPED ('+S.run.fcards.length+'/3)</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">';
   S.run.fcards.forEach(function(c,i){h+=row(c,'eq',i);});
+  h+='</div>';
   if(!S.run.fcards.length)h+='<div style="color:#555;font-size:11px">— none —</div>';
-  h+='<div style="color:#999;font-size:11px;margin:12px 0 2px">SATCHEL</div>';
+  h+='<div style="color:#999;font-size:11px;margin:14px 0 4px">SATCHEL</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">';
   S.run.finv.forEach(function(c,i){h+=row(c,'inv',i);});
+  h+='</div>';
   if(!S.run.finv.length)h+='<div style="color:#555;font-size:11px">— empty —</div>';
   h+='<div style="color:#666;font-size:10px;margin-top:14px">gold: '+(S.run.gold||0)+'g</div></div>';
   ov.innerHTML=h;
