@@ -7530,6 +7530,7 @@ function _getS(){
 function save(){try{localStorage.setItem('gambit4_proto',JSON.stringify(S));}catch(e){/* storage full or unavailable */}}
 function startNewRun(){
   S.run=_freshRun();
+  S.run._famFirstDraft=true;/* brief §4: draft 1 of 3 before the first seat */
   /* Snapshot renown at run start so the death summary can show how much
      was banked THIS run (renown is the one thing that persists). */
   S.run._renownAtStart=S.renown||0;
@@ -10316,6 +10317,348 @@ function famUse(i){
   if(fx.canUse&&!fx.canUse(inst)){famLog('NOT NOW');return;}
   if(fx.use(inst)){inst.charges--;famRenderRow();}
 }
+/* ── draft v2 (brief §4) ── */
+function famOwnedAll(){
+  _getS();S.run.fcards=S.run.fcards||[];S.run.finv=S.run.finv||[];
+  return S.run.fcards.concat(S.run.finv);
+}
+function famOwnTier(id){
+  var best=0;famOwnedAll().forEach(function(c){if(c.id===id&&c.tier>best)best=c.tier;});
+  return best;
+}
+function famOffer(forceTier1){
+  var night=(S.run.tier||0)+1;
+  var pool=FAM_CARDS.filter(function(d){return FAM_LIVE[d.id]&&!d.unique&&famOwnTier(d.id)<3;});
+  var ownedFams={};famOwnedAll().forEach(function(c){var d=famDef(c.id);if(d)ownedFams[d.fam]=1;});
+  function draw(){
+    var cands=pool;
+    if(Object.keys(ownedFams).length){
+      var inF=pool.filter(function(d){return ownedFams[d.fam];});
+      var outF=pool.filter(function(d){return !ownedFams[d.fam];});
+      cands=(Math.random()<0.6&&inF.length)?inF:(outF.length?outF:inF);
+    }
+    return cands[Math.floor(Math.random()*cands.length)];
+  }
+  var offer=[],guard=0;
+  while(offer.length<3&&guard++<80){
+    var d=draw();if(!d)break;
+    if(offer.some(function(o){return o.id===d.id;}))continue;
+    var owned=famOwnTier(d.id),tier;
+    if(owned>0)tier=owned+1;              /* duplicate -> upgrade in place */
+    else if(forceTier1)tier=1;
+    else tier=(night>=3&&Math.random()<0.30)?2:1; /* II raw from night 3; III never raw */
+    offer.push({id:d.id,tier:tier,upgrade:owned>0});
+  }
+  return offer;
+}
+var _famOffer=[];
+function famOfferHtml(offer,pickFn,declineGold){
+  var h='<div style="font-family:monospace;color:#eee;text-align:left;padding:10px 6px">'
+    +'<div style="font-size:12px;letter-spacing:2px;color:#999;margin-bottom:8px">CHOOSE A CARD</div>';
+  offer.forEach(function(o,i){
+    var d=famDef(o.id),col=FAMILIES[d.fam].color;
+    h+='<div onclick="'+pickFn+'('+i+')" style="cursor:pointer;margin:5px 0;padding:7px 9px;'
+      +'border:1px solid #555;border-left:5px solid '+col+';background:#161616">'
+      +'<b>'+d.name.toUpperCase()+' '+['I','II','III'][o.tier-1]+'</b>'
+      +' <span style="color:'+col+';font-size:10px">'+FAMILIES[d.fam].name+'</span>'
+      +' <span style="color:#888;font-size:10px">'+(d.kind==='active'?'ACTIVE':'PASSIVE')+'</span>'
+      +(o.upgrade?' <span style="color:#fd6;font-size:10px">UPGRADE</span>':'')
+      +'<div style="color:#aaa;font-size:11px;margin-top:3px;line-height:1.4">'+d.text[o.tier-1]+'</div></div>';
+  });
+  if(declineGold!=null){
+    h+='<div onclick="famDraftDecline()" style="cursor:pointer;margin-top:9px;padding:8px;'
+      +'border:1px dashed #776;color:#dc5;text-align:center">DECLINE — TAKE '+declineGold+'g</div>';
+  }
+  return h+'</div>';
+}
+function famApplyPick(o){
+  _getS();S.run.fcards=S.run.fcards||[];S.run.finv=S.run.finv||[];
+  if(o.upgrade){
+    var all=S.run.fcards.concat(S.run.finv);
+    for(var i=0;i<all.length;i++)if(all[i].id===o.id){all[i].tier=Math.min(3,o.tier);break;}
+  }else if(S.run.fcards.length<3)S.run.fcards.push({id:o.id,tier:o.tier});
+  else S.run.finv.push({id:o.id,tier:o.tier});
+  save();
+}
+function famDraftPick(i){
+  var o=_famOffer[i];if(!o)return;
+  famApplyPick(o);
+  var rc=document.querySelector('#end-ov .res-card')||document.getElementById('resCard');
+  var d=famDef(o.id);
+  if(rc)rc.innerHTML='<div style="font-family:monospace;color:#8e8;padding:30px 10px;text-align:center">TAKEN: '
+    +d.name.toUpperCase()+' '+['I','II','III'][o.tier-1]+'</div>';
+  _famEndReady();
+}
+function famDraftDecline(){
+  _getS();var g=5+((S.run.tier||0)+1)*5;
+  S.run.gold=(S.run.gold||0)+g;save();
+  var rc=document.querySelector('#end-ov .res-card')||document.getElementById('resCard');
+  if(rc)rc.innerHTML='<div style="font-family:monospace;color:#dc5;padding:30px 10px;text-align:center">DECLINED — +'+g+'g</div>';
+  _famEndReady();
+}
+function _famEndReady(){
+  try{var eb=document.getElementById('end-btns');if(eb)eb.style.display='';}catch(e){}
+  try{_endScreenPhase='ready';}catch(e){}
+}
+/* run-start draft: 1 of 3, tier I, no decline (brief §4) */
+function famRunDraftShow(){
+  if(document.getElementById('famRunDraft'))return;
+  _famOffer=famOffer(true);
+  if(!_famOffer.length){S.run._famFirstDraft=false;save();return;}
+  var ov=document.createElement('div');ov.id='famRunDraft';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9500;display:flex;align-items:center;justify-content:center';
+  ov.innerHTML='<div style="width:min(420px,92vw);background:#0d0d0d;border:1px solid #666;padding:8px">'
+    +'<div style="font-family:monospace;color:#eee;font-size:13px;letter-spacing:2px;padding:6px">A CARD BEFORE YOU SIT</div>'
+    +famOfferHtml(_famOffer,'famRunDraftPick',null)+'</div>';
+  document.body.appendChild(ov);
+}
+function famRunDraftPick(i){
+  var o=_famOffer[i];if(!o)return;
+  famApplyPick(o);
+  S.run._famFirstDraft=false;save();
+  var ov=document.getElementById('famRunDraft');if(ov)ov.remove();
+  famLog('CARD TAKEN: '+famDef(o.id).name.toUpperCase());
+}
+/* ── loadout greybox panel: equip 3 / inventory / sell 15g ── */
+function famPanelShow(){
+  _getS();S.run.fcards=S.run.fcards||[];S.run.finv=S.run.finv||[];
+  var old=document.getElementById('famPanel');if(old)old.remove();
+  var ov=document.createElement('div');ov.id='famPanel';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:9400;overflow:auto;font-family:monospace;color:#eee';
+  function row(c,where,idx){
+    var d=famDef(c.id),col=FAMILIES[d.fam].color;
+    return '<div style="margin:4px 0;padding:6px 8px;border:1px solid #555;border-left:5px solid '+col+';background:#151515">'
+      +'<b>'+d.name.toUpperCase()+' '+['I','II','III'][c.tier-1]+'</b> <span style="font-size:10px;color:'+col+'">'+FAMILIES[d.fam].name+'</span>'
+      +'<div style="font-size:11px;color:#aaa;margin:2px 0">'+d.text[c.tier-1]+'</div>'
+      +'<span onclick="famPanelMove(\''+where+'\','+idx+')" style="cursor:pointer;color:#8cf;margin-right:12px">['+(where==='eq'?'UNEQUIP':'EQUIP')+']</span>'
+      +'<span onclick="famPanelSell(\''+where+'\','+idx+')" style="cursor:pointer;color:#f88">[SELL 15g]</span></div>';
+  }
+  var h='<div style="max-width:460px;margin:20px auto;padding:0 10px">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center">'
+    +'<b style="letter-spacing:2px">CARDS</b><span onclick="document.getElementById(\'famPanel\').remove()" style="cursor:pointer;color:#f66;padding:4px 10px;border:1px solid #666">CLOSE</span></div>'
+    +'<div style="color:#999;font-size:11px;margin:8px 0 2px">EQUIPPED ('+S.run.fcards.length+'/3)</div>';
+  S.run.fcards.forEach(function(c,i){h+=row(c,'eq',i);});
+  if(!S.run.fcards.length)h+='<div style="color:#555;font-size:11px">— none —</div>';
+  h+='<div style="color:#999;font-size:11px;margin:12px 0 2px">SATCHEL</div>';
+  S.run.finv.forEach(function(c,i){h+=row(c,'inv',i);});
+  if(!S.run.finv.length)h+='<div style="color:#555;font-size:11px">— empty —</div>';
+  h+='<div style="color:#666;font-size:10px;margin-top:14px">gold: '+(S.run.gold||0)+'g</div></div>';
+  ov.innerHTML=h;
+  document.body.appendChild(ov);
+}
+function famPanelMove(where,idx){
+  _getS();
+  if(where==='eq'){S.run.finv.push(S.run.fcards.splice(idx,1)[0]);}
+  else{if(S.run.fcards.length>=3){famLog('THREE CARDS ONLY');famPanelShow();return;}
+    S.run.fcards.push(S.run.finv.splice(idx,1)[0]);}
+  save();famPanelShow();
+}
+function famPanelSell(where,idx){
+  _getS();
+  var arr=where==='eq'?S.run.fcards:S.run.finv;
+  arr.splice(idx,1);S.run.gold=(S.run.gold||0)+15;save();famPanelShow();
+}
+
+/* ── remaining effects ── */
+function famInst(id){return (G&&G.pF||[]).filter(function(i){return i.id===id;})[0]||null;}
+/* commit-time scoring hooks: short fuse, bloom, positional trio */
+function famCommitBonus(selD,pts){
+  if(!G||!G.pF||!G.pF.length||pts<=0)return pts;
+  var inst;
+  if((inst=famInst('short_fuse'))&&(G.turnRollCount||0)>=3){
+    pts*=2;inst.state.lit=true;_famPop('x2 SHORT FUSE');
+  }
+  if((inst=famInst('bloom'))){
+    var counts={};selD.forEach(function(d){counts[d.val]=(counts[d.val]||0)+1;});
+    var isTriple=Object.keys(counts).some(function(v){return counts[v]>=3;});
+    var uv=Object.keys(counts).map(Number).sort(function(a,b){return a-b;});
+    var run=1,best=1;for(var i=1;i<uv.length;i++){run=(uv[i]===uv[i-1]+1)?run+1:1;if(run>best)best=run;}
+    var isStraight=best>=5;
+    var hasJade=selD.some(function(d){return (d.mat||'').indexOf('jade')===0;});
+    if((isTriple||isStraight)&&hasJade){
+      var P=famDef('bloom').p[inst.tier-1];pts+=P;_famPop('+'+P+' BLOOM');
+    }
+  }
+  var first=G.pool[0],last=G.pool[G.pool.length-1];
+  var hitFirst=first&&selD.indexOf(first)>=0,hitLast=last&&selD.indexOf(last)>=0;
+  if((inst=famInst('vanguard_f'))&&hitFirst){var P1=famDef('vanguard_f').p[inst.tier-1];pts+=P1;_famPop('+'+P1+' VANGUARD');}
+  if((inst=famInst('anchor_f'))&&hitLast){var P2=famDef('anchor_f').p[inst.tier-1];pts+=P2;_famPop('+'+P2+' ANCHOR');}
+  if((inst=famInst('bookends_f'))&&hitFirst&&hitLast){var P3=famDef('bookends_f').p[inst.tier-1];pts+=P3;_famPop('+'+P3+' BOOKENDS');}
+  return pts;
+}
+CFX.short_fuse={
+  turnStart:function(ev){if(ev.owner==='p')ev.me.state.lit=false;},
+  bust:function(ev){if(!ev.mine||ev.owner!=='p'||!ev.me.state.lit)return;
+    var burn=ev.lost||0;
+    if(burn>0){G.pPts=Math.max(0,G.pPts-burn);famLog('THE FIRE SPREADS — '+burn+' BURNS OFF YOUR BANK');try{updHUD();}catch(e){}}
+    ev.me.state.lit=false;}
+};
+/* forces applied to a fresh roll (stargazer peek, honeytrap pull) */
+function famApplyRollForces(){
+  if(!G)return;
+  var free=G.pool.filter(function(d){return !d.committed&&!d._frozen;});
+  if(G._famPeekVals&&G._famPeekVals.length===free.length){
+    free.forEach(function(d,i){d.val=G._famPeekVals[i];try{reDrawDieFace(d);}catch(e){}});
+    G._famPeekVals=null;famLog('THE OMEN HOLDS');
+  }
+  if(G._famHoneyVal&&free.length){
+    var d0=free[0];d0.val=G._famHoneyVal;try{reDrawDieFace(d0);}catch(e){}
+    _famPop('HONEYTRAP → '+G._famHoneyVal);G._famHoneyVal=null;
+  }
+}
+/* fool's gold: auto-fires on a dead roll, one reroll; double-fail burns */
+function famFoolsGold(free){
+  var inst=famInst('fools_gold_f');
+  if(!inst||inst.charges<=0)return false;
+  inst.charges--;try{famRenderRow();}catch(e){}
+  famLog("FOOL'S GOLD — EVERYTHING REROLLS");
+  free.forEach(function(d){d.val=rollFace(d.mat);try{reDrawDieFace(d);}catch(e){}});
+  var fv=free.map(function(d){return d.val;}),fm=free.map(function(d){return d.mat;});
+  if(anyScoring(fv,effectiveCards(),fm)){
+    free.forEach(function(d){if(d.el)d.el.onclick=function(){toggleDie(d);};});
+    G.phase='choosing';try{refreshSelUI();}catch(e){}
+    return true;
+  }
+  inst.state.burn=true;famLog('THE SECOND ROLL FAILS TOO');
+  return false;
+}
+CFX.fools_gold_f={
+  bust:function(ev){if(!ev.mine||ev.owner!=='p'||!ev.me.state.burn)return;
+    var burn=ev.lost||0;
+    if(burn>0){G.pPts=Math.max(0,G.pPts-burn);famLog("FOOL'S GOLD BURNS "+burn+' MORE FROM YOUR BANK');try{updHUD();}catch(e){}}
+    ev.me.state.burn=false;}
+};
+CFX.transmute={
+  canUse:function(){return G&&G.phase==='choosing';},
+  use:function(inst){
+    var free=G.pool.filter(function(d){return !d.committed;});
+    if(!free.length)return false;
+    var pick=parseInt(prompt('Which die? 1..'+free.length+' (left to right, uncommitted)'),10);
+    if(!(pick>=1&&pick<=free.length))return false;
+    var face=parseInt(prompt('New face? 1-6'),10);
+    if(!(face>=1&&face<=6))return false;
+    var d=free[pick-1];d.val=face;try{reDrawDieFace(d);}catch(e){}
+    famLog('TRANSMUTED TO '+face);
+    try{refreshSelUI();}catch(e){}
+    return true;
+  }
+};
+CFX.powder_keg={
+  canUse:function(){return G&&G.phase==='choosing';},
+  use:function(inst){
+    /* everything rerolls, kept ones included — the turn resets */
+    G.kept=[];
+    G.pool.forEach(function(d){
+      d.committed=false;d._frozen=false;d.sel=false;
+      d.val=rollFace(d.mat);
+      if(d.el){d.el.classList.remove('committed','selected','die-frozen');try{reDrawDieFace(d);}catch(e){}}
+    });
+    G.numDice=G.pool.length;
+    G.turnRollCount++;
+    try{SFX.roll();}catch(e){}
+    famLog('POWDER KEG — THE WHOLE TABLE BLOWS');
+    var free=G.pool.slice();
+    setTimeout(function(){
+      var fv=free.map(function(d){return d.val;}),fm=free.map(function(d){return d.mat;});
+      if(!anyScoring(fv,effectiveCards(),fm)){if(_tryBustSave(free))return;_delayedDoBust(free);return;}
+      free.forEach(function(d){if(d.el)d.el.onclick=function(){toggleDie(d);};});
+      G.phase='choosing';try{refreshSelUI();}catch(e){}
+    },500);
+    return true;
+  }
+};
+CFX.sacrifice={
+  canUse:function(){return G&&(G.phase==='choosing'||G.phase==='idle')&&G.pool.filter(function(d){return !d.committed&&!d._shattered;}).length>0;},
+  use:function(inst){
+    var free=G.pool.filter(function(d){return !d.committed&&!d._shattered;});
+    var d=free[free.length-1];
+    d._shattered=true;
+    if(d.el){try{spawnShards(d.el,'#3a3a52');}catch(e){}d.el.classList.add('die-shatter');
+      (function(el){setTimeout(function(){if(el&&el.parentNode)el.remove();},360);})(d.el);}
+    if(G.numDice>1)G.numDice--;
+    if(Array.isArray(G.matchDice)){var mi=G.matchDice.indexOf(d.mat);if(mi>=0)G.matchDice.splice(mi,1);}
+    G.pool=G.pool.filter(function(x){return x!==d;});
+    var P=famDef('sacrifice').p[inst.tier-1];
+    G.pPts+=P;famLog('SACRIFICE — THE DIE SHATTERS FOR '+P);_famPop('+'+P);
+    try{updHUD();refreshSelUI();}catch(e){}
+    return true;
+  }
+};
+CFX.ward={
+  canUse:function(){return G&&G.phase!=='opp';},
+  use:function(inst){
+    G.dieShieldsPlayer=(G.dieShieldsPlayer||0)+1;
+    famLog('WARD RAISED — THE NEXT BUST IS ABSORBED');
+    return true;
+  }
+};
+CFX.stargazer={
+  canUse:function(){return G&&G.phase==='choosing';},
+  use:function(inst){
+    var free=G.pool.filter(function(d){return !d.committed&&!d._frozen;});
+    if(!free.length)return false;
+    G._famPeekVals=free.map(function(d){return rollFace(d.mat);});
+    famLog('OMEN — NEXT ROLL: '+G._famPeekVals.join(' · '));
+    return true;
+  }
+};
+CFX.honeytrap={
+  canUse:function(){
+    if(!G||G.phase==='opp')return false;
+    var vals={};var ok=false;
+    (G.kept||[]).forEach(function(k){(k.vals||[]).forEach(function(v){vals[v]=(vals[v]||0)+1;if(vals[v]>=2)ok=true;});});
+    return ok;
+  },
+  use:function(inst){
+    var vals={},pairVal=0;
+    (G.kept||[]).forEach(function(k){(k.vals||[]).forEach(function(v){vals[v]=(vals[v]||0)+1;});});
+    Object.keys(vals).forEach(function(v){if(vals[v]>=2)pairVal=Number(v);});
+    if(!pairVal)return false;
+    G._famHoneyVal=pairVal;
+    famLog('HONEYTRAP SET — THE NEXT ROLL PULLS A '+pairVal);
+    return true;
+  }
+};
+CFX.ill_omen={
+  canUse:function(){return G&&G.phase!=='opp'&&!G._famIllOmen;},
+  use:function(inst){
+    G._famIllOmen={tier:inst.tier};
+    famLog('ILL OMEN DECLARED — THEY BUST THIS TURN, OR PAY YOU DO');
+    return true;
+  }
+};
+CFX.sleight={
+  canUse:function(){return G&&G.phase!=='opp'&&!G._famSleight;},
+  use:function(inst){
+    G._famSleight=true;
+    famLog('SLEIGHT READY — THEIR NEXT ROLL COMES BACK');
+    return true;
+  }
+};
+CFX.tar_pit={
+  canUse:function(){return G&&G.phase!=='opp'&&!G._famTarPit;},
+  use:function(inst){
+    G._famTarPit={turns:(inst.tier===2?2:1),dice:(inst.tier===3?2:1)};
+    famLog('TAR PIT LAID — THEY ROLL SHORT NEXT TURN');
+    return true;
+  }
+};
+CFX.preserve={
+  canUse:function(){
+    if(!G||G.phase==='opp')return false;
+    return (G.kept||[]).some(function(k){return (k.vals||[]).some(function(v){return v===1||v===5;});});
+  },
+  use:function(inst){
+    var found=null;
+    (G.kept||[]).some(function(k){return (k.vals||[]).some(function(v){if(v===1||v===5){found=v;return true;}return false;});});
+    if(!found)return false;
+    G._famPreserve={val:found,pts:found===1?100:50,crack:(inst.tier===3?100:0)};
+    famLog('PRESERVED — A '+found+' WAITS IN AMBER FOR NEXT TURN');
+    return true;
+  }
+};
+/* update the live set */
+['transmute','fools_gold_f','bloom','preserve','honeytrap','tar_pit','ward','powder_keg','sacrifice','short_fuse','stargazer','ill_omen','sleight','vanguard_f','anchor_f','bookends_f'].forEach(function(id){FAM_LIVE[id]=1;});
 /* ═══════════════ end family engine ═══════════════ */
 
 function scoreRoll(vals,cards,locked,context,dieMats){
@@ -12629,7 +12972,7 @@ function flashYourTurn(){
 
 /* ═══════ TURN FLOW ═══════ */
 function effectiveCards(){
-  /* Filter out worn cards (tarnish >= TARNISH_DISABLE) — they stop working until cleaned */
+  return [];/* P1 cutover: old card pool retired — family engine (CFX) replaces it */
   if(!S||!S.cards)return G.pCards;
   return G.pCards.filter(function(cid){
     var sc=S.cards.find(function(c){return c.id===cid;});
@@ -12707,6 +13050,12 @@ function toggleDie(d){
 
 function startPTurn(){
   if(typeof famFire==='function'&&G){famFire('turnStart',{actor:'p'});try{famRenderRow();}catch(e){}}
+  if(G&&G._famPreserve){
+    var _fp=G._famPreserve;G._famPreserve=null;
+    G.kept=[{vals:[_fp.val],mat:'bone',pts:_fp.pts+(_fp.crack||0)}];
+    G.numDice=5;
+    famLog('THE AMBER CRACKS — A '+_fp.val+' ALREADY KEPT'+(_fp.crack?' (+'+_fp.crack+')':''));
+  }
   /* Ghost-timer guard: a scheduled callback from a fled/finished match must
      not start a player turn (it used to re-create S.pendingMatch after
      endMatch deleted it, resurrecting a RESUME for a match already lost). */
@@ -13217,6 +13566,7 @@ function afterRoll(){
   }
 }
 function _afterRollImpl(){
+  if(typeof famApplyRollForces==='function'&&G&&G.phase!=='opp')famApplyRollForces();
   if(typeof famFire==='function'&&G&&G.phase!=='opp')famFire('roll',{actor:'p',rolls:G.turnRollCount||0});
   G.turnRollCount++;
   /* ── TELL HOOKS (post-roll) ── */
@@ -13426,6 +13776,7 @@ function _afterRollImpl(){
      mutate d.val in place, so the snapshot taken at function entry would be stale. */
   freeV=free.map(d=>d.val);
   if(!anyScoring(freeV,cards,freeMats)&&!_anchorRescues(cards)){
+    if(famFoolsGold(free))return;
     if(_tryBustSave(free))return;
     _delayedDoBust(free);return;
   }
@@ -14118,6 +14469,7 @@ function doBust(){
    Aldric's Vow doubling, The Echo), silently shorting the turn's final
    selection vs. the printed card text. Returns the adjusted pts. */
 function _applyCommitBonuses(selDice,pts,cards){
+  pts=famCommitBonus(selDice,pts);
   /* POSITION-BASED CARD BONUSES (Vagabond synergy) — positions are read from
      G.pool (roll order, stable across commits). */
   var rowLen=G.pool.length;
@@ -14997,6 +15349,13 @@ function _oppDelay(ms){
   return Math.max(40,Math.round(ms*mult));
 }
 function runOppTurn(){
+  if(G&&G._famTarPit&&G._famTarPit.turns>0){
+    G._famTarPit.turns--;
+    var _cut=G._famTarPit.dice||1;
+    G.numDice=Math.max(1,6-_cut);
+    famLog('TAR PIT — THEY ROLL '+G.numDice);
+    if(G._famTarPit.turns<=0)G._famTarPit=null;
+  }
   /* pacing state: fresh multiplier per turn; flag lets the global tap-FF
      listener know a rival turn is in progress */
   G._oppTurnActive=true;G._ffMult=1;
@@ -15778,6 +16137,14 @@ function runOppTurn(){
     }catch(e){}
     if(G!==_matchG||!G||G._endMatchFired)return;/* ghost-timer guard */
     G.oTurns=(G.oTurns||0)+1;/* P3: a completed rival turn (bank or bust) */
+    /* ILL OMEN resolution: declared before this rival turn */
+    if(G._famIllOmen){
+      var _ioT=G._famIllOmen.tier||1,_ioP=famDef('ill_omen').p[_ioT-1];
+      if(pts<=0){var take=Math.min(_ioP[0],G.oPts);G.oPts-=take;G.pPts+=take;
+        famLog('THE OMEN LANDS — YOU TAKE '+take);}
+      else{G.oPts+=_ioP[1];famLog('THE OMEN MISSES — THEY GAIN '+_ioP[1]);}
+      G._famIllOmen=null;try{updHUD();}catch(e){}
+    }
     if(pts>0){
       /* STAKES RISING NPC mirror: surface the +300 seed bonus (already in
          oppBank/pts). Reset the carry-over flag. Mirrors player handleScore
@@ -16784,150 +17151,17 @@ function endMatch(win){
     }
   }
 
-  /* For patron wins: inject card draft directly into end screen */
+  /* For patron wins: family draft, greybox (P1 cutover) */
   if(win&&!isBoss){
-    _draftBossMode=false;
-    _getS();
-    /* Reshuffle perk is now ONCE PER MATCH (was once per run). Reset the flag
-       at every draft so the button appears anew after each match win. */
-    if(S&&S.run)S.run._restockUsed=false;
-    _draftCards=_buildDraftPool();
-    _draftSelected=null;_draftTargetSlot=-1;
-    _draftPickedCardId=null;_draftPickedSlotIdx=-1;_draftPickedEl=null;
-    _draftOriginals={};
-    /* Build inline draft HTML in resCard */
-    var draftHtml='<div class="end-draft">';
-    /* Spacer keeps the layout breathing room above the cards (the
-       CHOOSE A CARD prompt now lives BELOW the cards). */
-    draftHtml+='<div class="end-draft-spacer"></div>';
-    draftHtml+='<div class="end-draft-cards">';
-    _draftCards.forEach(function(card){
-      var sd=(Math.random()*8).toFixed(1);
-      draftHtml+='<div class="draft-card-wrap" data-card-id="'+card.id+'">';
-      draftHtml+='<div class="gcard rarity-'+card.rarity+'" style="--sheen-delay:-'+sd+'s">';
-      draftHtml+=_cardArtImg(card.id);
-      draftHtml+='<div class="gcard-cover" style="background:'+(CARD_BG[card.id]||'#444')+'">'+card.icon+'</div>';
-      draftHtml+='<div class="gcard-frame"></div>'+gcCorners()+'</div>';
-      draftHtml+=mkCardTooltipHTML(card,null,{showFlavor:false,asPlayer:true});
-      draftHtml+='</div>';
-    });
-    draftHtml+='</div>';
-    draftHtml+='<div class="end-draft-label">CHOOSE A CARD</div>';
-    /* Renown perk: Regular at the bar → reshuffle icon directly under the label.
-       Suppressed on the very match where the perk was just unlocked, so the
-       celebration notification fires first (next gauntlet screen) and the
-       button only appears on the FOLLOWING match — feels like a proper
-       "perk unlocked, then perk active" beat instead of effect-then-notice. */
-    var _freeRestockPending=(S.run._pendingPerkUnlocks||[]).indexOf('freeRestock')!==-1;
-    if(S.renownPerks&&S.renownPerks.freeRestock&&!S.run._restockUsed&&!_freeRestockPending){
-      draftHtml+='<div class="end-draft-reshuffle" id="endDraftReshuffleBtn" onclick="reshuffleDraft()" title="Reshuffle (renown)"><span>↻</span></div>';
-    }
-    draftHtml+='<div class="end-draft-slots" id="endDraftSlots"></div>';
-    /* Action row injected separately into #endDraftActionsHost below — must
-       live OUTSIDE .res-card so position:fixed anchors to the viewport. */
-    draftHtml+='</div>';
-    if(resCard){resCard.innerHTML=draftHtml;resCard.classList.add('show');}
-    /* Inject the action row into the #end-ov-level host (escapes resCard's
-       perspective/transform containing block so position:fixed pins to
-       the actual viewport bottom). */
-    var _actionsHost=document.getElementById('endDraftActionsHost');
-    if(_actionsHost)_actionsHost.innerHTML=_endDraftActionsHtml();
-    /* Slot-unlock celebration: drain pending perk-unlock modals NOW so the
-       "SLOT UNLOCKED" splash pops BEFORE the player drafts into the new
-       slot. The modal backdrop blocks draft interaction until dismissed.
-       Previously this drained on the gauntlet screen 900ms after exit,
-       which meant the player saw the unlocked slot and could draft into
-       it without ever understanding why it became available. The drain is
-       no-op if no perks are pending. */
-    setTimeout(function(){
-      /* Defer freeRestock to the gauntlet drain — its reshuffle button is
-         suppressed on this match anyway, so popping the alert here would
-         show the player a perk they can't immediately use. The gauntlet
-         drain at initGauntletScreen handles it once the next match's
-         draft (with the button visible) is one screen away. */
-      if(typeof _drainPerkUnlockQueue==='function')_drainPerkUnlockQueue(['freeRestock']);
-    },1200);
-    /* Attach tooltip + drag handlers + draw button canvases */
-    setTimeout(function(){
-      document.querySelectorAll('.end-draft .draft-card-wrap').forEach(function(el){
-        attachTooltipTap(el);
-        _initEndDraftDrag(el,el.dataset.cardId);
-      });
-      /* Tap anywhere on the draft background dismisses tooltips */
-      var draftBg=document.querySelector('.end-draft');
-      if(draftBg)draftBg.addEventListener('click',function(e){
-        if(!e.target.closest('.draft-card-wrap,.draft-slot,.mcard-tooltip'))closeAllChips();
-      });
-      _renderEndDraftSlots();
-      /* Draw SKIP button canvas */
-      var skipBtn=document.getElementById('endDraftSkipBtn');
-      if(skipBtn){
-        var cv=skipBtn.querySelector('canvas');
-        if(cv){cv.width=skipBtn.offsetWidth;cv.height=skipBtn.offsetHeight;cv.style.width='100%';cv.style.height='100%';
-          drawPixelPanel(cv,'#4a4038','#2a2420','#141010',667,0.015);
-        }
-      }
-    },100);
+    _famOffer=famOffer(false);
+    var _dg=5+((S.run.tier||0)+1)*5;
+    if(resCard){resCard.innerHTML=famOfferHtml(_famOffer,'famDraftPick',_dg);resCard.classList.add('show');}
+    if(endBtns)endBtns.style.display='none';
   }
 
-  /* Boss wins: show signature card draft for boss slot */
+  /* Boss wins: no draft — spoils overlay lands in P4 */
   if(win&&isBoss){
-    var _bossRung=G.rung;
-    var _bossName=(_bossRung.name||'').toLowerCase();
-    var _allBC=[];
-    var _ownedB=S.run.cards.filter(Boolean);
-    if(_bossRung.cardPool&&_bossRung.cardPool.length)_bossRung.cardPool.forEach(function(cid){if(_ownedB.indexOf(cid)===-1){var cd=getNpcCard(cid);if(cd)_allBC.push(cd);}});
-    NPC_CARDS.forEach(function(c){if(c.owner===_bossName&&!c.dep&&_ownedB.indexOf(c.id)===-1&&!_allBC.find(function(x){return x.id===c.id;}))_allBC.push(c);});
-    CARDS.forEach(function(c){if(c.npc===_bossName&&!c.dep&&_ownedB.indexOf(c.id)===-1&&!_allBC.find(function(x){return x.id===c.id;}))_allBC.push(c);});
-    /* Shuffle and pick up to 3 */
-    for(var bi=_allBC.length-1;bi>0;bi--){var bj=Math.floor(Math.random()*(bi+1));var bt=_allBC[bi];_allBC[bi]=_allBC[bj];_allBC[bj]=bt;}
-    var _bossDraftCards=_allBC.slice(0,3);
-    _draftBossMode=true;
-    _draftCards=_bossDraftCards;
-    _draftSelected=null;_draftTargetSlot=-1;
-    _draftPickedCardId=null;_draftPickedSlotIdx=-1;_draftPickedEl=null;
-    _draftOriginals={};
-    var bossHtml='<div class="end-draft">';
-    bossHtml+='<div class="end-draft-label">CHOOSE A SIGNATURE CARD</div>';
-    bossHtml+='<div class="end-draft-cards">';
-    var _bossRarClass='rarity-boss-'+_bossName;
-    _bossDraftCards.forEach(function(card){
-      var sd=(Math.random()*8).toFixed(1);
-      bossHtml+='<div class="draft-card-wrap boss-draft" data-card-id="'+card.id+'">';
-      /* card-outer wrapper enables the weathered look (clip-path edge holes
-         + canvas grunge) via the aging MutationObserver. */
-      bossHtml+='<div class="card-outer" data-cid="'+card.id+'">';
-      bossHtml+='<div class="gcard '+_bossRarClass+'" style="--sheen-delay:-'+sd+'s">';
-      bossHtml+=_cardArtImg(card.id);
-      bossHtml+='<div class="gcard-cover" style="background:'+(CARD_BG[card.id]||'#444')+'">'+card.icon+'</div>';
-      bossHtml+='<div class="gcard-frame"></div>'+gcCorners()+'</div>';
-      bossHtml+='</div>';/* /card-outer */
-      bossHtml+=mkCardTooltipHTML(card,null,{showFlavor:false,asPlayer:true});
-      bossHtml+='</div>';
-    });
-    bossHtml+='</div>';
-    bossHtml+='<div class="end-draft-slots" id="endDraftSlots"></div>';
-    /* Action row injected separately into #endDraftActionsHost below. */
-    bossHtml+='</div>';
-    if(resCard){resCard.innerHTML=bossHtml;resCard.classList.add('show');}
-    var _actionsHostBoss=document.getElementById('endDraftActionsHost');
-    if(_actionsHostBoss)_actionsHostBoss.innerHTML=_endDraftActionsHtml();
-    setTimeout(function(){
-      document.querySelectorAll('.end-draft .draft-card-wrap').forEach(function(el){
-        attachTooltipTap(el);
-        /* Boss draft: card goes to boss slot (idx 0) */
-        _initEndDraftDrag(el,el.dataset.cardId);
-      });
-      var draftBg=document.querySelector('.end-draft');
-      if(draftBg)draftBg.addEventListener('click',function(e){
-        if(!e.target.closest('.draft-card-wrap,.draft-slot,.mcard-tooltip'))closeAllChips();
-      });
-      _renderEndDraftSlots();
-      var skipBtn=document.getElementById('endDraftSkipBtn');
-      if(skipBtn){var cv=skipBtn.querySelector('canvas');
-        if(cv){cv.width=skipBtn.offsetWidth;cv.height=skipBtn.offsetHeight;cv.style.width='100%';cv.style.height='100%';
-          drawPixelPanel(cv,'#4a4038','#2a2420','#141010',667,0.015);}}
-    },100);
+    if(endBtns)endBtns.style.display='';_endScreenPhase='ready';
   }
   /* Show CONTINUE for losses — mark phase ready since animation is done */
   if(!win){if(endBtns)endBtns.style.display='';_endScreenPhase='ready';}
@@ -19150,7 +19384,7 @@ function initMatchScreen(data){
   /* Accept either a direct rung object or a rungId lookup */
   const rung=params.rung?{...params.rung}:{...RUNGS[params.rungId||0]};
   // Apply card effects to rung
-  const pCards=params.pCards||[];
+  const pCards=[];/* P1 cutover: old cards retired */
   if(pCards.includes('plague_wind'))rung.agg=Math.max(0.1,rung.agg-0.25);
   if(pCards.includes('jesters_mask'))rung.chaotic=true;
   if(pCards.includes('serpents_whisper'))rung.minBank=rung.minBank+300;
@@ -19580,6 +19814,7 @@ function hideGoldFloat(){
 
 /* ═══════ OPPONENT CARD GENERATION ═══════ */
 function generateOppCards(rung,playerCardCount){
+  return [];/* P1 cutover: NPC family cards land in P5 */
   /* Pool-based: each NPC draws from their own card pool */
   if(!rung.cardPool||!rung.cardPool.length)return[];
   if(rung.cardChance!==undefined&&Math.random()>rung.cardChance)return[];
@@ -21044,6 +21279,19 @@ function initTierScreen(data){
   }
   /* ROOM V2: silhouette + marks plaque mirror the boss state */
   _renderRoomV2(tier,_bossReady);
+  /* P1: greybox card entry points */
+  (function(){
+    var scr=document.getElementById('screen-gauntlet');if(!scr)return;
+    var b=document.getElementById('famRoomBtn');
+    if(!b){
+      b=document.createElement('div');b.id='famRoomBtn';
+      b.style.cssText='position:absolute;left:8px;top:64px;z-index:30;font-family:monospace;font-size:12px;color:#eee;background:#111;border:1px solid #666;padding:5px 10px;cursor:pointer';
+      b.textContent='CARDS';
+      b.onclick=function(){famPanelShow();};
+      scr.appendChild(b);
+    }
+    if(S.run&&S.run._famFirstDraft)famRunDraftShow();
+  })();
   /* P1: the roster replaces the old standard/handicap buttons. They stay in
      the DOM (hidden) so legacy canvas wiring keeps its targets. Seats stay
      playable after the boss unlocks — bounded greed, by design. */
