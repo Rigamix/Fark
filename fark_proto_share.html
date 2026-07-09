@@ -7433,15 +7433,10 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
 /* ═══════ SHARED STATE MANAGEMENT ═══════ */
 let S = null;
 var _boneDice=['bone','bone','bone','bone','bone','bone'];
-/* Loadout layout: 4 slots, fixed.
-   - Slot 0: BOSS — accepts boss/signature cards only. Always unlocked.
-   - Slot 1: regular. Always unlocked (default starting slot).
-   - Slot 2: regular. Gated on the 'fourthSlot' renown perk (75 renown).
-   - Slot 3: regular. Gated on the 'secondBoss' renown perk (200 renown).
-   Locked slots fill left-to-right as renown unlocks them. */
-var SLOT_UNLOCK_TIER=[0,0,99,99];/* slot 0..3 → tier index needed.
-   Slots 2 and 3 are gated on renown perks instead of tier — the 99
-   sentinel keeps the tier-based check from ever unlocking them. */
+/* Legacy loadout slots: gating and the boss slot are DELETED (brief §3 /
+   audit P1.2) — three free card slots via fcards are the live system.
+   The array below is a dead legacy shim kept only for old readers. */
+var SLOT_UNLOCK_TIER=[0,0,0,0];
 function _isSlotUnlocked(idx){
   return true;/* brief §3: three free card slots, no gates, no slot 0 (audit P1.2).
     The legacy 4-slot loadout is inert — fcards are the live system. */
@@ -9397,6 +9392,16 @@ function _generatePatronInner(tierIndex){
     var _upBias=_up.filter(function(m){return _persona.dieBias.indexOf(m)>=0;});
     var _upSrc=_upBias.length?_upBias:_up;
     dice[Math.floor(Math.random()*6)]=_upSrc[Math.floor(Math.random()*_upSrc.length)];
+  }
+  /* RUNSIM finding 2 (the night-3 wall): the patron gear ramp must not
+     outrun what a median purse can buy. Cap family dice per night —
+     nights 1-4 one, nights 5-6 two, nights 7-8 three. Extras revert to
+     mundane. The lucky die is flavour bone, uncapped. */
+  var _famMats={amber:1,jade:1,jade2:1,silver:1,obsidian:1,starstone:1,vagabond:1};
+  var _famCap=(tierIndex<=3)?1:(tierIndex<=5)?2:3;
+  var _famSeen=0;
+  for(var _fd=0;_fd<dice.length;_fd++){
+    if(_famMats[dice[_fd]]){_famSeen++;if(_famSeen>_famCap)dice[_fd]=(tierIndex>=3)?'flint':'iron';}
   }
   /* Patron cards scale by tier:
      T0: none. T1: 2 cards (was 1 — felt unfair vs the player's 2-3 cards at
@@ -22983,7 +22988,10 @@ function _renderChalkboard(host,tier,filled,anim){
 }
 function _nightSeats(){
   var t=TIERS[S.run.tier]||TIERS[0];
-  return t.pointsNeeded+2;/* brief §1: seats = pointsNeeded + 2, no perks */
+  /* RUNSIM finding 4: nights 1-2 seat +3 (was +2) — LAST ORDERS drained
+     hearts the boss ladder needs. Deliberate deviation from brief §1,
+     pending the target run-win-rate decision (runsim finding 1). */
+  return t.pointsNeeded+(((S.run.tier||0)<=1)?3:2);
 }
 function _ensureNight(){
   if(S.run.night&&S.run.night.tier===S.run.tier&&Array.isArray(S.run.night.roster)&&S.run.night.roster.length){
