@@ -230,3 +230,23 @@ Verified live: migration (3 old cards -> +45g), no HANDICAPS/_showHandicapSplash
 symbols, RENOWN_PERKS empty, pouch 0, slots free, handicap button hidden,
 seal rolls, pity fires with 6/7 families owned, sim defaults return rows,
 match boots with TURN 1/8 HUD, zero console errors.
+
+## P12 — FARK_RUNSIM_FINDINGS.md pass (2026-07-09) (done)
+
+- Finding 2 (night-3 wall): patron family-dice CAP by night in
+  _generatePatronInner — nights 1-4 max 1, nights 5-6 max 2, nights 7-8
+  max 3; extras revert to mundane (flint/iron). Lucky die uncapped
+  (flavour bone). Verified: measured max over 80 gens = 1/1/2/3 at
+  T2/T3/T5/T7. Night-4 patron at G2 gear: pw 49% -> 57%.
+- Finding 4: seats = pointsNeeded+3 on nights 1-2 (5 seats), +2 from
+  night 3. DELIBERATE DEVIATION from brief §1 (pointsNeeded+2), pending
+  Denis's target run-win-rate decision (finding 1, recommended 25-35%).
+  One-line revert in _nightSeats if he rules otherwise.
+- Audit fixes 4-5 residue: stale "Slot 0: BOSS / fourthSlot perk" comment
+  block replaced; SLOT_UNLOCK_TIER now a dead [0,0,0,0] shim with a
+  deletion note. (Functional gating was already dead since P11.)
+- NOT DONE (theirs/Denis's): target run-win rate is a design decision;
+  finding 3 (cowardice dominates — bank-200 beats push) is BY THEIR OWN
+  CALL the card layer's acceptance gate — re-test only when card effects
+  land in the sim (audit Part 3.2 + agent card policies). Their agents.js
+  harness lives in their container, not this repo.
