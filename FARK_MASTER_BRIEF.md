@@ -42,10 +42,15 @@ and the motion/animation rules. Everything else below is the game.
 - Boss win: heart restored (cap 3), boss gold, SPOILS choice (section 6),
   next night. Boss loss: heart lost, boss remains, retry with whatever
   seats remain.
-- One random seat per night carries the handicap offer (wax-sealed frame,
-  black wax + ribbon, visually distinct from trait seals): accept its
-  handicap to earn 2 circles and double gold; a handicap loss removes a
-  circle (floor 0).
+- One random seat per night is the SEALED SEAT (black wax + ribbon frame,
+  visually distinct from trait seals). Its rule: the match runs under ONE
+  RANDOM TELL from the boss tell pool, symmetric, announced on the seal.
+  Win it for 2 chalk circles and double gold; lose it and a circle is
+  erased (floor 0). This REPLACES the legacy HANDICAPS system entirely
+  (delete it); handicaps and tells are now one rules engine with two
+  entry points, and the sealed seat teaches tells before the first boss.
+  The player's own sleeved tell may stack on top (two rules max, same
+  badge limit as boss fights).
 - Match format: first to target wins, OR highest total at the turn cap
   (patron 8 banked turns each, boss 10). Trailing player always gets the
   final answer turn. Exact tie at cap: sudden-death turns. Turn counter
@@ -176,21 +181,76 @@ VAGABOND - cheat politely (red)
   numbers): Vanguard: a scorer in the FIRST spot scores +200/+350/+500.
   Anchor: same for the LAST spot. Bookends: scorers in BOTH end spots,
   +400/+700/+1200. Marked spots glow BEFORE the roll: the player aims.
-- For Keeps (unique, no tiers, drafts from night 4+ only): Play as you sit
-  down: this match is for dice. Win, take one of theirs (your pick,
-  including their lucky die). Lose, they take one of yours (THEIR pick).
-  Patron tables only: the house does not bet its dice.
+- For Keeps (CONSUMABLE, no tiers, drafts from night 4+ only): Play as
+  you sit down: this match is for dice. Win, take one of theirs (your
+  pick, including their lucky die). Lose, they take one of yours (THEIR
+  pick). Patron tables only. The card burns on use, win or lose.
+
+CONSUMABLE RULE: family cards never burn EXCEPT explicitly marked
+consumables; tavern cards split into standing and consumable per their
+copy. A burned card visibly crumples/is tossed to the innkeep (a slot
+silently emptying reads as a bug) and leaves the slot empty until the
+next draft. Debts and escrows outlive their cards: a chalk LEDGER strip
+on the bar in the Room tracks them (e.g. "OWED 400 - LOCKBOX 220").
+Loss-reward cap: at most ONE shipped tavern card may reward losing.
+
+ENCHANTS (innkeep services, NOT cards): at the bar, pay gold to
+permanently transform one die. This is the deliberate late-run gold sink.
+Rules: one enchant per die, ever; enchants travel with the die (For Keeps
+can steal your work); an enchant may NEVER replicate a purchasable die's
+power (no wilds, no bank bonuses); every enchant must be a transformation
+you can point at (a new face, a new behavior, a new mark - never a quiet
++X); each enchant is a small overlay layer composable on any die material
+(art: 4-5 overlay sets readable at 42px, including on obsidian black).
+First-pass menu, prices sim-tuned:
+- Amber Cast (~200g): trap one face in amber and replace another of its
+  faces with the copy.
+- Quicksilver (~250g): coat a die; once per turn you may reroll it alone,
+  free.
+- Tempering (~150g): hold a die to the fire. Half the time it hardens
+  (+100 to all its scores, for good), half the time it cracks and loses
+  its highest face.
+- Loaded (~400g): shave a die; pick a face, it rolls that face twice as
+  often. LOUDEST sim flag in the game.
+(Graft and Constellation from earlier drafts are CUT: one replicated
+Jade, one failed the pointable-transformation rule.)
 
 CUT (do not migrate): Ballast, Sure Thing, Heavy Hand, Counterweight,
 Anvil, Dead Weight, Gilding, Hoard, Perfect Set, Collector, Hot Streak,
 Second Wind, Rally, Alchemy. The old bespoke CARDS pool is replaced
 wholesale except the positional three and boss content per section 6.
 
+TAVERN CARDS (neutral, parchment-brown framing, NO tiers, max pool of
+five ever). Their domain is the RUN (gold, seats, pots, the night), never
+the dice table; they add zero in-match tracking. They compete for the
+same three card slots. Ship this copy:
+- Double Stakes: Before sitting down, double the buy-in AND the pot.
+- The Tab: Borrow 250 gold from the innkeep right now. Owe 400 by last
+  orders, or it costs a chalk circle.
+- Hair of the Dog: Lose a match, and your first bank next match is
+  doubled.
+- Marked Table: The sealed seat pays THREE circles instead of two.
+- High Table: When you sit down, raise the match target by 500 for both
+  sides. Win: the pot pays half again more, and GREEDY or BULLISH patrons
+  pay double.
+Sim flags: The Tab (forcing-function bend), High Table (must not push
+patron matches past the 8-turn cap into cap-decision territory). If any
+tavern card lets players farm around LAST ORDERS, it dies.
+
 ## 4. CARD ACQUISITION AND PROGRESSION LOCKS
 
-- Run start: draft 1 of 3 (tier I only) before the first seat.
+- Run start: STARTER DIE DRAFT, not a card draft. The innkeep offers three
+  family dice (randomized from Amber, Silver, Obsidian, Starstone,
+  Vagabond; Jade excluded, it stays the family you save for). Take one,
+  free, "with your first ale". This is the run's first screen after the
+  title and the identity seed the 60/40 weighting grips from seat one.
+  Presentation beat: three dice on the bar, colours doing the talking.
 - Every patron win: draft 1 of 3, or decline for gold (5 + night*5).
-  Weighting: 60% families the player owns dice or cards in, 40% outside.
+  Weighting: 60% families the player owns dice or cards in, 40% outside
+  (tavern cards occupy 10-15% of all offers, inside the 40%). Nights 1-2
+  run 50/50 so the starter die seeds identity without locking it.
+  Known ceiling, accepted: tier III only via upgrading a II means late
+  pivots cap at tier II; III is a commitment badge by design.
 - Never offer a same-tier duplicate of an owned card: it appears as that
   card's next-tier upgrade instead, and taking it upgrades in place.
 - Tier locks: tier II may appear raw from night 3. Tier III is NEVER
@@ -224,8 +284,15 @@ wholesale except the positional three and boss content per section 6.
   straights; BULLISH Honeytraps toward triples. Bosses use the same table
   with their family's full pool plus their tell natively.
 - Opponent cards are VISIBLE at their table edge (required by Tamper and
-  by scouting). Their actives firing must be readable events (parchment
-  callout + the ledger line).
+  by scouting). On the MATCH screen they render as colour-coded card
+  BACKS (family colour only) that flip face-up when played; full faces
+  are readable in the peek panel. TELEGRAPH RULE: every NPC targeted
+  active (Sleight, Tar Pit, Ill Omen, Tamper mid-match) telegraphs ONE
+  ROLL ahead - the patron visibly fingers the card - so the player gets
+  one bank-or-push decision under threat before it fires. No untelegraphed
+  targeted actives, ever: agency-less punishment is banned. Patrons carry
+  at most ONE active card before night 5; bosses are exempt from the cap
+  but not the telegraph.
 - NPC names get period titles by night band: nights 1-2 Goodman/Goodwife/
   Goody/Gaffer/Gammer/Widow/occupational ("Slink the Tanner"); 3-5
   Master/Mistress/Dame; 6-8 Sir/Lady/Squire/Father/His Grace. One const,
@@ -264,14 +331,20 @@ and purse do not grant the tell. Night 8 (Ambrose) pays out in renown:
 title jump + his die as a cosmetic trophy on the player's shelf.
 
 RELIC DICE (unique, family-tagged, count for all per-family scaling;
-first-pass stats, all sim-flagged):
+first-pass stats, all sim-flagged). SIDE-GRADE RULE: relics must be
+quirky and storied but tuned BELOW same-band shop dice in raw power -
+never strictly best - or they kill the late shop and make the purse
+spoil a joke. Aldric's Square is the known offender (near-free Jade II):
+its wilds are capped at triples-only until the sim proves otherwise. The
+sim tracks SHOP PURCHASE RATE PER NIGHT as a health metric; if night 6+
+purchases approach zero, relics are overtuned.
 - Grog's Tooth (obsidian): 10% shatter, +1500 on shatter, no 2 face.
 - Mabel's Thimble (amber): triples using it +400.
 - Finnick's Palm (vagabond): reorders like Vagabond; kept dice adjacent
   to it score +100.
 - Corvus's Ledger (starstone): +300 per bank and +5g per bank.
 - Brutus's Shield (silver): two bust saves per match.
-- Aldric's Square (jade): 6s wild for triples AND straights.
+- Aldric's Square (jade): 6s wild for triples only (side-grade rule; sim may relax).
 - Whisper's Fang (vagabond): its scores are doubled; bust while holding
   it kept and lose an extra 200.
 - Ambrose's Weight (amber): any bank that beats your previous bank +500.
@@ -290,8 +363,13 @@ first-pass stats, all sim-flagged):
   colours); active rules show as badges on the match HUD (reuse the tell
   badge component; two badges max).
 - Balance lever if the sim shows one tell auto-sleeved everywhere
-  (RECKONING is the suspect): add a small gold cost per sleeve. Never
-  convert tells to charges; rules stay rules.
+  (RECKONING and STEEPED are the suspects; STEEPED symmetric is near
+  free value for whoever busts less): add a small gold cost per sleeve.
+  Never convert tells to charges; rules stay rules.
+- Engineering note, costed: symmetric tells require the NPC bank/roll
+  policy to adapt on the RECEIVING side of all eight rules (LAST CALL
+  changes whether they bank, DRILL ORDER when, COUNTERFEIT what a bank is
+  worth, etc). Eight policy adaptations, not one table row.
 - NPC banking/rolling policy must respect any active rule from either
   side (min-bank, roll caps, curses, etc.).
 
@@ -364,7 +442,12 @@ debug-triggered). Additional acceptance work for this rewrite:
    screen; make it the best-looking overlay in the game.
 10. LAST ORDERS overlay (as specced).
 11. Dice store: rotating stock, SOLD tags, family dice visually magic vs
-    mundane, tier variants glance-readable.
+    mundane, tier variants glance-readable. NEW: enchant service counter
+    (menu, price, pick-a-die flow, overlay applied on the spot).
+11b. NEW Starter draft panel (run start): three family dice on the bar,
+    innkeep line, pick one. Reuses the store bar plate.
+11c. NEW Ledger strip in the Room: chalk record of debts/escrows/pawns
+    that outlive consumed cards.
 12. Innkeep's Book panel (unchanged mechanics).
 13. Loadout: six dice (reorder), THREE card slots, NEW sleeve slot +
     shelf (claimed tells, trophies, cosmetics), card sell, opponent-
