@@ -278,3 +278,26 @@ match boots with TURN 1/8 HUD, zero console errors.
   Per the brief's own sequencing, the LAST tuning step (hearts or late
   targets) waits for symmetric NPC card coverage in the run-level
   harness — NOT tuned here on partial coverage.
+
+## P14 — runsim v2 doc (card/sleeve/actives passes) reconciliation (done)
+
+Their card-layer + sleeve + targeting-actives passes updated two calls I
+had already shipped — both REVERTED to follow the newer data:
+- Patron family-dice cap (P12) REVERTED: verdict 2 says the night-3 wall
+  was card hunger, not gear ("do not change patron generation yet;
+  re-measure after NPC cards land"). generatePatron is back to pre-P12.
+- Seats+3 nights 1-2 (P12) REVERTED to brief §1 (pointsNeeded+2):
+  finding 10 projects the full card layer landing ONE step ABOVE the
+  25-35% run-win target — early softening now points the wrong way.
+  Tuning (hearts or late targets) waits for live playtest.
+- RENOWN_PERKS shim fully purged (their scanner kept flagging it): const
+  deleted, 12 reader tokens neutralized, _checkRenownPerks a one-line
+  no-op. typeof RENOWN_PERKS === 'undefined' now.
+- No action needed on: sleeve verdicts (DRILL ORDER/PICKPOCKET watched,
+  auto-sleeve fear dead), tell-spoils affordability, relic uptake
+  (side-grade holding), Tamper/Confession coexistence, session length.
+- Open flags they carry, noted: ILL OMEN numbers unvalidated (needs
+  mid-turn interrupts), RECKONING sleeve untestable pre-night-8,
+  bosses' bespoke legacy pools are dead data in this build.
+Verified live: seats back to 4 on night 1, patron family dice uncapped
+(max 5 seen at T3), match boots TURN 1/8, zero console errors.
