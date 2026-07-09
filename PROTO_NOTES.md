@@ -250,3 +250,31 @@ match boots with TURN 1/8 HUD, zero console errors.
   CALL the card layer's acceptance gate — re-test only when card effects
   land in the sim (audit Part 3.2 + agent card policies). Their agents.js
   harness lives in their container, not this repo.
+
+## P13 — brief refresh + harness ext 2 (2026-07-09) (done)
+
+- Brief updated in repo: RUN-LEVEL TARGET DECIDED = 25-35% full-run wins;
+  sleeve auto-pick fear closed (watch DRILL ORDER +4-5 and RECKONING);
+  silver-stack = trap not menace (low priority); design guard — skill
+  lives in drafting (~45pts), banking micro (~2pts) is fine, never widen
+  it with execution punishments.
+- Harness ext 2 (audit 3.2): deterministic card layer in _runBalanceSim,
+  BOTH sides. Modeled: bloom, slow_cook, short_fuse (+burn), insurance,
+  retort, reprisal, pickpocket, falling_star (extra turn), double-or-
+  nothing (flip when trailing 15%+), encore/stargazer/fool's-gold(+burn)/
+  transmute as bust mitigation, ward + silver die as bust saves.
+  Unmodeled ids in a loadout are inert. NPC cards: patron fcards as
+  generated; bosses get 1-2 family-pool cards by night (bossCardsFor).
+  Gear snapshots accept cards:[{id,tier}].
+- COWARDICE GATE (_runCowardiceGate, runsim finding 3 acceptance):
+  with push-reward cards (slow cook II, short fuse, falling star II) at
+  G2, tiers 2-4: bank200=57%, push750=72% -> +15 MARGIN, GATE PASSES.
+  The card layer does exactly what it was designed to do; no bank-
+  incentive tuning needed.
+- Carded acceptance snapshots: G2+2c nights 3-5: pw 58-59 (band),
+  bw 53-70. G3+3c nights 6-8: pw 93-95 / bw 95-97 pre-tells — a stacked
+  three-card push build steamrolls late matches, consistent with the
+  brief's "family-builders ~60% run-wins at partial NPC coverage".
+  Per the brief's own sequencing, the LAST tuning step (hearts or late
+  targets) waits for symmetric NPC card coverage in the run-level
+  harness — NOT tuned here on partial coverage.
