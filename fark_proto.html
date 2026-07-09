@@ -7757,7 +7757,9 @@ function getPouchCapacity(){
   return 0;
 }
 function _checkRenownPerks(){
-  if(!S.renownPerks)S.renownPerks={};
+  return;/* brief §8: perk ladder deleted — renown surfaces as titles + shelf only.
+    The P7 wipe cleared saved perks; this stops fresh unlocks (a feat crossing
+    an old threshold was still granting +200g 'Known Face'). */
   /* Track newly unlocked perks so we can pop the celebration overlay */
   var _newlyUnlocked=[];
   RENOWN_PERKS.forEach(function(p){
@@ -9055,6 +9057,8 @@ function _initHandicapHUD(){
    match-long passive that warps play (Balatro-style boss blind).
    _applyTell() sets up G-side state. _initTellHUD() builds a persistent
    badge near the player dice. _showTellSplash() does the match-start reveal. */
+var _SEAL_POOL=['last_call','steeped','pickpocket','in_arrears','drill_order','counterfeit','reckoning'];
+function _rollSealTell(){return _SEAL_POOL[Math.floor(Math.random()*_SEAL_POOL.length)];}
 function _tellById(id){
   for(var i=0;i<RUNGS.length;i++)if(RUNGS[i].tell&&RUNGS[i].tell.id===id)return RUNGS[i].tell;
   return null;
@@ -9063,6 +9067,7 @@ function _tellById(id){
    a sleeved tell binds BOTH sides (brief §7) */
 function _ruleActive(id,side){
   if(!G)return false;
+  if(G._sealRule===id)return true;/* sealed seat: symmetric, brief §1 */
   if(G._sleeve===id)return true;
   if(side==='p'&&G._tell&&G._tell.id===id)return true;
   return false;
@@ -9090,7 +9095,21 @@ function _applySleeve(){
 }
 function tellGive(id){_getS();S.run.tells=S.run.tells||[];
   if(S.run.tells.indexOf(id)<0)S.run.tells.push(id);save();return S.run.tells;}
-function _applyTellAndSleeve(){_applyTell();_applySleeve();}
+function _applySeal(){
+  if(!G||!G._sealRule)return;
+  if(!G._tellState)G._tellState={};
+  if(G._sealRule==='reckoning'&&G._tellState.lastNpcBank==null)G._tellState.lastNpcBank=0;
+  if(G._sealRule==='steeped'&&G._tellState.bonus==null)G._tellState.bonus=0;
+  if(!G._tell){
+    var t=_tellById(G._sealRule);
+    if(t){G._tell=t;
+      if(t.id==='in_arrears')G._tellState.totalRollCost=0;
+      if(t.id==='counterfeit'){G._tellState.cursedDice=[];G._tellState.lastCurseTurn=0;}
+    }
+  }
+  famLog('SEALED SEAT — '+G._sealRule.toUpperCase().replace(/_/g,' ')+' RULES THE TABLE, BOTH SIDES');
+}
+function _applyTellAndSleeve(){_applyTell();_applySeal();_applySleeve();}
 function _applyTell(){
   if(!G||!G.rung||!G.rung.tell)return;
   G._tell=G.rung.tell;
@@ -9359,12 +9378,18 @@ function generatePatron(tierIndex){
   }
   _gp.fcards=fc;
   if(S&&S.run&&S.run._grudges&&S.run._grudges[_gp.persona]){
+    _gp._grudgeNight=night;
     _gp.grudge=true;_gp.agg=Math.min(0.95,(_gp.agg||0.5)+0.12);
     if(fc.length<3&&Math.random()<0.5){/* +1 aggression tier: an extra card */
-      var gPool=FAM_CARDS.filter(function(d){return FAM_LIVE[d.id]&&!d.unique;});
+      var gPool=FAM_CARDS.filter(function(d){return FAM_LIVE[d.id]&&!d.unique&&d.fam!=='tavern';});
       var gp2=gPool[Math.floor(Math.random()*gPool.length)];
       fc.push({id:gp2.id,tier:1});
     }
+  }
+  if(night<5){/* telegraph rule sibling: at most ONE active before night 5 */
+    var _na=0;
+    _gp.fcards=fc.filter(function(c){var cd=famDef(c.id);
+      if(cd&&cd.kind==='active'){_na++;return _na<=1;}return true;});
   }
   return _gp;
 }
@@ -9953,8 +9978,8 @@ const DICE_TYPES=[
    faces:[1,2,3,4,5,6],effect:{type:'defense',mechanic:'shield',shieldCount:2},
    desc:'Two bust saves per match.'},
   {id:'aldrics_square',name:"ALDRIC'S SQUARE",icon:'⬜',cost:0,hidden:true,relic:'aldric',
-   faces:[1,2,3,4,5,6],effect:{type:'rule_changer',mechanic:'wild_straight'},
-   desc:'Its 6s go wild for triples AND straights.'},
+   faces:[1,2,3,4,5,6],effect:{type:'rule_changer',mechanic:'wild_triple'},
+   desc:'Its 6s go wild — for triples only.'},
   {id:'whispers_fang',name:"WHISPER'S FANG",icon:'🗡',cost:0,hidden:true,relic:'whisper',
    faces:[1,2,3,4,5,6],effect:{type:'risk_reward',mechanic:'fang'},
    desc:'Scores it joins pay +200. Bust while it sits kept: 200 more burns.'},
@@ -10221,7 +10246,8 @@ var FAMILIES={
   silver:{name:'SILVER',color:'#b9c2cc'},
   obsidian:{name:'OBSIDIAN',color:'#e2582f'},
   starstone:{name:'STARSTONE',color:'#4f74e3'},
-  vagabond:{name:'VAGABOND',color:'#c4404f'}
+  vagabond:{name:'VAGABOND',color:'#c4404f'},
+  tavern:{name:'TAVERN',color:'#b09a72'}
 };
 /* text = brief copy verbatim, per tier. kind: active | passive.
    Implemented flag tracks build progress; unimplemented cards are never
@@ -10319,7 +10345,19 @@ var FAM_CARDS=[
  {id:'bookends_f',fam:'vagabond',kind:'passive',name:'Bookends',p:[400,700,1200],
   text:['Scorers in BOTH end spots: +400.','Scorers in BOTH end spots: +700.','Scorers in BOTH end spots: +1200.']},
  {id:'for_keeps',fam:'vagabond',kind:'active',name:'For Keeps',charges:[1],unique:true,
-  text:['Play as you sit down: this match is for dice. Win, take one of theirs. Lose, they take one of yours — their pick. Patron tables only.','','']}
+  text:['Play as you sit down: this match is for dice. Win, take one of theirs. Lose, they take one of yours — their pick. Patron tables only.','','']},
+ /* TAVERN — neutral, parchment-brown. Their domain is the RUN, never the
+    dice table (brief §3). No tiers. */
+ {id:'double_stakes',fam:'tavern',kind:'active',name:'Double Stakes',
+  text:['Before sitting down, double the buy-in AND the pot.','','']},
+ {id:'the_tab',fam:'tavern',kind:'active',name:'The Tab',consumable:true,
+  text:['Borrow 250 gold from the innkeep right now. Owe 400 by last orders, or it costs a chalk circle.','','']},
+ {id:'hair_of_the_dog',fam:'tavern',kind:'passive',name:'Hair of the Dog',
+  text:['Lose a match, and your first bank next match is doubled.','','']},
+ {id:'marked_table',fam:'tavern',kind:'passive',name:'Marked Table',
+  text:['The sealed seat pays THREE circles instead of two.','','']},
+ {id:'high_table',fam:'tavern',kind:'passive',name:'High Table',
+  text:['When you sit down, raise the match target by 500 for both sides. Win: the pot pays half again more, and GREEDY or BULLISH patrons pay double.','','']}
 ];
 function famDef(id){for(var i=0;i<FAM_CARDS.length;i++)if(FAM_CARDS[i].id===id)return FAM_CARDS[i];return null;}
 /* implemented set — only these are offered/equipped-usable (grows per phase) */
@@ -10426,7 +10464,7 @@ CFX.encore={
     var free=G.pool.filter(function(d){return !d.committed&&!d._frozen;});
     if(!free.length)return false;
     free.forEach(function(d){
-      d.val=rollFace(d.mat);d.sel=false;
+      d.val=_rollD(d);d.sel=false;
       if(d.el){d.el.classList.remove('selected');d.el.classList.add('card-reroll');reDrawDieFace(d);
         setTimeout(function(){d.el.classList.remove('card-reroll');},400);}
     });
@@ -10465,6 +10503,7 @@ function famRenderRow(){
   var html='';
   (G&&G.pF||[]).forEach(function(inst,i){
     var d=famDef(inst.id);if(!d)return;
+    if(d.fam==='tavern')return;/* run-domain cards: nothing to track at the table (brief §3) */
     var col=(FAMILIES[d.fam]||{}).color||'#888';
     var chg=d.charges?(' ['+inst.charges+']'):'';
     var usable=d.kind==='active'&&inst.charges>0&&CFX[inst.id]&&CFX[inst.id].use;
@@ -10481,6 +10520,11 @@ function famRenderRow(){
       +'title="'+d.text[inst.tier-1].replace(/"/g,'&quot;')+'">THEIRS: '
       +(inst.broken?'<s>':'')+d.name.toUpperCase()+' '+['I','II','III'][inst.tier-1]+(inst.broken?'</s> ✂':'')+'</div>';
   });
+  if(G&&(G.pool||[]).some(function(x){return x.ench&&x.ench.t==='quicksilver'&&!x.committed&&!x._frozen;})){
+    var _qsSpent=(G._qsTurn===G.turnNum);
+    html+='<div onclick="famQuicksilver()" style="cursor:'+(_qsSpent?'default':'pointer')+';padding:3px 7px;background:#101018;color:#c9f;'
+      +'border:1px dashed #86a;font-size:10px;opacity:'+(_qsSpent?0.35:1)+'">QUICKSILVER — REROLL IT ALONE'+(_qsSpent?' (USED)':'')+'</div>';
+  }
   if(G&&G._tell)html+='<div style="padding:2px 7px;background:#221;color:#ca6;border:1px dashed #653;font-size:10px">RULE: '
     +G._tell.name+(G.isBoss?' (you)':' (both)')+'</div>';
   if(G&&G._sleeve&&(!G._tell||G._tell.id!==G._sleeve)){
@@ -10508,19 +10552,61 @@ function famOwnTier(id){
   var best=0;famOwnedAll().forEach(function(c){if(c.id===id&&c.tier>best)best=c.tier;});
   return best;
 }
+/* CONSUMABLE RULE (brief §3): a burned card visibly leaves — log + empty slot */
+function famBurn(id){
+  _getS();
+  var rm=function(arr){for(var i=0;i<(arr||[]).length;i++)if(arr[i]&&arr[i].id===id){arr.splice(i,1);return true;}return false;};
+  if(rm(S.run.fcards)||rm(S.run.finv)){
+    var d=famDef(id);
+    famLog((d?d.name.toUpperCase():id)+' IS SPENT — CRUMPLED AND TOSSED TO THE INNKEEP');
+    save();
+  }
+}
+function _tabSettle(){
+  if(!S.run||!S.run._tabOwed)return;
+  var owed=S.run._tabOwed;S.run._tabOwed=0;
+  if((S.run.gold||0)>=owed){S.run.gold-=owed;famLog('THE TAB IS PAID — '+owed+'g TO THE INNKEEP');}
+  else{
+    S.run.points=Math.max(0,(S.run.points||0)-1);
+    if(Array.isArray(S.run._chalkMeta))S.run._chalkMeta.pop();
+    famLog('THE TAB GOES UNPAID — A CIRCLE RUBBED OUT');
+  }
+}
+function famTabTake(){
+  _getS();if(S.run._tabOwed)return;
+  S.run.gold=(S.run.gold||0)+250;S.run._tabOwed=400;
+  famBurn('the_tab');save();
+  famLog('THE TAB — 250g NOW, 400 OWED BY LAST ORDERS');
+  showScreen('gauntlet');
+}
+function famTabPay(){
+  _getS();if(!S.run._tabOwed||(S.run.gold||0)<S.run._tabOwed)return;
+  S.run.gold-=S.run._tabOwed;S.run._tabOwed=0;save();
+  famLog('THE TAB IS PAID');showScreen('gauntlet');
+}
 function famOffer(forceTier1){
   var night=(S.run.tier||0)+1;
-  var pool=FAM_CARDS.filter(function(d){return FAM_LIVE[d.id]&&!d.unique&&famOwnTier(d.id)<3;});
+  var pool=FAM_CARDS.filter(function(d){
+    if(!FAM_LIVE[d.id]||d.unique)return false;
+    if(d.fam==='tavern')return famOwnTier(d.id)===0;/* no tiers, no duplicates */
+    return famOwnTier(d.id)<3;
+  });
   if(night>=4&&!forceTier1&&famOwnTier('for_keeps')===0&&Math.random()<0.25){
     pool=pool.concat([famDef('for_keeps')]);/* the dice wager enters late drafts */
   }
-  var ownedFams={};famOwnedAll().forEach(function(c){var d=famDef(c.id);if(d)ownedFams[d.fam]=1;});
+  var ownedFams={};famOwnedAll().forEach(function(c){var d=famDef(c.id);if(d&&d.fam!=='tavern')ownedFams[d.fam]=1;});
   function draw(){
-    var cands=pool;
+    if(!forceTier1&&Math.random()<0.12){/* tavern: 10-15% of all offers (brief §4) */
+      var tv=pool.filter(function(d){return d.fam==='tavern';});
+      if(tv.length)return tv[Math.floor(Math.random()*tv.length)];
+    }
+    var fpool=pool.filter(function(d){return d.fam!=='tavern';});
+    var cands=fpool;
+    var inBias=(night<=2)?0.5:0.6;/* nights 1-2 run 50/50 so the starter die seeds, not locks */
     if(Object.keys(ownedFams).length){
-      var inF=pool.filter(function(d){return ownedFams[d.fam];});
-      var outF=pool.filter(function(d){return !ownedFams[d.fam];});
-      cands=(Math.random()<0.6&&inF.length)?inF:(outF.length?outF:inF);
+      var inF=fpool.filter(function(d){return ownedFams[d.fam];});
+      var outF=fpool.filter(function(d){return !ownedFams[d.fam];});
+      cands=(Math.random()<inBias&&inF.length)?inF:(outF.length?outF:inF);
     }
     return cands[Math.floor(Math.random()*cands.length)];
   }
@@ -10528,6 +10614,7 @@ function famOffer(forceTier1){
   while(offer.length<3&&guard++<80){
     var d=draw();if(!d)break;
     if(offer.some(function(o){return o.id===d.id;}))continue;
+    if(d.fam==='tavern'){offer.push({id:d.id,tier:1});continue;}
     var owned=famOwnTier(d.id),tier;
     if(owned>0)tier=owned+1;              /* duplicate -> upgrade in place */
     else if(forceTier1)tier=1;
@@ -10544,10 +10631,10 @@ function famCardHtml(id,tier,opts){
     +' style="cursor:'+(opts.onclick?'pointer':'default')+';aspect-ratio:2/3;display:flex;flex-direction:column;'
     +'background:#191919;border:2px solid '+col+';padding:7px;box-sizing:border-box;position:relative">'
     +'<div style="font-size:12px;font-weight:bold;color:#eee;line-height:1.25">'+d.name.toUpperCase()+'</div>'
-    +'<div style="font-size:15px;color:'+col+';margin:1px 0 5px">'+['I','II','III'][tier-1]+'</div>'
+    +'<div style="font-size:15px;color:'+col+';margin:1px 0 5px">'+(d.fam==='tavern'?'&nbsp;':['I','II','III'][tier-1])+'</div>'
     +'<div style="width:100%;height:34px;background:'+col+'22;border:1px solid '+col+'55;'
       +'display:flex;align-items:center;justify-content:center;font-size:9px;letter-spacing:1px;color:'+col+'">'
-      +FAMILIES[d.fam].name+' · '+(d.kind==='active'?'ACTIVE':'PASSIVE')+'</div>'
+      +FAMILIES[d.fam].name+' · '+(d.kind==='active'?'ACTIVE':'PASSIVE')+(d.consumable||d.id==='for_keeps'?' · BURNS':'')+'</div>'
     +'<div style="flex:1;font-size:10px;color:#bbb;line-height:1.45;margin-top:6px;overflow:hidden">'+d.text[tier-1]+'</div>'
     +(opts.badge?'<div style="position:absolute;top:5px;right:5px;background:#fd6;color:#210;font-size:9px;padding:1px 5px">'+opts.badge+'</div>':'')
     +(opts.footer||'')
@@ -10605,6 +10692,7 @@ function famFkTake(i){
   var m=pool[i];if(!m)return;
   _getS();S.run.diceInv=S.run.diceInv||[];
   S.run.diceInv.push(m);
+  _enchInit();
   var msg;
   if(m==='lucky'){
     S.run.luckyNames=S.run.luckyNames||[];S.run.luckyNames.push(window._fkLucky);
@@ -10640,23 +10728,43 @@ function _famEndReady(){
   try{_endScreenPhase='ready';}catch(e){}
 }
 /* run-start draft: 1 of 3, tier I, no decline (brief §4) */
+var _starterOffer=null;
 function famRunDraftShow(){
   if(document.getElementById('famRunDraft'))return;
-  _famOffer=famOffer(true);
-  if(!_famOffer.length){S.run._famFirstDraft=false;save();return;}
+  /* three family dice on the bar — Jade excluded, it stays the family you
+     save for. Colours do the talking. */
+  if(!_starterOffer){
+    var pool=['amber','silver','obsidian','starstone','vagabond'];
+    _starterOffer=[];
+    while(_starterOffer.length<3){
+      var m=pool.splice(Math.floor(Math.random()*pool.length),1)[0];
+      _starterOffer.push(m);
+    }
+  }
   var ov=document.createElement('div');ov.id='famRunDraft';
   ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9500;display:flex;align-items:center;justify-content:center';
-  ov.innerHTML='<div style="width:min(420px,92vw);background:#0d0d0d;border:1px solid #666;padding:8px">'
-    +'<div style="font-family:monospace;color:#eee;font-size:13px;letter-spacing:2px;padding:6px">A CARD BEFORE YOU SIT</div>'
-    +famOfferHtml(_famOffer,'famRunDraftPick',null)+'</div>';
+  var h='<div style="width:min(420px,92vw);background:#0d0d0d;border:1px solid #666;padding:8px;font-family:monospace">'
+    +'<div style="color:#eee;font-size:13px;letter-spacing:2px;padding:6px">THE INNKEEP SETS THREE DICE ON THE BAR</div>'
+    +'<div style="color:#987;font-size:11px;padding:0 6px 8px">“take one, with your first ale.”</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">';
+  _starterOffer.forEach(function(m,i){
+    h+=_gbDieCard(m,{footer:'<div onclick="famRunDraftPick('+i+')" style="text-align:center;font-size:11px;padding:6px 0;cursor:pointer;background:#1d2d1d;color:#8e8;border:1px solid #4a4">TAKE IT</div>'});
+  });
+  h+='</div></div>';
+  ov.innerHTML=h;
   document.body.appendChild(ov);
 }
 function famRunDraftPick(i){
-  var o=_famOffer[i];if(!o)return;
-  famApplyPick(o);
-  S.run._famFirstDraft=false;save();
+  var m=_starterOffer&&_starterOffer[i];if(!m)return;
+  _getS();
+  /* straight into the row — swap out a bone */
+  var bi=(S.run.dice||[]).lastIndexOf('bone');
+  if(bi>=0)S.run.dice[bi]=m;
+  else{S.run.diceInv=S.run.diceInv||[];S.run.diceInv.push(m);}
+  S.run._famFirstDraft=false;_starterOffer=null;save();
   var ov=document.getElementById('famRunDraft');if(ov)ov.remove();
-  famLog('CARD TAKEN: '+famDef(o.id).name.toUpperCase());
+  famLog(getDie(m).name.toUpperCase()+' — YOURS, WITH YOUR FIRST ALE');
+  showScreen('gauntlet');
 }
 /* ── loadout greybox panel: equip 3 / inventory / sell 15g ── */
 function famPanelShow(){
@@ -10725,6 +10833,8 @@ function famCommitBonus(selD,pts){
     if(grown>0){pts+=grown;_famPop('+'+grown+' CULTIVATE');}
     else _famPop('CULTIVATE GROWS');
   }
+  var _tempered=selD.filter(function(d){return d.ench&&d.ench.t==='tempering'&&d.ench.r==='hard';});
+  if(_tempered.length){var _tb=_tempered.length*100;pts+=_tb;_famPop('+'+_tb+' TEMPERED');}
   var first=G.pool[0],last=G.pool[G.pool.length-1];
   var hitFirst=first&&selD.indexOf(first)>=0,hitLast=last&&selD.indexOf(last)>=0;
   if((inst=famInst('vanguard_f'))&&hitFirst){var P1=famDef('vanguard_f').p[inst.tier-1];pts+=P1;_famPop('+'+P1+' VANGUARD');}
@@ -10766,7 +10876,7 @@ function famFoolsGold(free){
   if(!inst||inst.charges<=0)return false;
   inst.charges--;try{famRenderRow();}catch(e){}
   famLog("FOOL'S GOLD — EVERYTHING REROLLS");
-  free.forEach(function(d){d.val=rollFace(d.mat);try{reDrawDieFace(d);}catch(e){}});
+  free.forEach(function(d){d.val=_rollD(d);try{reDrawDieFace(d);}catch(e){}});
   var fv=free.map(function(d){return d.val;}),fm=free.map(function(d){return d.mat;});
   if(anyScoring(fv,effectiveCards(),fm)){
     free.forEach(function(d){if(d.el)d.el.onclick=function(){toggleDie(d);};});
@@ -10804,7 +10914,7 @@ CFX.powder_keg={
     G.kept=[];
     G.pool.forEach(function(d){
       d.committed=false;d._frozen=false;d.sel=false;
-      d.val=rollFace(d.mat);
+      d.val=_rollD(d);
       if(d.el){d.el.classList.remove('committed','selected','die-frozen');try{reDrawDieFace(d);}catch(e){}}
     });
     G.numDice=G.pool.length;
@@ -10853,7 +10963,7 @@ CFX.stargazer={
   use:function(inst){
     var free=G.pool.filter(function(d){return !d.committed&&!d._frozen;});
     if(!free.length)return false;
-    G._famPeekVals=free.map(function(d){return rollFace(d.mat);});
+    G._famPeekVals=free.map(function(d){return _rollD(d);});
     famLog('OMEN — NEXT ROLL: '+G._famPeekVals.join(' · '));
     return true;
   }
@@ -10928,12 +11038,12 @@ CFX.preserve={
   }
 };
 /* update the live set */
-['transmute','fools_gold_f','bloom','preserve','honeytrap','tar_pit','ward','powder_keg','sacrifice','short_fuse','stargazer','ill_omen','sleight','vanguard_f','anchor_f','bookends_f','for_keeps'].forEach(function(id){FAM_LIVE[id]=1;});
+['transmute','fools_gold_f','bloom','preserve','honeytrap','tar_pit','ward','powder_keg','sacrifice','short_fuse','stargazer','ill_omen','sleight','vanguard_f','anchor_f','bookends_f','for_keeps','double_stakes','the_tab','hair_of_the_dog','marked_table','high_table'].forEach(function(id){FAM_LIVE[id]=1;});
 FAM_LIVE.cultivate=1;/* P2: jade dice exist */
 FAM_LIVE.tamper=1;/* P5: opponent cards visible */
 /* ── PROTO greybox loadout: six dice, reorder + swap ── */
 function famLoadoutShow(){
-  _getS();S.run.diceInv=S.run.diceInv||[];
+  _getS();S.run.diceInv=S.run.diceInv||[];_enchInit();
   var old=document.getElementById('gbLoadout');if(old)old.remove();
   var ov=document.createElement('div');ov.id='gbLoadout';
   ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9400;overflow:auto;font-family:monospace;color:#ddd;padding:16px';
@@ -10946,7 +11056,8 @@ function famLoadoutShow(){
     +'<div style="display:flex;gap:5px;margin:10px 0">';
   (S.run.dice||[]).forEach(function(m,i){
     h+='<div style="flex:1;text-align:center">'
-      +'<div style="height:54px;background:#191919;border:2px solid '+col(m)+';display:flex;align-items:center;justify-content:center;font-size:9px;color:'+col(m)+'">'+getDie(m).name+'</div>'
+      +'<div style="height:54px;background:#191919;border:2px solid '+col(m)+';display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:9px;color:'+col(m)+'">'+getDie(m).name
+      +(((S.run.dieEnch||[])[i])?'<span style="font-size:8px;color:#c9f;margin-top:2px">✦ '+ENCHANTS[S.run.dieEnch[i].t].name+'</span>':'')+'</div>'
       +'<div style="display:flex;gap:2px;margin-top:3px">'
       +'<span onclick="famDieShift('+i+',-1)" style="flex:1;cursor:pointer;background:#222;border:1px solid #555;font-size:11px">&#9664;</span>'
       +'<span onclick="famDieShift('+i+',1)" style="flex:1;cursor:pointer;background:#222;border:1px solid #555;font-size:11px">&#9654;</span>'
@@ -10999,27 +11110,31 @@ function _gbRenderSleeve(){
 }
 function famSleeveSet(id){_getS();S.run.sleeve=id;save();_gbRenderSleeve();}
 function famDieShift(i,dir){
-  _getS();var d=S.run.dice;var j=i+dir;
+  _getS();_enchInit();var d=S.run.dice;var j=i+dir;
   if(j<0||j>=d.length)return;
-  var t=d[i];d[i]=d[j];d[j]=t;save();famLoadoutShow();
+  var t=d[i];d[i]=d[j];d[j]=t;
+  var e=S.run.dieEnch,te=e[i];e[i]=e[j];e[j]=te;
+  save();famLoadoutShow();
 }
 function famDieStash(i){
   _getS();
   if((S.run.dice||[]).length<=1){famLog('THE TABLE NEEDS DICE');return;}
-  S.run.diceInv=S.run.diceInv||[];
+  S.run.diceInv=S.run.diceInv||[];_enchInit();
   S.run.diceInv.push(S.run.dice.splice(i,1)[0]);
-  if(S.run.dice.length<6)S.run.dice.push('bone');/* never roll short */
+  S.run.dieEnchInv.push(S.run.dieEnch.splice(i,1)[0]||null);
+  if(S.run.dice.length<6){S.run.dice.push('bone');S.run.dieEnch.push(null);}
   save();famLoadoutShow();
 }
 function famDieEquip(i){
-  _getS();S.run.diceInv=S.run.diceInv||[];
+  _getS();S.run.diceInv=S.run.diceInv||[];_enchInit();
   var m=S.run.diceInv.splice(i,1)[0];
+  var me=S.run.dieEnchInv.splice(i,1)[0]||null;
   /* swap with the last bone if the row is full */
   var bi=S.run.dice.lastIndexOf('bone');
   if(bi<0)bi=S.run.dice.length-1;
-  var outMat=S.run.dice[bi];
-  S.run.dice[bi]=m;
-  if(outMat&&outMat!=='bone')S.run.diceInv.push(outMat);
+  var outMat=S.run.dice[bi],outEnch=S.run.dieEnch[bi]||null;
+  S.run.dice[bi]=m;S.run.dieEnch[bi]=me;
+  if(outMat&&outMat!=='bone'){S.run.diceInv.push(outMat);S.run.dieEnchInv.push(outEnch);}
   save();famLoadoutShow();
 }
 /* ── PROTO greybox Room: same composition as the real screen, but
@@ -11078,7 +11193,8 @@ function _gbRenderRoom(tier,bossReady){
     var spent=n.seatsPlayed[i];
     var word=(_PERSONA_WORDS[pat.persona]||'PATRON');
     var disp=(pat.title?pat.title+' ':'')+(pat.gname||word);
-    var hc=(i===n.handicapSeat&&S.run.handicapOffer&&S.run._handicapTier===S.run.tier);
+    var hc=(i===n.handicapSeat&&n.sealTell);
+    var hcT=hc?_tellById(n.sealTell):null;
     var inner;
     if(spent){
       var won=n.results[i]==='won';
@@ -11088,7 +11204,7 @@ function _gbRenderRoom(tier,bossReady){
       h+='<div style="opacity:.6">'+inner+'</div>';
     }else{
       inner='<div style="height:120px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#242424;border:2px solid #777;position:relative">'
-        +(hc?'<div style="position:absolute;top:4px;right:4px;background:#639;color:#dcf;font-size:9px;padding:2px 6px">HANDICAP x2</div>':'')
+        +(hc?'<div title="two circles and double gold — lose and a circle is rubbed out" style="position:absolute;top:4px;right:4px;background:#000;border:1px solid #96f;color:#cbf;font-size:9px;padding:2px 6px">⬤ SEALED · '+(hcT?hcT.name:'')+'</div>':'')
         +(pat.grudge?'<div style="position:absolute;top:4px;left:4px;background:#611;color:#f99;font-size:9px;padding:2px 6px">GRUDGE</div>':'')
         +'<div style="width:52px;height:52px;background:#3a3a3a;border:1px solid #666;margin-bottom:8px"></div>'
         +'<div style="font-size:12px;letter-spacing:1px;color:#eee">'+disp+'</div>'
@@ -11109,6 +11225,24 @@ function _gbRenderRoom(tier,bossReady){
       +'style="cursor:pointer;margin-top:10px;padding:9px;text-align:center;font-size:12px;letter-spacing:1px;'
       +'border:2px '+(fk?'solid #c4404f':'dashed #644')+';color:'+(fk?'#f8a':'#a77')+';background:#181114">'
       +(fk?'FOR KEEPS ARMED — NEXT MATCH IS FOR DICE':'FOR KEEPS — TAP TO PLAY IT ON THE NEXT SEAT')+'</div>';
+  }
+  /* TAVERN cards + the chalk ledger (brief §3) */
+  if(famOwnTier('double_stakes')>0){
+    var ds=!!S.run._dsArmed;
+    h+='<div onclick="_getS();S.run._dsArmed=!S.run._dsArmed;save();showScreen(&quot;gauntlet&quot;)" '
+      +'style="cursor:pointer;margin-top:10px;padding:9px;text-align:center;font-size:12px;letter-spacing:1px;'
+      +'border:2px '+(ds?'solid #b09a72':'dashed #665')+';color:'+(ds?'#dcb':'#987')+';background:#161310">'
+      +(ds?'DOUBLE STAKES ARMED — TWICE THE BUY-IN, TWICE THE POT':'DOUBLE STAKES — TAP TO PLAY IT ON THE NEXT SEAT')+'</div>';
+  }
+  if(famOwnTier('the_tab')>0&&!S.run._tabOwed){
+    h+='<div onclick="famTabTake()" style="cursor:pointer;margin-top:10px;padding:9px;text-align:center;font-size:12px;letter-spacing:1px;'
+      +'border:2px dashed #665;color:#987;background:#161310">THE TAB — BORROW 250g NOW, OWE 400 BY LAST ORDERS</div>';
+  }
+  if(S.run._tabOwed){
+    h+='<div style="margin-top:10px;padding:8px 10px;border:1px solid #665;background:#141310;color:#cb9;font-size:11px;display:flex;justify-content:space-between;align-items:center">'
+      +'<span>☰ LEDGER — OWED '+S.run._tabOwed+'g BY LAST ORDERS</span>'
+      +((S.run.gold||0)>=S.run._tabOwed?'<span onclick="famTabPay()" style="cursor:pointer;border:1px solid #8e8;color:#8e8;padding:3px 8px">PAY IT</span>':'<span style="color:#666">no coin</span>')
+      +'</div>';
   }
   /* action row */
   function act(label,fn,color){return '<div onclick="'+fn+'" style="flex:1;text-align:center;padding:12px 0;background:#1a1a1a;'
@@ -11703,6 +11837,45 @@ function isCombo(vals){
   }
   if(vals.length>=6){var pairs=0;for(var f2=1;f2<=6;f2++)if(cnt[f2]>=2)pairs++;if(pairs>=3)return true;}
   return false;
+}
+/* ═══ ENCHANTS — innkeep services, NOT cards (brief §3). One per die,
+   ever; travels with the die; never a quiet +X. ═══ */
+var ENCHANTS={
+  amber_cast:{name:'Amber Cast',price:200,desc:'Trap one face in amber and replace another of its faces with the copy.'},
+  quicksilver:{name:'Quicksilver',price:250,desc:'Coat a die; once per turn you may reroll it alone, free.'},
+  tempering:{name:'Tempering',price:150,desc:'Hold it to the fire. Half the time it hardens (+100 to all its scores, for good), half the time it cracks and loses its highest face.'},
+  loaded:{name:'Loaded',price:400,desc:'Shave it; pick a face, it rolls that face twice as often.'}
+};
+function _enchInit(){
+  _getS();
+  S.run.dieEnch=S.run.dieEnch||[];S.run.dieEnchInv=S.run.dieEnchInv||[];
+  while(S.run.dieEnch.length<(S.run.dice||[]).length)S.run.dieEnch.push(null);
+  S.run.dieEnch.length=(S.run.dice||[]).length;
+  while(S.run.dieEnchInv.length<(S.run.diceInv||[]).length)S.run.dieEnchInv.push(null);
+  S.run.dieEnchInv.length=(S.run.diceInv||[]).length;
+}
+function _enchFaces(mat,ench){
+  var f=((getDie(mat)||{}).faces||[1,2,3,4,5,6]).slice();
+  if(!ench)return f;
+  if(ench.t==='amber_cast')f=f.map(function(x){return x===ench.faceB?ench.faceA:x;});
+  if(ench.t==='tempering'&&ench.r==='crack'){var mx=Math.max.apply(null,f);f.splice(f.indexOf(mx),1);}
+  if(ench.t==='loaded')f.push(ench.face);
+  return f.length?f:[1];
+}
+function _enchRollM(mat,ench){var f=_enchFaces(mat,ench);return f[Math.floor(Math.random()*f.length)];}
+function _rollD(d){return _enchRollM(d.mat,d.ench||null);}
+function famQuicksilver(){
+  if(!G||G.phase!=='choosing')return;
+  if(G._qsTurn===G.turnNum){famLog('QUICKSILVER — ONCE PER TURN');return;}
+  var d=(G.pool||[]).filter(function(x){return x.ench&&x.ench.t==='quicksilver'&&!x.committed&&!x._frozen;})[0];
+  if(!d)return;
+  G._qsTurn=G.turnNum;
+  d.val=_rollD(d);d.sel=false;try{reDrawDieFace(d);}catch(e){}
+  famLog('QUICKSILVER — IT ROLLS ALONE, FREE');
+  var free=G.pool.filter(function(x){return !x.committed&&!x._frozen;});
+  var fv=free.map(function(x){return x.val;}),fm=free.map(function(x){return x.mat;});
+  if(!anyScoring(fv,effectiveCards(),fm)){if(!_tryBustSave(free))_delayedDoBust(free);return;}
+  try{refreshSelUI();}catch(e){}try{famRenderRow();}catch(e){}
 }
 function rollFace(mat){
   const dt=getDie(mat);
@@ -13926,8 +14099,10 @@ function handleRoll(){
     setTimeout(()=>{
       setStatusMsg('ROLLING...','active');const row=document.getElementById('playerDiceRow');
       var hotN=G.numDice||6;
-      for(let i=0;i<hotN;i++){const mat=G.matchDice[i%G.matchDice.length]||'bone';const val=hotSpur?rollFaceSpur(mat):rollFace(mat);
-        const el=mkDie(val,mat);el.classList.add('rolling');_appendDie(row,el);G.pool.push({val,mat,sel:false,committed:false,el});}
+      for(let i=0;i<hotN;i++){const mat=G.matchDice[i%G.matchDice.length]||'bone';
+        const _en=(G._enchArr||[])[i%G.matchDice.length]||null;
+        const val=hotSpur?rollFaceSpur(mat):_enchRollM(mat,_en);
+        const el=mkDie(val,mat);el.classList.add('rolling');_appendDie(row,el);G.pool.push({val,mat,ench:_en,sel:false,committed:false,el});}
       SFX.roll(hotN);
       setTimeout(()=>{G.pool.forEach(d=>{if(!d.committed)settleDie(d.el);});afterRoll();},480);
     },700);
@@ -13953,7 +14128,7 @@ function handleRoll(){
        It stays a normal selectable pool die — afterRoll reattaches its
        click handler like any other. */
     if(d._frozen){d.sel=false;if(d.el){d.el.classList.remove('sel');}return;}
-    const val=useSpur?rollFaceSpur(d.mat):rollFace(d.mat);d.val=val;d.sel=false;
+    const val=useSpur?rollFaceSpur(d.mat):_rollD(d);d.val=val;d.sel=false;
     d.el.classList.remove('sel');d.el.style.transition='none';d.el.style.transform='';d.el.style.animation='';d.el.offsetHeight;
     d.el.classList.add('rolling');d.el.onclick=null;d.el.style.cursor='';
     // Wait until 90° into first spin (0.4s period × 0.25 = 100ms) then crossfade dots.
@@ -13988,9 +14163,10 @@ function handleRoll(){
   var _blockadePattern=[2,3,4,2,3,4];
   const newEntries=[];
   for(let i=0;i<needNew;i++){const mat=G.matchDice[(G.pool.length+i)%G.matchDice.length]||'bone';
+    const _en=(G._enchArr||[])[(G.pool.length+i)%G.matchDice.length]||null;
     var val;
     if(_blockadeFire){val=_blockadePattern[i%_blockadePattern.length];}
-    else{val=useSpur?rollFaceSpur(mat):rollFace(mat);}
+    else{val=useSpur?rollFaceSpur(mat):_enchRollM(mat,_en);}
     const el=mkDie(val,mat);
     el.classList.add('rolling');
     if(_blockadeFire)el.classList.add('die-dampened','die-dampened-fresh');
@@ -14004,7 +14180,7 @@ function handleRoll(){
     /* Force layout so the browser commits the dice to the next paint
        before any subsequent setTimeout fires. */
     el.offsetWidth;
-    newEntries.push({val,mat,sel:false,committed:false,el});}
+    newEntries.push({val,mat,ench:_en,sel:false,committed:false,el});}
   if(_blockadeFire){
     triggerCard('blockade','BLOCKADE — ROLL DENIED!',false);
     setStatusMsg('BLOCKADE — '+(G.rung?G.rung.name:'RIVAL')+' BLOCKED YOUR OPENING!','red');
@@ -14042,7 +14218,7 @@ function _afterRollImpl(){
   if(G&&G._oSleight&&G.phase!=='opp'&&(G.turnRollCount||0)===0){
     G._oSleight=false;
     var _slFree=G.pool.filter(function(d){return !d.committed&&!d._frozen;});
-    _slFree.forEach(function(d){d.val=rollFace(d.mat);try{reDrawDieFace(d);}catch(e){}});
+    _slFree.forEach(function(d){d.val=_rollD(d);try{reDrawDieFace(d);}catch(e){}});
     famLog('SLEIGHT — YOUR ROLL COMES BACK DIFFERENT');
   }
   if(typeof famApplyRollForces==='function'&&G&&G.phase!=='opp')famApplyRollForces();
@@ -15561,6 +15737,10 @@ function handleBank(){
     }
     G._prevBankAmt=total;
     G._famBankCount=(G._famBankCount||0)+1;
+    if(G._famBankCount===1&&S&&S.run&&S.run._hotdNext){
+      total*=2;S.run._hotdNext=false;try{save();}catch(e){}
+      famLog('HAIR OF THE DOG — FIRST BANK DOUBLED');_famPop('×2 HAIR OF THE DOG');
+    }
     G._famMinBank=(G._famBankCount===1)?total:Math.min(G._famMinBank,total);
     G.pPts+=total;G._lastBankAmount=total;spawnBankPop(total);
     /* relic: Corvus's Ledger — +5g on every bank (the +300 rides the
@@ -15866,17 +16046,18 @@ function _npcArmActives(){
   /* GREEDY/others: tar-pit a player who just banked big */
   if((c=_npcFamCard('tar_pit'))&&(G._lastBankAmount||0)>=800&&!G._oTarPit){
     c.charges--;G._oTarPit=(c.tier===2?2:1);
-    famLog('THEY LAY A TAR PIT — YOU ROLL SHORT NEXT TURN');
+    famLog(G.rung.name+' FINGERS A CARD — TAR PIT. YOU ROLL SHORT NEXT TURN','red');
+    try{setStatusMsg(G.rung.name+' FINGERS A CARD — TAR PIT COMES','red');}catch(e){}
   }
   /* CUNNING: sleight when trailing a strong player */
   if((c=_npcFamCard('sleight'))&&!G._oSleight&&(G.pPts-G.oPts)>=800){
     c.charges--;G._oSleight=true;
-    famLog('THEY PALM SOMETHING — YOUR NEXT ROLL COMES BACK');
+    famLog(G.rung.name+' FINGERS A CARD — SLEIGHT. YOUR NEXT ROLL COMES BACK','red');
   }
   /* STEADY: ill omen against a many-rolls player */
   if((c=_npcFamCard('ill_omen'))&&!G._oIllOmen&&(G._pLastRolls||0)>=3){
     c.charges--;G._oIllOmen={tier:c.tier};
-    famLog('THEY DECLARE AN ILL OMEN — BUST THIS TURN AND PAY');
+    famLog(G.rung.name+' FINGERS A CARD — AN ILL OMEN. BUST NEXT TURN AND PAY','red');
   }
   try{famRenderRow();}catch(e){}
 }
@@ -17307,8 +17488,8 @@ function endMatch(win){
 
   var isBoss=!!G._isBoss;
   var isGauntlet=!!G._isGauntlet;
-  var isHandicap=!!G._handicap;
-  var pointsEarned=win?(isHandicap?2:1):0;
+  var isHandicap=!!G._handicap||!!G._sealRule;
+  var pointsEarned=win?(isHandicap?((G._sealRule&&famOwnTier('marked_table')>0)?3:2):1):0;
   /* Track per-run match wins for the First Blood feat. Increments on any
      win (boss or patron) so the feat fires exactly once on the first match
      win of a run. */
@@ -17468,6 +17649,11 @@ function endMatch(win){
     var _tier=(S&&S.run&&typeof S.run.tier==='number')?S.run.tier:0;
     _patronGold=15+_tier*10;
     if(isHandicap)_patronGold*=2;
+    if(G._doubleStakes)_patronGold*=2;/* tavern: double stakes */
+    if(G._highTable){/* tavern: high table — half again, double from GREEDY/BULLISH */
+      var _htM=(G.rung&&(G.rung.persona==='hoard'||G.rung.persona==='triples'))?2:1.5;
+      _patronGold=Math.floor(_patronGold*_htM);
+    }
     /* P2 pot: the seat buy-in returns on a win, folded into one number so
        the payout reads bigger than the old flat reward (it is). */
     _patronGold+=((typeof LO!=='undefined'&&LO&&LO.buyIn)?LO.buyIn:0);
@@ -17857,6 +18043,10 @@ function endMatch(win){
   _endScreenData=_bossLossData?{pFinal:G.pPts,oFinal:G.oPts,cardHTML:_bossLossData.cardHTML,dlgHTML:_bossLossData.dlgHTML,isCardLost:true}:null;
 
   /* Store navigation data for handleContinue */
+  try{if(!win&&!G._practice&&famOwnTier('hair_of_the_dog')>0&&S&&S.run){
+    S.run._hotdNext=true;save();
+    famLog('HAIR OF THE DOG — YOUR FIRST BANK NEXT MATCH IS DOUBLED');
+  }}catch(e){}
   try{_famFeats(win);}catch(e){}
   G._endRoute={_forKeeps:!!G._forKeeps,win:win,isBoss:isBoss,seatIdx:((typeof LO!=='undefined'&&LO&&LO.seatIdx!=null)?LO.seatIdx:null),isGauntlet:isGauntlet,isHandicap:isHandicap,practice:!!G._practice,pointsEarned:pointsEarned,bossName:G.rung?G.rung.name:'',bossKey:G.rung?G.rung.key:'',_bossLossData:_bossLossData||null};
   /* Settle the outcome into S.run NOW (tier/hearts/points/death), not at the
@@ -18046,6 +18236,7 @@ function _settleEndRoute(route){
     S.run._bookClosed[S.run.tier]=true;
   }
   if(route.win&&route.isBoss&&!route.isGauntlet){
+    _tabSettle();/* the night ends — the tab comes due */
     S.run.bossesBeaten.push(S.run.tier);
     S.run.points=0;S.run._chalkMeta=[];
     /* Beating a boss restores ONE heart, capped at the starting 3. */
@@ -18093,8 +18284,10 @@ function _settleEndRoute(route){
       if(pool2.length){
         var best=pool2.sort(function(a,b){return rank(b)-rank(a);})[0];
         var di=(S.run.dice||[]).indexOf(best);
-        if(di>=0){S.run.dice.splice(di,1);if(S.run.dice.length<6)S.run.dice.push('bone');}
-        else{var ii=(S.run.diceInv||[]).indexOf(best);if(ii>=0)S.run.diceInv.splice(ii,1);}
+        if(di>=0){S.run.dice.splice(di,1);if(S.run.dice.length<6)S.run.dice.push('bone');
+          if(S.run.dieEnch){S.run.dieEnch.splice(di,1);while(S.run.dieEnch.length<S.run.dice.length)S.run.dieEnch.push(null);}}
+        else{var ii=(S.run.diceInv||[]).indexOf(best);
+          if(ii>=0){S.run.diceInv.splice(ii,1);if(S.run.dieEnchInv)S.run.dieEnchInv.splice(ii,1);}}
         route._fkLost=best;
       }
     }
@@ -20142,6 +20335,7 @@ function initMatchScreen(data){
   G._isBoss=!!params.isBoss;
   G._isGauntlet=!!params.isGauntlet;
   G._handicap=params.handicap||null;
+  G._sealRule=params.sealRule||null;
   /* Init active card uses */
   pCards.forEach(cid=>{const cd=CARDS.find(c=>c.id===cid)||NPC_CARDS_MAP[cid];if(cd&&cd.type==='active')G.activeCardState.usedCards[cid]=cd.maxUses||1;});
   /* Per-RUN once-only actives: if the player already spent the card this
@@ -20276,6 +20470,7 @@ function initMatchScreen(data){
     }
   }
 
+  G._enchArr=(S&&S.run&&S.run.dieEnch)?S.run.dieEnch.slice():[];
   /* ── Apply patron Tell (signature passive rule) ── */
   _applyTellAndSleeve();
   if(typeof playerTitle==='function'&&playerTitle()!=='nobody'){
@@ -21074,8 +21269,48 @@ function _gbShop(){
     inv.forEach(function(m){h+='<div style="width:44px;height:44px;background:#131313;border:1px dashed #666;display:flex;align-items:center;justify-content:center;font-size:9px;color:#999">'+getDie(m).name+'</div>';});
     h+='</div>';
   }
+  _enchInit();
+  h+='<div style="color:#999;font-size:11px;margin:14px 0 4px">THE INNKEEP&#39;S SERVICE — enchant a die (one per die, ever; it travels with the die)</div>';
+  Object.keys(ENCHANTS).forEach(function(k){
+    var e=ENCHANTS[k];var can=(S.run.gold||0)>=e.price;
+    h+='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 9px;border:1px solid #544;background:#141210;margin-bottom:4px">'
+      +'<div style="flex:1"><div style="font-size:11px;color:#dcb">'+e.name.toUpperCase()+'</div>'
+      +'<div style="font-size:9px;color:#887;line-height:1.4">'+e.desc+'</div></div>'
+      +'<div onclick="_gbEnchant(\''+k+'\')" style="cursor:pointer;padding:5px 10px;font-size:11px;border:1px solid '+(can?'#4a4':'#633')+';color:'+(can?'#8e8':'#a66')+'">'+e.price+'g</div></div>';
+  });
+  var _enTags=(S.run.dice||[]).map(function(m,i){var en=S.run.dieEnch[i];return en?('<span style="border:1px solid #86a;color:#c9f;font-size:9px;padding:2px 6px;margin-right:4px">'+getDie(m).name+' · '+ENCHANTS[en.t].name+'</span>'):'';}).join('');
+  if(_enTags)h+='<div style="margin-top:6px">'+_enTags+'</div>';
   h+='<div onclick="SFX.nav();showScreen(\'gauntlet\')" style="margin-top:16px;text-align:center;padding:12px 0;background:#1a1a1a;border:2px solid #555;cursor:pointer;letter-spacing:1px">BACK TO THE ROOM</div>';
   host.innerHTML=h;
+}
+function _gbEnchant(k){
+  _getS();_enchInit();
+  var e=ENCHANTS[k];if(!e)return;
+  if((S.run.gold||0)<e.price){famLog('NOT ENOUGH GOLD');return;}
+  var list=(S.run.dice||[]).map(function(m,i){return (i+1)+' '+getDie(m).name+(S.run.dieEnch[i]?' [WORKED]':'');}).join('\n');
+  var pick=parseInt(prompt('WHICH DIE? (one enchant per die, ever)\n'+list),10)-1;
+  if(isNaN(pick)||pick<0||pick>=(S.run.dice||[]).length)return;
+  if(S.run.dieEnch[pick]){famLog('THAT DIE IS ALREADY WORKED — ONE ENCHANT, EVER');return;}
+  var mat=S.run.dice[pick],faces=((getDie(mat)||{}).faces||[1,2,3,4,5,6]);
+  var ench={t:k};
+  if(k==='amber_cast'){
+    var fa=parseInt(prompt('TRAP WHICH FACE IN AMBER? it shows: '+faces.join(' ')),10);
+    if(faces.indexOf(fa)<0)return;
+    var fb=parseInt(prompt('REPLACE WHICH FACE WITH THE COPY? it shows: '+faces.join(' ')),10);
+    if(faces.indexOf(fb)<0||fb===fa)return;
+    ench.faceA=fa;ench.faceB=fb;
+  }
+  if(k==='loaded'){
+    var fl=parseInt(prompt('SHAVE IT TOWARD WHICH FACE? it shows: '+faces.join(' ')),10);
+    if(faces.indexOf(fl)<0)return;
+    ench.face=fl;
+  }
+  if(k==='tempering')ench.r=Math.random()<0.5?'hard':'crack';
+  S.run.gold-=e.price;
+  S.run.dieEnch[pick]=ench;save();
+  if(k==='tempering')famLog(ench.r==='hard'?'IT HARDENS — +100 TO ALL ITS SCORES, FOR GOOD':'IT CRACKS — ITS HIGHEST FACE IS GONE');
+  else famLog(e.name.toUpperCase()+' — THE WORK IS DONE');
+  _gbShop();
 }
 function _gbBuyDie(mat){
   _getS();
@@ -21084,6 +21319,7 @@ function _gbBuyDie(mat){
   if((S.run.diceStock[mat]||0)<=0)return;
   S.run.gold-=price;S.run.diceStock[mat]--;
   S.run.diceInv=S.run.diceInv||[];S.run.diceInv.push(mat);
+  _enchInit();
   save();_gbShop();
   famLog(getDie(mat).name+' BOUGHT — swap it in at the loadout');
 }
@@ -22814,13 +23050,17 @@ function _nightSeats(){
   return t.pointsNeeded+2;/* brief §1: seats = pointsNeeded + 2, no perks */
 }
 function _ensureNight(){
-  if(S.run.night&&S.run.night.tier===S.run.tier&&Array.isArray(S.run.night.roster)&&S.run.night.roster.length)return;
+  if(S.run.night&&S.run.night.tier===S.run.tier&&Array.isArray(S.run.night.roster)&&S.run.night.roster.length){
+    if(!S.run.night.sealTell){S.run.night.sealTell=_rollSealTell();save();}
+    return;
+  }
   var n=_nightSeats(),roster=[];
   for(var i=0;i<n;i++)roster.push(generatePatron(S.run.tier));
   S.run.night={tier:S.run.tier,roster:roster,
     seatsPlayed:roster.map(function(){return false;}),
     results:roster.map(function(){return null;}),
-    handicapSeat:Math.floor(Math.random()*n)};
+    handicapSeat:Math.floor(Math.random()*n),
+    sealTell:_rollSealTell()};
   save();
 }
 function _markSeatResult(route){
@@ -22836,6 +23076,11 @@ function _checkNightFail(){
      dodge it. */
   var n=S&&S.run&&S.run.night;if(!n||n.tier!==S.run.tier)return;
   var t=TIERS[S.run.tier]||TIERS[0];
+  if(S.run._tabOwed&&n.seatsPlayed.length){
+    var _allSpent=true;
+    for(var _ti=0;_ti<n.seatsPlayed.length;_ti++)if(!n.seatsPlayed[_ti])_allSpent=false;
+    if(_allSpent)_tabSettle();/* due at last orders — an unpaid tab can tip the night */
+  }
   if(S.run.points>=t.pointsNeeded)return;
   if(!n.seatsPlayed.length)return;
   for(var i=0;i<n.seatsPlayed.length;i++)if(!n.seatsPlayed[i])return;
@@ -22994,21 +23239,26 @@ function launchSeat(seatIdx){
   if(night.seatsPlayed[seatIdx])return;/* seat already spent */
   /* clone — handicap target mutations must never touch the persisted roster */
   var patron=JSON.parse(JSON.stringify(night.roster[seatIdx]));
-  var isHandicap=(seatIdx===night.handicapSeat)&&!!S.run.handicapOffer&&S.run._handicapTier===S.run.tier;
-  var handicap=isHandicap?S.run.handicapOffer:null;
+  var isSealed=(seatIdx===night.handicapSeat)&&!!night.sealTell;
+  var sealRule=isSealed?night.sealTell:null;
+  var handicap=null;/* legacy handicaps deleted (brief §1) — the sealed seat replaces them */
   /* P2 buy-in: clamped to the purse (a player with 3g pays 3g — being broke
      is already the punishment, never soft-lock a seat). Deduct + mark the
      seat spent ATOMICALLY before the match starts so a force-close can
      neither refund the stake nor un-spend the seat. Result is pessimistic
      'lost' until the settle flips it — abandoning keeps the loss. */
   var buy=Math.min((S.run.gold||0),(NIGHT_BUYINS[S.run.tier]||0));
+  var _dsPlay=!!S.run._dsArmed;S.run._dsArmed=false;
+  if(_dsPlay)buy=Math.min((S.run.gold||0),(NIGHT_BUYINS[S.run.tier]||0)*2);
   S.run.gold=(S.run.gold||0)-buy;
   var _fkPlay=!!S.run._fkArmed;S.run._fkArmed=false;
+  if(_fkPlay)famBurn('for_keeps');/* consumable: burns on use, win or lose */
   night.seatsPlayed[seatIdx]=true;
   night.results[seatIdx]='lost';
   save();
   var pCards=(S.run.cards||[]).filter(function(c){return !!c;});
   var oCards=generateOppCards(patron);
+  if(famOwnTier('high_table')>0){patron.target=(patron.target||0)+500;patron._highTable=true;}
   if(handicap==='last_call')patron.target=Math.floor(patron.target*1.5);
   if(handicap==='sudden_death')patron.target=999999;
   /* Rising Stakes: target +80% so the streak multiplier matters — without
@@ -23031,9 +23281,12 @@ function launchSeat(seatIdx){
       pStake:[],oStake:null,buyIn:buy,effectiveWager:false,
       isBoss:false,isGauntlet:false,
       handicap:handicap,
+      sealRule:sealRule,
       seatIdx:seatIdx
     });
     if(_fkPlay&&G){G._forKeeps=true;famLog('FOR KEEPS — THIS MATCH IS FOR DICE');}
+    if(_dsPlay&&G){G._doubleStakes=true;famLog('DOUBLE STAKES — TWICE THE BUY-IN, TWICE THE POT');}
+    if(G&&G.rung&&G.rung._highTable){G._highTable=true;famLog('HIGH TABLE — TARGET RAISED 500 FOR BOTH SIDES');}
   },80);
 }
 /* legacy entry (debug paths) — delegates to the first open seat */

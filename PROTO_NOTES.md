@@ -142,3 +142,44 @@ Not done (needs your call / later): NPC use of self-dice actives
 - DEFERRED on purpose: physical deletion of the old card code (~330
   inert sites). Zero behavior now; deleting mid-proto risks breakage for
   no gain. Belongs in the final port to the real UI build.
+
+## P10 — brief update (2026-07-09) implemented (done)
+
+Sealed seat: handicaps deleted (offer machinery inert, _checkRenownPerks
+  neutralized — a feat crossing an old threshold was still granting the
+  +200g Known Face perk). One seat per night runs ONE random tell,
+  symmetric via _ruleActive/_applySeal; player sleeve stacks (two rules).
+  Win 2 circles + double gold, loss rubs a circle. Confession excluded
+  from the seal pool (no NPC-receiving side).
+Tavern cards (parchment #b09a72, no tiers): Double Stakes (arm in Room,
+  2x buy-in + 2x pot), The Tab (consumable: +250g now, 400 due when the
+  night ends — unpaid = circle rubbed BEFORE the last-orders check, so
+  debt can tip the night; PAY IT button on the chalk ledger), Hair of the
+  Dog (loss flags S.run._hotdNext, first bank next match x2), Marked
+  Table (sealed win pays 3), High Table (target +500 at launch; pot x1.5,
+  x2 from GREEDY/BULLISH). Drafts: tavern ~12% of offers, excluded from
+  identity weighting; nights 1-2 in-family bias 50/50. Consumable rule:
+  famBurn() logs + empties the slot (for_keeps burns at launch, win or
+  lose). Tavern cards hidden from the match famRow (run-domain only).
+Starter die draft: run start now offers 3 family dice (no jade), free,
+  replaces the tier-I card draft. Picked die swaps a bone in the row.
+Enchants (innkeep service in the dice store, prompt()-driven greybox):
+  amber_cast (face copy), quicksilver (once/turn solo reroll, chip in
+  famRow, busts if it kills the roll), tempering (50/50 permanent +100
+  per scored die at commit / loses highest face), loaded (face weighted
+  2x). One per die ever; S.run.dieEnch/dieEnchInv parallel arrays kept in
+  sync through shift/stash/equip/buy/For-Keeps (enchant leaves with a
+  stolen die). Pool dice carry .ench; _rollD/_enchRollM used at every
+  player roll seam (main, hot dice, powder keg, fool's gold, encore,
+  sleight-return, stargazer peek). NPC dice never enchanted.
+Telegraph rule: NPC tar pit / sleight / ill omen arm messages are now
+  "<name> FINGERS A CARD — ..." in red, one turn before resolving. NPC
+  tamper doesn't exist (player-only) — noted, not needed. Patrons cap at
+  ONE active card before night 5 (post-grudge filter).
+Aldric's Square nerfed to wild_triple (side-grade rule).
+Verified live: starter draft, seal roll+bind both sides (badge, 2-rule
+  stack with sleeve), sealed win 2 circles/exact double gold, marked
+  table 3 circles, DS buy-in x2, HT target +500, FK burn + loss takes
+  best die with its enchant, tab take/pay/due paths (incl. tipping into
+  LAST ORDERS), quicksilver once-per-turn, tavern offer rate 13%,
+  active-cap 0 violations in 60 patrons, no console errors.
