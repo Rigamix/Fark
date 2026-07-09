@@ -362,10 +362,14 @@ purchases approach zero, relics are overtuned.
 - UI: sleeve slot at loadout framed in boss-dark-wood (not family
   colours); active rules show as badges on the match HUD (reuse the tell
   badge component; two badges max).
-- Balance lever if the sim shows one tell auto-sleeved everywhere
-  (RECKONING and STEEPED are the suspects; STEEPED symmetric is near
-  free value for whoever busts less): add a small gold cost per sleeve.
-  Never convert tells to charges; rules stay rules.
+- Balance lever, UPDATED per run-sim findings: the auto-sleeve fear is
+  dead for every testable tell (STEEPED sleeved runs at-or-below base -
+  symmetric feeds the NPC too). The sleeve is a marginal edge plus
+  flavor, which is the intended shape. Watch DRILL ORDER (the one
+  consistently positive sleeve, +4-5 points) and RECKONING (untestable
+  pre-night-8 in sim, flag stays open). If a gold cost per sleeve is
+  ever needed, those two justify it. Never convert tells to charges;
+  rules stay rules.
 - Engineering note, costed: symmetric tells require the NPC bank/roll
   policy to adapt on the RECEIVING side of all eight rules (LAST CALL
   changes whether they bank, DRILL ORDER when, COUNTERFEIT what a bank is
@@ -404,12 +408,22 @@ debug-triggered). Additional acceptance work for this rewrite:
 - Card sim coverage for the deterministic passives and the flagged set:
   Double or Nothing, Short Fuse burn, Falling Star thresholds, Preserve
   III, Honeytrap+family stacking, Fool's Gold burn, Reprisal, Ill Omen
-  numbers vs real persona bust rates, cross-family bust-immunity stacks
+  numbers vs real persona bust rates, cross-family bust-immunity stacks (run-sim verdict: full silver
+   stacking is a TRAP at 4% run wins, not a menace - low priority; the
+   real risk is defense-only builds lacking any win condition)
   (Silver die + Ward + Insurance), For Keeps economy impact, every relic,
   RECKONING sleeve dominance.
 - Targets: patron win rate 60-70% at intended gear, boss 45-55%, median
-  match 5-7 banked turns per side inside the caps. Tune TARGETS down
-  before inflating player scoring.
+  match 5-7 banked turns per side inside the caps. RUN-level target:
+  25-35% full-run wins for a competent build-focused player (run-sim:
+  family-builders hit ~60% with partial NPC card coverage; expect
+  ~45-55% at symmetric coverage, then tune the last step with hearts or
+  late targets). Tune TARGETS down before inflating player scoring.
+- Design guard from run-sim finding 7: the skill ceiling lives in
+  drafting and build decisions (~45 points of win rate); banking micro
+  is compressed (~2 points). This is the intended cosy-with-a-high-
+  ceiling shape. Protect draft meaningfulness; never add banking-
+  execution punishments to widen skill spread.
 - Buy-ins, patron gold, boss purses, dice prices, sell value, decline-
   gold: one economy pass so a family die is purchasable roughly every 1-2
   nights early, every night mid-game.
