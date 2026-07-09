@@ -183,3 +183,50 @@ Verified live: starter draft, seal roll+bind both sides (badge, 2-rule
   best die with its enchant, tab take/pay/due paths (incl. tipping into
   LAST ORDERS), quicksilver once-per-turn, tavern offer rate 13%,
   active-cap 0 violations in 60 patrons, no console errors.
+
+## P11 — FARK_PROTO_AUDIT.md pass (2026-07-09) (done)
+
+Audit reconciliation notes:
+- Part 1.1 (turn cap "not live") was STALE: the cap has been live since P0
+  (TURN_CAP_PATRON=8 / BOSS=10, HUD TURN X/N, highest-tally, final answer,
+  dead-even extra round). The auditor read the harness comment. Fixed the
+  harness instead: _runBalanceSim now DEFAULTS to live caps (patron legs 8,
+  boss legs 10; pass turnCap:0 to A/B uncapped) + pctCapEnd/bossPctCapEnd
+  metrics; gear snapshots G2/G3 swap retired crystal for silver.
+- Part 1.3: HANDICAPS const, _showHandicapSplash, the offer-roll machinery
+  and all painted-room reads are physically deleted. Deep G._handicap
+  branches remain (always-null, inert) for the final-port sweep.
+- Part 1.2/1.4: slot gating deleted (_isSlotUnlocked=true, celebrate block
+  gone), RENOWN_PERKS=[] (readers inert), getPouchCapacity()=0, startGold
+  grant gone. _getS migrates any legacy equipped cards/pouch to 15g each —
+  never a crash, never silent loss.
+- Part 2 targets: T4-7 patron bands -> 6100-7500 / 7200-8800 / 7700-9300 /
+  8700-10300; bosses -> 9500/10500/11250/12500. Late NPC quality raised:
+  brass/crystal out of boss dice + patron pools; agg/minBank up (T4-7);
+  STARSTONE PARITY — the +500-per-bank now credits NPC banks too (live
+  finOpp + sim), and Aldric/Whisper carry one starstone, Ambrose one,
+  T5-7 patron pools can roll it. Root cause of the G3 steamroll was the
+  player's uncontested starstone adder (T7 pre-tells: 87% with it, 52%
+  without). Post-tune, harness @400 iters, hot policy, G3:
+  T5 pw71 mt6 / bw64 bmt8 · T6 pw74 mt7 / bw67 bmt9 · T7 pw67 mt7 cap21 /
+  bw65 bmt10 bcap26. Majority target-crossing everywhere; boss ~65
+  pre-tells leaves headroom for tells to pull into the 45-55 band. Early
+  nights untouched (T0 G0 pw52/bw40, T2 G2 pw62/bw59).
+- Part 3.1 economy run-sim: _runEconomySim (debug block) — gold curve,
+  rotation luck, purse-1/3 spoils, median purchase policy. First verdict:
+  pity 23% (>15% bar) -> PITY RULE ADDED to _shopRollNight (always stocks
+  one unowned family die; sim re-verified 0-1%). Economy pass (brief §9):
+  patron reward 15+t*10 -> 20+t*12. Final: P(G2 by n3) 51%, P(G3 by n6)
+  26%, buys/night 0.5-0.8 (family die every 1-2 nights early, ~every
+  night mid — brief bar met), shop health n6+ ~0.7 (relics not overtuned).
+  STRUCTURAL FINDING for Denis: G3 by night 6 is a ~1-in-4 outcome for a
+  median cardless policy — the gear cliff the audit flagged is economic,
+  not target-based. Card power (unsimmed) is the intended filler; re-check
+  after harness extension 2.
+- DEFERRED (audit fix order 8): harness extensions 2-4 (deterministic card
+  EV, RECKONING/STEEPED sleeve dominance, bust-immunity stack, For Keeps
+  economy impact).
+Verified live: migration (3 old cards -> +45g), no HANDICAPS/_showHandicapSplash
+symbols, RENOWN_PERKS empty, pouch 0, slots free, handicap button hidden,
+seal rolls, pity fires with 6/7 families owned, sim defaults return rows,
+match boots with TURN 1/8 HUD, zero console errors.
