@@ -7443,17 +7443,8 @@ var SLOT_UNLOCK_TIER=[0,0,99,99];/* slot 0..3 → tier index needed.
    Slots 2 and 3 are gated on renown perks instead of tier — the 99
    sentinel keeps the tier-based check from ever unlocking them. */
 function _isSlotUnlocked(idx){
-  if(idx<0||idx>=SLOT_UNLOCK_TIER.length)return true;
-  /* Slot 0: boss slot, always unlocked. */
-  if(idx===0)return true;
-  /* Slot 1: default regular slot, always unlocked. */
-  if(idx===1)return true;
-  /* Slot 2: BASE now (P4 rework) — the buildcraft layer was meta-gated exactly
-     when new players needed the hook. Two regular slots from the first night. */
-  if(idx===2)return true;
-  /* Slot 3: the true 4th, gated on the Trusted Hand perk (60 renown). */
-  if(idx===3)return !!(S&&S.renownPerks&&S.renownPerks.fourthSlot);
-  return true;
+  return true;/* brief §3: three free card slots, no gates, no slot 0 (audit P1.2).
+    The legacy 4-slot loadout is inert — fcards are the live system. */
 }
 /* Number of loadout slots to render — fixed at 4 (boss + 3 regular). */
 function _loadoutSlotCount(){
@@ -7492,6 +7483,16 @@ function _famDiceMigrate(){
 function _getS(){
   if(typeof S!=='undefined'&&S&&S.renownPerks&&Object.keys(S.renownPerks).length){
     S.renownPerks={};/* brief §8: perk ladder deleted; slots/seats are baseline */
+  }
+  if(typeof S!=='undefined'&&S&&S.run){
+    var _mg=0;/* audit P1.2: legacy equipped cards (incl. signatures) -> sell value */
+    if(Array.isArray(S.run.cards)&&S.run.cards.some(function(c){return !!c;})){
+      _mg+=S.run.cards.filter(function(c){return !!c;}).length;S.run.cards=[null,null,null,null];
+    }
+    if(Array.isArray(S.run.pouch)&&S.run.pouch.some(function(c){return !!c;})){
+      _mg+=S.run.pouch.filter(function(c){return !!c;}).length;S.run.pouch=[null,null,null];
+    }
+    if(_mg)S.run.gold=(S.run.gold||0)+15*_mg;
   }
   if(!S){
     try{S=JSON.parse(localStorage.getItem('gambit4_proto'))}catch(e){}
@@ -7570,7 +7571,6 @@ function startNewRun(){
      was banked THIS run (renown is the one thing that persists). */
   S.run._renownAtStart=S.renown||0;
   /* Renown perk: Known Face → +50 starting gold */
-  if(S.renownPerks&&S.renownPerks.startGold)S.run.gold=(S.run.gold||0)+200;
   /* Renown perk: Legend → arm a boss-signature draft on first tier visit */
   if(S.renownPerks&&S.renownPerks.legend)S.run._legendDraftPending=true;
   S.totalRuns++;
@@ -7735,27 +7735,12 @@ const FEATS=[
    Thresholds reduced ~25-30% to make perks more reachable + earlier
    feedback (player feedback: "renown perks are too expensive"). Paired
    with new feats above for more sources. */
-const RENOWN_PERKS=[
-  {threshold:20, key:'startGold',    label:'Known Face',     desc:'Begin every run with +200 starting gold'},
-  {threshold:40, key:'freeRestock',  label:'Regular at the bar', desc:'Reshuffle the post-match card draft once after every match'},
-  {threshold:60, key:'fourthSlot',   label:'Trusted Hand',   desc:'Unlock your 4th card slot'},
-  {threshold:80, key:'shopDiscount', label:'Respected',      desc:'All shop prices reduced by 15%'},
-  {threshold:120,key:'extraDraft',   label:'Honored guest',  desc:'Card drafts offer 4 cards instead of 3'},
-  {threshold:160,key:'extraSeat',    label:'House Favourite',desc:"+1 seat at every night's table"},
-  {threshold:200,key:'pouch1',       label:'Pocketed',       desc:'Unlock a Pouch — carry 1 card on the side, swap it with an active card before any match'},
-  {threshold:250,key:'legend',       label:'Legend',         desc:'Begin every run with a free boss-signature draft (pick 1 of 3) — title shimmer too'},
-  {threshold:360,key:'pouch2',       label:'Deep Pockets',   desc:'Pouch holds 2 cards on the side instead of 1'},
-  {threshold:520,key:'pouch3',       label:'Hoarder',        desc:'Pouch holds 3 cards on the side instead of 2'},
-];
+const RENOWN_PERKS=[];/* perk ladder deleted (brief §8 / audit P1.4) — renown
+   surfaces only as titles + the cosmetics shelf. Empty (not removed) so the
+   legacy readers below stay inert without a sweep. */
 /* Returns how many pouch slots are unlocked (0-3). Pouched cards sit on the side
    between matches — they don't contribute to archetype or synergy counts while there. */
-function getPouchCapacity(){
-  if(!S||!S.renownPerks)return 0;
-  if(S.renownPerks.pouch3)return 3;
-  if(S.renownPerks.pouch2)return 2;
-  if(S.renownPerks.pouch1)return 1;
-  return 0;
-}
+function getPouchCapacity(){return 0;/* pouch retired with the perk ladder (audit P1.4) */}
 function _checkRenownPerks(){
   return;/* brief §8: perk ladder deleted — renown surfaces as titles + shelf only.
     The P7 wipe cleared saved perks; this stops fresh unlocks (a feat crossing
@@ -8715,28 +8700,28 @@ const RUNGS=[
        score a bit." On victory, the drained gold is refunded as a bonus
        reward (handled in endMatch — see B3). */
     tell:{id:'in_arrears',name:'IN ARREARS',desc:"“Every roll costs you 5 gold — beat me and win it all back.”",icon:'📒',perRoll:5}},
-  {id:4,name:'BRUTUS',key:'soldier',icon:'⚔️',tier:'respected',target:11500,gold:500,buyIn:70,
+  {id:4,name:'BRUTUS',key:'soldier',icon:'⚔️',tier:'respected',target:9500,gold:500,buyIn:70,
     boss:null,bossDesc:null,
-    agg:.68,cardRarity:'silver',wager:true,wagerCount:1,wagerMode:'best',minBank:300,diceStop:2,chaotic:false,adaptive:true,
-    dice:['lead','amber','amber','jade','silver','silver'],
+    agg:.75,cardRarity:'silver',wager:true,wagerCount:1,wagerMode:'best',minBank:550,diceStop:2,chaotic:false,adaptive:true,
+    dice:['flint','amber','amber','jade','jade','iron'],
     cardPool:['hold_the_line','iron_gate_npc','campaign_veteran','steady_hands','old_partners_badge'],cardCount:3,
     tell:{id:'drill_order',name:'DRILL ORDER',desc:"“Three rolls a turn, then you're done. Hot Dice rolls free.”",icon:'🛡️',maxRolls:3}},
-  {id:5,name:'ALDRIC',key:'knight',icon:'🛡️',tier:'respected',target:14000,gold:700,buyIn:100,
+  {id:5,name:'ALDRIC',key:'knight',icon:'🛡️',tier:'respected',target:10500,gold:700,buyIn:100,
     boss:null,bossDesc:null,
-    agg:.72,cardRarity:'gold',wager:true,wagerCount:2,wagerMode:'best',minBank:350,diceStop:1,chaotic:false,adaptive:true,
-    dice:['amber','jade','jade','brass','brass','silver'],
+    agg:.80,cardRarity:'gold',wager:true,wagerCount:2,wagerMode:'best',minBank:700,diceStop:1,chaotic:false,adaptive:true,
+    dice:['amber','jade','jade','jade','starstone','flint'],
     cardPool:['the_verdict_npc','point_of_order','fathers_die','the_oath_npc','family_crest'],cardCount:4,
     tell:{id:'confession',name:'CONFESSION',desc:"“Each turn, I seal one of your cards shut.”",icon:'⛪'}},
-  {id:6,name:'WHISPER',key:'noble',icon:'👑',tier:'renowned',target:16500,gold:950,buyIn:140,
+  {id:6,name:'WHISPER',key:'noble',icon:'👑',tier:'renowned',target:11250,gold:950,buyIn:140,
     boss:null,bossDesc:null,
-    agg:.76,cardRarity:'gold',wager:true,wagerCount:2,wagerMode:'best',minBank:400,diceStop:1,chaotic:false,adaptive:true,
-    dice:['jade','brass','brass','silver','silver','crystal'],
+    agg:.84,cardRarity:'gold',wager:true,wagerCount:2,wagerMode:'best',minBank:800,diceStop:1,chaotic:false,adaptive:true,
+    dice:['amber','jade','jade','jade2','starstone','flint'],
     cardPool:['the_royal_purse','crown_authority','the_quiet_decree','sundays_rest','old_roads','royal_seizure'],cardCount:4,
     tell:{id:'counterfeit',name:'COUNTERFEIT COIN',desc:"“I curse your dice — each cursed one banks at half.”",icon:'💀',startCount:1,addEvery:3}},
-  {id:7,name:'AMBROSE',key:'bishop',icon:'✝️',tier:'renowned',target:19000,gold:1300,buyIn:200,
+  {id:7,name:'AMBROSE',key:'bishop',icon:'✝️',tier:'renowned',target:12500,gold:1300,buyIn:200,
     boss:null,bossDesc:null,
-    agg:.80,cardRarity:'gold',wager:true,wagerCount:3,wagerMode:'all',minBank:350,diceStop:1,chaotic:false,adaptive:true,
-    dice:['brass','silver','silver','crystal','crystal','crystal'],
+    agg:.88,cardRarity:'gold',wager:true,wagerCount:3,wagerMode:'all',minBank:900,diceStop:1,chaotic:false,adaptive:true,
+    dice:['amber','amber','jade','jade','jade2','starstone'],
     cardPool:['communion_wine','blessed_dice','the_sermon','judgment_npc','never_saw_a_robe','blessed_confiscation'],cardCount:5,
     tell:{id:'reckoning',name:'THE RECKONING',desc:"“Match my last bank, or you score nothing.”",icon:'⚖️'}},
 ];
@@ -8779,6 +8764,13 @@ function _shopRollNight(){
   if(availCount<2){/* never a fully dry night */
     for(var i=0;i<2;i++){var m=fams[Math.floor(Math.random()*fams.length)];sold[m]=false;}
   }
+  /* PITY RULE (audit 2b, sim-verified needed): the shop always stocks at
+     least one family die the player does not own. */
+  var _owned=(S.run.dice||[]).concat(S.run.diceInv||[]);
+  if(!fams.some(function(m){return !sold[m]&&_owned.indexOf(m)<0;})){
+    var _unowned=fams.filter(function(m){return _owned.indexOf(m)<0;});
+    if(_unowned.length)sold[_unowned[Math.floor(Math.random()*_unowned.length)]]=false;
+  }
   S.run._shopRoll={tier:S.run.tier,sold:sold};save();
   return S.run._shopRoll;
 }
@@ -8820,34 +8812,29 @@ const TIERS=[
     diceWeights:{iron:2,lead:2,amber:1,flint:1}},
   {id:4,name:'THE FORGE',pointsNeeded:3,
     boss:RUNGS[4],/* Brutus @ 13000 */
-    patronStats:{targetMin:7200,targetMax:8800,aggMin:.66,aggMax:.76,dicePool:['lead','flint','amber'],minBank:350,diceStop:2},
+    patronStats:{targetMin:6100,targetMax:7500,aggMin:.66,aggMax:.76,dicePool:['lead','flint','amber'],minBank:350,diceStop:2},
     draftPool:['silver','gold'],
     diceWeights:{lead:1,amber:2,jade:2,brass:1}},
   {id:5,name:'THE COURT',pointsNeeded:3,
     boss:RUNGS[5],/* Aldric @ 17000 */
-    patronStats:{targetMin:8800,targetMax:10800,aggMin:.70,aggMax:.80,dicePool:['flint','amber','jade'],minBank:400,diceStop:1},
+    patronStats:{targetMin:7200,targetMax:8800,aggMin:.74,aggMax:.84,dicePool:['amber','jade','jade','starstone'],minBank:600,diceStop:1},
     draftPool:['silver','gold'],
     diceWeights:{amber:2,jade:2,brass:1,silver:1}},
   {id:6,name:'THE PARLOUR',pointsNeeded:3,
     boss:RUNGS[6],/* Whisper @ 22000 */
-    patronStats:{targetMin:10800,targetMax:13000,aggMin:.74,aggMax:.84,dicePool:['amber','jade','brass'],minBank:450,diceStop:1},
+    patronStats:{targetMin:7700,targetMax:9300,aggMin:.78,aggMax:.88,dicePool:['amber','jade','jade','starstone'],minBank:700,diceStop:1},
     draftPool:['gold'],
     diceWeights:{jade:2,brass:2,silver:1,crystal:1}},
   {id:7,name:'THE SANCTUM',pointsNeeded:4,
     boss:RUNGS[7],/* Ambrose @ 28000 */
-    patronStats:{targetMin:12500,targetMax:15500,aggMin:.78,aggMax:.88,dicePool:['jade','brass','silver','crystal'],minBank:400,diceStop:1},
+    patronStats:{targetMin:8700,targetMax:10300,aggMin:.82,aggMax:.90,dicePool:['amber','jade','jade2','starstone'],minBank:800,diceStop:1},
     draftPool:['gold'],
     diceWeights:{brass:2,silver:2,crystal:2}}
 ];
 
 /* ── Handicap match modifiers ── */
-const HANDICAPS=[
-  {id:'last_call',    name:'HOURGLASS',     desc:'Target drops each turn',        icon:'⏳',  color:'#e8a030'},
-  {id:'sudden_death', name:'SUDDEN DEATH',  desc:'3 turns each — highest wins',   icon:'💀',  color:'#e05050'},
-  {id:'rising_stakes',name:'RISING STAKES', desc:'Bank streaks multiply points',  icon:'🔥',  color:'#e08830', minTier:1},
-  {id:'bounty_board', name:'BOUNTY BOARD',  desc:'Complete bounties for bonuses',  icon:'📜',  color:'#c0a050', minTier:2},
-  {id:'mirror_match', name:'MIRROR MATCH',  desc:'Play with the opponent\'s loadout',icon:'🪞',color:'#80a0d0', minTier:3},
-];
+/* HANDICAPS deleted (audit P1.3) — the sealed seat runs a random tell through
+   the rules engine instead. */
 /* Bounties — all hard, all big rewards. The easy/passive triggers were removed. */
 const BOUNTY_POOL=[
   {id:'use_all_dice',     desc:'Bank with all 6 dice',          reward:700, icon:'✨'},
@@ -8930,23 +8917,7 @@ function _updateBountyHUD(){
   html+='</div>';
   strip.innerHTML=html;
 }
-function _showHandicapSplash(handicap,cb){
-  var h=HANDICAPS.find(function(x){return x.id===handicap;});
-  if(!h){if(cb)cb();return;}
-  var ov=document.createElement('div');
-  ov.className='handicap-splash';
-  ov.style.setProperty('--hs-color',h.color||'#e8a030');
-  ov.innerHTML='<div class="hs-bg"></div><div class="hs-icon">'+h.icon+'</div><div class="hs-name">'+h.name+'</div><div class="hs-desc">'+h.desc+'</div>';
-  var ms=document.getElementById('screen-match');
-  ms.appendChild(ov);
-  ms.classList.add('has-splash');/* hides board content for the entire splash */
-  requestAnimationFrame(function(){ov.classList.add('hs-in');});
-  /* Bg + text fade out together at the END of the splash so nothing leaks through */
-  /* Reveal board the instant fade-out begins so the bg + board crossfade together (.5s).
-     Saves ~700ms vs. waiting for opacity to finish before revealing. */
-  setTimeout(function(){ov.classList.add('hs-bg-out');ov.classList.add('hs-out');ms.classList.remove('has-splash');},2800);
-  setTimeout(function(){ov.remove();if(cb)cb();},3300);
-}
+/* _showHandicapSplash deleted (audit P1.3). Tell/boss splashes remain. */
 
 function _showBossSplash(bossKey,bossName,cb){
   /* Crossfade music from tavern → boss the moment the splash starts. The
@@ -12878,10 +12849,7 @@ function _bossBtnDef(){
 }
 function _getTierHandicapDef(){
   /* Derive colors from the current handicap offer */
-  var h=null;
-  if(S&&S.run&&S.run.handicapOffer&&typeof HANDICAPS!=='undefined'){
-    h=HANDICAPS.find(function(hc){return hc.id===S.run.handicapOffer;});
-  }
+  var h=null;/* handicaps deleted (audit P1.3) */
   var accentHex=(h&&h.color)||'#c0a050';
   var ac=parseCol(accentHex);
   /* bevel = accent, face = darkened accent, shadow = very dark */
@@ -17320,6 +17288,12 @@ function runOppTurn(){
           dice:(G.oppDice||[]).filter(function(d){return d.kept;}).map(function(d){return {vals:[d.val],mat:d.mat||'bone',pts:0};})});
       }
       var _npcActuallyBanked=false;
+      /* Starstone parity (audit P2): an NPC rolling starstone gets the same
+         +500-per-bank the player does — late bosses carry it. */
+      if(pts>0&&Array.isArray(G.matchOppDice)){
+        var _oSS=G.matchOppDice.filter(function(m){return m==='starstone';}).length;
+        if(_oSS>0){pts+=_oSS*500;setStatusMsg('⭐ THEIR STARSTONE — +'+(_oSS*500),'red');}
+      }
       if(G._tabArmedVsOpp){
         /* THE TAB: you put the rival on the tab. Hold this bank in escrow
            instead of crediting oPts — released at the rival's NEXT turn start
@@ -17647,7 +17621,7 @@ function endMatch(win){
   var _patronGold=0;
   if(win&&!isBoss){
     var _tier=(S&&S.run&&typeof S.run.tier==='number')?S.run.tier:0;
-    _patronGold=15+_tier*10;
+    _patronGold=20+_tier*12;/* economy pass (brief §9, audit 2a) */
     if(isHandicap)_patronGold*=2;
     if(G._doubleStakes)_patronGold*=2;/* tavern: double stakes */
     if(G._highTable){/* tavern: high table — half again, double from GREEDY/BULLISH */
@@ -18244,12 +18218,7 @@ function _settleEndRoute(route){
     S.run.coins=Math.min(3,(S.run.coins||0)+1);
     route._heartAnim=(S.run.coins>_coinsBefore)?'gain':null;
     S.run._coinIncomeThisTier=0;
-    /* Detect newly-unlocked slots so the loadout can celebrate them */
-    var _wasUnlocked=[];for(var _us=0;_us<4;_us++){if(_isSlotUnlocked(_us))_wasUnlocked.push(_us);}
-    S.run.tier=Math.min(S.run.tier+1,TIERS.length);
-    var _nowUnlocked=[];for(var _ns=0;_ns<4;_ns++){if(_isSlotUnlocked(_ns))_nowUnlocked.push(_ns);}
-    var _newlyUnlocked=_nowUnlocked.filter(function(s){return _wasUnlocked.indexOf(s)<0;});
-    if(_newlyUnlocked.length){S.run._slotsToCelebrate=(S.run._slotsToCelebrate||[]).concat(_newlyUnlocked);}
+    S.run.tier=Math.min(S.run.tier+1,TIERS.length);/* slot celebrations retired with gating (audit P1.2) */
     if(S.run.tier>S.bestTier)S.bestTier=S.run.tier;
     if(S.run._bossCardPicks)delete S.run._bossCardPicks[S.run.tier-1];
     if(S.run.tier>=TIERS.length)S.totalWins++;/* beat the final boss */
@@ -20567,8 +20536,7 @@ function initMatchScreen(data){
   }
   if(!params._resumeData){
     /* Show handicap splash before match begins */
-    if(G._handicap){
-      _showHandicapSplash(G._handicap,function(){_afterPrimarySplash(false);});
+    if(false){/* handicaps deleted (audit P1.3) — sealed seat announces via the tell splash */
       /* NPC rivalry + head start still fire on delay */
       var _rivalNs=rung.key&&S.npcState&&S.npcState[rung.key]?S.npcState[rung.key]:null;
       if(_rivalNs){
@@ -22292,42 +22260,10 @@ function initTierScreen(data){
      back to loadout". The offer persists in S.run.handicapOffer with
      S.run._handicapTier as the tier-stamp; we only re-roll when the
      player has advanced tiers (new boss territory) or no offer exists. */
+  /* handicap offer machinery deleted (audit P1.3) — the sealed seat is
+     rolled at night generation and rules through the tell engine */
   var hb=document.getElementById('tierHandicap');
-  var hl=document.getElementById('handicapLabel');
-  if(typeof HANDICAPS!=='undefined'&&HANDICAPS.length){
-    /* Filter handicaps by tier requirement */
-    var _validH=HANDICAPS.filter(function(hc){
-      if(hc.minTier&&(S.run.tier||0)<hc.minTier)return false;
-      return true;
-    });
-    /* Re-use existing offer if it's still valid for the current tier and
-       still meets the tier-requirement filter. */
-    var _existing=null;
-    if(S.run.handicapOffer&&S.run._handicapTier===S.run.tier){
-      _existing=_validH.find(function(hc){return hc.id===S.run.handicapOffer;});
-    }
-    var h=_existing;
-    if(!h&&_validH.length){
-      /* Avoid same handicap twice in a row */
-      var _pickPool=_validH;
-      if(_pickPool.length>1&&S.run._lastHandicap){
-        _pickPool=_pickPool.filter(function(hc){return hc.id!==S.run._lastHandicap;});
-      }
-      h=_pickPool[Math.floor(Math.random()*_pickPool.length)];
-      S.run._lastHandicap=h.id;
-      S.run.handicapOffer=h.id;
-      S.run._handicapTier=S.run.tier;
-      save();
-    }
-    if(h){
-      if(hb){hb.style.display='';hb.style.setProperty('--hc-color',h.color||'#c0a050');}
-      if(hl)hl.innerHTML=h.icon+' '+h.name;
-      if(hb)hb.onclick=function(){launchPatronMatch(true);};
-    }else{
-      S.run.handicapOffer=null;save();
-      if(hb)hb.style.display='none';
-    }
-  }
+  if(hb)hb.style.display='none';
   /* P1 seat roster */
   _renderNightRoster();
   /* the innkeep at the bar — tap for the store (addendum: shop lives in the
@@ -23162,10 +23098,9 @@ function _renderNightRoster(){
   if(!host){host=document.createElement('div');host.id='nightRoster';tm.parentNode.insertBefore(host,tm.nextSibling);}
   var n=S.run.night;
   if(!n){host.innerHTML='';return;}
-  var reward=15+(S.run.tier||0)*10;
+  var reward=20+(S.run.tier||0)*12;
   var buy=NIGHT_BUYINS[S.run.tier]||0;
-  var offer=(S.run.handicapOffer&&S.run._handicapTier===S.run.tier&&typeof HANDICAPS!=='undefined')
-    ?HANDICAPS.find(function(h){return h.id===S.run.handicapOffer;}):null;
+  var offer=null;/* handicaps deleted (audit P1.3) */
   var open=0;n.seatsPlayed.forEach(function(b){if(!b)open++;});
   var _seen={};
   var html='';
@@ -23213,8 +23148,8 @@ function openPeek(i){
   var pat=n.roster[i];
   var buy=Math.min((S.run.gold||0),(NIGHT_BUYINS[S.run.tier]||0));
   var isHc=(i===n.handicapSeat)&&!!S.run.handicapOffer&&S.run._handicapTier===S.run.tier;
-  var offer=isHc&&typeof HANDICAPS!=='undefined'?HANDICAPS.find(function(h){return h.id===S.run.handicapOffer;}):null;
-  var reward=(15+(S.run.tier||0)*10)*(offer?2:1);
+  var offer=null;/* handicaps deleted (audit P1.3) */
+  var reward=(20+(S.run.tier||0)*12)*(offer?2:1);
   sh.innerHTML='<div class="pk-grab"></div>'
     +'<span class="pk-port-wrap"><img class="pk-port" src="Night_Art/char_patron_'+(pat.persona||'aggro')+'.png" alt="" onerror="this.style.display=\'none\'"></span>'
     +'<div class="pk-head"><span class="pk-trait">'+(_PERSONA_WORDS[pat.persona]||'PATRON')+'</span></div>'
@@ -24329,17 +24264,111 @@ document.addEventListener('DOMContentLoaded', function(){
    Skips interactive card effects by design; covers dice faces + in-scoring die
    effects (amber/jade/crystal handled inside scoreRoll via dieMats) + the
    deterministic starstone flat bank adder. */
+/* ═══ ECONOMY RUN-SIM (audit part 3.1) ═══
+   Run-level gold curve: buy-ins, rewards, boss purses (picked ~1/3 of
+   spoils), shop rotation luck, a median purchase policy. No dice rolled —
+   match outcomes use the balance sim's gear-band win rates. Outputs the
+   gear curve a median player can afford, the pity metric (runs that could
+   not BUY any family die by night 3), and shop purchases per night (relic
+   side-grade health metric, brief section 6). */
+function _runEconomySim(cfg){
+  cfg=cfg||{};
+  var RUNS=cfg.runs||2000;
+  var FAM_PRICE={amber:180,obsidian:500,silver:580,starstone:700,vagabond:700,jade:750,jade2:1800};
+  var FAMS=['amber','jade','jade2','silver','obsidian','starstone','vagabond'];
+  var PWIN=cfg.pwin||{0:0.48,1:0.55,2:0.62,3:0.68};
+  var BWIN=cfg.bwin||{0:0.30,1:0.45,2:0.55,3:0.62};
+  function gearLevel(fam){
+    var strong=fam.filter(function(m){return m==='jade'||m==='jade2'||m==='starstone';}).length;
+    if(fam.length>=4&&strong>=2)return 3;
+    if(fam.length>=2)return 2;
+    if(fam.length>=1)return 1;
+    return 0;
+  }
+  var agg={g2ByN3:0,g3ByN6:0,noBuyByN3:0,dead:0,won:0,
+    buys:[0,0,0,0,0,0,0,0],alive:[0,0,0,0,0,0,0,0],gold:[0,0,0,0,0,0,0,0]};
+  for(var r=0;r<RUNS;r++){
+    var gold=100,hearts=3,dead=false,boughtEver=false,g2Stamp=false,g3Stamp=false;
+    var fam=[['amber','silver','obsidian','starstone','vagabond'][Math.floor(Math.random()*5)]];/* starter die draft */
+    for(var night=1;night<=8&&!dead;night++){
+      var t=night-1;
+      agg.alive[t]++;agg.gold[t]+=gold;
+      var buyIn=NIGHT_BUYINS[t]||0;
+      var need=(TIERS[t]&&TIERS[t].pointsNeeded)||2;
+      var seats=need+2;
+      var g=gearLevel(fam),pw=PWIN[g];
+      /* seat cycles until the board fills; LAST ORDERS costs a heart and rerolls */
+      var filled=false,guard=0;
+      while(!filled&&!dead&&guard++<6){
+        var wins=0;
+        for(var s2=0;s2<seats;s2++){
+          if(wins>=need)break;/* board full — bounded greed skipped (median player) */
+          var paid=Math.min(gold,buyIn);gold-=paid;
+          if(Math.random()<pw){wins++;gold+=paid+20+t*12;}
+        }
+        if(wins>=need){filled=true;if(Math.random()<pw)gold+=20+t*12;/* sealed seat: double gold on its win */}
+        else{hearts--;if(hearts<=0){dead=true;}}
+      }
+      /* boss attempts until beaten or dead */
+      var bw=BWIN[gearLevel(fam)];
+      while(!dead){
+        if(Math.random()<bw){
+          hearts=Math.min(3,hearts+1);
+          gold+=(RUNGS[t]&&RUNGS[t].gold)||0;/* base boss payout */
+          if(Math.random()<1/3)gold+=500+t*60;/* purse spoil ~1/3 of choices */
+          break;
+        }
+        hearts--;if(hearts<=0)dead=true;
+      }
+      if(dead)break;
+      /* the shop between nights: rotation luck + median purchase policy */
+      var sold={},avail=0;
+      FAMS.forEach(function(m){var a=Math.random()<0.55;sold[m]=!a;if(a)avail++;});
+      if(avail<2){for(var f2=0;f2<2;f2++)sold[FAMS[Math.floor(Math.random()*FAMS.length)]]=false;}
+      if(!FAMS.some(function(m){return !sold[m]&&fam.indexOf(m)<0;})){
+        var _un=FAMS.filter(function(m){return fam.indexOf(m)<0;});
+        if(_un.length)sold[_un[Math.floor(Math.random()*_un.length)]]=false;
+      }
+      var reserve=(NIGHT_BUYINS[t+1]||0)*2;
+      for(var b=0;b<2;b++){
+        var options=FAMS.filter(function(m){return !sold[m]&&fam.indexOf(m)<0&&FAM_PRICE[m]<=gold-reserve;});
+        if(!options.length)break;
+        options.sort(function(a2,b2){return FAM_PRICE[a2]-FAM_PRICE[b2];});
+        var pick=(options.indexOf('jade')>=0&&Math.random()<0.6)?'jade':options[0];
+        gold-=FAM_PRICE[pick];fam.push(pick);boughtEver=true;agg.buys[t]++;
+      }
+      if(night===3){if(gearLevel(fam)>=2)g2Stamp=true;if(!boughtEver)agg.noBuyByN3++;}
+      if(night===6&&gearLevel(fam)>=3)g3Stamp=true;
+    }
+    if(g2Stamp)agg.g2ByN3++;
+    if(g3Stamp)agg.g3ByN6++;
+    if(dead)agg.dead++;else agg.won++;
+  }
+  var out={
+    runs:RUNS,
+    pG2byN3:Math.round(100*agg.g2ByN3/RUNS),
+    pG3byN6:Math.round(100*agg.g3ByN6/RUNS),
+    pityNoBuyByN3:Math.round(100*agg.noBuyByN3/RUNS),
+    runsWon:Math.round(100*agg.won/RUNS),
+    buysPerNight:agg.buys.map(function(b,i){return agg.alive[i]?+(b/agg.alive[i]).toFixed(2):0;}),
+    avgGoldAtNight:agg.gold.map(function(gd,i){return agg.alive[i]?Math.round(gd/agg.alive[i]):0;}),
+    aliveAtNight:agg.alive.map(function(a){return Math.round(100*a/RUNS);})
+  };
+  try{console.table([out]);}catch(e){}
+  return out;
+}
 function _runBalanceSim(cfg){
   cfg=cfg||{};
   var ITERS=cfg.iters||150;
   var TIERS_TO_RUN=cfg.tiers||[0,1,2,3,4,5,6,7];
-  var TURN_CAP=cfg.turnCap||0; /* 0 = uncapped (current live rules); 8 = brief P3 patron cap */
+  var TURN_CAP=(cfg.turnCap!=null)?cfg.turnCap:TURN_CAP_PATRON; /* defaults to LIVE rules (8 patron / 10 boss); pass 0 to A/B uncapped */
+  var BOSS_CAP=TURN_CAP?TURN_CAP_BOSS:0;
   /* Gear snapshots (brief P6): dice-only + starstone bank adder; card actives skipped. */
   var GEARS=cfg.gears||[
     {key:'G0-bone',   dice:['bone','bone','bone','bone','bone','bone'], bankAdd:0},
     {key:'G1-early',  dice:['iron','iron','flint','lead','bone','bone'], bankAdd:0},
-    {key:'G2-mid',    dice:['amber','amber','jade','iron','crystal','flint'], bankAdd:0},
-    {key:'G3-late',   dice:['jade','jade2','amber','amber','crystal','starstone'], bankAdd:500},
+    {key:'G2-mid',    dice:['amber','amber','jade','iron','silver','flint'], bankAdd:0},
+    {key:'G3-late',   dice:['jade','jade2','amber','amber','silver','starstone'], bankAdd:500},
   ];
   /* Player policies: keep-all-scorers with a bank threshold; diceStop=2 floor
      (bank when <=2 dice remain and something is banked), rational last-licks. */
@@ -24381,6 +24410,7 @@ function _runBalanceSim(cfg){
   /* One NPC turn using the real oppShouldBank. */
   function npcTurn(rung,myTotal,playerTotal,target,playerDone){
     var mats=(rung.dice&&rung.dice.length===6?rung.dice:['bone','bone','bone','bone','bone','bone']).slice();
+    var bankAdd=500*mats.filter(function(m){return m==='starstone';}).length;
     var turn=0,rolls=0;
     while(true){
       var vals=rollFaces(mats);rolls++;
@@ -24390,16 +24420,17 @@ function _runBalanceSim(cfg){
       var left=[];for(var i=0;i<mats.length;i++)if(!r.used[i])left.push(mats[i]);
       if(!left.length)mats=(rung.dice&&rung.dice.length===6?rung.dice:mats).slice();
       else mats=left;
-      if((myTotal+turn)>=target)return{banked:turn,busted:false,rolls:rolls};
-      if(playerDone&&(myTotal+turn)>playerTotal){return{banked:turn,busted:false,rolls:rolls};}
+      if((myTotal+turn+bankAdd)>=target)return{banked:turn+bankAdd,busted:false,rolls:rolls};
+      if(playerDone&&(myTotal+turn+bankAdd)>playerTotal){return{banked:turn+bankAdd,busted:false,rolls:rolls};}
       if(playerDone)continue; /* must catch up or bust */
       if(oppShouldBank(rung,turn,mats.length,myTotal,playerTotal,target))
-        return{banked:turn,busted:false,rolls:rolls};
+        return{banked:turn+bankAdd,busted:false,rolls:rolls};
     }
   }
   /* One full match. playerFirst alternates per iter. Returns stats. */
-  function playMatch(gear,policy,rung,target,playerFirst){
-    var p=0,o=0,pT=0,oT=0,pBusts=0,done=false,winner=null;
+  function playMatch(gear,policy,rung,target,playerFirst,cap){
+    cap=(cap==null)?TURN_CAP:cap;
+    var p=0,o=0,pT=0,oT=0,pBusts=0,done=false,winner=null,capEnd=false;
     var pDone=false,oDone=false; /* crossed target */
     var guard=0;
     while(!done&&guard++<200){
@@ -24422,13 +24453,13 @@ function _runBalanceSim(cfg){
       }
       if(done)break;
       if(pDone&&!oDone){/* opp gets last licks next loop */}
-      if(TURN_CAP&&pT>=TURN_CAP&&oT>=TURN_CAP&&!pDone&&!oDone){
+      if(cap&&pT>=cap&&oT>=cap&&!pDone&&!oDone){
         if(p===o){pDone=oDone=false;continue;} /* sudden death: keep playing turn pairs */
-        winner=(p>o)?'p':'o';done=true;
+        winner=(p>o)?'p':'o';done=true;capEnd=true;
       }
     }
     if(!winner)winner=(p>=o)?'p':'o';
-    return{win:winner==='p',pTurns:pT,oTurns:oT,pBusts:pBusts,pScore:p,oScore:o};
+    return{win:winner==='p',pTurns:pT,oTurns:oT,pBusts:pBusts,pScore:p,oScore:o,capEnd:capEnd};
   }
 
   var rows=[];
@@ -24436,25 +24467,26 @@ function _runBalanceSim(cfg){
     GEARS.forEach(function(gear){
       POLICIES.forEach(function(pol){
         /* vs patrons (fresh generated each match, like the real roster) */
-        var w=0,turnsArr=[],busts=0,tRolls=0;
+        var w=0,turnsArr=[],busts=0,tRolls=0,capN=0,bCapN=0;
         for(var it=0;it<ITERS;it++){
           var pat=generatePatron(ti);
-          var m=playMatch(gear,pol,pat,pat.target,it%2===0);
-          if(m.win)w++;turnsArr.push(m.pTurns);busts+=m.pBusts;
+          var m=playMatch(gear,pol,pat,pat.target,it%2===0,TURN_CAP);
+          if(m.win)w++;turnsArr.push(m.pTurns);busts+=m.pBusts;if(m.capEnd)capN++;
         }
         turnsArr.sort(function(a,b){return a-b;});
         var med=turnsArr[Math.floor(turnsArr.length/2)];
         /* vs boss */
         var boss=RUNGS[ti],bw=0,bTurnsArr=[];
         for(var it2=0;it2<ITERS;it2++){
-          var bm=playMatch(gear,pol,boss,boss.target,it2%2===0);
-          if(bm.win)bw++;bTurnsArr.push(bm.pTurns);
+          var bm=playMatch(gear,pol,boss,boss.target,it2%2===0,BOSS_CAP);
+          if(bm.win)bw++;bTurnsArr.push(bm.pTurns);if(bm.capEnd)bCapN++;
         }
         bTurnsArr.sort(function(a,b){return a-b;});
         rows.push({tier:ti,gear:gear.key,policy:pol.key,
           patronWin:Math.round(100*w/ITERS),medTurns:med,
           bustsPerMatch:+(busts/ITERS).toFixed(2),
           bossWin:Math.round(100*bw/ITERS),bossMedTurns:bTurnsArr[Math.floor(bTurnsArr.length/2)],
+          pctCapEnd:Math.round(100*capN/ITERS),bossPctCapEnd:Math.round(100*bCapN/ITERS),
           patronTarget:generatePatron(ti).target,bossTarget:boss.target});
       });
     });
