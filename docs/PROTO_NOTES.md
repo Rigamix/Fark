@@ -477,3 +477,15 @@ aggro→reckless, triples→strong, straights→orderly, combo→cunning;
 lucky.png reserved (likely the lucky-die marker). Art/ is gitignored
 (1.9GB, Denis-owned); the session worktree reaches it via an NTFS
 junction (mklink /J) so the 8084 dev server resolves Art/ paths.
+
+## P25 — starter draft dressed (Art/Assets/NewRun) (done)
+
+Three full-screen layers on a 9:16 stage: bg (innkeep at the table,
+coin-spotlight), shadow, hand (open palm). On entry the hand eases DOWN
+4.5% over 1.25s (cubic ease-out) presenting the dice; the shadow rides
+the same beat with a smaller, laterally-offset travel (1.2%,-2.6% -> 0)
+for parallax. Reduced-motion disables both. Dice stay placeholder chits
+(dark rounded boxes, family-colour base) moved up to 38% — above the
+palm, inside the bg spotlight — fading in after the hand lands. Tap →
+inspect → TAKE IT flow unchanged. Verified: all three layers load, anim
+wired, pick lands a die and the painted Room follows. Zero errors.
