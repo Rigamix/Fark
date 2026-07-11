@@ -346,6 +346,7 @@ body{
 #ptBgL{z-index:0;transition:filter .45s}
 #ptFgL{z-index:1;transform-origin:50% 92%;transition:transform .5s cubic-bezier(.4,0,.25,1),filter .45s}
 #ptStage.panel-open #ptFgL{transform:translateY(2.5%) scale(1.04)}
+@keyframes ptFgIn{from{opacity:0}to{opacity:1}}
 #ptCards{position:absolute;inset:0}
 #ptHearts,#ptGold{transition:filter .45s}
 #ptStage.panel-open #ptBgL,#ptStage.panel-open #ptFgL,
@@ -451,6 +452,11 @@ body{
   box-shadow:0 6px 16px rgba(0,0,0,.5);transition:transform .12s}
 #nrDice .nrdie:active{transform:scale(.96)}
 #nrDice .nrdie .sub{font-size:1.4cqh;opacity:.7}
+/* sheet-open: the painted world blurs and dims behind the parchment */
+#nrStage img.nr-env,#nrDice,#nrChalk,#ptCards{transition:filter .35s}
+body.gbSheetOn #nrStage img.nr-env,body.gbSheetOn #nrDice,body.gbSheetOn #nrChalk,
+body.gbSheetOn #ptStage>img.env,body.gbSheetOn #ptCards,body.gbSheetOn #ptHearts,
+body.gbSheetOn #ptGold,body.gbSheetOn #ptStage .pt-ov{filter:blur(6px) brightness(.55)}
 /* ═══ PROTO GREYBOX SKIN ═══ */
 @media (min-width:520px){
   body.phone-framed{background:#222 !important;display:flex;align-items:center;justify-content:center;min-height:100vh}
@@ -11427,10 +11433,12 @@ function _gbSheetOpen(html){
   sh.innerHTML='<div style="width:44px;height:5px;border-radius:3px;background:#999;margin:2px auto 10px"></div>'+html;
   document.getElementById('gbScrim').classList.add('on');
   sh.classList.add('on');
+  document.body.classList.add('gbSheetOn');/* painted stages blur+dim behind */
 }
 function _gbSheetClose(){
   var sh=document.getElementById('gbSheet');if(sh)sh.classList.remove('on');
   var sc=document.getElementById('gbScrim');if(sc)sc.classList.remove('on');
+  document.body.classList.remove('gbSheetOn');
 }
 function _gbModalOpen(html){
   _gbSheetInfra();
@@ -11695,6 +11703,17 @@ function _ptRoom(host,tier,bossReady){
   var pts=S.run.points||0,need=tier.pointsNeeded||0;
   var bossName=(tier.boss?tier.boss.name:'BOSS').toUpperCase();
   var pips='';for(var c=0;c<need;c++)pips+=(c<pts?'●':'○');
+  /* the boss lives in the room: idle → curious (halfway there) → ready.
+     Same layer scheme for every boss: Art/Assets/Backgrounds/MAIN/<NAME>/
+     <Name>_env_BG.png + <Name>_env_Foreground_{idle|curious|ready}.png.
+     Missing art falls back to the mockup tavern (bg3/fg3). */
+  var bossStage=bossReady?'ready':((pts>=Math.ceil(need/2)&&pts>0)?'curious':'idle');
+  var nice=bossName.charAt(0)+bossName.slice(1).toLowerCase();
+  var bossDir='Art/Assets/Backgrounds/MAIN/'+bossName+'/';
+  var envBg=bossDir+nice+'_env_BG.png';
+  var envFg=bossDir+nice+'_env_Foreground_'+bossStage+'.png';
+  var fgSwap=(window._ptBossStage&&window._ptBossStage!==bossStage&&window._ptBossKey===bossName);
+  window._ptBossStage=bossStage;window._ptBossKey=bossName;
   _ptSeats=n.roster.map(function(pat,i){
     var sealed=(i===n.handicapSeat&&n.sealTell);
     return{i:i,pat:pat,gone:!!n.seatsPlayed[i],won:n.results[i]==='won',
@@ -11721,8 +11740,10 @@ function _ptRoom(host,tier,bossReady){
     +(S.run._fkArmed?'FOR KEEPS ARMED':'for keeps')+'</div>';
   host.innerHTML=
     '<div id="ptStage">'
-    +'<img class="env" id="ptBgL" src="'+PT_A+'bg3.png" alt="">'
-    +'<img class="env" id="ptFgL" src="'+PT_A+'fg3.png" alt="">'
+    +'<img class="env" id="ptBgL" src="'+envBg+'" onerror="this.onerror=null;this.src=PT_A+\'bg3.png\'" alt="">'
+    +'<img class="env" id="ptFgL" src="'+envFg+'" '+(fgSwap?'style="animation:ptFgIn .7s ease-out both" ':'')
+    +'onerror="this.onerror=null;this.src=PT_A+\'fg3.png\'" alt="">'
+    +'<div id="ptBossTap" onclick="_gbBossPeek()" style="position:absolute;left:8%;right:8%;top:16%;height:34%;z-index:4;cursor:pointer"></div>'
     +'<div id="ptCards"></div>'
     +'<div id="ptScrim" onclick="_ptClosePanel()"></div>'
     +'<div id="ptPanel"><div id="ptPanelSheet">'
@@ -11754,6 +11775,10 @@ function _ptRoom(host,tier,bossReady){
   _ptOpen=false;
   _ptRenderCards();
   _ptStartLoop();
+  /* warm the other moods so the swap never pops */
+  ['idle','curious','ready'].forEach(function(st2){
+    if(st2!==bossStage){var im=new Image();im.src=bossDir+nice+'_env_Foreground_'+st2+'.png';}
+  });
 }
 function _ptRenderCards(){
   var hostC=document.getElementById('ptCards');if(!hostC)return;

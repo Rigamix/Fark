@@ -489,3 +489,22 @@ for parallax. Reduced-motion disables both. Dice stay placeholder chits
 palm, inside the bg spotlight — fading in after the hand lands. Tap →
 inspect → TAKE IT flow unchanged. Verified: all three layers load, anim
 wired, pick lands a die and the painted Room follows. Zero errors.
+
+## P26 — boss moods in the Room + sheet blur (done)
+
+- Sheet blur: opening any bottom sheet (die inspect, boss peek, book)
+  stamps body.gbSheetOn — the painted stage behind (NewRun layers, Room
+  env/cards/chips) blurs 6px and dims to .55 with a .35s transition, on
+  top of the scrim.
+- Boss-driven environment, generic for all bosses:
+  Art/Assets/Backgrounds/MAIN/<NAME>/<Name>_env_BG.png +
+  <Name>_env_Foreground_{idle|curious|ready}.png replace the mockup
+  bg3/fg3. Mood: ready when the board's full; curious from
+  ceil(pointsNeeded/2) circles; idle below. Foreground fades in (.7s)
+  when the mood changes; the other two moods preload so swaps never pop.
+  Missing boss art falls back to bg3/fg3 via onerror (nights 2-8 until
+  their layers land). Grog himself is a tap target (upper scene hotspot
+  → boss peek); the greybox pips bar stays until chalkboard art exists.
+Verified: idle at 0 circles, curious at 1, ready at 2 on night 1; layers
+load; tap-to-peek works; blur class engages/clears. (Pane freezes CSS
+transitions — verified by rule, not by eye; Denis to confirm visually.)
