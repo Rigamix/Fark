@@ -466,3 +466,14 @@ now lives on #ptPanelSheet — centered, art-aspect, width:min(92cqw,
 52.9cqh), drop-shadowed, all overlays (band/values/buttons) riding the
 sheet so their % positions hold. Verified: exact 9:16 sheet, margins
 ~20px sides / ~132px top+bottom at test size, SIT DOWN inside the sheet.
+
+## P24 — red trait seals from Art/Assets (done)
+
+Art/Assets/ is Denis's live export tree (traits, Frames, Panels, Hearts,
+Backgrounds, Bosses, Dice, NewRun...). Trait seals now load from
+Art/Assets/traits/*.png — the updated always-red wax set (design law 5:
+single-colour wax, symbol only). Persona map: ones→steady, hoard→greedy,
+aggro→reckless, triples→strong, straights→orderly, combo→cunning;
+lucky.png reserved (likely the lucky-die marker). Art/ is gitignored
+(1.9GB, Denis-owned); the session worktree reaches it via an NTFS
+junction (mklink /J) so the 8084 dev server resolves Art/ paths.
