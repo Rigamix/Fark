@@ -301,3 +301,42 @@ had already shipped — both REVERTED to follow the newer data:
   bosses' bespoke legacy pools are dead data in this build.
 Verified live: seats back to 4 on night 1, patron family dice uncapped
 (max 5 seen at T3), match boots TURN 1/8, zero console errors.
+
+## P15 — flow prototype connected (fark_greybox.html spec) (done)
+
+Denis's phone-frame flow prototype is now the proto's live greybox skin,
+driven by the real engine. Wireframe kit (.gbx-*) + bottom-sheet/scrim/
+modal infra added; screens rebuilt to the spec's grammar (status up top,
+primary actions in the thumb band, tap→inspect→act, no naked confirms):
+- ROOM (two states): hearts/gold strip, chalk chip → Innkeep's Book
+  sheet (schedule/rules/standing), conditional ledger+tavern chips, boss
+  door with circle pips ("N more wins") → boss-ready restage: seats
+  demote to a compact greed row, the door goes big. Patron tiles carry
+  seal (black border) and grudge marks; bnav menu/loadout/shop.
+- PEEK SHEET: portrait/trait/dice+lucky, their cards READABLE (brief §5
+  peek shows faces), target/buy-in/pot, sealed-seat rule block, For
+  Keeps banner, SIT DOWN — launches the real seat.
+- BOSS PEEK: tell (binds you only), relic on display, heart warning,
+  sleeve equip AT the decision point (famSleeveSet chips), CHALLENGE
+  gated ("WIN N MORE SEATS FIRST" when short).
+- SHOP: DICE/ENCHANTS tabs; rotation renders as empty pegs ("back
+  another night"), unaffordable dimmed-but-inspectable, owned ✓;
+  die inspect sheet with faces laid flat + BUY. Enchant flow is
+  prompt()-free: service → pick your die → face pickers (amber cast /
+  loaded) → confirm modal (permanent) → applied.
+- LOADOUT: shelf (trophies/cosmetics/lucky names) top, sleeve chips,
+  3 card slots + stash/sell + satchel, dice reorder lowest. famPanelShow
+  retired (card mgmt lives here; move/sell re-render loadout).
+- STARTER DRAFT: wireframe bar scene, tap die → inspect → TAKE IT.
+- MATCH deltas: BANK button swaps to a weighted "BANK TO WIN" when the
+  selection would cross the target (bank-to-win class + _selPts
+  preview); rule badges are tappable ⓘ (inspect sheet); armed NPC
+  targeted actives telegraph on their card chip (⚠ red, lifted).
+- DRAFT: tap → inspect sheet → CLAIM (upgrades labeled). SPOILS: tap →
+  "Take this? It's final." modal → TAKE / look again.
+Not ported (deliberate): phone frame + thumb-zone overlay (dev-tool
+chrome), race bar (existing HUD serves), title screen (painted menu
+stays). Verified live end-to-end: starter→room→peek→match→win→claim,
+boss-ready→challenge→spoils-confirm→take, shop tabs+enchant flow,
+loadout, book — zero console errors. Screenshots blocked by the known
+preview compositor freeze; DOM-verified.
