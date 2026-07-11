@@ -11685,7 +11685,8 @@ function _gbBarred(){
 }
 /* ═══ PAINTED ROOM (P22) — main-screen mockup wired to live state ═══ */
 var PT_A='assets/_mockups/new_main/';
-var PT_WHO={ones:'patron_fish',hoard:'patron_toucan',aggro:'patron_hog',triples:'patron_hog',straights:'patron_fish',combo:'patron_lizard'};
+var PT_P='Art/Assets/Frames/Patrons/';
+var PT_ART_POOL=['Krox','Eira','Nebb','Regis'];
 var PT_TRAIT={ones:'steady',hoard:'greedy',aggro:'reckless',triples:'strong',straights:'orderly',combo:'cunning'};
 var PT_TRAITDIR='Art/Assets/traits/';
 var PT_COLORS=['green','purple','blue','red'];
@@ -11714,11 +11715,25 @@ function _ptRoom(host,tier,bossReady){
   var envFg=bossDir+nice+'_env_Foreground_'+bossStage+'.png';
   var fgSwap=(window._ptBossStage&&window._ptBossStage!==bossStage&&window._ptBossKey===bossName);
   window._ptBossStage=bossStage;window._ptBossKey=bossName;
+  /* each seat wears one of the painted characters for the whole night;
+     the banner name follows the image name (Denis) */
+  (function(){
+    var used={},dirty=false;
+    n.roster.forEach(function(p2){if(p2._art)used[p2._art]=1;});
+    n.roster.forEach(function(p2){
+      if(p2._art)return;
+      var free=PT_ART_POOL.filter(function(a){return !used[a];});
+      var pool=free.length?free:PT_ART_POOL;
+      p2._art=pool[Math.floor(Math.random()*pool.length)];
+      used[p2._art]=1;dirty=true;
+    });
+    if(dirty)try{save();}catch(e){}
+  })();
   _ptSeats=n.roster.map(function(pat,i){
     var sealed=(i===n.handicapSeat&&n.sealTell);
     return{i:i,pat:pat,gone:!!n.seatsPlayed[i],won:n.results[i]==='won',
-      name:pat.gname||(_PERSONA_WORDS[pat.persona]||'patron'),
-      color:PT_COLORS[i%4],who:PT_WHO[pat.persona]||'patron_fish',
+      name:pat._art||'patron',art:pat._art||'Krox',
+      color:PT_COLORS[i%4],
       trait:PT_TRAIT[pat.persona]||'trait_steady',
       word:(_PERSONA_WORDS[pat.persona]||'PATRON'),
       price:buy,target:pat.target||0,
@@ -11793,11 +11808,11 @@ function _ptRenderCards(){
     d.style.cssText='width:'+lay.w+'%;left:'+P[0]+'%;top:'+P[1]+'%;--rot:'+P[2]+'deg;--d:'+(0.05+i*0.11)+'s';
     d.innerHTML=
       '<div class="cwrap">'
-      +'<img class="ly lbg" src="'+PT_A+'card_'+st.color+'_bg.png" alt="">'
-      +'<img class="ly lback" src="'+PT_A+'card_'+st.color+'_back.png" alt="">'
-      +'<img class="ly lwho'+((!st.gone&&st.who.indexOf('patron_')===0)?' win':'')+'" src="'+PT_A+(st.gone?'who_gonehome':st.who)+'.png" alt="">'
+      +'<img class="ly lbg" src="'+PT_P+'bg_'+st.color+'.png" alt="">'
+      +'<img class="ly lback" src="'+PT_P+'frame_bg_'+st.color+'.png" alt="">'
+      +'<img class="ly lwho" src="'+PT_P+(st.gone?'GoneHome':st.art)+'.png" alt="">'
       +'<div class="lfront">'
-        +'<img class="lffg" src="'+PT_A+'card_'+st.color+'_fg.png" alt="">'
+        +'<img class="lffg" src="'+PT_P+'frame_fg_'+st.color+'.png" alt="">'
         +'<canvas class="ctext"></canvas>'
         +(st.gone?'':'<img class="cseal" src="'+PT_TRAITDIR+st.trait+'.png" alt="" title="'+st.word+'">')
         +(st.sealed&&!st.gone?'<div class="cwax" title="SEALED — '+(st.sealTell?st.sealTell.name:'')+'">⬤</div>':'')

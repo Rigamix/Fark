@@ -508,3 +508,16 @@ wired, pick lands a die and the painted Room follows. Zero errors.
 Verified: idle at 0 circles, curious at 1, ready at 2 on night 1; layers
 load; tap-to-peek works; blur class engages/clears. (Pane freezes CSS
 transitions — verified by rule, not by eye; Denis to confirm visually.)
+
+## P27 — proper patron cards (Art/Assets/Frames/Patrons) (done)
+
+Cards rebuilt on the real layer set: bg_<color> / frame_bg_<color> /
+<Character>.png (full 443x802 canvas) / frame_fg_<color>; GoneHome.png
+for spent seats. Four characters (Krox, Eira, Nebb, Regis) are assigned
+per seat ONCE per night (stored as roster[i]._art, unique while pool
+lasts, repeats beyond 4 seats) and the banner NAME follows the image
+name. Frame colours still rotate by seat; trait seal stays persona-red.
+The old new_main who_/card_ layers and the patron_* window portraits are
+retired from the Room (the .win window path stays for any future
+window-format exports). Verified: layers load, four unique names, stable
+across re-renders.
