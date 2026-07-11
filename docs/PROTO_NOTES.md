@@ -458,3 +458,11 @@ SIT DOWN → match, zero art 404s, zero console errors. Layouts for
 - Desktop phone shell no longer downsamples to a fixed 390px: it fills
   96vh at phone aspect (e.g. 501x1085 in the test pane; bigger on a real
   monitor), so painted art renders near source resolution.
+
+## P23 — panel sheet contained (done)
+
+The character panel no longer covers/crops the stage: its art (1080x1920)
+now lives on #ptPanelSheet — centered, art-aspect, width:min(92cqw,
+52.9cqh), drop-shadowed, all overlays (band/values/buttons) riding the
+sheet so their % positions hold. Verified: exact 9:16 sheet, margins
+~20px sides / ~132px top+bottom at test size, SIT DOWN inside the sheet.
