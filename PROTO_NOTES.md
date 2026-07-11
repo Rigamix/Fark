@@ -372,3 +372,21 @@ Painted menu + gameover fully hidden (CSS, same host trick). New:
 Verified: fresh save shows no CONTINUE; one seat in → CONTINUE NIGHT 1;
 new-run confirm; starter draft chains from NEW RUN; barred + won states;
 painted children computed display:none; zero console errors.
+
+## P18 — Gambit folder housekeeping (done)
+
+Root reorganized (Denis's ask): the Gambit root now holds ONLY the newest
+game. fark_proto.html is THE game; index.html (old painted/GitHub build),
+menu/match/gauntlet protos, every index_backup_*, gambit_stable_*, old
+sims, build scripts and scratch txt files live in _old/. NEW/ (1.9GB art)
+untouched. Root checkout moved off main onto local branch `fark`
+(= claude/zen-chatterjee-f04c42); main itself untouched and unpushed.
+sw.js is now a SELF-DESTRUCT stub: any browser holding the old painted
+game's service worker wipes caches, unregisters and reloads — ends the
+stale-build gotcha for playtesters. Kept at root: fark_proto/_nights/
+_share, briefs + notes, manifest.json, card_visuals.md, art dirs,
+_mockups. Denis's uncommitted local edits preserved (char_frames.psd,
+pouch.png, Pyre09.png, .claude configs).
+NOTE for future sessions: root branch `fark` must be fast-forwarded when
+the worktree branch advances (git merge --ff-only), or work from root
+directly once this worktree retires.
