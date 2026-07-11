@@ -442,3 +442,19 @@ SIT DOWN → match, zero art 404s, zero console errors. Layouts for
   (inset:auto;left:5.5%;top:3.5%;w:89%;h:54.5%;object-fit:cover) instead
   of being contain-centered across the whole card. Gotcha: inset:auto
   must be declared BEFORE left/top — the shorthand resets them.
+
+## P22 — portrait registration v2 + de-aliasing (done)
+
+- Portraits: measured everything from pixels. All four patron_*.png share
+  one backdrop rect (15/10.7 -> 88.3/86.1% of their 460x495 canvas); the
+  frame's window hole is 6.1..93.9 x 4.5..60% of the card. The who-layer
+  now maps backdrop->window exactly (left:-11.9%;top:-3.4%;width:119.8%;
+  height:73.6%;object-fit:fill — ~3% aspect squeeze, imperceptible).
+  Art-pipeline note for Denis's future exports: keep the same canvas +
+  backdrop rect and everything self-registers.
+- Aliasing root cause: the old game's `body{image-rendering:pixelated;
+  -webkit-font-smoothing:none}` is inherited. The painted stage + every
+  dressed host now override with auto/antialiased.
+- Desktop phone shell no longer downsamples to a fixed 390px: it fills
+  96vh at phone aspect (e.g. 501x1085 in the test pane; bigger on a real
+  monitor), so painted art renders near source resolution.
