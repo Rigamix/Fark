@@ -340,6 +340,16 @@ body{
     border-radius:28px;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,.6);
     transform:translateZ(0);background:#0e0e0e}
 }
+#screen-menu{background:#4a4a4a !important}
+#screen-menu::before,#screen-menu::after{display:none !important}
+#screen-menu>*:not(#gbTitle){display:none !important}
+#gbTitle{position:absolute;inset:0;overflow:auto;color:#1c1c1c;
+  font-family:-apple-system,system-ui,'Segoe UI',Roboto,sans-serif}
+#screen-gameover{background:#4a4a4a !important}
+#screen-gameover::before,#screen-gameover::after{display:none !important}
+#screen-gameover>*:not(#gbBarred){display:none !important}
+#gbBarred{position:absolute;inset:0;overflow:auto;color:#1c1c1c;
+  font-family:-apple-system,system-ui,'Segoe UI',Roboto,sans-serif}
 #screen-shop{background:#0e0e0e !important}
 #screen-shop>*:not(#gbShop){display:none !important}
 #gbShop{position:absolute;inset:0;overflow:auto;font-family:-apple-system,system-ui,'Segoe UI',Roboto,sans-serif;color:#1c1c1c;background:#4a4a4a;padding:0}
@@ -11427,6 +11437,122 @@ function _gbBook(){
     +'feats done: '+(Object.keys(S.featsDone||{}).length)+' · trophies: '+((S.trophies||[]).length)+'</div>'
     +'<div class="gbx-btn" style="height:48px;margin-top:12px" onclick="_gbSheetClose()">back</div>';
   _gbSheetOpen(h);
+}
+/* ── TITLE (flow spec 1): logo box, CONTINUE, NEW RUN, shelf/settings ── */
+function _gbTitle(){
+  _getS();_gbSheetInfra();
+  var scr=document.getElementById('screen-menu');if(!scr)return;
+  var host=document.getElementById('gbTitle');
+  if(!host){host=document.createElement('div');host.id='gbTitle';scr.appendChild(host);}
+  var live=!!(S.run&&!S.run._died&&(S.run.tier||0)<TIERS.length&&(S.run.night||(S.run.tier||0)>0));
+  var h='<div class="gbx" style="min-height:100%;display:flex;flex-direction:column;padding:10px 14px 14px">'
+    +'<div class="gbx-box" style="margin:110px 26px 0;height:150px;font-size:34px;font-weight:800">FARK'
+    +'<span class="gbx-label" style="font-size:12px">'+(playerTitle()!=='nobody'?playerTitle():'logo / hero art')+'</span></div>'
+    +'<div style="flex:1"></div>'
+    +'<div style="display:flex;flex-direction:column;gap:8px;padding:0 26px 24px">';
+  if(live)h+='<div class="gbx-btn primary" style="height:64px" onclick="SFX.nav();showScreen(\'gauntlet\')">CONTINUE NIGHT '+((S.run.tier||0)+1)+'</div>';
+  h+='<div class="gbx-btn" style="height:52px" onclick="_gbNewRun('+(live?'true':'false')+')">NEW RUN</div>'
+    +'</div>'
+    +'<div style="display:flex;justify-content:space-between;gap:8px;padding-top:6px">'
+    +'<div class="gbx-btn" style="height:52px;min-width:110px" onclick="_gbShelf()">the shelf</div>'
+    +'<div class="gbx-btn" style="height:52px;min-width:110px" onclick="_gbSettings()">settings</div>'
+    +'</div></div>';
+  host.innerHTML=h;
+}
+function _gbNewRun(live){
+  if(live){
+    _gbModalOpen('<b>Start a new run?</b><div class="gbx-label">night '+((S.run.tier||0)+1)+' and everything on the table is lost</div>'
+      +'<div class="gbx-btn primary" style="height:48px" onclick="_gbModalClose();startNewRun();showScreen(\'gauntlet\')">NEW RUN</div>'
+      +'<div class="gbx-btn" style="height:48px" onclick="_gbModalClose()">keep drinking</div>');
+    return;
+  }
+  startNewRun();showScreen('gauntlet');
+}
+/* ── SETTINGS (flow spec 15): overlay — toggles, book, abandon ── */
+function _gbSettings(){
+  _getS();_gbSheetInfra();
+  var old=document.getElementById('gbSettings');if(old)old.remove();
+  var ov=document.createElement('div');ov.id='gbSettings';
+  ov.style.cssText='position:fixed;inset:0;background:#4a4a4a;z-index:9450;overflow:auto;color:#1c1c1c;'
+    +"font-family:-apple-system,system-ui,'Segoe UI',Roboto,sans-serif";
+  function row(label,key,isAudio){
+    var on=!S.settings||S.settings[key]!==false;
+    return '<div class="gbx-box sub" style="height:44px;justify-content:space-between;flex-direction:row;padding:0 12px;cursor:pointer" '
+      +'onclick="'+(isAudio?('toggleAudio(\''+key+'\')'):('toggleSetting(\''+key+'\')'))+';_gbSettings()">'
+      +'<span>'+label+'</span><b>'+(on?'ON':'OFF')+'</b></div>';
+  }
+  var h='<div class="gbx" style="min-height:100%;display:flex;flex-direction:column;padding:10px 14px 14px">'
+    +'<div style="font-weight:700;font-size:15px;padding:70px 0 0">Settings</div>'
+    +'<div style="flex:1"></div>'
+    +'<div style="display:flex;flex-direction:column;gap:8px;padding-bottom:8px">'
+    +row('music','music',true)
+    +row('ambience','ambience',true)
+    +row('sound effects','sfx',true)
+    +row('haptics','haptics',false)
+    +row('fast rival','fastRival',false)
+    +'<div class="gbx-box sub" style="height:44px;cursor:pointer" onclick="_gbBook()">innkeep&#39;s book</div>'
+    +'<div class="gbx-box sub" style="height:44px;cursor:pointer;border:2px solid #8a2d2d" onclick="_gbAbandon()">abandon run</div>'
+    +'</div>'
+    +'<div style="display:flex;gap:8px;padding-top:6px">'
+    +'<div class="gbx-btn" style="height:52px;flex:1" onclick="document.getElementById(\'gbSettings\').remove()">back</div>'
+    +'</div></div>';
+  ov.innerHTML=h;
+  document.body.appendChild(ov);
+}
+function _gbAbandon(){
+  _getS();
+  if(!S.run||S.run._died){famLog('NO RUN TO ABANDON');return;}
+  _gbModalOpen('<b>Abandon the run?</b><div class="gbx-label">you walk out barred — the night is lost</div>'
+    +'<div class="gbx-btn" style="height:48px;border:2px solid #8a2d2d" onclick="_gbModalClose();var el=document.getElementById(\'gbSettings\');if(el)el.remove();_getS();S.run._died=true;save();showScreen(\'gameover\')">walk out</div>'
+    +'<div class="gbx-btn primary" style="height:48px" onclick="_gbModalClose()">stay</div>');
+}
+/* ── THE SHELF (flow spec 15): trophies + keepsakes ── */
+function _gbShelf(){
+  _getS();_gbSheetInfra();
+  var old=document.getElementById('gbShelfScr');if(old)old.remove();
+  var ov=document.createElement('div');ov.id='gbShelfScr';
+  ov.style.cssText='position:fixed;inset:0;background:#4a4a4a;z-index:9450;overflow:auto;color:#1c1c1c;'
+    +"font-family:-apple-system,system-ui,'Segoe UI',Roboto,sans-serif";
+  var h='<div class="gbx" style="min-height:100%;display:flex;flex-direction:column;padding:10px 14px 14px">'
+    +'<div style="font-weight:700;font-size:15px;padding:70px 0 4px">The Shelf</div>'
+    +'<div class="gbx-label">'+playerTitle()+' · renown '+(S.renown||0)+' · feats '+(Object.keys(S.featsDone||{}).length)+'</div>'
+    +'<div style="flex:1"></div>'
+    +'<div style="display:flex;gap:10px;flex-wrap:wrap;padding-bottom:8px">';
+  (S.trophies||[]).forEach(function(t){h+='<div class="gbx-box sub" style="width:70px;height:70px">🏆<br><span class="gbx-label" style="font-size:8px">'+getDie(t).name+'</span></div>';});
+  var _shelf=[[60,'dice skin'],[160,'table mat'],[320,'your tankard'],[550,'warm greetings'],[900,'trophy stand']];
+  _shelf.forEach(function(it){var got=(S.renown||0)>=it[0];
+    h+='<div class="gbx-box sub" style="width:70px;height:70px;font-size:10px'+(got?'':';opacity:.4')+'">'+(got?'✓':'?')+'<br><span class="gbx-label" style="font-size:8px">'+it[1]+'</span></div>';});
+  h+='</div>'
+    +'<div style="display:flex;gap:8px;padding-top:6px">'
+    +'<div class="gbx-btn" style="height:52px;flex:1" onclick="document.getElementById(\'gbShelfScr\').remove()">back</div>'
+    +'</div></div>';
+  ov.innerHTML=h;
+  document.body.appendChild(ov);
+}
+/* ── BARRED / RUN WON (flow spec 13/14) ── */
+function _gbBarred(){
+  _getS();_gbSheetInfra();
+  var scr=document.getElementById('screen-gameover');if(!scr)return;
+  var host=document.getElementById('gbBarred');
+  if(!host){host=document.createElement('div');host.id='gbBarred';scr.appendChild(host);}
+  var won=!!(S.run&&(S.run.tier||0)>=TIERS.length);
+  var tier=TIERS[Math.min(S.run?S.run.tier||0:0,TIERS.length-1)];
+  var h='<div class="gbx" style="min-height:100%;display:flex;flex-direction:column;padding:10px 14px 14px">'
+    +'<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px">';
+  if(won){
+    h+='<div class="gbx-box" style="width:230px;height:64px">LAST ORDERS RUNG<br><span class="gbx-label">you own the night</span></div>'
+      +'<div class="gbx-box sub" style="width:230px;height:64px;font-size:12px">trophy → shelf · '+playerTitle()+' · renown '+(S.renown||0)+'</div>';
+  }else{
+    h+='<div class="gbx-box" style="width:230px;height:64px">BARRED<br><span class="gbx-label">'+(tier.boss?tier.boss.name:'the house')+' took your last heart — night '+((S.run?S.run.tier||0:0)+1)+'</span></div>'
+      +'<div class="gbx-box sub" style="width:230px;height:84px;font-size:12px">'+(S.run?(S.run.gold||0):0)+'g in the purse · '
+      +(Object.keys(S.featsDone||{}).length)+' feats · '+playerTitle()+'</div>';
+  }
+  h+='</div><div style="display:flex;flex-direction:column;gap:8px;padding:0 14px 10px">';
+  if(won)h+='<div class="gbx-btn primary" style="height:64px" onclick="_gbShelf()">TO THE SHELF</div>';
+  h+='<div class="gbx-btn'+(won?'':' primary')+'" style="height:'+(won?'48':'64')+'px" onclick="startNewRun();showScreen(\'gauntlet\')">NEW RUN</div>'
+    +'<div class="gbx-btn" style="height:48px" onclick="SFX.nav();showScreen(\'menu\')">title</div>'
+    +'</div></div>';
+  host.innerHTML=h;
 }
 /* ═══════════════ end family engine ═══════════════ */
 
@@ -24167,6 +24293,7 @@ var _goQuotes=[
   '"Rest up. The dice will be kinder next time."',
 ];
 function initGameOverScreen(){
+  try{_gbBarred();return;}catch(e){}
   _getS();
   /* Run-death summary: only when the run ended out of coins (S.run._died).
      The same screen is reused for the final-boss VICTORY, where _died is
@@ -24227,6 +24354,7 @@ function showGameOver(){
 /* ═══════ MENU SCREEN INIT ═══════ */
 function initMenuScreen() {
   _getS();
+  try{_gbTitle();}catch(e){}
   /* Offer RESUME/ABANDON for an unfinished match. The banner machinery
      existed but was never invoked from any screen init — saveMatchState
      snapshotted every turn while resume was silently never offered. */

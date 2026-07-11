@@ -357,3 +357,18 @@ preview compositor freeze; DOM-verified.
   the PWA service worker serving a STALE build (unregister + cache wipe
   fixed it) and/or the tool-pane input quirk. If buttons die again:
   DevTools → Application → Service Workers → unregister, or bump ?v=.
+
+## P17 — greybox title / settings / shelf / barred (flow spec 1, 13-15) (done)
+
+Painted menu + gameover fully hidden (CSS, same host trick). New:
+- TITLE: FARK logo box (shows earned title), CONTINUE NIGHT X (only when
+  a night exists or tier>0), NEW RUN (confirm modal when a run is live),
+  bnav: the shelf | settings. Hooked via initMenuScreen.
+- SETTINGS overlay: music/ambience/sfx (toggleAudio), haptics/fast rival
+  (toggleSetting), innkeep's book, abandon run (confirm modal → BARRED).
+- SHELF overlay: trophies, renown keepsakes, title/feats line.
+- BARRED/WON on screen-gameover: BARRED + who took the last heart + run
+  stats + NEW RUN/title; tier≥8 renders LAST ORDERS RUNG + TO THE SHELF.
+Verified: fresh save shows no CONTINUE; one seat in → CONTINUE NIGHT 1;
+new-run confirm; starter draft chains from NEW RUN; barred + won states;
+painted children computed display:none; zero console errors.
