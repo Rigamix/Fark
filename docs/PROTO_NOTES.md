@@ -429,3 +429,16 @@ The main-screen mockup (assets/_mockups/new_main) is now the live Room:
 Verified live: 4 cards == roster, canvas text baked, panel values real,
 SIT DOWN → match, zero art 404s, zero console errors. Layouts for
 5-6-seat nights are untested visually — check when night 4+ art lands.
+
+## P21 — font pass + portrait registration (done)
+
+- JMH Beda (the mockup's chosen body font) is now the UI font everywhere
+  in the dressed/greybox layer: title, room overlays, sheets, modals,
+  shop, loadout, settings, shelf, barred (11 font-stack swaps). The old
+  match screen keeps its own type until it gets dressed.
+- Portrait fix: who_*.png are full-card 443x802 transparent characters;
+  the four patron_*.png are 460x495 WINDOW portraits with their own
+  painted backdrop. They now render in the frame's picture window
+  (inset:auto;left:5.5%;top:3.5%;w:89%;h:54.5%;object-fit:cover) instead
+  of being contain-centered across the whole card. Gotcha: inset:auto
+  must be declared BEFORE left/top — the shorthand resets them.
