@@ -390,3 +390,18 @@ pouch.png, Pyre09.png, .claude configs).
 NOTE for future sessions: root branch `fark` must be fast-forwarded when
 the worktree branch advances (git merge --ff-only), or work from root
 directly once this worktree retires.
+
+## P19 — housekeeping 2: minimal root (done)
+
+Root is now: fark_proto.html + manifest.json + sw.js and four folders —
+NEW/ (Denis's art, untouched), assets/ (Audio, Card_ART, Characters_ART,
+Environment_ART, Fonts, Match_Art, Menu_Art, Night_Art, _mockups), docs/
+(all briefs + notes + README + card_visuals), _old/ (everything legacy,
+incl. fark_nights.html and the last share build; see _old/README.txt).
+fark_proto.html asset references rewritten to assets/<dir>/ (63 refs);
+manifest points at fark_proto.html with assets/ icons. Verified: game
+boots from the new layout, zero 404s among live requests, old paths 404.
+Denis's local edits preserved at their new homes (char_frames.psd,
+pouch.png, Pyre09.png, .claude configs). Recovery note: the root
+fast-forward aborted mid-cleanup (modified files inside moved dirs) —
+resolved by backup → reset --hard to the branch → restore; nothing lost.
