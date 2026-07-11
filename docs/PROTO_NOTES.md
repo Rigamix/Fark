@@ -405,3 +405,27 @@ Denis's local edits preserved at their new homes (char_frames.psd,
 pouch.png, Pyre09.png, .claude configs). Recovery note: the root
 fast-forward aborted mid-cleanup (modified files inside moved dirs) —
 resolved by backup → reset --hard to the branch → restore; nothing lost.
+
+## P20 — DRESSING BEGINS: painted Room (done)
+
+The main-screen mockup (assets/_mockups/new_main) is now the live Room:
+- Stage: bg3/fg3 env layers, 9:16, per-card layered parallax + wiggle,
+  entry/drop waves, the drag toy — all from the approved mockup.
+- Cards = the real roster: name (canvas-baked JMH Beda), buy-in, frame
+  colour rotates green/purple/blue/red by seat, trait seal by persona
+  (steady/greedy/reckless/strong/orderly/cunning), portraits mapped
+  persona→patron_fish/hog/lizard/toucan (placeholder until per-patron
+  art), gone-home swaps the who layer, won bakes "won" on the card.
+- Panel: panel_krox sheet (per-class art pending) with LIVE target /
+  stake / pot; band = trait · dice · lucky die · card count · sealed
+  rule · grudge · For Keeps armed. SIT DOWN launches the seat; close
+  re-enters the crowd.
+- Live top chips: hearts (heart_full/empty), gold plate. Sealed seat
+  wears a placeholder black-wax dot (art pending).
+- Temporary greybox overlays on the stage until art arrives: chalk chip
+  (→ book sheet), boss door bar with pips (→ boss peek sheet, READY
+  state), ledger/tavern chips, bottom nav (menu/loadout/shop).
+- Fan layouts for 5-6 seats added (mockup had 4 positions).
+Verified live: 4 cards == roster, canvas text baked, panel values real,
+SIT DOWN → match, zero art 404s, zero console errors. Layouts for
+5-6-seat nights are untested visually — check when night 4+ art lands.
