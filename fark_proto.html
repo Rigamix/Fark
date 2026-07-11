@@ -334,6 +334,12 @@ body{
 .cb-c.chalk-in{animation:chalkIn .55s cubic-bezier(.2,1.2,.4,1) both}
 #tierBossBtn.lit{box-shadow:0 0 18px rgba(106,184,255,.55),0 0 40px rgba(106,184,255,.25);border-radius:8px}
 /* ═══ PROTO GREYBOX SKIN ═══ */
+@media (min-width:520px){
+  body.phone-framed{background:#222 !important;display:flex;align-items:center;justify-content:center;min-height:100vh}
+  #phoneShell{position:relative;width:390px;height:844px;max-height:96vh;aspect-ratio:390/844;
+    border-radius:28px;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,.6);
+    transform:translateZ(0);background:#0e0e0e}
+}
 #screen-shop{background:#0e0e0e !important}
 #screen-shop>*:not(#gbShop){display:none !important}
 #gbShop{position:absolute;inset:0;overflow:auto;font-family:-apple-system,system-ui,'Segoe UI',Roboto,sans-serif;color:#1c1c1c;background:#4a4a4a;padding:0}
@@ -7506,6 +7512,13 @@ function _famDiceMigrate(){
   S.run._diceMigrated=true;
 }
 function _getS(){
+  if(typeof S!=='undefined'&&S){
+    S.settings=S.settings||{};
+    if(!S.settings._protoMuted){/* proto build: audio off by default (Denis) */
+      S.settings._protoMuted=true;
+      S.settings.music=false;S.settings.ambience=false;S.settings.sfx=false;
+    }
+  }
   if(typeof S!=='undefined'&&S&&S.renownPerks&&Object.keys(S.renownPerks).length){
     S.renownPerks={};/* brief §8: perk ladder deleted; slots/seats are baseline */
   }
@@ -24889,5 +24902,26 @@ document.addEventListener('pointerdown',function(e){
      created from JS in the BG_* system below. The previous static
      <audio id="bgMusic"> element has been replaced. -->
 
+<script>
+/* Desktop phone frame (flow-spec chrome): wrap the app in a 390x844 shell.
+   The shell's transform makes it the containing block for every
+   position:fixed overlay, and later body.appendChild calls are rerouted
+   into it so runtime overlays (sheets, loadout, drafts) stay framed. */
+(function(){
+  try{
+    if(!window.matchMedia||!window.matchMedia('(min-width:520px)').matches)return;
+    var shell=document.createElement('div');shell.id='phoneShell';
+    var kids=[].slice.call(document.body.childNodes);
+    kids.forEach(function(k){if(k.tagName==='SCRIPT')return;shell.appendChild(k);});
+    document.body.appendChild(shell);
+    document.body.classList.add('phone-framed');
+    var _ba=document.body.appendChild.bind(document.body);
+    document.body.appendChild=function(el){
+      if(el===shell||(el.tagName&&el.tagName==='SCRIPT'))return _ba(el);
+      return shell.appendChild(el);
+    };
+  }catch(e){}
+})();
+</script>
 </body>
 </html>

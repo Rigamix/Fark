@@ -340,3 +340,20 @@ stays). Verified live end-to-end: starter→room→peek→match→win→claim,
 boss-ready→challenge→spoils-confirm→take, shop tabs+enchant flow,
 loadout, book — zero console errors. Screenshots blocked by the known
 preview compositor freeze; DOM-verified.
+
+## P16 — phone shell + audio defaults (done)
+
+- Desktop phone frame: ≥520px viewports wrap the app in a centered
+  390x844 #phoneShell (rounded, shadowed, flow-spec chrome). The shell's
+  transform makes it the containing block for every position:fixed
+  overlay, and body.appendChild is rerouted into it, so sheets/loadout/
+  drafts stay framed. Phones (<520px) are untouched — fullscreen PWA.
+- Audio OFF by default: _getS stamps S.settings._protoMuted once, zeroing
+  music/ambience/sfx. Settings toggles still re-enable. Share build now
+  swaps all three mp3 payloads for a silent WAV stub (~5MB smaller).
+- Click audit: hit-tested every greybox control (elementFromPoint +
+  synthetic MouseEvent) at mobile AND desktop widths — nothing blocked;
+  peek opens from a real click event. The reported dead buttons trace to
+  the PWA service worker serving a STALE build (unregister + cache wipe
+  fixed it) and/or the tool-pane input quirk. If buttons die again:
+  DevTools → Application → Service Workers → unregister, or bump ?v=.
