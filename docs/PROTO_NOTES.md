@@ -521,3 +521,18 @@ The old new_main who_/card_ layers and the patron_* window portraits are
 retired from the Room (the .win window path stays for any future
 window-format exports). Verified: layers load, four unique names, stable
 across re-renders.
+
+## P28 — painted home screen (done)
+
+Homescreen folder held only homescreen.psd (no exports) — extracted via
+psd-tools: Background → bg.png (downscaled 1080x1920), LOGO → logo.png
+(native 1766x1372, placed at the PSD's own coords: left 10.1% top 15.3%
+w 81.8%). Buttons: Button_thick_red/green plates at the PSD positions
+(x 19%, w 62%, red y 60.7%, green y 73.3%), big centered JMH Beda text
+with a dark drop. Logic: fresh save → single green NEW RUN; live run →
+red NEW RUN (confirm modal) above green CONTINUE — NIGHT X. Icons:
+pouch (shelf) bottom-left, cog (settings) bottom-right, 13.5% wide,
+thick #100903 outline via 8-way drop-shadow stack. Verified: all art
+loads, fresh/live button states, icons open shelf/settings, outline on.
+NOTE: psd-tools (pip) now available for future layer extraction when
+exports are missing.
