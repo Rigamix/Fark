@@ -487,6 +487,21 @@ body.gbSheetOn #ptGold,body.gbSheetOn #ptStage .pt-ov{filter:blur(6px) brightnes
          drop-shadow(1px -1px 0 #e4b388) drop-shadow(-1px -1px 0 #e4b388)}
 #hsShelf{left:7.5%}
 #hsCog{right:7.5%}
+/* new-run confirm: played in the scene, not in a modal */
+#hsStage .env,#hsLogo{transition:filter .35s}
+#hsStage.confirming .env,#hsStage.confirming #hsLogo{filter:blur(6px) brightness(.5)}
+.hsIcon{transition:opacity .28s,transform .1s}
+#hsStage.confirming .hsIcon{opacity:0;pointer-events:none}
+#hsAsk{position:absolute;left:6%;right:6%;top:47.5%;z-index:2;text-align:center;color:#f7ecd2;
+  opacity:0;pointer-events:none;transition:opacity .32s .12s;
+  text-shadow:0 2px 0 rgba(16,9,3,.85),0 5px 14px rgba(0,0,0,.65)}
+#hsAsk b{display:block;font-size:5.2cqh;letter-spacing:.04em}
+#hsAsk span{display:block;font-size:2.5cqh;margin-top:1%;opacity:.92}
+#hsStage.confirming #hsAsk{opacity:1}
+#hsBtnBottom{transition:transform .3s cubic-bezier(.55,0,.8,.4)}
+#hsStage.confirming #hsBtnBottom{transform:translateX(-170%)}
+#hsBtnDrink{transform:translateX(170%);transition:transform .38s cubic-bezier(.2,.9,.3,1.04) .08s}
+#hsStage.confirming #hsBtnDrink{transform:translateX(0)}
 /* ═══ PROTO GREYBOX SKIN ═══ */
 @media (min-width:520px){
   body.phone-framed{background:#222 !important;display:flex;align-items:center;justify-content:center;min-height:100vh}
@@ -11607,10 +11622,14 @@ function _gbTitle(){
   var live=!!(S.run&&!S.run._died&&(S.run.tier||0)<TIERS.length&&(S.run.night||(S.run.tier||0)>0));
   var btns='';
   if(live){
-    btns+='<div class="hsBtn" id="hsBtnTop" onclick="_gbNewRun(true)">'
+    btns+='<div id="hsAsk"><b>Start a new run?</b>'
+      +'<span>night '+((S.run.tier||0)+1)+' and everything on the table is lost</span></div>';
+    btns+='<div class="hsBtn" id="hsBtnTop" onclick="_hsNewRunTap()">'
       +'<img src="'+BT+'Button_thick_red.png" alt=""><span>NEW RUN</span></div>';
-    btns+='<div class="hsBtn" id="hsBtnBottom" onclick="SFX.nav();showScreen(\'gauntlet\')">'
+    btns+='<div class="hsBtn" id="hsBtnBottom" onclick="_hsContinueTap()">'
       +'<img src="'+BT+'Button_thick_green.png" alt=""><span>CONTINUE</span></div>';
+    btns+='<div class="hsBtn" id="hsBtnDrink" style="top:73.3%" onclick="_hsKeepDrinking()">'
+      +'<img src="'+BT+'Button_thick_blue.png" alt=""><span>KEEP DRINKING</span></div>';
   }else{
     btns+='<div class="hsBtn" id="hsBtnBottom" onclick="_gbNewRun(false)">'
       +'<img src="'+BT+'Button_thick_green.png" alt=""><span>NEW RUN</span></div>';
@@ -11622,6 +11641,20 @@ function _gbTitle(){
     +'<div class="hsIcon" id="hsShelf" onclick="_gbShelf()" title="the shelf"><img src="'+IC+'pouch.png" alt="shelf"></div>'
     +'<div class="hsIcon" id="hsCog" onclick="_gbSettings()" title="settings"><img src="'+IC+'cog.png" alt="settings"></div>'
     +'</div>';
+}
+function _hsNewRunTap(){
+  var stg=document.getElementById('hsStage');if(!stg)return;
+  if(!stg.classList.contains('confirming')){SFX.nav();stg.classList.add('confirming');return;}
+  startNewRun();showScreen('gauntlet');
+}
+function _hsContinueTap(){
+  var stg=document.getElementById('hsStage');
+  if(stg&&stg.classList.contains('confirming'))return;/* it's on its way out */
+  SFX.nav();showScreen('gauntlet');
+}
+function _hsKeepDrinking(){
+  var stg=document.getElementById('hsStage');
+  if(stg)stg.classList.remove('confirming');
 }
 function _gbNewRun(live){
   if(live){

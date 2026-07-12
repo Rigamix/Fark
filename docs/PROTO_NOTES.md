@@ -536,3 +536,13 @@ thick #100903 outline via 8-way drop-shadow stack. Verified: all art
 loads, fresh/live button states, icons open shelf/settings, outline on.
 NOTE: psd-tools (pip) now available for future layer extraction when
 exports are missing.
+
+## P29 — in-scene new-run confirm on the title (done)
+
+No modal: tapping NEW RUN (red) with a live run blurs+dims the bg/logo,
+hides the bottom icons, raises "Start a new run? / night X and
+everything on the table is lost" big above the red button, slides
+CONTINUE out left (.3s) and a blue KEEP DRINKING in from the right
+(.38s, slight overshoot). Red tap #2 starts the run; KEEP DRINKING
+reverses everything. Fresh saves keep the single green NEW RUN direct
+path. _gbNewRun's modal remains for non-title callers.
