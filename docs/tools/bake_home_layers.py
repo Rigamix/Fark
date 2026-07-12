@@ -15,6 +15,6 @@ def bake(alpha_fn,blur,name):
     img.save(HS+name)
     print(name,'baked')
 # near plate: opaque from depth>=155, 15-step feather below, nothing else
-bake(lambda v:255 if v>=155 else (max(0,(v-140))*17 if v>=140 else 0),0,'hs_layer_near.png')
+bake(lambda v:255 if v>=213 else (max(0,(v-205))*32 if v>=205 else 0),0,'hs_layer_near.png')
 bake(lambda v:v,2.5,'hs_layer_dofNear.png')
 bake(lambda v:255-v,9,'hs_layer_dofFar.png')

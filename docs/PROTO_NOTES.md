@@ -589,3 +589,17 @@ zdepth.png change). Runtime canvas bake deleted; layer imgs point at
 the files with onerror hiding. hs_mask_*.png leftovers removed.
 LESSON: everything in this game must work from file:// — no runtime
 canvas pixel-reads on art, no fetch-dependent features.
+
+## P34 — parallax de-ghosted (done)
+
+Feathered semi-transparent bands blended shifted copies over the base =
+ghosting. Now: ONE hard-cutout near plate (depth>=213, 8-step edge —
+raised from 150 because the cobblestone floor's depth gradient crossed
+the old threshold and left a soft band), mid plate deleted, near travel
+halved (±0.8%w) with a slight opposite counter-shift on the base
+(±0.25%) so displacement splits across the cut. Plate audit: 1.3% semi-
+transparent px (edge feather only), 9% opaque (barrels/sign/planters).
+Remaining known artifact: a thin doubled edge at plate borders at full
+tilt — the real cure is Denis exporting separated plates with painted
+fill behind near objects (like the Grog room env layers) whenever he
+wants this dialed to perfect.
