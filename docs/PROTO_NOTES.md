@@ -546,3 +546,22 @@ CONTINUE out left (.3s) and a blue KEEP DRINKING in from the right
 (.38s, slight overshoot). Red tap #2 starts the run; KEEP DRINKING
 reverses everything. Fresh saves keep the single green NEW RUN direct
 path. _gbNewRun's modal remains for non-title callers.
+
+## P31 — zdepth home screen: parallax + depth blur (done)
+
+Denis painted Homescreen/zdepth.png (white=near). Baked four alpha-mask
+PNGs from it with PIL (hs_mask_near/mid = feathered parallax bands,
+hs_mask_depthNear/Far = raw + inverted depth for blur weighting) —
+alpha-channel masks so plain mask-image works across browsers.
+- Parallax: two bg clones masked near/mid drift on a lazy spring driven
+  by pointer (desktop) and deviceorientation (phone; iOS permission
+  requested on first tap). Near ±1.4%w, mid half; layers scale(1.05) to
+  hide edges; paused while confirming; reduced-motion disables.
+- Confirm blur is depth-weighted now: far clone blur(9px), near clone
+  blur(2.5px), base picks up blur(1.5px) — nothing in focus, falloff
+  follows the painted depth. Logo stays sharp.
+- Button swap fully sequenced (leaver clears in .28s, arriver enters
+  after .3s delay with overshoot — no overlap either direction).
+- Ask text: lower (43.5%), sub is just "everything on the table is lost".
+Masks regenerate via PIL if zdepth changes (script pattern in notes/
+session scratch). Pane rAF freeze = parallax verified by state, not eye.

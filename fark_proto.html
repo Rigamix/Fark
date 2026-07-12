@@ -487,35 +487,44 @@ body.gbSheetOn #ptGold,body.gbSheetOn #ptStage .pt-ov{filter:blur(6px) brightnes
          drop-shadow(1px -1px 0 #e4b388) drop-shadow(-1px -1px 0 #e4b388)}
 #hsShelf{left:7.5%}
 #hsCog{right:7.5%}
-/* new-run confirm: played in the scene, not in a modal.
-   Faked depth of field: the base bg just dims; two masked blurred clones
-   fade in — heavy blur up top (far), mild through the middle — so focus
-   falls off with distance instead of one flat gaussian. */
-#hsStage .env{transition:filter .35s}
-#hsStage.confirming .env{filter:brightness(.5)}
+/* new-run confirm + depth: bg is layered by the painted zdepth map.
+   Parallax: near/mid bands (alpha-masked clones) drift with pointer/gyro.
+   Confirm blur: depth-weighted clones — far heavy, near mild — NOTHING
+   stays in focus (base picks up 1.5px too). */
+#hsStage .env{transition:filter .35s;transform:scale(1.05);will-change:transform}
+#hsStage.confirming .env{filter:brightness(.5) blur(1.5px)}
+.hsPx{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none;
+  transform:scale(1.05);will-change:transform;transition:filter .35s;
+  -webkit-mask-size:cover;mask-size:cover;-webkit-mask-position:center;mask-position:center}
+#hsPxMid{-webkit-mask-image:url('Art/Assets/Homescreen/hs_mask_mid.png');
+  mask-image:url('Art/Assets/Homescreen/hs_mask_mid.png')}
+#hsPxNear{-webkit-mask-image:url('Art/Assets/Homescreen/hs_mask_near.png');
+  mask-image:url('Art/Assets/Homescreen/hs_mask_near.png')}
+#hsStage.confirming .hsPx{filter:brightness(.5) blur(1.5px)}
 .hsDof{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none;
-  opacity:0;transition:opacity .35s}
-#hsDofMid{filter:blur(3px) brightness(.5);
-  -webkit-mask-image:linear-gradient(to bottom,black 0%,black 46%,transparent 72%);
-  mask-image:linear-gradient(to bottom,black 0%,black 46%,transparent 72%)}
+  opacity:0;transition:opacity .35s;transform:scale(1.05);
+  -webkit-mask-size:cover;mask-size:cover;-webkit-mask-position:center;mask-position:center}
+#hsDofNear{filter:blur(2.5px) brightness(.5);
+  -webkit-mask-image:url('Art/Assets/Homescreen/hs_mask_depthNear.png');
+  mask-image:url('Art/Assets/Homescreen/hs_mask_depthNear.png')}
 #hsDofFar{filter:blur(9px) brightness(.5);
-  -webkit-mask-image:linear-gradient(to bottom,black 0%,black 22%,transparent 48%);
-  mask-image:linear-gradient(to bottom,black 0%,black 22%,transparent 48%)}
+  -webkit-mask-image:url('Art/Assets/Homescreen/hs_mask_depthFar.png');
+  mask-image:url('Art/Assets/Homescreen/hs_mask_depthFar.png')}
 #hsStage.confirming .hsDof{opacity:1}
 .hsIcon{transition:opacity .28s,transform .1s}
 #hsStage.confirming .hsIcon{opacity:0;pointer-events:none}
-#hsAsk{position:absolute;left:6%;right:6%;top:40%;z-index:2;text-align:center;color:#f7ecd2;
+#hsAsk{position:absolute;left:6%;right:6%;top:43.5%;z-index:2;text-align:center;color:#f7ecd2;
   opacity:0;pointer-events:none;transition:opacity .32s .12s;line-height:1.15}
 #hsAsk b{display:block;font-size:4.8cqh;letter-spacing:.04em}
 #hsAsk span{display:block;font-size:2.4cqh;margin-top:1.2%;opacity:.92}
 #hsStage.confirming #hsAsk{opacity:1}
 /* the swap: wind-up on departure, overshoot on arrival, both ways */
-#hsBtnBottom{transition:transform .34s cubic-bezier(.34,1.45,.54,1)}
+#hsBtnBottom{transition:transform .3s cubic-bezier(.34,1.45,.54,1) .3s}
 #hsStage.confirming #hsBtnBottom{transform:translateX(-170%);
-  transition:transform .32s cubic-bezier(.55,-0.35,.8,.5)}
-#hsBtnDrink{transform:translateX(170%);transition:transform .32s cubic-bezier(.55,-0.35,.8,.5)}
+  transition:transform .28s cubic-bezier(.55,-0.35,.8,.5)}
+#hsBtnDrink{transform:translateX(170%);transition:transform .28s cubic-bezier(.55,-0.35,.8,.5)}
 #hsStage.confirming #hsBtnDrink{transform:translateX(0);
-  transition:transform .34s cubic-bezier(.34,1.45,.54,1) .07s}
+  transition:transform .3s cubic-bezier(.34,1.45,.54,1) .3s}
 /* press feedback survives the id-level slide rules */
 #hsBtnTop:active,#hsBtnBottom:active,#hsBtnDrink:active{transition:transform .1s}
 #hsBtnBottom:active{transform:scale(.96)}
@@ -11641,7 +11650,7 @@ function _gbTitle(){
   var btns='';
   if(live){
     btns+='<div id="hsAsk"><b>Start a new run?</b>'
-      +'<span>night '+((S.run.tier||0)+1)+' and everything on the table is lost</span></div>';
+      +'<span>everything on the table is lost</span></div>';
     btns+='<div class="hsBtn" id="hsBtnTop" onclick="_hsNewRunTap()">'
       +'<img src="'+BT+'Button_thick_red.png" alt=""><span>NEW RUN</span></div>';
     btns+='<div class="hsBtn" id="hsBtnBottom" onclick="_hsContinueTap()">'
@@ -11654,13 +11663,55 @@ function _gbTitle(){
   }
   host.innerHTML='<div id="hsStage">'
     +'<img class="env" src="'+HS+'bg.png" alt="">'
-    +'<img class="hsDof" id="hsDofMid" src="'+HS+'bg.png" alt="">'
+    +'<img class="hsPx" id="hsPxMid" src="'+HS+'bg.png" alt="">'
+    +'<img class="hsPx" id="hsPxNear" src="'+HS+'bg.png" alt="">'
+    +'<img class="hsDof" id="hsDofNear" src="'+HS+'bg.png" alt="">'
     +'<img class="hsDof" id="hsDofFar" src="'+HS+'bg.png" alt="">'
     +'<img id="hsLogo" src="'+HS+'logo.png" alt="Fark!">'
     +btns
     +'<div class="hsIcon" id="hsShelf" onclick="_gbShelf()" title="the shelf"><img src="'+IC+'pouch.png" alt="shelf"></div>'
     +'<div class="hsIcon" id="hsCog" onclick="_gbSettings()" title="settings"><img src="'+IC+'cog.png" alt="settings"></div>'
     +'</div>';
+  _hsParallaxStart();
+}
+/* depth parallax: pointer on desktop, gyro on phone (iOS asks on first tap).
+   Near band leads, mid trails at half, everything eased by a lazy spring. */
+var _hsPx={tx:0,ty:0,x:0,y:0,on:false,gyro:false};
+function _hsParallaxStart(){
+  if(matchMedia('(prefers-reduced-motion:reduce)').matches)return;
+  if(!_hsPx.on){
+    _hsPx.on=true;
+    document.addEventListener('pointermove',function(e){
+      var stg=document.getElementById('hsStage');if(!stg)return;
+      var r=stg.getBoundingClientRect();
+      _hsPx.tx=Math.max(-1,Math.min(1,((e.clientX-r.left)/r.width-0.5)*2));
+      _hsPx.ty=Math.max(-1,Math.min(1,((e.clientY-r.top)/r.height-0.5)*2));
+    });
+    window.addEventListener('deviceorientation',function(e){
+      if(e.gamma==null)return;
+      _hsPx.gyro=true;
+      _hsPx.tx=Math.max(-1,Math.min(1,e.gamma/22));
+      _hsPx.ty=Math.max(-1,Math.min(1,(e.beta-45)/28));
+    });
+    document.addEventListener('pointerdown',function(){
+      try{
+        if(window.DeviceOrientationEvent&&DeviceOrientationEvent.requestPermission&&!_hsPx.gyro)
+          DeviceOrientationEvent.requestPermission().catch(function(){});
+      }catch(err){}
+    },{once:false});
+    (function loop(){
+      var stg=document.getElementById('hsStage');
+      if(stg&&!stg.classList.contains('confirming')){
+        _hsPx.x+=(_hsPx.tx-_hsPx.x)*0.06;
+        _hsPx.y+=(_hsPx.ty-_hsPx.y)*0.06;
+        var w=stg.offsetWidth,h=stg.offsetHeight;
+        var near=document.getElementById('hsPxNear'),mid=document.getElementById('hsPxMid');
+        if(near)near.style.transform='scale(1.05) translate3d('+(-_hsPx.x*w*0.014).toFixed(1)+'px,'+(-_hsPx.y*h*0.009).toFixed(1)+'px,0)';
+        if(mid)mid.style.transform='scale(1.05) translate3d('+(-_hsPx.x*w*0.007).toFixed(1)+'px,'+(-_hsPx.y*h*0.0045).toFixed(1)+'px,0)';
+      }
+      requestAnimationFrame(loop);
+    })();
+  }
 }
 function _hsNewRunTap(){
   var stg=document.getElementById('hsStage');if(!stg)return;
