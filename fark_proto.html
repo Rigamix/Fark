@@ -482,7 +482,9 @@ body.gbSheetOn #ptGold,body.gbSheetOn #ptStage .pt-ov{filter:blur(6px) brightnes
   text-shadow:0 2px 0 rgba(16,9,3,.85),0 4px 10px rgba(0,0,0,.55);transform:translateY(-4%)}
 #hsBtnTop{top:60.7%}
 #hsBtnBottom{top:73.3%}
-.hsIcon{position:absolute;bottom:2.2%;width:16.5%;aspect-ratio:1;cursor:pointer;transition:transform .1s}
+.hsIcon{position:absolute;bottom:2.2%;width:14.5%;aspect-ratio:1;cursor:pointer;transition:transform .1s}
+#hsBook{left:50%;transform:translateX(-50%)}
+#hsBook:active{transform:translateX(-50%) scale(.9)}
 .hsIcon:active{transform:scale(.9)}
 .hsIcon img{width:100%;height:100%;object-fit:contain}
 #hsShelf{left:7.5%}
@@ -547,9 +549,14 @@ body.gbSheetOn #ptGold,body.gbSheetOn #ptStage .pt-ov{filter:blur(6px) brightnes
   text-shadow:0 -1px 0 rgba(58,32,8,.8),0 1px 0 rgba(255,238,190,.65)}
 #setSheet .row.book:active img{transform:scale(.92)}
 #setSheet .sep{height:2px;background:rgba(74,45,18,.28);margin:0.8cqh 6%}
-#setX{position:absolute;left:37%;top:90.4%;width:26%;height:6.8%;cursor:pointer;
+#setSheet .rrow{display:flex;justify-content:space-between;align-items:baseline;
+  font-size:2.9cqh;color:#4a2d12;padding:.35cqh 0}
+#setSheet .rrow .v{white-space:nowrap;color:#b8862f;
+  text-shadow:0 -1px 0 rgba(58,32,8,.8),0 1px 0 rgba(255,238,190,.65)}
+#setSheet .rnote{text-align:center;font-size:2.3cqh;color:#4a2d12;opacity:.8;margin-top:.8cqh;line-height:1.35}
+#setX{position:absolute;left:34%;top:89.4%;width:32%;height:8.6%;cursor:pointer;
   display:flex;align-items:center;justify-content:center}
-#setX img{height:78%;filter:drop-shadow(0 2px 4px rgba(0,0,0,.45))}
+#setX img{height:96%;filter:drop-shadow(0 2px 4px rgba(0,0,0,.45))}
 #setX:active img{transform:scale(.88)}
 body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 /* ═══ PROTO GREYBOX SKIN ═══ */
@@ -11443,7 +11450,7 @@ function _gbRenderRoom(tier,bossReady){
     +'<div class="gbx-goldchip">'+(S.run.gold||0)+'g</div></div>'
     /* chalk chip → the book */
     +'<div style="display:flex;justify-content:center;margin-top:-38px;pointer-events:none">'
-    +'<div class="gbx-chalk" style="pointer-events:auto" onclick="_gbBook()">NIGHT '+((S.run.tier||0)+1)+' / 8'
+    +'<div class="gbx-chalk" style="pointer-events:auto" onclick="_gbRules()">NIGHT '+((S.run.tier||0)+1)+' / 8'
     +(playerTitle()!=='nobody'?' · '+playerTitle():'')+'<br><span class="gbx-label" style="color:#aaa">tap = innkeep&#39;s book</span></div></div>';
 
   /* ledger + tavern chips — only rendered when they exist */
@@ -11692,7 +11699,8 @@ function _gbTitle(){
     +'<img id="hsLogo" src="'+HS+'logo.png" alt="Fark!">'
     +btns
     +'<div class="hsIcon" id="hsShelf" onclick="_gbShelf()" title="the shelf"><img src="'+IC+'pouch.png" alt="shelf"></div>'
-    +'<div class="hsIcon" id="hsCog" onclick="_gbSettings()" title="settings"><img src="'+IC+'cog.png" alt="settings"></div>'
+    +'<div class="hsIcon" id="hsBook" onclick="_gbRules()" title="the rules"><img src="'+IC+'book.png" alt="rules"></div>'
+    +'<div class="hsIcon" id="hsCog" onclick="_gbSettings(\'set\')" title="settings"><img src="'+IC+'cog.png" alt="settings"></div>'
     +'</div>';
   /* the GL canvas survives re-renders: same node, same context/textures */
   (function(){
@@ -11878,8 +11886,9 @@ function _gbNewRun(live){
   startNewRun();showScreen('gauntlet');
 }
 /* ── SETTINGS (flow spec 15): overlay — toggles, book, abandon ── */
-function _gbSettings(){
+function _gbSettings(page){
   _getS();_gbSheetInfra();_audioEnforce();
+  page=page||window._gbSetPage||'set';window._gbSetPage=page;
   var re=!!document.getElementById('gbSettings');
   var old=document.getElementById('gbSettings');if(old)old.remove();
   var ov=document.createElement('div');ov.id='gbSettings';
@@ -11889,32 +11898,49 @@ function _gbSettings(){
     return '<div class="row" onclick="'+(isAudio?("toggleAudio('"+key+"')"):("toggleSetting('"+key+"')"))+';_audioEnforce();_gbSettings()">'
       +'<span>'+label+'</span><span class="st'+(on?'':' off')+'">'+(on?'on':'off')+'</span></div>';
   }
+  var body;
+  if(page==='rules'){
+    function rr(l,v){return '<div class="rrow"><span>'+l+'</span><span class="v">'+v+'</span></div>';}
+    body='<div class="ttl">Scoring</div>'
+      +rr('a single 1','100')
+      +rr('a single 5','50')
+      +rr('three of a kind','face &times;100')
+      +rr('three 1s','1,000')
+      +'<div class="rnote">every extra matching die doubles it</div>'
+      +'<div class="sep"></div>'
+      +rr('straight 1-5','500')
+      +rr('straight 2-6','750')
+      +rr('full straight 1-6','1,500')
+      +rr('three pairs','1,500')
+      +rr('two triplets','2,500')
+      +'<div class="sep"></div>'
+      +'<div class="rnote">all six dice score: HOT DICE — +250, roll them all again<br>'
+      +'nothing scores: BUST — the turn&#39;s points are lost</div>';
+  }else{
+    body='<div class="ttl">Settings</div>'
+      +row('music','music',true)
+      +row('ambience','ambience',true)
+      +row('sound effects','sfx',true)
+      +row('haptics','haptics',false)
+      +(function(){var on=!!(S.settings&&S.settings.fastRival);
+        return '<div class="row" onclick="S.settings=S.settings||{};S.settings.fastRival=!S.settings.fastRival;save();_gbSettings()">'
+          +'<span>fast rival</span><span class="st'+(on?'':' off')+'">'+(on?'on':'off')+'</span></div>';})();
+  }
   ov.innerHTML='<div id="setStage">'
     +'<div id="setSheet">'
       +'<img class="bg" src="Art/Assets/Panels/Settings/settings.png" alt="">'
-      +'<div class="rows">'
-        +'<div class="ttl">Settings</div>'
-        +row('music','music',true)
-        +row('ambience','ambience',true)
-        +row('sound effects','sfx',true)
-        +row('haptics','haptics',false)
-        +(function(){var on=!!(S.settings&&S.settings.fastRival);
-          return '<div class="row" onclick="S.settings=S.settings||{};S.settings.fastRival=!S.settings.fastRival;save();_gbSettings()">'
-            +'<span>fast rival</span><span class="st'+(on?'':' off')+'">'+(on?'on':'off')+'</span></div>';})()
-        +'<div class="sep"></div>'
-        +'<div class="row book" onclick="_gbBook()">'
-          +'<img src="Art/Assets/Icons/book.png" alt="">'
-          +'<span class="sub">the innkeep&#39;s book</span></div>'
-      +'</div>'
+      +'<div class="rows">'+body+'</div>'
       +'<div id="setX" onclick="_gbSettingsClose()"><img src="Art/Assets/Panels/close_x.png" alt="close"></div>'
     +'</div>'
     +'</div>';
   document.body.appendChild(ov);
   document.body.classList.add('gbSetOn');
-  if(re)ov.classList.add('on');/* re-render on toggle: no re-slide */
+  if(re)ov.classList.add('on');
   else setTimeout(function(){ov.classList.add('on');},30);
 }
+function _gbRules(){window._gbSetPage=null;_gbSettings('rules');}
 function _gbSettingsClose(){
+  window._gbSetPage=null;
   var ov=document.getElementById('gbSettings');if(!ov)return;
   document.body.classList.remove('gbSetOn');
   ov.classList.remove('on');ov.classList.add('out');
@@ -12085,7 +12111,7 @@ function _ptRoom(host,tier,bossReady){
     +'<div id="ptHearts">'+hearts+'</div>'
     +'<div id="ptGold"><img class="pl" src="'+PT_A+'plate_goldCounter.png" alt="">'
       +'<img class="co" src="'+PT_A+'coin.png" alt=""><div class="amt">'+(S.run.gold||0)+'g</div></div>'
-    +'<div class="pt-ov" id="ptChalk" onclick="_gbBook()">NIGHT '+((S.run.tier||0)+1)+' / 8'
+    +'<div class="pt-ov" id="ptChalk" onclick="_gbRules()">NIGHT '+((S.run.tier||0)+1)+' / 8'
       +(playerTitle()!=='nobody'?' · '+playerTitle():'')+'</div>'
     +(chips?'<div class="pt-ov" id="ptChips">'+chips+'</div>':'')
     +'<div class="pt-ov'+(bossReady?' ready':'')+'" id="ptBossBar" onclick="_gbBossPeek()">'

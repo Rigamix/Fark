@@ -620,3 +620,15 @@ cost one round). Fallback chain: no WebGL/data → DOM plates → static.
 Knobs: strength ±0.016uv, focus plane 0.30, overscan 1.04.
 Pixel-verified: renders, displaces (opposite offsets differ), glOn hides
 plates, survives re-render. bake_home_layers.py v3 regenerates the pack.
+
+## P39 — rules page + panel polish (done)
+
+Innkeep's Book screen removed. The settings sheet now serves two pages:
+_gbSettings('set') and _gbRules() (Scoring only — singles, triples with
+the doubling note, straights 500/750/1500, three pairs 1500, two
+triplets 2500, hot dice +250, bust). Book icon MOVED to the title's
+bottom middle (pouch · book · cog, all 14.5%, Room-scale); the Room's
+chalk chip also opens the rules. X on the sheet enlarged to character-
+panel scale (consistency rule from Denis: similar elements keep the
+same scale screen to screen). Abandon-run row already removed —
+title-screen NEW RUN covers it.
