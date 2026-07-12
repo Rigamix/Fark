@@ -603,3 +603,20 @@ Remaining known artifact: a thin doubled edge at plate borders at full
 tilt — the real cure is Denis exporting separated plates with painted
 fill behind near objects (like the Grog room env layers) whenever he
 wants this dialed to perfect.
+
+## P35 — WebGL depth displacement (the real 3D) (done)
+
+Plate parallax read as split/banded — replaced with a per-pixel
+displacement shader: uv += offset * (depth - 0.30), depth resampled once
+for stability; DoF is in-shader too (mix to a pre-blurred texture,
+weight 0.45+0.8*(1-depth), scaled by the confirm mix which eases 0..1)
+plus the 0.5 dim. Textures (bg 1080w jpg, blurred bg, 540w depth) ship
+as data-URIs inside Art/Assets/Homescreen/hs_home_data.js (0.53MB,
+script-loaded => file://-safe; canvas/WebGL image uploads from file://
+are tainted, data: is not). Canvas #hsGL is a PERSISTENT node
+(window._hsGLCanvas) re-attached on every title render — innerHTML
+rebuilds must never recreate it or the context+textures die (that bug
+cost one round). Fallback chain: no WebGL/data → DOM plates → static.
+Knobs: strength ±0.016uv, focus plane 0.30, overscan 1.04.
+Pixel-verified: renders, displaces (opposite offsets differ), glOn hides
+plates, survives re-render. bake_home_layers.py v3 regenerates the pack.
