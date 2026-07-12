@@ -519,6 +519,27 @@ body.gbSheetOn #ptGold,body.gbSheetOn #ptStage .pt-ov{filter:blur(6px) brightnes
 #hsBtnTop:active,#hsBtnBottom:active,#hsBtnDrink:active{transition:transform .1s}
 #hsBtnBottom:active{transform:scale(.96)}
 #hsStage.confirming #hsBtnDrink:active{transform:translateX(0) scale(.96)}
+/* ═══ SETTINGS PANEL (P40) ═══ */
+#gbSettings{position:fixed;inset:0;z-index:9450;background:rgba(6,4,2,.6);font-family:'JMH Beda',serif}
+#setStage{position:absolute;left:50%;top:0;height:100%;aspect-ratio:9/16;max-width:100%;
+  transform:translateX(-50%);container-type:size}
+#setSheet{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  height:92%;aspect-ratio:1019/1802;filter:drop-shadow(0 14px 34px rgba(0,0,0,.6))}
+#setSheet>img.bg{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+#setSheet .rows{position:absolute;left:15%;right:15%;top:15.5%;bottom:16%;
+  display:flex;flex-direction:column;justify-content:flex-start;gap:1.2cqh}
+#setSheet .ttl{text-align:center;font-size:4.6cqh;color:#4a2d12;margin-bottom:1.2cqh}
+#setSheet .row{display:flex;justify-content:space-between;align-items:center;cursor:pointer;
+  font-size:3.4cqh;color:#4a2d12;padding:0.4cqh 0}
+#setSheet .row:active{transform:scale(.98)}
+#setSheet .row .st{opacity:.95}
+#setSheet .row .st.off{opacity:.45}
+#setSheet .row.link{justify-content:center;text-decoration:underline;text-underline-offset:.4cqh}
+#setSheet .row.danger{justify-content:center;color:#8a2d2d}
+#setSheet .sep{height:2px;background:rgba(74,45,18,.28);margin:0.8cqh 6%}
+#setClose{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none}
+#setCloseTap{position:absolute;left:79%;top:86.5%;width:18%;height:11%;cursor:pointer}
+#setCloseTap:active ~ #setClose{transform:scale(.995)}
 /* ═══ PROTO GREYBOX SKIN ═══ */
 @media (min-width:520px){
   body.phone-framed{background:#222 !important;display:flex;align-items:center;justify-content:center;min-height:100vh}
@@ -11848,30 +11869,32 @@ function _gbSettings(){
   _getS();_gbSheetInfra();
   var old=document.getElementById('gbSettings');if(old)old.remove();
   var ov=document.createElement('div');ov.id='gbSettings';
-  ov.style.cssText='position:fixed;inset:0;background:#4a4a4a;z-index:9450;overflow:auto;color:#1c1c1c;'
-    +"font-family:'JMH Beda',serif";
+  ov.onclick=function(e){if(e.target===ov)ov.remove();};
   function row(label,key,isAudio){
     var on=!S.settings||S.settings[key]!==false;
-    return '<div class="gbx-box sub" style="height:44px;justify-content:space-between;flex-direction:row;padding:0 12px;cursor:pointer" '
-      +'onclick="'+(isAudio?('toggleAudio(\''+key+'\')'):('toggleSetting(\''+key+'\')'))+';_gbSettings()">'
-      +'<span>'+label+'</span><b>'+(on?'ON':'OFF')+'</b></div>';
+    return '<div class="row" onclick="'+(isAudio?("toggleAudio('"+key+"')"):("toggleSetting('"+key+"')"))+';_gbSettings()">'
+      +'<span>'+label+'</span><span class="st'+(on?'':' off')+'">'+(on?'on':'off')+'</span></div>';
   }
-  var h='<div class="gbx" style="min-height:100%;display:flex;flex-direction:column;padding:10px 14px 14px">'
-    +'<div style="font-weight:700;font-size:15px;padding:70px 0 0">Settings</div>'
-    +'<div style="flex:1"></div>'
-    +'<div style="display:flex;flex-direction:column;gap:8px;padding-bottom:8px">'
-    +row('music','music',true)
-    +row('ambience','ambience',true)
-    +row('sound effects','sfx',true)
-    +row('haptics','haptics',false)
-    +row('fast rival','fastRival',false)
-    +'<div class="gbx-box sub" style="height:44px;cursor:pointer" onclick="_gbBook()">innkeep&#39;s book</div>'
-    +'<div class="gbx-box sub" style="height:44px;cursor:pointer;border:2px solid #8a2d2d" onclick="_gbAbandon()">abandon run</div>'
+  ov.innerHTML='<div id="setStage">'
+    +'<div id="setSheet">'
+      +'<img class="bg" src="Art/Assets/Panels/Settings/settings.png" alt="">'
+      +'<div class="rows">'
+        +'<div class="ttl">Settings</div>'
+        +row('music','music',true)
+        +row('ambience','ambience',true)
+        +row('sound effects','sfx',true)
+        +row('haptics','haptics',false)
+        +(function(){var on=!!(S.settings&&S.settings.fastRival);
+          return '<div class="row" onclick="S.settings=S.settings||{};S.settings.fastRival=!S.settings.fastRival;save();_gbSettings()">'
+            +'<span>fast rival</span><span class="st'+(on?'':' off')+'">'+(on?'on':'off')+'</span></div>';})()
+        +'<div class="sep"></div>'
+        +'<div class="row link" onclick="_gbBook()">the innkeep&#39;s book</div>'
+        +'<div class="row danger" onclick="_gbAbandon()">abandon the run</div>'
+      +'</div>'
     +'</div>'
-    +'<div style="display:flex;gap:8px;padding-top:6px">'
-    +'<div class="gbx-btn" style="height:52px;flex:1" onclick="document.getElementById(\'gbSettings\').remove()">back</div>'
-    +'</div></div>';
-  ov.innerHTML=h;
+    +'<div id="setCloseTap" onclick="document.getElementById(\'gbSettings\').remove()"></div>'
+    +'<img id="setClose" src="Art/Assets/Panels/Close.png" alt="">'
+    +'</div>';
   document.body.appendChild(ov);
 }
 function _gbAbandon(){
