@@ -501,7 +501,7 @@ body.gbSheetOn #ptGold,body.gbSheetOn #ptStage .pt-ov{filter:blur(6px) brightnes
 #hsStage.confirming .hsDof{opacity:1}
 .hsIcon{transition:opacity .28s,transform .1s}
 #hsStage.confirming .hsIcon{opacity:0;pointer-events:none}
-#hsAsk{position:absolute;left:6%;right:6%;top:43.5%;z-index:2;text-align:center;color:#f7ecd2;
+#hsAsk{position:absolute;left:6%;right:6%;top:46.5%;z-index:2;text-align:center;color:#f7ecd2;
   opacity:0;pointer-events:none;transition:opacity .32s .12s;line-height:1.15}
 #hsAsk b{display:block;font-size:4.8cqh;letter-spacing:.04em}
 #hsAsk span{display:block;font-size:2.4cqh;margin-top:1.2%;opacity:.92}
@@ -11665,11 +11665,12 @@ function _gbTitle(){
    runtime canvas baking is blocked under file:// (tainted canvas). */
 /* depth parallax: pointer on desktop, gyro on phone (iOS asks on first tap).
    Near band leads, mid trails at half, everything eased by a lazy spring. */
-var _hsPx={tx:0,ty:0,x:0,y:0,on:false,gyro:false};
+var _hsPx={tx:0,ty:0,x:0,y:0,on:false,gyro:false,w:0,h:0,wDirty:true};
 function _hsParallaxStart(){
   if(matchMedia('(prefers-reduced-motion:reduce)').matches)return;
   if(!_hsPx.on){
     _hsPx.on=true;
+    window.addEventListener('resize',function(){_hsPx.wDirty=true;});
     document.addEventListener('pointermove',function(e){
       var stg=document.getElementById('hsStage');if(!stg)return;
       var r=stg.getBoundingClientRect();
@@ -11691,12 +11692,13 @@ function _hsParallaxStart(){
     (function loop(){
       var stg=document.getElementById('hsStage');
       if(stg&&!stg.classList.contains('confirming')){
-        _hsPx.x+=(_hsPx.tx-_hsPx.x)*0.06;
-        _hsPx.y+=(_hsPx.ty-_hsPx.y)*0.06;
-        var w=stg.offsetWidth,h=stg.offsetHeight;
+        _hsPx.x+=(_hsPx.tx-_hsPx.x)*0.09;
+        _hsPx.y+=(_hsPx.ty-_hsPx.y)*0.09;
+        if(!_hsPx.w||_hsPx.wDirty){_hsPx.w=stg.offsetWidth;_hsPx.h=stg.offsetHeight;_hsPx.wDirty=false;}
+        var w=_hsPx.w,h=_hsPx.h;
         var near=document.getElementById('hsPxNear'),base=document.getElementById('hsBase');
-        if(near)near.style.transform='scale(1.05) translate3d('+(-_hsPx.x*w*0.008).toFixed(1)+'px,'+(-_hsPx.y*h*0.005).toFixed(1)+'px,0)';
-        if(base)base.style.transform='scale(1.05) translate3d('+(_hsPx.x*w*0.0025).toFixed(1)+'px,'+(_hsPx.y*h*0.0016).toFixed(1)+'px,0)';
+        if(near)near.style.translate=(-_hsPx.x*w*0.008)+'px '+(-_hsPx.y*h*0.005)+'px';
+        if(base)base.style.translate=(_hsPx.x*w*0.0025)+'px '+(_hsPx.y*h*0.0016)+'px';
       }
       requestAnimationFrame(loop);
     })();
