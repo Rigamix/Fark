@@ -520,13 +520,20 @@ body.gbSheetOn #ptGold,body.gbSheetOn #ptStage .pt-ov{filter:blur(6px) brightnes
 #hsBtnBottom:active{transform:scale(.96)}
 #hsStage.confirming #hsBtnDrink:active{transform:translateX(0) scale(.96)}
 /* ═══ SETTINGS PANEL (P40) ═══ */
-#gbSettings{position:fixed;inset:0;z-index:9450;background:rgba(6,4,2,.6);font-family:'JMH Beda',serif}
+#gbSettings{position:fixed;inset:0;z-index:9450;background:rgba(6,4,2,0);
+  transition:background .3s;font-family:'JMH Beda',serif}
+#gbSettings.on{background:rgba(6,4,2,.6)}
 #setStage{position:absolute;left:50%;top:0;height:100%;aspect-ratio:9/16;max-width:100%;
   transform:translateX(-50%);container-type:size}
-#setSheet{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
-  height:92%;aspect-ratio:1019/1802;filter:drop-shadow(0 14px 34px rgba(0,0,0,.6))}
+#setSheet{position:absolute;left:50%;top:50%;transform:translate(-50%,120%);
+  transition:transform .5s cubic-bezier(.3,1,.3,1);
+  width:min(88cqw,53.5cqh);aspect-ratio:1019/1752;
+  filter:drop-shadow(0 14px 34px rgba(0,0,0,.6))}
+#gbSettings.on #setSheet{transform:translate(-50%,-50%)}
+#gbSettings.out #setSheet{transform:translate(-50%,120%);transition:transform .34s cubic-bezier(.55,0,.8,.4)}
+#gbSettings.out{background:rgba(6,4,2,0)}
 #setSheet>img.bg{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
-#setSheet .rows{position:absolute;left:15%;right:15%;top:15.5%;bottom:16%;
+#setSheet .rows{position:absolute;left:19%;right:19%;top:14.5%;bottom:18%;
   display:flex;flex-direction:column;justify-content:flex-start;gap:1.2cqh}
 #setSheet .ttl{text-align:center;font-size:4.6cqh;color:#4a2d12;margin-bottom:1.2cqh}
 #setSheet .row{display:flex;justify-content:space-between;align-items:center;cursor:pointer;
@@ -537,9 +544,11 @@ body.gbSheetOn #ptGold,body.gbSheetOn #ptStage .pt-ov{filter:blur(6px) brightnes
 #setSheet .row.link{justify-content:center;text-decoration:underline;text-underline-offset:.4cqh}
 #setSheet .row.danger{justify-content:center;color:#8a2d2d}
 #setSheet .sep{height:2px;background:rgba(74,45,18,.28);margin:0.8cqh 6%}
-#setClose{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none}
-#setCloseTap{position:absolute;left:79%;top:86.5%;width:18%;height:11%;cursor:pointer}
-#setCloseTap:active ~ #setClose{transform:scale(.995)}
+#setX{position:absolute;left:37%;top:90.6%;width:26%;height:6.4%;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  color:#efe3c4;font-size:3.6cqh;text-shadow:0 2px 3px rgba(0,0,0,.5)}
+#setX:active{transform:scale(.92)}
+body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 /* ═══ PROTO GREYBOX SKIN ═══ */
 @media (min-width:520px){
   body.phone-framed{background:#222 !important;display:flex;align-items:center;justify-content:center;min-height:100vh}
@@ -11692,6 +11701,7 @@ function _gbTitle(){
   })();
   _hsParallaxStart();
   _hsGLBoot();
+  try{_audioEnforce();}catch(e){}
 }
 /* ═══ WebGL depth displacement (P39): every pixel shifts by its own depth —
    continuous 3D, no plates, no seams. Textures arrive as data-URIs via
@@ -11866,13 +11876,14 @@ function _gbNewRun(live){
 }
 /* ── SETTINGS (flow spec 15): overlay — toggles, book, abandon ── */
 function _gbSettings(){
-  _getS();_gbSheetInfra();
+  _getS();_gbSheetInfra();_audioEnforce();
+  var re=!!document.getElementById('gbSettings');
   var old=document.getElementById('gbSettings');if(old)old.remove();
   var ov=document.createElement('div');ov.id='gbSettings';
-  ov.onclick=function(e){if(e.target===ov)ov.remove();};
+  ov.onclick=function(e){if(e.target===ov)_gbSettingsClose();};
   function row(label,key,isAudio){
     var on=!S.settings||S.settings[key]!==false;
-    return '<div class="row" onclick="'+(isAudio?("toggleAudio('"+key+"')"):("toggleSetting('"+key+"')"))+';_gbSettings()">'
+    return '<div class="row" onclick="'+(isAudio?("toggleAudio('"+key+"')"):("toggleSetting('"+key+"')"))+';_audioEnforce();_gbSettings()">'
       +'<span>'+label+'</span><span class="st'+(on?'':' off')+'">'+(on?'on':'off')+'</span></div>';
   }
   ov.innerHTML='<div id="setStage">'
@@ -11891,11 +11902,37 @@ function _gbSettings(){
         +'<div class="row link" onclick="_gbBook()">the innkeep&#39;s book</div>'
         +'<div class="row danger" onclick="_gbAbandon()">abandon the run</div>'
       +'</div>'
+      +'<div id="setX" onclick="_gbSettingsClose()">✕</div>'
     +'</div>'
-    +'<div id="setCloseTap" onclick="document.getElementById(\'gbSettings\').remove()"></div>'
-    +'<img id="setClose" src="Art/Assets/Panels/Close.png" alt="">'
     +'</div>';
   document.body.appendChild(ov);
+  document.body.classList.add('gbSetOn');
+  if(re)ov.classList.add('on');/* re-render on toggle: no re-slide */
+  else setTimeout(function(){ov.classList.add('on');},30);
+}
+function _gbSettingsClose(){
+  var ov=document.getElementById('gbSettings');if(!ov)return;
+  document.body.classList.remove('gbSetOn');
+  ov.classList.remove('on');ov.classList.add('out');
+  setTimeout(function(){ov.remove();},360);
+}
+/* OFF must mean silent — belt-and-braces over the sync paths */
+function _audioEnforce(){
+  try{
+    var mus=!S||!S.settings||S.settings.music!==false;
+    var amb=!S||!S.settings||S.settings.ambience!==false;
+    if(!mus){
+      ['BG_TAVERN','BG_BOSS'].forEach(function(n){
+        try{var L=window[n];
+          if(L&&L.audio){L.audio.muted=true;L.audio.pause();}}catch(e){}
+      });
+    }
+    if(!amb){
+      try{if(typeof BG_AMB!=='undefined'&&BG_AMB){
+        ['audioA','audioB'].forEach(function(k){var a=BG_AMB[k];if(a){a.muted=true;a.pause();}});
+      }}catch(e){}
+    }
+  }catch(e){}
 }
 function _gbAbandon(){
   _getS();
