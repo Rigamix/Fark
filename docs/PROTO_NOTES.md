@@ -565,3 +565,16 @@ alpha-channel masks so plain mask-image works across browsers.
 - Ask text: lower (43.5%), sub is just "everything on the table is lost".
 Masks regenerate via PIL if zdepth changes (script pattern in notes/
 session scratch). Pane rAF freeze = parallax verified by state, not eye.
+
+## P32 — depth layers canvas-baked (mask-image fallout) (done)
+
+Denis saw no parallax and uniform blur: CSS mask-image on the layered
+clones didn't take in his browser. Replaced with canvas baking at first
+title render (_hsBake): draw bg at 768px, inject per-pixel alpha from
+zdepth's red channel (near band (v-150)*4, mid band around v≈105, DoF
+near=v, far=255-v with ctx.filter blur 2.5/9px pre-composited), export
+four dataURL bitmaps, cache on window, feed the same layer <img>s
+(hidden until .baked). Pixel-verified: far alley alpha 0, foreground
+opaque, in the pane. hs_mask_*.png files are now unused leftovers.
+Fallback: bake failure (file://taint etc.) leaves base env + uniform
+confirm blur.

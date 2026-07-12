@@ -494,22 +494,12 @@ body.gbSheetOn #ptGold,body.gbSheetOn #ptStage .pt-ov{filter:blur(6px) brightnes
 #hsStage .env{transition:filter .35s;transform:scale(1.05);will-change:transform}
 #hsStage.confirming .env{filter:brightness(.5) blur(1.5px)}
 .hsPx{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none;
-  transform:scale(1.05);will-change:transform;transition:filter .35s;
-  -webkit-mask-size:cover;mask-size:cover;-webkit-mask-position:center;mask-position:center}
-#hsPxMid{-webkit-mask-image:url('Art/Assets/Homescreen/hs_mask_mid.png');
-  mask-image:url('Art/Assets/Homescreen/hs_mask_mid.png')}
-#hsPxNear{-webkit-mask-image:url('Art/Assets/Homescreen/hs_mask_near.png');
-  mask-image:url('Art/Assets/Homescreen/hs_mask_near.png')}
+  transform:scale(1.05);will-change:transform;transition:filter .35s;visibility:hidden}
+.hsPx.baked{visibility:visible}
 #hsStage.confirming .hsPx{filter:brightness(.5) blur(1.5px)}
 .hsDof{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none;
-  opacity:0;transition:opacity .35s;transform:scale(1.05);
-  -webkit-mask-size:cover;mask-size:cover;-webkit-mask-position:center;mask-position:center}
-#hsDofNear{filter:blur(2.5px) brightness(.5);
-  -webkit-mask-image:url('Art/Assets/Homescreen/hs_mask_depthNear.png');
-  mask-image:url('Art/Assets/Homescreen/hs_mask_depthNear.png')}
-#hsDofFar{filter:blur(9px) brightness(.5);
-  -webkit-mask-image:url('Art/Assets/Homescreen/hs_mask_depthFar.png');
-  mask-image:url('Art/Assets/Homescreen/hs_mask_depthFar.png')}
+  opacity:0;transition:opacity .35s;transform:scale(1.05);visibility:hidden;filter:brightness(.5)}
+.hsDof.baked{visibility:visible}
 #hsStage.confirming .hsDof{opacity:1}
 .hsIcon{transition:opacity .28s,transform .1s}
 #hsStage.confirming .hsIcon{opacity:0;pointer-events:none}
@@ -11672,7 +11662,53 @@ function _gbTitle(){
     +'<div class="hsIcon" id="hsShelf" onclick="_gbShelf()" title="the shelf"><img src="'+IC+'pouch.png" alt="shelf"></div>'
     +'<div class="hsIcon" id="hsCog" onclick="_gbSettings()" title="settings"><img src="'+IC+'cog.png" alt="settings"></div>'
     +'</div>';
+  _hsBake();_hsApplyBaked();
   _hsParallaxStart();
+}
+/* depth layers are BAKED in canvas (mask-image proved unreliable across
+   browsers): bg x depth-band alpha, DoF blur pre-composited. Cached once. */
+function _hsBake(){
+  if(window._hsBaked===true||window._hsBaked==='failed')return;
+  window._hsBaked=true;
+  var HS='Art/Assets/Homescreen/';
+  var bg=new Image(),dp=new Image(),n=0;
+  function apply(id,url){var el=document.getElementById(id);if(el){el.src=url;el.classList.add('baked');}}
+  function go(){
+    try{
+      var W=768,H=Math.round(768*bg.naturalHeight/bg.naturalWidth);
+      var cdp=document.createElement('canvas');cdp.width=W;cdp.height=H;
+      var xd=cdp.getContext('2d');xd.drawImage(dp,0,0,W,H);
+      var dpx=xd.getImageData(0,0,W,H).data;
+      function bake(alphaFn,blur){
+        var c=document.createElement('canvas');c.width=W;c.height=H;
+        var g=c.getContext('2d');
+        if(blur)g.filter='blur('+blur+'px)';
+        g.drawImage(bg,0,0,W,H);
+        g.filter='none';
+        var id=g.getImageData(0,0,W,H);
+        for(var i=0;i<W*H;i++)id.data[i*4+3]=alphaFn(dpx[i*4]);
+        g.putImageData(id,0,0);
+        return c.toDataURL('image/png');
+      }
+      window._hsBakedUrls={
+        near:bake(function(v){return Math.max(0,Math.min(255,(v-150)*4));},0),
+        mid:bake(function(v){return v>35?Math.max(0,Math.min(255,255-Math.abs(v-105)*4)):0;},0),
+        dofNear:bake(function(v){return v;},2.5),
+        dofFar:bake(function(v){return 255-v;},9)
+      };
+      _hsApplyBaked();
+    }catch(e){window._hsBaked='failed';}
+  }
+  bg.onload=dp.onload=function(){if(++n===2)go();};
+  bg.onerror=dp.onerror=function(){window._hsBaked='failed';};
+  bg.src=HS+'bg.png';dp.src=HS+'zdepth.png';
+}
+function _hsApplyBaked(){
+  var u=window._hsBakedUrls;if(!u)return;
+  [['hsPxNear',u.near],['hsPxMid',u.mid],['hsDofNear',u.dofNear],['hsDofFar',u.dofFar]].forEach(function(pair){
+    var el=document.getElementById(pair[0]);
+    if(el){el.src=pair[1];el.classList.add('baked');}
+  });
 }
 /* depth parallax: pointer on desktop, gyro on phone (iOS asks on first tap).
    Near band leads, mid trails at half, everything eased by a lazy spring. */
