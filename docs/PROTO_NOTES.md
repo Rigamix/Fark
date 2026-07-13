@@ -744,3 +744,15 @@ iron). Shapes are clip-path polygons, glow via drop-shadow(var(--pc))
 so it survives the clip; diamonds are elongated 1.5-2x for a shard
 feel. _nrFocus builds the 12 sparks from the spec. Banner now ends
 "a die with your ale..." (&hellip;).
+
+## P53 — pencil-grain outlines (done)
+
+Outlines thinned (cfg.ow 1.5 -> 1) and roughed up: D3.ensureFilters
+injects an inline SVG (feTurbulence fractalNoise + feDisplacementMap)
+and D3.draw appends url(#d3pencil) after tint+outline in the filter
+chain, so the whole die render — outline included — gets a ~1.8px
+hand-drawn wobble matching the painted art's pencil edges. Small
+chips (<34px) use url(#d3pencilSm), scale 1, higher frequency, so
+they don't smear. Inline SVG = file://-safe. Tune: baseFrequency
+(grain size) and feDisplacementMap scale (wobble strength);
+window.D3_PENCIL=false kills it if perf suffers on phone.

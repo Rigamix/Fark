@@ -12442,7 +12442,7 @@ function _ptClosePanel(){
    per-material colour filters as placeholders until real textures land. ═══ */
 var D3={
   list:[],running:false,
-  cfg:{tmin:2,tmax:4,dur:650,tilt:14,rot:75,jx:7,jy:19,ow:1.5,hgt:28},
+  cfg:{tmin:2,tmax:4,dur:650,tilt:14,rot:75,jx:7,jy:19,ow:1,hgt:28},
   PLACE:[
     {rx:0,ry:0,n:[0,0,1],img:0},
     {rx:0,ry:180,n:[0,0,-1],img:5},
@@ -12474,8 +12474,23 @@ var D3={
     vagabond:{c:'#ff6f60',shape:'diamond'},iron:{c:'#c3ccd6',shape:'diamond'},
     flint:{c:'#d8b98a',shape:'dot'},lead:{c:'#a9a9bb',shape:'dot'}}
 };
+D3.ensureFilters=function(){
+  if(document.getElementById('d3PencilSvg'))return;
+  var div=document.createElement('div');
+  div.innerHTML='<svg id="d3PencilSvg" width="0" height="0" style="position:absolute" aria-hidden="true">'
+    +'<filter id="d3pencil" x="-12%" y="-12%" width="124%" height="124%">'
+    +'<feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="7"/>'
+    +'<feDisplacementMap in="SourceGraphic" scale="1.8" xChannelSelector="R" yChannelSelector="G"/>'
+    +'</filter>'
+    +'<filter id="d3pencilSm" x="-12%" y="-12%" width="124%" height="124%">'
+    +'<feTurbulence type="fractalNoise" baseFrequency="1.1" numOctaves="2" seed="7"/>'
+    +'<feDisplacementMap in="SourceGraphic" scale="1" xChannelSelector="R" yChannelSelector="G"/>'
+    +'</filter></svg>';
+  document.body.appendChild(div.firstChild);
+};
 D3.make=function(host,opts){
   opts=opts||{};
+  D3.ensureFilters();
   var size=opts.size||42;
   var slot=document.createElement('div');
   slot.className='d3slot';
@@ -12524,7 +12539,8 @@ D3.draw=function(d){
   d.die.style.transform='translate('+x+'px,'+(d.y-h*0.55*s)+'px) scale('+(1+h*0.004)+')';
   var ow=D3.cfg.ow,oc=D3.OUT[d.matKey]||'#241407';
   var outline=ow?'drop-shadow('+ow+'px 0 0 '+oc+') drop-shadow(-'+ow+'px 0 0 '+oc+') drop-shadow(0 '+ow+'px 0 '+oc+') drop-shadow(0 -'+ow+'px 0 '+oc+')':'';
-  d.die.style.filter=((d.tint?d.tint+' ':'')+outline).trim();
+  var pen=(window.D3_PENCIL!==false)?' url(#'+(d.size>=34?'d3pencil':'d3pencilSm')+')':'';
+  d.die.style.filter=((d.tint?d.tint+' ':'')+outline+pen).trim();
   d.faces.forEach(function(f){
     var n=D3.rotv(f.n,d.pitch,d.yaw,d.spin);
     if(n[2]<=0.01){f.el.style.display='none';return;}
