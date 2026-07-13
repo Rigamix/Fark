@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="manifest.json">
@@ -113,10 +113,12 @@ body{
   -webkit-font-smoothing:none;
 }
 @supports (height:100dvh){body{height:100dvh}}
-/* standalone iOS: the layout viewport is short by the status bar; body is
-   stretched over the deficit (JS) and this transform makes it the
-   containing block for EVERY position:fixed overlay, so they all follow */
-html.fkSA body{transform:translateZ(0)}
+/* standalone iOS clips its render surface ~47px short at the bottom
+   (WebKit bug with black-translucent + cover). The game stays inside the
+   real viewport; the vignettes below fade the bottom edge to near-black
+   so the system band blends instead of reading as a crop. */
+html.fkSA #hsStage::after{background:linear-gradient(to top,#060402 0%,#060402 6%,rgba(6,4,2,.85) 34%,rgba(6,4,2,0) 100%)}
+html.fkSA #ptStage::after{background:linear-gradient(to top,#060402 0%,#060402 6%,rgba(6,4,2,.85) 34%,rgba(6,4,2,0) 100%) !important}
 html.fkSA #gbSheet,html.fkSA #peekSheet{padding-bottom:env(safe-area-inset-bottom)}
 
 /* ─── TOP BAR ─── */
@@ -12666,19 +12668,7 @@ D3.start=function(){
 /* iOS standalone sizes the layout viewport screen-minus-status-bar but
    anchors it at the top of the screen — the missing rows show as a dead
    band at the bottom. Measure the deficit and stretch the body over it. */
-if(navigator.standalone===true){
-  (function(){
-    document.documentElement.classList.add('fkSA');
-    var fit=function(){
-      var d=screen.height-window.innerHeight;
-      if(d>0&&d<=70)document.body.style.height=(window.innerHeight+d)+'px';
-      else document.body.style.height='';
-    };
-    window.addEventListener('resize',fit);
-    window.addEventListener('orientationchange',function(){setTimeout(fit,60);});
-    if(document.body)fit();else document.addEventListener('DOMContentLoaded',fit);
-  })();
-}
+if(navigator.standalone===true)document.documentElement.classList.add('fkSA');
 /* on-screen metrics for remote phone debugging: open ...?hsdebug —
    or tap the title logo 5x fast (works in the installed app, where the
    query string and Safari's localStorage don't carry over) */
