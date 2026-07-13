@@ -682,3 +682,24 @@ the placeholder tint (D3.TINT) until real textures land.
 Verified live: shop 8/8, loadout 6/6, inspect 1/1, enchant 6/6,
 peek 6/6 chips initialized; visible faces=3, per-face lighting and
 tilt+spin transform chain correct; no console errors.
+
+## P49 — starter offer rework (done)
+
+Entrance: dice are born small in the palm (scale .30, +58% down) and
+float up to full size over 1.5s, staggered 200ms — no tumble; D3.roll
+grew gentle knobs (turns:0 exact tumble count, spinMax caps table spin,
+flat kills the height parabola) so each die just settles onto its face
+from a random orientation while rising. Hover untouched (Denis: hover
+is fine, the initial spin was too strong). Row lowered 34% -> 41.5%,
+name labels pulled tight under the dice (38% -> 10% margin), banner
+bigger (1.9 -> 2.6cqh) and lower (2.6% -> 5.4%), wraps on two lines.
+
+Tap-to-focus replaces the parchment sheet: the die flies to screen
+center-top (translate+scale 2.05, back-out bezier) over a radial scrim;
+env layers blur+dim, the other two dice ghost to 8%; pulsing gold glow
++ 12 rising spark particles (pure CSS, file://-safe); read-out beneath
+in big white JMH Beda — name 5cqh, faces row gold 3.6cqh, desc 2.9cqh
+with digits accented gold; painted green TAKE IT button (home-screen
+plate); tap the scrim to put it back. The FIRST NIGHT banner stays
+sharp and above the scrim during focus (z6, no filter). Taps are
+ignored until a die's float-in completes (_floatDone).
