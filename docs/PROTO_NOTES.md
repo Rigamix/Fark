@@ -898,3 +898,17 @@ callouts sit below on the parchment in seal-red. Values row
 Denis's check_on/check_off icons (Icons/, 64x34) replace the on/off
 text in the settings rows (incl. fast rival). 3.4cqh tall, off state
 slightly dimmed, same tap-bounce on just the toggle.
+
+## P62 — panel v3: mock name layout + reference iso dice (done)
+
+Engine grew per-die camera params: d.tilt (overrides cfg.tilt) and
+d.turn (rotateY between tilt and spin; rotv matches). Iso still chips
+(.d3chip[data-iso]) pose every die identically — tilt -42 / turn -40 /
+spin 0, value face on TOP (pitch=FACE_ROT+90; verified empirically,
+the engine camera convention is inverted vs intuition) — with a tight
+1px-blur shadow ellipse under each, die at 96% of chip. Panel: name
+in the cream column right of the portrait (title small 3.3cqh over
+name 4.8cqh, right-aligned, dark ink per mock), wax seal beneath with
+the trait word in seal red #631c2a under it, dice span the full
+purple band (15.6% chips), lucky/cards line + red callouts below the
+band. ptvInfo removed.
