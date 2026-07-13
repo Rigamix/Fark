@@ -412,18 +412,21 @@ html.fkSA #gbSheet,html.fkSA #peekSheet{padding-bottom:env(safe-area-inset-botto
 #ptvPot{bottom:19.5%}
 #ptvName{position:absolute;left:56%;right:11.5%;top:8%;text-align:right;z-index:2;
   font-family:'JMH Beda',serif;color:#26170a;line-height:1.08}
-#ptvName .t1{display:block;font-size:3.3cqh}
-#ptvName .t2{display:block;font-size:4.8cqh;letter-spacing:.02em}
-#ptvSeal{position:absolute;right:16.5%;top:21.5%;width:17%;z-index:2;transform:rotate(-9deg);
+#ptvName .t1{display:block;font-size:4cqh}
+#ptvName .t2{display:block;font-size:6.2cqh;letter-spacing:.02em}
+#ptvSeal{position:absolute;right:19%;top:22.5%;width:13.5%;z-index:2;transform:rotate(-9deg);
   filter:drop-shadow(0 4px 8px rgba(0,0,0,.4))}
-#ptvTrait{position:absolute;left:57%;right:9%;top:33.8%;z-index:2;text-align:center;
-  font-family:'JMH Beda',serif;font-size:2.7cqh;color:#631c2a;letter-spacing:.04em}
-#ptvDice{position:absolute;left:10.5%;right:10.6%;top:43.6%;height:10%;z-index:2;
-  display:flex;align-items:center;justify-content:center;gap:1%}
-#ptvDice .d3chip{width:15.6%;aspect-ratio:1}
-#ptvXtra{position:absolute;left:11%;right:11%;top:55.1%;z-index:2;text-align:center;
-  font-family:var(--bodyFont);font-size:1.8cqh;line-height:1.25;color:#4a2d12}
-#ptvXtra .w{color:#a03426}
+#ptvTrait{position:absolute;left:57%;right:9%;top:30.6%;z-index:2;text-align:center;
+  font-family:'JMH Beda',serif;font-size:3.2cqh;color:#631c2a;letter-spacing:.04em}
+#ptvDice{position:absolute;left:10.5%;right:10.6%;top:43.4%;height:8.2%;z-index:2;
+  display:flex;align-items:flex-start;justify-content:center;gap:.4%}
+#ptvDice .d3chip{width:15.9%;aspect-ratio:1}
+#ptvXtra{position:absolute;left:12%;right:12%;top:51.6%;height:2.6%;z-index:2;text-align:center;
+  font-family:var(--bodyFont);font-size:1.9cqh;line-height:1.3;color:#efe2c8;
+  text-shadow:0 1px 2px rgba(0,0,0,.5);white-space:nowrap;overflow:hidden}
+#ptvXtra .w{color:#f3dfa6}
+#ptvLuck{position:absolute;left:11%;right:11%;top:55.3%;z-index:2;text-align:center;
+  font-family:var(--bodyFont);font-size:1.8cqh;color:#4a2d12}
 #ptPanel .pbtn{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;
   pointer-events:none;transition:transform .1s}
 #ptSitLayer{transform-origin:49.7% 88%}
@@ -12321,6 +12324,7 @@ function _ptRoom(host,tier,bossReady){
       +'<div id="ptvDice"></div>'
       +'<div id="ptvTrait"></div>'
       +'<div id="ptvXtra"></div>'
+      +'<div id="ptvLuck"></div>'
       +'<span class="pv" id="ptvTarget"></span>'
       +'<span class="pv" id="ptvStake"></span>'
       +'<span class="pv" id="ptvPot"></span>'
@@ -12491,15 +12495,16 @@ function _ptOpenPanel(st){
     dice+='<span class="d3chip" data-mat="'+m+'" data-iso="1"></span>';
   });
   document.getElementById('ptvDice').innerHTML=dice;
-  var xtra='';
-  var info='';
-  if(st.lucky)info+='⭐ '+st.lucky;
-  if(st.cards)info+=(info?' · ':'')+st.cards+' card'+(st.cards>1?'s':'');
-  if(info)xtra+='<div>'+info+'</div>';
-  if(st.sealed&&st.sealTell)xtra+='<div class="w">SEALED: '+st.sealTell.name+' — '+st.sealTell.desc+'</div>';
-  if(st.grudge)xtra+='<div class="w">they remember you</div>';
-  if(S.run&&S.run._fkArmed)xtra+='<div class="w">FOR KEEPS — this match is for dice</div>';
-  document.getElementById('ptvXtra').innerHTML=xtra;
+  var band=[];
+  if(st.sealed&&st.sealTell)band.push('<span class="w">SEALED — '+st.sealTell.name+'</span>');
+  if(st.grudge)band.push('<span class="w">they remember you</span>');
+  if(S.run&&S.run._fkArmed)band.push('<span class="w">FOR KEEPS</span>');
+  document.getElementById('ptvXtra').innerHTML=band.join(' · ');
+  var luck='';
+  if(st.lucky)luck+='⭐ '+st.lucky;
+  if(st.cards)luck+=(luck?' · ':'')+st.cards+' card'+(st.cards>1?'s':'');
+  if(st.sealed&&st.sealTell)luck+=(luck?' — ':'')+st.sealTell.desc;
+  document.getElementById('ptvLuck').textContent=luck;
   if(typeof _d3ChipScan==='function')_d3ChipScan(sheet);
   document.getElementById('ptvTarget').textContent=st.target.toLocaleString();
   document.getElementById('ptvStake').textContent=st.price+'g';
@@ -13415,7 +13420,7 @@ function _d3InitHost(div,tries){
     return;
   }
   var still=!!div._d3Still,iso=!!div._d3Iso;
-  var sz=Math.round(div.clientWidth*(iso?0.96:0.88));
+  var sz=Math.round(div.clientWidth*(iso?0.66:0.88));
   var d=D3.make(div,{size:sz,mat:div._trueMat,face:div._trueVal,group:still?null:'match'});
   d.slot.style.position='absolute';
   d.slot.style.left='50%';d.slot.style.top='50%';
@@ -13429,10 +13434,10 @@ function _d3InitHost(div,tries){
       var fr=D3.FACE_ROT[div._trueVal]||[0,0];
       d.pitch=fr[0]+90;d.yaw=fr[1];
       d.shadow.style.filter='blur(1px)';
-      d.shadow.style.background='rgba(12,7,4,.55)';
-      d.shadow.style.width=Math.round(sz*0.92)+'px';
-      d.shadow.style.height=Math.round(sz*0.26)+'px';
-      d.shadow.style.margin=Math.round(sz*0.05)+'px 0 0 '+Math.round(-sz*0.46)+'px';
+      d.shadow.style.background='rgba(12,7,4,.5)';
+      d.shadow.style.width=Math.round(sz*1.3)+'px';
+      d.shadow.style.height=Math.round(sz*0.3)+'px';
+      d.shadow.style.margin=Math.round(sz*0.28)+'px 0 0 '+Math.round(-sz*0.65)+'px';
     }else{
       d.shadow.style.display='none';
       d.spin=(((div._trueVal*47)+(div._trueMat||'bone').length*31)%15)-7;

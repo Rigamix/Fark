@@ -912,3 +912,16 @@ name 4.8cqh, right-aligned, dark ink per mock), wax seal beneath with
 the trait word in seal red #631c2a under it, dice span the full
 purple band (15.6% chips), lucky/cards line + red callouts below the
 band. ptvInfo removed.
+
+## P63 — panel corrections (done)
+
+The iso cube projects ~1.45x its face size — that's why the dice
+overflowed the band and buried their own shadows. Iso chips now use
+face=66% of chip; the shadow is 1.3x the face wide and sits below the
+projected bottom. Verified: each die 11.5% of sheet width, fully
+inside the band, row fills 95% of it, shadows visible, values on top.
+Name up (title 4cqh, name 6.2cqh), seal down (13.5%), trait word up
+(3.2cqh) hugging the seal. Sealed/grudge/FOR-KEEPS moved into the
+band's foot as short cream/parchment tags (they were overlapping the
+Target row); the tell's rule text joins the lucky/cards line below
+the band.
