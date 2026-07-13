@@ -783,3 +783,14 @@ chain that contains an SVG url() reference, killing tints+outlines —
 the pencil grain now skips Safari (UA guard, D3._noUrlFilter); tint
 and outline drop-shadows stay. Home-screen gyro parallax on iOS
 already requests motion permission on first tap.
+
+## P55 — under-the-notch + ambient depth (done)
+
+viewport-fit=cover added (standalone iOS was letterboxing below the
+status bar). Art now bleeds under the notch; HUD steps clear via
+safe-area rules: ptHearts/ptGold/nrChalk top:max(orig, inset-top),
+.hsIcon bottom:max(2.2%, inset-bottom), .gbx overlays pad top/bottom
+with the insets (!important beats their inline padding). Home depth:
+when no gyro/pointer input for 2.5s the parallax targets follow a slow
+sine sway (0.33/0.27 rad/s, amp .45/.35) so the 3D effect is visible
+on phones even if motion permission is denied or never granted.

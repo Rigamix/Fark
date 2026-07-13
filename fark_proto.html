@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="manifest.json">
@@ -622,6 +622,13 @@ body.gbSheetOn #ptGold,body.gbSheetOn #ptStage .pt-ov{filter:blur(6px) brightnes
 #setX img{height:96%;filter:drop-shadow(0 2px 4px rgba(0,0,0,.45))}
 #setX:active img{transform:scale(.88)}
 body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
+/* ═══ iOS safe areas — art bleeds under the notch, HUD steps clear ═══ */
+#ptHearts{top:max(1.8%,env(safe-area-inset-top))}
+#ptGold{top:max(1.8%,env(safe-area-inset-top))}
+#nrChalk{top:max(7.2%,env(safe-area-inset-top))}
+.hsIcon{bottom:max(2.2%,env(safe-area-inset-bottom))}
+.gbx{padding-top:max(12px,env(safe-area-inset-top)) !important;
+  padding-bottom:max(14px,env(safe-area-inset-bottom)) !important}
 /* ═══ D3 DICE (dice_playground21 port) ═══ */
 .die.d3on{background:none !important;border-color:transparent !important;box-shadow:none !important}
 .die.d3on::before,.die.d3on::after{display:none !important}
@@ -11976,12 +11983,14 @@ function _hsParallaxStart(){
       var r=stg.getBoundingClientRect();
       _hsPx.tx=Math.max(-1,Math.min(1,((e.clientX-r.left)/r.width-0.5)*2));
       _hsPx.ty=Math.max(-1,Math.min(1,((e.clientY-r.top)/r.height-0.5)*2));
+      _hsPx.lastIn=performance.now();
     });
     window.addEventListener('deviceorientation',function(e){
       if(e.gamma==null)return;
       _hsPx.gyro=true;
       _hsPx.tx=Math.max(-1,Math.min(1,e.gamma/22));
       _hsPx.ty=Math.max(-1,Math.min(1,(e.beta-45)/28));
+      _hsPx.lastIn=performance.now();
     });
     document.addEventListener('pointerdown',function(){
       try{
@@ -11992,6 +12001,12 @@ function _hsParallaxStart(){
     (function loop(){
       var stg=document.getElementById('hsStage');
       if(stg){
+        /* no gyro / pointer for 2.5s: slow ambient sway keeps the depth alive */
+        if(performance.now()-(_hsPx.lastIn||0)>2500){
+          var _ts=performance.now()/1000;
+          _hsPx.tx=Math.sin(_ts*0.33)*0.45;
+          _hsPx.ty=Math.cos(_ts*0.27)*0.35;
+        }
         _hsPx.x+=(_hsPx.tx-_hsPx.x)*0.09;
         _hsPx.y+=(_hsPx.ty-_hsPx.y)*0.09;
         var glOk=false;
