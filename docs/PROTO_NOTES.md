@@ -758,3 +758,16 @@ low-freq wobble (0.085, scale 4) so the line drifts like a hand
 stroke, plus high-freq grain (0.95, scale 2.4) for the dry edge;
 chips 0.14/2.2 + 1.1/1.3. Tune those four numbers for rougher or
 cleaner; window.D3_PENCIL=false kills it if perf suffers on phone.
+
+## P54 — phone testing via GitHub Pages (done)
+
+Live at https://rigamix.github.io/Fark/ (redirects to fark_proto.html).
+Pages source flipped main -> fark branch; main (old painted game) is
+untouched and can be re-pointed anytime. .gitignore now ships
+game-ready exports (Art/Assets minus *.psd and _old/, ~51MB) while PSD
+sources stay local. Case audit ran clean (Pages is case-sensitive,
+file:// is not) — 66 referenced paths, 0 mismatches. sw.js is the
+self-destruct stub, so phones with the old PWA cached get wiped on
+first visit. DEPLOY FLOW: commit in worktree -> ff-merge root ->
+git push origin fark (root checkout is the fark branch).
+BACK button on the offer focus: 46% -> 56% wide, lower, bigger text.
