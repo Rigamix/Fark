@@ -703,3 +703,16 @@ with digits accented gold; painted green TAKE IT button (home-screen
 plate); tap the scrim to put it back. The FIRST NIGHT banner stays
 sharp and above the scrim during focus (z6, no filter). Taps are
 ignored until a die's float-in completes (_floatDone).
+
+## P50 — offer screen round 2 (done)
+
+Entrance jitter fixed at the engine: flat rolls now rotate over the
+FULL duration (krFull — before, kc=0 collapsed the rotation window to
+the first 12%, a ~150ms snap), and hover height ramps in over 700ms
+after a roll instead of popping (d.hoverT0). Banner: 3 lines, 3.5cqh,
+dark plate removed (text-shadow carries it), fades out during focus.
+Dice row 41.5% -> 47%, labels ride with it. Focus: die target y
+0.27 -> 0.37 (hovers above her hand, closer to the text), panel
+51%, faces row one line (3cqh, .12em), desc smaller (2.4cqh),
+TAKE IT bigger (80% wide, native 1136/334 plate), painted thin-red
+BACK button replaces the tap-elsewhere hint (scrim tap still works).
