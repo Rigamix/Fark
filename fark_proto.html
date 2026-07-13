@@ -478,8 +478,11 @@ body{
 @keyframes nrGlowPulse{0%,100%{transform:translate(-50%,-50%) scale(1)}50%{transform:translate(-50%,-50%) scale(1.12)}}
 .nrparts{position:absolute;left:50%;top:33%;width:0;height:0;pointer-events:none;display:none;z-index:-1}
 #famRunDraft.focus .nrdie.zoom .nrparts{display:block}
-.nrparts span{position:absolute;left:0;top:0;border-radius:50%;background:#ffd98a;
-  box-shadow:0 0 6px 2px rgba(255,190,90,.55);opacity:0;animation:nrSpark 2.6s linear infinite}
+.nrparts span{position:absolute;left:0;top:0;background:var(--pc,#ffd98a);
+  filter:drop-shadow(0 0 3px var(--pc,#ffd98a));opacity:0;animation:nrSpark 2.6s linear infinite}
+.nrparts span.pdot{border-radius:50%}
+.nrparts span.pstar{clip-path:polygon(50% 0,61% 39%,100% 50%,61% 61%,50% 100%,39% 61%,0 50%,39% 39%)}
+.nrparts span.pdiamond{clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)}
 @keyframes nrSpark{0%{opacity:0;transform:translate(var(--px),26px) scale(.5)}
   18%{opacity:.95}100%{opacity:0;transform:translate(calc(var(--px) + var(--dx)),-96px) scale(1.05)}}
 #nrFocusPanel{position:absolute;left:6%;right:6%;top:57%;z-index:8;text-align:center;color:#fff;
@@ -11056,7 +11059,7 @@ function famRunDraftShow(){
     +'<img class="nr-env" id="nrHand" src="'+NR+'hand.png" alt="">'
     +'<div id="nrScrim" onclick="_nrUnfocus()"></div>'
     +'<div id="nrDice">'+dice+'</div>'
-    +'<div id="nrChalk"><span class="nrN">FIRST NIGHT</span><br>the innkeep offers<br>a die with your ale</div>'
+    +'<div id="nrChalk"><span class="nrN">FIRST NIGHT</span><br>the innkeep offers<br>a die with your ale&hellip;</div>'
     +'<div id="nrFocusPanel"></div>'
     +'</div>';
   document.body.appendChild(ov);
@@ -11094,17 +11097,21 @@ function _nrFocus(i){
   die.style.transition='transform .55s cubic-bezier(.3,1.35,.35,1),opacity .35s';
   die.style.transform='translate('+dx+'px,'+dy+'px) scale('+K+')';
   die.classList.add('zoom');
+  var mt=_starterOffer[i],dt=getDie(mt);
+  var spk=D3.SPARK[mt]||D3.SPARK.bone;
   var pts=die.querySelector('.nrparts');
   if(pts){pts.innerHTML='';
     for(var p2=0;p2<12;p2++){
       var sp=document.createElement('span');
-      var w=(2+Math.random()*3).toFixed(1);
-      sp.style.cssText='--px:'+((Math.random()*2-1)*46).toFixed(0)+'px;--dx:'+((Math.random()*2-1)*26).toFixed(0)+'px;'
-        +'width:'+w+'px;height:'+w+'px;'
+      var w2,h2;
+      if(spk.shape==='star'){w2=5+Math.random()*4;h2=w2;sp.className='pstar';}
+      else if(spk.shape==='diamond'){w2=3+Math.random()*3;h2=w2*(1.5+Math.random()*0.5);sp.className='pdiamond';}
+      else{w2=2+Math.random()*3;h2=w2;sp.className='pdot';}
+      sp.style.cssText='--pc:'+spk.c+';--px:'+((Math.random()*2-1)*46).toFixed(0)+'px;--dx:'+((Math.random()*2-1)*26).toFixed(0)+'px;'
+        +'width:'+w2.toFixed(1)+'px;height:'+h2.toFixed(1)+'px;'
         +'animation-duration:'+(2+Math.random()*1.6).toFixed(2)+'s;animation-delay:'+(Math.random()*2.4).toFixed(2)+'s';
       pts.appendChild(sp);
     }}
-  var mt=_starterOffer[i],dt=getDie(mt);
   var acc=function(t){return String(t).replace(/(\d+)/g,'<span class="num">$1</span>');};
   var pan=document.getElementById('nrFocusPanel');
   pan.innerHTML='<div class="ffaces">'+acc((dt.faces||[1,2,3,4,5,6]).join(' · '))+'</div>'
@@ -12459,7 +12466,13 @@ var D3={
     lucky:'sepia(.9) hue-rotate(5deg) saturate(2.4) brightness(1.12)'},
   OUT:{bone:'#241407',iron:'#1d2126',flint:'#332412',lead:'#1f1f26',
     amber:'#7a3a08',jade:'#14501e',jade2:'#175c22',silver:'#343c46',
-    obsidian:'#2a0d0b',starstone:'#1c4a74',vagabond:'#571412',lucky:'#7a5408'}
+    obsidian:'#2a0d0b',starstone:'#1c4a74',vagabond:'#571412',lucky:'#7a5408'},
+  SPARK:{bone:{c:'#f3e7c8',shape:'dot'},amber:{c:'#ffb84d',shape:'dot'},
+    jade:{c:'#7fe08a',shape:'dot'},jade2:{c:'#8ef29a',shape:'dot'},
+    silver:{c:'#eef4fb',shape:'star'},starstone:{c:'#a9d4ff',shape:'star'},
+    lucky:{c:'#ffd98a',shape:'star'},obsidian:{c:'#d4552f',shape:'diamond'},
+    vagabond:{c:'#ff6f60',shape:'diamond'},iron:{c:'#c3ccd6',shape:'diamond'},
+    flint:{c:'#d8b98a',shape:'dot'},lead:{c:'#a9a9bb',shape:'dot'}}
 };
 D3.make=function(host,opts){
   opts=opts||{};

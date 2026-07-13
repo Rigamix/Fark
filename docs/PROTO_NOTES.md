@@ -734,3 +734,13 @@ material to a darker, more saturated version of its own colour
 silver #343c46, vagabond #571412, lucky #7a5408, ...; bone keeps the
 warm near-black). Tint now applies BEFORE the drop-shadow outline in
 the filter chain so the outline colour stays exact.
+
+## P52 — per-material sparks + banner ellipsis (done)
+
+D3.SPARK maps each material to a particle colour + shape: warm dots
+(bone/amber/jade/flint/lead), white/blue/gold 4-point star glints
+(silver/starstone/lucky), ember diamond shards (obsidian/vagabond/
+iron). Shapes are clip-path polygons, glow via drop-shadow(var(--pc))
+so it survives the clip; diamonds are elongated 1.5-2x for a shard
+feel. _nrFocus builds the 12 sparks from the spec. Banner now ends
+"a die with your ale..." (&hellip;).
