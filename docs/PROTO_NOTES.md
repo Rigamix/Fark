@@ -875,3 +875,20 @@ to width+initial-scale+viewport-fit (maximum-scale/user-scalable
 dropped — documented trigger for the short-viewport bug on some iOS
 builds, ignored for pinch anyway). Badge (5-tap logo) tells the
 truth: inner 390x844 = iOS fixed it someday; 390x797 = band blended.
+
+## P61 — Room: boss text + new char panel (done)
+
+Grog's image is no longer tappable (ptBossTap removed) — only the
+BOSS — GROG text block opens the peek. The row lost its dark pill:
+plateless JMH Beda in offer-screen style, boss name gold (#ffd98a),
+progress circles now FILL gold with a soft glow (empty = dim cream),
+caption under. Char panel rebuilt on Denis's new base
+(Panels/Commoners/<art>.png, name + wax removed from the art;
+fallback Krox for characters not yet painted): name plaque (title +
+art-name, cream 3.4cqh) sits across the portrait's bottom edge, red
+wax trait seal on the portrait's bottom-right corner (rotate -9deg),
+and the purple band (measured 42.9-54.3%) holds the opponent's six
+dice as still D3 chips (11.5% each) with a one-line persona/lucky/
+cards caption inside the band's foot; sealed/grudge/for-keeps
+callouts sit below on the parchment in seal-red. Values row
+(target/stake/pot) unchanged.
