@@ -447,15 +447,16 @@ body{
 #nrChalk{position:absolute;left:50%;top:2.6%;transform:translateX(-50%);z-index:4;
   background:rgba(30,28,26,.85);color:#ddd;border-radius:6px;padding:5px 14px;
   font-size:1.9cqh;text-align:center;white-space:nowrap}
-#nrDice{position:absolute;left:0;right:0;top:38%;z-index:3;display:flex;gap:2.5%;
+#nrDice{position:absolute;left:0;right:0;top:34%;z-index:3;display:flex;gap:6%;
   justify-content:center;animation:nrDiceIn .8s ease-out .9s both}
-@keyframes nrDiceIn{from{opacity:0;transform:translateY(3%)}to{opacity:1;transform:translateY(0)}}
-#nrDice .nrdie{width:21%;aspect-ratio:2/3;background:rgba(24,20,16,.82);border-radius:10px;
-  border:1px solid rgba(190,160,110,.45);display:flex;flex-direction:column;align-items:center;
-  justify-content:center;color:#e8d9bc;cursor:pointer;font-size:2.2cqh;text-align:center;
-  box-shadow:0 6px 16px rgba(0,0,0,.5);transition:transform .12s}
-#nrDice .nrdie:active{transform:scale(.96)}
-#nrDice .nrdie .sub{font-size:1.4cqh;opacity:.7}
+@keyframes nrDiceIn{from{opacity:0}to{opacity:1}}
+#nrDice .nrdie{width:20%;aspect-ratio:1/1.5;display:flex;flex-direction:column;align-items:center;
+  justify-content:flex-start;color:#f0e3c6;cursor:pointer;font-size:2.1cqh;text-align:center;
+  transition:transform .12s}
+#nrDice .nrdie:active{transform:scale(.94)}
+#nrDice .nrdie .d3host{width:100%;aspect-ratio:1;position:relative;display:flex;
+  align-items:center;justify-content:center}
+#nrDice .nrdie .sub{margin-top:38%;text-shadow:0 2px 4px rgba(0,0,0,.7)}
 /* sheet-open: the painted world blurs and dims behind the parchment */
 #nrStage img.nr-env,#nrDice,#nrChalk,#ptCards{transition:filter .35s}
 body.gbSheetOn #nrStage img.nr-env,body.gbSheetOn #nrDice,body.gbSheetOn #nrChalk,
@@ -571,6 +572,17 @@ body.gbSheetOn #ptGold,body.gbSheetOn #ptStage .pt-ov{filter:blur(6px) brightnes
 #setX img{height:96%;filter:drop-shadow(0 2px 4px rgba(0,0,0,.45))}
 #setX:active img{transform:scale(.88)}
 body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
+/* ═══ D3 DICE (dice_playground21 port) ═══ */
+.die.d3on{background:none !important;border-color:transparent !important;box-shadow:none !important}
+.die.d3on::before,.die.d3on::after{display:none !important}
+.die.d3on.rolling{animation:none !important}
+.die.d3on .dc{display:none !important}
+.d3slot{position:relative;will-change:transform}
+.d3shadow{position:absolute;left:50%;top:50%;border-radius:50%;
+  background:rgba(20,12,6,.5);filter:blur(3px);will-change:transform;pointer-events:none}
+.d3die{position:absolute;inset:0;will-change:transform,filter;pointer-events:none}
+.d3f{position:absolute;inset:0;background-size:cover;will-change:transform;border-radius:3px}
+.d3f .d3sh{position:absolute;inset:0;background:rgb(60,42,24);opacity:0;border-radius:3px}
 /* ═══ PROTO GREYBOX SKIN ═══ */
 @media (min-width:520px){
   body.phone-framed{background:#222 !important;display:flex;align-items:center;justify-content:center;min-height:100vh}
@@ -10983,11 +10995,11 @@ function famRunDraftShow(){
   var dice='';
   _starterOffer.forEach(function(mt,i){
     var dt=getDie(mt);
-    var col=(FAMILIES[(dt||{}).fam]||{}).color||'#777';
-    dice+='<div class="nrdie" style="border-bottom:4px solid '+col+'" '
+    dice+='<div class="nrdie" '
       +'onclick="_gbInspect(\''+(dt.name+' — '+(dt.desc||'')).replace(/'/g,'&#39;').replace(/"/g,'&quot;')
       +' Take it, with your first ale.\',\'TAKE IT\',function(){famRunDraftPick('+i+');})">'
-      +dt.name.toLowerCase()+'<span class="sub">die</span></div>';
+      +'<div class="d3host" data-mat="'+mt+'"></div>'
+      +'<span class="sub">'+dt.name.toLowerCase()+'</span></div>';
   });
   ov.innerHTML='<div id="nrStage">'
     +'<img class="nr-env" src="'+NR+'bg.png" alt="">'
@@ -10997,6 +11009,16 @@ function famRunDraftShow(){
     +'<div id="nrChalk">FIRST NIGHT — the innkeep offers a die with your ale</div>'
     +'</div>';
   document.body.appendChild(ov);
+  /* the dice tumble in over the palm once the hand has landed, then hover */
+  setTimeout(function(){
+    var stg=document.getElementById('nrStage');if(!stg)return;
+    [].forEach.call(ov.querySelectorAll('.d3host'),function(hd,i){
+      var sz=Math.round(hd.clientWidth*0.72);
+      var d=D3.make(hd,{size:sz,mat:hd.getAttribute('data-mat'),hover:true,face:1+Math.floor(Math.random()*6)});
+      d.slot.style.margin='auto';
+      D3.roll(d,1+Math.floor(Math.random()*6),{delay:i*140,homeX:0,homeY:0});
+    });
+  },950);
 }
 function famRunDraftPick(i){
   var mt=_starterOffer&&_starterOffer[i];if(!mt)return;
@@ -12303,6 +12325,176 @@ function _ptClosePanel(){
     void c.offsetWidth;c.classList.add('enter');
   });
 }
+/* ═══ D3 — the 3D dice renderer (dice_playground21 verbatim math,
+   namespaced + sizable + tintable). One texture set for now (bone_1..6);
+   per-material colour filters as placeholders until real textures land. ═══ */
+var D3={
+  list:[],running:false,
+  cfg:{tmin:2,tmax:4,dur:650,tilt:14,rot:75,jx:7,jy:19,ow:1.5,hgt:28},
+  PLACE:[
+    {rx:0,ry:0,n:[0,0,1],img:0},
+    {rx:0,ry:180,n:[0,0,-1],img:5},
+    {rx:0,ry:90,n:[1,0,0],img:2},
+    {rx:0,ry:-90,n:[-1,0,0],img:3},
+    {rx:90,ry:0,n:[0,-1,0],img:1},
+    {rx:-90,ry:0,n:[0,1,0],img:4}
+  ],
+  FACE_ROT:{1:[0,0],6:[0,180],3:[0,-90],4:[0,90],2:[-90,0],5:[90,0]},
+  LIGHT:[0,-0.33,0.94],
+  TINT:{bone:'',iron:'grayscale(.5) brightness(.9) contrast(1.1)',
+    flint:'sepia(.4) hue-rotate(-18deg) saturate(.7) brightness(.85)',
+    lead:'grayscale(.7) brightness(.75)',
+    amber:'sepia(.7) hue-rotate(-8deg) saturate(1.9) brightness(1.05)',
+    jade:'sepia(.6) hue-rotate(60deg) saturate(1.7)',
+    jade2:'sepia(.6) hue-rotate(45deg) saturate(2.2) brightness(1.1)',
+    silver:'grayscale(.8) brightness(1.25) contrast(.95)',
+    obsidian:'brightness(.45) contrast(1.35) sepia(.3) hue-rotate(-25deg) saturate(1.6)',
+    starstone:'sepia(.7) hue-rotate(170deg) saturate(1.6) brightness(.9)',
+    vagabond:'sepia(.7) hue-rotate(-45deg) saturate(2.2) brightness(.95)',
+    lucky:'sepia(.9) hue-rotate(5deg) saturate(2.4) brightness(1.12)'}
+};
+D3.make=function(host,opts){
+  opts=opts||{};
+  var size=opts.size||42;
+  var slot=document.createElement('div');
+  slot.className='d3slot';
+  slot.style.width=size+'px';slot.style.height=size+'px';
+  var sh=document.createElement('div');sh.className='d3shadow';
+  sh.style.width=(size*0.9)+'px';sh.style.height=(size*0.29)+'px';
+  sh.style.margin=(-size*0.145)+'px 0 0 '+(-size*0.45)+'px';
+  var die=document.createElement('div');die.className='d3die';
+  slot.appendChild(sh);slot.appendChild(die);
+  var faces=[];
+  D3.PLACE.forEach(function(pl){
+    var f=document.createElement('div');f.className='d3f';
+    f.style.backgroundImage='url(Art/Assets/Dice/bone_'+(pl.img+1)+'.png)';
+    var fs=document.createElement('div');fs.className='d3sh';f.appendChild(fs);
+    die.appendChild(f);
+    faces.push({el:f,sh:fs,n:pl.n,place:'rotateX('+pl.rx+'deg) rotateY('+pl.ry+'deg) translateZ('+(size/2)+'px)'});
+  });
+  host.appendChild(slot);
+  var d={slot:slot,die:die,faces:faces,shadow:sh,size:size,s:size/42,
+    spin:0,pitch:0,yaw:0,x:0,y:0,h:0,ox:0,oxv:0,slotX:0,phase:'idle',
+    result:opts.face||1,tint:D3.TINT[opts.mat]||'',hover:!!opts.hover,
+    hoverPh:Math.random()*6.28,group:opts.group||null};
+  var fr=D3.FACE_ROT[d.result];d.pitch=fr[0];d.yaw=fr[1];
+  D3.list.push(d);D3.draw(d);D3.start();
+  return d;
+};
+D3.remove=function(d){
+  var i=D3.list.indexOf(d);if(i>=0)D3.list.splice(i,1);
+  if(d.slot&&d.slot.parentNode)d.slot.parentNode.removeChild(d.slot);
+};
+D3.setFace=function(d,val){
+  d.result=val;var fr=D3.FACE_ROT[val];
+  d.phase='idle';d.pitch=fr[0];d.yaw=fr[1];d.h=0;D3.draw(d);
+};
+D3.rotv=function(n,pitch,yaw,spin){
+  var r=function(x){return x*Math.PI/180;};
+  var x=n[0],y=n[1],z=n[2],c,s2;
+  c=Math.cos(r(yaw));s2=Math.sin(r(yaw));var x1=x*c+z*s2,z1=-x*s2+z*c;x=x1;z=z1;
+  c=Math.cos(r(pitch));s2=Math.sin(r(pitch));var y1=y*c-z*s2,z2=y*s2+z*c;y=y1;z=z2;
+  c=Math.cos(r(spin));s2=Math.sin(r(spin));var x2=x*c-y*s2,y2=x*s2+y*c;x=x2;y=y2;
+  c=Math.cos(r(D3.cfg.tilt));s2=Math.sin(r(D3.cfg.tilt));var y3=y*c-z*s2,z3=y*s2+z*c;
+  return[x,y3,z3];
+};
+D3.draw=function(d){
+  var x=d.x+d.ox,h=d.h||0,s=d.s;
+  d.die.style.transform='translate('+x+'px,'+(d.y-h*0.55*s)+'px) scale('+(1+h*0.004)+')';
+  var ow=D3.cfg.ow,oc='#241407';
+  var outline=ow?'drop-shadow('+ow+'px 0 0 '+oc+') drop-shadow(-'+ow+'px 0 0 '+oc+') drop-shadow(0 '+ow+'px 0 '+oc+') drop-shadow(0 -'+ow+'px 0 '+oc+')':'';
+  d.die.style.filter=(outline+' '+d.tint).trim();
+  d.faces.forEach(function(f){
+    var n=D3.rotv(f.n,d.pitch,d.yaw,d.spin);
+    if(n[2]<=0.01){f.el.style.display='none';return;}
+    f.el.style.display='block';
+    f.el.style.transform='rotateX('+D3.cfg.tilt+'deg) rotateZ('+d.spin+'deg) rotateX('+d.pitch+'deg) rotateY('+d.yaw+'deg) '+f.place;
+    var dot=n[0]*D3.LIGHT[0]+n[1]*D3.LIGHT[1]+n[2]*D3.LIGHT[2];
+    f.el.style.filter='brightness('+(0.55+0.55*Math.max(0,dot)).toFixed(2)+')';
+    f.sh.style.opacity=Math.max(0,(0.35-dot)*0.85).toFixed(2);
+  });
+  d.shadow.style.transform='translate('+x+'px,'+(d.y+16*s)+'px) scale('+Math.max(0.5,1-h*0.008)+')';
+  d.shadow.style.opacity=Math.max(0.15,0.5-h*0.006);
+};
+D3.roll=function(d,val,opts){
+  opts=opts||{};
+  var now=performance.now(),cfg=D3.cfg,s=d.s;
+  var r=function(a){return (Math.random()*2-1)*a;};
+  d.result=val||1+Math.floor(Math.random()*6);
+  var br=D3.FACE_ROT[d.result],bx=br[0],by=br[1];
+  var iturns=function(lo){return Math.sign(Math.random()-0.5)*360*Math.round(lo+Math.random()*(Math.max(cfg.tmax,cfg.tmin)-lo));};
+  var dom=Math.random()<.5;
+  var m=function(a){return ((a%360)+360)%360;};
+  d.from={spin:m(d.spin),pitch:m(d.pitch),yaw:m(d.yaw),x:d.x,y:d.y};
+  d.to={pitch:bx+iturns(dom?cfg.tmin:1),
+        yaw:by+iturns(dom?1:cfg.tmin),
+        spin:r(cfg.rot)+(Math.random()<.5?360:-360),
+        x:opts.homeX!=null?opts.homeX:r(cfg.jx*s),
+        y:opts.homeY!=null?opts.homeY:r(cfg.jy*s)};
+  d.phase='roll';d.t0=now+(opts.delay||0);
+  d.dur=(opts.dur||cfg.dur)*(0.7+Math.random()*0.6);
+  d.kc=0.28+Math.random()*0.14;
+  d.doB=Math.random()<0.65;
+  d.hb=(0.45+Math.random()*0.25);
+  d.kb=Math.min(0.95,d.kc+0.28+Math.random()*0.18);
+};
+D3.heightAt=function(d,k){
+  var cfg=D3.cfg,H=cfg.hgt*d.s;
+  if(k>=1)return 0;
+  if(k<d.kc){var m0=k/d.kc;return H*(1-m0*m0);}
+  if(d.doB&&k<d.kb){var m1=(k-d.kc)/(d.kb-d.kc);return H*d.hb*4*m1*(1-m1);}
+  return 0;
+};
+D3.easeOut=function(k){return 1-Math.pow(1-k,1.4);};
+D3.start=function(){
+  if(D3.running)return;D3.running=true;
+  function frame(now){
+    var dt=1/60;
+    D3.list.forEach(function(d){
+      if(!d.slot.isConnected)return;
+      if(d.phase==='roll'){
+        var t=now-d.t0;
+        if(t>=0){
+          var k=Math.min(t/d.dur,1),e=D3.easeOut(k);
+          var kr=Math.min(k/(d.doB?d.kb:Math.min(d.kc+0.12,1)),1),er=D3.easeOut(kr);
+          ['pitch','yaw'].forEach(function(pp){d[pp]=d.from[pp]+(d.to[pp]-d.from[pp])*er;});
+          ['spin','x','y'].forEach(function(pp){d[pp]=d.from[pp]+(d.to[pp]-d.from[pp])*e;});
+          d.h=D3.heightAt(d,k);
+          if(k>=1){d.phase=d.hover?'hover':'rest';d.h=0;}
+        }
+      }else if(d.hover&&d.phase!=='roll'){
+        var sec=now/1000;
+        d.h=6*d.s*(1+Math.sin(sec*1.1+d.hoverPh))*0.5+2*d.s;
+        d.pitch+= (Math.sin(sec*0.53+d.hoverPh)*0.05);
+        d.yaw+=(Math.cos(sec*0.41+d.hoverPh)*0.06);
+      }
+      d.oxv+=(-120*d.ox-14*d.oxv)*dt;d.ox+=d.oxv*dt;
+    });
+    /* neighbour shove within a group, mid-flight */
+    var groups={};
+    D3.list.forEach(function(d){if(d.group){(groups[d.group]=groups[d.group]||[]).push(d);}});
+    Object.keys(groups).forEach(function(g){
+      var arr=groups[g];
+      arr.forEach(function(d){var rct=d.slot.getBoundingClientRect();d.slotX=rct.left+rct.width/2;});
+      arr.sort(function(a,b){return a.slotX-b.slotX;});
+      for(var i=0;i<arr.length-1;i++){
+        var a=arr[i],b=arr[i+1];
+        if(a.phase!=='roll'&&b.phase!=='roll')continue;
+        var w=(a.size+b.size)/2;
+        var gap=(b.slotX+b.x+b.ox)-(a.slotX+a.x+a.ox);
+        if(Math.abs(gap)<w){
+          var push=(w-Math.abs(gap))*Math.sign(gap||1)*9;
+          a.oxv-=push;b.oxv+=push;
+        }
+      }
+    });
+    D3.list.forEach(function(d){if(d.slot.isConnected)D3.draw(d);});
+    /* prune dead nodes */
+    for(var i2=D3.list.length-1;i2>=0;i2--)if(!D3.list[i2].slot.isConnected)D3.list.splice(i2,1);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+};
 /* ═══════════════ end family engine ═══════════════ */
 
 function scoreRoll(vals,cards,locked,context,dieMats){
@@ -12952,7 +13144,30 @@ function rollFaceSpur(mat){
 }
 
 /* ═══════ DICE RENDERER ═══════ */
+function _d3InitHost(div,tries){
+  if(div._d3)return;
+  if(!div.isConnected||!div.clientWidth){
+    if((tries||0)<60)setTimeout(function(){_d3InitHost(div,(tries||0)+1);},40);
+    return;
+  }
+  var sz=Math.round(div.clientWidth*0.88);
+  var d=D3.make(div,{size:sz,mat:div._trueMat,face:div._trueVal,group:'match'});
+  d.slot.style.position='absolute';
+  d.slot.style.left='50%';d.slot.style.top='50%';
+  d.slot.style.margin=(-sz/2)+'px 0 0 '+(-sz/2)+'px';
+  div._d3=d;
+  D3.roll(d,div._trueVal,{dur:560,homeX:0,homeY:0});
+}
 function mkDie(val,mat,sizeClass){
+  if(window.D3_MATCH!==false){
+    const host=document.createElement('div');
+    host.className='die d3on dtype-'+(mat||'bone')+(sizeClass?' '+sizeClass:'');
+    if(/^jade\d?$/.test(mat||'')&&val===6)host.classList.add('die-wild');
+    host._trueVal=val;host._trueMat=mat;
+    host.style.position=host.style.position||'';
+    _d3InitHost(host,0);
+    return host;
+  }
   const div=document.createElement('div');
   div.className='die dtype-'+(mat||'bone')+(sizeClass?' '+sizeClass:'');
   /* Any jade variant rolling a 6 renders as a wild blank face. Covers
@@ -12982,6 +13197,11 @@ function mkDie(val,mat,sizeClass){
 }
 /* reDrawDieFace defined below (near active card effects) */
 function settleDie(el){
+  if(el&&el._d3){
+    el.classList.remove('rolling');
+    if(el._d3.phase!=='roll')D3.setFace(el._d3,el._trueVal);
+    return;
+  }
   /* Stop the rolling animation and snap to resting state */
   el.getAnimations().forEach(a=>{try{a.cancel();}catch(e){}});
   el.classList.remove('rolling');
@@ -15189,6 +15409,12 @@ function handleRoll(){
     // .die-wild class so any face-art rules apply. Was the missing path that
     // let a "6" face show on jade after a re-roll.
     setTimeout(()=>{
+      if(d.el._d3){
+        d.el._trueVal=d.val;
+        d.el.classList.toggle('die-wild',(/^jade\d?$/.test(d.mat||'')&&d.val===6));
+        D3.roll(d.el._d3,d.val,{dur:520,homeX:0,homeY:0});
+        return;
+      }
       const dots=d.el.children;
       const _isWildJade=(/^jade\d?$/.test(d.mat||'')&&d.val===6);
       d.el.classList.toggle('die-wild',_isWildJade);
@@ -15523,8 +15749,11 @@ function _afterRollImpl(){
         _sbVictims.forEach(function(victim){
           victim.val=_sbTo;
           if(victim.el){
+            if(victim.el._d3){victim.el._trueVal=_sbTo;D3.roll(victim.el._d3,_sbTo,{dur:420,homeX:0,homeY:0});}
+            else{
             var dots=victim.el.children;var nd=FACE_DOTS[_sbTo]||FACE_DOTS[1];
             for(var i=0;i<49;i++){if(!dots[i])continue;dots[i].className=nd.includes(i)?'dc dot':'dc';}
+            }
             victim.el.classList.add('eff-glow-red');
             spawnPixelSparks(victim.el,8);
             (function(_v){setTimeout(function(){if(_v.el)_v.el.classList.remove('eff-glow-red');},900);})(victim);
@@ -15547,8 +15776,11 @@ function _afterRollImpl(){
         var oldV=v2.val;var nv=rollFace(v2.mat);while(nv===1||nv===5)nv=rollFace(v2.mat);
         v2.val=nv;
         if(v2.el){
+          if(v2.el._d3){v2.el._trueVal=nv;D3.roll(v2.el._d3,nv,{dur:420,homeX:0,homeY:0});}
+          else{
           var dots2=v2.el.children;var nd2=FACE_DOTS[nv]||FACE_DOTS[1];
           for(var j=0;j<49;j++){if(!dots2[j])continue;dots2[j].className=nd2.includes(j)?'dc dot':'dc';}
+          }
           /* Visible feedback — red flash + sparks on the rerolled die */
           v2.el.classList.add('eff-glow-red');
           spawnPixelSparks(v2.el,8);
@@ -20378,6 +20610,12 @@ function refundActiveCardUse(cardId){
 /* Helper: redraw die face dots from d.val */
 function reDrawDieFace(d){
   if(!d.el)return;
+  if(d.el._d3){
+    d.el._trueVal=d.val;
+    d.el.classList.toggle('die-wild',(/^jade\d?$/.test(d.mat||'')&&d.val===6));
+    D3.roll(d.el._d3,d.val,{dur:420,homeX:0,homeY:0});
+    return;
+  }
   const isWildJade=(/^jade\d?$/.test(d.mat||'')&&d.val===6);
   d.el.classList.toggle('die-wild',isWildJade);
   const dots=d.el.children;const newDots=isWildJade?[]:(FACE_DOTS[d.val]||FACE_DOTS[1]);

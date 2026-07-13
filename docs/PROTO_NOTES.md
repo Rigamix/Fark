@@ -632,3 +632,33 @@ chalk chip also opens the rules. X on the sheet enlarged to character-
 panel scale (consistency rule from Denis: similar elements keep the
 same scale screen to screen). Abandon-run row already removed —
 title-screen NEW RUN covers it.
+
+## P45/P46 — 3D dice (dice_playground21 port) (done)
+
+D3 engine appended before the family engine: CSS-3D cuboid, 6 face divs
+each carrying the full transform chain (camera tilt > spin > pitch > yaw >
+face placement), manual backface culling, per-face lighting
+(brightness + shade overlay vs LIGHT vector), physics roll with tumble
+turns + parabola bounce + neighbour shove within a group, hover-bob mode
+for showcase dice. One shared rAF loop (D3.start) prunes disconnected
+dice. Face textures live in Art/Assets/Dice/bone_1..6.png (extracted
+from the playground's data-URIs); future sets drop in as <type>_N.png.
+Placeholder material tints via CSS filter (D3.TINT: amber/jade/silver/
+obsidian/starstone/vagabond/lucky...) until Denis paints real textures.
+
+Surfaces converted:
+- Starter offer (NewRun): 3 big hovering dice tumble in above the
+  innkeep's palm at 950ms (after the hand descends), hover:true.
+- Match (P46): mkDie now returns a .die.d3on host (keeps all selection/
+  frozen classes + handlers; D3 renders inside). _d3InitHost defers
+  D3.make until the host is connected+sized (setTimeout polling — the
+  tool pane freezes rAF, don't use it for init). Guards at settleDie,
+  reDrawDieFace, the reused-dice crossfade, and both NPC die-forcing
+  sites (sawdust/iron gate) reroute dot-grid rewrites to short D3.rolls.
+  window.D3_MATCH=false flips back to flat dice.
+
+Verified in-match: 6 dice render on roll, faces == pool values, click
+select works, reroll tumbles only uncommitted dice, banked 650 clean.
+
+Still flat (next): loadout tiles, shop dice cards, peek-sheet chips —
+plan is small fixed-pose D3 dice.
