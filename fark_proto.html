@@ -577,6 +577,9 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 .die.d3on::before,.die.d3on::after{display:none !important}
 .die.d3on.rolling{animation:none !important}
 .die.d3on .dc{display:none !important}
+.d3chip{display:inline-block;position:relative;vertical-align:middle;flex-shrink:0}
+.d3chip .die{position:absolute;inset:0;width:100% !important;height:100% !important;cursor:inherit;box-shadow:none}
+.d3chip .die:active{transform:none}
 .d3slot{position:relative;will-change:transform}
 .d3shadow{position:absolute;left:50%;top:50%;border-radius:50%;
   background:rgba(20,12,6,.5);filter:blur(3px);will-change:transform;pointer-events:none}
@@ -11370,7 +11373,7 @@ function famLoadoutShow(){
     var col=(FAMILIES[(getDie(mt)||{}).fam]||{}).color||'#777';
     var en=(S.run.dieEnch||[])[i];
     h+='<div style="flex:1;text-align:center">'
-      +'<div class="gbx-box" style="height:56px;font-size:9px;border-bottom:4px solid '+col+'">'+getDie(mt).name
+      +'<div class="gbx-box" style="height:74px;font-size:9px;border-bottom:4px solid '+col+'"><span class="d3chip" data-mat="'+mt+'" style="width:30px;height:30px;margin-bottom:2px"></span>'+getDie(mt).name
       +(en?'<span class="gbx-label" style="font-size:8px">✦ '+ENCHANTS[en.t].name+'</span>':'')+'</div>'
       +'<div style="display:flex;gap:2px;margin-top:3px">'
       +'<span class="gbx-box sub" style="flex:1;height:22px;font-size:11px;cursor:pointer" onclick="famDieShift('+i+',-1)">◀</span>'
@@ -11384,7 +11387,7 @@ function famLoadoutShow(){
     S.run.diceInv.forEach(function(mt,i){
       var col=(FAMILIES[(getDie(mt)||{}).fam]||{}).color||'#777';
       var en=(S.run.dieEnchInv||[])[i];
-      h+='<div class="gbx-box sub" style="width:56px;height:50px;font-size:9px;cursor:pointer;border-bottom:3px solid '+col+'" onclick="famDieEquip('+i+')">'+getDie(mt).name
+      h+='<div class="gbx-box sub" style="width:56px;height:64px;font-size:9px;cursor:pointer;border-bottom:3px solid '+col+'" onclick="famDieEquip('+i+')"><span class="d3chip" data-mat="'+mt+'" style="width:24px;height:24px"></span>'+getDie(mt).name
         +(en?'<span class="gbx-label" style="font-size:8px">✦</span>':'')+'</div>';
     });
     h+='</div>';
@@ -11394,6 +11397,7 @@ function famLoadoutShow(){
     +'</div>';
   ov.innerHTML=h;
   document.body.appendChild(ov);
+  _d3ChipScan(ov);
 }
 function _gbRenderSleeve(){
   var host=document.getElementById('gbSleeveZone');if(!host)return;
@@ -11570,6 +11574,7 @@ function _gbSheetOpen(html){
   document.getElementById('gbScrim').classList.add('on');
   sh.classList.add('on');
   document.body.classList.add('gbSheetOn');/* painted stages blur+dim behind */
+  if(typeof _d3ChipScan==='function')_d3ChipScan(sh);
 }
 function _gbSheetClose(){
   var sh=document.getElementById('gbSheet');if(sh)sh.classList.remove('on');
@@ -11603,9 +11608,8 @@ function _gbPeek(i){
   var reward=(20+(S.run.tier||0)*12)*(sealed?2:1)*(ds?2:1);
   var word=(_PERSONA_WORDS[pat.persona]||'PATRON');
   var diceChips=(pat.dice||[]).map(function(m){
-    var col=(FAMILIES[(getDie(m)||{}).fam]||{}).color||({lucky:'#a58a3c'}[m])||'#777';
-    if(m==='lucky')return '<span title="'+(pat.lucky?pat.lucky.name:'lucky die')+'" style="display:inline-block;width:18px;height:18px;border-radius:4px;background:#e0d6b8;border:1px solid #a58a3c;margin-right:3px"></span>';
-    return '<span style="display:inline-block;width:18px;height:18px;border-radius:4px;background:#c9c9c9;border:2px solid '+col+';margin-right:3px"></span>';
+    var ttl=m==='lucky'?(pat.lucky?pat.lucky.name:'lucky die'):(getDie(m)||{}).name||m;
+    return '<span class="d3chip" data-mat="'+m+'" title="'+ttl+'" style="width:24px;height:24px;margin-right:4px"></span>';
   }).join('');
   var cards=(pat.fcards||[]).map(function(c){
     var d=famDef(c.id);if(!d)return '';
@@ -13150,20 +13154,42 @@ function _d3InitHost(div,tries){
     if((tries||0)<60)setTimeout(function(){_d3InitHost(div,(tries||0)+1);},40);
     return;
   }
+  var still=!!div._d3Still;
   var sz=Math.round(div.clientWidth*0.88);
-  var d=D3.make(div,{size:sz,mat:div._trueMat,face:div._trueVal,group:'match'});
+  var d=D3.make(div,{size:sz,mat:div._trueMat,face:div._trueVal,group:still?null:'match'});
   d.slot.style.position='absolute';
   d.slot.style.left='50%';d.slot.style.top='50%';
   d.slot.style.margin=(-sz/2)+'px 0 0 '+(-sz/2)+'px';
   div._d3=d;
-  D3.roll(d,div._trueVal,{dur:560,homeX:0,homeY:0});
+  if(still){
+    d.shadow.style.display='none';
+    d.spin=(((div._trueVal*47)+(div._trueMat||'bone').length*31)%15)-7;
+    D3.draw(d);
+  }else{
+    D3.roll(d,div._trueVal,{dur:560,homeX:0,homeY:0});
+  }
 }
-function mkDie(val,mat,sizeClass){
+function _d3MatFace(mat){
+  if(/^jade\d?$/.test(mat||''))return 6;
+  var h=0;for(var i=0;i<(mat||'bone').length;i++)h+=(mat||'bone').charCodeAt(i)*(i+3);
+  return (h%6)+1;
+}
+/* swap .d3chip placeholders (data-mat / optional data-val) for still dice */
+function _d3ChipScan(root){
+  if(window.D3_MATCH===false)return;
+  (root||document).querySelectorAll('.d3chip').forEach(function(ph){
+    if(ph._d3done)return;ph._d3done=true;
+    var mat=ph.getAttribute('data-mat')||'bone';
+    var val=parseInt(ph.getAttribute('data-val'),10)||_d3MatFace(mat);
+    ph.appendChild(mkDie(val,mat,null,true));
+  });
+}
+function mkDie(val,mat,sizeClass,still){
   if(window.D3_MATCH!==false){
     const host=document.createElement('div');
     host.className='die d3on dtype-'+(mat||'bone')+(sizeClass?' '+sizeClass:'');
     if(/^jade\d?$/.test(mat||'')&&val===6)host.classList.add('die-wild');
-    host._trueVal=val;host._trueMat=mat;
+    host._trueVal=val;host._trueMat=mat;host._d3Still=!!still;
     host.style.position=host.style.position||'';
     _d3InitHost(host,0);
     return host;
@@ -14330,7 +14356,7 @@ function updHUD(){
 }
 function refreshKeptTray(){
   const t=document.getElementById('keptTray');t.querySelectorAll('.die,.kept-pts').forEach(e=>e.remove());
-  G.kept.forEach(k=>{const el=mkDie(k.vals[0],k.mat,'sm');el.style.cursor='default';t.appendChild(el);
+  G.kept.forEach(k=>{const el=mkDie(k.vals[0],k.mat,'sm',true);el.style.cursor='default';t.appendChild(el);
     const lbl=document.createElement('div');lbl.className='kept-pts';lbl.textContent='+'+k.pts;t.appendChild(lbl);});
   t.classList.toggle('has-items',G.kept.length>0);
 }
@@ -20444,7 +20470,7 @@ function toggleLoadoutPanel(){
   const pDice=G&&G.matchDice?G.matchDice:(S?S.dice:['bone','bone','bone','bone','bone','bone']);
   pDice.forEach((mat,i)=>{
     const wrap=document.createElement('div');wrap.className='lo-dw dtype-'+mat;wrap.dataset.mat=mat||'bone';
-    const d=mkDie(5,mat);d.style.cursor='pointer';
+    const d=mkDie(5,mat,null,true);d.style.cursor='pointer';
     d.style.setProperty('--lo-dur',(3+Math.random()*2).toFixed(1)+'s');
     d.style.setProperty('--lo-del',(Math.random()*3).toFixed(1)+'s');
     wrap.appendChild(d);
@@ -20464,7 +20490,7 @@ function toggleLoadoutPanel(){
   const oDice=G&&G.matchOppDice?G.matchOppDice:(G&&G.rung&&G.rung.dice?G.rung.dice:['bone','bone','bone','bone','bone','bone']);
   oDice.forEach((mat,i)=>{
     const wrap=document.createElement('div');wrap.className='lo-dw dtype-'+mat;wrap.dataset.mat=mat||'bone';
-    const d=mkDie(5,mat);d.style.cursor='pointer';
+    const d=mkDie(5,mat,null,true);d.style.cursor='pointer';
     d.style.setProperty('--lo-dur',(3+Math.random()*2).toFixed(1)+'s');
     d.style.setProperty('--lo-del',(Math.random()*3).toFixed(1)+'s');
     wrap.appendChild(d);
@@ -22564,6 +22590,7 @@ function _gbShop(){
       var afford=(S.run.gold||0)>=price;
       h+='<div class="gbx-box" style="width:110px;height:120px;cursor:pointer;border-bottom:4px solid '+col
         +(afford?'':';opacity:.45')+'" onclick="_gbDieInspect(\''+d.mat+'\')">'
+        +'<span class="d3chip" data-mat="'+d.mat+'" style="width:42px;height:42px;margin-bottom:4px"></span>'
         +d.label.toLowerCase()+(has?' ✓':'')+'<br><span class="gbx-label">'+price+'g'+(has?' · owned':'')+'</span></div>';
     });
     h+='</div>';
@@ -22587,6 +22614,7 @@ function _gbShop(){
     +'<div class="gbx-btn" style="height:52px;flex:1" onclick="famLoadoutShow()">loadout</div></div>'
     +'</div>';
   host.innerHTML=h;
+  _d3ChipScan(host);
 }
 /* die inspect sheet: faces laid flat + BUY (flow spec 10) */
 function _gbDieInspect(mat){
@@ -22595,6 +22623,7 @@ function _gbDieInspect(mat){
   var afford=(S.run.gold||0)>=price;
   var col=(FAMILIES[(dt||{}).fam]||{}).color||'#777';
   var h='<div class="gbx-box" style="min-height:100px;padding:12px;border-bottom:4px solid '+col+'">'
+    +'<span class="d3chip" data-mat="'+mat+'" style="width:54px;height:54px;margin-bottom:6px"></span>'
     +'<b>'+dt.name+'</b>'
     +'<div style="font-size:20px;letter-spacing:6px;margin:6px 0">'+(dt.faces||[1,2,3,4,5,6]).join(' ')+'</div>'
     +'<div class="gbx-label">'+(dt.desc||'')+'</div></div>';
@@ -22614,9 +22643,9 @@ function _gbEnchantPick(k){
   (S.run.dice||[]).forEach(function(mt,i){
     var en=S.run.dieEnch[i];
     var col=(FAMILIES[(getDie(mt)||{}).fam]||{}).color||'#777';
-    if(en)h+='<div class="gbx-box sub" style="width:78px;height:64px;font-size:11px;opacity:.5">'+getDie(mt).name+'<br><span class="gbx-label">worked</span></div>';
+    if(en)h+='<div class="gbx-box sub" style="width:78px;height:64px;font-size:11px;opacity:.5"><span class="d3chip" data-mat="'+mt+'" style="width:26px;height:26px"></span>'+getDie(mt).name+'<br><span class="gbx-label">worked</span></div>';
     else h+='<div class="gbx-box" style="width:78px;height:64px;font-size:11px;cursor:pointer;border-bottom:3px solid '+col+'" '
-      +'onclick="_gbEnchantDie(\''+k+'\','+i+')">'+getDie(mt).name+'</div>';
+      +'onclick="_gbEnchantDie(\''+k+'\','+i+')"><span class="d3chip" data-mat="'+mt+'" style="width:26px;height:26px"></span>'+getDie(mt).name+'</div>';
   });
   h+='</div>';
   _gbSheetOpen(h);
@@ -22762,7 +22791,7 @@ function _renderDiceStore(){
     /* Jade is the wild die — every face is blank in play, so always render it
        blank in the shop too (force val=6 which mkDie treats as the wild face). */
     var face=(d.mat==='jade')?6:_dsFaceCache[d.mat];
-    var die=mkDie(face,d.mat);
+    var die=mkDie(face,d.mat,null,true);
     die.style.pointerEvents='none';
     /* Default size for boss-reward overlay (where the grid is small); shop screen overrides via CSS */
     if(!document.getElementById('screen-shop')||!document.getElementById('screen-shop').classList.contains('active')){die.style.width='44px';die.style.height='44px';}
@@ -22800,7 +22829,7 @@ function _renderDiceStoreLoadout(){
     var face=[1,5,3,6,4,2][i%6]||5;
     /* Jade always renders blank (wild) in the shop */
     if(mat==='jade')face=6;
-    var die=mkDie(face,mat,'sm');
+    var die=mkDie(face,mat,'sm',true);
     slot.appendChild(die);
     attachDieTooltipTap(slot,mat);
     /* Tap-bounce feedback (animation is scoped to the shop screen via CSS) */
@@ -23235,7 +23264,7 @@ function _renderRewardDice(){
   row.innerHTML='';
   _rewardDice.forEach(function(mat,i){
     var face=[1,2,3,4,5,6][Math.floor(Math.random()*6)];
-    var die=mkDie(face,mat);
+    var die=mkDie(face,mat,null,true);
     die.style.width='44px';die.style.height='44px';die.style.cursor='pointer';
     die.style.transition='transform .15s, opacity .15s';
     if(_rewardDiceLocked&&_rewardDiceLocked[i]){die.style.opacity='0.4';die.style.transform='scale(.9)';die.title=mat+' (locked)';}
@@ -23717,7 +23746,7 @@ function _renderTierLoadout(){
       wrap.dataset.loIdx=String(i);/* used by the long-press swap handler below */
       /* Use mkDie for proper pixel-art dice matching the match screen */
       var face=[1,5,3,6,4,2][i%6]||5;
-      var die=mkDie(face,mat,'sm');
+      var die=mkDie(face,mat,'sm',true);
       wrap.appendChild(die);
       ld.appendChild(wrap);
       /* Attach 3D tooltip with rotating cube */
@@ -24294,7 +24323,7 @@ function _renderBossLoadout(tier){
       wrap.dataset.dieType=mat;
       wrap.dataset.mat=mat||'bone';
       var face=[1,5,3,6,4,2][i%6]||5;
-      var die=mkDie(face,mat,'sm');
+      var die=mkDie(face,mat,'sm',true);
       wrap.appendChild(die);
       bld.appendChild(wrap);
       if(typeof attachDieTooltipTap==='function')attachDieTooltipTap(wrap,mat);

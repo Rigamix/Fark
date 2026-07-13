@@ -662,3 +662,23 @@ select works, reroll tumbles only uncommitted dice, banked 650 clean.
 
 Still flat (next): loadout tiles, shop dice cards, peek-sheet chips —
 plan is small fixed-pose D3 dice.
+
+## P47/P48 — still-pose dice on every display surface (done)
+
+P47: mkDie grew a 4th arg (still) — pose-only D3: no tumble on
+re-render, no group shove, no cast shadow, deterministic small spin
+jitter so rows look hand-placed. Applied to the kept row, the old
+tier/boss loadout tiles, shop dice cards + strip, and reward dice.
+
+P48: the greybox surfaces that drew dice as text boxes / colored
+squares now show real still dice via .d3chip placeholders
+(data-mat/data-val) + _d3ChipScan(root). _gbSheetOpen scans
+automatically, so every sheet gets dice for free. Converted: shop
+dice tab cards (42px), die inspect sheet (54px), enchant pick-your-die
+boxes (26px), loadout equipped row (30px) + satchel (24px), patron
+peek chips (24px, replaces the 18px colored squares). Type shown by
+the placeholder tint (D3.TINT) until real textures land.
+
+Verified live: shop 8/8, loadout 6/6, inspect 1/1, enchant 6/6,
+peek 6/6 chips initialized; visible faces=3, per-face lighting and
+tilt+spin transform chain correct; no console errors.
