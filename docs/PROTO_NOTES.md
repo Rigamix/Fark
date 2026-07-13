@@ -857,3 +857,21 @@ brightness ON EACH FACE; the container filter is cleared. Shade
 overlay, corner radius, original brightness curve and size factors
 all restored. Rule of thumb recorded: on WebKit, filter anything with
 3D-transformed children at the CHILD level.
+
+## P59d-P60 — the iOS standalone bottom-band saga (done)
+
+Installed PWAs on iOS (black-translucent + cover) get a render surface
+clipped ~47px short at the bottom (innerHeight = screen - status bar,
+anchored at the top). Everything below is a SYSTEM letterbox painted
+in the manifest background_color — no CSS/JS can reach it. Failed
+attempts (reverted): stretching body over the deficit + making body
+the fixed-overlay containing block (only pushed content into the
+clipped zone — icons got cut); manifest display:fullscreen (no
+change). Final approach (P60): the game lives inside the real
+viewport; in standalone (html.fkSA) the title/Room bottom vignettes
+deepen to solid #060402 and manifest background_color is warm dark
+#1a0f08, so the band reads as part of the fade. Viewport meta slimmed
+to width+initial-scale+viewport-fit (maximum-scale/user-scalable
+dropped — documented trigger for the short-viewport bug on some iOS
+builds, ignored for pinch anyway). Badge (5-tap logo) tells the
+truth: inner 390x844 = iOS fixed it someday; 390x797 = band blended.
