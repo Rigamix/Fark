@@ -537,7 +537,8 @@ body.gbSheetOn #ptGold,body.gbSheetOn #ptStage .pt-ov{filter:blur(6px) brightnes
 #setSheet>img.bg{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
 #setSheet .rows{position:absolute;left:19%;right:19%;top:14.5%;bottom:17%;
   display:flex;flex-direction:column;justify-content:flex-start;gap:1.2cqh;
-  overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none}
+  overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none;
+  -webkit-overflow-scrolling:touch;touch-action:pan-y}
 #setSheet .rows::-webkit-scrollbar{display:none}
 #setSheet .rows.rules{gap:.7cqh}
 #setSheet .rows.rules .ttl{font-size:3.8cqh;margin-bottom:.6cqh}
@@ -556,7 +557,14 @@ body.gbSheetOn #ptGold,body.gbSheetOn #ptStage .pt-ov{filter:blur(6px) brightnes
 #setSheet .rrow{display:flex;justify-content:space-between;align-items:baseline;
   font-size:2.3cqh;color:#4a2d12;padding:.3cqh 0;flex-shrink:0}
 #setSheet .rrow .v{white-space:nowrap;color:#b8862f;
-  text-shadow:0 -1px 0 rgba(58,32,8,.8),0 1px 0 rgba(255,238,190,.65)}
+  text-shadow:0 -1px 0 rgba(255,238,190,.65),0 1px 0 rgba(58,32,8,.8)}
+#setSheet .df{color:#a03426}
+#setScrollHint{position:absolute;left:50%;bottom:17.5%;transform:translateX(-50%);
+  color:#b8862f;font-size:2.6cqh;pointer-events:none;opacity:0;transition:opacity .25s;
+  text-shadow:0 -1px 0 rgba(255,238,190,.65),0 1px 0 rgba(58,32,8,.8);
+  animation:setHintBob 1.4s ease-in-out infinite}
+#setScrollHint.show{opacity:.9}
+@keyframes setHintBob{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(.7cqh)}}
 #setSheet .rnote{text-align:center;font-size:1.9cqh;color:#4a2d12;opacity:.8;margin-top:.6cqh;line-height:1.35;flex-shrink:0}
 #setX{position:absolute;left:34%;top:89.4%;width:32%;height:8.6%;cursor:pointer;
   display:flex;align-items:center;justify-content:center}
@@ -11906,15 +11914,15 @@ function _gbSettings(page){
   if(page==='rules'){
     function rr(l,v){return '<div class="rrow"><span>'+l+'</span><span class="v">'+v+'</span></div>';}
     body='<div class="ttl">Scoring</div>'
-      +rr('a single 1','100')
-      +rr('a single 5','50')
+      +rr('a single <span class="df">1</span>','100')
+      +rr('a single <span class="df">5</span>','50')
       +rr('three of a kind','face &times;100')
-      +rr('three 1s','1,000')
+      +rr('three <span class="df">1</span>s','1,000')
       +'<div class="rnote">every extra matching die doubles it</div>'
       +'<div class="sep"></div>'
-      +rr('straight 1-5','500')
-      +rr('straight 2-6','750')
-      +rr('full straight 1-6','1,500')
+      +rr('straight <span class="df">1-5</span>','500')
+      +rr('straight <span class="df">2-6</span>','750')
+      +rr('full straight <span class="df">1-6</span>','1,500')
       +rr('three pairs','1,500')
       +rr('two triplets','2,500')
       +'<div class="sep"></div>'
@@ -11933,7 +11941,8 @@ function _gbSettings(page){
   ov.innerHTML='<div id="setStage">'
     +'<div id="setSheet">'
       +'<img class="bg" src="Art/Assets/Panels/Settings/settings.png" alt="">'
-      +'<div class="rows'+(page==='rules'?' rules':'')+'">'+body+'</div>'
+      +'<div class="rows'+(page==='rules'?' rules':'')+'" onscroll="_gbSetHint(this)">'+body+'</div>'
+      +'<div id="setScrollHint">&#9662;</div>'
       +'<div id="setX" onclick="_gbSettingsClose()"><img src="Art/Assets/Panels/close_x.png" alt="close"></div>'
     +'</div>'
     +'</div>';
@@ -11941,8 +11950,17 @@ function _gbSettings(page){
   document.body.classList.add('gbSetOn');
   if(re)ov.classList.add('on');
   else setTimeout(function(){ov.classList.add('on');},30);
+  setTimeout(function(){_gbSetHint();},60);
 }
 function _gbRules(){window._gbSetPage=null;_gbSettings('rules');}
+function _gbSetHint(rows){
+  var h=document.getElementById('setScrollHint');if(!h)return;
+  if(!rows)rows=document.querySelector('#setSheet .rows');
+  if(!rows)return;
+  var more=rows.scrollHeight>rows.clientHeight+4
+    &&rows.scrollTop+rows.clientHeight<rows.scrollHeight-8;
+  h.classList.toggle('show',more);
+}
 function _gbSettingsClose(){
   window._gbSetPage=null;
   var ov=document.getElementById('gbSettings');if(!ov)return;
