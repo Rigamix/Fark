@@ -794,3 +794,16 @@ with the insets (!important beats their inline padding). Home depth:
 when no gyro/pointer input for 2.5s the parallax targets follow a slow
 sine sway (0.33/0.27 rad/s, amp .45/.35) so the 3D effect is visible
 on phones even if motion permission is denied or never granted.
+
+## P56 — iOS round 2 (done)
+
+Reduce Motion on the phone was killing the ENTIRE depth system (the
+early return skipped the render loop, the ambient sway AND the
+motion-permission prompt — why iOS "never asked"). It now only mutes
+the self-running ambient sway; gyro/pointer input and the prompt are
+user-driven and stay active. Permission is requested on both
+DeviceOrientationEvent AND DeviceMotionEvent (iOS prompts
+inconsistently between them). body gets height:100dvh (@supports
+guard) against the standalone bottom dead-band. New remote debug:
+open ...fark_proto.html?hsdebug for an on-screen metrics badge
+(viewport/stage sizes, safe-area insets, standalone, rm/gyro/perm/gl).
