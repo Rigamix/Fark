@@ -892,3 +892,9 @@ dice as still D3 chips (11.5% each) with a one-line persona/lucky/
 cards caption inside the band's foot; sealed/grudge/for-keeps
 callouts sit below on the parchment in seal-red. Values row
 (target/stake/pot) unchanged.
+
+## P61b — painted settings checks (done)
+
+Denis's check_on/check_off icons (Icons/, 64x34) replace the on/off
+text in the settings rows (incl. fast rival). 3.4cqh tall, off state
+slightly dimmed, same tap-bounce on just the toggle.
