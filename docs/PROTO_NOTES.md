@@ -828,3 +828,18 @@ url() stayed in the chain and WebKit dropped the whole filter: every
 die rendered untinted bone. Now an ALLOWLIST: grain only on desktop
 Gecko/Chromium (Firefox|Chrome|Chromium|Edg, and never on iP*);
 everything else always gets tint + material outline.
+
+## P58 — baked pencil outlines (cross-platform) (done)
+
+Denis can't bake outlines into face art (they're engine-drawn), so the
+grain moved into the ALPHA: docs/tools/bake_dice_pencil.py shrinks
+each face 7% onto transparent margin and displaces the whole texture
+with wobble+grain noise fields (240px out; pristine faces auto-
+archived in Art/Assets/Dice/src/). The engine outline is a drop-shadow
+of the faces' alpha silhouette, so it now traces the wobble on EVERY
+engine — the SVG url() filter and its allowlist are deleted. Face
+corner radius dropped (clipped the wobble); the shade overlay div
+would have painted a square over the transparent margins, replaced by
+a deeper brightness range (0.42+0.68*dot). Die size factors bumped
+(match 0.88->0.94, offer 0.72->0.77) to compensate the margin.
+Future material sets: drop <mat>_1..6.png in Dice/ and rerun the tool.

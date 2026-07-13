@@ -646,8 +646,8 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 .d3shadow{position:absolute;left:50%;top:50%;border-radius:50%;
   background:rgba(20,12,6,.5);filter:blur(3px);will-change:transform;pointer-events:none}
 .d3die{position:absolute;inset:0;will-change:transform,filter;pointer-events:none}
-.d3f{position:absolute;inset:0;background-size:cover;will-change:transform;border-radius:3px}
-.d3f .d3sh{position:absolute;inset:0;background:rgb(60,42,24);opacity:0;border-radius:3px}
+.d3f{position:absolute;inset:0;background-size:cover;will-change:transform}
+.d3f .d3sh{display:none}
 /* ═══ PROTO GREYBOX SKIN ═══ */
 @media (min-width:520px){
   body.phone-framed{background:#222 !important;display:flex;align-items:center;justify-content:center;min-height:100vh}
@@ -11080,7 +11080,7 @@ function famRunDraftShow(){
   setTimeout(function(){
     var stg=document.getElementById('nrStage');if(!stg)return;
     [].forEach.call(ov.querySelectorAll('.d3host'),function(hd,i){
-      var sz=Math.round(hd.clientWidth*0.72);
+      var sz=Math.round(hd.clientWidth*0.77);
       var d=D3.make(hd,{size:sz,mat:hd.getAttribute('data-mat'),hover:true,face:1+Math.floor(Math.random()*6)});
       d.slot.style.margin='auto';
       d.pitch=Math.random()*360;d.yaw=Math.random()*360;
@@ -12506,27 +12506,8 @@ var D3={
     vagabond:{c:'#ff6f60',shape:'diamond'},iron:{c:'#c3ccd6',shape:'diamond'},
     flint:{c:'#d8b98a',shape:'dot'},lead:{c:'#a9a9bb',shape:'dot'}}
 };
-D3.ensureFilters=function(){
-  if(document.getElementById('d3PencilSvg'))return;
-  var div=document.createElement('div');
-  div.innerHTML='<svg id="d3PencilSvg" width="0" height="0" style="position:absolute" aria-hidden="true">'
-    +'<filter id="d3pencil" x="-16%" y="-16%" width="132%" height="132%">'
-    +'<feTurbulence type="fractalNoise" baseFrequency="0.085" numOctaves="2" seed="7" result="w"/>'
-    +'<feDisplacementMap in="SourceGraphic" in2="w" scale="2.4" xChannelSelector="R" yChannelSelector="G" result="d1"/>'
-    +'<feTurbulence type="fractalNoise" baseFrequency="0.95" numOctaves="2" seed="3" result="g"/>'
-    +'<feDisplacementMap in="d1" in2="g" scale="1.4" xChannelSelector="R" yChannelSelector="G"/>'
-    +'</filter>'
-    +'<filter id="d3pencilSm" x="-16%" y="-16%" width="132%" height="132%">'
-    +'<feTurbulence type="fractalNoise" baseFrequency="0.14" numOctaves="2" seed="7" result="w"/>'
-    +'<feDisplacementMap in="SourceGraphic" in2="w" scale="1.4" xChannelSelector="R" yChannelSelector="G" result="d1"/>'
-    +'<feTurbulence type="fractalNoise" baseFrequency="1.1" numOctaves="2" seed="3" result="g"/>'
-    +'<feDisplacementMap in="d1" in2="g" scale="0.8" xChannelSelector="R" yChannelSelector="G"/>'
-    +'</filter></svg>';
-  document.body.appendChild(div.firstChild);
-};
 D3.make=function(host,opts){
   opts=opts||{};
-  D3.ensureFilters();
   var size=opts.size||42;
   var slot=document.createElement('div');
   slot.className='d3slot';
@@ -12573,23 +12554,19 @@ D3.rotv=function(n,pitch,yaw,spin){
 D3.draw=function(d){
   var x=d.x+d.ox,h=d.h||0,s=d.s;
   d.die.style.transform='translate('+x+'px,'+(d.y-h*0.55*s)+'px) scale('+(1+h*0.004)+')';
+  /* the outline is a drop-shadow of the faces' alpha silhouette; the
+     pencil wobble is BAKED into the textures (docs/tools/
+     bake_dice_pencil.py) so it renders identically on every engine */
   var ow=D3.cfg.ow,oc=D3.OUT[d.matKey]||'#241407';
   var outline=ow?'drop-shadow('+ow+'px 0 0 '+oc+') drop-shadow(-'+ow+'px 0 0 '+oc+') drop-shadow(0 '+ow+'px 0 '+oc+') drop-shadow(0 -'+ow+'px 0 '+oc+')':'';
-  /* WebKit drops a filter chain that contains an SVG url() reference,
-     losing tints and outlines with it - and standalone iOS doesn't even
-     say "Safari" in its UA. Allowlist the grain to engines that handle
-     it (desktop Gecko/Chromium); everyone else keeps tint + outline. */
-  if(D3._pencilOk===undefined)D3._pencilOk=/(Firefox|Chrome|Chromium|Edg)\//.test(navigator.userAgent)&&!/iP(hone|ad|od)/.test(navigator.userAgent);
-  var pen=(window.D3_PENCIL!==false&&D3._pencilOk)?' url(#'+(d.size>=34?'d3pencil':'d3pencilSm')+')':'';
-  d.die.style.filter=((d.tint?d.tint+' ':'')+outline+pen).trim();
+  d.die.style.filter=((d.tint?d.tint+' ':'')+outline).trim();
   d.faces.forEach(function(f){
     var n=D3.rotv(f.n,d.pitch,d.yaw,d.spin);
     if(n[2]<=0.01){f.el.style.display='none';return;}
     f.el.style.display='block';
     f.el.style.transform='rotateX('+D3.cfg.tilt+'deg) rotateZ('+d.spin+'deg) rotateX('+d.pitch+'deg) rotateY('+d.yaw+'deg) '+f.place;
     var dot=n[0]*D3.LIGHT[0]+n[1]*D3.LIGHT[1]+n[2]*D3.LIGHT[2];
-    f.el.style.filter='brightness('+(0.55+0.55*Math.max(0,dot)).toFixed(2)+')';
-    f.sh.style.opacity=Math.max(0,(0.35-dot)*0.85).toFixed(2);
+    f.el.style.filter='brightness('+(0.42+0.68*Math.max(0,dot)).toFixed(2)+')';
   });
   d.shadow.style.transform='translate('+x+'px,'+(d.y+16*s)+'px) scale('+Math.max(0.5,1-h*0.008)+')';
   d.shadow.style.opacity=Math.max(0.15,0.5-h*0.006);
@@ -13362,7 +13339,7 @@ function _d3InitHost(div,tries){
     return;
   }
   var still=!!div._d3Still;
-  var sz=Math.round(div.clientWidth*0.88);
+  var sz=Math.round(div.clientWidth*0.94);
   var d=D3.make(div,{size:sz,mat:div._trueMat,face:div._trueVal,group:still?null:'match'});
   d.slot.style.position='absolute';
   d.slot.style.left='50%';d.slot.style.top='50%';
