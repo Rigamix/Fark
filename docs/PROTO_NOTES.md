@@ -819,3 +819,12 @@ display:standalone, start_url fark_proto.html, icon serves 200). When
 the game runs in an iOS BROWSER tab it now shows a one-time title
 hint: "for fullscreen: Share -> Add to Home Screen" (localStorage
 fk_a2hs_seen, tap to dismiss).
+
+## P57b — dice tints on iPhone (done)
+
+The P54b Safari guard was a blocklist matching the "Safari" UA token —
+but standalone/home-screen WebKit doesn't SAY Safari, so the pencil
+url() stayed in the chain and WebKit dropped the whole filter: every
+die rendered untinted bone. Now an ALLOWLIST: grain only on desktop
+Gecko/Chromium (Firefox|Chrome|Chromium|Edg, and never on iP*);
+everything else always gets tint + material outline.
