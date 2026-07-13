@@ -752,7 +752,9 @@ injects an inline SVG (feTurbulence fractalNoise + feDisplacementMap)
 and D3.draw appends url(#d3pencil) after tint+outline in the filter
 chain, so the whole die render — outline included — gets a ~1.8px
 hand-drawn wobble matching the painted art's pencil edges. Small
-chips (<34px) use url(#d3pencilSm), scale 1, higher frequency, so
-they don't smear. Inline SVG = file://-safe. Tune: baseFrequency
-(grain size) and feDisplacementMap scale (wobble strength);
-window.D3_PENCIL=false kills it if perf suffers on phone.
+chips (<34px) use url(#d3pencilSm) so they don't smear. Inline SVG =
+file://-safe. v2 (Denis: stronger/rougher): two displacement stages —
+low-freq wobble (0.085, scale 4) so the line drifts like a hand
+stroke, plus high-freq grain (0.95, scale 2.4) for the dry edge;
+chips 0.14/2.2 + 1.1/1.3. Tune those four numbers for rougher or
+cleaner; window.D3_PENCIL=false kills it if perf suffers on phone.
