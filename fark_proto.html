@@ -532,6 +532,10 @@ body.gbSheetOn #ptGold,body.gbSheetOn #ptStage .pt-ov{filter:blur(6px) brightnes
   filter:drop-shadow(0 8px 16px rgba(0,0,0,.45))}
 .hsBtn span{position:relative;z-index:1;font-size:3.1cqh;letter-spacing:.05em;color:#f7ecd2;white-space:nowrap;
   text-shadow:0 2px 0 rgba(16,9,3,.85),0 4px 10px rgba(0,0,0,.55);transform:translateY(-4%)}
+#hsA2hs{position:absolute;left:50%;bottom:max(11%,calc(env(safe-area-inset-bottom) + 9%));transform:translateX(-50%);
+  z-index:5;width:max-content;max-width:88%;background:rgba(20,12,6,.88);color:#e8dcc2;
+  font-size:1.7cqh;line-height:1.4;padding:1cqh 1.6cqh;border-radius:8px;text-align:center;cursor:pointer}
+#hsA2hs b{color:#ffd98a}
 #hsBtnTop{top:60.7%}
 #hsBtnBottom{top:73.3%}
 .hsIcon{position:absolute;bottom:2.2%;width:14.5%;aspect-ratio:1;cursor:pointer;transition:transform .1s}
@@ -11845,6 +11849,11 @@ function _gbTitle(){
     btns+='<div class="hsBtn" id="hsBtnBottom" onclick="_gbNewRun(false)">'
       +'<img src="'+BT+'Button_thick_red.png" alt=""><span>NEW RUN</span></div>';
   }
+  var iosTab=/iP(hone|ad|od)/.test(navigator.userAgent)&&navigator.standalone!==true;
+  if(iosTab&&!localStorage.getItem('fk_a2hs_seen')){
+    btns+='<div id="hsA2hs" onclick="localStorage.setItem(\'fk_a2hs_seen\',1);this.remove()">'
+      +'for fullscreen: <b>Share &#x2192; Add to Home Screen</b>, then open from the icon &#x2715;</div>';
+  }
   host.innerHTML='<div id="hsStage">'
     +'<img class="env" id="hsBase" src="'+HS+'bg.png" alt="">'
     +'<img class="hsPx" id="hsPxNear" src="'+HS+'hs_layer_near.png" onerror="this.style.display=\'none\'" alt="">'
@@ -11993,14 +12002,19 @@ function _hsParallaxStart(){
       _hsPx.ty=Math.max(-1,Math.min(1,(e.beta-45)/28));
       _hsPx.lastIn=performance.now();
     });
-    document.addEventListener('pointerdown',function(){
+    var _askMotion=function(){
       try{
         if(window.DeviceOrientationEvent&&DeviceOrientationEvent.requestPermission&&!_hsPx.gyro)
           DeviceOrientationEvent.requestPermission().then(function(r){_hsPx.perm='or:'+r;}).catch(function(){_hsPx.perm='or:err';});
+        else if(!window.DeviceOrientationEvent||!DeviceOrientationEvent.requestPermission)_hsPx.perm='noAPI';
         if(window.DeviceMotionEvent&&DeviceMotionEvent.requestPermission&&!_hsPx.gyro)
           DeviceMotionEvent.requestPermission().then(function(r){_hsPx.perm=(_hsPx.perm||'')+' mo:'+r;}).catch(function(){});
-      }catch(err){}
-    },{once:false});
+      }catch(err){_hsPx.perm='thrown';}
+    };
+    /* WebKit only counts click/touchend as user activation — pointerdown
+       alone never showed the iOS motion popup */
+    document.addEventListener('click',_askMotion,{once:false});
+    document.addEventListener('touchend',_askMotion,{once:false});
     (function loop(){
       var stg=document.getElementById('hsStage');
       if(stg){
@@ -12685,6 +12699,7 @@ if(/hsdebug/.test(location.search)){
         +'\nstandalone '+(navigator.standalone===true)
         +'\nrm '+(window._hsPx?_hsPx.rm:'-')+' gyro '+(window._hsPx?_hsPx.gyro:'-')
         +'\nperm '+((window._hsPx&&_hsPx.perm)||'-')
+        +'\nrpAPI '+!!(window.DeviceOrientationEvent&&DeviceOrientationEvent.requestPermission)
         +'\ngl '+!!(window._hsGL&&_hsGL.ready);
     },800);
   });

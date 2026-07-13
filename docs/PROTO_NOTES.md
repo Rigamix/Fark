@@ -807,3 +807,15 @@ inconsistently between them). body gets height:100dvh (@supports
 guard) against the standalone bottom dead-band. New remote debug:
 open ...fark_proto.html?hsdebug for an on-screen metrics badge
 (viewport/stage sizes, safe-area insets, standalone, rm/gyro/perm/gl).
+
+## P57 — iOS round 3 (done)
+
+Motion popup: WebKit doesn't grant user-activation to pointerdown, so
+requestPermission silently no-oped — now asked on click+touchend
+(badge also reports rpAPI presence and 'noAPI'/'thrown' states).
+Safari-tab reality: the bottom toolbar band cannot be painted from a
+tab; true fullscreen only in standalone (manifest already
+display:standalone, start_url fark_proto.html, icon serves 200). When
+the game runs in an iOS BROWSER tab it now shows a one-time title
+hint: "for fullscreen: Share -> Add to Home Screen" (localStorage
+fk_a2hs_seen, tap to dismiss).
