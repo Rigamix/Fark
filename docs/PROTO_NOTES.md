@@ -843,3 +843,17 @@ would have painted a square over the transparent margins, replaced by
 a deeper brightness range (0.42+0.68*dot). Die size factors bumped
 (match 0.88->0.94, offer 0.72->0.77) to compensate the margin.
 Future material sets: drop <mat>_1..6.png in Dice/ and rerun the tool.
+
+## P59 — clean outline + per-face filters (the real iOS tint fix) (done)
+
+The baked wobble tore holes at strength — reverted to pristine faces
+(Dice/src/ archive; bake tool kept for future tuning at lower
+amplitudes). And the true reason iPhones showed all-bone dice even
+with no url() in the chain: iOS WebKit IGNORES filters set on a
+parent of 3D-transformed children (the cuboid container) while
+per-face filters work (the dark side faces proved it). Tint + the
+material-colored drop-shadow outline now compose with the lighting
+brightness ON EACH FACE; the container filter is cleared. Shade
+overlay, corner radius, original brightness curve and size factors
+all restored. Rule of thumb recorded: on WebKit, filter anything with
+3D-transformed children at the CHILD level.

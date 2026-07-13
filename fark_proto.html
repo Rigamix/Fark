@@ -646,8 +646,8 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 .d3shadow{position:absolute;left:50%;top:50%;border-radius:50%;
   background:rgba(20,12,6,.5);filter:blur(3px);will-change:transform;pointer-events:none}
 .d3die{position:absolute;inset:0;will-change:transform,filter;pointer-events:none}
-.d3f{position:absolute;inset:0;background-size:cover;will-change:transform}
-.d3f .d3sh{display:none}
+.d3f{position:absolute;inset:0;background-size:cover;will-change:transform;border-radius:3px}
+.d3f .d3sh{position:absolute;inset:0;background:rgb(60,42,24);opacity:0;border-radius:3px}
 /* ═══ PROTO GREYBOX SKIN ═══ */
 @media (min-width:520px){
   body.phone-framed{background:#222 !important;display:flex;align-items:center;justify-content:center;min-height:100vh}
@@ -11080,7 +11080,7 @@ function famRunDraftShow(){
   setTimeout(function(){
     var stg=document.getElementById('nrStage');if(!stg)return;
     [].forEach.call(ov.querySelectorAll('.d3host'),function(hd,i){
-      var sz=Math.round(hd.clientWidth*0.77);
+      var sz=Math.round(hd.clientWidth*0.72);
       var d=D3.make(hd,{size:sz,mat:hd.getAttribute('data-mat'),hover:true,face:1+Math.floor(Math.random()*6)});
       d.slot.style.margin='auto';
       d.pitch=Math.random()*360;d.yaw=Math.random()*360;
@@ -12554,19 +12554,19 @@ D3.rotv=function(n,pitch,yaw,spin){
 D3.draw=function(d){
   var x=d.x+d.ox,h=d.h||0,s=d.s;
   d.die.style.transform='translate('+x+'px,'+(d.y-h*0.55*s)+'px) scale('+(1+h*0.004)+')';
-  /* the outline is a drop-shadow of the faces' alpha silhouette; the
-     pencil wobble is BAKED into the textures (docs/tools/
-     bake_dice_pencil.py) so it renders identically on every engine */
+  /* iOS WebKit ignores filters on a parent of 3D-transformed children,
+     so tint + outline live on each FACE, composed with its lighting */
   var ow=D3.cfg.ow,oc=D3.OUT[d.matKey]||'#241407';
-  var outline=ow?'drop-shadow('+ow+'px 0 0 '+oc+') drop-shadow(-'+ow+'px 0 0 '+oc+') drop-shadow(0 '+ow+'px 0 '+oc+') drop-shadow(0 -'+ow+'px 0 '+oc+')':'';
-  d.die.style.filter=((d.tint?d.tint+' ':'')+outline).trim();
+  var outline=ow?' drop-shadow('+ow+'px 0 0 '+oc+') drop-shadow(-'+ow+'px 0 0 '+oc+') drop-shadow(0 '+ow+'px 0 '+oc+') drop-shadow(0 -'+ow+'px 0 '+oc+')':'';
+  if(d.die.style.filter)d.die.style.filter='';
   d.faces.forEach(function(f){
     var n=D3.rotv(f.n,d.pitch,d.yaw,d.spin);
     if(n[2]<=0.01){f.el.style.display='none';return;}
     f.el.style.display='block';
     f.el.style.transform='rotateX('+D3.cfg.tilt+'deg) rotateZ('+d.spin+'deg) rotateX('+d.pitch+'deg) rotateY('+d.yaw+'deg) '+f.place;
     var dot=n[0]*D3.LIGHT[0]+n[1]*D3.LIGHT[1]+n[2]*D3.LIGHT[2];
-    f.el.style.filter='brightness('+(0.42+0.68*Math.max(0,dot)).toFixed(2)+')';
+    f.el.style.filter=(d.tint?d.tint+' ':'')+'brightness('+(0.55+0.55*Math.max(0,dot)).toFixed(2)+')'+outline;
+    f.sh.style.opacity=Math.max(0,(0.35-dot)*0.85).toFixed(2);
   });
   d.shadow.style.transform='translate('+x+'px,'+(d.y+16*s)+'px) scale('+Math.max(0.5,1-h*0.008)+')';
   d.shadow.style.opacity=Math.max(0.15,0.5-h*0.006);
@@ -13339,7 +13339,7 @@ function _d3InitHost(div,tries){
     return;
   }
   var still=!!div._d3Still;
-  var sz=Math.round(div.clientWidth*0.94);
+  var sz=Math.round(div.clientWidth*0.88);
   var d=D3.make(div,{size:sz,mat:div._trueMat,face:div._trueVal,group:still?null:'match'});
   d.slot.style.position='absolute';
   d.slot.style.left='50%';d.slot.style.top='50%';
