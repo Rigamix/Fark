@@ -11860,6 +11860,7 @@ function _gbTitle(){
     +'<img class="hsDof" id="hsDofNear" src="'+HS+'hs_layer_dofNear.png" onerror="this.style.display=\'none\'" alt="">'
     +'<img class="hsDof" id="hsDofFar" src="'+HS+'hs_layer_dofFar.png" onerror="this.style.display=\'none\'" alt="">'
     +'<img id="hsLogo" src="'+HS+'logo.png" alt="Fark!">'
+    +'<div id="hsLogoTap" style="position:absolute;left:30%;top:13%;width:40%;height:18%;z-index:4"></div>'
     +btns
     +'<div class="hsIcon" id="hsShelf" onclick="_gbShelf()" title="the shelf"><img src="'+IC+'pouch.png" alt="shelf"></div>'
     +'<div class="hsIcon" id="hsBook" onclick="_gbRules()" title="the rules"><img src="'+IC+'book.png" alt="rules"></div>'
@@ -12657,8 +12658,25 @@ D3.start=function(){
   }
   requestAnimationFrame(frame);
 };
-/* on-screen metrics for remote phone debugging: open ...?hsdebug */
-if(/hsdebug/.test(location.search)){
+/* on-screen metrics for remote phone debugging: open ...?hsdebug —
+   or tap the title logo 5x fast (works in the installed app, where the
+   query string and Safari's localStorage don't carry over) */
+if(/hsdebug/.test(location.search))try{localStorage.setItem('fk_dbg','1');}catch(e){}
+(function(){
+  var taps=[],ok=false;
+  try{ok=localStorage.getItem('fk_dbg')==='1';}catch(e){}
+  document.addEventListener('click',function(e){
+    var t=e.target;
+    if(!t||t.id!=='hsLogoTap')return;
+    var now=performance.now();
+    taps=taps.filter(function(x){return now-x<1600;});taps.push(now);
+    if(taps.length>=5){
+      taps=[];
+      try{localStorage.setItem('fk_dbg',localStorage.getItem('fk_dbg')==='1'?'0':'1');}catch(e2){}
+      location.reload();
+    }
+  });
+  if(!ok&&!/hsdebug/.test(location.search))return;
   window.addEventListener('load',function(){
     var b=document.createElement('div');
     b.style.cssText='position:fixed;left:4px;top:30%;z-index:99999;background:rgba(0,0,0,.75);'
@@ -12683,7 +12701,7 @@ if(/hsdebug/.test(location.search)){
         +'\ngl '+!!(window._hsGL&&_hsGL.ready);
     },800);
   });
-}
+})();
 /* ═══════════════ end family engine ═══════════════ */
 
 function scoreRoll(vals,cards,locked,context,dieMats){
