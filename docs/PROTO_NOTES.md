@@ -771,3 +771,15 @@ self-destruct stub, so phones with the old PWA cached get wiped on
 first visit. DEPLOY FLOW: commit in worktree -> ff-merge root ->
 git push origin fark (root checkout is the fark branch).
 BACK button on the offer focus: 46% -> 56% wide, lower, bigger text.
+
+## P54b — Pages fixes after Denis's phone test (done)
+
+Broken fonts/hearts/gold on the live build: GitHub Pages runs Jekyll
+by default and Jekyll EXCLUDES underscore-prefixed dirs — everything
+under assets/_mockups/ 404'd (JMH Beda.ttf, heart_full/empty, gold
+plate, panel sheets, sit/close buttons). Fix: .nojekyll at branch
+root. Dice-all-look-the-same on iPhone: Safari drops a CSS filter
+chain that contains an SVG url() reference, killing tints+outlines —
+the pencil grain now skips Safari (UA guard, D3._noUrlFilter); tint
+and outline drop-shadows stay. Home-screen gyro parallax on iOS
+already requests motion permission on first tap.
