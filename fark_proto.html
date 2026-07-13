@@ -444,10 +444,12 @@ body{
 @keyframes nrHandIn{from{transform:translateY(-4.5%)}to{transform:translateY(0)}}
 @keyframes nrShadowIn{from{transform:translate(1.2%,-2.6%)}to{transform:translate(0,0)}}
 @media (prefers-reduced-motion:reduce){#nrHand,#nrShadow{animation:none}}
-#nrChalk{position:absolute;left:50%;top:4.8%;transform:translateX(-50%);z-index:4;
-  color:#f0e9da;font-size:3.5cqh;line-height:1.32;text-align:center;width:max-content;
+#nrChalk{position:absolute;left:50%;top:7.2%;transform:translateX(-50%);z-index:4;
+  color:#f0e9da;font-size:4.2cqh;line-height:1.55;text-align:center;width:max-content;
   text-shadow:0 2px 0 rgba(16,9,3,.85),0 4px 14px rgba(0,0,0,.75);
   transition:opacity .3s}
+#nrChalk .nrN{color:#ffd98a;letter-spacing:.06em;
+  text-shadow:0 2px 0 rgba(58,32,8,.85),0 4px 14px rgba(0,0,0,.75)}
 #famRunDraft.focus #nrChalk{opacity:0}
 #nrDice{position:absolute;left:0;right:0;top:47%;z-index:3;display:flex;gap:6%;
   justify-content:center}
@@ -466,10 +468,9 @@ body{
 #famRunDraft.focus #nrScrim{opacity:1;pointer-events:auto}
 #famRunDraft.focus img.nr-env{filter:blur(6px) brightness(.55)}
 #famRunDraft.focus #nrDice{z-index:7}
-#famRunDraft.focus .nrdie:not(.zoom){opacity:.08;pointer-events:none}
+#famRunDraft.focus .nrdie:not(.zoom){opacity:0;pointer-events:none}
 #nrDice .nrdie{transition:transform .12s,opacity .35s}
 .nrdie.zoom{z-index:8}
-.nrdie.zoom .sub{opacity:0;transition:opacity .25s}
 .nrglow{position:absolute;left:50%;top:33%;width:210%;aspect-ratio:1;transform:translate(-50%,-50%);
   z-index:-1;opacity:0;transition:opacity .5s;pointer-events:none;
   background:radial-gradient(circle,rgba(255,208,120,.48) 0%,rgba(255,180,80,.2) 34%,rgba(255,160,60,.07) 56%,transparent 72%)}
@@ -481,11 +482,9 @@ body{
   box-shadow:0 0 6px 2px rgba(255,190,90,.55);opacity:0;animation:nrSpark 2.6s linear infinite}
 @keyframes nrSpark{0%{opacity:0;transform:translate(var(--px),26px) scale(.5)}
   18%{opacity:.95}100%{opacity:0;transform:translate(calc(var(--px) + var(--dx)),-96px) scale(1.05)}}
-#nrFocusPanel{position:absolute;left:6%;right:6%;top:51%;z-index:8;text-align:center;color:#fff;
+#nrFocusPanel{position:absolute;left:6%;right:6%;top:57%;z-index:8;text-align:center;color:#fff;
   opacity:0;pointer-events:none;transform:translateY(3%);transition:opacity .4s,transform .4s}
 #famRunDraft.focus #nrFocusPanel{opacity:1;pointer-events:auto;transform:none;transition-delay:.18s}
-#nrFocusPanel .fname{font-size:5cqh;letter-spacing:.04em;
-  text-shadow:0 3px 0 rgba(16,9,3,.8),0 6px 18px rgba(0,0,0,.6)}
 #nrFocusPanel .ffaces{font-size:3cqh;color:#ffd98a;letter-spacing:.12em;margin-top:1cqh;
   white-space:nowrap;text-shadow:0 2px 0 rgba(58,32,8,.75),0 3px 10px rgba(0,0,0,.5)}
 #nrFocusPanel .fdesc{font-size:2.4cqh;line-height:1.45;color:#f2e9d8;margin:1.3cqh auto 0;max-width:88%;
@@ -11057,7 +11056,7 @@ function famRunDraftShow(){
     +'<img class="nr-env" id="nrHand" src="'+NR+'hand.png" alt="">'
     +'<div id="nrScrim" onclick="_nrUnfocus()"></div>'
     +'<div id="nrDice">'+dice+'</div>'
-    +'<div id="nrChalk">FIRST NIGHT<br>the innkeep offers<br>a die with your ale</div>'
+    +'<div id="nrChalk"><span class="nrN">FIRST NIGHT</span><br>the innkeep offers<br>a die with your ale</div>'
     +'<div id="nrFocusPanel"></div>'
     +'</div>';
   document.body.appendChild(ov);
@@ -11084,11 +11083,16 @@ function _nrFocus(i){
   _nrFocused=i;
   var stg=document.getElementById('nrStage');
   var host=die.querySelector('.d3host');
-  var sr=stg.getBoundingClientRect(),hr=host.getBoundingClientRect();
-  var dx=(sr.left+sr.width/2)-(hr.left+hr.width/2);
-  var dy=(sr.top+sr.height*0.37)-(hr.top+hr.height/2);
+  var sr=stg.getBoundingClientRect(),hr=host.getBoundingClientRect(),nr=die.getBoundingClientRect();
+  /* scale happens about the tile's own centre, so project the host centre
+     through the scale before solving for the translate */
+  var K=2.05;
+  var ncx=nr.left+nr.width/2,ncy=nr.top+nr.height/2;
+  var hcx=hr.left+hr.width/2,hcy=hr.top+hr.height/2;
+  var dx=(sr.left+sr.width/2)-(ncx+(hcx-ncx)*K);
+  var dy=(sr.top+sr.height*0.37)-(ncy+(hcy-ncy)*K);
   die.style.transition='transform .55s cubic-bezier(.3,1.35,.35,1),opacity .35s';
-  die.style.transform='translate('+dx+'px,'+dy+'px) scale(2.05)';
+  die.style.transform='translate('+dx+'px,'+dy+'px) scale('+K+')';
   die.classList.add('zoom');
   var pts=die.querySelector('.nrparts');
   if(pts){pts.innerHTML='';
@@ -11103,8 +11107,7 @@ function _nrFocus(i){
   var mt=_starterOffer[i],dt=getDie(mt);
   var acc=function(t){return String(t).replace(/(\d+)/g,'<span class="num">$1</span>');};
   var pan=document.getElementById('nrFocusPanel');
-  pan.innerHTML='<div class="fname">'+dt.name+'</div>'
-    +'<div class="ffaces">'+acc((dt.faces||[1,2,3,4,5,6]).join(' · '))+'</div>'
+  pan.innerHTML='<div class="ffaces">'+acc((dt.faces||[1,2,3,4,5,6]).join(' · '))+'</div>'
     +(dt.desc?'<div class="fdesc">'+acc(dt.desc)+'</div>':'')
     +'<div id="nrTakeBtn" onclick="famRunDraftPick('+i+')"><img src="Art/Assets/Buttons/Button_thick_green.png" alt=""><span>TAKE IT</span></div>'
     +'<div id="nrBackBtn" onclick="_nrUnfocus()"><img src="Art/Assets/Buttons/Button_thin_red.png" alt=""><span>BACK</span></div>';
@@ -12453,7 +12456,10 @@ var D3={
     obsidian:'brightness(.45) contrast(1.35) sepia(.3) hue-rotate(-25deg) saturate(1.6)',
     starstone:'sepia(.7) hue-rotate(170deg) saturate(1.6) brightness(.9)',
     vagabond:'sepia(.7) hue-rotate(-45deg) saturate(2.2) brightness(.95)',
-    lucky:'sepia(.9) hue-rotate(5deg) saturate(2.4) brightness(1.12)'}
+    lucky:'sepia(.9) hue-rotate(5deg) saturate(2.4) brightness(1.12)'},
+  OUT:{bone:'#241407',iron:'#1d2126',flint:'#332412',lead:'#1f1f26',
+    amber:'#7a3a08',jade:'#14501e',jade2:'#175c22',silver:'#343c46',
+    obsidian:'#2a0d0b',starstone:'#1c4a74',vagabond:'#571412',lucky:'#7a5408'}
 };
 D3.make=function(host,opts){
   opts=opts||{};
@@ -12477,7 +12483,7 @@ D3.make=function(host,opts){
   host.appendChild(slot);
   var d={slot:slot,die:die,faces:faces,shadow:sh,size:size,s:size/42,
     spin:0,pitch:0,yaw:0,x:0,y:0,h:0,ox:0,oxv:0,slotX:0,phase:'idle',
-    result:opts.face||1,tint:D3.TINT[opts.mat]||'',hover:!!opts.hover,
+    result:opts.face||1,tint:D3.TINT[opts.mat]||'',matKey:opts.mat||'bone',hover:!!opts.hover,
     hoverPh:Math.random()*6.28,group:opts.group||null};
   var fr=D3.FACE_ROT[d.result];d.pitch=fr[0];d.yaw=fr[1];
   D3.list.push(d);D3.draw(d);D3.start();
@@ -12503,9 +12509,9 @@ D3.rotv=function(n,pitch,yaw,spin){
 D3.draw=function(d){
   var x=d.x+d.ox,h=d.h||0,s=d.s;
   d.die.style.transform='translate('+x+'px,'+(d.y-h*0.55*s)+'px) scale('+(1+h*0.004)+')';
-  var ow=D3.cfg.ow,oc='#241407';
+  var ow=D3.cfg.ow,oc=D3.OUT[d.matKey]||'#241407';
   var outline=ow?'drop-shadow('+ow+'px 0 0 '+oc+') drop-shadow(-'+ow+'px 0 0 '+oc+') drop-shadow(0 '+ow+'px 0 '+oc+') drop-shadow(0 -'+ow+'px 0 '+oc+')':'';
-  d.die.style.filter=(outline+' '+d.tint).trim();
+  d.die.style.filter=((d.tint?d.tint+' ':'')+outline).trim();
   d.faces.forEach(function(f){
     var n=D3.rotv(f.n,d.pitch,d.yaw,d.spin);
     if(n[2]<=0.01){f.el.style.display='none';return;}

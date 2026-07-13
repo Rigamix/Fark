@@ -716,3 +716,21 @@ Dice row 41.5% -> 47%, labels ride with it. Focus: die target y
 51%, faces row one line (3cqh, .12em), desc smaller (2.4cqh),
 TAKE IT bigger (80% wide, native 1136/334 plate), painted thin-red
 BACK button replaces the tap-elsewhere hint (scrim tap still works).
+
+## P51 — offer round 3 + material outlines (done)
+
+Banner: 4.2cqh, line-height 1.55, top 7.2%, FIRST NIGHT in gold
+(.nrN accent — it's run-tracking info). Focus: the other two dice hide
+completely (opacity 0), and the die's own name label now rides the
+zoom (scales 2.05 with the tile) to become the focus-screen title —
+no separate .fname, the panel starts with the faces row at 57%. Focus
+translate math fixed to project the host centre through the scale
+(scale is about the tile centre; the old direct-delta landed ~11%
+high) — die now lands exactly at (50%, 37%), label ~50.7%.
+
+Engine-wide: die outlines are no longer black. D3.OUT maps each
+material to a darker, more saturated version of its own colour
+(amber #7a3a08, jade #14501e, starstone #1c4a74, obsidian #2a0d0b,
+silver #343c46, vagabond #571412, lucky #7a5408, ...; bone keeps the
+warm near-black). Tint now applies BEFORE the drop-shadow outline in
+the filter chain so the outline colour stays exact.
