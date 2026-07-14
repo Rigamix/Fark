@@ -942,3 +942,15 @@ Sealed seat: the black wax dot is gone. The card gets a smoke ring —
 four blurred violet wisps drifting around the frame (inset -13%,
 z-order behind the card layers) plus 7 rising dark sparks along the
 edges — so the mark reads instantly without covering the portrait.
+
+## P64c — the vanished patrons (all browsers) (done)
+
+P64's smoke CSS added `.ptcard .cwrap{position:relative}` — but .cwrap
+was intentionally UNSTYLED: the card layers (.ly, absolute inset:0)
+anchor to .ptcard. Positioning .cwrap made it their containing block,
+and since it has zero flow height every layer collapsed to 0px — only
+the trait seal (own width + aspect-ratio) survived, which is why the
+Room showed nothing but small red seals at the card spots on phone AND
+Firefox. Rule deleted; the smoke ring now sits at z:-1 inside the
+card's stacking context (z:3) instead. Lesson in the CSS comment:
+never style .cwrap.
