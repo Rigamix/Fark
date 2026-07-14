@@ -954,3 +954,17 @@ Room showed nothing but small red seals at the card spots on phone AND
 Firefox. Rule deleted; the smoke ring now sits at z:-1 inside the
 card's stacking context (z:3) instead. Lesson in the CSS comment:
 never style .cwrap.
+
+## P65 — GROG overhead + opaque smoke (done)
+
+Boss name is now just GROG (rank line supported via tier.boss.title
+if one ever exists), 8.4cqh gold, at the top of the room BETWEEN the
+env bg and fg layers, so Grog's art overlaps the letters; still opens
+the peek (env imgs are pointer-events:none). Progress block moved up
+(47.8%) and grew (lozenges 6.2cqh, text 3cqh) with clear air between
+it and the name. Dimmed lozenges: saturate(.3) brightness(.72), NO
+transparency — Denis's art rule recorded: never semi-transparent
+objects in this game. Sealed smoke v2: sharp opaque violet blobs
+(#5e4d7a/#54446e/#493a61, no blur) with big wobble (morphing
+border-radius + drift/rotate/scale keyframes), diamond sparks that
+grow/shrink instead of alpha-fading.
