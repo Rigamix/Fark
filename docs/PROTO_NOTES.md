@@ -925,3 +925,20 @@ Name up (title 4cqh, name 6.2cqh), seal down (13.5%), trait word up
 band's foot as short cream/parchment tags (they were overlapping the
 Target row); the tell's rule text joins the lucky/cards line below
 the band.
+
+## P64 — boss progress lozenges + sealed smoke (done)
+
+Boss row much bigger (title 3.7cqh) and moved up over Grog (50.6%,
+z6); patron cards dropped 4.2% (tops ~66-67.6%). Progress = Denis's
+Icons/Wins lozenges (00 cold blue -> 03 red): one per required win,
+earned slots wear the current heat (start->0, progressing->1, one
+away->2, ready->3), empty slots dimmed cold; 4.8cqh tall. Text reads
+"You need N more wins" with the count phrase accented in the exact
+heat colour (HEAT map) — re-renders after every match, so it walks
+blue->red as the night progresses. Ready: GROG IS WAITING, all
+lozenges red, "a heart at stake" accented red.
+
+Sealed seat: the black wax dot is gone. The card gets a smoke ring —
+four blurred violet wisps drifting around the frame (inset -13%,
+z-order behind the card layers) plus 7 rising dark sparks along the
+edges — so the mark reads instantly without covering the portrait.
