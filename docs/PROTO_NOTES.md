@@ -991,3 +991,23 @@ baked in the new art — overlays hidden, hit zones moved onto the baked
 buttons (sit 14/81 72x9.5, X 78/87 18x8). Press-bounce feedback on
 those buttons is gone for now (art is baked); revisit if Denis wants
 it back via cropped button sprites.
+
+## P67 — panel round 5 + sealed rework (done)
+
+Room card: crisp outline now a border ELEMENT (.csout, 3px #3d2f52,
+radius 7%) — the old 4-way drop-shadow filter wrapped the translucent
+smoke and everything read blurry. Panel: SEALED label gone; a sealed
+seat's PANEL wears the same treatment (#ptvOutline border rect +
+#ptvSmoke band reusing the .csmoke classes, sheet.sealed toggles).
+Seal bigger (15.5%) under the centred name, trait 3cqh under it.
+Card count = fanned mini-card icons (#ptvFan) straddling the band's
+bottom line. Lucky die: name text dropped; its chip glows gold
+(.d3chip.lux::before). Dice centred in the band; shadows are now
+DIE-SHAPED sharp offset silhouettes (d.dieShadow -> per-face
+drop-shadow in D3.draw), ellipse hidden. Values re-anchored to the
+art's rule lines (66.4/73.4/81.7% -> bottoms 34.2/27.2/18.9). SIT
+DOWN painted green button restored (new base doesn't bake it), X at
+the true bottom corner (80/90). Sheet sits lower (52.6%). Panel-open:
+GROG + nav fade out; hearts/gold/NIGHT stay clean above the scrim
+(z9); only bg/fg/bossbar/chips blur. Tell rule text lives below the
+band (55%) pending Denis's placement pass.
