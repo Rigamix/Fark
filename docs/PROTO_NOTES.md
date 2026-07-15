@@ -968,3 +968,12 @@ objects in this game. Sealed smoke v2: sharp opaque violet blobs
 (#5e4d7a/#54446e/#493a61, no blur) with big wobble (morphing
 border-radius + drift/rotate/scale keyframes), diamond sparks that
 grow/shrink instead of alpha-fading.
+
+## P65j — GROG-only peek + purple sealed frame (done)
+
+The boss peek opens ONLY from tapping the GROG name (progress block is
+pointer-events:none). Sealed seats always wear the PURPLE card set
+(bg/frame_bg/frame_fg_purple regardless of seat index) plus a violet
+glow (two stacked drop-shadows on .ptcard.sealedFx) matching the smoke
+band. NIGHT chip is a plain label now — rules access is title-screen
+book icon only.
