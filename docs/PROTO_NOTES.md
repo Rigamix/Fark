@@ -977,3 +977,17 @@ pointer-events:none). Sealed seats always wear the PURPLE card set
 glow (two stacked drop-shadows on .ptcard.sealedFx) matching the smoke
 band. NIGHT chip is a plain label now — rules access is title-screen
 book icon only.
+
+## P66 — panel on the extended base (done)
+
+Krox.png grew to 1080x2011 (extended bottom). Sheet aspect + width
+clamp updated (50.3cqh), every anchor rescaled: band 41.0-51.8%, dice
+41.5/7.8, xtra 49.2, luck 52.6, values bottoms 40.6/31.6/23.1. Name
+CENTERED in the right column (3.8/6cqh), wax seal smaller (10.5%) at
+the portrait's bottom-right corner, trait word 2.3cqh beside it. The
+old full-sheet button overlays (btn_sit_full/btn_close_full) can't
+align with the new aspect (contain letterboxing) and the buttons are
+baked in the new art — overlays hidden, hit zones moved onto the baked
+buttons (sit 14/81 72x9.5, X 78/87 18x8). Press-bounce feedback on
+those buttons is gone for now (art is baked); revisit if Denis wants
+it back via cropped button sprites.
