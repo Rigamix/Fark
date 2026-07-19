@@ -1075,3 +1075,15 @@ transparent (brown bar gone), bank-to-win width-swap via :has, old
 soft glow removed. Race bar narrowed clear of the tokens (17.5%).
 Dice: clamp(58px,15vw,76px) (~76px) and raised to the centre band
 (47%) via the #diceArea spacer vars (--sp-before 1.1/--sp-after 2.4).
+
+## P72 — match pass 3 (done)
+
+Aliasing killed: the body's image-rendering:pixelated was smearing
+every scaled match asset — match plate/props/buttons/bar/tokens all
+render auto/antialiased now. Props: anchors 12-26%, 5-6 per match,
+ALWAYS >=1 coins prop + >=1 cup/vessel (guaranteed picks before the
+rest). Race bar wider (14% margins); the target number sits IN the
+crest badge hanging under the bar (top:108%, 17px ink). Patron token:
+grey metal ring (ring_02), 72px, hangs BELOW the bar's left end,
+portrait crop loosened (175% @ 50%/12%) so the face fits. Player side
+is text only (total + YOU) — no player portrait.
