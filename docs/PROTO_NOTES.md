@@ -1216,3 +1216,12 @@ dice already land in loadout order with homeX=0 (no drift) and the
 engine shove can't swap DOM order. NOT yet implementable: curse
 marks/PRESERVE casing/SLEIGHT rewind (those mechanics don't exist in
 the engine yet) — the per-die record structure is ready for them.
+
+## P80b — tag noise + labels (done)
+
+BANK label back to plain BANK / BANK TO WIN (thousands wouldn't fit
+the plate; the TURN tag and selection total carry the numbers). A
+selection whose single tag equals the total (triple 3s, one lone 5)
+shows only the centred total — per-die tags appear only when they add
+information. YIELD text sized to exactly match ROLL's (6.2cqw;
+verified identical computed size).

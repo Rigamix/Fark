@@ -719,7 +719,7 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
   background:url('Art/Assets/Match/Yield.png') center/100% 100% no-repeat;z-index:54;
   image-rendering:auto;transition:transform .1s}
 #btnYield:active{background-image:url('Art/Assets/Match/Yield_pressed.png')}
-#btnYield span{font-family:'JMH Beda',serif;font-size:5cqw;letter-spacing:.08em;color:#f7ecd2;
+#btnYield span{font-family:'JMH Beda',serif;font-size:6.2cqw;letter-spacing:.08em;color:#f7ecd2;
   text-shadow:0 2px 0 rgba(16,9,3,.85),0 4px 10px rgba(0,0,0,.5)}
 #btnYield.on{display:flex}
 #activateZone.dragging-active ~ #btnYield,#activateZone.hot ~ #btnYield{display:none !important}
@@ -14881,10 +14881,7 @@ function setBtns(r,b){
     var _inner=bankBtn.querySelector('.btn-inner');
     var _wins=!!(G&&b&&(G.pPts+(G.turnPts||0)+(typeof _selPts==='function'?_selPts():0))>=G.target);
     bankBtn.classList.toggle('bank-to-win',_wins);
-    if(_inner){
-      var _amt=(G?(G.turnPts||0)+(typeof _selPts==='function'?_selPts():0):0);
-      _inner.textContent=_wins?'BANK TO WIN':(_amt>0?'BANK '+_amt:'BANK');
-    }
+    if(_inner)_inner.textContent=_wins?'BANK TO WIN':'BANK';
   }catch(e){}
   if(r)rollBtn.classList.remove('disabled');else rollBtn.classList.add('disabled');
   try{var _yb=document.getElementById('btnYield');if(_yb)_yb.classList.toggle('on',!!((r||b)&&G&&G._anyPlayerRoll));}catch(e){}
@@ -16576,20 +16573,23 @@ function _renderSelTags(selD,total,valid){
   function _tag(host,txt){var t=document.createElement('div');t.className='selTag';t.textContent=txt;host.appendChild(t);}
   var counts={};selD.forEach(function(d){counts[d.val]=(counts[d.val]||0)+1;});
   if(valid&&total>0){
-    var comboDice=[],singleSum=0;
+    var comboDice=[],singleSum=0,planned=[];
     selD.forEach(function(d){
       if(!d.el)return;
       if(counts[d.val]>=3){comboDice.push(d);return;}
-      if(d.val===1){singleSum+=100;_tag(d.el,'+100');}
-      else if(d.val===5){singleSum+=50;_tag(d.el,'+50');}
+      if(d.val===1){singleSum+=100;planned.push([d.el,100]);}
+      else if(d.val===5){singleSum+=50;planned.push([d.el,50]);}
       else comboDice.push(d);
     });
     var rest=total-singleSum;
     if(rest>0&&comboDice.length){
       comboDice.sort(function(a,b){return a.el.getBoundingClientRect().left-b.el.getBoundingClientRect().left;});
       var mid=comboDice[(comboDice.length-1)>>1];
-      if(mid.el)_tag(mid.el,'+'+rest.toLocaleString());
+      if(mid.el)planned.push([mid.el,rest]);
     }
+    /* one tag that just repeats the total is noise — the total suffices */
+    if(!(planned.length===1&&planned[0][1]===total))
+      planned.forEach(function(t2){_tag(t2[0],'+'+t2[1].toLocaleString());});
   }
   var row=document.getElementById('playerDiceRow');
   var area=document.querySelector('#screen-match .dice-area');
