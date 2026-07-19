@@ -1148,3 +1148,17 @@ draws its own rectangle — suppressed for 3D dice. Match dice tilt
 the die's outline flips to bright gold (#ffd061) at 1.8x width and a
 double warm halo wraps the silhouette (0.14 + 0.32 die-size
 drop-shadows) — all engine-drawn per face, iOS-safe.
+
+## P77 — match pass 8 (done)
+
+Dice: I had "less top down" inverted — the table camera is HIGH, so
+match dice now rest VALUE-UP viewed from above (d.restTop lifts every
+roll/settle target by +90 pitch through D3.roll/setFace; camera tilt
+-30). Verified all six settle value-top. New narrower ScoreBar art
+(3020x304): bar spans to 2% margins, number 5.2cqw at top 33%.
+PATRON/YOU labels removed (Denis's parchment name plate to come).
+Button STATE art wired: Roll/Bank default/pressed/inactive pngs (all
+dim filters off — the art carries state; the mid-roll disabled swap
+verified). Card activation area now wears the YIELD plate (zone
+reshaped to the plate's 720/218 aspect, dashed border gone, hot ->
+Yield_pressed, unavailable -> desaturate).
