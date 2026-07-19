@@ -1113,3 +1113,15 @@ hidden in matches. Dialogue: square portrait frame hidden, strip is
 a slim parchment quote under the HUD (14cqw). Prop zones: top
 clusters start below the HUD (y>=16), bottom clusters capped (45)
 clear of the kept pile.
+
+## P75 — match pass 6 (done)
+
+Props can no longer touch the dice band: top clusters y15-25 with the
+partner stacked in the same margin column, bottom cluster is BR only
+(partner below it), BL is a small edge single, the opposite-top single
+sits above the band — verified zero prop centres within the rolled
+dice band ±3%. Player token restored as the bronze ring placeholder,
+same size/baseline as the patron token (names + totals aligned). Race
+bar bigger (11% margins), number seated on the crest (top 55%).
+Disabled buttons stay fully opaque (filter dim only). Pause sits
+bottom-left, level with the loadout chest.
