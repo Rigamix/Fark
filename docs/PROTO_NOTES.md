@@ -1027,3 +1027,11 @@ between band and rows (53.6%); values re-anchored to the new rules
 (68.4/75.5/82.5 -> bottoms 32/25.1/18.1) and shrunk to 3.3cqh;
 SIT DOWN on the stretched 1430/334 plate (72% wide, shorter);
 grudge/FK tags at 61.6%; die drop-shadows removed.
+
+## P69 — sealed reward callout (done)
+
+Sealed panels show, above the character name: N win-lozenges + "worth
+N wins" (N=2, or 3 with Marked Table). The lozenges render in the heat
+stage the run would REACH if you won this match (need 2, have 0 -> two
+red 03s = "this puts you at the boss"), so the shortcut to the boss is
+visible at a glance. Non-sealed panels show nothing there.
