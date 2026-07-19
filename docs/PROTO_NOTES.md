@@ -1062,3 +1062,16 @@ Verified live: plate+3 seeded margin props, portrait token, roll,
 select -> "BANK 50", bank -> fill 1.79%/score 50, boss toggle hides
 plate+props. Next passes: kept-pile tag, selection chalk tag styling,
 card backs + rule notes, paws, boss hearts row.
+
+## P71 — match pass 2 (Denis's reference) (done)
+
+Props: chunky corner-weighted authored clusters (12-24% wide, edge
+crop welcome), not an even sprinkle. Buttons: the OLD layout
+absolutely centred ROLL (left:50% translate) and pushed BANK right
+with margin-left:auto — that's why order/flex had no effect and the
+plates overlapped; overridden (position:relative, margin 0), plates
+keep native aspect via width+aspect-ratio+contain, controls strip
+transparent (brown bar gone), bank-to-win width-swap via :has, old
+soft glow removed. Race bar narrowed clear of the tokens (17.5%).
+Dice: clamp(58px,15vw,76px) (~76px) and raised to the centre band
+(47%) via the #diceArea spacer vars (--sp-before 1.1/--sp-after 2.4).
