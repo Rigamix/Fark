@@ -1087,3 +1087,16 @@ crest badge hanging under the bar (top:108%, 17px ink). Patron token:
 grey metal ring (ring_02), 72px, hangs BELOW the bar's left end,
 portrait crop loosened (175% @ 50%/12%) so the face fits. Player side
 is text only (total + YOU) — no player portrait.
+
+## P73 — match pass 4: measured + rule-based (done)
+
+Real cause of "texts too small": px sizes against a scaling shell —
+#screen-match is a size container now and every dressed size is cqw
+(texts, tokens, pause, dice 15cqw). Target number sits at the
+MEASURED crest (a centre badge ON the bar, x44-56% — not hanging
+below). Patron token crops come from per-character alpha
+measurements (CROP map: Krox/Eira/Nebb/Regis). Props are RULES now:
+intrinsic real-world sizes per sprite (coin 8 -> towel 20), two
+diagonal corner clusters of two (big prop anchors the cluster,
+smaller rides beside), 1-2 side singles, coin+cup guaranteed, 5-6
+total, jitter everywhere, centre band never spawns.
