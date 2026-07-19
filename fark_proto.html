@@ -793,7 +793,9 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 #btnBank.bank-to-win .btn-inner{color:#3a2408;text-shadow:0 1px 0 rgba(255,242,205,.55);font-size:6cqw}
 #screen-match .controls:has(#btnBank.bank-to-win) #btnRoll{width:35%;aspect-ratio:1135/409}
 /* dice: bigger and raised toward the centre band */
-#screen-match .die{width:15cqw;height:15cqw}
+#screen-match .die{width:13cqw;height:13cqw}
+#screen-match .player-dice-row{gap:3cqw}
+#screen-match .opp-dice-row{gap:3cqw}
 #screen-match .die.sm{width:8.7cqw;height:8.7cqw}
 #screen-match #diceArea{--sp-before:1.1;--sp-after:2.4}
 /* ═══ iOS safe areas — art bleeds under the notch, HUD steps clear ═══ */
@@ -808,6 +810,8 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 .die.d3on::before,.die.d3on::after{display:none !important}
 .die.d3on.rolling{animation:none !important}
 .die.d3on .dc{display:none !important}
+.die.d3on.selected{box-shadow:none !important}
+.die.d3on.selected::before{display:none !important}
 .d3chip{display:inline-block;position:relative;vertical-align:middle;flex-shrink:0}
 .d3chip .die{position:absolute;inset:0;width:100% !important;height:100% !important;cursor:inherit;box-shadow:none}
 .d3chip .die:active{transform:none}
@@ -12836,6 +12840,9 @@ D3.rotv=function(n,pitch,yaw,spin,turn,tilt){
   return[x,y3,z3];
 };
 D3.draw=function(d){
+  /* selection glow mirrors the host's .selected class — single source of
+     truth so every select/deselect path stays honest */
+  try{d._selGlow=!!(d.slot&&d.slot.parentNode&&d.slot.parentNode.classList.contains('selected'));}catch(e){d._selGlow=false;}
   var x=d.x+d.ox,h=d.h||0,s=d.s;
   d.die.style.transform='translate('+x+'px,'+(d.y-h*0.55*s)+'px) scale('+(1+h*0.004)+')';
   /* iOS WebKit ignores filters on a parent of 3D-transformed children,
@@ -12851,7 +12858,8 @@ D3.draw=function(d){
     f.el.style.transform='rotateX('+tl+'deg)'+(d.turn?' rotateY('+d.turn+'deg)':'')+' rotateZ('+d.spin+'deg) rotateX('+d.pitch+'deg) rotateY('+d.yaw+'deg) '+f.place;
     var dot=n[0]*D3.LIGHT[0]+n[1]*D3.LIGHT[1]+n[2]*D3.LIGHT[2];
     f.el.style.filter=(d.tint?d.tint+' ':'')+'brightness('+(0.55+0.55*Math.max(0,dot)).toFixed(2)+')'+outline
-      +(d.dieShadow?' drop-shadow('+(d.size*0.05).toFixed(1)+'px '+(d.size*0.11).toFixed(1)+'px 0 rgba(26,16,8,.45))':'');
+      +(d.dieShadow?' drop-shadow('+(d.size*0.05).toFixed(1)+'px '+(d.size*0.11).toFixed(1)+'px 0 rgba(26,16,8,.45))':'')
+      +(d._selGlow?' drop-shadow(0 0 '+(d.size*0.1).toFixed(1)+'px rgba(255,196,80,.9))':'');
     f.sh.style.opacity=Math.max(0,(0.35-dot)*0.85).toFixed(2);
   });
   d.shadow.style.transform='translate('+x+'px,'+(d.y+16*s)+'px) scale('+Math.max(0.5,1-h*0.008)+')';
@@ -12957,7 +12965,7 @@ function _matchDress(isBoss){
   if(tok){
     var art=window._lastSeatArt;
     /* measured face crops: [bg-size%, pos-x%, pos-y%] per character */
-    var CROP={Krox:[118,100,10],Eira:[115,21,9],Nebb:[128,52,9],Regis:[116,100,1]};
+    var CROP={Krox:[109,100,0],Eira:[106,0,0],Nebb:[118,52,0],Regis:[106,100,0]};
     var cr=CROP[art]||[175,50,10];
     tok.style.backgroundImage=(!isBoss&&art)?'url("Art/Assets/Frames/Patrons/'+art+'.png")':'none';
     tok.style.backgroundSize=cr[0]+'%';
@@ -13721,6 +13729,7 @@ function _d3InitHost(div,tries){
   var still=!!div._d3Still,iso=!!div._d3Iso;
   var sz=Math.round(div.clientWidth*(iso?0.66:0.88));
   var d=D3.make(div,{size:sz,mat:div._trueMat,face:div._trueVal,group:still?null:'match'});
+  if(!still)d.tilt=8;/* match table reads flatter than the showcase angle */
   d.slot.style.position='absolute';
   d.slot.style.left='50%';d.slot.style.top='50%';
   d.slot.style.margin=(-sz/2)+'px 0 0 '+(-sz/2)+'px';
@@ -15504,6 +15513,7 @@ function toggleDie(d){
   if(G._palmAnimating)return;
   d.sel=!d.sel;
   d.el.classList.toggle('selected',d.sel);
+  if(d.el._d3)D3.draw(d.el._d3);
   /* Every tap: subtle bounce + short haptic so the die always feels responsive */
   d.el.classList.remove('die-tap-pop');void d.el.offsetWidth;
   d.el.classList.add('die-tap-pop');
@@ -15812,7 +15822,7 @@ function handleRoll(){
        the triple" — the card's printed use — was IMPOSSIBLE: the kept faces
        were pure loss. A frozen die survives the reroll, stays selectable,
        counts in bust checks, and scores with new matches. */
-    geSelected.forEach(function(d){d._frozen=true;d.sel=false;if(d.el){d.el.classList.remove('selected');d.el.classList.add('die-frozen');}});
+    geSelected.forEach(function(d){d._frozen=true;d.sel=false;if(d.el){d.el.classList.remove('selected');d.el.classList.add('die-frozen');if(d.el._d3)D3.draw(d.el._d3);}});
     /* Reroll non-held free dice */
     var toReroll=geFree.filter(function(d){return !d._frozen;});
     G.numDice=toReroll.length;
@@ -21525,7 +21535,7 @@ function activateGamblersEye(){
     refundActiveCardUse('gamblers_eye');
     return;}
   /* Deselect all current selections */
-  G.pool.forEach(d=>{d.sel=false;if(d.el)d.el.classList.remove('selected');});
+  G.pool.forEach(d=>{d.sel=false;if(d.el){d.el.classList.remove('selected');if(d.el._d3)D3.draw(d.el._d3);}});
   _clearDieEffects();
   /* Enter special selection mode */
   G.phase='gamblers_eye';
@@ -21538,6 +21548,7 @@ function activateGamblersEye(){
     d.el.onclick=function(){
       if(G.phase!=='gamblers_eye')return;
       d.sel=!d.sel;d.el.classList.toggle('selected',d.sel);
+      if(d.el._d3)D3.draw(d.el._d3);
       SFX.commit();
       /* Show count of selected */
       var selCount=G.pool.filter(x=>x.sel&&!x.committed).length;
@@ -21964,7 +21975,7 @@ function activateAlchemistsChisel(){
     setTimeout(function(){if(leftDie.el)leftDie.el.classList.remove('eff-glow-gold');},900);
   }
   /* Clear selection so the swap reads as a clean act. */
-  selDice.forEach(function(d){d.sel=false;if(d.el)d.el.classList.remove('selected');});
+  selDice.forEach(function(d){d.sel=false;if(d.el){d.el.classList.remove('selected');if(d.el._d3)D3.draw(d.el._d3);}});
   /* Lock the card for the rest of the run. */
   if(S&&S.run)S.run._chiselUsed=true;
   try{save();}catch(e){}

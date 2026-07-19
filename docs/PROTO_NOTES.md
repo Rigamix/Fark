@@ -1125,3 +1125,17 @@ same size/baseline as the patron token (names + totals aligned). Race
 bar bigger (11% margins), number seated on the crest (top 55%).
 Disabled buttons stay fully opaque (filter dim only). Pause sits
 bottom-left, level with the loadout chest.
+
+## P76 — match pass 7 (done)
+
+Portrait crops recomputed eye-centred with the whole head width in
+frame (S 106-118; comb/hat crops at the top when tall). MATCH dice:
+per-die tilt 8 (flatter, matches the table's modest perspective —
+offer/showcase dice keep 14), size 13cqw, 3cqw row gap. Selection is
+now a warm gold SILHOUETTE glow drawn by the engine (per-face
+drop-shadow appended when the host has .selected — the flag is read
+inside D3.draw so every select/deselect path stays honest; explicit
+redraws at the five toggle/clear sites). The old octagon box outline
+and box-shadow are suppressed for 3D dice. Bank-history popover
+anchors follow the new sides with a parchment look + THEIR/YOUR BANKS
+header (P75d).
