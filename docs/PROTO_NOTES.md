@@ -1100,3 +1100,16 @@ intrinsic real-world sizes per sprite (coin 8 -> towel 20), two
 diagonal corner clusters of two (big prop anchors the cluster,
 smaller rides beside), 1-2 side singles, coin+cup guaranteed, 5-6
 total, jitter everywhere, centre band never spawns.
+
+## P74 — match pass 5: de-greybox the overlays (done)
+
+The mid-table tell badge is now the brief's parchment RULE NOTE at
+the opponent edge: compact cream note, wax dot on its left (gold =
+binds both, red = boss/player-only), icon + name + live counters
+(steepedVal/arrearsVal/drillVal ids intact), desc hidden, tap opens
+the rule sheet. The duplicate green famRow "RULE:" chip is gone
+(SLEEVED chip stays until notes support two side by side). POT chip
+hidden in matches. Dialogue: square portrait frame hidden, strip is
+a slim parchment quote under the HUD (14cqw). Prop zones: top
+clusters start below the HUD (y>=16), bottom clusters capped (45)
+clear of the kept pile.
