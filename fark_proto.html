@@ -723,6 +723,13 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
   text-shadow:0 2px 0 rgba(16,9,3,.85),0 4px 10px rgba(0,0,0,.5)}
 #btnYield.on{display:flex}
 #activateZone.dragging-active ~ #btnYield,#activateZone.hot ~ #btnYield{display:none !important}
+/* kept pile: persistent dice cluster + one chalk TURN tag (brief §9) */
+#screen-match #keptTray .kept-die+.kept-die{margin-left:-1.6cqw}
+#screen-match #keptTray .kept-pts{font-family:'JMH Beda',serif;font-size:3.6cqw;color:#f0e3c6;
+  letter-spacing:.06em;text-shadow:0 2px 0 rgba(16,9,3,.75);background:none;border:none;padding:0 0 0 1.6cqw}
+#keptTray.bust-wipe .die{filter:grayscale(1) brightness(.6)}
+#keptTray.bust-wipe .kept-pts{animation:keptWipe .45s ease-in forwards}
+@keyframes keptWipe{to{opacity:0;transform:translateY(4px) scale(.8)}}
 /* concept scoring tags: medieval numbers under the selected dice */
 #screen-match .dice-area{position:relative}
 .selTag{position:absolute;top:calc(100% + 1cqw);left:50%;transform:translateX(-50%);z-index:6;
@@ -15004,8 +15011,18 @@ function updHUD(){
 }
 function refreshKeptTray(){
   const t=document.getElementById('keptTray');t.querySelectorAll('.die,.kept-pts').forEach(e=>e.remove());
-  G.kept.forEach(k=>{const el=mkDie(k.vals[0],k.mat,'sm',true);el.style.cursor='default';t.appendChild(el);
-    const lbl=document.createElement('div');lbl.className='kept-pts';lbl.textContent='+'+k.pts;t.appendChild(lbl);});
+  /* brief §9: every kept die is a persistent object — own material and
+     readable face in the pile, never one anonymous die per group */
+  G.kept.forEach(k=>{
+    (k.dice||k.vals.map(function(v){return{val:v,mat:k.mat};})).forEach(function(dd){
+      const el=mkDie(dd.val,dd.mat,'sm',true);el.style.cursor='default';el.classList.add('kept-die');
+      t.appendChild(el);
+    });
+  });
+  if(G.kept.length){
+    const lbl=document.createElement('div');lbl.className='kept-pts';
+    lbl.textContent=(G.turnPts||0)+' TURN';t.appendChild(lbl);
+  }
   t.classList.toggle('has-items',G.kept.length>0);
 }
 function triggerCard(cardId,msg,isPlayer,persist){
@@ -16009,7 +16026,9 @@ function handleRoll(){
       try{SFX.err&&SFX.err();}catch(e){}
     }
     selDice.forEach(d=>{d.committed=true;d._frozen=false;d.el.classList.remove('selected','die-frozen');d.el.classList.add('committed');d.el.onclick=null;d.el.style.cursor='default';});
-    SFX.commit();Haptic.commit();G.kept.push({vals:selVals,mat:selDice[0].mat,pts,cursed:_cfHit});G.turnPts=G.kept.reduce((a,k)=>a+k.pts,0)+(G._stakesRisingBonus||0);refreshKeptTray();
+    SFX.commit();Haptic.commit();G.kept.push({vals:selVals,mat:selDice[0].mat,pts,cursed:_cfHit,
+      dice:selDice.map(function(dd){return{val:dd.val,mat:dd.mat};})});
+    G.turnPts=G.kept.reduce((a,k)=>a+k.pts,0)+(G._stakesRisingBonus||0);refreshKeptTray();
     /* OPENING SHOT (opener): track scoring dice committed on roll 1 only.
        turnRollCount === 1 means this commit happened during the very first
        roll of the turn (before any rerolls). */
@@ -16392,7 +16411,7 @@ function _afterRollImpl(){
   }
   if(G.pCards.includes('last_stand')&&free.length===1&&(freeV[0]===1||freeV[0]===5)){
     const d=free[0];d.committed=true;if(d.el){d.el.classList.add('committed');d.el.onclick=null;}
-    G.kept.push({vals:[freeV[0]],mat:d.mat,pts:600});G.turnPts=G.kept.reduce((a,k)=>a+k.pts,0)+(G._stakesRisingBonus||0);refreshKeptTray();updHUD();
+    G.kept.push({vals:[freeV[0]],mat:d.mat,pts:600,dice:[{val:freeV[0],mat:d.mat}]});G.turnPts=G.kept.reduce((a,k)=>a+k.pts,0)+(G._stakesRisingBonus||0);refreshKeptTray();updHUD();
     triggerCard('last_stand','LAST STAND! 600',true);if(window.DLG)setTimeout(function(){DLG.triggerCard('last_stand',true);},800);setBtns(false,true);return;
   }
   /* ── Boss edicts removed — patron "edict" system simplified away.
@@ -16905,6 +16924,8 @@ function doBust(){
     if(_tsBov){_alignOverlayWord(_tsBov.querySelector('.bust-word'));_tsBov.classList.add('flash');setTimeout(function(){_tsBov.classList.remove('flash');},1100);}
     try{SFX.bust&&SFX.bust();}catch(e){}
     try{Haptic.bust&&Haptic.bust();}catch(e){}
+    try{var _kt=document.getElementById('keptTray');
+      if(_kt){_kt.classList.add('bust-wipe');setTimeout(function(){_kt.classList.remove('bust-wipe');},900);}}catch(e){}
     _bustImpact();
     if(window.DLG)DLG.trigger('PLAYER_BUST');
     /* Save fires AFTER the bust beat (~1s) so the relief reads clearly */
@@ -16938,6 +16959,8 @@ function doBust(){
     if(_lsBov){_alignOverlayWord(_lsBov.querySelector('.bust-word'));_lsBov.classList.add('flash');setTimeout(function(){_lsBov.classList.remove('flash');},1100);}
     try{SFX.bust&&SFX.bust();}catch(e){}
     try{Haptic.bust&&Haptic.bust();}catch(e){}
+    try{var _kt=document.getElementById('keptTray');
+      if(_kt){_kt.classList.add('bust-wipe');setTimeout(function(){_kt.classList.remove('bust-wipe');},900);}}catch(e){}
     _bustImpact();
     if(window.DLG)DLG.trigger('PLAYER_BUST');
     setTimeout(function(){
@@ -17102,6 +17125,8 @@ function doBust(){
       });
     }
     var _bov=document.getElementById('bust-ov');_alignOverlayWord(_bov.querySelector('.bust-word'));_bov.classList.add('flash');SFX.bust();Haptic.bust();
+    try{var _kt=document.getElementById('keptTray');
+      if(_kt){_kt.classList.add('bust-wipe');setTimeout(function(){_kt.classList.remove('bust-wipe');},900);}}catch(e){}
     _bustImpact();
     if(window.DLG)DLG.trigger('PLAYER_BUST');
     /* No status-msg 'BUST' — the large bust-ov overlay covers it */
@@ -17244,7 +17269,8 @@ function handleBank(){
       var _cfBank=false;
       if(G._tell&&G._tell.id==='counterfeit'&&selD.some(function(d){return d.cursed;})){_cfBank=true;pts=Math.floor(pts/2);spawnPop('💀 −HALF');try{SFX.err&&SFX.err();}catch(e){}}
       selD.forEach(d=>{d.committed=true;d._frozen=false;if(d.el){d.el.classList.remove('selected','die-frozen');d.el.classList.add('committed');d.el.onclick=null;}});
-      G.kept.push({vals:selV,mat:selD[0].mat,pts,cursed:_cfBank});
+      G.kept.push({vals:selV,mat:selD[0].mat,pts,cursed:_cfBank,
+        dice:selD.map(function(dd){return{val:dd.val,mat:dd.mat};})});
     }}
   let total=G.kept.reduce((a,k)=>a+k.pts,0);
   /* Stakes Rising: fold the +300 turn-start bonus into the bank total. The

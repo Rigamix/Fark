@@ -1202,3 +1202,17 @@ emboss (0 2px ink + soft drop), seated 5% lower in the plate; the
 old engraved-dark ROLL and green-shadow BANK looks are gone.
 Verified: hidden before roll / shown after, box match, identical
 computed color+shadow across all three.
+
+## P80 — brief §9: dice as persistent objects (core) (done)
+
+Kept groups now store PER-DIE records ({val,mat}) at all three commit
+sites; the pile renders EVERY kept die through the rest-state renderer
+with its own material (never one anonymous die per group), slight
+overlap, readable faces. The per-group +pts labels are replaced by
+ONE discreet "N TURN" chalk tag (BANK carries the prominent number).
+Real busts (after all saves, on all three player-bust paths) grey the
+pile and wipe the tag in <600ms at the impact beat. Ordering: match
+dice already land in loadout order with homeX=0 (no drift) and the
+engine shove can't swap DOM order. NOT yet implementable: curse
+marks/PRESERVE casing/SLEIGHT rewind (those mechanics don't exist in
+the engine yet) — the per-die record structure is ready for them.
