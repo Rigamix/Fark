@@ -1178,3 +1178,15 @@ slot (blue plate + pressed png, "YIELD" label) shown whenever the
 player can act (roll OR bank), hidden during card drags, opening the
 forfeit confirm. Scores moved INTO the bar over the fill ends
 (o left 7%, p right 7%).
+
+## P79 — concept scoring readout (done)
+
+Selection scoring now matches Denis's concept: a medieval +N in cream
+with a warm glow under EACH selected die (singles exact: 1->+100,
+5->+50; combo groups — triples, straights, pairs specials — get ONE
+tag under the group's middle die carrying the remainder so the tags
+always sum to the true total), and the selection TOTAL centred on
+screen beneath the row (bigger, same style). Invalid selections show
+a grey 0 (the old status-bar '+N' / 'NO SCORE' texts are retired).
+Verified: single +100, mixed 1/5/1 -> +100/+50/+100 with +250 total
+centred below the row, invalid -> grey 0, full cleanup on deselect.

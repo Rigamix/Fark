@@ -723,6 +723,15 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
   text-shadow:0 2px 0 rgba(10,30,50,.55)}
 #btnYield.on{display:flex}
 #activateZone.dragging-active ~ #btnYield,#activateZone.hot ~ #btnYield{display:none !important}
+/* concept scoring tags: medieval numbers under the selected dice */
+#screen-match .dice-area{position:relative}
+.selTag{position:absolute;top:calc(100% + 1cqw);left:50%;transform:translateX(-50%);z-index:6;
+  font-family:'JMH Beda',serif;font-size:4.6cqw;color:#f6ecd4;white-space:nowrap;pointer-events:none;
+  text-shadow:0 0 10px rgba(255,190,90,.65),0 2px 0 rgba(58,32,8,.85)}
+#selTotal{position:absolute;left:50%;transform:translateX(-50%);z-index:6;
+  font-family:'JMH Beda',serif;font-size:6.4cqw;color:#f6ecd4;pointer-events:none;white-space:nowrap;
+  text-shadow:0 0 12px rgba(255,190,90,.7),0 2px 0 rgba(58,32,8,.85)}
+#selTotal.zero{color:#9a8f7a;text-shadow:0 2px 0 rgba(20,12,6,.6)}
 /* silhouette selection layers */
 .d3selg{position:absolute;inset:0;pointer-events:none}
 .d3selg i{position:absolute;inset:0;background:#ffd061;border-radius:3px}
@@ -16539,12 +16548,43 @@ function _selPts(){
     return (r&&r.valid)?(r.total||0):0;
   }catch(e){return 0;}
 }
+function _renderSelTags(selD,total,valid){
+  document.querySelectorAll('.selTag').forEach(function(e){e.remove();});
+  var tot=document.getElementById('selTotal');
+  if(!selD.length){if(tot)tot.remove();return;}
+  function _tag(host,txt){var t=document.createElement('div');t.className='selTag';t.textContent=txt;host.appendChild(t);}
+  var counts={};selD.forEach(function(d){counts[d.val]=(counts[d.val]||0)+1;});
+  if(valid&&total>0){
+    var comboDice=[],singleSum=0;
+    selD.forEach(function(d){
+      if(!d.el)return;
+      if(counts[d.val]>=3){comboDice.push(d);return;}
+      if(d.val===1){singleSum+=100;_tag(d.el,'+100');}
+      else if(d.val===5){singleSum+=50;_tag(d.el,'+50');}
+      else comboDice.push(d);
+    });
+    var rest=total-singleSum;
+    if(rest>0&&comboDice.length){
+      comboDice.sort(function(a,b){return a.el.getBoundingClientRect().left-b.el.getBoundingClientRect().left;});
+      var mid=comboDice[(comboDice.length-1)>>1];
+      if(mid.el)_tag(mid.el,'+'+rest.toLocaleString());
+    }
+  }
+  var row=document.getElementById('playerDiceRow');
+  var area=document.querySelector('#screen-match .dice-area');
+  if(!row||!area)return;
+  if(!tot){tot=document.createElement('div');tot.id='selTotal';area.appendChild(tot);}
+  tot.className=(valid&&total>0)?'':'zero';
+  tot.textContent=(valid&&total>0)?('+'+total.toLocaleString()):'0';
+  var rr=row.getBoundingClientRect(),ar=area.getBoundingClientRect();
+  tot.style.top=(rr.bottom-ar.top+rr.height*0.55)+'px';
+}
 function refreshSelUI(){
   /* Guard: don't update selection-status text outside the player's choosing/idle phases.
      Otherwise stale 'NO SCORE' from the player UI bleeds into NPC turn status messages. */
   if(G&&G.phase!=='choosing'&&G.phase!=='idle'&&G.phase!=='gamblers_eye')return;
   const selD=G.pool.filter(d=>d.sel&&!d.committed);const selV=selD.map(d=>d.val);const selMats=selD.map(d=>d.mat);const locked=G.kept.reduce((a,k)=>a+k.pts,0);const cards=effectiveCards();
-  if(!selV.length){G.turnPts=locked+(G._stakesRisingBonus||0);updHUD();setBtns(false,locked>0||(G._stakesRisingBonus||0)>0);setStatusMsg('','');_clearDieEffects();G.pool.forEach(d=>{d.el.classList.remove('combo-glow');d.el.style.removeProperty('--gd');});G._comboGlow=false;return;}
+  if(!selV.length){G.turnPts=locked+(G._stakesRisingBonus||0);updHUD();setBtns(false,locked>0||(G._stakesRisingBonus||0)>0);setStatusMsg('','');_renderSelTags([],0,true);_clearDieEffects();G.pool.forEach(d=>{d.el.classList.remove('combo-glow');d.el.style.removeProperty('--gd');});G._comboGlow=false;return;}
   /* Bookends row-eligibility stamp (see handleRoll) — preview must agree
      with the commit/bank paths. */
   var _beE=_bookendsEligible(selD);
@@ -16585,8 +16625,8 @@ function refreshSelUI(){
   setBtns(ok&&(rem>0||allFreeSelected),ok);
   if(ok){
     var hasDieBoost=_sr.effects&&_sr.effects.length>0;
-    setStatusMsg('+'+pts.toLocaleString()+(hasDieBoost?' ✦':''),'gold');
-  }else{SFX.err();setStatusMsg('NO SCORE','red');}
+    setStatusMsg('','');_renderSelTags(selD,pts,true);
+  }else{SFX.err();setStatusMsg('','');_renderSelTags(selD,0,false);}
   /* combo glow sweep */
   const nowCombo=ok&&isCombo(selV);
   G.pool.forEach(d=>{if(!d.sel||d.committed){d.el.classList.remove('combo-glow');d.el.style.removeProperty('--gd');}});
