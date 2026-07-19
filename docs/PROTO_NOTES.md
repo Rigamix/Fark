@@ -1162,3 +1162,19 @@ dim filters off — the art carries state; the mid-roll disabled swap
 verified). Card activation area now wears the YIELD plate (zone
 reshaped to the plate's 720/218 aspect, dashed border gone, hot ->
 Yield_pressed, unavailable -> desaturate).
+
+## P78 — match pass 9 (done)
+
+Dice: back to the reference — value face FRONT, camera high (tilt
++32) so the value tips back readable (verified: the value face is
+the largest projected face on every settled die). Selection glow
+rebuilt SILHOUETTE-ONLY: two clone layers behind the die (crisp
+#ffd061 rim at scale 1.06 + blurred halo at 1.16) built from the
+visible faces' own transforms — internal cube edges stay clean, no
+parent filters, iOS-safe; verified created on select, torn down on
+deselect. Activation area: dashed border returns, shaped like the
+plate (720/218, rounded ends); the YIELD art is a real button in that
+slot (blue plate + pressed png, "YIELD" label) shown whenever the
+player can act (roll OR bank), hidden during card drags, opening the
+forfeit confirm. Scores moved INTO the bar over the fill ends
+(o left 7%, p right 7%).
