@@ -1035,3 +1035,30 @@ N wins" (N=2, or 3 with Marked Table). The lozenges render in the heat
 stage the run would REACH if you won this match (need 2, have 0 -> two
 red 03s = "this puts you at the boss"), so the shortcut to the boss is
 visible at a glance. Non-sealed panels show nothing there.
+
+## P70 — match screen art, pass 1 (FARK_MATCH_BRIEF) (done)
+
+Assets: Art/Assets/Match/ (Table plate 1080x2011, 15 props, ScoreBar
+base/fill/overlay — the fill art is PRE-SPLIT red-left(opp)/
+blue-right(player) racing to the overlay's centre crest, portrait
+rings copper(opp)/iron(player), Bank/Roll plates, pause).
+- Plate: #matchPlate behind patron matches; boss matches keep their
+  bespoke ::before plates (_matchDress(isBoss) toggles; boss detection
+  = the 8 known keys at the boss-class site).
+- Props: 8 authored margin anchors (never the centre band), per-match
+  mulberry32 seed (G._propSeed), 3-5 sprites, size jitter, ±8° rot.
+- Race bar: raceWrap 70% centred; the engine's EXISTING width writes
+  to #oProg/#pProg now reveal the fill halves (rbClip halves are
+  size containers; fill img spans 200cqw anchored to the outer edge),
+  target number sits on the crest, TURN X chalk beneath. Portrait
+  tokens at the ends: opp gets a face crop of Frames/Patrons/<art>
+  (window._lastSeatArt set in launchSeat), totals + labels beneath.
+  ALL engine ids preserved — zero engine update-site changes.
+- Buttons: BANK left (green plate) / ROLL right (gold, flex 1.55);
+  BANK label carries the exact bankable amount ("BANK 650"),
+  bank-to-win swaps BANK onto the gold plate; quit ✕ hidden, pause
+  button top-right opens the same confirm.
+Verified live: plate+3 seeded margin props, portrait token, roll,
+select -> "BANK 50", bank -> fill 1.79%/score 50, boss toggle hides
+plate+props. Next passes: kept-pile tag, selection chalk tag styling,
+card backs + rule notes, paws, boss hearts row.
