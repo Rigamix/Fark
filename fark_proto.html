@@ -812,6 +812,8 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 .die.d3on .dc{display:none !important}
 .die.d3on.selected{box-shadow:none !important}
 .die.d3on.selected::before{display:none !important}
+.die-wrap:has(.die.d3on.selected)::after{display:none !important}
+.die-wrap:has(.die.d3on.selected)::before{display:none !important}
 .d3chip{display:inline-block;position:relative;vertical-align:middle;flex-shrink:0}
 .d3chip .die{position:absolute;inset:0;width:100% !important;height:100% !important;cursor:inherit;box-shadow:none}
 .d3chip .die:active{transform:none}
@@ -12848,6 +12850,7 @@ D3.draw=function(d){
   /* iOS WebKit ignores filters on a parent of 3D-transformed children,
      so tint + outline live on each FACE, composed with its lighting */
   var ow=D3.cfg.ow,oc=D3.OUT[d.matKey]||'#241407';
+  if(d._selGlow){oc='#ffd061';ow=Math.max(1.8,ow*1.8);}
   var outline=ow?' drop-shadow('+ow+'px 0 0 '+oc+') drop-shadow(-'+ow+'px 0 0 '+oc+') drop-shadow(0 '+ow+'px 0 '+oc+') drop-shadow(0 -'+ow+'px 0 '+oc+')':'';
   if(d.die.style.filter)d.die.style.filter='';
   var tl=(d.tilt!=null?d.tilt:D3.cfg.tilt);
@@ -12859,7 +12862,8 @@ D3.draw=function(d){
     var dot=n[0]*D3.LIGHT[0]+n[1]*D3.LIGHT[1]+n[2]*D3.LIGHT[2];
     f.el.style.filter=(d.tint?d.tint+' ':'')+'brightness('+(0.55+0.55*Math.max(0,dot)).toFixed(2)+')'+outline
       +(d.dieShadow?' drop-shadow('+(d.size*0.05).toFixed(1)+'px '+(d.size*0.11).toFixed(1)+'px 0 rgba(26,16,8,.45))':'')
-      +(d._selGlow?' drop-shadow(0 0 '+(d.size*0.1).toFixed(1)+'px rgba(255,196,80,.9))':'');
+      +(d._selGlow?' drop-shadow(0 0 '+(d.size*0.14).toFixed(1)+'px rgba(255,196,80,.95))'
+        +' drop-shadow(0 0 '+(d.size*0.32).toFixed(1)+'px rgba(255,170,60,.55))':'');
     f.sh.style.opacity=Math.max(0,(0.35-dot)*0.85).toFixed(2);
   });
   d.shadow.style.transform='translate('+x+'px,'+(d.y+16*s)+'px) scale('+Math.max(0.5,1-h*0.008)+')';
@@ -13729,7 +13733,7 @@ function _d3InitHost(div,tries){
   var still=!!div._d3Still,iso=!!div._d3Iso;
   var sz=Math.round(div.clientWidth*(iso?0.66:0.88));
   var d=D3.make(div,{size:sz,mat:div._trueMat,face:div._trueVal,group:still?null:'match'});
-  if(!still)d.tilt=8;/* match table reads flatter than the showcase angle */
+  if(!still)d.tilt=3;/* match table reads nearly straight-on */
   d.slot.style.position='absolute';
   d.slot.style.left='50%';d.slot.style.top='50%';
   d.slot.style.margin=(-sz/2)+'px 0 0 '+(-sz/2)+'px';

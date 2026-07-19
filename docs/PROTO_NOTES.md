@@ -1139,3 +1139,12 @@ redraws at the five toggle/clear sites). The old octagon box outline
 and box-shadow are suppressed for 3D dice. Bank-history popover
 anchors follow the new sides with a parchment look + THEIR/YOUR BANKS
 header (P75d).
+
+## P76b — selection concept + drastic angle (done)
+
+The lingering box was a THIRD party: .die-wrap:has(.selected)::after
+draws its own rectangle — suppressed for 3D dice. Match dice tilt
+8 -> 3 (nearly straight-on). Selection now matches Denis's concept:
+the die's outline flips to bright gold (#ffd061) at 1.8x width and a
+double warm halo wraps the silhouette (0.14 + 0.32 die-size
+drop-shadows) — all engine-drawn per face, iOS-safe.
