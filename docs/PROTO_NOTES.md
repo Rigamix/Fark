@@ -1190,3 +1190,15 @@ screen beneath the row (bigger, same style). Invalid selections show
 a grey 0 (the old status-bar '+N' / 'NO SCORE' texts are retired).
 Verified: single +100, mixed 1/5/1 -> +100/+50/+100 with +250 total
 centred below the row, invalid -> grey 0, full cleanup on deselect.
+
+## P79b — yield gating + unified button text (done)
+
+YIELD hides until the player's first roll of the match
+(G._anyPlayerRoll set in handleRoll), then follows can-act as before.
+It fills the dashed zone exactly (same box), and the dashes' corner
+radius (18px) follows the plate's rounded ends. All three plates
+share ONE text treatment now: cream #f7ecd2, identical two-step
+emboss (0 2px ink + soft drop), seated 5% lower in the plate; the
+old engraved-dark ROLL and green-shadow BANK looks are gone.
+Verified: hidden before roll / shown after, box match, identical
+computed color+shadow across all three.
