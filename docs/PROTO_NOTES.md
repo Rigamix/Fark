@@ -1011,3 +1011,19 @@ the true bottom corner (80/90). Sheet sits lower (52.6%). Panel-open:
 GROG + nav fade out; hearts/gold/NIGHT stay clean above the scrim
 (z9); only bg/fg/bossbar/chips blur. Tell rule text lives below the
 band (55%) pending Denis's placement pass.
+
+## P68 — title + outline fit + panel round 6 (done)
+
+Title: shelf/pouch icon removed, rules book takes the left slot.
+Room card: outline hugs the VISIBLE art (frame alpha ends 97.1%
+bottom -> insets .4/.4/.4/2.9), opacity .7 to match the smoke's
+intensity, and the smoke band now ends AT the outline's top edge so
+the two never stack into a darker seam. Panel: outline follows the
+art's alpha bbox (1.6/.7/.9), smoke band deleted on the panel (sparks
+stay); name in the frame olive #4b5527; seal 12% centred on the
+column axis, shadow removed, trait tight under it (27.6%); tell name
+(2.7cqh purple) + small rule text (1.7cqh brown) fill the new gap
+between band and rows (53.6%); values re-anchored to the new rules
+(68.4/75.5/82.5 -> bottoms 32/25.1/18.1) and shrunk to 3.3cqh;
+SIT DOWN on the stretched 1430/334 plate (72% wide, shorter);
+grudge/FK tags at 61.6%; die drop-shadows removed.
