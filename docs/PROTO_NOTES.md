@@ -1277,3 +1277,23 @@ height. Audited 60 seeds: 0 rule violations, 7-10 props per table.
 
 NOTE: pane screenshots timed out (capture-side); verified via DOM,
 cover-math equality checks and canvas pixel sampling of both tables.
+
+## P84 — candlelight reads now + shadows read + separation solver (done)
+
+P83 post-mortem from Denis's phone shot: the mask box (212%) kept the
+whole screen inside the opaque core (fully lit table, wobble
+invisible); shadow offsets hid behind the props and the unlit reveal
+was only ~25% darker; corner clusters buried each other.
+
+- mask box now 140%x130%, stops 26->88, positions recomputed per
+  keyframe (pool centre holds ~50/44 with a sway): centre pool bright,
+  edges ~27%, corners dark. 5.6s loop + a brightness flicker on the
+  lit layer (filter animates everywhere incl. iOS as a guaranteed
+  visible movement fallback).
+- shadows: offsets up (min 1.5%, 0.115/dist), scale 1.07, and the
+  revealed slice dims to brightness .7 (dice ellipse .72) at FULL
+  opacity — reads as shadow against both lit and unlit table.
+- separation solver: perspective baked into widths first, then 7 relax
+  iterations in width-pct space (min dist 0.42*(wA+wB), coins exempt —
+  they pile), margins/band clamped each pass. Audit over 50 seeds:
+  0 buried pairs, 0 band violations, worst ratio 0.96, 7-10 props.

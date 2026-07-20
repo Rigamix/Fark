@@ -784,32 +784,41 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
    The source hangs above the table centre, off screen — mask centred
    at 50%/44%, radial scale + sideways sway, slow. */
 #matchLit{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;pointer-events:none;
-  -webkit-mask-image:radial-gradient(ellipse,#000 30%,rgba(0,0,0,0) 74%);
-  mask-image:radial-gradient(ellipse,#000 30%,rgba(0,0,0,0) 74%);
+  -webkit-mask-image:radial-gradient(ellipse,#000 26%,rgba(0,0,0,0) 88%);
+  mask-image:radial-gradient(ellipse,#000 26%,rgba(0,0,0,0) 88%);
   -webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;
-  -webkit-mask-size:212% 192%;mask-size:212% 192%;
-  -webkit-mask-position:50% 56.5%;mask-position:50% 56.5%;
-  animation:candleFlick 6.4s ease-in-out infinite}
+  -webkit-mask-size:140% 130%;mask-size:140% 130%;
+  -webkit-mask-position:50% 70%;mask-position:50% 70%;
+  animation:candleFlick 5.6s ease-in-out infinite,candleBreathe 5.6s ease-in-out infinite}
+/* positions recomputed per stop so the pool centre stays ~50%/44%
+   (with a slight sway) while the box radially scales */
 @keyframes candleFlick{
-  0%,100%{-webkit-mask-size:212% 192%;mask-size:212% 192%;-webkit-mask-position:50% 56.5%;mask-position:50% 56.5%}
-  31%{-webkit-mask-size:205% 186%;mask-size:205% 186%;-webkit-mask-position:48.8% 56.2%;mask-position:48.8% 56.2%}
-  58%{-webkit-mask-size:217% 197%;mask-size:217% 197%;-webkit-mask-position:51.3% 56.8%;mask-position:51.3% 56.8%}
-  79%{-webkit-mask-size:209% 189%;mask-size:209% 189%;-webkit-mask-position:49.5% 56.4%;mask-position:49.5% 56.4%}
+  0%,100%{-webkit-mask-size:140% 130%;mask-size:140% 130%;-webkit-mask-position:50% 70%;mask-position:50% 70%}
+  27%{-webkit-mask-size:132% 123%;mask-size:132% 123%;-webkit-mask-position:52.5% 74.3%;mask-position:52.5% 74.3%}
+  55%{-webkit-mask-size:148% 137%;mask-size:148% 137%;-webkit-mask-position:48.1% 67%;mask-position:48.1% 67%}
+  78%{-webkit-mask-size:137% 128%;mask-size:137% 128%;-webkit-mask-position:51.1% 71.1%;mask-position:51.1% 71.1%}
+}
+@keyframes candleBreathe{
+  0%,100%{filter:brightness(1)}
+  27%{filter:brightness(.955)}
+  55%{filter:brightness(1.05)}
+  78%{filter:brightness(.985)}
 }
 /* shadows reveal the UNLIT table through the prop's own silhouette;
    the layer breathes about the light centre in sync with the mask */
 #matchShadows{position:absolute;inset:0;z-index:0;pointer-events:none;
-  transform-origin:50% 44%;animation:shBreath 6.4s ease-in-out infinite}
+  transform-origin:50% 44%;animation:shBreath 5.6s ease-in-out infinite}
 @keyframes shBreath{
   0%,100%{transform:scale(1.012)}
-  31%{transform:scale(1)}
-  58%{transform:scale(1.022)}
-  79%{transform:scale(1.008)}
+  27%{transform:scale(1)}
+  55%{transform:scale(1.032)}
+  78%{transform:scale(1.006)}
 }
 #matchShadows .pshadow{position:absolute;
   background-image:url('Art/Assets/Match/Commoner/Table.png?v=2');background-repeat:no-repeat;
   -webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;
-  -webkit-mask-size:100% 100%;mask-size:100% 100%}
+  -webkit-mask-size:100% 100%;mask-size:100% 100%;
+  filter:brightness(.7) saturate(.85)}
 #matchProps{position:absolute;inset:0;z-index:0;pointer-events:none}
 #matchProps img{position:absolute}
 #matchPause{position:absolute;left:2.2%;bottom:calc(21cqw + env(safe-area-inset-bottom,0px));top:auto;right:auto;
@@ -903,7 +912,7 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 .d3slot{position:relative;will-change:transform}
 .d3shadow{position:absolute;left:50%;top:50%;border-radius:50%;
   background:rgba(20,12,6,.5);filter:blur(3px);will-change:transform;pointer-events:none}
-.d3shadow.tblsh{background:url('Art/Assets/Match/Commoner/Table.png?v=2') no-repeat;filter:none}
+.d3shadow.tblsh{background:url('Art/Assets/Match/Commoner/Table.png?v=2') no-repeat;filter:brightness(.72)}
 .d3die{position:absolute;inset:0;will-change:transform,filter;pointer-events:none}
 .d3f{position:absolute;inset:0;background-size:cover;will-change:transform;border-radius:3px}
 .d3f .d3sh{position:absolute;inset:0;background:rgb(60,42,24);opacity:0;border-radius:3px}
@@ -13198,11 +13207,38 @@ function _matchDress(isBoss){
       y:bandY(pour.y+(rnd()*6-1),pour.y,SIZE[mug]),
       w:SIZE[mug]*(0.9+rnd()*0.15),rot:(rnd()*18-9)|0});
   }
+  /* perspective baked into the widths BEFORE separation */
+  placed.forEach(function(q){q.w*=0.86+0.42*(q.y/100);});
+  /* separation pass: props may kiss but never bury each other.
+     Distances in width-pct space (y scaled ~1.9); 3 relax iterations,
+     then margins + dice band re-clamped. */
+  var _pc=function(q){var a=ASPECT[q.n]||[1,1];return{x:q.x+q.w/2,y:(q.y+q.w*(a[1]/a[0])*0.26)*1.9};};
+  for(var it=0;it<7;it++){
+    for(var i2=0;i2<placed.length;i2++)for(var j2=i2+1;j2<placed.length;j2++){
+      var A=placed[i2],B=placed[j2],ca=_pc(A),cb=_pc(B);
+      /* loose coins are allowed to pile up */
+      if(A.n==='singleCoin'||B.n==='singleCoin')continue;
+      var ddx=cb.x-ca.x,ddy=cb.y-ca.y,dist=Math.sqrt(ddx*ddx+ddy*ddy);
+      var min=(A.w+B.w)*0.42;
+      if(dist>=min)continue;
+      if(dist<0.01){ddx=1;ddy=0;dist=1;}
+      var push=(min-dist)/2,ux=ddx/dist,uy=ddy/dist;
+      A.x-=ux*push;A.y-=uy*push/1.9;
+      B.x+=ux*push;B.y+=uy*push/1.9;
+    }
+    placed.forEach(function(q){
+      q.x=Math.max(-6,Math.min(88,q.x));
+      q.y=Math.max(14.5,Math.min(68,q.y));
+      var a=ASPECT[q.n]||[1,1];
+      var cy=q.y+q.w*(a[1]/a[0])*0.26,cx=q.x+q.w/2;
+      if(cy>32.5&&cy<55.5&&cx>13&&cx<69){
+        if(cy<44)q.y-=(cy-32);else q.y+=(56-cy)+1;
+      }
+    });
+  }
   var shWrap=document.getElementById('matchShadows');
   placed.forEach(function(q){
-    /* perspective: closer to the player (bottom) reads bigger */
-    var pf=0.86+0.42*(q.y/100);
-    var w=q.w*pf;
+    var w=q.w;
     var img=document.createElement('img');
     img.src=PP+q.n+'.png?v=2';
     img.style.cssText='left:'+q.x.toFixed(1)+'%;top:'+q.y.toFixed(1)+'%;width:'+w.toFixed(1)+'%;'
@@ -13216,12 +13252,12 @@ function _matchDress(isBoss){
     var cx=q.x+w/2,cy=q.y+w*(a[1]/a[0])*0.26;   /* prop centre, approx (h% ~ w%*ratio/1.9) */
     var dx=cx-50,dy=(cy-44)*1.9;                 /* direction in width-pct space */
     var len=Math.sqrt(dx*dx+dy*dy)||1;
-    var mag=Math.max(0.9,len*0.085);
+    var mag=Math.max(1.5,len*0.115);
     var ox=dx/len*mag,oy=(dy/len*mag)/1.9;
     var sd=document.createElement('div');
     sd.className='pshadow';
     sd.style.cssText='left:'+(q.x+ox).toFixed(2)+'%;top:'+(q.y+oy).toFixed(2)+'%;'
-      +'width:'+(w*1.05).toFixed(1)+'%;aspect-ratio:'+a[0]+'/'+a[1]+';'
+      +'width:'+(w*1.07).toFixed(1)+'%;aspect-ratio:'+a[0]+'/'+a[1]+';'
       +'transform:rotate('+q.rot+'deg);'
       +'-webkit-mask-image:url("'+PP+q.n+'.png?v=2");mask-image:url("'+PP+q.n+'.png?v=2")';
     shWrap.appendChild(sd);
