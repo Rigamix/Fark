@@ -1253,3 +1253,27 @@ hands over (yieldTurn); post-bank it is the normal handover
 (handleYield → endPTurn). Flee stays on pause/X. showYieldButton /
 restoreRollButton drive the .on class (no more inline display that
 used to permanently hide the button after the first handover).
+
+## P83 — candlelight + table-reveal shadows + prop rules v2 (done)
+
+Light hangs above the table centre, off screen. TableLit.png sits on
+the unlit plate behind a breathing radial mask (radial scale + sway,
+6.4s ease loop, centre 50%/44%) — candle glow pools mid-table, edges
+stay unlit. NOT the candle prop (that stays a normal prop).
+
+Fake shadows: every prop gets a div masked by its own silhouette that
+reveals the UNLIT Table.png (cover-geometry slice, aligned via
+_alignPropShadows; settle timers, resize hook). The layer breathes in
+sync with the light (scale about the light centre — shadows stretch
+away radially). Match dice swap the blurry rgba ellipse for the same
+sharp unlit-table ellipse, aligned per frame in D3.draw (class tblsh,
+opaque; boss tables keep the old ellipse — no plate, _mLight.on=false).
+
+Prop pass v2 (?v=2 art): perspective (bottom props up to ~1.14x, top
+~0.92x), one extra edge anchor (7 anchors, 6-7 picks), coins NEVER
+alone (pile scatters 1-2 singles, lone coin brings 2 friends), jug or
+bottle always gets a mug beside it. bandY clamp accounts for prop
+height. Audited 60 seeds: 0 rule violations, 7-10 props per table.
+
+NOTE: pane screenshots timed out (capture-side); verified via DOM,
+cover-math equality checks and canvas pixel sampling of both tables.
