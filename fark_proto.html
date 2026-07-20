@@ -794,14 +794,7 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 }
 /* shadows reveal the UNLIT table through the prop's own silhouette;
    the layer breathes about the light centre in sync with the mask */
-#matchShadows{position:absolute;inset:0;z-index:0;pointer-events:none;
-  transform-origin:50% 44%;animation:shBreath 5.6s ease-in-out infinite}
-@keyframes shBreath{
-  0%,100%{transform:scale(1.018)}
-  27%{transform:scale(1)}
-  55%{transform:scale(1.05)}
-  78%{transform:scale(1.01)}
-}
+#matchShadows{position:absolute;inset:0;z-index:0;pointer-events:none}
 #matchShadows canvas{position:absolute;inset:0;width:100%;height:100%}
 #matchProps{position:absolute;inset:0;z-index:0;pointer-events:none}
 #matchProps img{position:absolute}
@@ -13080,6 +13073,7 @@ function _mLightCalc(){
   window._mLight={on:true,bw:bw,bh:bh,ox:r.left+(r.width-bw)/2,oy:r.top+(r.height-bh)/2};
 }
 window._tblImg=window._tblImg||(function(){var i=new Image();i.src='Art/Assets/Match/Commoner/Table.png?v=2';return i;})();
+function _candleF(t){return 0.6*Math.sin(t*1.1)+0.3*Math.sin(t*2.3+2)+0.1*Math.sin(t*4.7);}
 /* the dark layer: unlit table with the candle pool punched out */
 function _drawCandle(tSec){
   var cv=document.getElementById('matchDark'),ml=window._mLight;
@@ -13095,12 +13089,15 @@ function _drawCandle(tSec){
   x.globalCompositeOperation='source-over';
   x.clearRect(0,0,W,H);
   x.drawImage(_tblImg,ml.ox-sc.left,ml.oy-sc.top,ml.bw,ml.bh);
-  /* breathing pool: radial scale + sway, uneven sines so it never loops
-     mechanically */
-  var f=0.6*Math.sin(tSec*1.1)+0.3*Math.sin(tSec*2.3+2)+0.1*Math.sin(tSec*4.7);
-  var cx=W*0.5+W*0.018*Math.sin(tSec*0.7)+W*0.008*Math.sin(tSec*1.9+1);
-  var cy=H*0.44+H*0.006*Math.sin(tSec*1.3+3);
-  var rx=W*0.58*(1+0.11*f),ry=H*0.35*(1+0.11*f);
+  /* the lit/unlit paintings differ subtly — tint the unlit layer so the
+     pool contrast actually reads */
+  x.globalCompositeOperation='source-atop';
+  x.fillStyle='rgba(10,6,3,0.38)';x.fillRect(0,0,W,H);
+  /* breathing pool: a soft circle radially expanding/contracting */
+  var f=_candleF(tSec);
+  var cx=W*0.5+W*0.012*Math.sin(tSec*0.7);
+  var cy=H*0.44+H*0.004*Math.sin(tSec*1.3+3);
+  var rx=W*0.58*(1+0.11*f),ry=H*0.30*(1+0.11*f);
   x.globalCompositeOperation='destination-out';
   x.save();x.translate(cx,cy);x.scale(1,ry/rx);
   var g=x.createRadialGradient(0,0,rx*0.22,0,0,rx);
@@ -13113,49 +13110,63 @@ function _candleLoop(){
   if(window._candleOn)return;
   if(matchMedia('(prefers-reduced-motion:reduce)').matches){_drawCandle(0.8);return;}
   window._candleOn=true;
-  var last=0;
+  var last=0,last2=0;
   function tick(t){
     var sc=document.getElementById('screen-match');
     if(!sc||!sc.classList.contains('active')||!window._mLight||!window._mLight.on){window._candleOn=false;return;}
     if(t-last>40){last=t;_drawCandle(t/1000);}
+    if(t-last2>80){last2=t;_drawPropShadows(t/1000);}
     requestAnimationFrame(tick);
   }
   requestAnimationFrame(tick);
 }
 /* prop shadows: each silhouette composited from the UNLIT table slice,
-   tinted dark, stamped rotated at its radial offset */
-function _drawPropShadows(){
+   tinted dark, stamped rotated at its offset. The wiggle scales each
+   silhouette about its OWN fixed centre (shape + intensity pulse); the
+   revealed table slice stays pinned to screen coords so the texture
+   never slides against the base table. */
+function _drawPropShadows(tSec){
   var cv=document.getElementById('shCanvas'),ml=window._mLight;
   var jobs=window._shJobs||[];
   if(!cv||!ml||!ml.on)return;
   var sc=document.getElementById('screen-match').getBoundingClientRect();
   var W=sc.width,H=sc.height;if(W<10)return;
   var dpr=Math.min(window.devicePixelRatio||1,2);
-  cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);
+  if(cv.width!==Math.round(W*dpr)||cv.height!==Math.round(H*dpr)){
+    cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);
+  }
+  var f=_candleF(tSec===undefined?0.8:tSec);
+  var sMul=1+0.035*f,alpha=0.55+0.09*f;
   var x=cv.getContext('2d');x.setTransform(dpr,0,0,dpr,0,0);
   x.clearRect(0,0,W,H);
+  var needsLoad=false;
   jobs.forEach(function(j){
     if(!j._im){j._im=new Image();j._im.src=j.src;}
     var im=j._im;
-    var draw=function(){
-      if(!im.complete||!im.naturalWidth||!_tblImg.complete||!_tblImg.naturalWidth)return;
-      var w=j.w/100*W,h=w*j.a[1]/j.a[0];
-      var px=j.x/100*W,py=j.y/100*H;
-      var tc=document.createElement('canvas');
-      tc.width=Math.max(2,Math.round(w*dpr));tc.height=Math.max(2,Math.round(h*dpr));
-      var tx=tc.getContext('2d');tx.setTransform(dpr,0,0,dpr,0,0);
-      tx.drawImage(im,0,0,w,h);
-      tx.globalCompositeOperation='source-in';
-      tx.drawImage(_tblImg,(ml.ox-sc.left)-px,(ml.oy-sc.top)-py,ml.bw,ml.bh);
-      tx.globalCompositeOperation='source-atop';
-      tx.fillStyle='rgba(8,4,2,0.58)';tx.fillRect(0,0,w,h);
-      x.save();x.translate(px+w/2,py+h/2);x.rotate(j.rot*Math.PI/180);
-      x.drawImage(tc,0,0,tc.width,tc.height,-w/2,-h/2,w,h);
-      x.restore();
-    };
-    if(im.complete&&_tblImg.complete&&_tblImg.naturalWidth)draw();
-    else{im.addEventListener('load',function(){_drawPropShadows();},{once:true});
-      if(!_tblImg.complete)_tblImg.addEventListener('load',function(){_drawPropShadows();},{once:true});}
+    if(!im.complete||!im.naturalWidth||!_tblImg.complete||!_tblImg.naturalWidth){needsLoad=true;
+      im.addEventListener('load',function(){_drawPropShadows(tSec);},{once:true});
+      if(!_tblImg.complete)_tblImg.addEventListener('load',function(){_drawPropShadows(tSec);},{once:true});
+      return;}
+    var w0=j.w/100*W,h0=w0*j.a[1]/j.a[0];
+    var cx=j.x/100*W+w0/2,cy=j.y/100*H+h0/2;   /* fixed centre */
+    var w=w0*sMul,h=h0*sMul;
+    var TW=Math.max(2,Math.round(w0*1.08*dpr)+2),TH=Math.max(2,Math.round(h0*1.08*dpr)+2);
+    if(!j._tc||j._tc.width!==TW||j._tc.height!==TH){
+      j._tc=document.createElement('canvas');j._tc.width=TW;j._tc.height=TH;
+    }
+    var tw=TW/dpr,th=TH/dpr;
+    var tx2=j._tc.getContext('2d');tx2.setTransform(dpr,0,0,dpr,0,0);
+    tx2.globalCompositeOperation='source-over';
+    tx2.clearRect(0,0,tw,th);
+    tx2.drawImage(im,(tw-w)/2,(th-h)/2,w,h);
+    tx2.globalCompositeOperation='source-in';
+    var tlx=cx-tw/2,tly=cy-th/2;               /* tmp top-left in screen coords */
+    tx2.drawImage(_tblImg,(ml.ox-sc.left)-tlx,(ml.oy-sc.top)-tly,ml.bw,ml.bh);
+    tx2.globalCompositeOperation='source-atop';
+    tx2.fillStyle='rgba(8,4,2,'+alpha.toFixed(3)+')';tx2.fillRect(0,0,tw,th);
+    x.save();x.translate(cx,cy);x.rotate(j.rot*Math.PI/180);
+    x.drawImage(j._tc,0,0,TW,TH,-tw/2,-th/2,tw,th);
+    x.restore();
   });
 }
 window.addEventListener('resize',function(){_mLightCalc();_drawPropShadows();try{_drawCandle(performance.now()/1000);}catch(e){}});
@@ -13302,7 +13313,7 @@ function _matchDress(isBoss){
     var cx=q.x+w/2,cy=q.y+w*(a[1]/a[0])*0.26;   /* prop centre, approx (h% ~ w%*ratio/1.9) */
     var dx=cx-50,dy=(cy-44)*1.9;                 /* direction in width-pct space */
     var len=Math.sqrt(dx*dx+dy*dy)||1;
-    var mag=Math.max(2.2,len*0.15);
+    var mag=Math.max(1.1,len*0.07);
     var ox=dx/len*mag,oy=(dy/len*mag)/1.9;
     _jobs.push({src:PP+q.n+'.png?v=2',x:+(q.x+ox).toFixed(2),y:+(q.y+oy).toFixed(2),
       w:+(w*1.1).toFixed(1),rot:q.rot,a:a});

@@ -1342,3 +1342,20 @@ nothing) — both effects now run on canvas compositing, no masks:
 Dice keep the CSS bg-reveal ellipse (no masks involved).
 Pixel-verified via getImageData: pool centre alpha 0, edges unlit
 opaque, 143 opaque shadow samples across 8 stamps.
+
+## P87 — pool contrast + own-centre shadow wiggle (done)
+
+- The pool never read because Table vs TableLit differ by only
+  ~15-25%: the dark canvas now tints the unlit layer (source-atop
+  rgba(10,6,3,.38)) before punching — real contrast. Pool is a soft
+  screen-space CIRCLE (rx .58W / ry .30H) breathing on radial scale,
+  sway trimmed.
+- Shadow offsets reduced to hug the props (min 1.1%, .07*dist).
+- The CSS scale on #matchShadows dragged the baked texture out of
+  alignment — removed. The wiggle is in-canvas (~12fps, same rAF loop
+  as the candle): each silhouette scales about its OWN fixed centre
+  (1±3.5%) with intensity pulsing in sync (alpha .55±.09); the
+  revealed slice is sampled in screen coords each frame so the texture
+  never slides. Temp canvases cached per job.
+Pixel-verified at two flicker phases: same-pixel texture constant,
+boundary alpha 247->167, opaque count 227->215 (shape breathes).
