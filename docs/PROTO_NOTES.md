@@ -1394,3 +1394,13 @@ shadow footprint 248 vs 230, avg darkness 42 vs 58.
   crisper, far ones softer. Pure drawImage accumulation (ctx.filter
   blur is not iOS-safe). Verified: 170 fringe samples vs 575 solid,
   per-prop radii 1.34-1.6.
+
+## P91 — props dim by the pool falloff (done)
+
+Props now sit in the same light system: each one takes a brightness/
+saturate dim from the SAME radial falloff as the table pool, evaluated
+at its centre — on a BIGGER circle (rx .75W / ry .39H, cropped at the
+sides) so only true edge/corner props go properly dark (floor .55).
+Breathes with the flare (same f, updated with the shadow tick, .12s
+filter transition smooths the steps). Verified: corner props ~.65-.68,
+props nearest the pool ~.80.
