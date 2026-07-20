@@ -1230,8 +1230,8 @@ verified identical computed size).
 
 Denis brightened the patron frame art and moved GONE HOME's lettering
 down inside its file — all card layer srcs (+ the match token crop)
-carry ?v=2 to force the reload. Gone-home cards now KEEP the
-character portrait, darken+desaturate the whole card (saturate .5 /
+carry ?v=2 to force the reload. Gone-home cards drop the
+character portrait entirely (P81b), darken+desaturate the whole card (saturate .5 /
 brightness .55 on bg/back/who/frame/banner), and GoneHome.png stamps
 on TOP (z4, object-fit contain, no positional overrides — its
 placement lives in the art). Verified against a forced gone seat;
