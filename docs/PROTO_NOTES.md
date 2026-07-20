@@ -1404,3 +1404,12 @@ sides) so only true edge/corner props go properly dark (floor .55).
 Breathes with the flare (same f, updated with the shadow tick, .12s
 filter transition smooths the steps). Verified: corner props ~.65-.68,
 props nearest the pool ~.80.
+
+## P92 — flicker dark-dips clamped + wider prop-light circle (done)
+
+- Table flicker no longer dips dark: plate brightness clamps the dim
+  side (1+0.08*max(f,-0.3) -> range .976-1.075, was down to .90) and
+  the pool contracts less than it flares (f floored at -0.4 for radii).
+- Prop-shadow circle cheated larger than the table's (rx .95W /
+  ry .50H, was .75/.39): props now sit ~.74-.90 brightness — only true
+  corner props read as shadowed.
