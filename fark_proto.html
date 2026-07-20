@@ -13150,7 +13150,9 @@ function _drawPropShadows(tSec){
     var w0=j.w/100*W,h0=w0*j.a[1]/j.a[0];
     var cx=j.x/100*W+w0/2,cy=j.y/100*H+h0/2;   /* fixed centre */
     var w=w0*sMul,h=h0*sMul;
-    var TW=Math.max(2,Math.round(w0*1.08*dpr)+2),TH=Math.max(2,Math.round(h0*1.08*dpr)+2);
+    /* square tmp big enough for the rotated silhouette */
+    var side=Math.ceil(Math.sqrt(w0*w0+h0*h0)*1.08);
+    var TW=Math.max(2,Math.round(side*dpr)+2),TH=TW;
     if(!j._tc||j._tc.width!==TW||j._tc.height!==TH){
       j._tc=document.createElement('canvas');j._tc.width=TW;j._tc.height=TH;
     }
@@ -13158,15 +13160,16 @@ function _drawPropShadows(tSec){
     var tx2=j._tc.getContext('2d');tx2.setTransform(dpr,0,0,dpr,0,0);
     tx2.globalCompositeOperation='source-over';
     tx2.clearRect(0,0,tw,th);
-    tx2.drawImage(im,(tw-w)/2,(th-h)/2,w,h);
+    /* the rotation lives in the MASK SHAPE only — the revealed texture
+       stays axis-aligned, pixel-identical to the base table */
+    tx2.save();tx2.translate(tw/2,th/2);tx2.rotate(j.rot*Math.PI/180);
+    tx2.drawImage(im,-w/2,-h/2,w,h);tx2.restore();
     tx2.globalCompositeOperation='source-in';
     var tlx=cx-tw/2,tly=cy-th/2;               /* tmp top-left in screen coords */
     tx2.drawImage(_tblImg,(ml.ox-sc.left)-tlx,(ml.oy-sc.top)-tly,ml.bw,ml.bh);
     tx2.globalCompositeOperation='source-atop';
     tx2.fillStyle='rgba(8,4,2,'+alpha.toFixed(3)+')';tx2.fillRect(0,0,tw,th);
-    x.save();x.translate(cx,cy);x.rotate(j.rot*Math.PI/180);
-    x.drawImage(j._tc,0,0,TW,TH,-tw/2,-th/2,tw,th);
-    x.restore();
+    x.drawImage(j._tc,0,0,TW,TH,cx-tw/2,cy-th/2,tw,th);
   });
 }
 window.addEventListener('resize',function(){_mLightCalc();_drawPropShadows();try{_drawCandle(performance.now()/1000);}catch(e){}});
@@ -13299,6 +13302,12 @@ function _matchDress(isBoss){
       }
     });
   }
+  /* painter's order: what is further (higher on the table) sits BELOW
+     what is closer (lower) — sort by visual base line, then append */
+  placed.sort(function(A,B){
+    var aa=ASPECT[A.n]||[1,1],ab=ASPECT[B.n]||[1,1];
+    return (A.y+A.w*(aa[1]/aa[0])*0.52)-(B.y+B.w*(ab[1]/ab[0])*0.52);
+  });
   var _jobs=window._shJobs=[];
   placed.forEach(function(q){
     var w=q.w;

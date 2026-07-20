@@ -1359,3 +1359,14 @@ opaque, 143 opaque shadow samples across 8 stamps.
   never slides. Temp canvases cached per job.
 Pixel-verified at two flicker phases: same-pixel texture constant,
 boundary alpha 247->167, opaque count 227->215 (shape breathes).
+
+## P88 — shadow texture pixel-aligned + painter's order (done)
+
+- The stamp rotation was rotating the revealed table slice with the
+  silhouette (plank lines tilted against the base). Rotation now lives
+  in the MASK SHAPE only: silhouette drawn rotated into a square tmp,
+  unlit slice composited axis-aligned in screen coords, tmp stamped
+  unrotated. Verified: shadow pixel == tinted base pixel (delta <=1).
+- Painter's order: props sorted by visual base line (y + height)
+  before append — further/higher sits below closer/lower; shadows
+  stamp in the same order.
