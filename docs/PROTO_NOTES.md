@@ -1236,3 +1236,20 @@ brightness .55 on bg/back/who/frame/banner), and GoneHome.png stamps
 on TOP (z4, object-fit contain, no positional overrides — its
 placement lives in the art). Verified against a forced gone seat;
 active cards stay unfiltered.
+
+## P82 — scoring tags tuned + exciting totals + YIELD yields (done)
+
+Per-die score tags: smaller (3.4cqw) with more air under the dice
+(2.6cqw gap). The selection TOTAL is gold (#ffd98a) with a glow+shake
+that ramps with the score — ~200 is calm, ~2000 is full double-glow
+with a 2.4px jitter (selShake keyframes driven by --sh; shadow built
+inline in JS, iOS-safe). Invalid stays grey and still.
+
+YIELD bug: the art button had DUPLICATED the legacy #btnYield id (the
+hidden post-bank handover button), so getElementById hit the art
+button — which was wired to the flee confirm. One button now, and it
+yields: mid-turn it forfeits unbanked points, clears the table and
+hands over (yieldTurn); post-bank it is the normal handover
+(handleYield → endPTurn). Flee stays on pause/X. showYieldButton /
+restoreRollButton drive the .on class (no more inline display that
+used to permanently hide the button after the first handover).

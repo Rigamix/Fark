@@ -734,13 +734,20 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 @keyframes keptWipe{to{opacity:0;transform:translateY(4px) scale(.8)}}
 /* concept scoring tags: medieval numbers under the selected dice */
 #screen-match .dice-area{position:relative}
-.selTag{position:absolute;top:calc(100% + 1cqw);left:50%;transform:translateX(-50%);z-index:6;
-  font-family:'JMH Beda',serif;font-size:4.6cqw;color:#f6ecd4;white-space:nowrap;pointer-events:none;
-  text-shadow:0 0 10px rgba(255,190,90,.65),0 2px 0 rgba(58,32,8,.85)}
+.selTag{position:absolute;top:calc(100% + 2.6cqw);left:50%;transform:translateX(-50%);z-index:6;
+  font-family:'JMH Beda',serif;font-size:3.4cqw;color:#f6ecd4;white-space:nowrap;pointer-events:none;
+  text-shadow:0 0 8px rgba(255,190,90,.6),0 2px 0 rgba(58,32,8,.85)}
 #selTotal{position:absolute;left:50%;transform:translateX(-50%);z-index:6;
-  font-family:'JMH Beda',serif;font-size:6.4cqw;color:#f6ecd4;pointer-events:none;white-space:nowrap;
-  text-shadow:0 0 12px rgba(255,190,90,.7),0 2px 0 rgba(58,32,8,.85)}
-#selTotal.zero{color:#9a8f7a;text-shadow:0 2px 0 rgba(20,12,6,.6)}
+  font-family:'JMH Beda',serif;font-size:6.4cqw;color:#ffd98a;pointer-events:none;white-space:nowrap;
+  text-shadow:0 0 12px rgba(255,190,90,.7),0 2px 0 rgba(58,32,8,.85);
+  animation:selShake .16s linear infinite}
+#selTotal.zero{color:#9a8f7a;text-shadow:0 2px 0 rgba(20,12,6,.6);animation:none}
+@keyframes selShake{
+  0%,100%{transform:translate(calc(-50% + var(--sh,0px)),0)}
+  25%{transform:translate(calc(-50% - var(--sh,0px)),calc(var(--sh,0px)*.6))}
+  50%{transform:translate(calc(-50% + var(--sh,0px)*.6),calc(var(--sh,0px)*-.6))}
+  75%{transform:translate(calc(-50% - var(--sh,0px)*.7),calc(var(--sh,0px)*.3))}
+}
 /* silhouette selection layers */
 .d3selg{position:absolute;inset:0;pointer-events:none}
 .d3selg i{position:absolute;inset:0;background:#ffd061;border-radius:3px}
@@ -7752,11 +7759,7 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
 <!-- PLAYER CARD BAR (fanned, tucked under controls) -->
 <div class="card-bar bot" id="playerCards">
   <div class="activate-zone" id="activateZone"><svg class="az-border" width="100%" height="100%" preserveAspectRatio="none"><rect x="1" y="1" rx="8" ry="8"></rect></svg><span class="az-label">ACTIVATE</span></div>
-  <div id="btnYield" onclick="SFX.nav();showQuitConfirm()"><span>YIELD</span></div>
-  <div class="match-btn match-btn-yield" id="btnYield" style="display:none" onclick="handleYield()">
-    <canvas></canvas>
-    <div class="btn-inner">YIELD</div>
-  </div>
+  <div id="btnYield" onclick="yieldTurn()"><span>YIELD</span></div>
 </div>
 
 <!-- CONTROLS -->
@@ -14889,7 +14892,7 @@ function setBtns(r,b){
     if(_inner)_inner.textContent=_wins?'BANK TO WIN':'BANK';
   }catch(e){}
   if(r)rollBtn.classList.remove('disabled');else rollBtn.classList.add('disabled');
-  try{var _yb=document.getElementById('btnYield');if(_yb)_yb.classList.toggle('on',!!((r||b)&&G&&G._anyPlayerRoll));}catch(e){}
+  try{var _yb=document.getElementById('btnYield');if(_yb)_yb.classList.toggle('on',(G&&G.phase==='yielding')||!!((r||b)&&G&&G._anyPlayerRoll));}catch(e){}
   if(b){
     bankBtn.classList.remove('disabled');
     if(wasDisabled){
@@ -16602,6 +16605,14 @@ function _renderSelTags(selD,total,valid){
   if(!tot){tot=document.createElement('div');tot.id='selTotal';area.appendChild(tot);}
   tot.className=(valid&&total>0)?'':'zero';
   tot.textContent=(valid&&total>0)?('+'+total.toLocaleString()):'0';
+  /* excitement ramp: ~200 is calm, ~2000 is full glow + shake */
+  var ex=(valid&&total>0)?Math.max(0,Math.min(1,(total-200)/1800)):0;
+  tot.style.setProperty('--sh',(ex*2.4).toFixed(2)+'px');
+  tot.style.textShadow=(valid&&total>0)
+    ?('0 0 '+(6+22*ex).toFixed(0)+'px rgba(255,190,90,'+(0.55+0.4*ex).toFixed(2)+')'
+      +(ex>0?',0 0 '+(40*ex).toFixed(0)+'px rgba(255,150,40,'+(0.75*ex).toFixed(2)+')':'')
+      +',0 2px 0 rgba(58,32,8,.85)')
+    :'';
   var rr=row.getBoundingClientRect(),ar=area.getBoundingClientRect();
   tot.style.top=(rr.bottom-ar.top+rr.height*0.55)+'px';
 }
@@ -17809,14 +17820,23 @@ function showYieldButton(){
   document.getElementById('btnRoll').classList.add('disabled');
   document.getElementById('btnBank').classList.add('disabled');
   var yb=document.getElementById('btnYield');
-  yb.style.display='flex';
+  yb.classList.add('on');
   yb.style.animation='none';
   requestAnimationFrame(function(){
-    drawMatchBtn('btnYield');
     yb.style.animation='yieldPopIn .25s cubic-bezier(.2,.8,.3,1) forwards';
   });
   SFX.bank();
   setStatusMsg('','');
+}
+/* mid-turn yield: unbanked points are forfeit, the table clears, the
+   rival takes over. Post-bank it's the normal handover. */
+function yieldTurn(){
+  if(!G||G._endMatchFired||G.phase==='opp')return;
+  if(G.phase!=='yielding'){
+    try{_renderSelTags([],0,true);}catch(e){}
+    clearRow('playerDiceRow');G.pool=[];
+  }
+  handleYield();
 }
 function handleYield(){
   SFX.nav();
@@ -17842,7 +17862,7 @@ function handleYield(){
 }
 function restoreRollButton(){
   var yb=document.getElementById('btnYield');
-  yb.style.animation='none';yb.style.display='none';
+  yb.style.animation='none';yb.classList.remove('on');
   var btn=document.getElementById('btnRoll');
   btn.classList.remove('disabled');btn.onclick=handleRoll;
   btn.style.animation='rollBounce .15s ease-out';
