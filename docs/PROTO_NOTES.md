@@ -1460,3 +1460,19 @@ die, peeking out at the base instead of hanging low.
   clearRow() never touches — it survived bank/yield into the NPC turn.
   _renderSelTags([],0,true) now fires at all three bank commit sites,
   in endPTurn and at startPTurn.
+
+## P96 — patron colour system (done)
+
+- Purple frames ONLY on the handicap/sealed seat; the other seats
+  cycle green/blue/red distinctly (index skips the sealed slot; the
+  card builder and launchSeat share the formula).
+- The seat colour follows the patron into the match as --patCol on
+  #screen-match (FRAME_COL sampled from the bg_ art: green #46503c,
+  purple #503c46, blue #3c505a, red #6e463c):
+  - NPC kept dice: green box outline replaced by the die-shaped
+    silhouette glow (same engine path as the player's selection,
+    .oppkeep recolours it via --patCol); all four un-keep paths
+    updated.
+  - the dark circle behind the patron portrait ring takes the colour.
+  - match dialogue text takes the colour.
+  Boss matches clear the var and keep the defaults.
