@@ -1533,3 +1533,13 @@ Mid-turn forfeit lives only on pause/X. Yield.png art unused for now.
   scatter/opp-scatter (level 2) and .kept-tray/#keptTray ancestors
   (level 1), with redraws at the scatter sites and a sweep in
   refreshKeptTray. Legacy 2D dice keep the old opacity via :not(.d3on).
+
+## P100b — BANK TO WIN fixed (done)
+
+Denis never saw BANK TO WIN because _selPts() always returned 0: it
+was written for an old scoreSelection API that returned
+{valid,total}, but the current API returns a plain number — so the
+winning check only counted COMMITTED points, and the common flow
+(select dice, bank directly) never triggered it. _selPts now handles
+the numeric return. Verified: selection alone crossing the target ->
+verb BANK TO WIN, wide gold plate, caption +N.
