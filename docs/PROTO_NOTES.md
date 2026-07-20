@@ -1443,3 +1443,10 @@ offer-screen dice keep the original ellipse.
 The dice feather ring was 2.2px — too tight to read as the props'
 two-layer handmade look. Ring radius now max(4, size*0.1) (~4.6px on
 match dice): fringe/solid ratio 0.36, matching the props (~0.30).
+
+## P94c — dice shadows tucked under, top-down (done)
+
+Silhouette squashed vertically (y*0.72 — ground shadow seen from a
+higher light), radial nudge halved (max 3.5px) and the base drop
+trimmed (10px + 0.14*size) so the shadow sits directly underneath the
+die, peeking out at the base instead of hanging low.
