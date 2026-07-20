@@ -1382,3 +1382,15 @@ shadows. Flicker ~1.75x faster; unlit tint deepened to .46 and pool
 tightened (rx .52W / ry .27H) so the effect lives on the visible
 table. Verified at opposite flare phases: ring alpha 88 vs 117,
 shadow footprint 248 vs 230, avg darkness 42 vs 58.
+
+## P90 — gentler pool, hugging shadows, radial blur (done)
+
+- pool scale amplitude halved (+/-8%).
+- shadow offsets down again (min 0.7%, 0.045*dist) — they hug the
+  props.
+- radial blur on shadow rims (Denis asked): solid core + 8 low-alpha
+  ring stamps feather the silhouette edge; fringe radius grows with
+  distance from the light (0.4+0.02*dist, cap 1.6%W) — nearer shadows
+  crisper, far ones softer. Pure drawImage accumulation (ctx.filter
+  blur is not iOS-safe). Verified: 170 fringe samples vs 575 solid,
+  per-prop radii 1.34-1.6.

@@ -13090,7 +13090,7 @@ function _drawCandle(tSec){
   var f=_candleF(tSec);
   var cx=W*0.5+W*0.012*Math.sin(tSec*0.7);
   var cy=H*0.44+H*0.004*Math.sin(tSec*1.3+3);
-  var rx=W*0.52*(1+0.16*f),ry=H*0.27*(1+0.16*f);
+  var rx=W*0.52*(1+0.08*f),ry=H*0.27*(1+0.08*f);
   x.globalCompositeOperation='destination-out';
   x.save();x.translate(cx,cy);x.scale(1,ry/rx);
   var g=x.createRadialGradient(0,0,rx*0.22,0,0,rx);
@@ -13158,9 +13158,18 @@ function _drawPropShadows(tSec){
     tx2.globalCompositeOperation='source-over';
     tx2.clearRect(0,0,tw,th);
     /* the rotation lives in the MASK SHAPE only — the revealed texture
-       stays axis-aligned, pixel-identical to the base table */
+       stays axis-aligned, pixel-identical to the base table.
+       Radial blur: solid core + 8 low-alpha ring stamps feather the
+       rim; fringe radius grows with distance from the light. */
     tx2.save();tx2.translate(tw/2,th/2);tx2.rotate(j.rot*Math.PI/180);
-    tx2.drawImage(im,-w/2,-h/2,w,h);tx2.restore();
+    tx2.drawImage(im,-w/2,-h/2,w,h);
+    var bpx=(j.bl||0.8)*W/100;
+    tx2.globalAlpha=0.16;
+    for(var k2=0;k2<8;k2++){
+      var an=k2*Math.PI/4;
+      tx2.drawImage(im,-w/2+Math.cos(an)*bpx,-h/2+Math.sin(an)*bpx,w,h);
+    }
+    tx2.globalAlpha=1;tx2.restore();
     tx2.globalCompositeOperation='source-in';
     var tlx=cx-tw/2,tly=cy-th/2;               /* tmp top-left in screen coords */
     tx2.drawImage(_tblImg,(ml.ox-sc.left)-tlx,(ml.oy-sc.top)-tly,ml.bw,ml.bh);
@@ -13319,11 +13328,12 @@ function _matchDress(isBoss){
     var cx=q.x+w/2,cy=q.y+w*(a[1]/a[0])*0.26;   /* prop centre, approx (h% ~ w%*ratio/1.9) */
     var dx=cx-50,dy=(cy-44)*1.9;                 /* direction in width-pct space */
     var len=Math.sqrt(dx*dx+dy*dy)||1;
-    var mag=Math.max(1.1,len*0.07);
+    var mag=Math.max(0.7,len*0.045);
     var ox=dx/len*mag,oy=(dy/len*mag)/1.9;
     _jobs.push({src:PP+q.n+'.png?v=2',x:+(q.x+ox).toFixed(2),y:+(q.y+oy).toFixed(2),
       w:+(w*1.1).toFixed(1),rot:q.rot,a:a,
-      ux:+(dx/len).toFixed(3),uy:+((dy/len)/1.9).toFixed(3)});
+      ux:+(dx/len).toFixed(3),uy:+((dy/len)/1.9).toFixed(3),
+      bl:+Math.min(1.6,0.4+len*0.02).toFixed(2)});
   });
   _mLightCalc();_drawPropShadows();_candleLoop();
   try{_drawCandle(0.8);}catch(e){}
