@@ -1306,3 +1306,21 @@ the breathing shadow layer (scale about 50%/44%) started poking a few
 px past the bottom, which made the match screen scrollable on phone.
 #screen-match now forces overflow:hidden — everything lives in one
 screen space, any sub-pixel animation overflow is clipped.
+
+## P85 — LAST ORDERS safety net + light/shadow crank (done)
+
+Denis hit a room with all four GONE HOME, 0 points, boss locked, and
+nothing happening. The mechanic exists (_checkNightFail: all seats
+spent + short of the boss = heart pays, roster re-rolls, LAST ORDERS
+splash) and the live loss path does settle it (verified by repro) —
+his run was stuck from stale state. Fix: _checkNightFail now ALSO runs
+at room render (initTierScreen, right after _ensureNight), so any
+stuck run settles the moment the room shows. Verified by forging the
+exact stuck state: heart 3->2, night re-rolled, splash up.
+
+Visual crank (both were too subtle on device):
+- light pool: box 118%x112%, stops 18->66 — bright heart ~10% around
+  centre, sides/corners properly dark; flicker brightness .93-1.09;
+  positions per keyframe. shBreath up to 1.05.
+- shadows: revealed slice at brightness .45 (dice ellipse .5), offset
+  min 2.2% / 0.15*dist, silhouettes 1.10 — sharp and unmissable.
