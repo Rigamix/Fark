@@ -716,15 +716,6 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 #screen-match .activate-zone{left:20%;right:20%;height:auto;aspect-ratio:720/218}
 #screen-match .activate-zone .az-border rect{rx:18px;ry:18px}
 #screen-match .activate-zone .az-label{font-family:'JMH Beda',serif;font-size:4.2cqw;letter-spacing:.08em}
-#btnYield{position:absolute;left:20%;right:20%;bottom:calc(100% + 100px);height:auto;
-  aspect-ratio:720/218;display:none;align-items:center;justify-content:center;cursor:pointer;
-  background:url('Art/Assets/Match/Yield.png') center/100% 100% no-repeat;z-index:54;
-  image-rendering:auto;transition:transform .1s}
-#btnYield:active{background-image:url('Art/Assets/Match/Yield_pressed.png')}
-#btnYield span{font-family:'JMH Beda',serif;font-size:6.2cqw;letter-spacing:.08em;color:#f7ecd2;
-  text-shadow:0 2px 0 rgba(16,9,3,.85),0 4px 10px rgba(0,0,0,.5)}
-#btnYield.on{display:flex}
-#activateZone.dragging-active ~ #btnYield,#activateZone.hot ~ #btnYield{display:none !important}
 /* kept pile: persistent dice cluster + one chalk TURN tag (brief §9) */
 #screen-match #keptTray .kept-die+.kept-die{margin-left:-1.6cqw}
 #screen-match #keptTray .kept-pts{font-family:'JMH Beda',serif;font-size:3.6cqw;color:#f0e3c6;
@@ -7778,7 +7769,6 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
 <!-- PLAYER CARD BAR (fanned, tucked under controls) -->
 <div class="card-bar bot" id="playerCards">
   <div class="activate-zone" id="activateZone"><svg class="az-border" width="100%" height="100%" preserveAspectRatio="none"><rect x="1" y="1" rx="8" ry="8"></rect></svg><span class="az-label">ACTIVATE</span></div>
-  <div id="btnYield" onclick="yieldTurn()"><span>YIELD</span></div>
 </div>
 
 <!-- CONTROLS -->
@@ -15263,7 +15253,6 @@ function setBtns(r,b){
     if(_inner)_inner.textContent=_wins?'BANK TO WIN':'BANK';
   }catch(e){}
   if(r)rollBtn.classList.remove('disabled');else rollBtn.classList.add('disabled');
-  try{var _yb=document.getElementById('btnYield');if(_yb)_yb.classList.toggle('on',(G&&G.phase==='yielding')||!!((r||b)&&G&&G._anyPlayerRoll));}catch(e){}
   if(b){
     bankBtn.classList.remove('disabled');
     if(wasDisabled){
@@ -18190,27 +18179,15 @@ function handleBank(){
 
 /* ═══════ YIELD PHASE ═══════ */
 function showYieldButton(){
+  /* brief: no YIELD button — banking hands the dice over by itself
+     once the bank feedback has landed */
   G.phase='yielding';
   document.getElementById('btnRoll').classList.add('disabled');
   document.getElementById('btnBank').classList.add('disabled');
-  var yb=document.getElementById('btnYield');
-  yb.classList.add('on');
-  yb.style.animation='none';
-  requestAnimationFrame(function(){
-    yb.style.animation='yieldPopIn .25s cubic-bezier(.2,.8,.3,1) forwards';
-  });
   SFX.bank();
   setStatusMsg('','');
-}
-/* mid-turn yield: unbanked points are forfeit, the table clears, the
-   rival takes over. Post-bank it's the normal handover. */
-function yieldTurn(){
-  if(!G||G._endMatchFired||G.phase==='opp')return;
-  if(G.phase!=='yielding'){
-    try{_renderSelTags([],0,true);}catch(e){}
-    clearRow('playerDiceRow');G.pool=[];
-  }
-  handleYield();
+  var _g=G;
+  setTimeout(function(){if(G===_g&&G&&G.phase==='yielding')handleYield();},900);
 }
 function handleYield(){
   SFX.nav();
@@ -18235,8 +18212,6 @@ function handleYield(){
   endPTurn();
 }
 function restoreRollButton(){
-  var yb=document.getElementById('btnYield');
-  yb.style.animation='none';yb.classList.remove('on');
   var btn=document.getElementById('btnRoll');
   btn.classList.remove('disabled');btn.onclick=handleRoll;
   btn.style.animation='rollBounce .15s ease-out';

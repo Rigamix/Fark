@@ -1490,3 +1490,16 @@ Match dice match Denis's concept:
   55%) that sits them on the table.
 Two new per-face layers (.d3wash/.d3grnd) — zeroed outside match
 dice (offer/chips/kept unchanged, verified).
+
+## P98 — YIELD retired; bank auto-passes (FARK_UI_SCREENS_BRIEF in) (done)
+
+New brief docs/FARK_UI_SCREENS_BRIEF.md (owns everything outside the
+match screen; acceptance: the string "YIELD" appears nowhere in UI,
+primary CTAs move to a two-line verb+caption pattern — Denis will
+paint bigger button bodies with caption room; using existing art
+until then).
+For now: the YIELD button is gone (element, CSS, setBtns toggle,
+yieldTurn). Banking hands the dice over automatically ~900ms after
+the bank feedback (showYieldButton keeps the 'yielding' phase beat
+and the DLG triggers via handleYield; guarded against stale G).
+Mid-turn forfeit lives only on pause/X. Yield.png art unused for now.
