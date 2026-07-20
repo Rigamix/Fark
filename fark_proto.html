@@ -784,14 +784,7 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
    the UNLIT table with a soft breathing ellipse punched out — the pool
    reveals the lit base, edges stay unlit. No CSS masks (they never
    rendered on iOS). The pool flicker rides on the base's brightness. */
-#matchPlate{animation:candleBreathe 5.6s ease-in-out infinite}
 #matchDark{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
-@keyframes candleBreathe{
-  0%,100%{filter:brightness(1)}
-  27%{filter:brightness(.93)}
-  55%{filter:brightness(1.09)}
-  78%{filter:brightness(.97)}
-}
 /* shadows reveal the UNLIT table through the prop's own silhouette;
    the layer breathes about the light centre in sync with the mask */
 #matchShadows{position:absolute;inset:0;z-index:0;pointer-events:none}
@@ -13073,7 +13066,7 @@ function _mLightCalc(){
   window._mLight={on:true,bw:bw,bh:bh,ox:r.left+(r.width-bw)/2,oy:r.top+(r.height-bh)/2};
 }
 window._tblImg=window._tblImg||(function(){var i=new Image();i.src='Art/Assets/Match/Commoner/Table.png?v=2';return i;})();
-function _candleF(t){return 0.6*Math.sin(t*1.1)+0.3*Math.sin(t*2.3+2)+0.1*Math.sin(t*4.7);}
+function _candleF(t){t*=1.75;return 0.6*Math.sin(t*1.1)+0.3*Math.sin(t*2.3+2)+0.1*Math.sin(t*4.7);}
 /* the dark layer: unlit table with the candle pool punched out */
 function _drawCandle(tSec){
   var cv=document.getElementById('matchDark'),ml=window._mLight;
@@ -13092,12 +13085,12 @@ function _drawCandle(tSec){
   /* the lit/unlit paintings differ subtly — tint the unlit layer so the
      pool contrast actually reads */
   x.globalCompositeOperation='source-atop';
-  x.fillStyle='rgba(10,6,3,0.38)';x.fillRect(0,0,W,H);
+  x.fillStyle='rgba(10,6,3,0.46)';x.fillRect(0,0,W,H);
   /* breathing pool: a soft circle radially expanding/contracting */
   var f=_candleF(tSec);
   var cx=W*0.5+W*0.012*Math.sin(tSec*0.7);
   var cy=H*0.44+H*0.004*Math.sin(tSec*1.3+3);
-  var rx=W*0.58*(1+0.11*f),ry=H*0.30*(1+0.11*f);
+  var rx=W*0.52*(1+0.16*f),ry=H*0.27*(1+0.16*f);
   x.globalCompositeOperation='destination-out';
   x.save();x.translate(cx,cy);x.scale(1,ry/rx);
   var g=x.createRadialGradient(0,0,rx*0.22,0,0,rx);
@@ -13114,7 +13107,10 @@ function _candleLoop(){
   function tick(t){
     var sc=document.getElementById('screen-match');
     if(!sc||!sc.classList.contains('active')||!window._mLight||!window._mLight.on){window._candleOn=false;return;}
-    if(t-last>40){last=t;_drawCandle(t/1000);}
+    if(t-last>40){last=t;_drawCandle(t/1000);
+      var pl=document.getElementById('matchPlate');
+      if(pl)pl.style.filter='brightness('+(1+0.10*_candleF(t/1000)).toFixed(3)+')';
+    }
     if(t-last2>80){last2=t;_drawPropShadows(t/1000);}
     requestAnimationFrame(tick);
   }
@@ -13136,7 +13132,8 @@ function _drawPropShadows(tSec){
     cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);
   }
   var f=_candleF(tSec===undefined?0.8:tSec);
-  var sMul=1+0.035*f,alpha=0.55+0.09*f;
+  /* flare -> larger, darker, pushed further along its own offset dir */
+  var sMul=1+0.05*f,alpha=0.60+0.12*f,push=0.8*f;
   var x=cv.getContext('2d');x.setTransform(dpr,0,0,dpr,0,0);
   x.clearRect(0,0,W,H);
   var needsLoad=false;
@@ -13148,7 +13145,7 @@ function _drawPropShadows(tSec){
       if(!_tblImg.complete)_tblImg.addEventListener('load',function(){_drawPropShadows(tSec);},{once:true});
       return;}
     var w0=j.w/100*W,h0=w0*j.a[1]/j.a[0];
-    var cx=j.x/100*W+w0/2,cy=j.y/100*H+h0/2;   /* fixed centre */
+    var cx=(j.x+(j.ux||0)*push)/100*W+w0/2,cy=(j.y+(j.uy||0)*push)/100*H+h0/2;
     var w=w0*sMul,h=h0*sMul;
     /* square tmp big enough for the rotated silhouette */
     var side=Math.ceil(Math.sqrt(w0*w0+h0*h0)*1.08);
@@ -13325,7 +13322,8 @@ function _matchDress(isBoss){
     var mag=Math.max(1.1,len*0.07);
     var ox=dx/len*mag,oy=(dy/len*mag)/1.9;
     _jobs.push({src:PP+q.n+'.png?v=2',x:+(q.x+ox).toFixed(2),y:+(q.y+oy).toFixed(2),
-      w:+(w*1.1).toFixed(1),rot:q.rot,a:a});
+      w:+(w*1.1).toFixed(1),rot:q.rot,a:a,
+      ux:+(dx/len).toFixed(3),uy:+((dy/len)/1.9).toFixed(3)});
   });
   _mLightCalc();_drawPropShadows();_candleLoop();
   try{_drawCandle(0.8);}catch(e){}

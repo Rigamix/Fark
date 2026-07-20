@@ -1370,3 +1370,15 @@ boundary alpha 247->167, opaque count 227->215 (shape breathes).
 - Painter's order: props sorted by visual base line (y + height)
   before append — further/higher sits below closer/lower; shadows
   stamp in the same order.
+
+## P89 — one flicker signal, physically linked + faster (done)
+
+f = candle flare drives EVERYTHING now: pool radius (+/-16%), plate
+brightness (+/-10%, set from the loop — the desynced CSS candleBreathe
+is gone), shadow silhouette scale (+/-5%), shadow darkness (alpha
+.60+/-.12) and a push (+/-0.8%) along each shadow's own offset
+direction — flare = brighter light, bigger pool, bigger/darker/longer
+shadows. Flicker ~1.75x faster; unlit tint deepened to .46 and pool
+tightened (rx .52W / ry .27H) so the effect lives on the visible
+table. Verified at opposite flare phases: ring alpha 88 vs 117,
+shadow footprint 248 vs 230, avg darkness 42 vs 58.
