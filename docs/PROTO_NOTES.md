@@ -1450,3 +1450,13 @@ Silhouette squashed vertically (y*0.72 — ground shadow seen from a
 higher light), radial nudge halved (max 3.5px) and the base drop
 trimmed (10px + 0.14*size) so the shadow sits directly underneath the
 die, peeking out at the base instead of hanging low.
+
+## P95 — yield gating per turn + no lingering totals (done)
+
+- G._anyPlayerRoll was set on the first roll of the MATCH and never
+  reset, so YIELD greeted every later turn before rolling. startPTurn
+  now resets it — yield earns its place per turn.
+- The floating +N selection total lives in .dice-area, which
+  clearRow() never touches — it survived bank/yield into the NPC turn.
+  _renderSelTags([],0,true) now fires at all three bank commit sites,
+  in endPTurn and at startPTurn.
