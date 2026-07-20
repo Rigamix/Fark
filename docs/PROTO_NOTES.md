@@ -1503,3 +1503,20 @@ yieldTurn). Banking hands the dice over automatically ~900ms after
 the bank feedback (showYieldButton keeps the 'yielding' phase beat
 and the DLG triggers via handleYield; guarded against stale G).
 Mid-turn forfeit lives only on pause/X. Yield.png art unused for now.
+
+## P99 — shadows unsqueezed, opaque dark kept/bust dice, BANK caption (done)
+
+- dice shadows back to the full projected silhouette (vertical squeeze
+  reverted), tucked a bit more under the die (drop 7px + 0.10size);
+  top-face glow toned down (x1.06, glow .3 at 0.05size).
+- kept (committed) and busting dice NEVER go translucent: engine dims
+  per face (committed: saturate .6 brightness .62; bust/bust-wipe:
+  saturate .25 brightness .55 — iOS-safe, host filters over 3D
+  children are ignored there). Redraw triggers at all commit sites
+  (x3), bust sites (x7) and the kept-tray wipe (x3). Opacity rules
+  scoped to legacy non-d3 dice only.
+- BANK follows the brief's two-line CTA: verb (BANK / BANK TO WIN) +
+  caption "+N" showing the live turn total incl. selection; caption
+  hides when there is nothing to bank. (Lesson: the P99 script died
+  mid-run before its file write — P99b/P99c re-applied; always check
+  the write happened.)

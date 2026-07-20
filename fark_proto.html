@@ -720,7 +720,7 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 #screen-match #keptTray .kept-die+.kept-die{margin-left:-1.6cqw}
 #screen-match #keptTray .kept-pts{font-family:'JMH Beda',serif;font-size:3.6cqw;color:#f0e3c6;
   letter-spacing:.06em;text-shadow:0 2px 0 rgba(16,9,3,.75);background:none;border:none;padding:0 0 0 1.6cqw}
-#keptTray.bust-wipe .die{filter:grayscale(1) brightness(.6)}
+#keptTray.bust-wipe .die:not(.d3on){filter:grayscale(1) brightness(.6)}
 #keptTray.bust-wipe .kept-pts{animation:keptWipe .45s ease-in forwards}
 @keyframes keptWipe{to{opacity:0;transform:translateY(4px) scale(.8)}}
 /* concept scoring tags: medieval numbers under the selected dice */
@@ -842,11 +842,16 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 #btnRoll .btn-inner{font-family:'JMH Beda',serif;font-size:6.2cqw;letter-spacing:.08em;color:#f7ecd2;
   text-shadow:0 2px 0 rgba(16,9,3,.85),0 4px 10px rgba(0,0,0,.5);background:none;transform:translateY(5%)}
 #btnBank .btn-inner{font-family:'JMH Beda',serif;font-size:5.2cqw;letter-spacing:.05em;color:#f7ecd2;
-  text-shadow:0 2px 0 rgba(16,9,3,.85),0 4px 10px rgba(0,0,0,.5);background:none;transform:translateY(5%)}
+  text-shadow:0 2px 0 rgba(16,9,3,.85),0 4px 10px rgba(0,0,0,.5);background:none;transform:translateY(5%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.02}
+#btnBank #bankVerb{font-size:4.6cqw}
+#btnBank .btn-cap{font-size:2.7cqw;letter-spacing:.08em;color:#efdcb2;
+  text-shadow:0 2px 0 rgba(16,9,3,.85)}
+#btnBank .btn-cap:empty{display:none}
 #screen-match .match-btn.disabled{opacity:1;filter:none}
 #screen-match .match-btn-roll.roll-locked{filter:none}
 #btnBank.bank-to-win{width:55%;aspect-ratio:1782/541;background:url('Art/Assets/Match/Roll.png') center/contain no-repeat}
-#btnBank.bank-to-win .btn-inner{font-size:6cqw}
+#btnBank.bank-to-win #bankVerb{font-size:5.2cqw}
 #screen-match .controls:has(#btnBank.bank-to-win) #btnRoll{width:35%;aspect-ratio:1135/409}
 /* dice: bigger and raised toward the centre band */
 #screen-match .die{width:13cqw;height:13cqw}
@@ -1856,7 +1861,8 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
   animation:none!important;
   transition:transform 360ms cubic-bezier(.25,.46,.45,.94)!important;
 }
-.die.committed{opacity:.38;cursor:default}
+.die.committed{cursor:default}
+.die.committed:not(.d3on){opacity:.38}
 .die.committed:active{transform:none}
 .die.rolling{animation:dRoll .4s linear infinite;cursor:default;box-shadow:none;transition:none;border-color:var(--dborder)}
 /* Jade wild face: leave completely blank (no pips, no marker). */
@@ -7783,7 +7789,7 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
   </div>
   <div class="match-btn match-btn-bank disabled" id="btnBank" onclick="handleBank()">
     <canvas></canvas>
-    <div class="btn-inner">BANK</div>
+    <div class="btn-inner"><span id="bankVerb">BANK</span><span class="btn-cap" id="bankCap"></span></div>
   </div>
 </div>
 
@@ -12909,7 +12915,15 @@ D3.rotv=function(n,pitch,yaw,spin,turn,tilt){
 D3.draw=function(d){
   /* selection glow mirrors the host's .selected class — single source of
      truth so every select/deselect path stays honest */
-  try{d._selGlow=!!(d.slot&&d.slot.parentNode&&d.slot.parentNode.classList.contains('selected'));}catch(e){d._selGlow=false;}
+  try{
+    var _hcl=d.slot&&d.slot.parentNode&&d.slot.parentNode.classList;
+    d._selGlow=!!(_hcl&&_hcl.contains('selected'));
+    /* kept/bust dice DARKEN, never fade — per-face (iOS ignores host
+       filters over 3D children) */
+    d._dim=_hcl?(_hcl.contains('bust')?2:(_hcl.contains('committed')?1:0)):0;
+    if(!d._dim&&d.slot.closest&&d.slot.closest('.bust-wipe'))d._dim=2;
+  }catch(e){d._selGlow=false;d._dim=0;}
+  var _dm=d._dim===2?' saturate(.25) brightness(.55)':(d._dim===1?' saturate(.6) brightness(.62)':'');
   var x=d.x+d.ox,h=d.h||0,s=d.s;
   d.die.style.transform='translate('+x+'px,'+(d.y-h*0.55*s)+'px) scale('+(1+h*0.004)+')';
   /* iOS WebKit ignores filters on a parent of 3D-transformed children,
@@ -12936,8 +12950,8 @@ D3.draw=function(d){
     f.el.style.transform='rotateX('+tl+'deg)'+(d.turn?' rotateY('+d.turn+'deg)':'')+' rotateZ('+d.spin+'deg) rotateX('+d.pitch+'deg) rotateY('+d.yaw+'deg) '+f.place;
     var dot=n[0]*D3.LIGHT[0]+n[1]*D3.LIGHT[1]+n[2]*D3.LIGHT[2];
     var isTop=(d.group==='match'&&f===_topF);
-    f.el.style.filter=(d.tint?d.tint+' ':'')+'brightness('+((0.55+0.55*Math.max(0,dot))*(isTop?1.1:1)).toFixed(2)+')'+outline
-      +(isTop?' drop-shadow(0 0 '+(d.size*0.07).toFixed(1)+'px rgba(255,238,200,.55))':'')
+    f.el.style.filter=(d.tint?d.tint+' ':'')+'brightness('+((0.55+0.55*Math.max(0,dot))*(isTop?1.06:1)).toFixed(2)+')'+_dm+outline
+      +(isTop?' drop-shadow(0 0 '+(d.size*0.05).toFixed(1)+'px rgba(255,238,200,.3))':'')
       +(d.dieShadow?' drop-shadow('+(d.size*0.05).toFixed(1)+'px '+(d.size*0.11).toFixed(1)+'px 0 rgba(26,16,8,.45))':'')
       ;
     f.sh.style.opacity=Math.max(0,(0.35-dot)*0.85).toFixed(2);
@@ -13231,17 +13245,17 @@ function _drawDiceShadows(tSec){
     var sr=d.slot.getBoundingClientRect();
     if(!sr.width)return;
     var scx=sr.left-sc.left+sr.width/2+(d.x+d.ox);
-    var scy=sr.top-sc.top+sr.height/2+d.y+10*s2;
+    var scy=sr.top-sc.top+sr.height/2+d.y+7*s2;
     /* radial nudge from the light + flare push */
     var lx=ml.ox-sc.left+ml.bw/2,ly=ml.oy-sc.top+ml.bh*0.44;
     var ddx=scx-lx,ddy=scy-ly,dl=Math.sqrt(ddx*ddx+ddy*ddy)||1;
     var pm=Math.min(3.5,1.2+dl*0.012)+1.5*f;
-    scx+=ddx/dl*pm;scy+=ddy/dl*pm+d.size*0.14;
+    scx+=ddx/dl*pm;scy+=ddy/dl*pm+d.size*0.10;
     /* project the corners, hull them */
     var half=d.size/2*sMul*Math.max(0.5,1-h*0.008),pts=[];
     for(var ci=0;ci<8;ci++){
       var v=D3.rotv([C[ci][0]*half,C[ci][1]*half,C[ci][2]*half],d.pitch,d.yaw,d.spin,d.turn,d.tilt);
-      pts.push([v[0],v[1]*0.55]);/* squashed: ground shadow seen top-down */
+      pts.push([v[0],v[1]]);/* full silhouette — no vertical squeeze */
     }
     /* gift-wrap hull (8 pts) */
     var hull=[],start=0;
@@ -15247,10 +15261,12 @@ function setBtns(r,b){
   /* flow spec 5: when the bank would cross the target, BANK takes the
      primary weight and says so — the win tap must be unmissable. */
   try{
-    var _inner=bankBtn.querySelector('.btn-inner');
-    var _wins=!!(G&&b&&(G.pPts+(G.turnPts||0)+(typeof _selPts==='function'?_selPts():0))>=G.target);
+    var _verb=document.getElementById('bankVerb'),_cap=document.getElementById('bankCap');
+    var _bpts=(G?(G.turnPts||0)+(typeof _selPts==='function'?_selPts():0):0);
+    var _wins=!!(G&&b&&(G.pPts+_bpts)>=G.target);
     bankBtn.classList.toggle('bank-to-win',_wins);
-    if(_inner)_inner.textContent=_wins?'BANK TO WIN':'BANK';
+    if(_verb)_verb.textContent=_wins?'BANK TO WIN':'BANK';
+    if(_cap)_cap.textContent=(b&&_bpts>0)?('+'+_bpts.toLocaleString()):'';
   }catch(e){}
   if(r)rollBtn.classList.remove('disabled');else rollBtn.classList.add('disabled');
   if(b){
@@ -16392,7 +16408,7 @@ function handleRoll(){
       _cfHit=true;pts=Math.floor(pts/2);spawnPop('💀 −HALF');
       try{SFX.err&&SFX.err();}catch(e){}
     }
-    selDice.forEach(d=>{d.committed=true;d._frozen=false;d.el.classList.remove('selected','die-frozen');d.el.classList.add('committed');d.el.onclick=null;d.el.style.cursor='default';});
+    selDice.forEach(d=>{d.committed=true;d._frozen=false;d.el.classList.remove('selected','die-frozen');d.el.classList.add('committed');d.el.onclick=null;d.el.style.cursor='default';if(d.el._d3)D3.draw(d.el._d3);});
     SFX.commit();Haptic.commit();G.kept.push({vals:selVals,mat:selDice[0].mat,pts,cursed:_cfHit,
       dice:selDice.map(function(dd){return{val:dd.val,mat:dd.mat};})});
     G.turnPts=G.kept.reduce((a,k)=>a+k.pts,0)+(G._stakesRisingBonus||0);refreshKeptTray();
@@ -16777,7 +16793,7 @@ function _afterRollImpl(){
     _delayedDoBust(free);return;
   }
   if(G.pCards.includes('last_stand')&&free.length===1&&(freeV[0]===1||freeV[0]===5)){
-    const d=free[0];d.committed=true;if(d.el){d.el.classList.add('committed');d.el.onclick=null;}
+    const d=free[0];d.committed=true;if(d.el){d.el.classList.add('committed');d.el.onclick=null;if(d.el._d3)D3.draw(d.el._d3);}
     G.kept.push({vals:[freeV[0]],mat:d.mat,pts:600,dice:[{val:freeV[0],mat:d.mat}]});G.turnPts=G.kept.reduce((a,k)=>a+k.pts,0)+(G._stakesRisingBonus||0);refreshKeptTray();updHUD();
     triggerCard('last_stand','LAST STAND! 600',true);if(window.DLG)setTimeout(function(){DLG.triggerCard('last_stand',true);},800);setBtns(false,true);return;
   }
@@ -17081,7 +17097,7 @@ function _tryBustSave(free){
   var _bankable=G.kept.length>0||(G._stakesRisingBonus||0)>0;
   if(_drillCapped&&!_bankable)return false;
   function _runSave(label,text){
-    free.forEach(d=>{if(d.el){d.el.classList.add('bust');setTimeout(()=>{if(d.el)d.el.remove();},380);}});
+    free.forEach(d=>{if(d.el){d.el.classList.add('bust');if(d.el._d3)D3.draw(d.el._d3);setTimeout(()=>{if(d.el)d.el.remove();},380);}});
     G.pool=G.pool.filter(d=>d.committed);G.phase='idle';
     /* Flag the turn as a bust-save turn. Subsequent dialogue triggers
        (PLAYER_HOT_DICE, PLAYER_SIX_KIND, etc) skip their NPC comment
@@ -17218,7 +17234,7 @@ function doBust(){
       Array.prototype.forEach.call(_sdRow.querySelectorAll('.die'),function(el){
         var _w=el.parentElement;
         if(_w===_sdTarget)return;
-        el.style.opacity='';el.style.filter='';el.classList.add('bust');
+        el.style.opacity='';el.style.filter='';el.classList.add('bust');if(el._d3)D3.draw(el._d3);
       });
     }
     try{SFX.shield&&SFX.shield();}catch(e){}
@@ -17248,7 +17264,7 @@ function doBust(){
   if(G.activeCardState&&G.activeCardState.secondWindActive){
     G.activeCardState.secondWindActive=false;clearCardLabel('second_wind');
     /* Apply bust to all visible dice in the row (not just G.pool — see comment in main bust path) */
-    (function(){var _r=document.getElementById('playerDiceRow');if(_r)Array.prototype.forEach.call(_r.querySelectorAll('.die'),function(el){el.style.opacity='';el.style.filter='';el.classList.add('bust');});})();
+    (function(){var _r=document.getElementById('playerDiceRow');if(_r)Array.prototype.forEach.call(_r.querySelectorAll('.die'),function(el){el.style.opacity='';el.style.filter='';el.classList.add('bust');if(el._d3)D3.draw(el._d3);});})();
     setStatusMsg('SECOND WIND — 3-DICE RESCUE!','gold');triggerCard('second_wind','RESCUE ROLL!',true);
     G.safeTurnStreak=0;G.turnPts=0;G.kept=[];updHUD();refreshKeptTray();setBtns(false,false);
     setTimeout(function(){
@@ -17295,7 +17311,7 @@ function doBust(){
     var _tsSaved=Math.floor(_tsTurnPts/2);
     G._stakesRisingBonus=0;
     /* Apply bust class to all visible dice in the row */
-    (function(){var _r=document.getElementById('playerDiceRow');if(_r)Array.prototype.forEach.call(_r.querySelectorAll('.die'),function(el){el.style.opacity='';el.style.filter='';el.classList.add('bust');});})();
+    (function(){var _r=document.getElementById('playerDiceRow');if(_r)Array.prototype.forEach.call(_r.querySelectorAll('.die'),function(el){el.style.opacity='';el.style.filter='';el.classList.add('bust');if(el._d3)D3.draw(el._d3);});})();
     G.safeTurnStreak=0;G.turnPts=0;G.kept=[];updHUD();refreshKeptTray();setBtns(false,false);
     /* Full bust feedback: red overlay word, screen shake, vignette, SFX */
     var _tsBov=document.getElementById('bust-ov');
@@ -17303,7 +17319,10 @@ function doBust(){
     try{SFX.bust&&SFX.bust();}catch(e){}
     try{Haptic.bust&&Haptic.bust();}catch(e){}
     try{var _kt=document.getElementById('keptTray');
-      if(_kt){_kt.classList.add('bust-wipe');setTimeout(function(){_kt.classList.remove('bust-wipe');},900);}}catch(e){}
+      if(_kt){_kt.classList.add('bust-wipe');
+        _kt.querySelectorAll('.die').forEach(function(el){if(el._d3)D3.draw(el._d3);});
+        setTimeout(function(){_kt.classList.remove('bust-wipe');
+          _kt.querySelectorAll('.die').forEach(function(el){if(el._d3)D3.draw(el._d3);});},900);}}catch(e){}
     _bustImpact();
     if(window.DLG)DLG.trigger('PLAYER_BUST');
     /* Save fires AFTER the bust beat (~1s) so the relief reads clearly */
@@ -17331,14 +17350,17 @@ function doBust(){
     var _lsTurnPts=G.kept.reduce((a,k)=>a+k.pts,0)+(G._stakesRisingBonus||0);
     var _lsSaved=Math.floor(_lsTurnPts/2);
     G._stakesRisingBonus=0;
-    (function(){var _r=document.getElementById('playerDiceRow');if(_r)Array.prototype.forEach.call(_r.querySelectorAll('.die'),function(el){el.style.opacity='';el.style.filter='';el.classList.add('bust');});})();
+    (function(){var _r=document.getElementById('playerDiceRow');if(_r)Array.prototype.forEach.call(_r.querySelectorAll('.die'),function(el){el.style.opacity='';el.style.filter='';el.classList.add('bust');if(el._d3)D3.draw(el._d3);});})();
     G.safeTurnStreak=0;G.turnPts=0;G.kept=[];updHUD();refreshKeptTray();setBtns(false,false);
     var _lsBov=document.getElementById('bust-ov');
     if(_lsBov){_alignOverlayWord(_lsBov.querySelector('.bust-word'));_lsBov.classList.add('flash');setTimeout(function(){_lsBov.classList.remove('flash');},1100);}
     try{SFX.bust&&SFX.bust();}catch(e){}
     try{Haptic.bust&&Haptic.bust();}catch(e){}
     try{var _kt=document.getElementById('keptTray');
-      if(_kt){_kt.classList.add('bust-wipe');setTimeout(function(){_kt.classList.remove('bust-wipe');},900);}}catch(e){}
+      if(_kt){_kt.classList.add('bust-wipe');
+        _kt.querySelectorAll('.die').forEach(function(el){if(el._d3)D3.draw(el._d3);});
+        setTimeout(function(){_kt.classList.remove('bust-wipe');
+          _kt.querySelectorAll('.die').forEach(function(el){if(el._d3)D3.draw(el._d3);});},900);}}catch(e){}
     _bustImpact();
     if(window.DLG)DLG.trigger('PLAYER_BUST');
     setTimeout(function(){
@@ -17363,7 +17385,7 @@ function doBust(){
     const saved=G.kept.reduce((a,k)=>a+k.pts,0)+(G._stakesRisingBonus||0);
     G._stakesRisingBonus=0;
     /* Apply bust to all visible dice in the row */
-    (function(){var _r=document.getElementById('playerDiceRow');if(_r)Array.prototype.forEach.call(_r.querySelectorAll('.die'),function(el){el.style.opacity='';el.style.filter='';el.classList.add('bust');});})();
+    (function(){var _r=document.getElementById('playerDiceRow');if(_r)Array.prototype.forEach.call(_r.querySelectorAll('.die'),function(el){el.style.opacity='';el.style.filter='';el.classList.add('bust');if(el._d3)D3.draw(el._d3);});})();
     /* Bank the accumulated pts safely into G.pPts so they aren't at risk
        on the upcoming reroll. */
     G.pPts+=saved;
@@ -17500,11 +17522,15 @@ function doBust(){
         el.style.opacity='';
         el.classList.remove('selected','combo-glow','eff-glow-gold','eff-glow-green','eff-glow-red','eff-glow-blue');
         el.classList.add('bust');
+        if(el._d3)D3.draw(el._d3);
       });
     }
     var _bov=document.getElementById('bust-ov');_alignOverlayWord(_bov.querySelector('.bust-word'));_bov.classList.add('flash');SFX.bust();Haptic.bust();
     try{var _kt=document.getElementById('keptTray');
-      if(_kt){_kt.classList.add('bust-wipe');setTimeout(function(){_kt.classList.remove('bust-wipe');},900);}}catch(e){}
+      if(_kt){_kt.classList.add('bust-wipe');
+        _kt.querySelectorAll('.die').forEach(function(el){if(el._d3)D3.draw(el._d3);});
+        setTimeout(function(){_kt.classList.remove('bust-wipe');
+          _kt.querySelectorAll('.die').forEach(function(el){if(el._d3)D3.draw(el._d3);});},900);}}catch(e){}
     _bustImpact();
     if(window.DLG)DLG.trigger('PLAYER_BUST');
     /* No status-msg 'BUST' — the large bust-ov overlay covers it */
@@ -17646,7 +17672,7 @@ function handleBank(){
       pts=_applyCommitBonuses(selD,pts,cards);
       var _cfBank=false;
       if(G._tell&&G._tell.id==='counterfeit'&&selD.some(function(d){return d.cursed;})){_cfBank=true;pts=Math.floor(pts/2);spawnPop('💀 −HALF');try{SFX.err&&SFX.err();}catch(e){}}
-      selD.forEach(d=>{d.committed=true;d._frozen=false;if(d.el){d.el.classList.remove('selected','die-frozen');d.el.classList.add('committed');d.el.onclick=null;}});
+      selD.forEach(d=>{d.committed=true;d._frozen=false;if(d.el){d.el.classList.remove('selected','die-frozen');d.el.classList.add('committed');d.el.onclick=null;if(d.el._d3)D3.draw(d.el._d3);}});
       G.kept.push({vals:selV,mat:selD[0].mat,pts,cursed:_cfBank,
         dice:selD.map(function(dd){return{val:dd.val,mat:dd.mat};})});
     }}
