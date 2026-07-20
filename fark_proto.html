@@ -890,6 +890,9 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 .d3die{position:absolute;inset:0;will-change:transform,filter;pointer-events:none}
 .d3f{position:absolute;inset:0;background-size:cover;will-change:transform;border-radius:3px}
 .d3f .d3sh{position:absolute;inset:0;background:rgb(60,42,24);opacity:0;border-radius:3px}
+.d3f .d3wash{position:absolute;inset:0;background:#f0d8a8;opacity:0;border-radius:3px}
+.d3f .d3grnd{position:absolute;inset:0;border-radius:3px;opacity:0;
+  background:linear-gradient(to top,rgba(30,18,10,.4) 0%,rgba(30,18,10,0) 55%)}
 /* ═══ PROTO GREYBOX SKIN ═══ */
 @media (min-width:520px){
   body.phone-framed{background:#222 !important;display:flex;align-items:center;justify-content:center;min-height:100vh}
@@ -12876,9 +12879,13 @@ D3.make=function(host,opts){
   D3.PLACE.forEach(function(pl){
     var f=document.createElement('div');f.className='d3f';
     f.style.backgroundImage='url(Art/Assets/Dice/bone_'+(pl.img+1)+'.png)';
+    /* table-look layers (match dice): base-colour wash softens side-face
+       pips; a from-below gradient in the shadow colour grounds the die */
+    var fw=document.createElement('div');fw.className='d3wash';f.appendChild(fw);
+    var fg2=document.createElement('div');fg2.className='d3grnd';f.appendChild(fg2);
     var fs=document.createElement('div');fs.className='d3sh';f.appendChild(fs);
     die.appendChild(f);
-    faces.push({el:f,sh:fs,n:pl.n,place:'rotateX('+pl.rx+'deg) rotateY('+pl.ry+'deg) translateZ('+(size/2)+'px)'});
+    faces.push({el:f,sh:fs,wash:fw,grnd:fg2,n:pl.n,place:'rotateX('+pl.rx+'deg) rotateY('+pl.ry+'deg) translateZ('+(size/2)+'px)'});
   });
   host.appendChild(slot);
   var d={slot:slot,die:die,faces:faces,shadow:sh,size:size,s:size/42,
@@ -12921,16 +12928,33 @@ D3.draw=function(d){
   var outline=ow?' drop-shadow('+ow+'px 0 0 '+oc+') drop-shadow(-'+ow+'px 0 0 '+oc+') drop-shadow(0 '+ow+'px 0 '+oc+') drop-shadow(0 -'+ow+'px 0 '+oc+')':'';
   if(d.die.style.filter)d.die.style.filter='';
   var tl=(d.tilt!=null?d.tilt:D3.cfg.tilt);
+  /* which visible face is the TOP (most lit) — it gets the concept
+     treatment: brighter + a tiny glow; the others get the wash/ground */
+  var _topF=null,_topDot=-9;
+  if(d.group==='match'){
+    d.faces.forEach(function(f){
+      var n=D3.rotv(f.n,d.pitch,d.yaw,d.spin,d.turn,d.tilt);
+      if(n[2]<=0.01)return;
+      var dot=n[0]*D3.LIGHT[0]+n[1]*D3.LIGHT[1]+n[2]*D3.LIGHT[2];
+      if(dot>_topDot){_topDot=dot;_topF=f;}
+    });
+  }
   d.faces.forEach(function(f){
     var n=D3.rotv(f.n,d.pitch,d.yaw,d.spin,d.turn,d.tilt);
     if(n[2]<=0.01){f.el.style.display='none';return;}
     f.el.style.display='block';
     f.el.style.transform='rotateX('+tl+'deg)'+(d.turn?' rotateY('+d.turn+'deg)':'')+' rotateZ('+d.spin+'deg) rotateX('+d.pitch+'deg) rotateY('+d.yaw+'deg) '+f.place;
     var dot=n[0]*D3.LIGHT[0]+n[1]*D3.LIGHT[1]+n[2]*D3.LIGHT[2];
-    f.el.style.filter=(d.tint?d.tint+' ':'')+'brightness('+(0.55+0.55*Math.max(0,dot)).toFixed(2)+')'+outline
+    var isTop=(d.group==='match'&&f===_topF);
+    f.el.style.filter=(d.tint?d.tint+' ':'')+'brightness('+((0.55+0.55*Math.max(0,dot))*(isTop?1.1:1)).toFixed(2)+')'+outline
+      +(isTop?' drop-shadow(0 0 '+(d.size*0.07).toFixed(1)+'px rgba(255,238,200,.55))':'')
       +(d.dieShadow?' drop-shadow('+(d.size*0.05).toFixed(1)+'px '+(d.size*0.11).toFixed(1)+'px 0 rgba(26,16,8,.45))':'')
       ;
     f.sh.style.opacity=Math.max(0,(0.35-dot)*0.85).toFixed(2);
+    if(f.wash){
+      f.wash.style.opacity=(d.group==='match'&&!isTop)?0.24:0;
+      f.grnd.style.opacity=(d.group==='match'&&!isTop)?1:0;
+    }
   });
   d.shadow.style.transform='translate('+x+'px,'+(d.y+16*s)+'px) scale('+Math.max(0.5,1-h*0.008)+')';
   var ml=window._mLight;
@@ -13205,7 +13229,7 @@ function _drawDiceShadows(tSec){
     cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);
   }
   var f=_candleF(tSec===undefined?0.8:tSec);
-  var sMul=1+0.05*f,alphaB=0.60+0.12*f;
+  var sMul=1+0.05*f,alphaB=0.45+0.09*f;
   var x=cv.getContext('2d');x.setTransform(dpr,0,0,dpr,0,0);
   x.clearRect(0,0,W,H);
   if(!_tblImg.complete||!_tblImg.naturalWidth)return;
@@ -13227,7 +13251,7 @@ function _drawDiceShadows(tSec){
     var half=d.size/2*sMul*Math.max(0.5,1-h*0.008),pts=[];
     for(var ci=0;ci<8;ci++){
       var v=D3.rotv([C[ci][0]*half,C[ci][1]*half,C[ci][2]*half],d.pitch,d.yaw,d.spin,d.turn,d.tilt);
-      pts.push([v[0],v[1]*0.72]);/* squashed: ground shadow seen top-down */
+      pts.push([v[0],v[1]*0.55]);/* squashed: ground shadow seen top-down */
     }
     /* gift-wrap hull (8 pts) */
     var hull=[],start=0;

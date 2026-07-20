@@ -1476,3 +1476,17 @@ die, peeking out at the base instead of hanging low.
   - the dark circle behind the patron portrait ring takes the colour.
   - match dialogue text takes the colour.
   Boss matches clear the var and keep the defaults.
+
+## P97 — dice concept pass: top glow, side wash, grounding (done)
+
+Match dice match Denis's concept:
+- shadow flatter (squash .55) and lighter (alpha .45+.09f).
+- the TOP face (most lit) gets brightness x1.1 + a tiny warm glow
+  (drop-shadow, no url — iOS-safe).
+- side faces get a faint wash of the base surface colour (#f0d8a8
+  sampled from bone_1, opacity .24, inherits the material tint since
+  it lives inside the tinted face) to tone down their pips, plus a
+  from-below gradient in the shadow colour (rgba(30,18,10,.4) -> 0 at
+  55%) that sits them on the table.
+Two new per-face layers (.d3wash/.d3grnd) — zeroed outside match
+dice (offer/chips/kept unchanged, verified).
