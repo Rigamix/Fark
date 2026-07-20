@@ -1413,3 +1413,14 @@ props nearest the pool ~.80.
 - Prop-shadow circle cheated larger than the table's (rx .95W /
   ry .50H, was .75/.39): props now sit ~.74-.90 brightness — only true
   corner props read as shadowed.
+
+## P93 — dice shadows match the props' look (done)
+
+The match-dice shadow was a 0.9x0.29 ellipse hidden behind the die.
+Table mode now swaps in a cube-sized footprint (1.02x0.88 of the die,
+border-radius 26%) revealing the darkened table (brightness .5) with a
+soft rim (plain blur(2.5px) — iOS-safe, no masks), nudged radially
+away from the light centre (2-6px, distance-scaled + a small fixed
+drop — subtle, dice live near the centre). Geometry restores to the
+old ellipse off-table (offer screen unchanged). bg slice re-aligned to
+the new rect per frame.

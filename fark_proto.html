@@ -882,7 +882,8 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 .d3slot{position:relative;will-change:transform}
 .d3shadow{position:absolute;left:50%;top:50%;border-radius:50%;
   background:rgba(20,12,6,.5);filter:blur(3px);will-change:transform;pointer-events:none}
-.d3shadow.tblsh{background:url('Art/Assets/Match/Commoner/Table.png?v=2') no-repeat;filter:brightness(.5)}
+.d3shadow.tblsh{background:url('Art/Assets/Match/Commoner/Table.png?v=2') no-repeat;
+  filter:brightness(.5) blur(2.5px);border-radius:26%}
 .d3die{position:absolute;inset:0;will-change:transform,filter;pointer-events:none}
 .d3f{position:absolute;inset:0;background-size:cover;will-change:transform;border-radius:3px}
 .d3f .d3sh{position:absolute;inset:0;background:rgb(60,42,24);opacity:0;border-radius:3px}
@@ -12930,17 +12931,30 @@ D3.draw=function(d){
   d.shadow.style.transform='translate('+x+'px,'+(d.y+16*s)+'px) scale('+Math.max(0.5,1-h*0.008)+')';
   var ml=window._mLight;
   if(d.group==='match'&&ml&&ml.on){
-    /* the shadow is a sharp ellipse revealing the UNLIT table: align a
-       slice of Table.png (cover geometry) to the shadow's screen spot */
-    if(!d._tbl){d._tbl=1;d.shadow.classList.add('tblsh');}
+    /* prop-style shadow: cube-sized footprint revealing the darkened
+       table, soft rim, nudged radially away from the light (small —
+       the dice live near the centre) */
+    if(!d._tbl){d._tbl=1;d.shadow.classList.add('tblsh');
+      d.shadow.style.width=(d.size*1.02)+'px';d.shadow.style.height=(d.size*0.88)+'px';
+      d.shadow.style.margin=(-d.size*0.44)+'px 0 0 '+(-d.size*0.51)+'px';
+    }
     var _sr=d.slot.getBoundingClientRect();
-    var _sx=_sr.left+_sr.width/2-d.size*0.45+x;
-    var _sy=_sr.top+_sr.height/2-d.size*0.145+(d.y+16*s);
+    var _scx=_sr.left+_sr.width/2,_scy=_sr.top+_sr.height/2;
+    var _lx=ml.ox+ml.bw/2,_ly=ml.oy+ml.bh*0.44;
+    var _dx=_scx-_lx,_dy=_scy-_ly,_dl=Math.sqrt(_dx*_dx+_dy*_dy)||1;
+    var _pm=Math.min(6,2+_dl*0.02);
+    var _tx=x+_dx/_dl*_pm,_ty=(d.y+16*s)+_dy/_dl*_pm+d.size*0.05;
+    d.shadow.style.transform='translate('+_tx+'px,'+_ty+'px) scale('+Math.max(0.5,1-h*0.008)+')';
+    var _sx=_scx-d.size*0.51+_tx;
+    var _sy=_scy-d.size*0.44+_ty;
     d.shadow.style.backgroundSize=ml.bw+'px '+ml.bh+'px';
     d.shadow.style.backgroundPosition=(ml.ox-_sx).toFixed(1)+'px '+(ml.oy-_sy).toFixed(1)+'px';
     d.shadow.style.opacity=1;
   }else{
-    if(d._tbl){d._tbl=0;d.shadow.classList.remove('tblsh');}
+    if(d._tbl){d._tbl=0;d.shadow.classList.remove('tblsh');
+      d.shadow.style.width=(d.size*0.9)+'px';d.shadow.style.height=(d.size*0.29)+'px';
+      d.shadow.style.margin=(-d.size*0.145)+'px 0 0 '+(-d.size*0.45)+'px';
+    }
     d.shadow.style.opacity=Math.max(0.15,0.5-h*0.006);
   }
   /* selection: clone the visible faces behind the die — crisp gold rim +
