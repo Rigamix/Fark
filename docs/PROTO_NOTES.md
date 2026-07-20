@@ -1297,3 +1297,12 @@ was only ~25% darker; corner clusters buried each other.
   iterations in width-pct space (min dist 0.42*(wA+wB), coins exempt —
   they pile), margins/band clamped each pass. Audit over 50 seeds:
   0 buried pairs, 0 band violations, worst ratio 0.96, 7-10 props.
+
+
+## P84b — match screen never scrolls (done)
+
+.screen ships overflow-y:auto by design (other screens can scroll);
+the breathing shadow layer (scale about 50%/44%) started poking a few
+px past the bottom, which made the match screen scrollable on phone.
+#screen-match now forces overflow:hidden — everything lives in one
+screen space, any sub-pixel animation overflow is clipped.
