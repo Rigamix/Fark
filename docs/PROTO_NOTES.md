@@ -1324,3 +1324,21 @@ Visual crank (both were too subtle on device):
   positions per keyframe. shBreath up to 1.05.
 - shadows: revealed slice at brightness .45 (dice ellipse .5), offset
   min 2.2% / 0.15*dist, silhouettes 1.10 — sharp and unmissable.
+
+## P86 — candlelight + prop shadows rebuilt on canvas (done)
+
+CSS masks never rendered on Denis's iPhone (two crank rounds changed
+nothing) — both effects now run on canvas compositing, no masks:
+- #matchPlate is the LIT table (base) with the brightness flicker
+  (plain filter keyframes — safe everywhere).
+- #matchDark canvas: UNLIT table drawn cover with a soft breathing
+  ellipse punched out (destination-out radial gradient, centre ~50/44,
+  sway + radial scale from layered sines). ~24fps rAF loop while the
+  match screen is active; single static draw under reduced-motion;
+  self-stops when the screen deactivates.
+- #shCanvas (inside the breathing #matchShadows div): per prop,
+  silhouette png -> source-in unlit slice -> source-atop dark tint,
+  stamped rotated at its radial offset. Drawn at dress/resize.
+Dice keep the CSS bg-reveal ellipse (no masks involved).
+Pixel-verified via getImageData: pool centre alpha 0, edges unlit
+opaque, 143 opaque shadow samples across 8 stamps.

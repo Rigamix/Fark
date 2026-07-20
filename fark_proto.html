@@ -780,24 +780,12 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 #screen-match img,#matchPlate,#matchProps img,#screen-match .match-btn,#raceWrap,
 #screen-match .tokImg{image-rendering:auto;-webkit-font-smoothing:antialiased}
 #matchPlate{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0}
-/* candlelight: the lit table shows through a breathing radial mask.
-   The source hangs above the table centre, off screen — mask centred
-   at 50%/44%, radial scale + sideways sway, slow. */
-#matchLit{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;pointer-events:none;
-  -webkit-mask-image:radial-gradient(ellipse,#000 18%,rgba(0,0,0,0) 66%);
-  mask-image:radial-gradient(ellipse,#000 18%,rgba(0,0,0,0) 66%);
-  -webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;
-  -webkit-mask-size:118% 112%;mask-size:118% 112%;
-  -webkit-mask-position:50% 100%;mask-position:50% 100%;
-  animation:candleFlick 5.6s ease-in-out infinite,candleBreathe 5.6s ease-in-out infinite}
-/* positions recomputed per stop so the pool centre stays ~50%/44%
-   (with a slight sway) while the box radially scales */
-@keyframes candleFlick{
-  0%,100%{-webkit-mask-size:118% 112%;mask-size:118% 112%;-webkit-mask-position:50% 100%;mask-position:50% 100%}
-  27%{-webkit-mask-size:112% 106%;mask-size:112% 106%;-webkit-mask-position:58.3% 150%;mask-position:58.3% 150%}
-  55%{-webkit-mask-size:126% 120%;mask-size:126% 120%;-webkit-mask-position:46.2% 82.5%;mask-position:46.2% 82.5%}
-  78%{-webkit-mask-size:116% 110%;mask-size:116% 110%;-webkit-mask-position:53.1% 110%;mask-position:53.1% 110%}
-}
+/* candlelight (canvas): #matchPlate is the LIT table; #matchDark draws
+   the UNLIT table with a soft breathing ellipse punched out — the pool
+   reveals the lit base, edges stay unlit. No CSS masks (they never
+   rendered on iOS). The pool flicker rides on the base's brightness. */
+#matchPlate{animation:candleBreathe 5.6s ease-in-out infinite}
+#matchDark{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
 @keyframes candleBreathe{
   0%,100%{filter:brightness(1)}
   27%{filter:brightness(.93)}
@@ -814,11 +802,7 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
   55%{transform:scale(1.05)}
   78%{transform:scale(1.01)}
 }
-#matchShadows .pshadow{position:absolute;
-  background-image:url('Art/Assets/Match/Commoner/Table.png?v=2');background-repeat:no-repeat;
-  -webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;
-  -webkit-mask-size:100% 100%;mask-size:100% 100%;
-  filter:brightness(.45) saturate(.7)}
+#matchShadows canvas{position:absolute;inset:0;width:100%;height:100%}
 #matchProps{position:absolute;inset:0;z-index:0;pointer-events:none}
 #matchProps img{position:absolute}
 #matchPause{position:absolute;left:2.2%;bottom:calc(21cqw + env(safe-area-inset-bottom,0px));top:auto;right:auto;
@@ -7699,9 +7683,9 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
 
 <!-- SCREEN: MATCH -->
 <div id="screen-match" class="screen">
-<img id="matchPlate" src="Art/Assets/Match/Commoner/Table.png?v=2" alt="">
-<img id="matchLit" src="Art/Assets/Match/Commoner/TableLit.png" alt="">
-<div id="matchShadows"></div>
+<img id="matchPlate" src="Art/Assets/Match/Commoner/TableLit.png" alt="">
+<canvas id="matchDark"></canvas>
+<div id="matchShadows"><canvas id="shCanvas"></canvas></div>
 <div id="matchProps"></div>
 <div id="matchPause" onclick="SFX.nav();showQuitConfirm()"><img src="Art/Assets/Match/pause.png" alt="pause"></div>
 <div id="matchVignette"></div>
@@ -13095,26 +13079,94 @@ function _mLightCalc(){
   var cs=Math.max(r.width/1080,r.height/2011),bw=1080*cs,bh=2011*cs;
   window._mLight={on:true,bw:bw,bh:bh,ox:r.left+(r.width-bw)/2,oy:r.top+(r.height-bh)/2};
 }
-function _alignPropShadows(){
-  var ml=window._mLight,sh=document.getElementById('matchShadows'),
-      sc=document.getElementById('screen-match');
-  if(!ml||!ml.on||!sh||!sc)return;
-  var scr=sc.getBoundingClientRect();
-  [].forEach.call(sh.children,function(el){
-    el.style.backgroundSize=ml.bw+'px '+ml.bh+'px';
-    el.style.backgroundPosition=((ml.ox-scr.left)-el.offsetLeft).toFixed(1)+'px '
-      +((ml.oy-scr.top)-el.offsetTop).toFixed(1)+'px';
+window._tblImg=window._tblImg||(function(){var i=new Image();i.src='Art/Assets/Match/Commoner/Table.png?v=2';return i;})();
+/* the dark layer: unlit table with the candle pool punched out */
+function _drawCandle(tSec){
+  var cv=document.getElementById('matchDark'),ml=window._mLight;
+  if(!cv||!ml||!ml.on||!window._tblImg||!_tblImg.complete||!_tblImg.naturalWidth)return;
+  var sc=document.getElementById('screen-match').getBoundingClientRect();
+  var W=sc.width,H=sc.height;if(W<10)return;
+  var dpr=Math.min(window.devicePixelRatio||1,2);
+  if(cv.width!==Math.round(W*dpr)||cv.height!==Math.round(H*dpr)){
+    cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);
+  }
+  var x=cv.getContext('2d');
+  x.setTransform(dpr,0,0,dpr,0,0);
+  x.globalCompositeOperation='source-over';
+  x.clearRect(0,0,W,H);
+  x.drawImage(_tblImg,ml.ox-sc.left,ml.oy-sc.top,ml.bw,ml.bh);
+  /* breathing pool: radial scale + sway, uneven sines so it never loops
+     mechanically */
+  var f=0.6*Math.sin(tSec*1.1)+0.3*Math.sin(tSec*2.3+2)+0.1*Math.sin(tSec*4.7);
+  var cx=W*0.5+W*0.018*Math.sin(tSec*0.7)+W*0.008*Math.sin(tSec*1.9+1);
+  var cy=H*0.44+H*0.006*Math.sin(tSec*1.3+3);
+  var rx=W*0.58*(1+0.11*f),ry=H*0.35*(1+0.11*f);
+  x.globalCompositeOperation='destination-out';
+  x.save();x.translate(cx,cy);x.scale(1,ry/rx);
+  var g=x.createRadialGradient(0,0,rx*0.22,0,0,rx);
+  g.addColorStop(0,'rgba(0,0,0,1)');g.addColorStop(1,'rgba(0,0,0,0)');
+  x.fillStyle=g;x.fillRect(-rx,-rx,rx*2,rx*2);
+  x.restore();
+  x.globalCompositeOperation='source-over';
+}
+function _candleLoop(){
+  if(window._candleOn)return;
+  if(matchMedia('(prefers-reduced-motion:reduce)').matches){_drawCandle(0.8);return;}
+  window._candleOn=true;
+  var last=0;
+  function tick(t){
+    var sc=document.getElementById('screen-match');
+    if(!sc||!sc.classList.contains('active')||!window._mLight||!window._mLight.on){window._candleOn=false;return;}
+    if(t-last>40){last=t;_drawCandle(t/1000);}
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+/* prop shadows: each silhouette composited from the UNLIT table slice,
+   tinted dark, stamped rotated at its radial offset */
+function _drawPropShadows(){
+  var cv=document.getElementById('shCanvas'),ml=window._mLight;
+  var jobs=window._shJobs||[];
+  if(!cv||!ml||!ml.on)return;
+  var sc=document.getElementById('screen-match').getBoundingClientRect();
+  var W=sc.width,H=sc.height;if(W<10)return;
+  var dpr=Math.min(window.devicePixelRatio||1,2);
+  cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);
+  var x=cv.getContext('2d');x.setTransform(dpr,0,0,dpr,0,0);
+  x.clearRect(0,0,W,H);
+  jobs.forEach(function(j){
+    if(!j._im){j._im=new Image();j._im.src=j.src;}
+    var im=j._im;
+    var draw=function(){
+      if(!im.complete||!im.naturalWidth||!_tblImg.complete||!_tblImg.naturalWidth)return;
+      var w=j.w/100*W,h=w*j.a[1]/j.a[0];
+      var px=j.x/100*W,py=j.y/100*H;
+      var tc=document.createElement('canvas');
+      tc.width=Math.max(2,Math.round(w*dpr));tc.height=Math.max(2,Math.round(h*dpr));
+      var tx=tc.getContext('2d');tx.setTransform(dpr,0,0,dpr,0,0);
+      tx.drawImage(im,0,0,w,h);
+      tx.globalCompositeOperation='source-in';
+      tx.drawImage(_tblImg,(ml.ox-sc.left)-px,(ml.oy-sc.top)-py,ml.bw,ml.bh);
+      tx.globalCompositeOperation='source-atop';
+      tx.fillStyle='rgba(8,4,2,0.58)';tx.fillRect(0,0,w,h);
+      x.save();x.translate(px+w/2,py+h/2);x.rotate(j.rot*Math.PI/180);
+      x.drawImage(tc,0,0,tc.width,tc.height,-w/2,-h/2,w,h);
+      x.restore();
+    };
+    if(im.complete&&_tblImg.complete&&_tblImg.naturalWidth)draw();
+    else{im.addEventListener('load',function(){_drawPropShadows();},{once:true});
+      if(!_tblImg.complete)_tblImg.addEventListener('load',function(){_drawPropShadows();},{once:true});}
   });
 }
-window.addEventListener('resize',function(){_mLightCalc();_alignPropShadows();});
+window.addEventListener('resize',function(){_mLightCalc();_drawPropShadows();try{_drawCandle(performance.now()/1000);}catch(e){}});
 function _matchDress(isBoss){
   var pl=document.getElementById('matchPlate');
   var pr=document.getElementById('matchProps');
   if(!pl||!pr)return;
   pl.style.display=isBoss?'none':'';
-  var lit=document.getElementById('matchLit'),shw=document.getElementById('matchShadows');
+  var lit=document.getElementById('matchDark'),shw=document.getElementById('matchShadows');
   if(lit)lit.style.display=isBoss?'none':'';
-  if(shw){shw.style.display=isBoss?'none':'';shw.innerHTML='';}
+  if(shw)shw.style.display=isBoss?'none':'';
   pr.innerHTML='';
   var tok=document.getElementById('tokOImg');
   if(tok){
@@ -13236,7 +13288,7 @@ function _matchDress(isBoss){
       }
     });
   }
-  var shWrap=document.getElementById('matchShadows');
+  var _jobs=window._shJobs=[];
   placed.forEach(function(q){
     var w=q.w;
     var img=document.createElement('img');
@@ -13244,28 +13296,22 @@ function _matchDress(isBoss){
     img.style.cssText='left:'+q.x.toFixed(1)+'%;top:'+q.y.toFixed(1)+'%;width:'+w.toFixed(1)+'%;'
       +'transform:rotate('+q.rot+'deg)';
     pr.appendChild(img);
-    if(!shWrap)return;
-    /* silhouette shadow: offset radially away from the overhead light
-       centre (50%/44%), revealing the unlit table; aligned in
-       _alignPropShadows once layout settles */
+    /* silhouette shadow job: offset radially away from the overhead
+       light centre (50%/44%); drawn on the shadow canvas */
     var a=ASPECT[q.n]||[1,1];
     var cx=q.x+w/2,cy=q.y+w*(a[1]/a[0])*0.26;   /* prop centre, approx (h% ~ w%*ratio/1.9) */
     var dx=cx-50,dy=(cy-44)*1.9;                 /* direction in width-pct space */
     var len=Math.sqrt(dx*dx+dy*dy)||1;
     var mag=Math.max(2.2,len*0.15);
     var ox=dx/len*mag,oy=(dy/len*mag)/1.9;
-    var sd=document.createElement('div');
-    sd.className='pshadow';
-    sd.style.cssText='left:'+(q.x+ox).toFixed(2)+'%;top:'+(q.y+oy).toFixed(2)+'%;'
-      +'width:'+(w*1.1).toFixed(1)+'%;aspect-ratio:'+a[0]+'/'+a[1]+';'
-      +'transform:rotate('+q.rot+'deg);'
-      +'-webkit-mask-image:url("'+PP+q.n+'.png?v=2");mask-image:url("'+PP+q.n+'.png?v=2")';
-    shWrap.appendChild(sd);
+    _jobs.push({src:PP+q.n+'.png?v=2',x:+(q.x+ox).toFixed(2),y:+(q.y+oy).toFixed(2),
+      w:+(w*1.1).toFixed(1),rot:q.rot,a:a});
   });
-  _mLightCalc();_alignPropShadows();
-  /* re-align once the screen transition settles (rAF can stall on iOS pageshow) */
-  setTimeout(function(){_mLightCalc();_alignPropShadows();},120);
-  setTimeout(function(){_mLightCalc();_alignPropShadows();},900);
+  _mLightCalc();_drawPropShadows();_candleLoop();
+  try{_drawCandle(0.8);}catch(e){}
+  /* redraw once the screen transition settles */
+  setTimeout(function(){_mLightCalc();_drawPropShadows();try{_drawCandle(0.9);}catch(e){}},120);
+  setTimeout(function(){_mLightCalc();_drawPropShadows();_candleLoop();},900);
 }
 /* on-screen metrics for remote phone debugging: open ...?hsdebug —
    or tap the title logo 5x fast (works in the installed app, where the
