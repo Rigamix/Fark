@@ -1437,3 +1437,9 @@ slice -> dark tint, small feather ring, radial nudge (2-6px, near the
 light so barely spread) + flare push/scale/alpha from the shared f.
 Follows rolls (redraws off D3.list each tick, shrinks with height);
 offer-screen dice keep the original ellipse.
+
+## P94b — dice shadow fringe widened (done)
+
+The dice feather ring was 2.2px — too tight to read as the props'
+two-layer handmade look. Ring radius now max(4, size*0.1) (~4.6px on
+match dice): fringe/solid ratio 0.36, matching the props (~0.30).
