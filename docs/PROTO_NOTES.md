@@ -1424,3 +1424,16 @@ away from the light centre (2-6px, distance-scaled + a small fixed
 drop — subtle, dice live near the centre). Geometry restores to the
 old ellipse off-table (offer screen unchanged). bg slice re-aligned to
 the new rect per frame.
+
+## P94 — dice shadows: true silhouette, breathing (done)
+
+The DOM ellipse never matched the cube and sat frozen at rest (only
+physics redraws touched it). Match dice now hide the DOM shadow; a
+dedicated canvas (#dsCanvas, redrawn every candle tick ~25fps) stamps
+each die's TRUE silhouette: the 8 cube corners projected through the
+same rotation chain as the faces (D3.rotv; validated hull == rendered
+face union exactly), convex hull filled as the mask -> unlit table
+slice -> dark tint, small feather ring, radial nudge (2-6px, near the
+light so barely spread) + flare push/scale/alpha from the shared f.
+Follows rolls (redraws off D3.list each tick, shrinks with height);
+offer-screen dice keep the original ellipse.

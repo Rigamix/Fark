@@ -7672,7 +7672,7 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
 <div id="screen-match" class="screen">
 <img id="matchPlate" src="Art/Assets/Match/Commoner/TableLit.png" alt="">
 <canvas id="matchDark"></canvas>
-<div id="matchShadows"><canvas id="shCanvas"></canvas></div>
+<div id="matchShadows"><canvas id="shCanvas"></canvas><canvas id="dsCanvas"></canvas></div>
 <div id="matchProps"></div>
 <div id="matchPause" onclick="SFX.nav();showQuitConfirm()"><img src="Art/Assets/Match/pause.png" alt="pause"></div>
 <div id="matchVignette"></div>
@@ -12931,30 +12931,10 @@ D3.draw=function(d){
   d.shadow.style.transform='translate('+x+'px,'+(d.y+16*s)+'px) scale('+Math.max(0.5,1-h*0.008)+')';
   var ml=window._mLight;
   if(d.group==='match'&&ml&&ml.on){
-    /* prop-style shadow: cube-sized footprint revealing the darkened
-       table, soft rim, nudged radially away from the light (small —
-       the dice live near the centre) */
-    if(!d._tbl){d._tbl=1;d.shadow.classList.add('tblsh');
-      d.shadow.style.width=(d.size*1.02)+'px';d.shadow.style.height=(d.size*0.88)+'px';
-      d.shadow.style.margin=(-d.size*0.44)+'px 0 0 '+(-d.size*0.51)+'px';
-    }
-    var _sr=d.slot.getBoundingClientRect();
-    var _scx=_sr.left+_sr.width/2,_scy=_sr.top+_sr.height/2;
-    var _lx=ml.ox+ml.bw/2,_ly=ml.oy+ml.bh*0.44;
-    var _dx=_scx-_lx,_dy=_scy-_ly,_dl=Math.sqrt(_dx*_dx+_dy*_dy)||1;
-    var _pm=Math.min(6,2+_dl*0.02);
-    var _tx=x+_dx/_dl*_pm,_ty=(d.y+16*s)+_dy/_dl*_pm+d.size*0.05;
-    d.shadow.style.transform='translate('+_tx+'px,'+_ty+'px) scale('+Math.max(0.5,1-h*0.008)+')';
-    var _sx=_scx-d.size*0.51+_tx;
-    var _sy=_scy-d.size*0.44+_ty;
-    d.shadow.style.backgroundSize=ml.bw+'px '+ml.bh+'px';
-    d.shadow.style.backgroundPosition=(ml.ox-_sx).toFixed(1)+'px '+(ml.oy-_sy).toFixed(1)+'px';
-    d.shadow.style.opacity=1;
+    /* the canvas (#dsCanvas) draws the true projected silhouette */
+    if(!d._tbl){d._tbl=1;d.shadow.style.display='none';}
   }else{
-    if(d._tbl){d._tbl=0;d.shadow.classList.remove('tblsh');
-      d.shadow.style.width=(d.size*0.9)+'px';d.shadow.style.height=(d.size*0.29)+'px';
-      d.shadow.style.margin=(-d.size*0.145)+'px 0 0 '+(-d.size*0.45)+'px';
-    }
+    if(d._tbl){d._tbl=0;d.shadow.style.display='';}
     d.shadow.style.opacity=Math.max(0.15,0.5-h*0.006);
   }
   /* selection: clone the visible faces behind the die — crisp gold rim +
@@ -13136,7 +13116,7 @@ function _candleLoop(){
   function tick(t){
     var sc=document.getElementById('screen-match');
     if(!sc||!sc.classList.contains('active')||!window._mLight||!window._mLight.on){window._candleOn=false;return;}
-    if(t-last>40){last=t;_drawCandle(t/1000);
+    if(t-last>40){last=t;_drawCandle(t/1000);_drawDiceShadows(t/1000);
       var pl=document.getElementById('matchPlate');
       if(pl)pl.style.filter='brightness('+(1+0.08*Math.max(-0.3,_candleF(t/1000))).toFixed(3)+')';
     }
@@ -13207,7 +13187,87 @@ function _drawPropShadows(tSec){
     x.drawImage(j._tc,0,0,TW,TH,cx-tw/2,cy-th/2,tw,th);
   });
 }
-window.addEventListener('resize',function(){_mLightCalc();_drawPropShadows();try{_drawCandle(performance.now()/1000);}catch(e){}});
+/* dice shadows: the die's true silhouette (8 corners through the same
+   rotation chain as the faces, convex hull), revealing the darkened
+   table, breathing with the flare like the prop shadows */
+function _drawDiceShadows(tSec){
+  var cv=document.getElementById('dsCanvas'),ml=window._mLight;
+  if(!cv||!ml||!ml.on)return;
+  var scEl=document.getElementById('screen-match');
+  var sc=scEl.getBoundingClientRect();
+  var W=sc.width,H=sc.height;if(W<10)return;
+  var dpr=Math.min(window.devicePixelRatio||1,2);
+  if(cv.width!==Math.round(W*dpr)||cv.height!==Math.round(H*dpr)){
+    cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);
+  }
+  var f=_candleF(tSec===undefined?0.8:tSec);
+  var sMul=1+0.05*f,alphaB=0.60+0.12*f;
+  var x=cv.getContext('2d');x.setTransform(dpr,0,0,dpr,0,0);
+  x.clearRect(0,0,W,H);
+  if(!_tblImg.complete||!_tblImg.naturalWidth)return;
+  var C=[[-1,-1,-1],[1,-1,-1],[-1,1,-1],[1,1,-1],[-1,-1,1],[1,-1,1],[-1,1,1],[1,1,1]];
+  (D3.list||[]).forEach(function(d){
+    if(d.group!=='match'||!d.slot||!d.slot.isConnected)return;
+    if(d.slot.offsetParent===null)return;
+    var h=d.h||0,s2=d.s;
+    var sr=d.slot.getBoundingClientRect();
+    if(!sr.width)return;
+    var scx=sr.left-sc.left+sr.width/2+(d.x+d.ox);
+    var scy=sr.top-sc.top+sr.height/2+d.y+16*s2;
+    /* radial nudge from the light + flare push */
+    var lx=ml.ox-sc.left+ml.bw/2,ly=ml.oy-sc.top+ml.bh*0.44;
+    var ddx=scx-lx,ddy=scy-ly,dl=Math.sqrt(ddx*ddx+ddy*ddy)||1;
+    var pm=Math.min(6,2+dl*0.02)+2*f;
+    scx+=ddx/dl*pm;scy+=ddy/dl*pm+d.size*0.05;
+    /* project the corners, hull them */
+    var half=d.size/2*sMul*Math.max(0.5,1-h*0.008),pts=[];
+    for(var ci=0;ci<8;ci++){
+      var v=D3.rotv([C[ci][0]*half,C[ci][1]*half,C[ci][2]*half],d.pitch,d.yaw,d.spin,d.turn,d.tilt);
+      pts.push([v[0],v[1]]);
+    }
+    /* gift-wrap hull (8 pts) */
+    var hull=[],start=0;
+    for(var i2=1;i2<8;i2++)if(pts[i2][0]<pts[start][0]||(pts[i2][0]===pts[start][0]&&pts[i2][1]<pts[start][1]))start=i2;
+    var cur=start,guard=0;
+    do{
+      hull.push(pts[cur]);
+      var next=(cur+1)%8;
+      for(var k2=0;k2<8;k2++){
+        var a2=pts[next],b2=pts[k2],o2=pts[cur];
+        if(k2===cur)continue;
+        var cr=(a2[0]-o2[0])*(b2[1]-o2[1])-(a2[1]-o2[1])*(b2[0]-o2[0]);
+        if(cr<0)next=k2;
+      }
+      cur=next;guard++;
+    }while(cur!==start&&guard<9);
+    /* mask tmp: hull core + small feather ring */
+    var side=Math.ceil(d.size*1.7*sMul);
+    var TW=Math.max(2,Math.round(side*dpr));
+    if(!d._dsc||d._dsc.width!==TW){d._dsc=document.createElement('canvas');d._dsc.width=TW;d._dsc.height=TW;}
+    var tw=TW/dpr;
+    var tx2=d._dsc.getContext('2d');tx2.setTransform(dpr,0,0,dpr,0,0);
+    tx2.globalCompositeOperation='source-over';
+    tx2.clearRect(0,0,tw,tw);
+    var fill=function(offx,offy){
+      tx2.beginPath();
+      hull.forEach(function(p2,i3){var hx=tw/2+p2[0]+offx,hy=tw/2+p2[1]+offy;
+        if(i3)tx2.lineTo(hx,hy);else tx2.moveTo(hx,hy);});
+      tx2.closePath();tx2.fill();
+    };
+    tx2.fillStyle='#000';fill(0,0);
+    tx2.globalAlpha=0.16;
+    for(var r2=0;r2<8;r2++){var an=r2*Math.PI/4;fill(Math.cos(an)*2.2,Math.sin(an)*2.2);}
+    tx2.globalAlpha=1;
+    tx2.globalCompositeOperation='source-in';
+    var tlx=scx-tw/2,tly=scy-tw/2;
+    tx2.drawImage(_tblImg,(ml.ox-sc.left)-tlx,(ml.oy-sc.top)-tly,ml.bw,ml.bh);
+    tx2.globalCompositeOperation='source-atop';
+    var aH=alphaB*Math.max(0.35,1-h*0.004);
+    tx2.fillStyle='rgba(8,4,2,'+aH.toFixed(3)+')';tx2.fillRect(0,0,tw,tw);
+    x.drawImage(d._dsc,0,0,TW,TW,tlx,tly,tw,tw);
+  });
+}
+window.addEventListener('resize',function(){_mLightCalc();_drawPropShadows();try{_drawCandle(performance.now()/1000);_drawDiceShadows(performance.now()/1000);}catch(e){}});
 function _matchDress(isBoss){
   var pl=document.getElementById('matchPlate');
   var pr=document.getElementById('matchProps');
@@ -13365,7 +13425,7 @@ function _matchDress(isBoss){
       ux:+(dx/len).toFixed(3),uy:+((dy/len)/1.9).toFixed(3),
       bl:+Math.min(1.6,0.4+len*0.02).toFixed(2)});
   });
-  _mLightCalc();_drawPropShadows();_litProps(_candleF(0.8));_candleLoop();
+  _mLightCalc();_drawPropShadows();_litProps(_candleF(0.8));_drawDiceShadows(0.8);_candleLoop();
   try{_drawCandle(0.8);}catch(e){}
   /* redraw once the screen transition settles */
   setTimeout(function(){_mLightCalc();_drawPropShadows();try{_drawCandle(0.9);}catch(e){}},120);
