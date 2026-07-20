@@ -1520,3 +1520,16 @@ Mid-turn forfeit lives only on pause/X. Yield.png art unused for now.
   hides when there is nothing to bank. (Lesson: the P99 script died
   mid-run before its file write — P99b/P99c re-applied; always check
   the write happened.)
+
+## P100 — NPC glow rim-only + last translucency holdouts (done)
+
+- The NPC kept-dice halo (blurred patron-colour layer) read as a
+  TINTED SHADOW under their dice — gone. The keep marker is now the
+  crisp die-shaped rim only; the canvas shadow underneath is the same
+  neutral one the player's dice get.
+- Remaining translucent dice states converted to opaque darkening:
+  .die.scatter (was opacity .6), .die.opp-scatter (was .6), kept-tray
+  pile (was .65 + host filter). Engine dim now also covers
+  scatter/opp-scatter (level 2) and .kept-tray/#keptTray ancestors
+  (level 1), with redraws at the scatter sites and a sweep in
+  refreshKeptTray. Legacy 2D dice keep the old opacity via :not(.d3on).
