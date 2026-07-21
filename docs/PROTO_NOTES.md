@@ -1614,3 +1614,10 @@ front -> goods. The innkeep rises .8s ease on screen entry only
   the tilt), bright cream ink with emboss, 3.9cqw.
 - innkeep scaled 1.18 about (48.8%,44%) — grows up/out from behind the
   counter; entrance rise keeps the scale.
+
+
+## P102d — price ink + innkeep size (done)
+
+Prices lose their text shadow (flat ink per art rules); unaffordable
+prices go dark brown (#4a3020) instead of faded cream. Innkeeper up
+to 1.34x (same behind-counter origin, rise preserved).
