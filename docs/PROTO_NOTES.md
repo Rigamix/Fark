@@ -1725,3 +1725,13 @@ tiny stand chip scaled 2.3x they scattered across the screen. Offsets
 are now relative to the chip (+/-40% of stand width, drift 55% of
 that): the particles rise from the die's own footprint and scale with
 the zoom.
+
+
+## P104 — Beda breathes + coloured die names (done)
+
+- body-level letter-spacing .045em: every JMH Beda text without an
+  explicit tighter/looser value inherits it (focus descriptions,
+  tags, dialogue...). Store focus name .09em, prices .07em.
+- die name in the store focus: first letter capitalized, coloured
+  with the die's particle colour (D3.SPARK[mat].c — e.g. Amber in
+  #ffb84d).
