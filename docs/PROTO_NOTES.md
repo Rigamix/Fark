@@ -1643,3 +1643,11 @@ stage now sets BOTH dimensions explicitly (width min(100cqw,
 56.25cqh), height min(177.78cqw,100cqh)) — no aspect-ratio
 dependency, bottom anchor holds everywhere; the shortfall sits at
 the top where Store_back covers it with matching shelf art.
+
+
+## P102g — store tweaks (done)
+
+Gold amounts drop the g suffix (HUD + price tags); stand-dice
+silhouette shadows removed (did not render); nav buttons are icon
+buttons now — Icons/back.png (left) and the room's Icons/pouch.png
+(right, loadout), 13.5% wide.
