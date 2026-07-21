@@ -1706,3 +1706,13 @@ future use.
   the in-stage scrim uses the same flat colour so there is no seam,
   and the zoomed die still stacks above (z60 in the stage context).
 - gold chip coin: Icons/coin.png (the game coin), height 58% top 21%.
+
+
+## P103f — one scrim, no double-darkening (done)
+
+The two-scrim approach double-darkened the stage area (both layers
+overlapped there) with a seam at the stage edge. Now a SINGLE scrim:
+in-stage (so the zoomed die stays above it, z60>50) but oversized
+(-60cqw sides / -100cqh top / -20cqh bottom, stage has no clip;
+gbShop clips at the screen) — one flat rgba(10,6,2,.82) layer covers
+the entire screen uniformly. Coin in the gold chip +10% (64% height).
