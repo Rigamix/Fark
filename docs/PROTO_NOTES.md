@@ -1621,3 +1621,14 @@ front -> goods. The innkeep rises .8s ease on screen entry only
 Prices lose their text shadow (flat ink per art rules); unaffordable
 prices go dark brown (#4a3020) instead of faded cream. Innkeeper up
 to 1.34x (same behind-counter origin, rise preserved).
+
+
+## P102e — store never scrolls (done)
+
+A legacy #gbShop rule later in the sheet (overflow:auto, grey #4a4a4a
+background) was overriding the store rule — the scaled innkeep's
+transform overflow made the screen scrollable and the grey band
+showed below the stage. Legacy rule now carries the store values
+(overflow:hidden, #120b06, container-type:size). The stage stays
+locked 9:16 bottom-anchored; taller screens get the cover back-layer
+above it, squarer windows clip.
