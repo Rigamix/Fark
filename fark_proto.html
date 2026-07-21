@@ -735,6 +735,53 @@ body.gbSheetOn #ptGold,body.gbSheetOn #ptStage .pt-ov{filter:blur(6px) brightnes
 #setX img{height:100%;filter:drop-shadow(0 2px 4px rgba(0,0,0,.45))}
 #setX:active img{transform:scale(.88)}
 body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
+/* ═══ STORE DRESSING (FARK_UI_SCREENS_BRIEF 3.9, dice tab) ═══ */
+#screen-shop{background:#120b06 !important}
+#gbShop{position:absolute;inset:0;overflow:hidden;container-type:size;background:#120b06}
+#stBack{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+#stStage{position:absolute;left:50%;bottom:0;transform:translateX(-50%);
+  width:min(100cqw,56.25cqh);aspect-ratio:1080/1920;container-type:size}
+#stStage .stL{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+#stChar.enter{animation:stCharUp .8s cubic-bezier(.2,.8,.3,1) .12s both}
+@keyframes stCharUp{from{transform:translateY(9%)}to{transform:translateY(0)}}
+/* tabs scale about their baked bottom-centres */
+#stTabL{transform-origin:32.1% 49.5%;transition:transform .22s ease,filter .22s ease}
+#stTabR{transform-origin:69.5% 49.5%;transition:transform .22s ease,filter .22s ease}
+.stTab.off{transform:scale(.85);filter:brightness(.55) saturate(.85)}
+.stTabLbl{position:absolute;bottom:51.6%;width:24%;text-align:center;pointer-events:none;
+  font-family:'JMH Beda',serif;font-size:4.4cqw;letter-spacing:.06em;color:#3a2812;line-height:1;
+  transform-origin:50% 100%;transition:transform .22s ease,filter .22s ease}
+.stTabLbl.L{left:20.1%}
+.stTabLbl.R{left:57.5%}
+.stTabLbl.off{transform:scale(.85);filter:brightness(.55)}
+#stTabStrip{position:absolute;left:6%;right:6%;top:41%;height:10%;z-index:5;
+  touch-action:none;cursor:pointer}
+#stGoods{position:absolute;inset:0;pointer-events:none}
+.stStand{position:absolute;width:18%;aspect-ratio:1;display:flex;align-items:center;
+  justify-content:center;pointer-events:auto;cursor:pointer}
+.stStand .d3chip{width:60%;aspect-ratio:1;display:block}
+.stPrice{position:absolute;pointer-events:auto;cursor:pointer;transform:rotate(var(--r,0deg));
+  font-family:'JMH Beda',serif;font-size:3.4cqw;color:#3a2812;letter-spacing:.04em;line-height:1}
+.stPrice.dim{color:#8a7455}
+#stHud{position:absolute;left:0;right:0;top:0;pointer-events:none;z-index:6}
+#stHud .hs{position:absolute;left:3.5%;top:calc(env(safe-area-inset-top,0px) + 1.4cqh);
+  display:flex;gap:2cqw;width:26%}
+#stHud .hs img{width:29%}
+#stHud .gd{position:absolute;right:3.2%;top:calc(env(safe-area-inset-top,0px) + 1.4cqh);width:26%}
+#stHud .gd .pl{width:100%;display:block}
+#stHud .gd .co{position:absolute;left:3%;top:6%;height:88%}
+#stHud .gd span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-family:'JMH Beda',serif;font-size:4.4cqw;color:#f0e3c6;letter-spacing:.04em;
+  padding-left:14%;text-shadow:0 2px 0 rgba(16,9,3,.75)}
+.stNavBtn{position:absolute;bottom:calc(env(safe-area-inset-bottom,0px) + 1.4cqh);width:29%;
+  z-index:6;cursor:pointer;transition:transform .1s}
+.stNavBtn.L{left:4%}
+.stNavBtn.R{right:4%}
+.stNavBtn img{width:100%;display:block}
+.stNavBtn span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-family:'JMH Beda',serif;font-size:3.6cqw;letter-spacing:.12em;color:#f7ecd2;
+  transform:translateY(-6%);text-shadow:0 2px 0 rgba(16,9,3,.85)}
+.stNavBtn:active{transform:scale(.96)}
 /* ═══ MATCH DRESSING (FARK_MATCH_BRIEF pass 1) ═══ */
 #screen-match .activate-zone{left:20%;right:20%;height:auto;aspect-ratio:720/218}
 #screen-match .activate-zone .az-border rect{rx:18px;ry:18px}
@@ -12946,7 +12993,7 @@ D3.draw=function(d){
     d._selGlow=!!(_hcl&&_hcl.contains('selected'));
     /* kept/bust dice DARKEN, never fade — per-face (iOS ignores host
        filters over 3D children) */
-    d._dim=_hcl?((_hcl.contains('bust')||_hcl.contains('scatter')||_hcl.contains('opp-scatter'))?2:(_hcl.contains('committed')?1:0)):0;
+    d._dim=_hcl?((_hcl.contains('bust')||_hcl.contains('scatter')||_hcl.contains('opp-scatter'))?2:((_hcl.contains('committed')||_hcl.contains('stdim'))?1:0)):0;
     if(!d._dim&&d.slot.closest){
       if(d.slot.closest('.bust-wipe'))d._dim=2;
       else if(d.slot.closest('.kept-tray,#keptTray'))d._dim=1;
@@ -23684,7 +23731,7 @@ function _endDraftDone(){
 
 /* Standalone shop screen — same dice-store renderer that the boss-reward overlay uses */
 function initShopScreen(){
-  return _gbShop();
+  return _gbShop(true);
 }
 function _gbDieCard(mat,opts){
   opts=opts||{};
@@ -23701,63 +23748,90 @@ function _gbDieCard(mat,opts){
     +'</div>';
 }
 var _gbShopTab='dice';
-function _gbShop(){
+var _stFresh=false;
+function _gbShop(fresh){
   _getS();_famDiceMigrate();_enchInit();_gbSheetInfra();
   var scr=document.getElementById('screen-shop');if(!scr)return;
   var host=document.getElementById('gbShop');
   if(!host){host=document.createElement('div');host.id='gbShop';scr.appendChild(host);}
+  if(fresh)_stFresh=true;
   if(!S.run.diceStock)S.run.diceStock=_initDiceStock();
   var roll=_shopRollNight();
-  var hearts='';for(var i=0;i<3;i++)hearts+='<span class="gbx-heart'+(i<(S.run.coins||0)?'':' lost')+'"></span>';
-  var h='<div class="gbx" style="min-height:100%;display:flex;flex-direction:column;padding:10px 14px 14px">'
-    +'<div style="display:flex;justify-content:space-between;align-items:center;height:44px">'
-    +'<span>'+hearts+'</span><div class="gbx-goldchip">'+(S.run.gold||0)+'g</div></div>'
-    +'<div style="display:flex;gap:8px;margin-top:8px">'
-    +'<div class="gbx-btn" style="height:40px;flex:1'+(_gbShopTab==='dice'?';border:2px solid #a58a3c':'')+'" onclick="_gbShopTab=\'dice\';_gbShop()">DICE</div>'
-    +'<div class="gbx-btn" style="height:40px;flex:1'+(_gbShopTab==='ench'?';border:2px solid #a58a3c':'')+'" onclick="_gbShopTab=\'ench\';_gbShop()">ENCHANTS</div></div>';
-  if(_gbShopTab==='dice'){
-    h+='<div class="gbx-label" style="text-align:center;margin-top:6px">stock turns over each night</div>'
-      +'<div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;align-content:flex-end;flex:1;padding:12px 0">';
-    var owned=(S.run.dice||[]).concat(S.run.diceInv||[]);
-    DICE_STORE.forEach(function(d){
-      if(d.mat==='bone')return;
-      var soldOut=(S.run.diceStock[d.mat]||0)<=0;
-      var rotated=roll.sold[d.mat];
-      var price=_dicePrice(d.mat);
-      var has=owned.indexOf(d.mat)>=0;
-      var col=(FAMILIES[(getDie(d.mat)||{}).fam]||{}).color||'#777';
-      if(rotated||soldOut){
-        h+='<div class="gbx-box sub" style="width:110px;height:120px">empty peg<br><span class="gbx-label">back another night</span></div>';
-        return;
-      }
-      var afford=(S.run.gold||0)>=price;
-      h+='<div class="gbx-box" style="width:110px;height:120px;cursor:pointer;border-bottom:4px solid '+col
-        +(afford?'':';opacity:.45')+'" onclick="_gbDieInspect(\''+d.mat+'\')">'
-        +'<span class="d3chip" data-mat="'+d.mat+'" style="width:42px;height:42px;margin-bottom:4px"></span>'
-        +d.label.toLowerCase()+(has?' ✓':'')+'<br><span class="gbx-label">'+price+'g'+(has?' · owned':'')+'</span></div>';
-    });
-    h+='</div>';
-  }else{
-    h+='<div class="gbx-label" style="text-align:center;margin-top:6px">the innkeep&#39;s service — one enchant per die, ever; it travels with the die</div>'
-      +'<div style="display:flex;flex-direction:column;gap:8px;flex:1;justify-content:flex-end;padding:12px 0">';
-    Object.keys(ENCHANTS).forEach(function(k){
-      var e=ENCHANTS[k];var can=(S.run.gold||0)>=e.price;
-      h+='<div class="gbx-box" style="min-height:56px;cursor:pointer;padding:8px;text-align:left;align-items:stretch'
-        +(can?'':';opacity:.45')+'" onclick="_gbEnchantPick(\''+k+'\')">'
-        +'<div style="display:flex;justify-content:space-between;width:100%"><b>'+e.name.toUpperCase()+'</b><b>'+e.price+'g</b></div>'
-        +'<div class="gbx-label" style="text-align:left">'+e.desc+'</div></div>';
-    });
-    var tags=(S.run.dice||[]).map(function(mt,i){var en=S.run.dieEnch[i];
-      return en?'<span class="gbx-box sub" style="display:inline-flex;height:26px;padding:0 8px;font-size:11px;margin:2px">'+getDie(mt).name+' · '+ENCHANTS[en.t].name+'</span>':'';}).join('');
-    if(tags)h+='<div>'+tags+'</div>';
-    h+='</div>';
+  var ST='Art/Assets/Store/';
+  /* the night's stock fills up to four stands */
+  var owned=(S.run.dice||[]).concat(S.run.diceInv||[]);
+  var famStock=[],mundane=[];
+  DICE_STORE.forEach(function(d){
+    if(d.mat==='bone')return;
+    if((S.run.diceStock[d.mat]||0)<=0)return;
+    if(roll.sold[d.mat]===false)famStock.push(d.mat);      /* rolled-in family dice */
+    else if(roll.sold[d.mat]===undefined)mundane.push(d.mat);/* commons pad leftovers */
+  });
+  var stock=famStock.concat(mundane).slice(0,4);
+  /* measured on Store_front: stand centres + tag ink anchors (canvas %) */
+  var STANDS=[[11.8,62.9],[31.3,63.1],[50.5,63.4],[69.4,63.7]];
+  var TAGS=[[13.4,70.6,-2],[32.4,71.0,-1],[52.5,71.4,1],[70.8,71.8,2]];
+  var goods='';
+  for(var i=0;i<4;i++){
+    var mat=stock[i];
+    if(!mat)continue;
+    var price=_dicePrice(mat),afford=(S.run.gold||0)>=price,has=owned.indexOf(mat)>=0;
+    goods+='<div class="stStand" style="left:'+(STANDS[i][0]-9).toFixed(1)+'%;top:'+(STANDS[i][1]-5.1).toFixed(1)+'%"'
+      +' onclick="SFX.nav();_gbDieInspect(\''+mat+'\')">'
+      +'<span class="d3chip'+(afford?'':' stdim')+'" data-iso="1" data-mat="'+mat+'"></span></div>'
+      +'<div class="stPrice'+(afford?'':' dim')+'" style="left:'+TAGS[i][0].toFixed(1)+'%;top:'+TAGS[i][1].toFixed(1)+'%;--r:'+TAGS[i][2]+'deg"'
+      +' onclick="SFX.nav();_gbDieInspect(\''+mat+'\')">'+price+'g'+(has?' \u2713':'')+'</div>';
   }
-  h+='<div style="display:flex;justify-content:space-between;gap:8px;padding-top:6px">'
-    +'<div class="gbx-btn" style="height:52px;flex:1" onclick="SFX.nav();showScreen(\'gauntlet\')">back to room</div>'
-    +'<div class="gbx-btn" style="height:52px;flex:1" onclick="famLoadoutShow()">loadout</div></div>'
-    +'</div>';
+  window._stGoodsHTML=goods;
+  var hearts='';for(var hi=0;hi<3;hi++)hearts+='<img src="'+PT_A+(hi<(S.run.coins||0)?'heart_full':'heart_empty')+'.png" alt="">';
+  var dOn=_gbShopTab==='dice';
+  var h=''
+    +'<img id="stBack" src="'+ST+'Store_back.png" alt="">'
+    +'<div id="stStage">'
+      +'<img class="stL'+(_stFresh?' enter':'')+'" id="stChar" src="'+ST+'Store_char.png" alt="">'
+      +'<img class="stL" id="stMid" src="'+ST+'Store_mid.png" alt="">'
+      +'<img class="stL stTab'+(dOn?'':' off')+'" id="stTabL" src="'+ST+'Store_tab_left.png" alt="">'
+      +'<img class="stL stTab'+(dOn?' off':'')+'" id="stTabR" src="'+ST+'Store_tab_right.png" alt="">'
+      +'<div class="stTabLbl L'+(dOn?'':' off')+'">DICE</div>'
+      +'<div class="stTabLbl R'+(dOn?' off':'')+'">ENCHANTS</div>'
+      +'<div id="stTabStrip"></div>'
+      +'<img class="stL" id="stFront" src="'+ST+'Store_front.png" alt="">'
+      +'<div id="stGoods">'+(dOn?goods:'')+'</div>'
+    +'</div>'
+    +'<div id="stHud"><div class="hs">'+hearts+'</div>'
+      +'<div class="gd"><img class="pl" src="'+PT_A+'plate_goldCounter.png" alt="">'
+      +'<img class="co" src="'+PT_A+'coin.png" alt=""><span>'+(S.run.gold||0)+'g</span></div></div>'
+    +'<div class="stNavBtn L" onclick="SFX.nav();showScreen(\'gauntlet\')"><img src="Art/Assets/Buttons/Button_thin_orange.png" alt=""><span>BACK</span></div>'
+    +'<div class="stNavBtn R" onclick="famLoadoutShow()"><img src="Art/Assets/Buttons/Button_thin_blue.png" alt=""><span>LOADOUT</span></div>';
   host.innerHTML=h;
-  _d3ChipScan(host);
+  _stFresh=false;
+  /* tabs: tap or slide a thumb across — in-place flip so the strip
+     (and its pointer capture) survives the switch */
+  var strip=document.getElementById('stTabStrip');
+  if(strip){
+    var setTab=function(t){
+      if(_gbShopTab===t)return;
+      _gbShopTab=t;try{SFX.nav();}catch(e){}
+      var d2=t==='dice';
+      document.getElementById('stTabL').classList.toggle('off',!d2);
+      document.getElementById('stTabR').classList.toggle('off',d2);
+      document.querySelector('.stTabLbl.L').classList.toggle('off',!d2);
+      document.querySelector('.stTabLbl.R').classList.toggle('off',d2);
+      var g=document.getElementById('stGoods');
+      g.innerHTML=d2?(window._stGoodsHTML||''):'';/* enchant layers pending */
+      if(d2&&typeof _d3ChipScan==='function')_d3ChipScan(g);
+    };
+    var pick=function(ev){
+      var r=strip.getBoundingClientRect();
+      setTab(((ev.clientX-r.left)/r.width)<0.5?'dice':'ench');
+    };
+    strip.addEventListener('pointerdown',function(ev){
+      if(strip.setPointerCapture)try{strip.setPointerCapture(ev.pointerId);}catch(e){}
+      pick(ev);
+    });
+    strip.addEventListener('pointermove',function(ev){if(ev.buttons)pick(ev);});
+  }
+  if(typeof _d3ChipScan==='function')_d3ChipScan(host);
 }
 /* die inspect sheet: faces laid flat + BUY (flow spec 10) */
 function _gbDieInspect(mat){

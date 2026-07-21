@@ -1581,3 +1581,26 @@ Verified: tap opens the peek with the CHALLENGE CTA.
 (ready only). The diamond bar is back to non-interactive; below the
 diamonds a READY button (Button_thick_red plate, 44cqw, press squash)
 opens the boss peek -> CHALLENGE. Verified end-to-end.
+
+## P102 — the painted STORE, dice tab (done)
+
+Layer stack (Art/Assets/Store, all 1080x1920 pre-positioned):
+Store_back full-bleed cover behind a width-fit bottom-anchored stage
+(aspect locked, container-type:size) holding char -> mid -> tabs ->
+front -> goods. The innkeep rises .8s ease on screen entry only
+(_stFresh flag; buys re-render without replay).
+- stock: family dice rolled in for the night claim the 4 stands first
+  (mundane pad leftovers); iso value-up chips on the measured stand
+  centres, prices inked on the baked parchment tags (slight per-tag
+  tilts). Unaffordable: chip dims via engine stdim class + faded ink.
+  Tap stand or tag -> existing inspect sheet -> BUY (stock/gold logic
+  untouched).
+- tabs DICE|ENCHANTS: active full size/brightness, inactive scale .85
+  darkened, scaling about each tab's baked bottom-centre; labels are
+  font-layer (no baked text). A pointer-capture strip across both
+  supports tap AND thumb-slide, switching in place (the strip survives
+  the flip, so one drag can cross back and forth). Enchants tab clears
+  the counter — layers pending from Denis (enchant flow temporarily
+  not reachable from the shop skin).
+- HUD: painted hearts + gold plate (room kit); BACK / LOADOUT thin
+  button plates bottom corners.
