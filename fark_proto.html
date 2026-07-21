@@ -742,8 +742,9 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 #stStage{position:absolute;left:50%;bottom:0;transform:translateX(-50%);
   width:min(100cqw,56.25cqh);aspect-ratio:1080/1920;container-type:size}
 #stStage .stL{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+#stChar{transform:scale(1.18);transform-origin:48.8% 44%}
 #stChar.enter{animation:stCharUp .8s cubic-bezier(.2,.8,.3,1) .12s both}
-@keyframes stCharUp{from{transform:translateY(9%)}to{transform:translateY(0)}}
+@keyframes stCharUp{from{transform:translateY(9%) scale(1.18)}to{transform:translateY(0) scale(1.18)}}
 /* tabs scale about their baked bottom-centres */
 #stTabL{transform-origin:32.1% 49.5%;transition:transform .22s ease,filter .22s ease}
 #stTabR{transform-origin:69.5% 49.5%;transition:transform .22s ease,filter .22s ease}
@@ -759,10 +760,12 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 #stGoods{position:absolute;inset:0;pointer-events:none}
 .stStand{position:absolute;width:18%;aspect-ratio:1;display:flex;align-items:center;
   justify-content:center;pointer-events:auto;cursor:pointer}
-.stStand .d3chip{width:60%;aspect-ratio:1;display:block}
-.stPrice{position:absolute;pointer-events:auto;cursor:pointer;transform:rotate(var(--r,0deg));
-  font-family:'JMH Beda',serif;font-size:3.4cqw;color:#3a2812;letter-spacing:.04em;line-height:1}
-.stPrice.dim{color:#8a7455}
+.stStand .d3chip{width:88%;aspect-ratio:1;display:block}
+.stPrice{position:absolute;pointer-events:auto;cursor:pointer;
+  transform:translate(-50%,-50%) rotate(var(--r,0deg));
+  font-family:'JMH Beda',serif;font-size:3.9cqw;color:#f0e3c6;letter-spacing:.04em;line-height:1;
+  text-shadow:0 2px 0 rgba(16,9,3,.8),0 3px 6px rgba(0,0,0,.5)}
+.stPrice.dim{color:#9a8a6e}
 #stHud{position:absolute;left:0;right:0;top:0;pointer-events:none;z-index:6}
 #stHud .hs{position:absolute;left:3.5%;top:calc(env(safe-area-inset-top,0px) + 1.4cqh);
   display:flex;gap:2cqw;width:26%}
@@ -14251,7 +14254,7 @@ function _d3InitHost(div,tries){
     if((tries||0)<60)setTimeout(function(){_d3InitHost(div,(tries||0)+1);},40);
     return;
   }
-  var still=!!div._d3Still,iso=!!div._d3Iso;
+  var still=!!div._d3Still,iso=!!div._d3Iso,wantShadow=!!div._d3Shadow;
   var sz=Math.round(div.clientWidth*(iso?0.66:0.88));
   var d=D3.make(div,{size:sz,mat:div._trueMat,face:div._trueVal,group:still?null:'match'});
   if(!still)d.tilt=32;/* high camera: the value face tips back, readable, top edge showing */
@@ -14268,6 +14271,7 @@ function _d3InitHost(div,tries){
       var fr=D3.FACE_ROT[div._trueVal]||[0,0];
       d.pitch=fr[0]+90;d.yaw=fr[1];
       d.shadow.style.display='none';
+      if(wantShadow)d.dieShadow=true;/* sharp offset silhouette (store stands) */
     }else{
       d.shadow.style.display='none';
       d.spin=(((div._trueVal*47)+(div._trueMat||'bone').length*31)%15)-7;
@@ -14291,6 +14295,7 @@ function _d3ChipScan(root){
     var val=parseInt(ph.getAttribute('data-val'),10)||_d3MatFace(mat);
     var die=mkDie(val,mat,null,true);
     if(ph.hasAttribute('data-iso'))die._d3Iso=true;
+    if(ph.hasAttribute('data-shadow'))die._d3Shadow=true;
     ph.appendChild(die);
   });
 }
@@ -23778,7 +23783,7 @@ function _gbShop(fresh){
     var price=_dicePrice(mat),afford=(S.run.gold||0)>=price,has=owned.indexOf(mat)>=0;
     goods+='<div class="stStand" style="left:'+(STANDS[i][0]-9).toFixed(1)+'%;top:'+(STANDS[i][1]-5.1).toFixed(1)+'%"'
       +' onclick="SFX.nav();_gbDieInspect(\''+mat+'\')">'
-      +'<span class="d3chip'+(afford?'':' stdim')+'" data-iso="1" data-mat="'+mat+'"></span></div>'
+      +'<span class="d3chip'+(afford?'':' stdim')+'" data-iso="1" data-shadow="1" data-mat="'+mat+'"></span></div>'
       +'<div class="stPrice'+(afford?'':' dim')+'" style="left:'+TAGS[i][0].toFixed(1)+'%;top:'+TAGS[i][1].toFixed(1)+'%;--r:'+TAGS[i][2]+'deg"'
       +' onclick="SFX.nav();_gbDieInspect(\''+mat+'\')">'+price+'g'+(has?' \u2713':'')+'</div>';
   }

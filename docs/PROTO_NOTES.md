@@ -1604,3 +1604,13 @@ front -> goods. The innkeep rises .8s ease on screen entry only
   not reachable from the shop skin).
 - HUD: painted hearts + gold plate (room kit); BACK / LOADOUT thin
   button plates bottom corners.
+
+## P102b/c — store polish (done)
+
+- stand dice up to 88% of the stand (was 60), with the engine's sharp
+  offset silhouette shadow (data-shadow attr -> _d3Shadow -> dieShadow
+  at chip creation — no post-scan race).
+- prices: centred on their tag anchors (translate(-50%,-50%) before
+  the tilt), bright cream ink with emboss, 3.9cqw.
+- innkeep scaled 1.18 about (48.8%,44%) — grows up/out from behind the
+  counter; entrance rise keeps the scale.
