@@ -1573,3 +1573,11 @@ waiting bar swallowed no taps (pointer-events:none). When ready, the
 whole block (diamonds + GROG IS WAITING) is now the tap target ->
 boss peek -> CHALLENGE (2 taps, per the brief), with a press squash.
 Verified: tap opens the peek with the CHALLENGE CTA.
+
+
+## P101d — IS WAITING under the title, READY button (done)
+
+"IS WAITING" now sits as a cream line under the big GROG title
+(ready only). The diamond bar is back to non-interactive; below the
+diamonds a READY button (Button_thick_red plate, 44cqw, press squash)
+opens the boss peek -> CHALLENGE. Verified end-to-end.
