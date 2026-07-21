@@ -1688,3 +1688,12 @@ stands.
   creation so the engine dim actually applies on the stands.
 - BUY plate 84% wide, text 2.9cqh (NOT-ENOUGH 2.1cqh) — label sits at
   under half the plate width.
+
+
+## P103d — stand dice always bright (done)
+
+The unaffordable engine dim (finally rendering after P103c) made the
+whole counter read dark — dropped. Dice on the stands are always full
+brightness; affordability lives in the price ink alone (cream vs dark
+brown). The stdim plumbing stays dormant in the engine/scan for
+future use.
