@@ -1632,3 +1632,14 @@ showed below the stage. Legacy rule now carries the store values
 (overflow:hidden, #120b06, container-type:size). The stage stays
 locked 9:16 bottom-anchored; taller screens get the cover back-layer
 above it, squarer windows clip.
+
+
+## P102f — bottom band fixed (done)
+
+Denis's Firefox top-anchored the store stage (bottom:0 with an
+aspect-ratio-derived height did not resolve there; Chromium was
+fine), leaving the 16:9 shortfall as a flat band at the BOTTOM. The
+stage now sets BOTH dimensions explicitly (width min(100cqw,
+56.25cqh), height min(177.78cqw,100cqh)) — no aspect-ratio
+dependency, bottom anchor holds everywhere; the shortfall sits at
+the top where Store_back covers it with matching shelf art.
