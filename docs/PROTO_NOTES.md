@@ -1543,3 +1543,15 @@ winning check only counted COMMITTED points, and the common flow
 (select dice, bank directly) never triggered it. _selPts now handles
 the numeric return. Verified: selection alone crossing the target ->
 verb BANK TO WIN, wide gold plate, caption +N.
+
+## P101 — boss-ready dressing (done)
+
+- activated win diamonds get a bright gold 4-way outline + warm glow
+  (drop-shadows, iOS-safe).
+- boss bar pulled lower (top 52.5%, was 47.8); ready text split into
+  two lines: "GROG IS WAITING" / "a heart at stake".
+- the boss name pulses a warm glow when ready (bossNmGlow 1.7s), on
+  BOTH the bar line and the big screen title (#ptBossName.rdy).
+- boss-ready radial vignette (#ptVign, z5 — under HUD z8, over room
+  art + seats): ellipse centred on the boss face (50%/24%), eases in
+  on screen entry (opacity+scale, 1.4s). Absent when not ready.
