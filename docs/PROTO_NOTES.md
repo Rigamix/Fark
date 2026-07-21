@@ -1651,3 +1651,16 @@ Gold amounts drop the g suffix (HUD + price tags); stand-dice
 silhouette shadows removed (did not render); nav buttons are icon
 buttons now — Icons/back.png (left) and the room's Icons/pouch.png
 (right, loadout), 13.5% wide.
+
+
+## P103 — store die focus = the offer treatment (done)
+
+Tapping a stand (or its price tag) now works like picking the first
+die: the die spring-zooms to centre stage (same projection + easing,
+K=2.3 to 50%/27%), the store dims behind a radial scrim (other
+stands/prices fade), per-material sparks rise from the die, and the
+focus panel shows name / faces / description with BUY (stake-labelled
+per the brief; NOT ENOUGH state dimmed) and BACK. Buying re-renders
+the shop (st-focus reset in render); BACK springs the die home. The
+old bottom-sheet inspect (_gbDieInspect) is no longer wired from the
+stands.
