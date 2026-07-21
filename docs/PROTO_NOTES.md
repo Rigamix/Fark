@@ -1564,3 +1564,12 @@ emboss shadow — no glow, no red (it fought readability). The
 "a heart at stake" sub-line is gone (the stake still labels the
 CHALLENGE CTA in the boss peek, per the brief). The big GROG title
 keeps its ready pulse; diamonds keep their bright outlines.
+
+
+## P101c — the waiting block launches the boss flow (done)
+
+The CHALLENGE path existed only behind the small GROG title text; the
+waiting bar swallowed no taps (pointer-events:none). When ready, the
+whole block (diamonds + GROG IS WAITING) is now the tap target ->
+boss peek -> CHALLENGE (2 taps, per the brief), with a press squash.
+Verified: tap opens the peek with the CHALLENGE CTA.
