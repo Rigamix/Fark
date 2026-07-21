@@ -1735,3 +1735,16 @@ the zoom.
 - die name in the store focus: first letter capitalized, coloured
   with the die's particle colour (D3.SPARK[mat].c — e.g. Amber in
   #ffb84d).
+
+
+## P105 — focus polish + unified back arrow (done)
+
+- hyphenated words never split across lines: focus descriptions wrap
+  them in nowrap spans (store + offer), hyphens:none besides.
+- store HUD (hearts/gold) and bottom nav icons hide while a die is
+  focused, restore on back.
+- name + faces higher (panel top 39.5%) with real air before the
+  description (3.2cqh).
+- ALL back actions use Icons/back.png: store focus + offer focus BACK
+  plates replaced by the arrow icon (11% wide, press squash); the
+  store screen nav already used it.
