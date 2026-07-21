@@ -780,7 +780,10 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 .stNavBtn.icon{width:13.5%}
 /* die focus — the offer-screen treatment on the store counter */
 #stFocusScrim{position:absolute;inset:0;z-index:50;opacity:0;pointer-events:none;transition:opacity .35s;
-  background:radial-gradient(ellipse at 50% 26%,rgba(10,6,2,.3),rgba(10,6,2,.74) 78%)}
+  background:radial-gradient(ellipse at 50% 26%,rgba(10,6,2,.5),rgba(10,6,2,.88) 78%)}
+#gbShop .stL,#gbShop #stBack,#gbShop .stTabLbl{transition:filter .35s}
+#gbShop.st-focus .stL,#gbShop.st-focus #stBack,#gbShop.st-focus .stTabLbl{
+  filter:blur(6px) brightness(.5) saturate(.85)}
 #gbShop.st-focus #stFocusScrim{opacity:1;pointer-events:auto}
 .stStand{transition:opacity .3s}
 #gbShop.st-focus .stStand:not(.zoom),#gbShop.st-focus .stPrice{opacity:0;pointer-events:none}
@@ -807,8 +810,9 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 #stBuyBtn:active{transform:scale(.96)}
 #stBuyBtn.off{filter:saturate(.35) brightness(.6);cursor:default}
 #stBuyBtn img{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;pointer-events:none}
-#stBuyBtn span{position:relative;z-index:1;font-family:'JMH Beda',serif;font-size:3.4cqh;letter-spacing:.05em;
-  color:#f7ecd2;text-shadow:0 2px 0 rgba(16,9,3,.85),0 4px 10px rgba(0,0,0,.55);transform:translateY(-4%)}
+#stBuyBtn span{position:relative;z-index:1;font-family:'JMH Beda',serif;font-size:3cqh;letter-spacing:.04em;
+  white-space:nowrap;color:#f7ecd2;text-shadow:0 2px 0 rgba(16,9,3,.85),0 4px 10px rgba(0,0,0,.55);transform:translateY(-4%)}
+#stBuyBtn.off span{font-size:2.5cqh}
 #stBackBtn{position:relative;width:50%;aspect-ratio:1127/243;margin:2.4cqh auto 0;cursor:pointer;
   display:flex;align-items:center;justify-content:center;transition:transform .1s}
 #stBackBtn:active{transform:scale(.96)}
@@ -23921,6 +23925,11 @@ function _stFocus(i){
   stand.style.transform='translate('+dx+'px,'+dy+'px) scale('+K+')';
   stand.classList.add('zoom');
   gb.classList.add('st-focus');
+  var chip=stand.querySelector('.die');
+  if(chip&&chip._d3){
+    var d3d=chip._d3;d3d.hover=true;d3d.hoverT0=performance.now();
+    try{D3.start();}catch(e){}
+  }
 }
 function _stUnfocus(){
   var gb=document.getElementById('gbShop');
@@ -23928,6 +23937,13 @@ function _stUnfocus(){
   gb.classList.remove('st-focus');
   var stand=gb.querySelector('.stStand.zoom');
   if(stand){
+    var chip=stand.querySelector('.die');
+    if(chip&&chip._d3){
+      var d3d=chip._d3;d3d.hover=false;d3d.h=0;
+      var fr=D3.FACE_ROT[chip._trueVal||d3d.result]||[0,0];
+      d3d.pitch=fr[0]+90;d3d.yaw=fr[1];
+      try{D3.draw(d3d);}catch(e){}
+    }
     stand.style.transition='transform .45s cubic-bezier(.3,1.2,.4,1)';
     stand.style.transform='';
     setTimeout(function(){stand.classList.remove('zoom');stand.style.transition='';},470);

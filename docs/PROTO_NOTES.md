@@ -1664,3 +1664,14 @@ per the brief; NOT ENOUGH state dimmed) and BACK. Buying re-renders
 the shop (st-focus reset in render); BACK springs the die home. The
 old bottom-sheet inspect (_gbDieInspect) is no longer wired from the
 stands.
+
+
+## P103b — focus polish (done)
+
+- store blurs + darkens behind the focus (blur 6px brightness .5 on
+  all stage layers + labels, .35s ease; scrim deepened .5/.88) — the
+  zoomed die stays sharp (goods layer exempt).
+- BUY text fits: 3cqh nowrap, NOT-ENOUGH state 2.5cqh.
+- the focused die hovers like the offer dice: engine hover flag +
+  ramp on focus (float bob + slow pitch/yaw drift via D3.start loop),
+  restored to the exact iso pose on BACK.
