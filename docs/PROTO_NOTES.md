@@ -1697,3 +1697,12 @@ whole counter read dark — dropped. Dice on the stands are always full
 brightness; affordability lives in the price ink alone (cream vs dark
 brown). The stdim plumbing stays dormant in the engine/scan for
 future use.
+
+
+## P103e — full-cover focus scrim + smaller coin (done)
+
+- second scrim: full-screen flat rgba(10,6,2,.78) mounted on #gbShop
+  UNDER the stage (covers the top strip the in-stage scrim missed);
+  the in-stage scrim uses the same flat colour so there is no seam,
+  and the zoomed die still stacks above (z60 in the stage context).
+- gold chip coin: Icons/coin.png (the game coin), height 58% top 21%.
