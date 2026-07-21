@@ -1555,3 +1555,12 @@ verb BANK TO WIN, wide gold plate, caption +N.
 - boss-ready radial vignette (#ptVign, z5 — under HUD z8, over room
   art + seats): ellipse centred on the boss face (50%/24%), eases in
   on screen entry (opacity+scale, 1.4s). Absent when not ready.
+
+
+## P101b — waiting line: beige, no glow, no stake line (done)
+
+"GROG IS WAITING" is now plain cream (#f0e3c6) with the standard
+emboss shadow — no glow, no red (it fought readability). The
+"a heart at stake" sub-line is gone (the stake still labels the
+CHALLENGE CTA in the boss peek, per the brief). The big GROG title
+keeps its ready pulse; diamonds keep their bright outlines.
