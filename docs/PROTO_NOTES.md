@@ -1716,3 +1716,12 @@ in-stage (so the zoomed die stays above it, z60>50) but oversized
 (-60cqw sides / -100cqh top / -20cqh bottom, stage has no clip;
 gbShop clips at the screen) — one flat rgba(10,6,2,.82) layer covers
 the entire screen uniformly. Coin in the gold chip +10% (64% height).
+
+
+## P103g — sparks emanate from the die (done)
+
+Spark spawn offsets were the offer screen's fixed +/-46px — on the
+tiny stand chip scaled 2.3x they scattered across the screen. Offsets
+are now relative to the chip (+/-40% of stand width, drift 55% of
+that): the particles rise from the die's own footprint and scale with
+the zoom.
