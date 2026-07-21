@@ -1675,3 +1675,16 @@ stands.
 - the focused die hovers like the offer dice: engine hover flag +
   ramp on focus (float bob + slow pitch/yaw drift via D3.start loop),
   restored to the exact iso pose on BACK.
+
+
+## P103c — focus stacking + text room (done)
+
+- the scrim lived on #gbShop while #stStage is its own stacking
+  context (container-type layout containment) — the whole stage incl.
+  the zoomed die rendered UNDER it, darkening the die. Scrim now
+  mounts INSIDE the stage: zoom z60 > scrim z50.
+- the focused die sheds the unaffordable stdim for the inspection
+  (restored on BACK); stdim now rides onto the die host at chip
+  creation so the engine dim actually applies on the stands.
+- BUY plate 84% wide, text 2.9cqh (NOT-ENOUGH 2.1cqh) — label sits at
+  under half the plate width.
