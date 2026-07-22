@@ -42,6 +42,14 @@ and bottom.
   disabled: unaffordable items dim but stay inspectable; owned items
   display as owned; locked actions show the unlock condition as
   static text, not a dead button.
+- ONE OBJECT, ONE LOOK (design law). A game object has exactly one
+  visual form in every context and state: a badge is the same badge
+  in the boss's art, the spoils choice, the badge case, worn at the
+  table, and on the shelf; a die is the same render in shop, rail,
+  and match; a card is the same frame everywhere. State is expressed
+  by LOCATION and at most a glow/dim — never by transforming the
+  object into a different thing. Any spec or asset that gives one
+  concept two shapes is a bug.
 - NO BAKED TEXT in any painted asset. All lettering is font-layer.
 - Feedback < 100ms on every tap. Tap targets >= 44px (46px+ for
   icons). No horizontal scrolling anywhere.
@@ -78,8 +86,10 @@ directly above the tiles carrying the CIRCLE PIPS ON THE DOOR
 ("BOSS — GROG / ooo + 1 more win to challenge") — progress and its
 goal are one object; won circles animate flying INTO the door pips,
 sealed losses crack one off. Door always peekable. Patron tiles fill
-the bottom band (biggest targets in the game; sealed seat visually
-distinct). Bottom nav: menu / loadout / shop.
+the bottom band (biggest targets in the game; the sealed seat's
+patron visibly WEARS the house badge — The Tankard — on the tile
+and in their peek; that is the sealed marker, no black wax).
+Bottom nav: menu / loadout / shop.
 State B, BOSS READY: door swells into the prime band ("GROG IS
 WAITING / READY", stake caption), remaining seats demote to a
 compact "gold runs" row above it. With zero seats left the door
@@ -96,10 +106,13 @@ SIT DOWN with stake label at sheet bottom.
 
 ### 3.5 BOSS PEEK (bottom sheet, taller)
 Boss art header + one flavour line (no cutscenes anywhere). Heart
-warning chip. Tell in full (binds player only). Relic on display.
-SLEEVE EQUIP INLINE — the claimed-tells row lives here at the
-decision point (also editable in loadout). CHALLENGE with stake
-label; when not ready, replaced by static "WIN N MORE SEATS FIRST".
+warning chip. His WORN BADGE shown with rule in full (binds player
+only; absent if already taken). Relic on display.
+BADGE PIN INLINE — the owned-badges row lives here at the decision
+point (also editable in loadout): pin one to wear it this match; the
+row states the wager ("lost if you lose"). The boss's own badge is
+shown worn in his art. CHALLENGE with stake label; when not ready,
+replaced by static "WIN N MORE SEATS FIRST".
 
 ### 3.6 VICTORY + DRAFT
 Summary strip top ("WON · +Xg · +1 circle"). Pick-1-of-3 card fan in
@@ -113,7 +126,8 @@ Fast. What was lost (buy-in; sealed: circle cracks off the door
 icon), single CONTINUE. Under 2 seconds of forced viewing.
 
 ### 3.8 BOSS SPOILS
-Pick-1-of-3: relic die / tell scroll / purse, equal size. Tap ->
+Pick-1-of-3: relic die / the boss's BADGE / purse, equal size (the
+badge shown is the same brooch he wears). Tap ->
 inspect sheet -> TAKE -> "It's final" confirm. Hearts restore + gold
 visible in top strip. This screen gets the art budget.
 
@@ -123,8 +137,14 @@ secondary to merchandise. Tabs DICE | ENCHANTS under her (rare
 switch, top placement acceptable). FOUR rotating stands, gravity to
 the lower half; empty stand = sold-out state with "back another
 night" slate. Tap die -> sheet: six faces laid flat (from the dice
-face textures — never repainted), effect text, BUY (stays in shop).
-Unaffordable: dimmed, inspectable. Owned: owned treatment.
+face textures — never repainted), effect text, BUY with stake
+caption "trades out one of yours" (the player always holds exactly
+SIX dice — no reserve). Confirming BUY opens the replace picker:
+the player's six dice (same picker pattern as enchant targeting),
+tap the one to give up — it is gone, no trade-in gold (a purchase
+is a commitment, bet law). New die lands in the vacated loadout
+position. Stays in shop after. Unaffordable: dimmed, inspectable.
+Owned: owned treatment (duplicates of family dice remain buyable).
 STOCK RULES (game logic, implement with the UI): all stock rotates
 per night through the 4 stands; no commons barrel (decided against
 for now). Weighting: at least 2 slots hold family dice the player
@@ -134,13 +154,20 @@ are legal stock (they upgrade builds). Nights 6-8: stands grow to 5
 (counter plate is painted with room for 5).
 ENCHANTS tab: 4 service plaques (Amber Cast, Quicksilver, Tempering,
 Loaded). Flow: pick service -> pick YOUR die (dice row appears) ->
-irreversible confirm. One enchant per die ever: enchanted dice carry
-a permanent seal mark and are excluded from the picker.
+irreversible confirm. One enchant per die ever: an enchanted die
+carries its enchant's own permanent mark (per-enchant overlay spec)
+and is excluded from the picker, shown greyed with its enchant icon
+chip.
 
 ### 3.10 LOADOUT
-Interactivity increases downward: SHELF (view-only trophies + titles
-& feats progress) top; SLEEVE wallet (claimed tells, equip one) mid;
-CARDS (exactly 3 slots, empty = faint outline) lower-mid; DICE RAIL
+Interactivity increases downward: SHELF (view-only: titles & feats
+progress and cosmetic run trophies ONLY — badges never appear here;
+a lost badge is simply gone) top;
+BADGE CASE (the player's FULL badge collection, up to eight; tap to
+pin exactly one = worn; wager stated) mid;
+CARDS (exactly 3 slots = the entire collection, no reserve; swap
+happens only at draft-time replacement; inspect-only here, empty =
+faint outline) lower-mid; DICE RAIL
 (six dice, hold-and-drag reorder — position IS loadout order, feeds
 Vagabond positional scoring) lowest. BACK bottom.
 
@@ -165,18 +192,38 @@ innkeep's book screen; do not rebuild one.
 - SHARED KITS (one source each, reused everywhere): HUD kit (hearts,
   gold chip), UI kit from the button/UI sheet (two-line ROLL/BANK
   bodies at ~2.4:1 with caption room, generic buttons, race bar,
-  portrait rings, pause icon, parchment note+seal, sheet panel),
+  portrait rings, pause icon, sheet panel),
   props sheet (mug, candle, coins, cup, jug, cloth — each with baked
   contact shadow), card frame system (6 family colours x 3 metal
-  trims + abstract motifs), wax seal set.
+  trims + abstract motifs), wax TRAIT seal set (patron traits ONLY —
+  wax appears nowhere else), BADGE SET — nine brooches, locked roster (readable at the
+  smallest placement, currently the sealed-seat tile ~32px):
+  Grog THE BOOT (pewter hobnailed boot), Finnick THE PALM (tin open
+  hand + coin), Mabel THE KETTLE (brass, cast steam curl), Brutus
+  THE DENTED HELM (brass), Corvus THE TIPPED SCALES (silver, one
+  pan low with a coin), Whisper THE SERPENT (patinated silver
+  coil), Aldric THE ANTLER CROWN (silver + jade cabochon), Ambrose
+  THE BRIMMING CHALICE (gold + garnet, coins over the rim), house
+  THE TANKARD (iron, cast foam). Plus the badge case sprite and
+  worn-pin placements for boss art and the player's table edge.
+  A badge exists in exactly two places ever: pinned on its boss, or
+  in the case. Lost = gone, nowhere.
+  Scroll, note, and ribbon assets are CUT — do not produce them.
 - ROOM: tavern plate per night band (rough/mid/fine, 3), boss door
   element with pip sockets, patron tile frames by night band.
 - SHOP paintings (8): bar plate (room for 5 stands, no innkeep, no
   dice), innkeep sprite x2 poses (idle polishing, happy hand-over),
   display stand (x1 reused), blank price tag, chalk slate, tab pair
-  (2 states), 4 enchant plaques, enchanted-die seal mark.
+  (2 states), 4 enchant plaques (emblems double as each enchant's
+  icon chip everywhere — no generic "enchanted" seal exists), and
+  per-enchant die overlays: amber-pane face, quicksilver corner
+  bead, tempered edge tint + scorched-blank face + corner stamp,
+  loaded plug-ring face; plus FX sprites (silver streak,
+  heavy-landing puff; shop cast-moment sprites deferrable).
+  Overlays authored in face-texture space; beads/FX in screen
+  space.
 - LOADOUT: corner plate (wall+table, no objects), shelf sprite,
-  sleeve wallet sprite (open), dice rail sprite, trophy sprites (per
+  badge case sprite (open, cloth-lined), dice rail sprite, trophy sprites (per
   relic/tell as they're earned).
 - MATCH: owned by the match brief (table plates, props anchors, boss
   plates with character painted in, opponent paws set).

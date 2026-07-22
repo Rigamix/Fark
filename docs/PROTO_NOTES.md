@@ -1759,3 +1759,17 @@ left 3.6% top max(1.8%,env) width 27% img 30%; gold right 3.2% width
 #stHud strip had zero height so % offsets collapsed). The coin is the
 STAR coin (Icons/coin.png) on BOTH — the room swapped off the mockup
 coin — and both amounts are bare numbers.
+
+## P107 — shop TRADE flow (brief 3.9 v2: six dice, no reserve) (done)
+
+Buying is a trade now. The focus screen pins YOUR SIX as a slot row
+at the bottom (iso chips, faint-outline slots, caption states the
+stake: "BUY — N · drag onto the die it replaces"); drag the zoomed
+shop die onto a slot — hover highlights it, the DROP is the purchase:
+gold paid, stock down, the outgoing die AND its enchant mark gone for
+good (no trade-in gold, bet law), the new die lands in that exact
+loadout slot, back in the shop. Miss-drops spring the die back to the
+focus pose; unaffordable keeps the NOT-ENOUGH plate with no dragging.
+The old BUY-to-reserve path is no longer reachable from the shop
+(diceInv/famDieStash remain for the loadout until the reserve is
+retired wholesale). Updated FARK_UI_SCREENS_BRIEF filed in docs/.

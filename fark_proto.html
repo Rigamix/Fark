@@ -814,6 +814,17 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
   white-space:nowrap;max-width:72%;overflow:visible;text-align:center;
   color:#f7ecd2;text-shadow:0 2px 0 rgba(16,9,3,.85),0 4px 10px rgba(0,0,0,.55);transform:translateY(-4%)}
 #stBuyBtn.off span{font-size:2.1cqh}
+#stTradeRow{position:absolute;left:4%;right:4%;bottom:calc(env(safe-area-inset-bottom,0px) + 2.2cqh);
+  z-index:56;opacity:0;pointer-events:none;transform:translateY(4%);transition:opacity .4s,transform .4s}
+#gbShop.st-focus #stTradeRow{opacity:1;pointer-events:auto;transform:none;transition-delay:.18s}
+#stTradeRow .cap{text-align:center;font-family:'JMH Beda',serif;font-size:2.2cqh;color:#ffd98a;
+  letter-spacing:.06em;margin-bottom:1.2cqh;text-shadow:0 2px 0 rgba(58,32,8,.75)}
+#stTradeRow .slots{display:flex;justify-content:center;gap:2%}
+.stTSlot{width:13.5%;aspect-ratio:1;border:2px solid rgba(240,227,198,.28);border-radius:14%;
+  display:flex;align-items:center;justify-content:center;background:rgba(10,6,2,.35);
+  transition:border-color .15s,transform .15s}
+.stTSlot.hot{border-color:#ffd98a;transform:scale(1.12);box-shadow:0 0 12px rgba(255,217,138,.4)}
+.stTSlot .d3chip{width:78%;aspect-ratio:1;display:block;pointer-events:none}
 #stBackBtn{position:relative;width:11%;margin:3cqh auto 0;cursor:pointer;transition:transform .1s}
 #stBackBtn:active{transform:scale(.9)}
 #stBackBtn img{width:100%;display:block;pointer-events:none}
@@ -23920,7 +23931,7 @@ function _stFocus(i){
     +'<div class="ffaces">'+acc((dt.faces||[1,2,3,4,5,6]).join(' \u00b7 '))+'</div>'
     +(dt.desc?'<div class="fdesc">'+acc(nbh(dt.desc))+'</div>':'')
     +(afford
-      ?'<div id="stBuyBtn" onclick="SFX.nav();_gbBuyDie(\''+mat+'\')"><img src="Art/Assets/Buttons/Button_thick_green.png" alt=""><span>BUY \u2014 '+price+'</span></div>'
+      ?''
       :'<div id="stBuyBtn" class="off"><img src="Art/Assets/Buttons/Button_thick_green.png" alt=""><span>'+price+' \u2014 NOT ENOUGH</span></div>')
     +'<div id="stBackBtn" onclick="_stUnfocus()"><img src="Art/Assets/Icons/back.png" alt="back"></div>';
   var gr=gb.getBoundingClientRect(),nr2=stand.getBoundingClientRect();
@@ -23938,6 +23949,70 @@ function _stFocus(i){
     var d3d=chip._d3;d3d.hover=true;d3d.hoverT0=performance.now();
     try{D3.start();}catch(e){}
   }
+  /* trade row: your six at the bottom — drag the new die onto the slot
+     it replaces; the drop is the purchase (brief 3.9, no reserve) */
+  var oldRow=document.getElementById('stTradeRow');if(oldRow)oldRow.remove();
+  if(afford){
+    var row=document.createElement('div');row.id='stTradeRow';
+    var deck='';
+    (S.run.dice||[]).forEach(function(mt,ii){
+      deck+='<div class="stTSlot" data-i="'+ii+'"><span class="d3chip" data-iso="1" data-mat="'+mt+'"></span></div>';
+    });
+    row.innerHTML='<div class="cap">BUY \u2014 '+price+' \u00b7 drag onto the die it replaces</div>'
+      +'<div class="slots">'+deck+'</div>';
+    gb.appendChild(row);
+    if(typeof _d3ChipScan==='function')_d3ChipScan(row);
+    var focusTf=stand.style.transform;
+    var dragOn=false,slotEls=null;
+    stand.style.touchAction='none';
+    stand.onpointerdown=function(ev){
+      if(!gb.classList.contains('st-focus'))return;
+      ev.preventDefault();
+      try{stand.setPointerCapture(ev.pointerId);}catch(e){}
+      dragOn=true;
+      slotEls=[].slice.call(row.querySelectorAll('.stTSlot'));
+      stand.style.transition='transform .12s';
+    };
+    stand.onpointermove=function(ev){
+      if(!dragOn)return;
+      stand.style.transform='translate('+(ev.clientX-ncx)+'px,'+(ev.clientY-ncy)+'px) scale(1.35)';
+      slotEls.forEach(function(el){
+        var r=el.getBoundingClientRect();
+        el.classList.toggle('hot',ev.clientX>=r.left&&ev.clientX<=r.right&&ev.clientY>=r.top&&ev.clientY<=r.bottom);
+      });
+    };
+    var endDrag=function(ev,commit){
+      if(!dragOn)return;dragOn=false;
+      var hit=null;
+      slotEls.forEach(function(el){
+        var r=el.getBoundingClientRect();
+        if(commit&&ev.clientX>=r.left&&ev.clientX<=r.right&&ev.clientY>=r.top&&ev.clientY<=r.bottom)hit=el;
+        el.classList.remove('hot');
+      });
+      if(hit){_stTrade(mat,parseInt(hit.getAttribute('data-i'),10));return;}
+      stand.style.transition='transform .45s cubic-bezier(.3,1.2,.4,1)';
+      stand.style.transform=focusTf;
+    };
+    stand.onpointerup=function(ev){endDrag(ev,true);};
+    stand.onpointercancel=function(ev){endDrag(ev,false);};
+  }
+}
+/* the drop commits the trade: gold paid, stock down, the outgoing die
+   (and its enchant mark) is GONE — no trade-in gold, bet law */
+function _stTrade(mat,slot){
+  _getS();
+  var price=_dicePrice(mat);
+  if((S.run.gold||0)<price){famLog('NOT ENOUGH GOLD');return;}
+  if((S.run.diceStock[mat]||0)<=0)return;
+  if(!S.run.dice||slot<0||slot>=S.run.dice.length)return;
+  var out=S.run.dice[slot];
+  S.run.gold-=price;S.run.diceStock[mat]--;
+  S.run.dice[slot]=mat;
+  _enchInit();if(S.run.dieEnch)S.run.dieEnch[slot]=null;
+  save();
+  try{SFX.bank();}catch(e){}
+  famLog(getDie(mat).name.toUpperCase()+' JOINS YOUR SIX \u2014 '+getDie(out).name.toUpperCase()+' TRADED OUT');
+  _gbShop();
 }
 function _stUnfocus(){
   var gb=document.getElementById('gbShop');
@@ -23953,6 +24028,8 @@ function _stUnfocus(){
       d3d.pitch=fr[0]+90;d3d.yaw=fr[1];
       try{D3.draw(d3d);}catch(e){}
     }
+    stand.onpointerdown=stand.onpointermove=stand.onpointerup=stand.onpointercancel=null;
+    var _tr=document.getElementById('stTradeRow');if(_tr)_tr.remove();
     stand.style.transition='transform .45s cubic-bezier(.3,1.2,.4,1)';
     stand.style.transform='';
     setTimeout(function(){stand.classList.remove('zoom');stand.style.transition='';},470);
