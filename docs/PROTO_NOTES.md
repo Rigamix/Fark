@@ -1773,3 +1773,11 @@ focus pose; unaffordable keeps the NOT-ENOUGH plate with no dragging.
 The old BUY-to-reserve path is no longer reachable from the shop
 (diceInv/famDieStash remain for the loadout until the reserve is
 retired wholesale). Updated FARK_UI_SCREENS_BRIEF filed in docs/.
+
+
+## P109 — win diamonds on every patron panel (done)
+
+The panel diamonds were sealed-only; now EVERY patron shows their win
+value under the name: one diamond normally, two on the sealed seat
+(three with Marked Table), heat-tinted by how close that win brings
+you to the boss. Verified: normal panel 1, sealed panel 2.
