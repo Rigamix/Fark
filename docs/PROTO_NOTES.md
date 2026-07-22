@@ -1748,3 +1748,14 @@ the zoom.
 - ALL back actions use Icons/back.png: store focus + offer focus BACK
   plates replaced by the arrow icon (11% wide, press squash); the
   store screen nav already used it.
+
+
+## P106 — one HUD everywhere (done)
+
+Hearts + gold chip are now IDENTICAL on room and store (verified
+pixel-identical rects): the store adopts the room geometry (hearts
+left 3.6% top max(1.8%,env) width 27% img 30%; gold right 3.2% width
+27.5%, amt 2.8cqh #f3dfa6), anchored to the full screen box (the old
+#stHud strip had zero height so % offsets collapsed). The coin is the
+STAR coin (Icons/coin.png) on BOTH — the room swapped off the mockup
+coin — and both amounts are bare numbers.
