@@ -2007,3 +2007,19 @@ BEFORE the ground shadow so the outline hugs the art, not the bbox).
 The lit state rides the tooltip (applied in _loTip, cleared on
 tap-away/hide). Nudges: Bookkeeper +5, StickyFingers -5,
 HisOwnMedecine -5.
+
+## P126 — the feat ceremony (done)
+
+When a feat with art unlocks (post-match drain) or waits unpinned on
+shelf entry: full-screen scrim, the trinket huge (24cqh) with the
+amber alpha outline + spring entrance, rising gold particles (nrSpark
+reuse), feat name / flavour / +renown, and a PIN IT plate
+(Button_thick_green). Tapping PIN flies the trinket (FLIP clone) onto
+its exact wall spot — the hidden wall img then fades in — or, away
+from the shelf, off toward the corner. One ceremony per feat ever
+(S.featsPinned in the save). Artless feats keep the old golden
+splash. FEAT_ART hoisted global. Gotcha found: the desktop phone
+frame reroutes body.appendChild into #phoneShell whose transform is
+the containing block for fixed — flight coords must subtract the
+shell origin. Both the fade-in class and the flight destination have
+timer fallbacks beside rAF.
