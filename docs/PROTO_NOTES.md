@@ -1830,3 +1830,15 @@ SecondWind=comeback, Teetotaller=beat_grog, TheCollector=
 card_collector, ThreeTorches=hot_storm); the other 12 images await
 their feats (debug flag previews all 24 on the wall). Only earned
 feats ever render live, per the brief.
+
+## P112 — seamless wall + always six dice (done)
+
+- the top-strip cover rendered the wall at a different crop/scale
+  (visible seam + "weird wall"). Replaced by an in-stage mirrored
+  extension: the same bg flipped vertically sitting flush above the
+  stage — vertical plank columns continue through the join.
+- Denis's save had a 4-entry dice array (older builds): _famDiceMigrate
+  now pads short arrays back to SIX bones (dieEnch in step) on every
+  run, famLoadoutShow runs the migration, and the rail render loops
+  all six slots with a bone fallback. shelf_bg updated by Denis
+  (empty rail) committed along.
