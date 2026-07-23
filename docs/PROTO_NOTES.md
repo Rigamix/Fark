@@ -1817,3 +1817,16 @@ trophy shelf) is retired per the brief.
   y 81%, 12% wide). Box art will be emptied later.
 - unified HUD (shared CSS with #stHud) + back arrow. Feats wall wired
   when Denis's pin art lands.
+
+## P111 — feats wall (done)
+
+Earned feats hang as Denis's trinket sprites on the dark wall: 5-col
+grid (x 12/31/50/69/88, rows y 7-29%), height 5.6% each, tap -> the
+shared anchored tooltip (feat label + one-liner), tiny tally top-right
+(N/24). 12 confident art->code mappings (Barehands=naked_run,
+Bookkeeper=five_banker, CleanNight=no_busts, Death&Taxes=beat_corvus,
+FirstBlood, HighRoller, LastManSitting=survivor, LongRoad=persistent,
+SecondWind=comeback, Teetotaller=beat_grog, TheCollector=
+card_collector, ThreeTorches=hot_storm); the other 12 images await
+their feats (debug flag previews all 24 on the wall). Only earned
+feats ever render live, per the brief.

@@ -781,6 +781,10 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
   width:min(100cqw,56.25cqh);height:min(177.78cqw,100cqh)}
 #loStage .bg{position:absolute;inset:0;width:100%;height:100%}
 .loBadge{position:absolute;height:4.6%;transform:translate(-50%,-50%);cursor:pointer;transition:transform .12s}
+.loFeat{position:absolute;height:5.6%;transform:translate(-50%,-50%);cursor:pointer;transition:transform .12s}
+.loFeat:active{transform:translate(-50%,-50%) scale(1.15)}
+#loTally{position:absolute;right:5%;top:1.8%;font-family:'JMH Beda',serif;font-size:1.7cqh;
+  color:#bfae8e;letter-spacing:.12em}
 .loBadge:active{transform:translate(-50%,-50%) scale(1.15)}
 .loCard{position:absolute;width:21%;aspect-ratio:245/315;transform:translate(-50%,-50%)}
 .loCard .edge{position:absolute;inset:0;transform:translate(2.5%,2.5%);border-radius:7%/5.5%;background:#1a1208}
@@ -11879,6 +11883,32 @@ function famLoadoutShow(){
       +'style="left:'+x.toFixed(1)+'%;top:53.6%" '
       +'data-nm="'+bd.name+'" data-ds="'+String(bd.desc).replace(/"/g,'&quot;')+'">';
   });
+  /* feats wall: earned feats hang as trinkets on the nail grid */
+  var FEAT_ART={naked_run:'Barehands',five_banker:'Bookkeeper',no_busts:'CleanNight',
+    beat_corvus:'Death&Taxes',first_blood:'FirstBlood',high_roller:'HighRoller',
+    survivor:'LastManSitting',persistent:'LongRoad',comeback:'SecondWind',
+    beat_grog:'Teetotaller',card_collector:'TheCollector',hot_storm:'ThreeTorches'};
+  var _fd={};FEATS.forEach(function(f){_fd[f.id]=f;});
+  var fEarn=[];
+  Object.keys(S.featsDone||{}).forEach(function(id){
+    if(FEAT_ART[id])fEarn.push({png:FEAT_ART[id],nm:(_fd[id]||{}).label||id,ds:(_fd[id]||{}).desc||''});
+  });
+  if(!fEarn.length&&window._fkDbgOn){
+    ['Barehands','Bookkeeper','CleanNight','Death&Taxes','FirstBlood','ForKeeps','FullBloom',
+     'GreenThumb','HighRoller','HisOwnMedecine','LastManSitting','LongRoad','NoClaim','OmensTrue',
+     'OwnTheNight','PowderMonkey','SecondWind','SlowBoiled','StickyFingers','Teetotaller',
+     'TheCollector','ThreeTorches','TwiceSaved','WishGranted'].forEach(function(n){
+      fEarn.push({png:n,nm:n.replace(/([A-Z])/g,' $1').replace(/ &/g,' &').trim(),ds:'feat art preview'});
+    });
+  }
+  var fHtml='';
+  var _COLS=[12,31,50,69,88],_ROWY=[7,12.5,18,23.5,29];
+  fEarn.slice(0,24).forEach(function(f,i){
+    fHtml+='<img class="loFeat" src="Art/Assets/Feats/'+encodeURIComponent(f.png)+'.png" alt="" '
+      +'style="left:'+_COLS[i%5]+'%;top:'+_ROWY[(i/5)|0]+'%" '
+      +'data-nm="'+f.nm+'" data-ds="'+String(f.ds).replace(/"/g,'&quot;')+'">';
+  });
+  fHtml+='<div id="loTally">'+fEarn.length+'/24</div>';
   /* cards on the three marked table slots — placeholder 3D cards,
      visuals to come */
   var SLOTS=[[18.4,67.1],[50.2,66.9],[77.1,67.1]];
@@ -11903,7 +11933,7 @@ function famLoadoutShow(){
     +'<img id="loBgCover" src="'+BG+'" alt="">'
     +'<div id="loStage">'
       +'<img class="bg" src="'+BG+'" alt="">'
-      +bHtml+cHtml+dHtml
+      +fHtml+bHtml+cHtml+dHtml
     +'</div>'
     +'<div id="loHud"><div class="hs">'+hearts+'</div>'
       +'<div class="gd"><img class="pl" src="'+PT_A+'plate_goldCounter.png" alt="">'
@@ -11913,7 +11943,7 @@ function famLoadoutShow(){
   document.body.appendChild(ov);
   document.getElementById('loBack').onclick=function(){try{SFX.nav();}catch(e){}ov.remove();};
   ov.addEventListener('pointerdown',function(ev){
-    var bd=ev.target.closest?ev.target.closest('.loBadge'):null;
+    var bd=ev.target.closest?ev.target.closest('.loBadge,.loFeat'):null;
     if(bd)_loTip(bd,bd.getAttribute('data-nm'),bd.getAttribute('data-ds'));
     else if(!(ev.target.closest&&ev.target.closest('#loTip')))_loTipHide();
   });
