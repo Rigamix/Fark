@@ -1962,3 +1962,13 @@ vignette halved (.38 -> .19).
   Omens True, Own the Night, Powder Monkey, Slow Boiled, Sticky
   Fingers, Twice Saved, Wish Granted) — doubling as the design hooks
   for those future feats; debug preview shows real text for all 24.
+
+
+## P121 — one-line titles, Metamorphous body, helm boost (done)
+
+- tooltip titles never wrap (nowrap; the plate grows to fit).
+- tooltip BODY text set in Metamorphous (OFL, bundled locally at
+  assets/fonts/Metamorphous.ttf — works file:// and on Pages; titles
+  stay JMH Beda). One selector away from rolling it to other body
+  texts if Denis likes it.
+- BMUL: TheDentedHelm 1.15 joins the tankard boost.
