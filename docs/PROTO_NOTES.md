@@ -1855,3 +1855,16 @@ all 24 feats + all 9 badges (showcase); live players see earned only.
 Also answered: the 4-dice save came from older builds — matches
 always roll six (materials pad with bone), so play felt normal; the
 P112 migration heals the save on shelf open.
+
+## P114 — shelf feel + dice diagnostics (done)
+
+- sharp offset silhouette shadows under feats and badges (drop-shadow
+  0.7/0.9cqw, zero blur).
+- feats bigger (6.2%) and hung by hand: deterministic jitter (+-3%
+  x / +-1.6% y from index sines) + tilt (+-7deg) off the nail grid.
+- badges bigger (5.4%) and centre-packed (12.5% step about the row
+  centre; 5 lid + 4 base under debug).
+- hsdebug badge now reports "dice save:N chips:M" — the pane renders
+  6 chips from any save (P112 pads + 0..5 loop), and the committed
+  shelf_bg rail is EMPTY, so if Denis still sees 4 painterly dice his
+  local art copy has them painted in (OneDrive divergence suspected).
