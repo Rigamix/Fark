@@ -8301,6 +8301,19 @@ function _famCardsV2(){
   /* vanguard collapse: owned Anchor/Bookends become Vanguard at the
      same tier; several copies merge keeping the highest tier */
   if(!S||!S.run)return;
+  /* satchel retired (3 slots ARE the collection): equip into empty
+     slots, sell the rest at 15g */
+  if(S.run.finv&&S.run.finv.length){
+    S.run.fcards=S.run.fcards||[];
+    var sold=0;
+    S.run.finv.forEach(function(c){
+      if(!c)return;
+      if(S.run.fcards.length<3&&!S.run.fcards.some(function(x){return x.id===c.id;}))S.run.fcards.push(c);
+      else{S.run.gold=(S.run.gold||0)+15;sold++;}
+    });
+    S.run.finv=[];
+    if(sold)try{famLog('the innkeep bought '+sold+' spare card'+(sold>1?'s':'')+' \u2014 +'+(sold*15)+'g');}catch(e){}
+  }
   ['fcards','finv'].forEach(function(k){
     var a=S.run[k];if(!a||!a.length)return;
     a.forEach(function(c){if(c&&_FAM_ALIAS[c.id])c.id=_FAM_ALIAS[c.id];});
@@ -11418,20 +11431,23 @@ function famOffer(forceTier1){
   if(night>=4&&!forceTier1&&famOwnTier('for_keeps')===0&&Math.random()<0.25){
     pool=pool.concat([famDef('for_keeps')]);/* the dice wager enters late drafts */
   }
-  var ownedFams={};famOwnedAll().forEach(function(c){var d=famDef(c.id);if(d&&d.fam!=='tavern')ownedFams[d.fam]=1;});
+  var ownedFams=famOwnedFams();
+  var _FAMS=['jade','amber','silver','obsidian','starstone','vagabond'];
   function draw(){
     if(!forceTier1&&Math.random()<0.12){/* tavern: 10-15% of all offers (brief §4) */
       var tv=pool.filter(function(d){return d.fam==='tavern';});
       if(tv.length)return tv[Math.floor(Math.random()*tv.length)];
     }
-    var fpool=pool.filter(function(d){return d.fam!=='tavern';});
-    var cands=fpool;
+    /* FAMILY-FIRST (brief §4): pick the family by the weighting, THEN a
+       card inside it — family sizes never skew draft rates */
+    var live=function(f){return pool.some(function(d){return d.fam===f;});};
+    var inF=_FAMS.filter(function(f){return ownedFams[f]&&live(f);});
+    var outF=_FAMS.filter(function(f){return !ownedFams[f]&&live(f);});
     var inBias=(night<=2)?0.5:0.6;/* nights 1-2 run 50/50 so the starter die seeds, not locks */
-    if(Object.keys(ownedFams).length){
-      var inF=fpool.filter(function(d){return ownedFams[d.fam];});
-      var outF=fpool.filter(function(d){return !ownedFams[d.fam];});
-      cands=(Math.random()<inBias&&inF.length)?inF:(outF.length?outF:inF);
-    }
+    var fams=(inF.length&&outF.length)?((Math.random()<inBias)?inF:outF):(inF.length?inF:outF);
+    if(!fams.length)return null;
+    var fam=fams[Math.floor(Math.random()*fams.length)];
+    var cands=pool.filter(function(d){return d.fam===fam;});
     return cands[Math.floor(Math.random()*cands.length)];
   }
   var offer=[],guard=0;
@@ -11446,6 +11462,21 @@ function famOffer(forceTier1){
     offer.push({id:d.id,tier:tier,upgrade:owned>0});
   }
   return offer;
+}
+var _RELIC_FAM={grogs_tooth:'obsidian',mabels_thimble:'amber',finnicks_palm:'vagabond',
+  corvus_ledger:'starstone',brutus_shield:'silver',aldrics_square:'jade',
+  whispers_fang:'vagabond',ambrose_weight:'amber'};
+/* families the player is invested in: cards AND dice (brief §4) */
+function famOwnedFams(){
+  var o={};
+  famOwnedAll().forEach(function(c){var d=famDef(c.id);if(d&&d.fam!=='tavern')o[d.fam]=1;});
+  (S.run.dice||[]).forEach(function(m){
+    if(!m)return;
+    if(_RELIC_FAM[m]){o[_RELIC_FAM[m]]=1;return;}
+    ['jade','amber','silver','obsidian','starstone','vagabond'].forEach(function(f){
+      if(m.indexOf(f)===0)o[f]=1;});
+  });
+  return o;
 }
 var _famOffer=[];
 /* THE painted card — one look everywhere (loadout, draft, match, peek).
@@ -11481,14 +11512,32 @@ function famCardHtml(id,tier,opts){
     +(opts.footer||'')
     +'</div>';
 }
+/* bottom sheet: the painted card big + rule + action */
+function famCardSheet(id,tier,opts){
+  opts=opts||{};
+  var d=famDef(id);if(!d)return;
+  var col=(FAMILIES[d.fam]||{}).color||'#a58a3c';
+  var h='<div style="text-align:center;padding:4px 2px">'
+    +'<div style="width:38%;max-width:170px;margin:0 auto">'+famCardArt(id,tier,{tierAlways:true})+'</div>'
+    +'<div style="font-family:\'JMH Beda\',serif;font-size:19px;color:#2a1808;margin-top:10px;letter-spacing:.05em">'
+      +d.name.toUpperCase()+(d.fam==='tavern'?'':' <span style="color:'+col+'">'+['I','II','III'][tier-1]+'</span>')
+      +(opts.badge?' <span style="background:#ffd98a;color:#2a1808;font-size:11px;padding:2px 7px;border-radius:3px;vertical-align:middle">'+opts.badge+'</span>':'')+'</div>'
+    +'<div style="font-size:11px;letter-spacing:1.5px;color:'+col+';margin-top:2px">'
+      +FAMILIES[d.fam].name+' \u00b7 '+(d.kind==='active'?'ACTIVE':'PASSIVE')
+      +(d.consumable||d.id==='for_keeps'?' \u00b7 BURNS ON USE':'')+'</div>'
+    +'<div style="font-size:14px;line-height:1.5;color:#3a2812;margin:10px auto 4px;max-width:88%">'+d.text[tier-1]+'</div>'
+    +(opts.btn?'<div class="gbx-btn primary" style="margin-top:10px" onclick="_gbSheetClose();('+opts.cb+')()">'+opts.btn+'</div>':'')
+    +'</div>';
+  _gbSheetOpen(h);
+}
 function famOfferHtml(offer,pickFn,declineGold){
   var h='<div style="font-family:monospace;color:#eee;text-align:left;padding:10px 6px">'
     +'<div style="font-size:12px;letter-spacing:2px;color:#999;margin-bottom:10px">CHOOSE A CARD</div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">';
   offer.forEach(function(o,i){
-    var d=famDef(o.id);
-    var _txt=(d.name.toUpperCase()+' '+(d.fam==='tavern'?'':['I','II','III'][o.tier-1])+(o.upgrade?' (IN-PLACE UPGRADE)':'')+' — '+d.text[o.tier-1]).replace(/'/g,'&#39;').replace(/"/g,'&quot;');
-    h+=famCardHtml(o.id,o.tier,{onclick:"_gbInspect('"+_txt+"','CLAIM',function(){"+pickFn+"("+i+");})",badge:(o.upgrade?'UPGRADE':null)});
+    h+=famCardHtml(o.id,o.tier,{onclick:"famCardSheet('"+o.id+"',"+o.tier
+      +",{btn:'CLAIM',badge:"+(o.upgrade?"'UPGRADE'":"null")+",cb:'function(){"+pickFn+"("+i+");}'})",
+      badge:(o.upgrade?'UPGRADE':null)});
   });
   h+='</div>';
   if(declineGold!=null){
@@ -11498,22 +11547,56 @@ function famOfferHtml(offer,pickFn,declineGold){
   return h+'</div>';
 }
 function famApplyPick(o){
-  _getS();S.run.fcards=S.run.fcards||[];S.run.finv=S.run.finv||[];
+  _getS();S.run.fcards=S.run.fcards||[];
   if(o.upgrade){
-    var all=S.run.fcards.concat(S.run.finv);
-    for(var i=0;i<all.length;i++)if(all[i].id===o.id){all[i].tier=Math.min(3,o.tier);break;}
+    for(var i=0;i<S.run.fcards.length;i++)if(S.run.fcards[i].id===o.id){S.run.fcards[i].tier=Math.min(3,o.tier);break;}
   }else if(S.run.fcards.length<3)S.run.fcards.push({id:o.id,tier:o.tier});
-  else S.run.finv.push({id:o.id,tier:o.tier});
   save();
 }
-function famDraftPick(i){
-  var o=_famOffer[i];if(!o)return;
-  famApplyPick(o);
+function _famDraftDone(o){
   var rc=document.querySelector('#end-ov .res-card')||document.getElementById('resCard');
   var d=famDef(o.id);
   if(rc)rc.innerHTML='<div style="font-family:monospace;color:#8e8;padding:30px 10px;text-align:center">TAKEN: '
-    +d.name.toUpperCase()+' '+['I','II','III'][o.tier-1]+'</div>';
+    +d.name.toUpperCase()+(d.fam==='tavern'?'':' '+['I','II','III'][o.tier-1])+'</div>';
   _famEndReady();
+}
+function famDraftPick(i){
+  var o=_famOffer[i];if(!o)return;
+  _getS();S.run.fcards=S.run.fcards||[];
+  if(!o.upgrade&&S.run.fcards.length>=3){_famReplacePick(o);return;}
+  famApplyPick(o);
+  _famDraftDone(o);
+}
+/* slots full: claim opens the replace picker — one of the three
+   irreversible confirms (brief §3.6). The traded card is gone. */
+function _famReplacePick(o){
+  var nd=famDef(o.id);
+  var h='<div style="text-align:center;padding:4px 2px">'
+    +'<div style="font-family:\'JMH Beda\',serif;font-size:17px;color:#2a1808;letter-spacing:.05em">'
+      +'TRADE OUT \u2014 pick the card to let go</div>'
+    +'<div style="font-size:12px;color:#6a5238;margin:3px 0 10px">'
+      +nd.name.toUpperCase()+' takes its slot. The old card is gone \u2014 final.</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;max-width:340px;margin:0 auto">';
+  S.run.fcards.forEach(function(c,i){
+    h+='<div onclick="_famReplaceDo('+i+')" style="cursor:pointer">'
+      +famCardArt(c.id,c.tier,{tierAlways:true})
+      +'<div style="font-size:10px;color:#3a2812;margin-top:3px;font-family:\'JMH Beda\',serif">'
+        +(famDef(c.id)||{name:c.id}).name.toUpperCase()+'</div></div>';
+  });
+  h+='</div>'
+    +'<div class="gbx-btn" style="margin-top:12px" onclick="_gbSheetClose()">KEEP WHAT I HAVE</div>'
+    +'</div>';
+  window._famReplaceOffer=o;
+  _gbSheetOpen(h);
+}
+function _famReplaceDo(i){
+  var o=window._famReplaceOffer;if(!o)return;
+  window._famReplaceOffer=null;
+  _getS();
+  S.run.fcards[i]={id:o.id,tier:o.tier};
+  save();
+  _gbSheetClose();
+  _famDraftDone(o);
 }
 function _famFeats(win){
   _getS();S.featsDone=S.featsDone||{};
