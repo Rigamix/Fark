@@ -12036,7 +12036,9 @@ function famLoadoutShow(){
      'CleanNight','PowderMonkey','WishGranted','StickyFingers','Barehands',
      'SecondWind','LongRoad','ForKeeps','LastManSitting'].forEach(function(n){
       var t=_ftext(n);
-      fEarn.push({png:n,nm:t.nm,ds:t.ds});
+      var _id=_artFeat[n];
+      fEarn.push({png:n,nm:t.nm,ds:t.ds,id:_id,
+        unpinned:!!(_id&&S.featsDone&&S.featsDone[_id]&&!S.featsPinned[_id])});
     });
   }
   var fHtml='';
@@ -12130,17 +12132,15 @@ function famLoadoutShow(){
     if(bd)_loTip(bd,bd.getAttribute('data-nm'),bd.getAttribute('data-ds'));
     else if(!(ev.target.closest&&ev.target.closest('#loTip')))_loTipHide();
   });
-  /* pin ceremony for feats earned but never pinned (skip in debug —
-     the wall is a full showcase there) */
-  if(!window._fkDbgOn){
-    var _pend=[];
-    Object.keys(S.featsDone||{}).forEach(function(id){
-      if(FEAT_ART[id]&&!S.featsPinned[id])_pend.push(id);
-    });
-    if(_pend.length){
-      var _fs=_pend.map(function(id){return FEATS.find(function(x){return x.id===id;});}).filter(Boolean);
-      if(_fs.length)_featCeremony(_fs);
-    }
+  /* pin ceremony for feats earned but never pinned (debug wall included:
+     its showcase entries carry real unpinned state, so flights land) */
+  var _pend=[];
+  Object.keys(S.featsDone||{}).forEach(function(id){
+    if(FEAT_ART[id]&&!S.featsPinned[id])_pend.push(id);
+  });
+  if(_pend.length){
+    var _fs=_pend.map(function(id){return FEATS.find(function(x){return x.id===id;});}).filter(Boolean);
+    if(_fs.length)_featCeremony(_fs);
   }
   /* convert chips POST-layout; rebuild any that converted at zero size
      (Firefox could size them off a 0-width host: present but invisible) */
@@ -13128,7 +13128,7 @@ function _ptRoom(host,tier,bossReady){
       +'<img class="pbtn" id="ptCloseLayer" src="'+PT_A+'btn_close_full.png" alt="">'
     +'</div></div>'
     +(bossReady?'<div id="ptVign"></div>':'')
-    +'<div id="ptHearts">'+hearts+'</div>'
+    +'<div id="ptHearts"'+(window._fkDbgOn?' style="cursor:pointer" onclick="_fkFeats()"':'')+'>'+hearts+'</div>'
     +'<div id="ptGold"'+(window._fkDbgOn?' style="cursor:pointer" onclick="_fkGold()"':'')+'><img class="pl" src="'+PT_A+'plate_goldCounter.png" alt="">'
       +'<img class="co" src="Art/Assets/Icons/coin.png" alt=""><div class="amt">'+(S.run.gold||0)+'</div></div>'
     +'<div class="pt-ov" id="ptChalk">NIGHT '+((S.run.tier||0)+1)+'/8'
@@ -14030,6 +14030,13 @@ if(/hsdebug/.test(location.search))try{localStorage.setItem('fk_dbg','1');}catch
   try{ok=localStorage.getItem('fk_dbg')==='1';}catch(e){}
   window._fkDbgOn=ok;/* dev conveniences hang off the same flag */
   window._fkGold=function(){_getS();S.run.gold=(S.run.gold||0)+1000;save();showScreen('gauntlet');};
+  /* seed 'just won these' feats: earned, never pinned - open the shelf
+     and the ceremony plays; repeatable (re-tap re-arms it) */
+  window._fkFeats=function(){_getS();
+    S.featsDone=S.featsDone||{};S.featsPinned=S.featsPinned||{};
+    ['first_blood','no_busts','comeback'].forEach(function(id){
+      S.featsDone[id]=1;delete S.featsPinned[id];});
+    save();showScreen('gauntlet');};
   document.addEventListener('click',function(e){
     var t=e.target;
     if(!t||t.id!=='hsLogoTap')return;

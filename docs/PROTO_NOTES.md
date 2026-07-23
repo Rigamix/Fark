@@ -2042,3 +2042,12 @@ recovery net (app killed mid-ceremony -> re-offered on shelf entry).
 classic golden splash instead of silently nothing. (3) opacity joined
 the base .loFeat transition list — the fade lived only on .unpinned,
 whose list stops applying the moment the class is removed.
+
+## P129 — debug: hearts tap seeds fresh feats (done)
+
+With debug on, tapping the HEARTS in the room seeds three
+just-won feats (First Blood, Untouchable, Comeback: featsDone set,
+pins cleared) — open the shelf and the FEATS OF THE NIGHT ceremony
+plays. Re-tap to re-arm and watch it again. The ceremony now also
+runs under the debug flag: the 24-feat showcase wall carries real
+unpinned state for earned ids, so the flights land properly there.
