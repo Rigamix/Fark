@@ -2023,3 +2023,22 @@ frame reroutes body.appendChild into #phoneShell whose transform is
 the containing block for fixed — flight coords must subtract the
 shell origin. Both the fade-in class and the flight destination have
 timer fallbacks beside rAF.
+
+## P127+P128 — multi-feat ceremony + wall wiring fixes (done)
+
+P127: feats earned together share ONE ceremony — trinkets in a row
+(smaller as count grows: 24/17/12.5cqh for 1/2/3+, staggered pop-in),
+name captions under each, FEATS OF THE NIGHT heading, summed renown,
+PIN THEM — and on pin they all fly to their wall spots in a 110ms
+stagger, each wall img revealing as its flight lands. #fcOv is now
+container-type:size so its cq units track the phone frame on desktop.
+
+P128 (from adversarial review): (1) evaluateFeats now writes
+S.featsDone (lifetime record) — before, only the five _famFeats
+family ids ever landed there, so the wall was empty in production and
+the ceremony always flew to the corner; this also arms the shelf
+recovery net (app killed mid-ceremony -> re-offered on shelf entry).
+(2) Repeat earns in later runs (feat already pinned) fall back to the
+classic golden splash instead of silently nothing. (3) opacity joined
+the base .loFeat transition list — the fade lived only on .unpinned,
+whose list stops applying the moment the class is removed.

@@ -797,7 +797,7 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 #loWallVig{position:absolute;left:0;right:0;top:-100cqh;bottom:66%;pointer-events:none;
   background:linear-gradient(to bottom,rgba(12,7,3,.11) 60%,rgba(12,7,3,.11) 82%,rgba(12,7,3,0))}
 .loFeat{position:absolute;height:6.2%;transform:var(--jt,translate(-50%,-50%));cursor:pointer;
-  transition:transform .18s,filter .18s;
+  transition:transform .18s,filter .18s,opacity .35s;
   filter:drop-shadow(0.7cqw 0.9cqw 0 rgba(15,9,4,.45))}
 .loFeat:active{transform:var(--jt,translate(-50%,-50%)) scale(1.12)}
 
@@ -852,7 +852,7 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 .loFeat.unpinned{opacity:0;pointer-events:none;transition:opacity .35s}
 #fcOv{position:fixed;inset:0;z-index:9600;background:rgba(8,5,2,.88);
   display:flex;flex-direction:column;align-items:center;justify-content:center;
-  opacity:0;transition:opacity .3s;font-family:'JMH Beda',serif}
+  opacity:0;transition:opacity .3s;font-family:'JMH Beda',serif;container-type:size}
 #fcOv.on{opacity:1}
 #fcOv .fcw{position:relative}
 #fcOv .fcp{position:absolute;left:50%;top:35%;width:0;height:0;pointer-events:none}
@@ -860,10 +860,14 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
   filter:drop-shadow(0 0 3px var(--pc,#ffd98a));opacity:0;animation:nrSpark 2.6s linear infinite}
 #fcOv .fcp span.pdot{border-radius:50%}
 #fcOv .fcp span.pstar{clip-path:polygon(50% 0,61% 39%,100% 50%,61% 61%,50% 100%,39% 61%,0 50%,39% 39%)}
+#fcOv .fcr{display:flex;align-items:flex-end;justify-content:center;gap:4cqw;flex-wrap:wrap;max-width:92cqw}
+#fcOv .fci{display:flex;flex-direction:column;align-items:center;gap:1.1cqh}
+#fcOv .fci .cap{font-size:1.7cqh;color:#ffd98a;letter-spacing:.1em;text-align:center;max-width:26cqw;
+  text-shadow:0 2px 0 rgba(58,32,8,.8)}
 #fcOv .art{height:24cqh;display:block;
   filter:drop-shadow(1.5px 0 0 #e1a755) drop-shadow(-1.5px 0 0 #e1a755)
     drop-shadow(0 1.5px 0 #e1a755) drop-shadow(0 -1.5px 0 #e1a755);
-  animation:fcArtIn .6s cubic-bezier(.3,1.35,.35,1)}
+  animation:fcArtIn .6s cubic-bezier(.3,1.35,.35,1) backwards}
 @keyframes fcArtIn{from{transform:scale(.35)}to{transform:scale(1)}}
 #fcOv .nm{margin-top:3cqh;font-size:3.6cqh;color:#ffd98a;letter-spacing:.12em;text-align:center;
   text-shadow:0 2px 0 rgba(58,32,8,.8),0 4px 12px rgba(0,0,0,.6)}
@@ -8686,13 +8690,12 @@ function _drainFeatUnlockQueue(onDone){
   S.run._pendingFeatUnlocks=[];try{save();}catch(e){}
   var feats=ids.map(function(id){return FEATS.find(function(f){return f.id===id;});}).filter(Boolean);
   if(!feats.length){if(onDone)onDone();return;}
+  var _hasArt=function(f){return typeof FEAT_ART!=='undefined'&&FEAT_ART[f.id]&&typeof _featCeremony==='function'
+    &&!(S.featsPinned&&S.featsPinned[f.id]);};
+  var withArt=feats.filter(_hasArt),plain=feats.filter(function(f){return !_hasArt(f);});
   var seq=Promise.resolve();
-  feats.forEach(function(f){
-    seq=seq.then(function(){
-      return (typeof FEAT_ART!=='undefined'&&FEAT_ART[f.id]&&typeof _featCeremony==='function')
-        ?_featCeremony(f):_showFeatUnlock(f);
-    });
-  });
+  if(withArt.length)seq=seq.then(function(){return _featCeremony(withArt);});
+  plain.forEach(function(f){seq=seq.then(function(){return _showFeatUnlock(f);});});
   seq.then(function(){if(onDone)onDone();});
 }
 /* Returns an ordered list of rank suffixes for dialogue lookup —
@@ -8760,6 +8763,9 @@ function evaluateFeats(){
     try{
       if(f.check(G)){
         S.run.feats[f.id]=true;
+        /* lifetime record: the feats wall + the ceremony recovery net
+           (shelf entry) read this - per-run dedup stays in S.run.feats */
+        S.featsDone=S.featsDone||{};S.featsDone[f.id]=1;
         S.renown=(S.renown||0)+f.renown;
         earned.push(f);
       }
@@ -12132,11 +12138,8 @@ function famLoadoutShow(){
       if(FEAT_ART[id]&&!S.featsPinned[id])_pend.push(id);
     });
     if(_pend.length){
-      var _chain=Promise.resolve();
-      _pend.forEach(function(id){
-        var f=FEATS.find(function(x){return x.id===id;});
-        if(f)_chain=_chain.then(function(){return _featCeremony(f);});
-      });
+      var _fs=_pend.map(function(id){return FEATS.find(function(x){return x.id===id;});}).filter(Boolean);
+      if(_fs.length)_featCeremony(_fs);
     }
   }
   /* convert chips POST-layout; rebuild any that converted at zero size
@@ -12153,30 +12156,46 @@ function famLoadoutShow(){
   requestAnimationFrame(function(){requestAnimationFrame(_scanLo);});
   setTimeout(_scanLo,250);
 }
-/* FEAT CEREMONY: trinket huge over a scrim, particles, flavour, and a
-   PIN that flies it onto the wall (or off toward the shelf) */
-function _featCeremony(feat){
+/* FEAT CEREMONY: one or several trinkets huge over a scrim, particles,
+   flavour, and a PIN that flies them all onto the wall together (or
+   off toward the shelf). Takes a feat or an array of feats. */
+function _featCeremony(list){
+  if(!Array.isArray(list))list=[list];
   return new Promise(function(resolve){
+    var ov=null;
     try{
       _getS();S.featsPinned=S.featsPinned||{};
-      if(S.featsPinned[feat.id]){resolve();return;}
-      var art=FEAT_ART[feat.id];if(!art){resolve();return;}
+      list=list.filter(function(f){return f&&FEAT_ART[f.id]&&!S.featsPinned[f.id];});
+      if(!list.length){resolve();return;}
+      var n=list.length;
       var old=document.getElementById('fcOv');if(old)old.remove();
-      var ov=document.createElement('div');ov.id='fcOv';
+      ov=document.createElement('div');ov.id='fcOv';
+      var spread=Math.min(150,60+(n-1)*30);
       var parts='';
-      for(var i=0;i<14;i++){
+      for(var i=0;i<14+(n-1)*4;i++){
         var w2=(2.5+Math.random()*4).toFixed(1);
         parts+='<span class="'+(Math.random()<0.4?'pstar':'pdot')+'" style="--pc:'+(Math.random()<0.5?'#e1a755':'#ffd98a')+';'
-          +'--px:'+((Math.random()*2-1)*60).toFixed(0)+'px;--dx:'+((Math.random()*2-1)*30).toFixed(0)+'px;'
+          +'--px:'+((Math.random()*2-1)*spread).toFixed(0)+'px;--dx:'+((Math.random()*2-1)*30).toFixed(0)+'px;'
           +'width:'+w2+'px;height:'+w2+'px;'
           +'animation-duration:'+(2+Math.random()*1.6).toFixed(2)+'s;animation-delay:'+(Math.random()*2).toFixed(2)+'s"></span>';
       }
+      var artH=n===1?24:(n===2?17:12.5);
+      var arts='';
+      list.forEach(function(f,i2){
+        arts+='<div class="fci"><img class="art" data-fid="'+f.id+'" '
+          +'style="height:'+artH+'cqh;animation-delay:'+(i2*0.12).toFixed(2)+'s" '
+          +'src="Art/Assets/Feats/'+encodeURIComponent(FEAT_ART[f.id])+'.png" alt="">'
+          +(n>1?'<div class="cap">'+(f.label||f.id).toUpperCase()+'</div>':'')
+          +'</div>';
+      });
+      var totR=list.reduce(function(a,f){return a+(f.renown||0);},0);
+      var one=list[0];
       ov.innerHTML='<div class="fcw"><div class="fcp">'+parts+'</div>'
-        +'<img class="art" src="Art/Assets/Feats/'+encodeURIComponent(art)+'.png" alt=""></div>'
-        +'<div class="nm">'+(feat.label||feat.id).toUpperCase()+'</div>'
-        +(feat.desc?'<div class="ds">'+feat.desc+'</div>':'')
-        +'<div class="rn">+'+(feat.renown||0)+' RENOWN</div>'
-        +'<div class="pin"><img src="Art/Assets/Buttons/Button_thick_green.png" alt=""><span>PIN IT</span></div>';
+        +'<div class="fcr">'+arts+'</div></div>'
+        +'<div class="nm">'+(n===1?(one.label||one.id).toUpperCase():'FEATS OF THE NIGHT')+'</div>'
+        +(n===1&&one.desc?'<div class="ds">'+one.desc+'</div>':'')
+        +'<div class="rn">+'+totR+' RENOWN</div>'
+        +'<div class="pin"><img src="Art/Assets/Buttons/Button_thick_green.png" alt=""><span>'+(n>1?'PIN THEM':'PIN IT')+'</span></div>';
       document.body.appendChild(ov);
       requestAnimationFrame(function(){ov.classList.add('on');});
       setTimeout(function(){ov.classList.add('on');},60);/* rAF-stall fallback */
@@ -12184,41 +12203,47 @@ function _featCeremony(feat){
       ov.querySelector('.pin').onclick=function(){
         if(pinned)return;pinned=true;
         try{SFX.bank();}catch(e){}
-        S.featsPinned[feat.id]=1;try{save();}catch(e){}
-        var img=ov.querySelector('.art');
-        var tgt=document.querySelector('#gbLoadout .loFeat.unpinned[data-png="'+art+'"]');
-        var r=img.getBoundingClientRect();
+        list.forEach(function(f){S.featsPinned[f.id]=1;});
+        try{save();}catch(e){}
         /* the desktop phone frame is the containing block for fixed —
            rect coords are viewport-relative, so shift by its origin */
         var ps=document.getElementById('phoneShell');
         var cb=ps?ps.getBoundingClientRect():{left:0,top:0};
-        var fly=img.cloneNode();
-        fly.style.cssText='position:fixed;left:'+(r.left-cb.left)+'px;top:'+(r.top-cb.top)+'px;width:'+r.width+'px;height:'+r.height+'px;'
-          +'z-index:9700;margin:0;transition:all .6s cubic-bezier(.4,.9,.3,1);filter:none';
-        document.body.appendChild(fly);
-        img.style.visibility='hidden';
         ov.classList.remove('on');
-        var _went=false;
-        var _go=function(){
-          if(_went)return;_went=true;
-          if(tgt){
-            var tr=tgt.getBoundingClientRect();
-            fly.style.left=(tr.left-cb.left)+'px';fly.style.top=(tr.top-cb.top)+'px';
-            fly.style.width=tr.width+'px';fly.style.height=tr.height+'px';
-          }else{
-            fly.style.left='12px';fly.style.top='12px';
-            fly.style.width='34px';fly.style.height='34px';fly.style.opacity='0';
-          }
-        };
-        requestAnimationFrame(function(){requestAnimationFrame(_go);});
-        setTimeout(_go,80);/* rAF-stall fallback */
-        setTimeout(function(){
-          if(tgt)tgt.classList.remove('unpinned');
-          fly.remove();ov.remove();
-          resolve();
-        },640);
+        list.forEach(function(f,i2){
+          var art=FEAT_ART[f.id];
+          var img=ov.querySelector('img.art[data-fid="'+f.id+'"]');
+          var tgt=document.querySelector('#gbLoadout .loFeat.unpinned[data-png="'+art+'"]');
+          var r=img.getBoundingClientRect();
+          var fly=img.cloneNode();
+          fly.style.cssText='position:fixed;left:'+(r.left-cb.left)+'px;top:'+(r.top-cb.top)+'px;width:'+r.width+'px;height:'+r.height+'px;'
+            +'z-index:9700;margin:0;transition:all .6s cubic-bezier(.4,.9,.3,1);filter:none;animation:none';
+          document.body.appendChild(fly);
+          img.style.visibility='hidden';
+          var went=false;
+          var go=function(){
+            if(went)return;went=true;
+            if(tgt){
+              var tr=tgt.getBoundingClientRect();
+              fly.style.left=(tr.left-cb.left)+'px';fly.style.top=(tr.top-cb.top)+'px';
+              fly.style.width=tr.width+'px';fly.style.height=tr.height+'px';
+            }else{
+              fly.style.left='12px';fly.style.top='12px';
+              fly.style.width='34px';fly.style.height='34px';fly.style.opacity='0';
+            }
+          };
+          /* staggered launch: each trinket leaves a beat after the last;
+             its wall img fades in just before the flight lands */
+          setTimeout(function(){
+            requestAnimationFrame(function(){requestAnimationFrame(go);});
+            setTimeout(go,80);/* rAF-stall fallback */
+          },i2*110);
+          setTimeout(function(){if(tgt)tgt.classList.remove('unpinned');},i2*110+500);
+          setTimeout(function(){fly.remove();},i2*110+680);
+        });
+        setTimeout(function(){ov.remove();resolve();},(n-1)*110+700);
       };
-    }catch(e){try{ov&&ov.remove();}catch(e2){}resolve();}
+    }catch(e){try{if(ov)ov.remove();}catch(e2){}resolve();}
   });
 }
 /* shelf die focus — the shop treatment, inspect-only */
