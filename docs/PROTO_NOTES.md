@@ -1920,3 +1920,11 @@ rendered: 13.8/28/42.2/56.4/70.6/84.8, all on screen.
   passes with REAL natural-px widths/heights, min margins 1.2%/0.7%,
   clamped to the wall band. Audited on rendered rects: 0 overlaps
   across all 24, lowest bottom 43.2% (above the case).
+
+
+## P118 — bigger badges (mug boosted) + bigger higher dice (done)
+
+Badge scale up (BK .0136) with a per-badge multiplier map — the ale
+mug (smallest art) gets 1.28x so it holds its own (5.47% vs boot
+5.82%); all badges stay inside the base felt (max bottom 61.1%).
+Rail dice up to 15% wide and raised to 82.6%.
