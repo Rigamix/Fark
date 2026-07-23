@@ -1984,3 +1984,15 @@ vignette halved (.38 -> .19).
   never share a column; right-edge clamp tightened (94) so no gutter
   column forms. Verified: trio scattered across rows/columns, still 0
   overlaps.
+
+## P124 — shelf die focus + store tray art (done)
+
+- tapping a rail die on the shelf opens the shop-style focus,
+  inspect-only: spring-zoom to centre (translate keeps the -50% base
+  so the math holds), flat oversized scrim inside #loStage (under the
+  z60 die), shared panel styles (#loFocusPanel comma-extends the
+  store's), name in particle colour + faces + desc, hover float,
+  BACK arrow; HUD/back/tooltip hidden during focus.
+- store trade row wears Art/Assets/Store/dice_row.png (wooden tray,
+  1200x274): slots are invisible 14% hit zones over the six notch
+  bays (13.3..85.8), hot slot keeps the gold ring.
