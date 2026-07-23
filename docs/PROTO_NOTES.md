@@ -1895,3 +1895,15 @@ P112 migration heals the save on shelf open.
   conv:6. CONFIRMED via the debug badge: Denis's four visible dice
   are PAINTED IN HIS LOCAL shelf_bg (repo copy is empty; his side
   needs a re-export/flatten).
+
+## P116b — THE FOUR-DICE MYSTERY SOLVED (done)
+
+The art was innocent. .d3chip's own rule (later in the sheet, equal
+specificity) beat .loDie's position:absolute with position:relative —
+the six chips FLOWED INLINE, each 12% wide, PLUS their left offsets:
+cumulative drift (13.8/40/66.2/92.4/118.6/144.8), dice 4-6 off
+screen, four visible evenly spread. Chrome AND Firefox alike; my
+earlier checks read style.left instead of RENDERED rects (lesson:
+verify getBoundingClientRect, not intent). Fix: #loStage .loDie
+{position:absolute !important;left:0;display:block}. Verified
+rendered: 13.8/28/42.2/56.4/70.6/84.8, all on screen.
