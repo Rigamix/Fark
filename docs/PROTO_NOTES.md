@@ -1781,3 +1781,20 @@ The panel diamonds were sealed-only; now EVERY patron shows their win
 value under the name: one diamond normally, two on the sealed seat
 (three with Marked Table), heat-tinted by how close that win brings
 you to the boss. Verified: normal panel 1, sealed panel 2.
+
+
+## Brief update filed (2026-07-23): SHELF -> FEATS WALL
+
+New revision of FARK_UI_SCREENS_BRIEF.md filed. Delta vs previous:
+- The trophy SHELF is CUT. Replaced by the FEATS WALL: earned feats
+  hang as small keepsake trinkets on iron nails (the nail = visual
+  signature AND the code placement grid). Only earned feats render +
+  a tiny tally (12/24). Tap a pin -> anchored tooltip popover (name +
+  one-liner), tap-away dismiss. No list view, no locked entries.
+  The game s only meta surface.
+- Title bottom corner: the shelf -> the wall (feats).
+- Barred/Run-won: feats earned this run get pinned LIVE one by one;
+  button TO THE SHELF -> TO THE WALL.
+- Assets: trophy sprites cut; instead feat pin markers (one generic
+  pin + per-feat mini-emblems, batchable).
+Not acted on yet — lands with the loadout/badge-case rework.

@@ -71,7 +71,7 @@ Regressions on these counts fail review.
 Logo top (art, non-interactive). Bottom column: CONTINUE (primary,
 labelled with run state: "CONTINUE NIGHT 3"), NEW RUN (junior; if a
 run exists its caption warns "abandons night 3"). Bottom corners:
-the shelf, settings. Nothing else — no news, no popups.
+the wall (feats), settings. Nothing else — no news, no popups.
 
 ### 3.2 STARTER DRAFT (run start)
 Pick-1-of-3 pattern. Three family dice from the master brief's
@@ -160,9 +160,14 @@ and is excluded from the picker, shown greyed with its enchant icon
 chip.
 
 ### 3.10 LOADOUT
-Interactivity increases downward: SHELF (view-only: titles & feats
-progress and cosmetic run trophies ONLY — badges never appear here;
-a lost badge is simply gone) top;
+Interactivity increases downward: FEATS WALL (earned feats as small
+keepsake trinkets, each hanging on an iron nail — the nail is the
+system's visual signature and the code's placement grid; only earned
+feats render, plus a tiny tally like 12/24 — the game's only meta
+surface; no trophy shelf exists; badges never appear here; a lost
+badge is simply gone. TAP a pin -> a small tooltip popover anchored
+to it: feat name + one-line description of what it was; dismiss on
+tap-away; no list view, no locked/unearned entries shown) top;
 BADGE CASE (the player's FULL badge collection, up to eight; tap to
 pin exactly one = worn; wager stated) mid;
 CARDS (exactly 3 slots = the entire collection, no reserve; swap
@@ -173,7 +178,8 @@ Vagabond positional scoring) lowest. BACK bottom.
 
 ### 3.11 BARRED / RUN WON
 Centered summary (what ended the run / trophy ceremony), run stats
-line, titles earned. Primary bottom: NEW RUN / TO THE SHELF.
+line, feats earned this run (pinned live, one by one). Primary
+bottom: NEW RUN / TO THE WALL.
 
 ### 3.12 SETTINGS & PAUSE
 Settings: audio, haptics, text size, abandon run (stake-labelled,
@@ -223,8 +229,8 @@ innkeep's book screen; do not rebuild one.
   Overlays authored in face-texture space; beads/FX in screen
   space.
 - LOADOUT: corner plate (wall+table, no objects), shelf sprite,
-  badge case sprite (open, cloth-lined), dice rail sprite, trophy sprites (per
-  relic/tell as they're earned).
+  badge case sprite (open, cloth-lined), dice rail sprite, feat pin
+  markers (one generic pin + per-feat mini-emblems, batchable).
 - MATCH: owned by the match brief (table plates, props anchors, boss
   plates with character painted in, opponent paws set).
 - INNKEEP CANON: an older gentle lady frog — smooth green skin, kind
