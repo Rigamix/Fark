@@ -802,6 +802,25 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 .loFeat:active{transform:var(--jt,translate(-50%,-50%)) scale(1.12)}
 
 .loBadge:active{transform:translate(-50%,-50%) scale(1.15)}
+#famRowP{position:absolute;left:50%;transform:translateX(-50%);bottom:11.6%;display:flex;gap:2cqw;z-index:41}
+#famRowP .fcv{width:11.5cqw;cursor:pointer;transition:transform .15s,filter .15s}
+#famRowP .fcv.spent{filter:saturate(.25) brightness(.55) drop-shadow(2px 3px 0 rgba(15,9,4,.4))}
+#famRowP .fcv.sealed::after{content:'';position:absolute;inset:0;background:rgba(24,12,34,.58);border-radius:7%}
+#famRowP .fcv.armed{filter:drop-shadow(0 0 6px rgba(255,217,138,.8)) drop-shadow(2px 3px 0 rgba(15,9,4,.4))}
+#famRowO{position:absolute;right:2.5cqw;top:15.2%;display:flex;gap:1.5cqw;z-index:40}
+.mcBack{width:8cqw;aspect-ratio:911/1298;border-radius:8%;position:relative;cursor:pointer;
+  background:linear-gradient(160deg,#2b1c11,#1d1309);border:0.55cqw solid var(--fc,#666);
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.5),1px 2px 0 rgba(15,9,4,.45);
+  transition:transform .2s,box-shadow .2s,filter .2s}
+.mcBack::after{content:'';position:absolute;inset:26%;border:1px solid var(--fc,#666);
+  opacity:.6;transform:rotate(45deg)}
+.mcBack.armed{transform:translateY(-1.5cqw);
+  box-shadow:0 0 9px 2px rgba(224,70,45,.6),inset 0 0 0 1px rgba(0,0,0,.5)}
+.mcBack.broken{filter:grayscale(.85) brightness(.5)}
+.mcBack.broken::before{content:'\2715';position:absolute;inset:0;display:flex;align-items:center;
+  justify-content:center;color:#c96a5a;font-size:4cqw;z-index:1}
+#famAux{position:absolute;left:2cqw;bottom:11.6%;display:flex;flex-direction:column;gap:4px;z-index:40;
+  font-family:monospace;font-size:10px;max-width:34cqw}
 .fcv{position:relative;aspect-ratio:911/1298;filter:drop-shadow(2px 3px 0 rgba(15,9,4,.4))}
 .fcv img{width:100%;height:100%;display:block;-webkit-user-select:none;user-select:none}
 .fcv .fcvTier{position:absolute;right:5%;top:3.5%;min-width:15%;box-sizing:border-box;text-align:center;
@@ -11327,49 +11346,68 @@ CFX.double_or_nothing={
 
 /* ── bare match UI: chip row (B&W, family colour accent) ── */
 function famRenderRow(){
-  var host=document.getElementById('famRow');
-  if(!host){
-    host=document.createElement('div');host.id='famRow';
-    host.style.cssText='position:absolute;left:4px;top:34%;z-index:40;display:flex;flex-direction:column;gap:4px;font-family:monospace;font-size:11px;';
-    var ms=document.getElementById('screen-match');(ms||document.body).appendChild(host);
-  }
-  var html='';
+  var ms=document.getElementById('screen-match')||document.body;
+  var old=document.getElementById('famRow');if(old)old.remove();/* pre-P132 text column */
+  var hostP=document.getElementById('famRowP');
+  if(!hostP){hostP=document.createElement('div');hostP.id='famRowP';ms.appendChild(hostP);}
+  var hostO=document.getElementById('famRowO');
+  if(!hostO){hostO=document.createElement('div');hostO.id='famRowO';ms.appendChild(hostO);}
+  var hostA=document.getElementById('famAux');
+  if(!hostA){hostA=document.createElement('div');hostA.id='famAux';ms.appendChild(hostA);}
+  /* player: the painted cards, worn at your table edge */
+  var hp='';
   (G&&G.pF||[]).forEach(function(inst,i){
     var d=famDef(inst.id);if(!d)return;
     if(d.fam==='tavern')return;/* run-domain cards: nothing to track at the table (brief §3) */
-    var col=(FAMILIES[d.fam]||{}).color||'#888';
-    var chg=d.charges?(' ['+inst.charges+']'):'';
-    var usable=d.kind==='active'&&inst.charges>0&&CFX[inst.id]&&CFX[inst.id].use;
     var sealed=(typeof _ruleActive==='function'&&_ruleActive('confession','p')&&G._fSealIdx===i);
-    html+='<div onclick="famUse('+i+')" style="cursor:'+(usable?'pointer':'default')+';padding:3px 7px;background:#111;color:#eee;'
-      +'border:1px solid #555;border-left:4px solid '+col+';opacity:'+((sealed||(d.kind==='active'&&inst.charges<=0))?0.35:1)+'" '
-      +'title="'+d.text[inst.tier-1].replace(/"/g,'&quot;')+'">'
-      +(sealed?'⛪ ':'')+d.name.toUpperCase()+' '+['I','II','III'][inst.tier-1]+chg+(inst.state.armed?' ⚡':'')+'</div>';
+    var spent=d.kind==='active'&&inst.charges<=0;
+    var cls=(spent?' spent':'')+(sealed?' sealed':'')+(inst.state.armed?' armed':'');
+    hp+=famCardArt(inst.id,inst.tier,{cls:cls.trim(),onclick:'famCardTap('+i+')'});
   });
+  hostP.innerHTML=hp;
+  /* opponent: face-down backs near the paws; armed actives rise with a
+     red glow one roll ahead (telegraph, brief §6) */
+  var ho='';
   (G&&G.oF||[]).forEach(function(inst,i){
     var d=famDef(inst.id);if(!d)return;
     var col=(FAMILIES[d.fam]||{}).color||'#888';
     var _tg=(inst.id==='tar_pit'&&G._oTarPit)||(inst.id==='sleight'&&G._oSleight)||(inst.id==='ill_omen'&&G._oIllOmen);
-    html+='<div style="padding:3px 7px;background:'+(_tg?'#2a1010':'#0a0a14')+';color:'+(_tg?'#f88':'#99a')
-      +';border:1px solid '+(_tg?'#a44':'#445')+';border-right:4px solid '+col
-      +';font-size:10px'+(_tg?';transform:translateX(-5px)':'')+'" '
-      +'title="'+d.text[inst.tier-1].replace(/"/g,'&quot;')+'">'+(_tg?'⚠ ':'')+'THEIRS: '
-      +(inst.broken?'<s>':'')+d.name.toUpperCase()+' '+['I','II','III'][inst.tier-1]+(inst.broken?'</s> ✂':'')+'</div>';
+    ho+='<div class="mcBack'+(_tg?' armed':'')+(inst.broken?' broken':'')+'" style="--fc:'+col+'" '
+      +'onclick="famOppTap('+i+')"></div>';
   });
+  hostO.innerHTML=ho;
+  /* aux chips: quicksilver reroll + the sleeved rule */
+  var ha='';
   if(G&&(G.pool||[]).some(function(x){return x.ench&&x.ench.t==='quicksilver'&&!x.committed&&!x._frozen;})){
     var _qsSpent=(G._qsTurn===G.turnNum);
-    html+='<div onclick="famQuicksilver()" style="cursor:'+(_qsSpent?'default':'pointer')+';padding:3px 7px;background:#101018;color:#c9f;'
-      +'border:1px dashed #86a;font-size:10px;opacity:'+(_qsSpent?0.35:1)+'">QUICKSILVER — REROLL IT ALONE'+(_qsSpent?' (USED)':'')+'</div>';
+    ha+='<div onclick="famQuicksilver()" style="cursor:'+(_qsSpent?'default':'pointer')+';padding:3px 7px;background:#101018;color:#c9f;'
+      +'border:1px dashed #86a;opacity:'+(_qsSpent?0.35:1)+'">QUICKSILVER — REROLL IT ALONE'+(_qsSpent?' (USED)':'')+'</div>';
   }
-  /* the active rule renders as the parchment note at the opponent edge
-     (#tellBadge) — no duplicate chip here */
   if(G&&G._sleeve&&(!G._tell||G._tell.id!==G._sleeve)){
     var _st=_tellById(G._sleeve);
-    html+='<div title="'+((_st?_st.name+' — '+_st.desc:G._sleeve)+' Binds both sides.').replace(/"/g,'&quot;')+'" onclick="_gbInspect(this.title)" '
-      +'style="cursor:pointer;padding:2px 7px;background:#122;color:#6bc;border:1px dashed #365;font-size:10px">SLEEVED: '
+    ha+='<div title="'+((_st?_st.name+' — '+_st.desc:G._sleeve)+' Binds both sides.').replace(/"/g,'&quot;')+'" onclick="_gbInspect(this.title)" '
+      +'style="cursor:pointer;padding:2px 7px;background:#122;color:#6bc;border:1px dashed #365">SLEEVED: '
       +(_st?_st.name:G._sleeve)+' (both) ⓘ</div>';
   }
-  host.innerHTML=html;
+  hostA.innerHTML=ha;
+}
+/* tap a card at the table: the painted sheet; PLAY when usable */
+function famCardTap(i){
+  if(!G||!G.pF||!G.pF[i])return;
+  var inst=G.pF[i],d=famDef(inst.id);if(!d)return;
+  var sealed=(typeof _ruleActive==='function'&&_ruleActive('confession','p')&&G._fSealIdx===i);
+  var usable=d.kind==='active'&&inst.charges>0&&CFX[inst.id]&&CFX[inst.id].use&&!sealed;
+  var sub=sealed?'SEALED SHUT THIS TURN (Confession)'
+    :(d.kind==='active'?(inst.charges>0?'uses left: '+inst.charges:'spent for this match'):'');
+  famCardSheet(inst.id,inst.tier,{sub:sub,
+    btn:usable?'PLAY':null,cb:usable?('function(){famUse('+i+');}'):null});
+}
+function famOppTap(i){
+  if(!G||!G.oF||!G.oF[i])return;
+  var inst=G.oF[i],d=famDef(inst.id);if(!d)return;
+  var _tg=(inst.id==='tar_pit'&&G._oTarPit)||(inst.id==='sleight'&&G._oSleight)||(inst.id==='ill_omen'&&G._oIllOmen);
+  famCardSheet(inst.id,inst.tier,{sub:inst.broken?'BROKEN — Tampered for the night'
+    :(_tg?'ARMED — it fires after your next roll':'their card — read the table')});
 }
 function famUse(i){
   if(!G||!G.pF||!G.pF[i])return;
@@ -11525,6 +11563,7 @@ function famCardSheet(id,tier,opts){
     +'<div style="font-size:11px;letter-spacing:1.5px;color:'+col+';margin-top:2px">'
       +FAMILIES[d.fam].name+' \u00b7 '+(d.kind==='active'?'ACTIVE':'PASSIVE')
       +(d.consumable||d.id==='for_keeps'?' \u00b7 BURNS ON USE':'')+'</div>'
+    +(opts.sub?'<div style="font-size:12px;color:#6a5238;margin-top:5px">'+opts.sub+'</div>':'')
     +'<div style="font-size:14px;line-height:1.5;color:#3a2812;margin:10px auto 4px;max-width:88%">'+d.text[tier-1]+'</div>'
     +(opts.btn?'<div class="gbx-btn primary" style="margin-top:10px" onclick="_gbSheetClose();('+opts.cb+')()">'+opts.btn+'</div>':'')
     +'</div>';
