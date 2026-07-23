@@ -1972,3 +1972,15 @@ vignette halved (.38 -> .19).
   stay JMH Beda). One selector away from rolling it to other body
   texts if Denis likes it.
 - BMUL: TheDentedHelm 1.15 joins the tankard boost.
+
+
+## P122 — Macondo body + interleaved feat shapes (done)
+
+- tooltip body font switched Metamorphous -> Macondo (bundled at
+  assets/fonts/Macondo.ttf; both files kept so swapping back is one
+  selector).
+- feat display order hand-shuffled so similar silhouettes (the dangly
+  spoon / chain die / cork trio, plus the narrow jar and lantern)
+  never share a column; right-edge clamp tightened (94) so no gutter
+  column forms. Verified: trio scattered across rows/columns, still 0
+  overlaps.
