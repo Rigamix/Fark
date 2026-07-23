@@ -1881,3 +1881,17 @@ P112 migration heals the save on shelf open.
   converted chips: "dice save:N chips:M conv:K" — next screenshot
   settles whether Denis's 4 visible dice are painted into his local
   shelf_bg copy.
+
+## P116 — shelf tune + chip-size heal (done)
+
+- badges: step 14% (more air), base row raised to 58.9% and common
+  scale eased to .0126 — tallest brooch bottoms out at 61.6%, inside
+  the base felt (~61.8%).
+- feats: brickwork stagger (rows alternate +-2.8%) + x jitter +-4.5
+  on tighter columns (14..86) — no more vertical alignment or wide
+  gutters.
+- chips: scan runs post-layout (double rAF + 250ms fallback) and any
+  chip converted at zero size is rebuilt — fixes Firefox's invisible
+  conv:6. CONFIRMED via the debug badge: Denis's four visible dice
+  are PAINTED IN HIS LOCAL shelf_bg (repo copy is empty; his side
+  needs a re-export/flatten).

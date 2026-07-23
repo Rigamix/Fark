@@ -11876,7 +11876,7 @@ function famLoadoutShow(){
     LastManSitting:394,LongRoad:283,NoClaim:341,OmensTrue:382,OwnTheNight:476,
     PowderMonkey:316,SecondWind:480,SlowBoiled:503,StickyFingers:358,Teetotaller:285,
     TheCollector:429,ThreeTorches:465,TwiceSaved:350,WishGranted:441};
-  var BK=0.0135,FK=0.0142;/* %-per-native-px */
+  var BK=0.0126,FK=0.0142;/* %-per-native-px */
   var owned=[];
   var _tRungs=RUNGS.filter(function(r){return r.tell;});
   (S.run.tells||[]).forEach(function(id){
@@ -11902,15 +11902,15 @@ function famLoadoutShow(){
   var _bRow=function(list,y){
     var n=list.length;
     list.forEach(function(bd,i){
-      var x=50+(i-(n-1)/2)*12.5;
+      var x=50+(i-(n-1)/2)*14;
       bHtml+='<img class="loBadge" src="Art/Assets/Badges/'+bd.png+'.png" alt="" '
         +'style="left:'+x.toFixed(1)+'%;top:'+y+'%;height:'+((BSZ[bd.png]||380)*BK).toFixed(2)+'%" '
         +'data-nm="'+bd.name+'" data-ds="'+String(bd.desc).replace(/"/g,'&quot;')+'">';
     });
   };
   var _bs=owned.slice(0,9);
-  if(_bs.length>5){var _cut=Math.floor(_bs.length/2);_bRow(_bs.slice(0,_cut),50.3);_bRow(_bs.slice(_cut),59.3);}
-  else _bRow(_bs,59.3);
+  if(_bs.length>5){var _cut=Math.floor(_bs.length/2);_bRow(_bs.slice(0,_cut),50.3);_bRow(_bs.slice(_cut),58.9);}
+  else _bRow(_bs,58.9);
   /* feats wall: earned feats hang as trinkets on the nail grid */
   var FEAT_ART={naked_run:'Barehands',five_banker:'Bookkeeper',no_busts:'CleanNight',
     beat_corvus:'Death&Taxes',first_blood:'FirstBlood',high_roller:'HighRoller',
@@ -11931,10 +11931,11 @@ function famLoadoutShow(){
     });
   }
   var fHtml='';
-  var _COLS=[12,31,50,69,88],_ROWY=[9,16.5,24,31.5,39];
+  var _COLS=[14,32,50,68,86],_ROWY=[9,16.5,24,31.5,39];
   fEarn.slice(0,24).forEach(function(f,i){
-    /* hung by hand: deterministic jitter + tilt off the nail grid */
-    var jx=Math.sin(i*3.7)*3.0,jy=Math.cos(i*2.9)*1.6,jr=(Math.sin(i*5.3)*7).toFixed(1);
+    /* hung by hand: brickwork row stagger + jitter + tilt */
+    var _ro=(((i/5)|0)%2===0)?-2.8:2.8;
+    var jx=Math.sin(i*3.7)*4.5+_ro,jy=Math.cos(i*2.9)*1.6,jr=(Math.sin(i*5.3)*7).toFixed(1);
     fHtml+='<img class="loFeat" src="Art/Assets/Feats/'+encodeURIComponent(f.png)+'.png" alt="" '
       +'style="left:'+(_COLS[i%5]+jx).toFixed(1)+'%;top:'+(_ROWY[(i/5)|0]+jy).toFixed(1)+'%;'
       +'height:'+((FSZ[f.png]||400)*FK).toFixed(2)+'%;'
@@ -11980,7 +11981,19 @@ function famLoadoutShow(){
     if(bd)_loTip(bd,bd.getAttribute('data-nm'),bd.getAttribute('data-ds'));
     else if(!(ev.target.closest&&ev.target.closest('#loTip')))_loTipHide();
   });
-  if(typeof _d3ChipScan==='function')_d3ChipScan(ov);
+  /* convert chips POST-layout; rebuild any that converted at zero size
+     (Firefox could size them off a 0-width host: present but invisible) */
+  var _scanLo=function(){
+    ov.querySelectorAll('.loDie').forEach(function(sp){
+      if(sp._d3done){
+        var dd=sp.querySelector('.die');
+        if(dd&&dd._d3&&dd._d3.size<4){sp._d3done=false;sp.innerHTML='';}
+      }
+    });
+    if(typeof _d3ChipScan==='function')_d3ChipScan(ov);
+  };
+  requestAnimationFrame(function(){requestAnimationFrame(_scanLo);});
+  setTimeout(_scanLo,250);
 }
 /* small anchored tooltip: name + one-liner, tap-away dismiss */
 function _loTip(el,name,desc){
