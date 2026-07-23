@@ -1996,3 +1996,14 @@ vignette halved (.38 -> .19).
 - store trade row wears Art/Assets/Store/dice_row.png (wooden tray,
   1200x274): slots are invisible 14% hit zones over the six notch
   bays (13.3..85.8), hot slot keeps the gold ring.
+
+## P125 — tap-lift on trinkets + nudges (done)
+
+Tapping a badge or feat lifts it toward the camera: scale 1.2 (feats
+keep their tilt via --jt), the ground shadow slides further away and
+fades (offset x2, alpha .45 -> .2) and a gold alpha-silhouette
+outline appears (4-way 1.5px drop-shadows around the alpha, ordered
+BEFORE the ground shadow so the outline hugs the art, not the bbox).
+The lit state rides the tooltip (applied in _loTip, cleared on
+tap-away/hide). Nudges: Bookkeeper +5, StickyFingers -5,
+HisOwnMedecine -5.
