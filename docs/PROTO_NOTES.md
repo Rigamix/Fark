@@ -1842,3 +1842,16 @@ feats ever render live, per the brief.
   run, famLoadoutShow runs the migration, and the rail render loops
   all six slots with a bone fallback. shelf_bg updated by Denis
   (empty rail) committed along.
+
+## P113 — shelf remap for the extended art + debug showcase (done)
+
+Denis extended shelf_bg himself (2160x4476): stage aspect updated
+(48.26cqh / 207.22cqw), mirror extension kept for still-taller
+screens. Remeasured: feats rows y 9-39, badge case fills BOTH felt
+rows when >5 badges (lid 50.3 / base 59.3, up to 5+4), card slots
+19.6/50.5/78.5 @ 71.5 (aspect 215/260), dice rail y 83.5
+x 13.8-84.8. The 0/24 tally is REMOVED. Debug flag now ALWAYS shows
+all 24 feats + all 9 badges (showcase); live players see earned only.
+Also answered: the 4-dice save came from older builds — matches
+always roll six (materials pad with bone), so play felt normal; the
+P112 migration heals the save on shelf open.
