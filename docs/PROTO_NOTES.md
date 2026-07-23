@@ -1868,3 +1868,16 @@ P112 migration heals the save on shelf open.
   6 chips from any save (P112 pads + 0..5 loop), and the committed
   shelf_bg rail is EMPTY, so if Denis still sees 4 painterly dice his
   local art copy has them painted in (OneDrive divergence suspected).
+
+## P115 — consistent trinket scale + wall vignette (done)
+
+- badges: 4 lid / 5 base; every badge AND feat renders at one common
+  scale from its natural pixel size (baked size maps; height-
+  normalizing had made wide pieces loom and tall ones shrink).
+  Verified: implied scale uniform to rounding.
+- very subtle top vignette over the wall (linear fade .38 -> 0 over
+  the top 34%, above the trinkets) so they bed into the wood.
+- hsdebug dice line fixed (S is lexical, not window.S) + reports
+  converted chips: "dice save:N chips:M conv:K" — next screenshot
+  settles whether Denis's 4 visible dice are painted into his local
+  shelf_bg copy.
