@@ -783,8 +783,8 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 #loStage .bg{position:absolute;inset:0;width:100%;height:100%}
 .loBadge{position:absolute;height:5.1%;transform:translate(-50%,-50%);cursor:pointer;transition:transform .12s;
   filter:drop-shadow(0.7cqw 0.9cqw 0 rgba(15,9,4,.45))}
-#loWallVig{position:absolute;left:0;right:0;top:0;height:34%;pointer-events:none;
-  background:linear-gradient(to bottom,rgba(12,7,3,.38),rgba(12,7,3,0))}
+#loWallVig{position:absolute;left:0;right:0;top:-100cqh;bottom:66%;pointer-events:none;
+  background:linear-gradient(to bottom,rgba(12,7,3,.38) 60%,rgba(12,7,3,.38) 82%,rgba(12,7,3,0))}
 .loFeat{position:absolute;height:6.2%;transform:var(--jt,translate(-50%,-50%));cursor:pointer;transition:transform .12s;
   filter:drop-shadow(0.7cqw 0.9cqw 0 rgba(15,9,4,.45))}
 .loFeat:active{transform:var(--jt,translate(-50%,-50%)) scale(1.12)}
@@ -797,7 +797,7 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 .loCard .ic{font-size:5.4cqw;line-height:1}
 .loCard .nm{font-size:2.2cqw;color:#f0e3c6;letter-spacing:.06em;text-align:center;max-width:90%;line-height:1.2}
 .loCard .tr{font-size:2cqw;color:var(--fc,#a58a3c);letter-spacing:.2em}
-#loStage .loDie{position:absolute !important;left:0;top:83.5%;width:12%;aspect-ratio:1;
+#loStage .loDie{position:absolute !important;left:0;top:83.5%;width:13.5%;aspect-ratio:1;
   transform:translate(-50%,-50%);display:block}
 #loTip{position:absolute;z-index:20;max-width:64%;background:#1d1509;border:2px solid #a58a3c;border-radius:8px;
   padding:1.2cqh 1.6cqh;opacity:0;pointer-events:none;transition:opacity .18s;color:#f0e3c6}
@@ -11877,7 +11877,12 @@ function famLoadoutShow(){
     LastManSitting:394,LongRoad:283,NoClaim:341,OmensTrue:382,OwnTheNight:476,
     PowderMonkey:316,SecondWind:480,SlowBoiled:503,StickyFingers:358,Teetotaller:285,
     TheCollector:429,ThreeTorches:465,TwiceSaved:350,WishGranted:441};
-  var BK=0.0126,FK=0.0142;/* %-per-native-px */
+  var BK=0.0126,FK=0.0155;/* %-per-native-px */
+  var FW={Barehands:240,Bookkeeper:280,CleanNight:272,'Death&Taxes':306,FirstBlood:375,
+    ForKeeps:257,FullBloom:329,GreenThumb:277,HighRoller:295,HisOwnMedecine:282,
+    LastManSitting:292,LongRoad:289,NoClaim:438,OmensTrue:401,OwnTheNight:170,
+    PowderMonkey:267,SecondWind:309,SlowBoiled:221,StickyFingers:263,Teetotaller:267,
+    TheCollector:152,ThreeTorches:279,TwiceSaved:311,WishGranted:255};
   var owned=[];
   var _tRungs=RUNGS.filter(function(r){return r.tell;});
   (S.run.tells||[]).forEach(function(id){
@@ -11894,7 +11899,7 @@ function famLoadoutShow(){
   });
   if(window._fkDbgOn){
     owned=[];
-    Object.keys(BADGE).forEach(function(bk){
+    ['grog','mabel','finnick','corvus','brutus','aldric','whisper','ambrose','house'].forEach(function(bk){
       owned.push({png:BADGE[bk],name:BADGE[bk].replace(/([A-Z])/g,' $1').trim(),
         desc:'badge art preview \u2014 '+bk});
     });
@@ -11910,8 +11915,8 @@ function famLoadoutShow(){
     });
   };
   var _bs=owned.slice(0,9);
-  if(_bs.length>5){var _cut=Math.floor(_bs.length/2);_bRow(_bs.slice(0,_cut),50.3);_bRow(_bs.slice(_cut),58.9);}
-  else _bRow(_bs,58.9);
+  if(_bs.length>5){var _cut=Math.floor(_bs.length/2);_bRow(_bs.slice(0,_cut),50.3);_bRow(_bs.slice(_cut),58.2);}
+  else _bRow(_bs,58.2);
   /* feats wall: earned feats hang as trinkets on the nail grid */
   var FEAT_ART={naked_run:'Barehands',five_banker:'Bookkeeper',no_busts:'CleanNight',
     beat_corvus:'Death&Taxes',first_blood:'FirstBlood',high_roller:'HighRoller',
@@ -11932,16 +11937,52 @@ function famLoadoutShow(){
     });
   }
   var fHtml='';
-  var _COLS=[14,32,50,68,86],_ROWY=[9,16.5,24,31.5,39];
+  var _COLS=[15,32,49,66,83],_ROWY=[8,16,24,32,40];
+  var _fits=[];
   fEarn.slice(0,24).forEach(function(f,i){
-    /* hung by hand: brickwork row stagger + jitter + tilt */
-    var _ro=(((i/5)|0)%2===0)?-2.8:2.8;
-    var jx=Math.sin(i*3.7)*4.5+_ro,jy=Math.cos(i*2.9)*1.6,jr=(Math.sin(i*5.3)*7).toFixed(1);
-    fHtml+='<img class="loFeat" src="Art/Assets/Feats/'+encodeURIComponent(f.png)+'.png" alt="" '
-      +'style="left:'+(_COLS[i%5]+jx).toFixed(1)+'%;top:'+(_ROWY[(i/5)|0]+jy).toFixed(1)+'%;'
-      +'height:'+((FSZ[f.png]||400)*FK).toFixed(2)+'%;'
-      +'--jt:translate(-50%,-50%) rotate('+jr+'deg)" '
-      +'data-nm="'+f.nm+'" data-ds="'+String(f.ds).replace(/"/g,'&quot;')+'">';
+    /* hung by hand: brickwork stagger + jitter + tilt */
+    var _ro=(((i/5)|0)%2===0)?-2.6:2.6;
+    var jx=Math.sin(i*3.7)*3.5+_ro,jy=Math.cos(i*2.9)*0.8;
+    _fits.push({f:f,row:(i/5)|0,col:i%5,
+      x:_COLS[i%5]+jx,y:_ROWY[(i/5)|0]+jy,
+      w:(FW[f.png]||300)*FK*2.0722,/* stage-width % from natural px */
+      h:(FSZ[f.png]||400)*FK,
+      rot:(Math.sin(i*5.3)*7).toFixed(1)});
+  });
+  /* per-row separation: pieces keep a real margin, never overlap */
+  var _byRow={};
+  _fits.forEach(function(it){(_byRow[it.row]=_byRow[it.row]||[]).push(it);});
+  Object.keys(_byRow).forEach(function(rk){
+    var row=_byRow[rk].sort(function(a2,b2){return a2.x-b2.x;});
+    for(var p2=0;p2<3;p2++){
+      for(var k2=0;k2<row.length-1;k2++){
+        var A=row[k2],B=row[k2+1];
+        var min=(A.w+B.w)/2+1.2,d=B.x-A.x;
+        if(d<min){var push=(min-d)/2;A.x-=push;B.x+=push;}
+      }
+      row.forEach(function(it){it.x=Math.max(4+it.w/2,Math.min(96-it.w/2,it.x));});
+    }
+  });
+  /* per-column vertical separation: tall neighbours keep a margin too */
+  var _byCol={};
+  _fits.forEach(function(it){(_byCol[it.col]=_byCol[it.col]||[]).push(it);});
+  Object.keys(_byCol).forEach(function(ck){
+    var col=_byCol[ck].sort(function(a2,b2){return a2.y-b2.y;});
+    for(var p3=0;p3<3;p3++){
+      for(var k3=0;k3<col.length-1;k3++){
+        var A=col[k3],B=col[k3+1];
+        var min=(A.h+B.h)/2+0.7,d=B.y-A.y;
+        if(d<min){var push=(min-d)/2;A.y-=push;B.y+=push;}
+      }
+      col.forEach(function(it){it.y=Math.max(4.5+it.h/2,Math.min(43-it.h/2,it.y));});
+    }
+  });
+  _fits.forEach(function(it){
+    fHtml+='<img class="loFeat" src="Art/Assets/Feats/'+encodeURIComponent(it.f.png)+'.png" alt="" '
+      +'style="left:'+it.x.toFixed(1)+'%;top:'+it.y.toFixed(1)+'%;'
+      +'height:'+((FSZ[it.f.png]||400)*FK).toFixed(2)+'%;'
+      +'--jt:translate(-50%,-50%) rotate('+it.rot+'deg)" '
+      +'data-nm="'+it.f.nm+'" data-ds="'+String(it.f.ds).replace(/"/g,'&quot;')+'">';
   });
   /* cards on the three marked table slots — placeholder 3D cards,
      visuals to come */
@@ -11961,7 +12002,7 @@ function famLoadoutShow(){
   var dHtml='';
   for(var di=0;di<6;di++){
     var mt=(S.run.dice&&S.run.dice[di])||'bone';
-    dHtml+='<span class="d3chip loDie" data-iso="1" data-mat="'+mt+'" style="left:'+DX[di]+'%"></span>';
+    dHtml+='<span class="d3chip loDie" data-iso="1" data-shadow="1" data-mat="'+mt+'" style="left:'+DX[di]+'%"></span>';
   }
   var hearts='';for(var hi=0;hi<3;hi++)hearts+='<img src="'+PT_A+(hi<(S.run.coins||0)?'heart_full':'heart_empty')+'.png" alt="">';
   ov.innerHTML=''

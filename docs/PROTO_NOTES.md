@@ -1907,3 +1907,16 @@ earlier checks read style.left instead of RENDERED rects (lesson:
 verify getBoundingClientRect, not intent). Fix: #loStage .loDie
 {position:absolute !important;left:0;display:block}. Verified
 rendered: 13.8/28/42.2/56.4/70.6/84.8, all on screen.
+
+## P117 — shelf round 3 (done)
+
+- rail dice 13.5% + engine silhouette shadow (data-shadow, per-face).
+- wall vignette extends past the screen top (covers the mirrored
+  strip; band .38 fading out by the bottom of the wall).
+- badge base row up to 58.2; debug badge order = boss order
+  (grog..ambrose, house Tankard last); real earns follow claim order.
+- feats scaled up (FK .0155), tighter columns (step 17), and a
+  two-axis separation: per-row horizontal + per-column vertical
+  passes with REAL natural-px widths/heights, min margins 1.2%/0.7%,
+  clamped to the wall band. Audited on rendered rects: 0 overlaps
+  across all 24, lowest bottom 43.2% (above the case).
