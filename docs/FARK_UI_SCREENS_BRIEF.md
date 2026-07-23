@@ -215,6 +215,36 @@ innkeep's book screen; do not rebuild one.
   A badge exists in exactly two places ever: pinned on its boss, or
   in the case. Lost = gone, nowhere.
   Scroll, note, and ribbon assets are CUT — do not produce them.
+
+CARD FACE ART MAP (name -> painted emblem; the face files are
+textless, this map is the binding source of truth for Code):
+FAMILY BACKS (shared per family, one each): jade = young sprout;
+amber = honey drop + bee; silver = shield; obsidian = fire in black
+rock; starstone = falling star in night sky; vagabond = winding road
+through hills; tavern = (uses plain brown back, no emblem).
+JADE faces: Transmute = grey stone half-turned to jade; Fool's Gold
+= coin heap, some revealed as painted pebbles; Cultivate = tended
+garden row; Bloom = great green flower.
+AMBER: Preserve = treasure sealed in amber; Honeytrap = open honey
+jar luring flies; Tar Pit = tar pool with caught boot; Slow Cook =
+lidded pot over embers, steam.
+SILVER: Ward = shield turning an arrow; Retort = struck blade
+answered by another; Reprisal = hand reclaiming coins; Insurance =
+banded strongbox, papers tied to lid.
+OBSIDIAN: Powder Keg = powder barrel, burning fuse; Double or
+Nothing = coin spinning on edge, light/shadow; Sacrifice = offering
+burning in stone bowl; Short Fuse = fuse burnt nearly out.
+STARSTONE: Encore = fallen star rising again; Stargazer = eye turned
+to a sky of stars; Ill Omen = dark bird above a doorway; Falling
+Star = star streaking over sleeping hills.
+VAGABOND: Sleight = doubled playing card, rear one ghost-faded;
+Pickpocket = hanging purse, cut strings, coin slipping; Tamper =
+die with one pip sliding out of place; Vanguard = banner on a pole
+over a road line; For Keeps = crossed dice over a stake pile.
+TAVERN: Double Stakes = two purses tied at the neck; The Tab =
+hanging chalk slate with tallies; Hair of the Dog = tankard with
+morning steam; Marked Table = knife stuck point-down; High Table =
+crown above a long table shape.
 - ROOM: tavern plate per night band (rough/mid/fine, 3), boss door
   element with pip sockets, patron tile frames by night band.
 - SHOP paintings (8): bar plate (room for 5 stands, no innkeep, no

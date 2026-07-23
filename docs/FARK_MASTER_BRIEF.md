@@ -42,14 +42,17 @@ and the motion/animation rules. Everything else below is the game.
 - Boss win: heart restored (cap 3), boss gold, SPOILS choice (section 6),
   next night. Boss loss: heart lost, boss remains, retry with whatever
   seats remain.
-- One random seat per night is the SEALED SEAT (black wax + ribbon frame,
-  visually distinct from trait seals). Its rule: the match runs under ONE
-  RANDOM TELL from the boss tell pool, symmetric, announced on the seal.
+- One random seat per night is the SEALED SEAT: its patron visibly WEARS
+  the HOUSE BADGE (The Tankard) on their tile and in their peek — that is
+  the sealed marker (no black wax, no ribbons; wax belongs to trait seals
+  only, per section 7). Its rule: the match runs under ONE RANDOM TELL
+  from the boss tell pool, symmetric, announced on the worn badge's
+  tooltip.
   Win it for 2 chalk circles and double gold; lose it and a circle is
   erased (floor 0). This REPLACES the legacy HANDICAPS system entirely
   (delete it); handicaps and tells are now one rules engine with two
   entry points, and the sealed seat teaches tells before the first boss.
-  The player's own sleeved tell may stack on top (two rules max, same
+  The player's own worn badge may stack on top (two rules max, same
   badge limit as boss fights).
 - Match format: first to target wins, OR highest total at the turn cap
   (patron 8 banked turns each, boss 10). Trailing player always gets the
@@ -99,7 +102,7 @@ card). Lucky dice are what For Keeps and grudges are about.
 ## 3. CARD FAMILIES
 
 Six families. Player holds THREE card slots (no renown gating, no slot 0)
-plus one SLEEVE slot (tells only, section 7). Cards are equipment, not a
+plus the BADGE CASE (badges, section 7). Cards are equipment, not a
 hand: all visible at the table edge, colour-chunked.
 
 Every family: one marquee active, one nerdy passive (max one numbers card
@@ -177,10 +180,13 @@ VAGABOND - cheat politely (red)
 - Tamper (active, pre-match): Break one of the opponent's cards for the
   night. (II: also usable once mid-match. III: breaking it steals 300.)
   Requires opponent cards visible at the table: build that UI.
-- Positional suite (passives, migrate from current CARDS with new
-  numbers): Vanguard: a scorer in the FIRST spot scores +200/+350/+500.
-  Anchor: same for the LAST spot. Bookends: scorers in BOTH end spots,
-  +400/+700/+1200. Marked spots glow BEFORE the roll: the player aims.
+- Vanguard (passive; COLLAPSES the old Vanguard/Anchor/Bookends trio
+  into one card whose tiers expand WHERE it applies): I: a scorer in
+  the FIRST spot scores +200. II: both END spots live, +350 each.
+  III: full bookends — when BOTH end spots score, +1200 total.
+  Marked spots glow BEFORE the roll: the player aims. Vagabond is
+  back to four draftable cards like every family; legacy Anchor/
+  Bookends cards migrate to Vanguard at the same tier.
 - For Keeps (CONSUMABLE, no tiers, drafts from night 4+ only): Play as
   you sit down: this match is for dice. Win, take one of theirs (your
   pick, including their lucky die). Lose, they take one of yours (THEIR
@@ -246,6 +252,10 @@ tavern card lets players farm around LAST ORDERS, it dies.
   title and the identity seed the 60/40 weighting grips from seat one.
   Presentation beat: three dice on the bar, colours doing the talking.
 - Every patron win: draft 1 of 3, or decline for gold (5 + night*5).
+  Offer sampling is FAMILY-FIRST: pick the family by the 60/40
+  owned/outside weighting, THEN a card within that family — never
+  uniform over the total card pool, so family sizes can never skew
+  draft rates.
   Weighting: 60% families the player owns dice or cards in, 40% outside
   (tavern cards occupy 10-15% of all offers, inside the 40%). Nights 1-2
   run 50/50 so the starter die seeds identity without locking it.
@@ -314,7 +324,7 @@ TELLS v2 (mostly as existing, changes marked):
 - FINNICK, PICKPOCKET: each roll, 30% one die is palmed for the turn.
   Clarify: palmed dice always return; never permanent.
 - CORVUS, IN ARREARS: player-side unchanged (5g per roll, win it back).
-  SLEEVED side rewritten: each of their rolls adds 5g to the pot you win.
+  BADGE-WEARING side rewritten: each of their rolls adds 5g to the pot you win.
 - BRUTUS, DRILL ORDER: three rolls a turn, hot dice roll free. Unchanged.
 - ALDRIC, CONFESSION: REWORKED. Rotating seal: one card locked at a time,
   moving each turn. (Old per-turn stacking seal is dead: it empties a
@@ -328,7 +338,8 @@ buyback: (a) his RELIC DIE, (b) his TELL (goes to the shelf), (c) his
 PURSE (gold ~ a fancy die for that tier band, sim-tuned 500-700+).
 His tell also displays on the shelf as claimed only if chosen; the die
 and purse do not grant the tell. Night 8 (Ambrose) pays out in renown:
-title jump + his die as a cosmetic trophy on the player's shelf.
+the OWN THE NIGHT feat — its wall pin is a miniature of his die.
+There is no trophy shelf; the feats wall is the only meta surface.
 
 RELIC DICE (unique, family-tagged, count for all per-family scaling;
 first-pass stats, all sim-flagged). SIDE-GRADE RULE: relics must be
@@ -349,25 +360,39 @@ purchases approach zero, relics are overtuned.
   it kept and lose an extra 200.
 - Ambrose's Weight (amber): any bank that beats your previous bank +500.
 
-## 7. THE SLEEVE (claimed tells)
+## 7. BADGES (tells made physical) — REPLACES the badge/scroll system
 
-- Claimed tells live on the shelf (loadout screen). Before any match the
-  player may sleeve exactly ONE. Optional; empty until first boss kill.
-- A sleeved tell is a SYMMETRIC house rule for the whole match: binds both
-  sides, constant, no charges, no activation. The edge is the asymmetry
-  between the rule and the two builds; sleeving is a wager on reading the
-  table.
-- Boss fights: the boss is the house. His tell binds only the player; the
-  player's sleeved tell binds both. Boss matches can run two rules.
-- UI: sleeve slot at loadout framed in boss-dark-wood (not family
-  colours); active rules show as badges on the match HUD (reuse the tell
-  badge component; two badges max).
-- Balance lever, UPDATED per run-sim findings: the auto-sleeve fear is
-  dead for every testable tell (STEEPED sleeved runs at-or-below base -
-  symmetric feeds the NPC too). The sleeve is a marginal edge plus
+- The whole mechanic in one line: a boss WEARS their tell as a badge;
+  beat them to take it; WEAR one badge into a match to invoke its rule;
+  lose a match while wearing it and the badge is GONE.
+- Badges are the only physical form of tells. There are exactly eight,
+  one per boss, worn visibly on the boss in their art and peek. The
+  sealed seat's patron wears a HOUSE BADGE (random rule from the pool,
+  pinned by the innkeep, visible on the tile and peek) — house badges
+  are never winnable; only the eight boss badges are.
+- Wearing: exactly ONE badge per match, chosen at the boss peek or
+  loadout (badge case). A worn badge is a SYMMETRIC house rule for the
+  whole match: binds both sides, constant, no charges, no activation.
+- THE WAGER (bet law compliance the old badge lacked): lose any match
+  while wearing a badge and it is lost for the run. A worn badge is
+  always a stake, never a free option. A lost badge is GONE — no
+  shelf echo, no memorial, no reclaim. Badges exist in exactly one
+  place: the badge case (and pinned on their boss until won).
+- Boss fights: the boss is the house. His worn badge binds only the
+  player; the player's worn badge binds both. Boss matches can run two
+  rules. A boss whose badge you already took fights bare (his tell is
+  gone with the badge — beating him again yields other spoils).
+- Semiotics, locked: WAX SEALS mean patron traits and nothing else.
+  BADGES mean rules — worn = in force, in the case = owned. No scrolls,
+  no notes, no ribbons, no colour codes; binding direction is stated in
+  words on the badge tooltip and by a tiny one-arrow / both-arrows
+  glyph.
+- Balance lever, UPDATED per run-sim findings: the auto-wear fear is
+  dead for every testable tell (STEEPED badge-worn runs at-or-below base -
+  symmetric feeds the NPC too). The badge is a marginal edge plus
   flavor, which is the intended shape. Watch DRILL ORDER (the one
-  consistently positive sleeve, +4-5 points) and RECKONING (untestable
-  pre-night-8 in sim, flag stays open). If a gold cost per sleeve is
+  consistently positive badge, +4-5 points) and RECKONING (untestable
+  pre-night-8 in sim, flag stays open). If a gold cost per badge is
   ever needed, those two justify it. Never convert tells to charges;
   rules stay rules.
 - Engineering note, costed: symmetric tells require the NPC bank/roll
@@ -377,29 +402,47 @@ purchases approach zero, relics are overtuned.
 - NPC banking/rolling policy must respect any active rule from either
   side (min-bank, roll caps, curses, etc.).
 
-## 8. RENOWN v2 AND FEATS
+## 8. FEATS (replaces renown/titles entirely)
 
-- Renown is an INVISIBLE counter. No panel, no perks, no power. Delete
-  the perk ladder entirely; 3 card slots and full seats are baseline.
-- Surfaces exactly two ways:
-  1. TITLES: the player's honorific climbs the same period ladder as
-     NPCs (nobody -> Goodman/Goodwife -> Master/Mistress -> Sir/Dame ->
-     a Name). NPCs address the player by current title with per-persona
-     flavour lines.
-  2. CUSTOMIZATION SHELF: thresholds unlock cosmetics only: dice skins,
-     a table mat, the player's tankard visible at their table edge,
-     warmer innkeep greetings, and boss trophies (night-8 die). Shelf
-     lives in the loadout screen.
-- FEATS remain the renown source, retuned to family stunts that advertise
-  builds (examples to implement: win a night fielding three obsidian
-  dice; win a match without banking under 800; take a relic with For
-  Keeps... no, For Keeps is patron-only: steal three lucky dice in one
-  run; win under your own sleeved RECKONING; detonate Powder Keg into a
-  triple). Old stat-grind feats migrate or die; feat completion toasts on
-  the victory overlay.
-- Migration: existing renown totals convert to title progress; players
-  with old perk unlocks lose nothing functional (slots are free now,
-  extra-seat perk retired; grant a cosmetic as compensation).
+- There is NO renown counter, NO title ladder, NO threshold
+  cosmetics, and the player's form of address never changes. NPC
+  period titles (Goodman/Master/Sir by night band) remain — they are
+  worldbuilding for patrons, not player progression.
+- FEATS are direct, visible achievements: do the thing, a small
+  pinned marker appears on the player's wall (loadout corner) with
+  the feat's name on tap. No levels, no tiers, no unlock currency.
+  Persistent across runs. A small tally (e.g. 12 / 24) is the only
+  meta-progress display in the game. There is NO trophy shelf — any
+  "trophy" moment (night-8 win) is expressed as that feat's pin.
+- Starter feat list (~24; names final, conditions playtest-tunable;
+  each advertises a build or a story):
+  FAMILY STUNTS (two per family):
+  jade: GREEN THUMB (bank a straight completed by a jade wild),
+    FULL BLOOM (Bloom fires three times in one match);
+  amber: SLOW BOILED (a single turn of six or more rolls),
+    STICKY FINGERS (win a match with Tar Pit active on the opponent
+    twice);
+  silver: TWICE SAVED (two bust-saves in one match, then win),
+    NO CLAIM (win a match holding Insurance without ever busting);
+  obsidian: POWDER MONKEY (bank a shatter's +1000),
+    THREE TORCHES (win a night fielding three obsidian dice);
+  starstone: WISH GRANTED (chain two Falling Star extra turns),
+    OMENS TRUE (win the pot on a correct Ill Omen call);
+  vagabond: FOR KEEPS (win a dice stake), BOOKKEEPER (Bookends pays
+    three times in one match);
+  TABLE STORIES (general):
+  FIRST BLOOD (first boss badge taken), HIS OWN MEDICINE (beat a
+  boss on rematch wearing the badge you took from him), CLEAN NIGHT
+  (clear a night with zero seat losses), THE LONG ROAD (win a match
+  from 2,000+ behind), DEATH AND TAXES (beat Ambrose), LAST MAN
+  SITTING (win a sudden-death turn), HIGH ROLLER (a single bank of
+  2,500+), TEETOTALLER (win a match without ever banking under 500),
+  SECOND WIND (win the night after LAST ORDERS takes a heart),
+  BARE HANDS (beat a boss with all-bone dice), THE COLLECTOR (hold
+  four badges at once), OWN THE NIGHT (win the run).
+- Design guard: feats must never grant power — the wall is the whole
+  reward. If a feat's condition encourages degenerate play in sim or
+  playtest, retire the feat, don't tune the game around it.
 
 ## 9. BALANCE SIM (extend FARK_LOOP_BRIEF P6)
 
@@ -412,7 +455,7 @@ debug-triggered). Additional acceptance work for this rewrite:
    stacking is a TRAP at 4% run wins, not a menace - low priority; the
    real risk is defense-only builds lacking any win condition)
   (Silver die + Ward + Insurance), For Keeps economy impact, every relic,
-  RECKONING sleeve dominance.
+  RECKONING badge dominance.
 - Targets: patron win rate 60-70% at intended gear, boss 45-55%, median
   match 5-7 banked turns per side inside the caps. RUN-level target:
   25-35% full-run wins for a competent build-focused player (run-sim:
@@ -443,7 +486,7 @@ debug-triggered). Additional acceptance work for this rewrite:
    NEW: his relic die and cards visible.
 5. Match: HUD (scores, target, TURN X/N, up to two rule badges), opponent
    at table edge with THEIR cards and dice visible, pot pile, player dice
-   row (v21 renderer), THREE card slots + sleeve badge, kept tray, ROLL/
+   row (v21 renderer), THREE card slots + badge badge, kept tray, ROLL/
    BANK. NEW: family actives are tappable cards; opponent active
    callouts; Ward shimmer layer; Short Fuse smolder state; Preserve amber
    casing on a die; positional glow spots; ghost dice for Stargazer.
@@ -452,7 +495,7 @@ debug-triggered). Additional acceptance work for this rewrite:
 7. Return-to-room chalking beat (stepped chalk frames).
 8. Defeat overlay: exit line, coins away, BACK TO THE ROOM.
 9. NEW SPOILS overlay (boss win): his table with three objects: relic
-   die, tell scroll, purse. Pick one, final. The centrepiece reward
+   die, the boss's BADGE, purse. Pick one, final. The centrepiece reward
    screen; make it the best-looking overlay in the game.
 10. LAST ORDERS overlay (as specced).
 11. Dice store: rotating stock, SOLD tags, family dice visually magic vs
@@ -463,9 +506,9 @@ debug-triggered). Additional acceptance work for this rewrite:
 11c. NEW Ledger strip in the Room: chalk record of debts/escrows/pawns
     that outlive consumed cards.
 12. Innkeep's Book panel (unchanged mechanics).
-13. Loadout: six dice (reorder), THREE card slots, NEW sleeve slot +
+13. Loadout: six dice (reorder), THREE card slots, NEW badge case +
     shelf (claimed tells, trophies, cosmetics), card sell, opponent-
-    aware sleeving happens here.
+    aware wearing a badge happens here.
 14. BARRED (game over): run summary, title/renown earned.
 15. Run won (night 8): celebration, trophy to shelf, summary.
 16. Settings: rival speed etc.
@@ -478,13 +521,13 @@ debug-triggered). Additional acceptance work for this rewrite:
   run silently.
 - Test checklist additions to the loop brief's list: draft weighting and
   duplicate-upgrade path; tier locks by night; spoils choice finality;
-  sleeve symmetric application both sides; boss double-rule fight;
+  badge symmetric application both sides; boss double-rule fight;
   Tamper vs Confession coexistence; For Keeps win and loss paths
   including losing a relic and the flaunt/reclaim seat; grudge trigger;
   NPC actives firing per policy table; economy pass output.
 - Build order: (1) families data + acquisition + 3-slot loadout, old
   cards migrated; (2) night/seat loop from the loop brief if not already
-  landed; (3) tells v2 + sleeve symmetric engine; (4) spoils + relics +
+  landed; (3) tells v2 + badge symmetric engine; (4) spoils + relics +
   shelf; (5) NPC families/AI policy + visible opponent cards; (6) For
   Keeps + lucky dice + grudges; (7) renown v2/titles/feats; (8) sim
   extension and economy pass; (9) juice per the addendum's motion rules.

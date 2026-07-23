@@ -2051,3 +2051,17 @@ pins cleared) — open the shelf and the FEATS OF THE NIGHT ceremony
 plays. Re-tap to re-arm and watch it again. The ceremony now also
 runs under the debug flag: the 24-feat showcase wall carries real
 unpinned state for earned ids, so the flights land properly there.
+
+## P130 — painted cards, part 1 (done)
+
+Denis delivered all 30 card faces (911x1298, family frame baked,
+textless). assets/cards/<id>.webp = 456x650 derivatives (~60KB each,
+1.7MB total; sources gitignored — Art/Assets/Cards/ stays local).
+famCardArt(id,tier,opts) is THE painted card builder (face + roman
+tier chip, tier I clean); famCardHtml wraps it with a name caption
+(draft/panel upgraded for free). VANGUARD COLLAPSE per the updated
+master brief: vanguard_f absorbs anchor_f/bookends_f (I first spot
++200 / II both ends +350 each / III both-ends 1200), _FAM_ALIAS
+redirects stale ids everywhere, _famCardsV2 migrates owned copies
+keeping the highest tier. Loadout slots wear the real cards; tap
+gives the parchment tooltip (name+tier+rule).

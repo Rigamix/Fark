@@ -802,13 +802,15 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 .loFeat:active{transform:var(--jt,translate(-50%,-50%)) scale(1.12)}
 
 .loBadge:active{transform:translate(-50%,-50%) scale(1.15)}
-.loCard{position:absolute;width:21.5%;aspect-ratio:215/260;transform:translate(-50%,-50%)}
-.loCard .edge{position:absolute;inset:0;transform:translate(2.5%,2.5%);border-radius:7%/5.5%;background:#1a1208}
-.loCard .face{position:absolute;inset:0;border-radius:7%/5.5%;background:#2c3a56;border:2px solid var(--fc,#a58a3c);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4%}
-.loCard .ic{font-size:5.4cqw;line-height:1}
-.loCard .nm{font-size:2.2cqw;color:#f0e3c6;letter-spacing:.06em;text-align:center;max-width:90%;line-height:1.2}
-.loCard .tr{font-size:2cqw;color:var(--fc,#a58a3c);letter-spacing:.2em}
+.fcv{position:relative;aspect-ratio:911/1298;filter:drop-shadow(2px 3px 0 rgba(15,9,4,.4))}
+.fcv img{width:100%;height:100%;display:block;-webkit-user-select:none;user-select:none}
+.fcv .fcvTier{position:absolute;right:5%;top:3.5%;min-width:15%;box-sizing:border-box;text-align:center;
+  font-family:'JMH Beda',serif;font-size:min(2.4cqh,14px);line-height:1.5;color:#f6ecd4;
+  background:rgba(22,13,6,.82);border:1.5px solid #a58a3c;border-radius:999px;padding:1% 4%}
+.fcv .fcvBadge{position:absolute;left:5%;top:3.5%;font-size:min(1.6cqh,10px);letter-spacing:.08em;
+  background:#ffd98a;color:#2a1808;padding:2% 5%;border-radius:3px;font-weight:bold}
+.loCard{position:absolute;width:21.5%;transform:translate(-50%,-50%);cursor:pointer}
+.loCard .fcvTier{font-size:1.9cqw}
 #loStage .loDie{position:absolute !important;left:0;top:82.6%;width:15%;aspect-ratio:1;
   transform:translate(-50%,-50%);display:block}
 #loTip{position:absolute;z-index:20;width:max-content;max-width:88%;min-width:60%;
@@ -8295,8 +8297,25 @@ function _freshRun(){
      the patron grind can't be farmed for infinite lives. */
   return{tier:0,points:0,coins:3,_coinIncomeThisTier:0,cards:[null,null,null,null],pouch:[null,null,null],dice:[..._boneDice],bossesBeaten:[],diceRerolls:1,handicapOffer:null,inGauntlet:false,gauntletIndex:0,gold:100,diceStock:null,cardTarnish:{}};
 }
+function _famCardsV2(){
+  /* vanguard collapse: owned Anchor/Bookends become Vanguard at the
+     same tier; several copies merge keeping the highest tier */
+  if(!S||!S.run)return;
+  ['fcards','finv'].forEach(function(k){
+    var a=S.run[k];if(!a||!a.length)return;
+    a.forEach(function(c){if(c&&_FAM_ALIAS[c.id])c.id=_FAM_ALIAS[c.id];});
+  });
+  var seen={},keep=[];
+  (S.run.fcards||[]).forEach(function(c){
+    if(!c)return;
+    if(seen[c.id]!==undefined){keep[seen[c.id]].tier=Math.max(keep[seen[c.id]].tier,c.tier);return;}
+    seen[c.id]=keep.length;keep.push(c);
+  });
+  if(S.run.fcards&&keep.length!==S.run.fcards.length)S.run.fcards=keep;
+}
 function _famDiceMigrate(){
   if(!S||!S.run)return;
+  try{_famCardsV2();}catch(e){}
   /* the law: exactly six dice, always — heal short arrays from older
      builds (and keep the enchant array in step) */
   if(Array.isArray(S.run.dice)&&S.run.dice.length<6){
@@ -11139,12 +11158,10 @@ var FAM_CARDS=[
  {id:'tamper',fam:'vagabond',kind:'active',name:'Tamper',charges:[1,1,1],
   text:["Break one of the opponent's cards for the night.",
         'As tier one, also usable once mid-match.','As tier two, and breaking it steals 300.']},
- {id:'vanguard_f',fam:'vagabond',kind:'passive',name:'Vanguard',p:[200,350,500],
-  text:['A scorer in the FIRST spot scores +200.','A scorer in the FIRST spot scores +350.','A scorer in the FIRST spot scores +500.']},
- {id:'anchor_f',fam:'vagabond',kind:'passive',name:'Anchor',p:[200,350,500],
-  text:['A scorer in the LAST spot scores +200.','A scorer in the LAST spot scores +350.','A scorer in the LAST spot scores +500.']},
- {id:'bookends_f',fam:'vagabond',kind:'passive',name:'Bookends',p:[400,700,1200],
-  text:['Scorers in BOTH end spots: +400.','Scorers in BOTH end spots: +700.','Scorers in BOTH end spots: +1200.']},
+ {id:'vanguard_f',fam:'vagabond',kind:'passive',name:'Vanguard',p:[200,350,1200],
+  text:['A scorer in the FIRST spot scores +200.',
+        'Both END spots live: a scorer in either scores +350.',
+        'Full bookends: end-spot scorers +350 each, and when BOTH ends score, +1200 total.']},
  {id:'for_keeps',fam:'vagabond',kind:'active',name:'For Keeps',charges:[1],unique:true,
   text:['Play as you sit down: this match is for dice. Win, take one of theirs. Lose, they take one of yours — their pick. Patron tables only.','','']},
  /* TAVERN — neutral, parchment-brown. Their domain is the RUN, never the
@@ -11160,7 +11177,9 @@ var FAM_CARDS=[
  {id:'high_table',fam:'tavern',kind:'passive',name:'High Table',
   text:['When you sit down, raise the match target by 500 for both sides. Win: the pot pays half again more, and GREEDY or BULLISH patrons pay double.','','']}
 ];
-function famDef(id){for(var i=0;i<FAM_CARDS.length;i++)if(FAM_CARDS[i].id===id)return FAM_CARDS[i];return null;}
+var _FAM_ALIAS={anchor_f:'vanguard_f',bookends_f:'vanguard_f'};/* vanguard collapse */
+function famDef(id){id=_FAM_ALIAS[id]||id;
+  for(var i=0;i<FAM_CARDS.length;i++)if(FAM_CARDS[i].id===id)return FAM_CARDS[i];return null;}
 /* implemented set — only these are offered/equipped-usable (grows per phase) */
 var FAM_LIVE={slow_cook:1,insurance:1,retort:1,reprisal:1,pickpocket:1,falling_star:1,
               encore:1,double_or_nothing:1};
@@ -11429,19 +11448,36 @@ function famOffer(forceTier1){
   return offer;
 }
 var _famOffer=[];
+/* THE painted card — one look everywhere (loadout, draft, match, peek).
+   Face art carries the family frame; tier is a roman chip (art law:
+   no baked text). assets/cards/<id>.webp = downscaled derivatives of
+   Art/Assets/Cards (sources stay out of the repo). */
+function famCardArt(id,tier,opts){
+  opts=opts||{};
+  var d=famDef(id);if(!d)return '';
+  var col=(FAMILIES[d.fam]||{}).color||'#a58a3c';
+  var showTier=d.fam!=='tavern'&&(opts.tierAlways||((tier||1)>=2));
+  return '<div class="fcv'+(opts.cls?' '+opts.cls:'')+'" data-cid="'+d.id+'"'
+    +(opts.onclick?' onclick="'+opts.onclick+'"':'')
+    +(opts.style?' style="'+opts.style+'"':'')+'>'
+    +'<img src="assets/cards/'+d.id+'.webp" alt="" draggable="false">'
+    +(showTier?'<span class="fcvTier" style="border-color:'+col+'">'+['I','II','III'][(tier||1)-1]+'</span>':'')
+    +(opts.badge?'<span class="fcvBadge">'+opts.badge+'</span>':'')
+    +'</div>';
+}
 function famCardHtml(id,tier,opts){
   opts=opts||{};
   var d=famDef(id),col=FAMILIES[d.fam].color;
+  var cap='<div style="margin-top:4px;text-align:center;font-family:\'JMH Beda\',serif;letter-spacing:.05em">'
+    +'<div style="font-size:12px;color:#f0e3c6">'+d.name.toUpperCase()
+    +(d.fam==='tavern'?'':' <span style="color:'+col+'">'+['I','II','III'][tier-1]+'</span>')+'</div>'
+    +'</div>';
   return '<div '+(opts.onclick?'onclick="'+opts.onclick+'"':'')
-    +' style="cursor:'+(opts.onclick?'pointer':'default')+';aspect-ratio:2/3;display:flex;flex-direction:column;'
-    +'background:#191919;border:2px solid '+col+';padding:7px;box-sizing:border-box;position:relative">'
-    +'<div style="font-size:12px;font-weight:bold;color:#eee;line-height:1.25">'+d.name.toUpperCase()+'</div>'
-    +'<div style="font-size:15px;color:'+col+';margin:1px 0 5px">'+(d.fam==='tavern'?'&nbsp;':['I','II','III'][tier-1])+'</div>'
-    +'<div style="width:100%;height:34px;background:'+col+'22;border:1px solid '+col+'55;'
-      +'display:flex;align-items:center;justify-content:center;font-size:9px;letter-spacing:1px;color:'+col+'">'
-      +FAMILIES[d.fam].name+' · '+(d.kind==='active'?'ACTIVE':'PASSIVE')+(d.consumable||d.id==='for_keeps'?' · BURNS':'')+'</div>'
-    +'<div style="flex:1;font-size:10px;color:#bbb;line-height:1.45;margin-top:6px;overflow:hidden">'+d.text[tier-1]+'</div>'
-    +(opts.badge?'<div style="position:absolute;top:5px;right:5px;background:#fd6;color:#210;font-size:9px;padding:1px 5px">'+opts.badge+'</div>':'')
+    +' style="cursor:'+(opts.onclick?'pointer':'default')+';position:relative">'
+    +famCardArt(id,tier,{tierAlways:true})
+    +cap
+    +(opts.badge?'<div style="position:absolute;top:-6px;right:-4px;background:#fd6;color:#210;font-size:9px;'
+      +'padding:2px 6px;border-radius:3px;font-weight:bold;z-index:2">'+opts.badge+'</div>':'')
     +(opts.footer||'')
     +'</div>';
 }
@@ -11727,9 +11763,15 @@ function famCommitBonus(selD,pts){
   if(_tempered.length){var _tb=_tempered.length*100;pts+=_tb;_famPop('+'+_tb+' TEMPERED');}
   var first=G.pool[0],last=G.pool[G.pool.length-1];
   var hitFirst=first&&selD.indexOf(first)>=0,hitLast=last&&selD.indexOf(last)>=0;
-  if((inst=famInst('vanguard_f'))&&hitFirst){var P1=famDef('vanguard_f').p[inst.tier-1];pts+=P1;_famPop('+'+P1+' VANGUARD');}
-  if((inst=famInst('anchor_f'))&&hitLast){var P2=famDef('anchor_f').p[inst.tier-1];pts+=P2;_famPop('+'+P2+' ANCHOR');}
-  if((inst=famInst('bookends_f'))&&hitFirst&&hitLast){var P3=famDef('bookends_f').p[inst.tier-1];pts+=P3;_famPop('+'+P3+' BOOKENDS');}
+  if((inst=famInst('vanguard_f'))){
+    /* collapsed positional card: I first spot; II both ends; III adds
+       the full-bookends payoff when both ends score */
+    var vb=0,t=inst.tier;
+    if(t===1){if(hitFirst)vb=200;}
+    else if(t===2){if(hitFirst)vb+=350;if(hitLast)vb+=350;}
+    else{if(hitFirst&&hitLast)vb=1200;else if(hitFirst||hitLast)vb=350;}
+    if(vb>0){pts+=vb;_famPop('+'+vb+' VANGUARD');}
+  }
   /* relic commit effects */
   var _palm=G.pool.filter(function(d){return d.mat==='finnicks_palm';})[0];
   if(_palm){
@@ -12093,18 +12135,13 @@ function famLoadoutShow(){
       +'--jt:translate(-50%,-50%) rotate('+it.rot+'deg)" '
       +'data-nm="'+it.f.nm+'" data-ds="'+String(it.f.ds).replace(/"/g,'&quot;')+'">';
   });
-  /* cards on the three marked table slots — placeholder 3D cards,
-     visuals to come */
+  /* the three marked table slots wear the painted cards */
   var SLOTS=[[19.6,71.5],[50.5,71.5],[78.5,71.5]];
   var cHtml='';
   S.run.fcards.slice(0,3).forEach(function(c,i){
-    var d=famDef(c.id)||{name:c.id,icon:'',fam:null};
-    var col=(d.fam&&FAMILIES[d.fam]&&FAMILIES[d.fam].color)||'#a58a3c';
-    cHtml+='<div class="loCard" style="left:'+SLOTS[i][0]+'%;top:'+SLOTS[i][1]+'%;--fc:'+col+'">'
-      +'<div class="edge"></div><div class="face"><span class="ic">'+(d.icon||'')+'</span>'
-      +'<span class="nm">'+d.name+'</span>'
-      +((c.tier||1)>1?'<span class="tr">'+new Array((c.tier||1)+1).join('I')+'</span>':'')
-      +'</div></div>';
+    var d=famDef(c.id);if(!d)return;
+    cHtml+=famCardArt(c.id,c.tier||1,{cls:'loCard',
+      style:'left:'+SLOTS[i][0]+'%;top:'+SLOTS[i][1]+'%'});
   });
   /* your six over the painted rail (the box art empties later) */
   var DX=[13.8,28.0,42.2,56.4,70.6,84.8];
@@ -12129,7 +12166,14 @@ function famLoadoutShow(){
   document.getElementById('loBack').onclick=function(){try{SFX.nav();}catch(e){}ov.remove();};
   ov.addEventListener('pointerdown',function(ev){
     var bd=ev.target.closest?ev.target.closest('.loBadge,.loFeat'):null;
+    var cd=!bd&&ev.target.closest?ev.target.closest('.loCard'):null;
     if(bd)_loTip(bd,bd.getAttribute('data-nm'),bd.getAttribute('data-ds'));
+    else if(cd){
+      var cdd=famDef(cd.getAttribute('data-cid'));
+      var own=(S.run.fcards||[]).filter(function(c){return famDef(c.id)===cdd;})[0];
+      var t=(own&&own.tier)||1;
+      if(cdd)_loTip(cd,cdd.name+(cdd.fam==='tavern'?'':' '+['I','II','III'][t-1]),cdd.text[t-1]);
+    }
     else if(!(ev.target.closest&&ev.target.closest('#loTip')))_loTipHide();
   });
   /* pin ceremony for feats earned but never pinned (debug wall included:
