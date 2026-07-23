@@ -2065,3 +2065,32 @@ master brief: vanguard_f absorbs anchor_f/bookends_f (I first spot
 redirects stale ids everywhere, _famCardsV2 migrates owned copies
 keeping the highest tier. Loadout slots wear the real cards; tap
 gives the parchment tooltip (name+tier+rule).
+
+## P131-P133 - painted cards everywhere + brief-v3 draft (done)
+
+P131 draft: famOffer goes FAMILY-FIRST (pick the family by the 60/40
+owned/outside weighting - dice and relics count as ownership via
+famOwnedFams/_RELIC_FAM - then a card inside it; nights 1-2 50/50;
+tavern ~12% of all offers). Offer tiles are painted; tapping one
+opens famCardSheet (big painted card + rule + CLAIM). Slots full ->
+_famReplacePick: painted replace picker, traded card gone, no
+refund; cancellable before the tap. Satchel (finv) retired: the
+migration equips into empty slots and sells the rest at 15g.
+
+P132 match edges: player's three painted cards centred above the
+buttons (spent = desaturated, Confession seal = dark veil, armed =
+gold glow; tap -> sheet with uses-left + PLAY through famUse's
+gating). Opponent cards are face-down CSS backs top-right (dark
+parchment + family border + diamond motif - painted backs pending
+art): telegraph = rise + red glow, Tamper-broken = grey + cross,
+tap -> info sheet. Quicksilver/sleeve chips live in a small aux
+stack bottom-left. The old #famRow monospace column is gone.
+
+P133 peek: patron peek shows their painted cards (tap -> full
+sheet). Boss peek unchanged - his hand is rolled at match start,
+nothing to preview yet.
+
+Gotcha relearned the hard way: bash heredocs eat backslashes even
+with a quoted delimiter on this setup - the P133 first attempt broke
+the parse gate; repaired via a Write-tool .py using &quot; entities
+instead of escaped quotes in onclick attributes.
