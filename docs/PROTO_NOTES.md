@@ -1928,3 +1928,11 @@ Badge scale up (BK .0136) with a per-badge multiplier map — the ale
 mug (smallest art) gets 1.28x so it holds its own (5.47% vs boot
 5.82%); all badges stay inside the base felt (max bottom 61.1%).
 Rail dice up to 15% wide and raised to 82.6%.
+
+
+## P118b — grounded die shadows + softer vignette (done)
+
+The engine dieShadow offsets were rim-like (dx .05 / dy .11): now
+dx .04 / dy .22, alpha .5 — the silhouette sits clearly UNDER the
+cube (verified on visible faces: 1.1px/6.2px at rail size). Wall
+vignette halved (.38 -> .19).
