@@ -762,17 +762,39 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
   transform:translate(-50%,-50%) rotate(var(--r,0deg));
   font-family:'JMH Beda',serif;font-size:3.9cqw;color:#f0e3c6;letter-spacing:.07em;line-height:1}
 .stPrice.dim{color:#4a3020}
-#stHud{position:absolute;inset:0;pointer-events:none;z-index:6}
+#stHud,#loHud{position:absolute;inset:0;pointer-events:none;z-index:6}
 /* IDENTICAL to the room HUD (#ptHearts/#ptGold) — one look everywhere */
-#stHud .hs{position:absolute;left:3.6%;top:max(1.8%,env(safe-area-inset-top));
+#stHud .hs,#loHud .hs{position:absolute;left:3.6%;top:max(1.8%,env(safe-area-inset-top));
   display:flex;gap:3.5%;width:27%}
-#stHud .hs img{width:30%}
-#stHud .gd{position:absolute;right:3.2%;top:max(1.8%,env(safe-area-inset-top));width:27.5%}
-#stHud .gd .pl{width:100%;display:block}
-#stHud .gd .co{position:absolute;left:6%;top:50%;width:18%;transform:translateY(-50%)}
-#stHud .gd span{position:absolute;left:26%;right:8%;top:0;bottom:0;display:flex;align-items:center;justify-content:center;
+#stHud .hs img,#loHud .hs img{width:30%}
+#stHud .gd,#loHud .gd{position:absolute;right:3.2%;top:max(1.8%,env(safe-area-inset-top));width:27.5%}
+#stHud .gd .pl,#loHud .gd .pl{width:100%;display:block}
+#stHud .gd .co,#loHud .gd .co{position:absolute;left:6%;top:50%;width:18%;transform:translateY(-50%)}
+#stHud .gd span,#loHud .gd span{position:absolute;left:26%;right:8%;top:0;bottom:0;display:flex;align-items:center;justify-content:center;
   font-family:var(--bodyFont,'JMH Beda'),serif;font-size:2.8cqh;color:#f3dfa6;letter-spacing:1px;
   text-shadow:0 2px 3px rgba(0,0,0,.7)}
+/* ═══ SHELF / LOADOUT (FARK_UI_SCREENS_BRIEF 3.10, painted pass 1) ═══ */
+#gbLoadout{position:fixed;inset:0;z-index:9400;overflow:hidden;background:#120b06;container-type:size;
+  font-family:'JMH Beda',serif}
+#loBgCover{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+#loStage{position:absolute;left:50%;top:auto;bottom:0;transform:translateX(-50%);
+  width:min(100cqw,56.25cqh);height:min(177.78cqw,100cqh)}
+#loStage .bg{position:absolute;inset:0;width:100%;height:100%}
+.loBadge{position:absolute;height:4.6%;transform:translate(-50%,-50%);cursor:pointer;transition:transform .12s}
+.loBadge:active{transform:translate(-50%,-50%) scale(1.15)}
+.loCard{position:absolute;width:21%;aspect-ratio:245/315;transform:translate(-50%,-50%)}
+.loCard .edge{position:absolute;inset:0;transform:translate(2.5%,2.5%);border-radius:7%/5.5%;background:#1a1208}
+.loCard .face{position:absolute;inset:0;border-radius:7%/5.5%;background:#2c3a56;border:2px solid var(--fc,#a58a3c);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4%}
+.loCard .ic{font-size:5.4cqw;line-height:1}
+.loCard .nm{font-size:2.2cqw;color:#f0e3c6;letter-spacing:.06em;text-align:center;max-width:90%;line-height:1.2}
+.loCard .tr{font-size:2cqw;color:var(--fc,#a58a3c);letter-spacing:.2em}
+.loDie{position:absolute;top:81%;width:12%;aspect-ratio:1;transform:translate(-50%,-50%)}
+#loTip{position:absolute;z-index:20;max-width:64%;background:#1d1509;border:2px solid #a58a3c;border-radius:8px;
+  padding:1.2cqh 1.6cqh;opacity:0;pointer-events:none;transition:opacity .18s;color:#f0e3c6}
+#loTip.on{opacity:1}
+#loTip b{display:block;font-size:2.2cqh;color:#ffd98a;letter-spacing:.06em;margin-bottom:.4cqh}
+#loTip span{display:block;font-size:1.8cqh;line-height:1.4}
 .stNavBtn{position:absolute;bottom:calc(env(safe-area-inset-bottom,0px) + 1.4cqh);width:29%;
   z-index:6;cursor:pointer;transition:transform .1s,opacity .3s}
 .stNavBtn.icon{width:13.5%}
@@ -11820,94 +11842,95 @@ FAM_LIVE.cultivate=1;/* P2: jade dice exist */
 FAM_LIVE.tamper=1;/* P5: opponent cards visible */
 /* ── PROTO greybox loadout: six dice, reorder + swap ── */
 function famLoadoutShow(){
-  _getS();S.run.diceInv=S.run.diceInv||[];S.run.fcards=S.run.fcards||[];S.run.finv=S.run.finv||[];_enchInit();_gbSheetInfra();
+  _getS();S.run.fcards=S.run.fcards||[];_enchInit();_gbSheetInfra();
   var old=document.getElementById('gbLoadout');if(old)old.remove();
   var ov=document.createElement('div');ov.id='gbLoadout';
-  ov.style.cssText='position:fixed;inset:0;background:#4a4a4a;z-index:9400;overflow:auto;color:#1c1c1c;'
-    +"font-family:'JMH Beda',serif";
-  var hearts='';for(var i=0;i<3;i++)hearts+='<span class="gbx-heart'+(i<(S.run.coins||0)?'':' lost')+'"></span>';
-  var h='<div class="gbx" style="min-height:100%;display:flex;flex-direction:column;padding:10px 14px 14px">'
-    +'<div style="display:flex;justify-content:space-between;align-items:center;height:44px">'
-    +'<span>'+hearts+'</span><div class="gbx-goldchip">'+(S.run.gold||0)+'g</div></div>';
-  /* SHELF — view-only lives up top */
-  h+='<h2 style="font-size:12px;opacity:.75;margin:8px 0 4px">SHELF — keepsakes (renown '+(S.renown||0)+' · '+playerTitle()+')</h2>'
-    +'<div style="display:flex;gap:6px;flex-wrap:wrap">';
-  (S.trophies||[]).forEach(function(t){h+='<div class="gbx-box sub" style="width:60px;height:60px">🏆<br><span class="gbx-label" style="font-size:8px">'+getDie(t).name+'</span></div>';});
-  var _shelf=[[60,'dice skin'],[160,'table mat'],[320,'your tankard'],[550,'warm greetings'],[900,'trophy stand']];
-  _shelf.forEach(function(it){var got=(S.renown||0)>=it[0];
-    h+='<div class="gbx-box sub" style="height:32px;padding:0 8px;font-size:10px'+(got?'':';opacity:.45')+'">'+(got?'✓ ':'🔒 ')+it[1]+'</div>';});
-  (S.run.luckyNames||[]).forEach(function(nm){h+='<div class="gbx-box sub" style="height:32px;padding:0 8px;font-size:10px;border:1px solid #a58a3c">✦ '+nm+'</div>';});
-  h+='</div><div style="flex:1;min-height:12px"></div>';
-  /* SLEEVE */
-  h+='<h2 style="font-size:12px;opacity:.75;margin:8px 0 4px">SLEEVE — one claimed tell, a rule for the whole table (also equippable at the boss peek)</h2>'
-    +'<div style="display:flex;gap:6px;flex-wrap:wrap">';
-  if(!(S.run.tells||[]).length)h+='<div class="gbx-box sub" style="height:40px;padding:0 10px;font-size:11px">no tells claimed yet — boss spoils</div>';
-  else{
-    h+='<div class="gbx-box sub" style="min-width:70px;height:44px;font-size:11px;cursor:pointer'+(!S.run.sleeve?';border:2px solid #a58a3c':'')+'" onclick="famSleeveSet(null);famLoadoutShow()">— none —</div>';
-    S.run.tells.forEach(function(id){var t=_tellById(id);if(!t)return;
-      h+='<div class="gbx-box sub" style="min-width:90px;height:44px;font-size:11px;cursor:pointer'
-        +(S.run.sleeve===id?';border:2px solid #a58a3c':'')+'" onclick="famSleeveSet(\''+id+'\');famLoadoutShow()" title="'+t.desc.replace(/"/g,'&quot;')+'">'+t.icon+' '+t.name+'</div>';});
+  var BG='Art/Assets/Shelf/shelf_bg.png';
+  /* badge case: claimed tells wear their boss's brooch (debug flag
+     lays out all nine while the system grows into badges proper) */
+  var BADGE={grog:'TheBoot',finnick:'ThePalm',mabel:'TheKettle',brutus:'TheDentedHelm',
+    corvus:'TheTippedScales',whisper:'TheSerpent',aldric:'TheAntlerCrown',ambrose:'TheChalice',
+    house:'TheTankard'};
+  var owned=[];
+  var _tRungs=RUNGS.filter(function(r){return r.tell;});
+  (S.run.tells||[]).forEach(function(id){
+    for(var i=0;i<_tRungs.length;i++){
+      if(_tRungs[i].tell.id===id){
+        /* tell i belongs to tier i's boss \u2014 his brooch */
+        var bk=(TIERS[i]&&TIERS[i].boss&&String(TIERS[i].boss.name||'').toLowerCase())||null;
+        if(bk&&BADGE[bk])owned.push({png:BADGE[bk],
+          name:BADGE[bk].replace(/([A-Z])/g,' $1').trim(),
+          desc:_tRungs[i].tell.name+' \u2014 '+_tRungs[i].tell.desc});
+        break;
+      }
+    }
+  });
+  if(!owned.length&&window._fkDbgOn){
+    Object.keys(BADGE).forEach(function(bk){
+      owned.push({png:BADGE[bk],name:BADGE[bk].replace(/([A-Z])/g,' $1').trim(),
+        desc:'badge art preview \u2014 '+bk});
+    });
   }
-  h+='</div>';
-  /* CARDS — 3 slots + satchel */
-  h+='<h2 style="font-size:12px;opacity:.75;margin:10px 0 4px">CARDS — three slots · sell to the innkeep for 15g</h2>'
-    +'<div style="display:flex;gap:6px;flex-wrap:wrap">';
-  S.run.fcards.forEach(function(c,i){
-    var d=famDef(c.id);if(!d)return;
-    var col=(FAMILIES[d.fam]||{}).color||'#777';
-    h+='<div class="gbx-box" style="width:104px;height:130px;padding:5px;font-size:11px;border-top:4px solid '+col+'">'
-      +d.name.toUpperCase()+' '+(d.fam==='tavern'?'':['I','II','III'][(c.tier||1)-1])
-      +'<div class="gbx-label" style="font-size:8px;line-height:1.3;overflow:hidden;max-height:44px">'+d.text[(c.tier||1)-1]+'</div>'
-      +'<div style="display:flex;gap:3px;margin-top:4px;width:100%">'
-      +'<span class="gbx-box sub" style="flex:1;height:22px;font-size:9px;cursor:pointer" onclick="famPanelMove(\'eq\','+i+')">stash</span>'
-      +'<span class="gbx-box sub" style="flex:1;height:22px;font-size:9px;cursor:pointer;border:1px solid #8a2d2d" onclick="famPanelSell(\'eq\','+i+')">sell</span>'
+  var bHtml='';
+  owned.slice(0,9).forEach(function(bd,i){
+    var n=Math.min(owned.length,9);
+    var x=(n===1)?50:(14+(86-14)*i/(n-1));
+    bHtml+='<img class="loBadge" src="Art/Assets/Badges/'+bd.png+'.png" alt="" '
+      +'style="left:'+x.toFixed(1)+'%;top:53.6%" '
+      +'data-nm="'+bd.name+'" data-ds="'+String(bd.desc).replace(/"/g,'&quot;')+'">';
+  });
+  /* cards on the three marked table slots — placeholder 3D cards,
+     visuals to come */
+  var SLOTS=[[18.4,67.1],[50.2,66.9],[77.1,67.1]];
+  var cHtml='';
+  S.run.fcards.slice(0,3).forEach(function(c,i){
+    var d=famDef(c.id)||{name:c.id,icon:'',fam:null};
+    var col=(d.fam&&FAMILIES[d.fam]&&FAMILIES[d.fam].color)||'#a58a3c';
+    cHtml+='<div class="loCard" style="left:'+SLOTS[i][0]+'%;top:'+SLOTS[i][1]+'%;--fc:'+col+'">'
+      +'<div class="edge"></div><div class="face"><span class="ic">'+(d.icon||'')+'</span>'
+      +'<span class="nm">'+d.name+'</span>'
+      +((c.tier||1)>1?'<span class="tr">'+new Array((c.tier||1)+1).join('I')+'</span>':'')
       +'</div></div>';
   });
-  for(var e2=S.run.fcards.length;e2<3;e2++)h+='<div class="gbx-box sub" style="width:104px;height:130px">empty</div>';
-  h+='</div>';
-  if(S.run.finv.length){
-    h+='<h2 style="font-size:12px;opacity:.75;margin:8px 0 4px">satchel — tap to equip</h2><div style="display:flex;gap:6px;flex-wrap:wrap">';
-    S.run.finv.forEach(function(c,i){
-      var d=famDef(c.id);if(!d)return;
-      var col=(FAMILIES[d.fam]||{}).color||'#777';
-      h+='<div class="gbx-box sub" style="width:88px;height:64px;font-size:10px;cursor:pointer;border-top:3px solid '+col+'" onclick="famPanelMove(\'inv\','+i+')">'
-        +d.name.toUpperCase()+' '+(d.fam==='tavern'?'':['I','II','III'][(c.tier||1)-1])+'</div>';
-    });
-    h+='</div>';
-  }
-  /* DICE — most interactive sits lowest */
-  h+='<h2 style="font-size:12px;opacity:.75;margin:10px 0 4px">YOUR DICE — reorder: first and last spots feed Vagabond cards</h2>'
-    +'<div style="display:flex;gap:5px">';
-  (S.run.dice||[]).forEach(function(mt,i){
-    var col=(FAMILIES[(getDie(mt)||{}).fam]||{}).color||'#777';
-    var en=(S.run.dieEnch||[])[i];
-    h+='<div style="flex:1;text-align:center">'
-      +'<div class="gbx-box" style="height:74px;font-size:9px;border-bottom:4px solid '+col+'"><span class="d3chip" data-mat="'+mt+'" style="width:30px;height:30px;margin-bottom:2px"></span>'+getDie(mt).name
-      +(en?'<span class="gbx-label" style="font-size:8px">✦ '+ENCHANTS[en.t].name+'</span>':'')+'</div>'
-      +'<div style="display:flex;gap:2px;margin-top:3px">'
-      +'<span class="gbx-box sub" style="flex:1;height:22px;font-size:11px;cursor:pointer" onclick="famDieShift('+i+',-1)">◀</span>'
-      +'<span class="gbx-box sub" style="flex:1;height:22px;font-size:11px;cursor:pointer" onclick="famDieShift('+i+',1)">▶</span></div>'
-      +'<span class="gbx-box sub" style="display:block;height:20px;font-size:9px;cursor:pointer;margin-top:3px" onclick="famDieStash('+i+')">stash</span>'
-      +'</div>';
+  /* your six over the painted rail (the box art empties later) */
+  var DX=[14.7,28.0,41.8,55.6,70.7,84.4];
+  var dHtml='';
+  (S.run.dice||[]).slice(0,6).forEach(function(mt,i){
+    dHtml+='<span class="d3chip loDie" data-iso="1" data-mat="'+mt+'" style="left:'+DX[i]+'%"></span>';
   });
-  h+='</div>';
-  if(S.run.diceInv.length){
-    h+='<h2 style="font-size:12px;opacity:.75;margin:8px 0 4px">satchel — tap to swap in</h2><div style="display:flex;gap:5px;flex-wrap:wrap">';
-    S.run.diceInv.forEach(function(mt,i){
-      var col=(FAMILIES[(getDie(mt)||{}).fam]||{}).color||'#777';
-      var en=(S.run.dieEnchInv||[])[i];
-      h+='<div class="gbx-box sub" style="width:56px;height:64px;font-size:9px;cursor:pointer;border-bottom:3px solid '+col+'" onclick="famDieEquip('+i+')"><span class="d3chip" data-mat="'+mt+'" style="width:24px;height:24px"></span>'+getDie(mt).name
-        +(en?'<span class="gbx-label" style="font-size:8px">✦</span>':'')+'</div>';
-    });
-    h+='</div>';
-  }
-  h+='<div style="display:flex;gap:8px;padding-top:12px">'
-    +'<div class="gbx-btn" style="height:52px;flex:1" onclick="document.getElementById(\'gbLoadout\').remove();showScreen(\'gauntlet\')">back to room</div></div>'
-    +'</div>';
-  ov.innerHTML=h;
+  var hearts='';for(var hi=0;hi<3;hi++)hearts+='<img src="'+PT_A+(hi<(S.run.coins||0)?'heart_full':'heart_empty')+'.png" alt="">';
+  ov.innerHTML=''
+    +'<img id="loBgCover" src="'+BG+'" alt="">'
+    +'<div id="loStage">'
+      +'<img class="bg" src="'+BG+'" alt="">'
+      +bHtml+cHtml+dHtml
+    +'</div>'
+    +'<div id="loHud"><div class="hs">'+hearts+'</div>'
+      +'<div class="gd"><img class="pl" src="'+PT_A+'plate_goldCounter.png" alt="">'
+      +'<img class="co" src="Art/Assets/Icons/coin.png" alt=""><span>'+(S.run.gold||0)+'</span></div></div>'
+    +'<div class="stNavBtn L icon" id="loBack"><img src="Art/Assets/Icons/back.png" alt="back"></div>'
+    +'<div id="loTip"></div>';
   document.body.appendChild(ov);
-  _d3ChipScan(ov);
+  document.getElementById('loBack').onclick=function(){try{SFX.nav();}catch(e){}ov.remove();};
+  ov.addEventListener('pointerdown',function(ev){
+    var bd=ev.target.closest?ev.target.closest('.loBadge'):null;
+    if(bd)_loTip(bd,bd.getAttribute('data-nm'),bd.getAttribute('data-ds'));
+    else if(!(ev.target.closest&&ev.target.closest('#loTip')))_loTipHide();
+  });
+  if(typeof _d3ChipScan==='function')_d3ChipScan(ov);
 }
+/* small anchored tooltip: name + one-liner, tap-away dismiss */
+function _loTip(el,name,desc){
+  var tip=document.getElementById('loTip'),ov=document.getElementById('gbLoadout');
+  if(!tip||!ov)return;
+  tip.innerHTML='<b>'+name+'</b>'+(desc?'<span>'+desc+'</span>':'');
+  tip.classList.add('on');
+  var r=el.getBoundingClientRect(),o=ov.getBoundingClientRect();
+  var x=r.left+r.width/2-o.left,y=r.bottom-o.top+8;
+  tip.style.left=Math.max(6,Math.min(o.width-6-tip.offsetWidth,x-tip.offsetWidth/2))+'px';
+  tip.style.top=Math.min(o.height-tip.offsetHeight-6,y)+'px';
+}
+function _loTipHide(){var tip=document.getElementById('loTip');if(tip)tip.classList.remove('on');}
 function _gbRenderSleeve(){
   var host=document.getElementById('gbSleeveZone');if(!host)return;
   _getS();S.run.tells=S.run.tells||[];

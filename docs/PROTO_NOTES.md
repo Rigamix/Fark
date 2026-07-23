@@ -1798,3 +1798,22 @@ New revision of FARK_UI_SCREENS_BRIEF.md filed. Delta vs previous:
 - Assets: trophy sprites cut; instead feat pin markers (one generic
   pin + per-feat mini-emblems, batchable).
 Not acted on yet — lands with the loadout/badge-case rework.
+
+## P110 — painted SHELF/LOADOUT pass 1 (done)
+
+famLoadoutShow rebuilt on Art/Assets/Shelf/shelf_bg.png (2160x3840,
+store stage pattern: cover backdrop + width-fit bottom-anchored 9:16
+stage, coords in art %). The greybox loadout (satchel/stash/sell +
+trophy shelf) is retired per the brief.
+- BADGES in the wooden case: claimed tells wear their tier-boss's
+  brooch (mapped by boss NAME — TIERS[i].boss.key is the class name
+  like 'drunkard', names are GROG/MABEL/...), spread across the blue
+  felt base (y 53.6%). Tap -> anchored tooltip (#loTip: badge name +
+  rule one-liner), tap-away dismiss. Debug flag lays out all nine.
+- CARDS: equipped fcards as placeholder 3D cards (face + offset dark
+  edge, family-colour trim, icon+name+tier pips) centred on the three
+  marked slots (18.4/50.2/77.1 x 67%). Visual pass later.
+- DICE: your six as iso chips over the painted rail (x 14.7..84.4,
+  y 81%, 12% wide). Box art will be emptied later.
+- unified HUD (shared CSS with #stHud) + back arrow. Feats wall wired
+  when Denis's pin art lands.
