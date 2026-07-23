@@ -2094,3 +2094,11 @@ Gotcha relearned the hard way: bash heredocs eat backslashes even
 with a quoted delimiter on this setup - the P133 first attempt broke
 the parse gate; repaired via a Write-tool .py using &quot; entities
 instead of escaped quotes in onclick attributes.
+
+## P134 - patron panel wears their painted cards (done)
+
+The room's character panel (#ptPanel) no longer shows blank cream
+count-markers in #ptvFan: the patron's actual cards render as
+painted minis (11.5% wide, same fan rotation math, tier chips),
+tappable -> famCardSheet. When the seat is sealed and a fan is
+present, the tell text drops to 59% so they never collide.
