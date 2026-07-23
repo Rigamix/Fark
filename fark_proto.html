@@ -799,11 +799,12 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 .loCard .tr{font-size:2cqw;color:var(--fc,#a58a3c);letter-spacing:.2em}
 #loStage .loDie{position:absolute !important;left:0;top:82.6%;width:15%;aspect-ratio:1;
   transform:translate(-50%,-50%);display:block}
-#loTip{position:absolute;z-index:20;max-width:64%;background:#1d1509;border:2px solid #a58a3c;border-radius:8px;
-  padding:1.2cqh 1.6cqh;opacity:0;pointer-events:none;transition:opacity .18s;color:#f0e3c6}
+#loTip{position:absolute;z-index:20;max-width:72%;min-width:38%;
+  background:url('Art/Assets/Icons/tooltip_box.png');background-size:100% 100%;
+  padding:2cqh 2.6cqh;opacity:0;pointer-events:none;transition:opacity .18s;color:#3a2812;text-align:center}
 #loTip.on{opacity:1}
-#loTip b{display:block;font-size:2.2cqh;color:#ffd98a;letter-spacing:.06em;margin-bottom:.4cqh}
-#loTip span{display:block;font-size:1.8cqh;line-height:1.4}
+#loTip b{display:block;font-size:2.2cqh;color:#8a4a18;letter-spacing:.08em;margin-bottom:.4cqh}
+#loTip span{display:block;font-size:1.75cqh;line-height:1.4}
 .stNavBtn{position:absolute;bottom:calc(env(safe-area-inset-bottom,0px) + 1.4cqh);width:29%;
   z-index:6;cursor:pointer;transition:transform .1s,opacity .3s}
 .stNavBtn.icon{width:13.5%}
@@ -11888,14 +11889,21 @@ function famLoadoutShow(){
     TheCollector:152,ThreeTorches:279,TwiceSaved:311,WishGranted:255};
   var owned=[];
   var _tRungs=RUNGS.filter(function(r){return r.tell;});
+  /* every brooch names its boss and quotes his table rule */
+  var _bInfo={};
+  ['grog','mabel','finnick','corvus','brutus','aldric','whisper','ambrose'].forEach(function(bk,i){
+    var t=_tRungs[i]&&_tRungs[i].tell;
+    _bInfo[BADGE[bk]]={nm:BADGE[bk].replace(/([A-Z])/g,' $1').trim(),
+      ds:bk.charAt(0).toUpperCase()+bk.slice(1)+"'s badge"+(t?' \u00b7 '+t.name+' \u2014 '+t.desc:'')};
+  });
+  _bInfo[BADGE.house]={nm:'The Tankard',
+    ds:'The house badge \u00b7 a patron wearing it plays a SEALED match \u2014 two wins on the line, or one crossed off.'};
   (S.run.tells||[]).forEach(function(id){
     for(var i=0;i<_tRungs.length;i++){
       if(_tRungs[i].tell.id===id){
-        /* tell i belongs to tier i's boss \u2014 his brooch */
         var bk=(TIERS[i]&&TIERS[i].boss&&String(TIERS[i].boss.name||'').toLowerCase())||null;
-        if(bk&&BADGE[bk])owned.push({png:BADGE[bk],
-          name:BADGE[bk].replace(/([A-Z])/g,' $1').trim(),
-          desc:_tRungs[i].tell.name+' \u2014 '+_tRungs[i].tell.desc});
+        var bi=bk&&BADGE[bk]&&_bInfo[BADGE[bk]];
+        if(bi)owned.push({png:BADGE[bk],name:bi.nm,desc:bi.ds});
         break;
       }
     }
@@ -11903,8 +11911,8 @@ function famLoadoutShow(){
   if(window._fkDbgOn){
     owned=[];
     ['grog','mabel','finnick','corvus','brutus','aldric','whisper','ambrose','house'].forEach(function(bk){
-      owned.push({png:BADGE[bk],name:BADGE[bk].replace(/([A-Z])/g,' $1').trim(),
-        desc:'badge art preview \u2014 '+bk});
+      var bi=_bInfo[BADGE[bk]];
+      owned.push({png:BADGE[bk],name:bi.nm,desc:bi.ds});
     });
   }
   var bHtml='';
@@ -11926,6 +11934,26 @@ function famLoadoutShow(){
     survivor:'LastManSitting',persistent:'LongRoad',comeback:'SecondWind',
     beat_grog:'Teetotaller',card_collector:'TheCollector',hot_storm:'ThreeTorches'};
   var _fd={};FEATS.forEach(function(f){_fd[f.id]=f;});
+  /* authored texts for images whose feats are not coded yet */
+  var FTEXT={
+    ForKeeps:['For Keeps','Win a for-keeps match and pocket their die.'],
+    FullBloom:['Full Bloom','Sit down with six family dice \u2014 not a bone among them.'],
+    GreenThumb:['Green Thumb','Grow a triple out of Jade wilds.'],
+    HisOwnMedecine:['His Own Medicine','Beat a boss with his own rule on the table.'],
+    NoClaim:['No Claim','Decline a victory draft and take the gold instead.'],
+    OmensTrue:['Omens True','Call the omen and watch it land.'],
+    OwnTheNight:['Own the Night','Clear every seat in a single night.'],
+    PowderMonkey:['Powder Monkey','Fire the flintlock three times in one match.'],
+    SlowBoiled:['Slow Boiled','Win a match that runs all the way to the cap.'],
+    StickyFingers:['Sticky Fingers','Lift gold from the same patron three times.'],
+    TwiceSaved:['Twice Saved','Cheat two busts in a single match.'],
+    WishGranted:['Wish Granted','Bank the exact target score.']};
+  var _artFeat={};Object.keys(FEAT_ART).forEach(function(id){_artFeat[FEAT_ART[id]]=id;});
+  var _ftext=function(n){
+    if(FTEXT[n])return{nm:FTEXT[n][0],ds:FTEXT[n][1]};
+    var id=_artFeat[n],f=id&&_fd[id];
+    return{nm:(f&&f.label)||n.replace(/([A-Z])/g,' $1').trim(),ds:(f&&f.desc)||''};
+  };
   var fEarn=[];
   Object.keys(S.featsDone||{}).forEach(function(id){
     if(FEAT_ART[id])fEarn.push({png:FEAT_ART[id],nm:(_fd[id]||{}).label||id,ds:(_fd[id]||{}).desc||''});
@@ -11936,7 +11964,8 @@ function famLoadoutShow(){
      'GreenThumb','HighRoller','HisOwnMedecine','LastManSitting','LongRoad','NoClaim','OmensTrue',
      'OwnTheNight','PowderMonkey','SecondWind','SlowBoiled','StickyFingers','Teetotaller',
      'TheCollector','ThreeTorches','TwiceSaved','WishGranted'].forEach(function(n){
-      fEarn.push({png:n,nm:n.replace(/([A-Z])/g,' $1').replace(/ &/g,' &').trim(),ds:'feat art preview'});
+      var t=_ftext(n);
+      fEarn.push({png:n,nm:t.nm,ds:t.ds});
     });
   }
   var fHtml='';

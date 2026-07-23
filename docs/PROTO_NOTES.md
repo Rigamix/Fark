@@ -1949,3 +1949,16 @@ vignette halved (.38 -> .19).
   (size*.05, size*.17), alpha .45 on the CONTAINER so overlapping
   clones never seam. iOS-safe (transforms+opacity). Verified: clone
   layer present, zero per-face shadow terms.
+
+## P120 — parchment tooltips + real texts (done)
+
+- #loTip wears Icons/tooltip_box.png (100% stretch), dark ink, name
+  in warm brown, centred.
+- badge texts: every brooch names its boss and quotes his rule from
+  the tell data ("Grog's badge · LAST CALL — ..."); the Tankard
+  explains the sealed seat. Same in debug and live.
+- feat texts: 12 authored one-liners for the not-yet-coded images
+  (For Keeps, Full Bloom, Green Thumb, His Own Medicine, No Claim,
+  Omens True, Own the Night, Powder Monkey, Slow Boiled, Sticky
+  Fingers, Twice Saved, Wish Granted) — doubling as the design hooks
+  for those future feats; debug preview shows real text for all 24.
