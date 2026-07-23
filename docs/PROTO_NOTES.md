@@ -1936,3 +1936,16 @@ The engine dieShadow offsets were rim-like (dx .05 / dy .11): now
 dx .04 / dy .22, alpha .5 — the silhouette sits clearly UNDER the
 cube (verified on visible faces: 1.1px/6.2px at rail size). Wall
 vignette halved (.38 -> .19).
+
+## P118c/P119 — feats clear the case, vignette softer, die shadows done right (done)
+
+- feats rows raised (7..38.2, clamp 41.2) — lowest bottom 41.4%,
+  clear of the badge case.
+- vignette down again (.19 -> .11).
+- die shadows: per-face drop-shadows fundamentally bleed on a cube
+  (each face shadows onto its neighbours — "passing through").
+  Rebuilt as a SILHOUETTE CLONE layer (the selection-glow machinery):
+  solid #241610 clones of the visible faces behind the die, offset
+  (size*.05, size*.17), alpha .45 on the CONTAINER so overlapping
+  clones never seam. iOS-safe (transforms+opacity). Verified: clone
+  layer present, zero per-face shadow terms.
