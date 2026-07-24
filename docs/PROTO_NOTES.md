@@ -2262,3 +2262,14 @@ card centre 36.5%. Tier chip pokes out of the card corner
 ...) in every focus panel, the card sheet, and tooltips (gold on
 dark, bold brown on parchment). Deeper copy rewrite of card/die
 texts stays open for a dedicated pass.
+
+## P146 - focus polish round (done)
+
+Card float restarts from rest (the old keyframes began at -1.3deg -
+that was the landing snap) and is rotation-led (+-1.1deg, 1-2px bob,
+4.4s). Tier chip re-attached to the corner (-2/-1.5) and smaller.
+Die names keep ROMAN caps ("Jade II"). Focus names: 6.4cqh at
+-41cqh, 4-way + diagonal outline in a darker saturated cut of the
+text colour (_fkDarker in JS - no color-mix dependency), deeper
+drop. Idle fan cards (and dotted empties) now VANISH during focus
+like the dice - the dark blurred rectangles are gone.
