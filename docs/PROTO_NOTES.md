@@ -2118,3 +2118,17 @@ plaque + two gold diamonds + font label (dark ink on gold); X sits
 on the bottom-right corner. Sealed: smoke hugs the shield top,
 purple outline moves onto the patron inside the window. Fan/luck/
 wins/trait re-zoned into the parchment (44.6/52.6/42.4/38.9).
+
+## P136 - character panel round 2 (done)
+
+Portrait + frame colour now truly BEHIND the plate (bg z2 > smoke z1
+> port z0 - sealed particles rise over the colour, under the rim);
+bg_<color> art is opaque only in its top 61%, so .pbg stretches 164%
+tall to fill the shield. Trait seal + word are one centred row; name
+6.2cqh. X hugs the corner (84.5/93.4/14.5). Dice 16.4% at top 60%
+with the engine silhouette shadow and the shelf-style tap-to-focus
+(_ptDieFocus: scrim + zoom K2.5 + shared focus panel; lucky die
+shows its given name). Parchment stack moved up (tell text cleared
+off the divider; fan-present drops it to 53.8). Quote/desc text =
+Macondo. Row values right-aligned to the line ends. SIT DOWN wears a
+solid #a77d53 drop shadow that flattens on press.
