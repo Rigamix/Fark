@@ -2273,3 +2273,9 @@ Die names keep ROMAN caps ("Jade II"). Focus names: 6.4cqh at
 text colour (_fkDarker in JS - no color-mix dependency), deeper
 drop. Idle fan cards (and dotted empties) now VANISH during focus
 like the dice - the dark blurred rectangles are gone.
+
+## P146b/c - room vignette + split name colours (done)
+
+The room's bottom vignette (#ptStage::after) dropped to z2, under
+the patron tiles (z3) - portraits stay clean. Panel name: first name
+very dark brown (#241505), surname keeps the portrait accent colour.
