@@ -2279,3 +2279,11 @@ like the dice - the dark blurred rectangles are gone.
 The room's bottom vignette (#ptStage::after) dropped to z2, under
 the patron tiles (z3) - portraits stay clean. Panel name: first name
 very dark brown (#241505), surname keeps the portrait accent colour.
+
+## P147 - straight landings, chip rides the float, clean sheen (done)
+
+Card focus landing tilt reduced to +-0.6-1.6deg (mostly straight).
+famCardArt wraps the face in .fcvIn - the float animates the wrapper
+so the tier chip (and badge) sway WITH the card. Sheen keyframes
+travel 170% -> -170% over a 300% canvas: the shine exits the
+letters completely on both ends, so the loop restart is invisible.
