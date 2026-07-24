@@ -2287,3 +2287,15 @@ famCardArt wraps the face in .fcvIn - the float animates the wrapper
 so the tier chip (and badge) sway WITH the card. Sheen keyframes
 travel 170% -> -170% over a 300% canvas: the shine exits the
 letters completely on both ends, so the loop restart is invisible.
+
+## SIDE LAB - die3d_test.html (not part of the game)
+
+Standalone 3D-die ideation lab for Art/Assets/3D/die.glb (216 verts,
+PBR, 219KB): three.js (unpkg CDN - lab only) with a candle rig (warm
+flickering key, moon fill, ember bounce), orbit, tumble, ROLL with
+springy settle, face-pose buttons 1-6 (tap again to cycle the
+axis mapping until it lands right - the GLB's face layout is
+discovered interactively), the game's iso rest pose, and BAKE:
+renders the six posed faces to a transparent PNG strip + a 40px
+game-size preview. Proves both the live-3D and the pre-baked-sprite
+(renderDieAtRest swap, match brief 1.4) integration paths.

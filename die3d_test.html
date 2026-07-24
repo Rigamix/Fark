@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Fark — 3D die lab</title>
+<style>
+  html,body{margin:0;height:100%;background:#171009;color:#f0e3c6;
+    font-family:Georgia,serif;overflow:hidden;-webkit-user-select:none;user-select:none}
+  #stage{position:fixed;inset:0}
+  #hud{position:fixed;left:0;right:0;bottom:0;padding:10px 10px calc(10px + env(safe-area-inset-bottom));
+    display:flex;flex-wrap:wrap;gap:6px;justify-content:center;z-index:5;
+    background:linear-gradient(to top,rgba(10,6,2,.92),rgba(10,6,2,0))}
+  button{font:inherit;font-size:14px;padding:9px 13px;border-radius:8px;border:1px solid #6b4a26;
+    background:#2b1c10;color:#f0e3c6;cursor:pointer}
+  button:active{transform:translateY(1px);background:#3a2818}
+  button.on{background:#5c3a1a;border-color:#c49967}
+  #top{position:fixed;left:10px;top:max(10px,env(safe-area-inset-top));z-index:5;font-size:12px;
+    line-height:1.5;opacity:.85;pointer-events:none;text-shadow:0 1px 2px #000}
+  #bakeOut{position:fixed;right:8px;top:max(8px,env(safe-area-inset-top));z-index:6;display:none;
+    background:#12100c;border:1px solid #6b4a26;border-radius:8px;padding:8px;max-width:46vw}
+  #bakeOut img{image-rendering:auto;display:block;margin-bottom:6px;background:
+    repeating-conic-gradient(#222 0 25%,#2a2a2a 0 50%) 0 0/16px 16px;border-radius:4px}
+  #bakeOut .cap{font-size:11px;opacity:.8;margin-bottom:4px}
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<div id="top">
+  <b>Fark 3D die lab</b> — die.glb (216 verts)<br>
+  <span id="stats">loading…</span><br>
+  <span id="faceRead"></span>
+</div>
+<div id="bakeOut"><div class="cap">baked sprites (transparent PNG)</div></div>
+<div id="hud">
+  <button id="bTumble" class="on">tumble</button>
+  <button id="bRoll">ROLL</button>
+  <button data-f="1">1</button><button data-f="2">2</button><button data-f="3">3</button>
+  <button data-f="4">4</button><button data-f="5">5</button><button data-f="6">6</button>
+  <button id="bIso">iso pose</button>
+  <button id="bCandle" class="on">candlelight</button>
+  <button id="bBake">bake sprites</button>
+</div>
+
+<script type="importmap">
+{"imports":{
+  "three":"https://unpkg.com/three@0.160.0/build/three.module.js",
+  "three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"
+}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+
+const stage=document.getElementById('stage');
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight);
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.15;
+stage.appendChild(renderer.domElement);
+
+const scene=new THREE.Scene();
+/* tavern backdrop: dark wood-ish gradient plane far behind */
+scene.background=new THREE.Color(0x171009);
+const cam=new THREE.PerspectiveCamera(34,innerWidth/innerHeight,.1,50);
+cam.position.set(0,1.15,4.4);
+const controls=new OrbitControls(cam,renderer.domElement);
+controls.enableDamping=true;controls.enablePan=false;
+controls.minDistance=2;controls.maxDistance=10;
+
+/* ── the candle rig: warm key + cool moon fill + ember bounce ── */
+const key=new THREE.PointLight(0xffb45e,60,0,2);key.position.set(1.6,2.6,2.2);scene.add(key);
+const fill=new THREE.DirectionalLight(0x5a6f9e,.55);fill.position.set(-2,1.4,-1.5);scene.add(fill);
+const amb=new THREE.AmbientLight(0x33241a,1.6);scene.add(amb);
+const bounce=new THREE.PointLight(0xc4571f,8,6,2);bounce.position.set(-.8,-1.2,1.2);scene.add(bounce);
+
+/* ground shadow: cheap contact blob (the game would use its canvas shadows) */
+const blob=new THREE.Mesh(new THREE.CircleGeometry(1.05,32),
+  new THREE.MeshBasicMaterial({color:0x0a0603,transparent:true,opacity:.55}));
+blob.rotation.x=-Math.PI/2;blob.position.y=-1.02;scene.add(blob);
+
+const stats=document.getElementById('stats');
+const faceRead=document.getElementById('faceRead');
+let die=null,t0=performance.now();
+new GLTFLoader().load('Art/Assets/3D/die.glb',g=>{
+  die=g.scene;
+  /* normalise: centre + scale to unit cube */
+  const box=new THREE.Box3().setFromObject(die);
+  const size=box.getSize(new THREE.Vector3()),c=box.getCenter(new THREE.Vector3());
+  const s=1.6/Math.max(size.x,size.y,size.z);
+  die.scale.setScalar(s);
+  die.position.sub(c.multiplyScalar(s));
+  const pivot=new THREE.Group();pivot.add(die);scene.add(pivot);
+  window._pivot=pivot;
+  stats.textContent='loaded in '+Math.round(performance.now()-t0)+'ms · '+
+    renderer.info.programs.length+' programs';
+},undefined,e=>{stats.textContent='LOAD FAILED: '+e;});
+
+/* ── face posing ─────────────────────────────────────────────
+   A standard die mesh has its six values on the axis directions.
+   We discover which value faces the camera-up by sampling: pose
+   each axis up, and let the buttons cycle if the guess is wrong.
+   AXIS_UP[v] = quaternion turning value v's face to +Y.            */
+const AX={px:new THREE.Vector3(1,0,0),nx:new THREE.Vector3(-1,0,0),
+  py:new THREE.Vector3(0,1,0),ny:new THREE.Vector3(0,-1,0),
+  pz:new THREE.Vector3(0,0,1),nz:new THREE.Vector3(0,0,-1)};
+/* first guess: common layout 1=+Y 6=-Y 2=+X 5=-X 3=+Z 4=-Z */
+let MAP={1:'py',6:'ny',2:'px',5:'nx',3:'pz',4:'nz'};
+const qFor=k=>new THREE.Quaternion().setFromUnitVectors(AX[k],new THREE.Vector3(0,1,0));
+
+let mode='tumble',qTarget=null,rollT=0;
+const setMode=m=>{mode=m;
+  document.getElementById('bTumble').classList.toggle('on',m==='tumble');};
+
+document.getElementById('bTumble').onclick=()=>setMode('tumble');
+document.getElementById('bRoll').onclick=()=>{
+  const v=1+Math.floor(Math.random()*6);
+  faceRead.textContent='rolled a '+v;
+  qTarget=qFor(MAP[v]);
+  /* wind up: extra random turns so it reads as a throw */
+  const rq=new THREE.Quaternion().setFromEuler(new THREE.Euler(
+    Math.PI*2*(1+Math.random()),Math.PI*2*(1+Math.random()),Math.PI*(Math.random())));
+  window._pivot&&window._pivot.quaternion.copy(rq.multiply(window._pivot.quaternion));
+  rollT=performance.now();setMode('roll');
+};
+document.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{
+  const v=+b.dataset.f;
+  faceRead.textContent='posing '+v+' up ('+MAP[v]+') — wrong? tap again to cycle';
+  if(mode==='pose'+v){ /* cycle the mapping if the guess was wrong */
+    const keys=Object.keys(AX);
+    MAP[v]=keys[(keys.indexOf(MAP[v])+1)%6];
+    faceRead.textContent='remapped '+v+' -> '+MAP[v];
+  }
+  qTarget=qFor(MAP[v]);rollT=performance.now();setMode('pose'+v);
+});
+document.getElementById('bIso').onclick=()=>{
+  /* the game's rest pose: value up, tipped toward camera like FACE_ROT+90 */
+  const q=qFor(MAP[5]).clone();
+  const tip=new THREE.Quaternion().setFromEuler(new THREE.Euler(
+    THREE.MathUtils.degToRad(-32),THREE.MathUtils.degToRad(38),0,'YXZ'));
+  qTarget=tip.multiply(q);rollT=performance.now();setMode('iso');
+};
+let candle=true;
+document.getElementById('bCandle').onclick=e=>{
+  candle=!candle;e.target.classList.toggle('on',candle);
+  fill.intensity=candle?.55:1.4;amb.intensity=candle?1.6:3.2;
+  key.color.set(candle?0xffb45e:0xffffff);key.intensity=candle?60:80;
+};
+
+/* ── sprite bake: offscreen renders -> transparent PNGs ── */
+document.getElementById('bBake').onclick=()=>{
+  if(!window._pivot)return;
+  const out=document.getElementById('bakeOut');out.style.display='block';
+  [...out.querySelectorAll('img')].forEach(i=>i.remove());
+  const R=128,cols=6;
+  const cnv=document.createElement('canvas');cnv.width=R*cols;cnv.height=R;
+  const ctx=cnv.getContext('2d');
+  const saveQ=window._pivot.quaternion.clone(),saveBg=scene.background;
+  scene.background=null;blob.visible=false;
+  const oldSize=new THREE.Vector2();renderer.getSize(oldSize);
+  renderer.setSize(R,R,false);
+  const bcam=cam.clone();bcam.aspect=1;bcam.updateProjectionMatrix();
+  for(let v=1;v<=6;v++){
+    const q=qFor(MAP[v]).clone();
+    const tip=new THREE.Quaternion().setFromEuler(new THREE.Euler(
+      THREE.MathUtils.degToRad(-32),THREE.MathUtils.degToRad(38),0,'YXZ'));
+    window._pivot.quaternion.copy(tip.multiply(q));
+    renderer.render(scene,bcam);
+    ctx.drawImage(renderer.domElement,(v-1)*R,0,R,R);
+  }
+  renderer.setSize(oldSize.x,oldSize.y,false);
+  scene.background=saveBg;blob.visible=true;
+  window._pivot.quaternion.copy(saveQ);
+  const strip=new Image();strip.src=cnv.toDataURL('image/png');
+  strip.style.width='100%';
+  out.appendChild(strip);
+  /* game-size preview: 40px like the panel tray */
+  const small=new Image();small.src=cnv.toDataURL('image/png');
+  small.style.width=(40*cols)+'px';small.style.height='40px';
+  out.appendChild(small);
+  const cap=document.createElement('div');cap.className='cap';
+  cap.textContent='top: 128px bake · bottom: at game size (40px)';
+  out.appendChild(cap);
+};
+
+/* ── loop ── */
+let frames=0,fpsT=performance.now();
+function loop(t){
+  requestAnimationFrame(loop);
+  controls.update();
+  if(window._pivot){
+    if(mode==='tumble'){
+      window._pivot.rotation.x+=.004;window._pivot.rotation.y+=.007;
+    }else if(qTarget){
+      /* spring toward the target pose */
+      const k=Math.min(1,(t-rollT)/900);
+      const ease=1-Math.pow(1-k,3);
+      window._pivot.quaternion.slerp(qTarget,.06+.10*ease);
+    }
+    /* candle flicker on the key light */
+    if(candle){
+      const f=Math.sin(t*.006)*.5+Math.sin(t*.013+1.7)*.35+Math.sin(t*.027+4)*.15;
+      key.intensity=60+f*10;
+      key.position.x=1.6+Math.sin(t*.0021)*.08;
+    }
+  }
+  renderer.render(scene,cam);
+  frames++;
+  if(t-fpsT>1000){
+    stats.textContent=frames+' fps · '+renderer.info.render.calls+' draw calls · '
+      +renderer.info.render.triangles+' tris';
+    frames=0;fpsT=t;
+  }
+}
+requestAnimationFrame(loop);
+addEventListener('resize',()=>{
+  cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+});
+</script>
+</body>
+</html>
