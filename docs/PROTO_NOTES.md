@@ -2198,3 +2198,15 @@ stable per-card wiggle; family word in family colour, rest muted
 #cfc0a8; numbers get .num accents. GROG block to 8.4%. STORE:
 prices straight, owned = engraved tally strokes under the tag
 (.stTally, 4+diagonal for 5).
+
+## P141 - family names + focus polish (done)
+
+Patrons get a FAMILY NAME on the panel only (deterministic hash of
+the given name over 24 cosy surnames: Thistledown, Bramblewick,
+Copperpot...; name font auto-fits 7/5.4/4.4cqh by length; room tiles
+keep the short name). Win diamond up to 23.8%. Card-focus wiggle is
+now real (random each open, 1.6-4deg, never near zero, +-8px x);
+the tier numeral left the meta line (the card's chip already shows
+it). All three focus scrims darkened to rgba(8,5,2,.64); the panel's
+lifted idle rows dim to brightness(.16)+blur(4px) to match the
+backdrop.
