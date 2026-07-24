@@ -2132,3 +2132,16 @@ shows its given name). Parchment stack moved up (tell text cleared
 off the divider; fan-present drops it to 53.8). Quote/desc text =
 Macondo. Row values right-aligned to the line ends. SIT DOWN wears a
 solid #a77d53 drop shadow that flattens on press.
+
+## P137 - character panel round 3 (done)
+
+Shield colour stretched (110% x 180%, -3% top) so it reaches the
+point - the art's transparent strip left a dark gap. Title + name on
+ONE line (3.6/7cqh, nowrap, a touch lower); win diamonds moved to
+the bottom of the portrait (27.4%, z3). Trait row gap 2.4cqh. Row
+values #a95839 with fixed-width right-aligned amounts (8cqh) so the
+coins stack vertically; coins 2.55cqh. SIT DOWN 3.6cqh #402d14 with
+the diamonds flexed against the text (2.2cqh margins). Lucky-die
+radial glow removed (read as a bigger die). Die focus stacking fixed:
+.pt-focus lifts #ptvDice to z55 and dims the idle chips itself - the
+scrim's stacking context was darkening the zoomed die.
