@@ -2178,3 +2178,23 @@ framed by SitDown_diamond chips (.nbDmd). Aspect ratios per asset
 from the painted screens; the character panel's bespoke plaque/X
 untouched. Greybox sheet buttons (gbx) stay for their own dressing
 passes.
+
+## P140 - round 5 batch (done)
+
+BUTTONS: gold plaque is panel-only again; everywhere else the two
+new plates (red 01 destructive/challenge, cream 02 primary/neutral).
+Title buttons 62% wide; all labels letterpress-embossed (no text
+drop shadows). DICE: shelf chips 13.6%, store stand chips 80% (the
+root fix had grown classics there); panel untouched. PANEL: values
+#802c10; title line rides .5cqh lower; the name wears the portrait's
+flat colour; win diamond off the frame (25%); patron -16% in the
+shield; seal-word gap 1.5cqh; tell is one flowing line (title-case
+small name + Macondo text); #ptPort is a SOLID colour now
+(PT_BGCOL green #505c47 / blue #45555b / red #784a42 / purple
+#5c4750). FOCUS LAW v2: all scrims rgba(8,5,2,.5) + backdrop
+blur(6px) brightness(.55) (the starter-draft look); panel idle rows
+dim brightness(.28)+blur(2px) to match. Card focus K3.6 with a
+stable per-card wiggle; family word in family colour, rest muted
+#cfc0a8; numbers get .num accents. GROG block to 8.4%. STORE:
+prices straight, owned = engraved tally strokes under the tag
+(.stTally, 4+diagonal for 5).
