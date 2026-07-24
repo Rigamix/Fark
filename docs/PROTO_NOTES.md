@@ -2228,3 +2228,11 @@ Art/Assets/Icons/close.png (the round copper X, new) replaces every
 close: the five focus returns, the character panel corner X, and the
 rules/settings scroll X. close_x.png and the derived
 close_focus.png are retired.
+
+## P143 - wax seal rides the portrait corner (done)
+
+The trait seal sits on the shield's bottom-right corner (64/26.4,
+12.5% wide, tilted, solid offset shadow); the attached trait word is
+gone from the flow - tapping the seal fades the word in beside it
+(2.4s auto-hide, tap toggles, press scales the seal). The card fan
+rose to 45.8 into the freed space.
