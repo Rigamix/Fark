@@ -2165,3 +2165,16 @@ engine strips it later, but _d3InitHost measured clientWidth at init
 materials (lucky, starstone...) got the full width. Every d3chip
 surface undersized classic dice. Fix: _d3InitHost sizes from the
 enclosing .d3chip. Panel + shelf verified uniform.
+
+## P139 - the new button kit (done)
+
+Roles: GOLD (Panels/SitDown.png, ink #402d14) = primary CTA -
+CONTINUE, KEEP DRINKING, TAKE IT (starter draft), PIN IT/THEM
+(ceremony); RED (Button_new_01, cream text) = challenge/destructive
+- READY, NEW RUN (both branches); CREAM (Button_new_02, ink
+#6a5238) = neutral/disabled - the store's NOT-ENOUGH plate. Labels
+framed by SitDown_diamond chips (.nbDmd). Aspect ratios per asset
+(729/194, 936/265, 934/235). Button_thick_*/thin_* fully retired
+from the painted screens; the character panel's bespoke plaque/X
+untouched. Greybox sheet buttons (gbx) stay for their own dressing
+passes.
