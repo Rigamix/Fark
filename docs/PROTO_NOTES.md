@@ -2236,3 +2236,13 @@ The trait seal sits on the shield's bottom-right corner (64/26.4,
 gone from the flow - tapping the seal fades the word in beside it
 (2.4s auto-hide, tap toggles, press scales the seal). The card fan
 rose to 45.8 into the freed space.
+
+## P144 - panel round 6 (done)
+
+Seal 15.5% at 60.5/23.2, shadowless; trait word fades in UNDERNEATH
+on tap. Diamonds 31.6 / name 36.4 (more air). The card spread always
+shows THREE slots: real cards fill from the left, dotted #c49967
+outlines mark the empties (no-card patrons show three). Win diamonds
+locked to the red Wins/03. Row amounts measure themselves per open:
+every .amt takes the widest amount's width, so coins hug the numbers
+and still stack in one vertical line.

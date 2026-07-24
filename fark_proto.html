@@ -444,26 +444,25 @@ body{letter-spacing:.045em}
 #ptPanel .pv{position:absolute;right:13%;font-family:var(--bodyFont);color:#802c10;
   font-size:2.7cqh;display:flex;align-items:center;justify-content:flex-end;gap:1cqh;
   transform:translateY(-50%);z-index:2}
-#ptPanel .pv .amt{display:inline-block;min-width:8cqh;text-align:right}
+#ptPanel .pv .amt{display:inline-block;min-width:0;text-align:right}
 #ptvTarget{top:71.8%}
 #ptvStake{top:77.2%}
 #ptvPot{top:82.3%}
 #ptPanel .pv .pcoin{height:2.55cqh}
-#ptvWins{position:absolute;left:20%;right:20%;top:30.8%;z-index:3;display:flex;align-items:center;
+#ptvWins{position:absolute;left:20%;right:20%;top:31.6%;z-index:3;display:flex;align-items:center;
   justify-content:center;gap:.7cqh;white-space:nowrap}
 #ptvWins img{height:3.8cqh}
-#ptvName{position:absolute;left:9%;right:9%;top:34.4%;text-align:center;z-index:2;
+#ptvName{position:absolute;left:9%;right:9%;top:36.4%;text-align:center;z-index:2;
   font-family:'JMH Beda',serif;color:#4b5527;line-height:1.05;white-space:nowrap}
 #ptvName .t1{display:block;font-size:2.6cqh;color:#26170a;position:relative;top:.5cqh}
 #ptvName .t2{display:block;font-size:7cqh;letter-spacing:.02em}
-#ptvTrait{position:absolute;left:64%;top:26.4%;width:12.5%;z-index:3;cursor:pointer}
-#ptvTrait img{width:100%;transform:rotate(-9deg);filter:drop-shadow(2px 3px 0 rgba(15,9,4,.3));
-  transition:transform .15s}
+#ptvTrait{position:absolute;left:60.5%;top:23.2%;width:15.5%;z-index:3;cursor:pointer}
+#ptvTrait img{width:100%;transform:rotate(-9deg);transition:transform .15s}
 #ptvTrait:active img{transform:rotate(-9deg) scale(1.12)}
-#ptSealTip{position:absolute;right:108%;top:26%;white-space:nowrap;
+#ptSealTip{position:absolute;left:50%;top:102%;white-space:nowrap;
   font-family:'JMH Beda',serif;font-size:3cqh;color:#631c2a;letter-spacing:.04em;
-  opacity:0;transform:translateX(6px);transition:opacity .25s,transform .25s;pointer-events:none}
-#ptvTrait.show #ptSealTip{opacity:1;transform:none}
+  opacity:0;transform:translate(-50%,-6px);transition:opacity .25s,transform .25s;pointer-events:none}
+#ptvTrait.show #ptSealTip{opacity:1;transform:translate(-50%,0)}
 #ptvDice{position:absolute;left:18.5%;right:18.5%;top:60%;height:6.4%;z-index:2;
   display:flex;align-items:center;justify-content:space-between}
 #ptvDice .d3chip{width:16.4%;aspect-ratio:1;cursor:pointer}
@@ -488,7 +487,9 @@ body{letter-spacing:.045em}
 #ptvLuck .tn{font-size:2cqh;color:#3d2f52;white-space:nowrap}
 #ptvLuck .td{font-size:1.75cqh;color:#4a2d12;line-height:1.4;
   font-family:'Macondo',serif;-webkit-text-stroke:.25px currentColor}
-#ptvFan{position:absolute;left:0;right:0;top:45.8%;z-index:3;display:flex;justify-content:center;
+#ptvFan .fcEmpty{border:2px dashed #c49967;border-radius:8%/5.6%;box-sizing:border-box;
+  filter:none;pointer-events:none;opacity:.85}
+#ptvFan{position:absolute;left:0;right:0;top:48%;z-index:3;display:flex;justify-content:center;
   pointer-events:none}
 #ptvFan .fcv{width:11.5%;margin:0 -1%;pointer-events:auto;cursor:pointer}
 #ptvFan .fcv .fcvTier{font-size:min(1.5cqh,9px);min-width:24%;border-width:1px;padding:0 6%}
@@ -13556,20 +13557,23 @@ function _ptOpenPanel(st){
     var _need=(TIERS[S.run.tier]&&TIERS[S.run.tier].pointsNeeded)||0;
     var _rem=_need-((S.run.points||0)+circ);
     var _h=_rem<=0?3:(_rem===1?2:1);
-    var w='';for(var wi=0;wi<circ;wi++)w+='<img src="Art/Assets/Icons/Wins/0'+_h+'.png" alt="">';
+    var w='';for(var wi=0;wi<circ;wi++)w+='<img src="Art/Assets/Icons/Wins/03.png" alt="">';
     winsEl.innerHTML=w;
   }
   /* their real cards as a little fan straddling the band's bottom
      line — painted faces, tap to read (scouting, brief S5) */
+  /* the spread always shows three slots: real cards fill from the
+     left, dotted outlines mark where the others would live */
   var fan='';
-  var _fc=(st.pat.fcards||[]);
-  _fc.forEach(function(c,f2){
-    var d=famDef(c.id);if(!d)return;
-    var rot=(_fc.length===1)?0:(f2-((_fc.length-1)/2))*10;
-    fan+=famCardArt(c.id,c.tier||1,{tierAlways:true,
-      onclick:'_ptCardFocus(this,'+(c.tier||1)+')',
-      style:'transform:rotate('+rot+'deg) translateY('+(Math.abs(rot)*0.14).toFixed(1)+'px)'});
-  });
+  var _fc=(st.pat.fcards||[]).filter(function(c){return !!famDef(c.id);});
+  for(var f2=0;f2<3;f2++){
+    var rot=(f2-1)*10;
+    var sty='transform:rotate('+rot+'deg) translateY('+(Math.abs(rot)*0.14).toFixed(1)+'px)';
+    var c=_fc[f2];
+    if(c)fan+=famCardArt(c.id,c.tier||1,{tierAlways:true,
+      onclick:'_ptCardFocus(this,'+(c.tier||1)+')',style:sty});
+    else fan+='<div class="fcv fcEmpty" style="'+sty+'"></div>';
+  }
   document.getElementById('ptvFan').innerHTML=fan;
 
   var band=[];
@@ -13599,6 +13603,13 @@ function _ptOpenPanel(st){
   document.getElementById('ptvPot').innerHTML=
     '<img class="pcoin" src="Art/Assets/Panels/SitDown_coin.png" alt="">'
     +'<span class="amt">+'+st.pot+'g</span>';
+  /* coin column hugs the numbers but stays a straight vertical line:
+     every amount takes the widest amount's width */
+  var _amts=['ptvTarget','ptvStake','ptvPot'].map(function(id){
+    return document.getElementById(id).querySelector('.amt');}).filter(Boolean);
+  var _mw=0;
+  _amts.forEach(function(a){a.style.minWidth='0px';_mw=Math.max(_mw,a.getBoundingClientRect().width);});
+  _amts.forEach(function(a){a.style.minWidth=Math.ceil(_mw)+'px';});
   var sit=document.getElementById('ptBtnSit');
   sit.onclick=function(){_ptOpen=false;launchSeat(st.i);};
   document.getElementById('ptScrim').classList.add('on');
