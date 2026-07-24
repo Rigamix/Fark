@@ -2145,3 +2145,23 @@ the diamonds flexed against the text (2.2cqh margins). Lucky-die
 radial glow removed (read as a bigger die). Die focus stacking fixed:
 .pt-focus lifts #ptvDice to z55 and dims the idle chips itself - the
 scrim's stacking context was darkening the zoomed die.
+
+## P138 - panel round 4 + the dice-size root cause (done)
+
+Panel: name back to two stacked lines (small title), values #8a4630
+nudged left, win diamonds 3.8cqh at 26.2%, single fan card stands
+straight, NIGHT chalk to 4.4% (was touching the panel), debug chalk
+tap seeds seat 0 sealed WITH cards (_fkSeedPanel). FOCUS LAW unified
+across store/shelf/panel: object at 42% height, text panel top 53%,
+scrim rgba(10,6,2,.9) full-bleed; idle chips/cards dim by brightness
+(never transparency; the row lifts above the scrim and dims its own
+idle members). Card focus in the fan (_ptCardFocus, K3.1, springy,
+straightens the fan tilt, family-colour panel); shared _ptUnfocus.
+
+THE DICE-SIZE BUG, root-caused: legacy .dtype-bone/iron/flint/lead
+rules still put a 3px border-box border on a FRESH .die host; the
+engine strips it later, but _d3InitHost measured clientWidth at init
+=> classic materials sized 24/30 of their chip while borderless new
+materials (lucky, starstone...) got the full width. Every d3chip
+surface undersized classic dice. Fix: _d3InitHost sizes from the
+enclosing .d3chip. Panel + shelf verified uniform.
