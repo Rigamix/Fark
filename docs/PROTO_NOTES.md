@@ -2102,3 +2102,19 @@ count-markers in #ptvFan: the patron's actual cards render as
 painted minis (11.5% wide, same fan rotation math, tier chips),
 tappable -> famCardSheet. When the seat is sealed and a fan is
 present, the tell text drops to 59% so they never collide.
+
+## P135 - the redone character panel (done)
+
+New separate elements: SitDown_panel_bg (1117x2320, labels + row
+icons + tray + divider baked), SitDown.png (blank gold plaque),
+SitDown_coin/_diamond, close_x. Sheet re-tuned to aspect 1117/2320.
+The shield window (#ptPort at 27.2/1.9/46/27.9) shows the SAME art
+as the room tile - Frames/Patrons/<art>.png at 140% width over
+bg_<color>.png cover - so the panel and frame are one object
+(Commoners art retired). Rows: font-layer values at x57
+(target 71.8 / stake 77.2 / pot 82.3 row centres), star-coin on
+stake+pot. Dice ride the painted tray (19-81%, y61). SIT DOWN =
+plaque + two gold diamonds + font label (dark ink on gold); X sits
+on the bottom-right corner. Sealed: smoke hugs the shield top,
+purple outline moves onto the patron inside the window. Fan/luck/
+wins/trait re-zoned into the parchment (44.6/52.6/42.4/38.9).
