@@ -2246,3 +2246,19 @@ outlines mark the empties (no-card patrons show three). Win diamonds
 locked to the red Wins/03. Row amounts measure themselves per open:
 every .amt takes the widest amount's width, so coins hug the numbers
 and still stack in one vertical line.
+
+## P145 - round 7: seal cascade, centre slot, focus title + clarity (done)
+
+Seal straight; trait word cascades in letter-by-letter (38ms
+stagger, springy rise) under the seal. Name-to-tell air +1.3%.
+Single-card spreads centre the card (2 cards fill left+middle).
+FOCUS: title 5.4cqh at -38cqh with a travelling sheen (_fkSheen
+duplicate-text gradient clip; on all four builders), X returns 19%,
+scrims .78 everywhere; the focused CARD floats (fcvFloat: slow
+rotation sway + rise on the inner img, so the zoom transform stays);
+card centre 36.5%. Tier chip pokes out of the card corner
+(-4.5/-3). CLARITY: _accG accents numbers AND core gameplay words
+(bust/bank/reroll/triple/straight/wild/shatter/kept/once-per-match
+...) in every focus panel, the card sheet, and tooltips (gold on
+dark, bold brown on parchment). Deeper copy rewrite of card/die
+texts stays open for a dedicated pass.
