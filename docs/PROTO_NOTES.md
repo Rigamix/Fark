@@ -2221,3 +2221,10 @@ panel, starter): body text is Macondo bold (dropped the JMH override
 that was shadowing it); the NAME renders ABOVE the object (-31cqh
 off the text panel); the return arrow is the red X (close_x) on
 focus returns only - screen-nav arrows untouched.
+
+## P142e - one close icon everywhere (done)
+
+Art/Assets/Icons/close.png (the round copper X, new) replaces every
+close: the five focus returns, the character panel corner X, and the
+rules/settings scroll X. close_x.png and the derived
+close_focus.png are retired.
