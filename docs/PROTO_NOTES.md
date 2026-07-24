@@ -2210,3 +2210,14 @@ the tier numeral left the meta line (the card's chip already shows
 it). All three focus scrims darkened to rgba(8,5,2,.64); the panel's
 lifted idle rows dim to brightness(.16)+blur(4px) to match the
 backdrop.
+
+## P142 - no titles, tell under name, focus text pass (done)
+
+Panel: period titles removed from the panel; the win diamond(s) sit
+where the title was (29.6%, above the name at 32.4%); the tell text
+moved up under the name (38.6) with trait (43.6) and fan (47.8)
+reflowed - the fan-dodge died with it. FOCUS SCREENS (store, shelf,
+panel, starter): body text is Macondo bold (dropped the JMH override
+that was shadowing it); the NAME renders ABOVE the object (-31cqh
+off the text panel); the return arrow is the red X (close_x) on
+focus returns only - screen-nav arrows untouched.
