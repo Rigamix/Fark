@@ -15290,9 +15290,17 @@ var D3X={
     }else ld.load('assets/models/die.glb',onModel,undefined,onErr);
   },
   /* value-up isometric rest pose, the painted screens' reference look */
-  /* measured off the GLB: which mesh axis carries which value */
-  AX:{1:[-1,0,0],6:[1,0,0],2:[0,1,0],5:[0,-1,0],3:[0,0,-1],4:[0,0,1]},
-  ISO:null,TILT:11,YAW:15,
+  /* measured off the GLB (normals + UV tangents): each value's face
+     as a full basis [right, up, normal] in mesh space, so the face
+     lands FACING the camera AND upright - aligning the normal alone
+     leaves the roll free and the pips come out diagonal */
+  FACE:{1:[[0,-1,0],[0,0,1],[-1,0,0]],
+        2:[[-1,0,0],[0,0,1],[0,1,0]],
+        3:[[0,-1,0],[-1,0,0],[0,0,-1]],
+        4:[[0,-1,0],[1,0,0],[0,0,1]],
+        5:[[-1,0,0],[0,0,-1],[0,-1,0]],
+        6:[[0,-1,0],[0,0,-1],[1,0,0]]},
+  ISO:null,TILT:11,YAW:15,ROLL:90,
   _isoQ:function(val){
     if(!this.ISO){
       var yaw=new THREE.Quaternion().setFromAxisAngle(
@@ -15303,10 +15311,18 @@ var D3X={
     }
     /* the value face looks AT the camera; the tilt/yaw only reveal a
        sliver of the top and one side, like the painted dice */
-    var a=(this.AX[val]||this.AX[1]);
-    var face=new THREE.Quaternion().setFromUnitVectors(
-      new THREE.Vector3(a[0],a[1],a[2]),new THREE.Vector3(0,0,1));
-    return this.ISO.clone().multiply(face);
+    var f=this.FACE[val]||this.FACE[1];
+    var m=new THREE.Matrix4().makeBasis(
+      new THREE.Vector3(f[0][0],f[0][1],f[0][2]),
+      new THREE.Vector3(f[1][0],f[1][1],f[1][2]),
+      new THREE.Vector3(f[2][0],f[2][1],f[2][2]));
+    m.transpose();/* mesh basis -> world: right->+X, up->+Y, normal->+Z */
+    var face=new THREE.Quaternion().setFromRotationMatrix(m);
+    /* the UV islands are authored a quarter-turn off, so every face
+       lands on its side without this roll (a 6 reads 3x2, not 2x3) */
+    var roll=new THREE.Quaternion().setFromAxisAngle(
+      new THREE.Vector3(0,0,1),THREE.MathUtils.degToRad(this.ROLL));
+    return this.ISO.clone().multiply(roll.multiply(face));
   },
   _mkShadow:function(){
     /* the game's die-shaped offset silhouette, rebuilt in 3D: a flat
@@ -15352,7 +15368,6 @@ var D3X={
       if(!down||!self.focus)return;
       self.focus.uYaw=down.yaw+(e.clientX-down.x)*.011;
       self.focus.uPit=down.pit+(e.clientY-down.y)*.011;
-      self.focus.spun=true;
     },true);
     var up=function(){down=null;};
     document.addEventListener('pointerup',up,true);
@@ -15426,7 +15441,7 @@ var D3X={
     var zoomed=null;
     this.dice.forEach(function(d){if(d.chip.classList.contains('zoom'))zoomed=d;});
     if(this.focus!==zoomed){
-      if(zoomed){zoomed.uYaw=0;zoomed.uPit=0;zoomed.spun=false;zoomed.t0=performance.now();}
+      if(zoomed){zoomed.uYaw=0;zoomed.uPit=0;zoomed.t0=performance.now();}
       this.focus=zoomed;
     }
     var now=performance.now();
@@ -15443,7 +15458,8 @@ var D3X={
       d.obj.position.set(x,y,0);
       /* focus: a slow turn, plus whatever the player has dragged */
       if(d===zoomed){
-        var idle=d.spun?0:(now-d.t0)*0.00042;
+        /* the slow turn never stops; dragging just adds to it */
+        var idle=(now-d.t0)*0.00042;
         var extra=new THREE.Quaternion().setFromEuler(
           new THREE.Euler(d.uPit||0,(d.uYaw||0)+idle,0,'YXZ'));
         d.obj.quaternion.copy(extra.multiply(D3X._isoQ(d.val)));

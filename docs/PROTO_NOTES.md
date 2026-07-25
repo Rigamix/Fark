@@ -2436,3 +2436,21 @@ the focused die so it can't read as a twin.
 DEBUG NOTE: pip-counting from screen pixels needs a sample window
 >= ~0.36 of the chip and a dead-on face, or 5s and 6s undercount
 (their corner pips fall outside a tighter window) and the test lies.
+
+## P154 - faces landed on their side; focus spin fixed (done)
+
+Aligning a value's axis to the camera picks WHICH face you see but
+leaves its roll free, so pips came out diagonal/sideways. Each face
+now carries a full basis [right, up, normal] computed from the model's
+own UV tangents, plus a global ROLL of 90deg because the UV islands
+are authored a quarter-turn off. Verified by clustering pip centroids
+in the rendered pixels: a 6 now reads 2 columns x 3 rows (it read
+3x2 before), 5 reads five, 1 reads one.
+FOCUS: grabbing the die no longer snaps it (the idle spin used to be
+dropped on grab) and letting go no longer freezes it - the slow turn
+runs continuously and the drag is an offset on top.
+
+MEASURING GOTCHA: at rail size a die is only ~40px, so pip sampling
+windows either clip the outer pips (undercount) or spill onto the
+side faces (overcount). Scale one chip up (CSS transform) before
+counting.
