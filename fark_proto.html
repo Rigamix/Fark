@@ -15277,7 +15277,7 @@ var D3X={
      keeps the old tinted stock texture until its art lands. */
   SKINS:{},/* filled from assets/models/dice/skins.js (base64, file:// safe) */
   /* put one material's art on EVERY die (a look-see); null = per material */
-  SKIN_ALL:'amber',
+  SKIN_ALL:null,
   /* specular strength + gloss, matching the texture lab's defaults so what
      is painted there is what ships */
   SPEC:{color:0x736e66,shininess:30},
@@ -15326,7 +15326,9 @@ var D3X={
     var self=this;
     this.dice.forEach(function(d){
       var sk=self._skinFor(d.mat);
-      d.obj.traverse(function(o){if(o.isMesh)self._dress(o.material,d.mat,sk);});
+      d.obj.traverse(function(o){
+        if(o.isMesh&&!o.userData.outline)self._dress(o.material,d.mat,sk);
+      });
     });
     this.frame();
   },
@@ -15597,6 +15599,72 @@ var D3X={
      dial for the whole read of the table. */
   TABLE:{tilt:42, pitch:1.38, ease:0.22, land:10},
   _tbl:null,_play:null,_pend:null,
+  /* a sharp contact shadow: one soft-edged quad lying under the die,
+     turned with it and fading as the die leaves the table */
+  /* Straight under the die the shadow is almost entirely hidden BEHIND it
+     at this camera angle, so it is nudged away from the candle - the same
+     offset silhouette the painted dice use. */
+  SHADOW_COL:0x5a2c12, SHADOW_OP:0.62, SHADOW_SIZE:1.3,
+  SHADOW_OFF:{x:0.13,z:0.20},
+  _shadowTex:function(){
+    if(this._shTex)return this._shTex;
+    var c=document.createElement('canvas');c.width=c.height=128;
+    var x=c.getContext('2d');
+    /* a rounded square with a tight falloff - a contact shadow, not a blob */
+    var g=x.createRadialGradient(64,64,26,64,64,62);
+    g.addColorStop(0,'rgba(255,255,255,1)');
+    g.addColorStop(.62,'rgba(255,255,255,.92)');
+    g.addColorStop(1,'rgba(255,255,255,0)');
+    x.fillStyle=g;
+    x.beginPath();
+    if(x.roundRect)x.roundRect(8,8,112,112,26);else x.rect(8,8,112,112);
+    x.fill();
+    var t=new THREE.CanvasTexture(c);
+    t.needsUpdate=true;this._shTex=t;return t;
+  },
+  _mkShadowQuad:function(){
+    var m=new THREE.Mesh(new THREE.PlaneGeometry(1,1),
+      new THREE.MeshBasicMaterial({map:this._shadowTex(),transparent:true,
+        color:new THREE.Color(this.SHADOW_COL),opacity:this.SHADOW_OP,
+        depthWrite:false,depthTest:false}));
+    m.rotation.x=-Math.PI/2;m.renderOrder=-2;
+    return m;
+  },
+  /* a silhouette in the die's own colour, drawn as a back-face hull just
+     behind it - the same per-material outline the painted dice had */
+  OUTLINE:0.055,
+  /* Denis's outline colours per die type; anything not listed falls back to
+     the painted dice's own OUT table */
+  OUTCOL:{bone:'#291d11', amber:'#3f1000'},
+  _mkOutline:function(mat){
+    var col=this.OUTCOL[mat]||(window.D3&&D3.OUT&&D3.OUT[mat])||'#241407';
+    var g=this.proto.clone(true),grp=new THREE.Group();
+    g.traverse(function(o){
+      if(!o.isMesh)return;
+      o.material=new THREE.MeshBasicMaterial({
+        color:new THREE.Color(col),side:THREE.BackSide});
+      /* the skin pass walks the whole die group, and would happily paint
+         the outline with the die's texture - it is not a face */
+      o.userData.outline=true;
+    });
+    grp.add(g);grp.renderOrder=-1;
+    return grp;
+  },
+  /* park the die's contact shadow under it, turned the same way */
+  _contact:function(d,root,x,y,z,q){
+    if(!d.sq)d.sq=this._mkShadowQuad();
+    if(d.sq.parent!==root)root.add(d.sq);
+    var lift=Math.max(0,y-0.5);
+    var k=Math.max(0,1-lift*0.85);
+    d.sq.visible=k>0.02;
+    if(!d.sq.visible)return;
+    var e2=new THREE.Euler().setFromQuaternion(q,'YXZ');
+    d.sq.position.set(x+this.SHADOW_OFF.x,0.012,z+this.SHADOW_OFF.z);
+    d.sq.rotation.set(-Math.PI/2,0,-e2.y);
+    var sp=this.SHADOW_SIZE*(1+lift*0.5);
+    d.sq.scale.set(sp,sp,1);
+    d.sq.material.opacity=this.SHADOW_OP*k;
+  },
   _tableRoot:function(){
     if(!this._tbl){
       this._tbl=new THREE.Group();
@@ -15758,8 +15826,6 @@ var D3X={
     var self=this;
     var r=new THREE.WebGLRenderer({antialias:true,alpha:true});
     r.setPixelRatio(Math.min(devicePixelRatio,2));
-    r.shadowMap.enabled=true;
-    r.shadowMap.type=THREE.PCFSoftShadowMap;
     r.outputEncoding=THREE.sRGBEncoding;
     r.toneMapping=THREE.NoToneMapping;
     r.domElement.id='d3xCanvas';
@@ -15767,17 +15833,13 @@ var D3X={
     var sc=new THREE.Scene();this.scene=sc;
     /* the tavern's candle rig, matched to the painted screens */
     /* soft warm key from above, warm ambient so shadows stay warm */
-    var key=new THREE.DirectionalLight(0xfff1d6,.95);key.position.set(.12,1,.42);sc.add(key);
-    /* the candle overhead: casts the dice shadows onto the table. The
-       shadow camera is sized in die-widths and re-aimed with the table. */
-    key.castShadow=true;
-    key.shadow.mapSize.set(1024,1024);
-    var sh=key.shadow.camera;
-    sh.near=-20;sh.far=40;sh.left=-9;sh.right=9;sh.top=9;sh.bottom=-9;
-    key.shadow.bias=-0.0022;key.shadow.normalBias=0.03;
-    this._key=key;
-    var warm=new THREE.DirectionalLight(0xffd9a8,.28);warm.position.set(-.6,.25,.5);sc.add(warm);
-    sc.add(new THREE.AmbientLight(0xb08a5e,.85));
+    /* the candle sits above the table, so the face turned up to it takes
+       the light and the sides fall away. Ambient is a warm brown at low
+       strength: the shaded faces go dark but stay SATURATED, where a grey
+       ambient would just wash them out. */
+    var key=new THREE.DirectionalLight(0xfff2dc,1.5);key.position.set(.16,1,.34);sc.add(key);
+    var warm=new THREE.DirectionalLight(0xffb469,.20);warm.position.set(-.6,.15,.5);sc.add(warm);
+    sc.add(new THREE.AmbientLight(0x8a4f22,.58));
     this.cam=new THREE.PerspectiveCamera(this.FOV,1,1,20000);
     var onModel=function(g){
       var proto=g.scene;
@@ -15888,11 +15950,14 @@ var D3X={
           map:src.map||null,normalMap:src.normalMap||null,
           color:new THREE.Color(col),specular:0x000000,shininess:0,
           reflectivity:0});
-        o.castShadow=true;o.receiveShadow=false;
         self._dress(o.material,mat,sk);
       }
     });
     g.add(m);
+    /* silhouette outline: a slightly fatter copy drawn back-faces-only */
+    var out=this._mkOutline(mat);
+    out.scale.setScalar(1+this.OUTLINE);
+    g.add(out);
     return g;
   },
   focus:null,SHADOW:false,FOV:40,FOV_MATCH:54,RISE_MATCH:20,MSCALE:0.77,_matchOn:false,
@@ -16094,6 +16159,7 @@ var D3X={
           d.obj.scale.setScalar(1);
           d.obj.position.set(pose.x,pose.y,pose.z);
           d.obj.quaternion.copy(pose.q);
+          D3X._contact(d,root,pose.x,pose.y,pose.z,pose.q);
           e._d3xOwned=true;
           D3X._slaveHost(d,root);
           return;
@@ -16110,6 +16176,7 @@ var D3X={
           d.obj.visible=true;d.obj.scale.setScalar(1);
           d.obj.position.set(d.phys.x,d.phys.y,d.phys.z);
           d.obj.quaternion.copy(d.phys.q);
+          D3X._contact(d,root3,d.phys.x,d.phys.y,d.phys.z,d.phys.q);
           if(e)e._d3xOwned=true;
           D3X._slaveHost(d,root3);
           return;

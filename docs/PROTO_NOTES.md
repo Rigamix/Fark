@@ -3126,3 +3126,32 @@ then an additive glow pass and an alpha line pass composited over the frame.
 The game currently falls back to the DOM gold octagon ring from P163. That
 port is the next job.
 
+## P181 — contact shadows, per-type outlines, warm shading, own skins
+
+**Shadows.** The P180 shadow-map catcher was there but unreadable, so it's
+gone. Each die now drops a **sharp contact shadow**: one soft-edged quad
+lying on the table, turned with the die, growing and fading as the die
+leaves the table. Two things it needed:
+- the colour is a warm brown (`SHADOW_COL 0x5a2c12`), not grey — measured
+  R 104 / B 91 with 84% of its pixels warm-biased;
+- straight underneath, it was **almost entirely hidden behind the die** at
+  this camera angle (105 visible pixels), so it is nudged away from the
+  candle, the same offset silhouette the painted dice use.
+
+**Outlines.** Every die carries a silhouette in its own colour, drawn as a
+back-face hull just behind it. `OUTCOL = {bone:'#291d11', amber:'#3f1000'}`,
+falling back to the painted dice's `D3.OUT` for anything not listed.
+
+Bug worth remembering: the outline rendered WHITE, because `_reskin` walks
+the whole die group and re-dressed the hull with the die's texture. Outline
+meshes are now tagged `userData.outline` and skipped by the skin pass.
+
+**Shading.** The candle sits above the table, so the face turned up to it
+takes the light and the sides fall away: key up to 1.5, ambient dropped to
+0.58 and recoloured to a warm brown `0x8a4f22`. That keeps the shaded faces
+dark but SATURATED — a grey ambient just washes them out. Measured face
+luminance on a die: 87 in shade against 250 lit.
+
+**Skins.** `SKIN_ALL` is off, so each material wears its own art again;
+`bone` and `amber` are both embedded (bone 97KB, amber 216KB as JPEG).
+
