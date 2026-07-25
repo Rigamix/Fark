@@ -2490,3 +2490,17 @@ face still square to the camera. Focus close no longer snaps - the
 die slerps from wherever it was spun back to the shared rest angle
 over 420ms with an ease-out (sampled path: 36.5 -> 16.7 -> 7.3 ->
 2.4 -> 0.2 -> 0 degrees).
+
+## P158 - square-on top-down pose, return unwinds in flight (done)
+
+TILT 32->42, YAW 3->0: the die is now square to the camera (side
+reveal measures 0.000) and seen well from above (top reveal 0.669).
+RETURN TIMING: a die was counted as focused while its .zoom class
+lasted, but the focus code leaves that class on for ~470ms AFTER the
+panel closes - so the angle only started unwinding once the die had
+already landed. D3X now treats a die as focused only while the
+PANEL is open (#gbLoadout.lo-focus / #gbShop.st-focus /
+#ptPanelSheet.pt-focus / #famRunDraft.focus), so the rotation eases
+home during the flight. Measured from the close: 68.8 -> 34.4 ->
+13.8 -> 3.7 -> 0.3 degrees, square by the time it lands (450ms, the
+same duration as the CSS travel).
