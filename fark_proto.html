@@ -15300,7 +15300,7 @@ var D3X={
         4:[[0,-1,0],[1,0,0],[0,0,1]],
         5:[[-1,0,0],[0,0,-1],[0,-1,0]],
         6:[[0,-1,0],[0,0,-1],[1,0,0]]},
-  ISO:null,TILT:21,YAW:7,ROLL:90,
+  ISO:null,TILT:32,YAW:3,ROLL:90,
   _isoQ:function(val){
     if(!this.ISO){
       var yaw=new THREE.Quaternion().setFromAxisAngle(
@@ -15442,8 +15442,14 @@ var D3X={
     if(this.focus!==zoomed){
       /* the die that just left focus forgets its spin and drops back
          into the row at the same angle as its neighbours */
-      if(this.focus){this.focus.uYaw=0;this.focus.uPit=0;
-        this.focus.obj.userData.posed=null;}
+      if(this.focus){
+        /* ease home rather than snap: remember where it was and
+           slerp back to the shared rest angle */
+        this.focus.retFrom=this.focus.obj.quaternion.clone();
+        this.focus.retT0=performance.now();
+        this.focus.uYaw=0;this.focus.uPit=0;
+        this.focus.obj.userData.posed=null;
+      }
       if(zoomed){zoomed.uYaw=0;zoomed.uPit=0;zoomed.t0=performance.now();}
       this.focus=zoomed;
     }
@@ -15466,6 +15472,11 @@ var D3X={
         var extra=new THREE.Quaternion().setFromEuler(
           new THREE.Euler(d.uPit||0,(d.uYaw||0)+idle,0,'YXZ'));
         d.obj.quaternion.copy(extra.multiply(D3X._isoQ(d.val)));
+      }else if(d.retT0){
+        var rk=Math.min(1,(now-d.retT0)/420);
+        var re=1-Math.pow(1-rk,3);
+        d.obj.quaternion.copy(d.retFrom).slerp(D3X._isoQ(d.val),re);
+        if(rk>=1){d.retT0=0;d.retFrom=null;d.obj.userData.posed=d.val;}
       }else if(d.obj.userData.posed!==d.val){
         d.obj.quaternion.copy(D3X._isoQ(d.val));
         d.obj.userData.posed=d.val;

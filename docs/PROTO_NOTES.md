@@ -2481,3 +2481,12 @@ Focus: closing the panel now resets the die's dragged rotation and
 re-poses it, so it drops back into the row at exactly the same angle
 as its neighbours instead of keeping whatever angle it was spun to
 (verified: 0.0deg difference from the rest pose after a 74deg spin).
+
+## P157 - properly top-down, eased focus return (done)
+
+TILT 21->32, YAW 7->3: the reveal is now 12x more top than side
+(measured 0.53 vs 0.04 on the neighbouring faces), with the value
+face still square to the camera. Focus close no longer snaps - the
+die slerps from wherever it was spun back to the shared rest angle
+over 420ms with an ease-out (sampled path: 36.5 -> 16.7 -> 7.3 ->
+2.4 -> 0.2 -> 0 degrees).
