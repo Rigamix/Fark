@@ -2802,3 +2802,37 @@ Final state on the table: widths 39/38/36/36/38/39 (spread 3px, up from 2 —
 the cost of the wider lens), heights all 46, tops and bottoms dead level,
 gaps even, max row-by-row difference between any two dice 3px.
 
+## P168 — lift the lens instead of tipping the die further
+
+*"more from the top please, wider lens"* — again. The die's own pitch was
+nearly spent: past ~45° the top-back edge sits nearer than the bottom-front
+one and the die reads inside-out (the P159 trap). At `TILT_MATCH = 38` the
+separation is only 0.086 die-widths, so there was no room left there.
+
+So the top-down now comes from the CAMERA, which has no such ceiling and is
+what looking down at a table actually is. `RISE_MATCH` (degrees) lifts the
+lens above the table while keeping the film plane upright: widen the frustum
+by the rise and take the slice that still maps one world unit to one CSS
+pixel, exactly the shift lens from P161 but ONE camera for the whole surface
+rather than per die — so every die in a row gets the same vertical angle and
+they stay identical. `RISE_MATCH = 20`, `FOV_MATCH = 34 -> 44`.
+
+Measuring this needed the geometry, not the pixels. The silhouette is nearly
+useless (a cube's outline barely moves with pitch) and a luminance-step
+detector latches onto the bevel highlight once the top face gets big. So the
+top-face share is now computed by projecting the three edges that bound it —
+top-back, the shared edge, bottom-front — through the live camera. Note the
+object's local axes are the MESH's, not the pose's, so this has to be done in
+world space off the tilt quaternion.
+
+Top-face share by rise, at tilt 38: **43% / 50% / 56% / 61% / 67% / 73%** for
+rise 0 / 8 / 14 / 20 / 26 / 32. Shipped at 20 = **61%**, up from 43%.
+
+Final: widths 41/39/37/37/39/41 (spread 4px, the cost of the wider lens),
+heights all 48, tops and bottoms level, worst DOM-register error 1.1px.
+
+Worth raising with Denis: the value is on the die's FRONT face, so the further
+top-down we go the smaller the face carrying the number gets (39% of the
+height now). Past this point the value really wants to move to the TOP face,
+the way a die on a real table works — a bigger change, his call.
+

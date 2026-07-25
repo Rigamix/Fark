@@ -15401,7 +15401,7 @@ var D3X={
     g.add(m);
     return g;
   },
-  focus:null,SHADOW:false,FOV:40,FOV_MATCH:34,MSCALE:0.86,_matchOn:false,
+  focus:null,SHADOW:false,FOV:40,FOV_MATCH:44,RISE_MATCH:20,MSCALE:0.86,_matchOn:false,
   _bindDrag:function(){
     if(this._dragBound)return;this._dragBound=true;
     var self=this,down=null;
@@ -15544,6 +15544,17 @@ var D3X={
       this.cam.position.set(mr.width/2,-mr.height/2,dist);
       this.cam.rotation.set(0,0,0);
       this.cam.clearViewOffset();
+      var rise=this._matchOn?dist*Math.tan(THREE.MathUtils.degToRad(this.RISE_MATCH||0)):0;
+      if(rise){
+        /* lift the lens but keep the film plane upright and the image where
+           it was: widen the frustum and take the slice that still maps one
+           world unit to one CSS pixel on the dice plane */
+        var fh=mr.height+2*rise;
+        this.cam.fov=2*Math.atan((fh/2)/dist)*180/Math.PI;
+        this.cam.aspect=mr.width/fh;
+        this.cam.setViewOffset(mr.width,fh,0,fh/2+rise-mr.height/2,mr.width,mr.height);
+        this.cam.position.set(mr.width/2,-mr.height/2+rise,dist);
+      }
       this.cam.updateProjectionMatrix();
       this._w=mr.width;this._h=mr.height;
     }
