@@ -2662,3 +2662,61 @@ tumble was verified mathematically rather than watched), and the kept-tray /
 opponent rows, which take the same code path but were not reached in test.
 Next: port the lab's silhouette outline+glow to replace the box ring.
 
+## P164 — die re-unwrapped: six equal islands, seam on the middle of the curve
+
+Denis, before handing the die to a texture artist: *"some of the faces are cut
+short rather than all the faces having the same padding around. They should
+all cut neatly in the middle of the curve between each face."*
+
+What the old unwrap actually was, measured off the model:
+- the bottom **27% of the sheet was empty** (v never went below 0.266)
+- **two faces had 10% more resolution than the other four** — the ±Z islands
+  were 0.294 wide against 0.244 for ±X/±Y, texel density 13.31 vs 12.11. The
+  mesh is a *perfect* cube (all three axes equal to five decimals), so that was
+  pure layout inconsistency: a pip at a given pixel size came out ~10% smaller
+  on two faces.
+- islands at irregular offsets, so there was no grid to paint against.
+
+**The new unwrap.** The die is a cube of half-size h with a constant-radius
+bevel r = h/4 (verified to 2.4e-9 across all 216 verts). So for any surface
+point: `a = clamp(P,-c,c)` with `c = h-r`, and `dir = (P-a)/r` is the exact
+outward normal. The island coordinate unfolds the bevel by ARC LENGTH:
+
+    u = a·right + r·atan2(dir·right, dir·n)
+    v = a·up    + r·atan2(dir·up,    dir·n)
+
+On the plateau that is just the position; at the 45° midline it is `c + rπ/4`
+on every side. So each island carries exactly half the bevel on all four
+sides and the seam lands precisely on the middle of the curve — which is what
+was asked for. Islands use each face's own right/up basis from the game's
+FACE table, so every number sits upright, laid out 3×2 in value order 1..6.
+
+Nothing had to be split: the bevel already has a vertex ring at exactly 45°
+and **zero triangles cross a face boundary** (88 verts sit on a 2-face seam,
+16 on 3-face corners). Vertices were unshared per triangle (216 → 900) since
+a seam vertex needs a different UV per island.
+
+Existing maps were rebaked onto the new layout — per triangle the old and new
+UVs are both per-vertex, so a pixel's old UV is its barycentric coords in the
+new UV triangle applied to the old ones. The normal map additionally has its
+tangent frame rotated (decode with the old basis into object space, re-encode
+with the new), and everything is dilated outward to fill the bleed margin.
+
+Results:
+- texel density spread across the six faces: **0.000%** (was 9.9%)
+- sheet coverage **93.8%** (was 71.4%), 310px per face, all equal
+- atlas reads 1‑2‑3 / 4‑5‑6 in order — pip-counted per island
+- rendered die is unchanged: **100% silhouette overlap** with the old model,
+  mean colour delta 3.1/255 (resampling at pip edges)
+- all six values show the correct face in game
+
+Shipped: `assets/models/die.glb` (292KB, 960×640 atlas) + `die_glb.js` base64,
+and the texture lab re-embeds model, rebaked maps and the new guide.
+`Art/Assets/3D/die.glb` was never written to.
+
+For the artist: `assets/models/die_uv_guide.png` (1536×1024 transparent
+overlay — island bounds, where the flat face ends, wireframe, numbers) and
+`die_uv_guide_over_art.png`. Flat face is **79.3%** of the island; the curve
+padding is **10.4% each side**. Authoring res is free — the layout is
+normalised, so paint at whatever size and it downsamples.
+
