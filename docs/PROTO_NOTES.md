@@ -2754,3 +2754,28 @@ in the same order.
 Still open (Denis): scored dice leaving the line — he'd rather they stay put
 and get a treatment instead; deferred.
 
+## P166 — the dice settle FLAT
+
+Denis: *"the dice still all have a different rotation when settling as if seen
+by different cameras or just stopping when not fully flat on the surface"*.
+
+Not the camera — the roll's landing. `D3.roll` lands the in-plane spin on
+`r(cfg.rot)` with `cfg.rot = 75`, i.e. **a random roll of up to ±75° per
+die**. On the flat CSS cube that read as a thrown die; on a real 3D die the
+same roll reads as stopped mid-tumble, resting on an edge. Pitch and yaw were
+never the problem — `iturns()` always returns whole turns, so those land
+exactly on `FACE_ROT`.
+
+Fix is one line in `D3.roll`: when the 3D layer has booted, snap the landing
+spin to a whole turn. The die still spins the entire way there — only where
+it stops changes. If D3X never boots, the CSS dice keep their thrown look.
+
+Verified by simulating **240 roll landings** (6 dice x 40 rolls): residual
+spin **0.0000°**, and the landing pose is **0.0000°** off the shared rest pose
+for every one.
+
+Testing note: this slipped through P163/P165 because the preview pane freezes
+requestAnimationFrame, so a roll never actually animates to its landing —
+every measurement was taken with the dice still at spin 0. Landing state has
+to be checked against `d.to`, not against whatever the frozen dice show.
+
