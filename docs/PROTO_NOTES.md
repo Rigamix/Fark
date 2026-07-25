@@ -2374,3 +2374,13 @@ transparent elsewhere) and the CSS cubes are hidden.
 TEST GOTCHA: the pane serves fark_proto.html from cache - a stale
 copy had D3 but not D3X, which reads exactly like a scope bug. Add a
 query string to bust it.
+
+## P150b - the 3D dice never booted from file:// (fixed)
+
+GLTFLoader.load() fetches over XHR, which browsers BLOCK for local
+files - so opening fark_proto.html straight off disk left D3X.ready
+false forever and the CSS cubes stayed visible ("still the old
+dice"). The model now ships as assets/models/die_glb.js (base64 in a
+script tag - script loading is allowed on file://) and D3X parses it
+with GLTFLoader.parse(); it falls back to .load() if the script is
+absent. Same trick the standalone lab uses.

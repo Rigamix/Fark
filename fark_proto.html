@@ -15247,7 +15247,9 @@ var D3X={
       document.head.appendChild(sc);
     };
     add('assets/vendor/three.min.js',function(){
-      add('assets/vendor/GLTFLoader.js',function(){self._init();});
+      add('assets/vendor/GLTFLoader.js',function(){
+        add('assets/models/die_glb.js',function(){self._init();});
+      });
     });
   },
   _init:function(){
@@ -15267,7 +15269,7 @@ var D3X={
     var ember=new THREE.DirectionalLight(0xc4571f,.5);ember.position.set(.2,-.9,.35);sc.add(ember);
     this.cam=new THREE.OrthographicCamera(0,100,0,-100,-2000,2000);
     this.cam.position.set(0,0,600);
-    new THREE.GLTFLoader().load('assets/models/die.glb',function(g){
+    var onModel=function(g){
       var proto=g.scene;
       var box=new THREE.Box3().setFromObject(proto);
       var size=box.getSize(new THREE.Vector3()),c=box.getCenter(new THREE.Vector3());
@@ -15277,7 +15279,16 @@ var D3X={
       var q=self._need;self._need=[];
       q.forEach(function(f){f&&f();});
       self.frame();
-    },undefined,function(){self.loading=false;self.fail=true;});
+    };
+    var onErr=function(){self.loading=false;self.fail=true;};
+    var ld=new THREE.GLTFLoader();
+    if(window.FK_DIE_GLB){
+      /* file:// safe: the model ships as base64 in a script */
+      var b=atob(String(window.FK_DIE_GLB).split(',').pop());
+      var bytes=new Uint8Array(b.length);
+      for(var i=0;i<b.length;i++)bytes[i]=b.charCodeAt(i);
+      try{ld.parse(bytes.buffer,'',onModel,onErr);}catch(e){onErr();}
+    }else ld.load('assets/models/die.glb',onModel,undefined,onErr);
   },
   /* value-up isometric rest pose, the painted screens' reference look */
   ISO:null,
