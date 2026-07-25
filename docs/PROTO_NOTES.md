@@ -2919,3 +2919,46 @@ above ~200px): amber diffuse 141KB, spec 76KB, 290KB as base64.
 Verified: map source starts `data:image/jpeg;base64,`, and the dice render
 RGB(209,117,24).
 
+## P173 — physics roll, stage 1: the solve
+
+Denis picked full physics for the match table: dice tumble, bounce off each
+other and the rails, settle in a rough line, and **the number scored is the
+face that lands up** — like `die3d_lab.html`. That is the fork that decides
+everything else: today the match shows the value on the face turned toward
+the camera and each die sits in a layout slot, which is exactly why it reads
+as a row rather than as thrown dice.
+
+Ported from the lab, unchanged in spirit: every random choice is made up
+front, the sim runs HIDDEN at a fixed 1/60 step until the dice rest, the
+natural up-face is read, and each die is then **relabelled by a cube
+symmetry** so the face the GAME rolled is the one on top. The game still owns
+the numbers; physics only owns the placement. Lane springs pull each die
+toward its slot, a spring-MINUS-damper shove keeps them apart without buzzing,
+and bounded overtime calms the table rather than shoving harder.
+
+Two additions over the lab port:
+- **flat-snap**: a die that stopped a few degrees off flat never reads clean,
+  so the final orientation is tipped the minimum amount to sit square. It is
+  built with `setFromUnitVectors` on the up-axis, which preserves the die's
+  yaw — the row stays as randomly turned as it landed.
+- `_relabel` snaps its matrix to an exact cube symmetry so faces stay axis
+  aligned after the swap.
+
+Measured over 40 rolls / 240 dice at the real row spacing (51px pitch on 37px
+dice = 1.38 die-widths — an earlier run used 1.04 and produced dice landing
+on top of each other, which was the test's fault, not the sim's):
+
+- **wrong face: 0** — the relabel is exact
+- **cocked at rest: 0** (was 2 before the flat-snap)
+- hit the step cap: 0; gaps under 0.9 die-widths: 3/200, min 0.87
+- 5.9 ms per roll, 71 steps average (1.2s), 203 worst (3.4s)
+- yaw spread 358 degrees — they land every which way, which is the whole point
+
+`_physSolve` is inert so far: nothing calls it, so the game is unchanged.
+
+**Stage 2 (next)** is the bigger half — the match layer is 2.5D today (dice on
+a plane facing the camera, one world unit = one CSS pixel). Physics needs a
+real horizontal table: a camera looking down at a tray, dice projected from
+world XZ onto the screen, and the DOM hosts slaved to those projected
+positions so hit-testing and selection follow the dice where they land.
+

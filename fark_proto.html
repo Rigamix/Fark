@@ -15349,6 +15349,160 @@ var D3X={
     });
     return out;
   },
+
+  /* ═══ physics roll (ported from die3d_lab) ═══════════════════════════
+     World units are die-widths. All randomness is made up front, the sim
+     runs hidden to rest, the up-face is read and relabelled to the value
+     the game rolled, then the recorded trajectory replays visibly. */
+  PHYS:{
+    on:true, gravity:-50, dt:1/60, cap:700, stopV:.15, stopW:.25,
+    laneKX:9, laneCX:2.4, laneKZ:8, laneCZ:2.4,
+    sepK:22, sepC:5.5, sepMin:1.04,
+    trayZ:1.7, wallPad:.3, restY:.5
+  },
+  _cannon:false,
+  _loadCannon:function(cb){
+    if(window.CANNON){cb();return;}
+    if(this._cannonWait){this._cannonWait.push(cb);return;}
+    this._cannonWait=[cb];
+    var self=this,sc=document.createElement('script');
+    sc.src='assets/vendor/cannon.min.js';
+    sc.onload=function(){var q=self._cannonWait;self._cannonWait=null;q.forEach(function(f){f();});};
+    sc.onerror=function(){self._cannonWait=null;self.PHYS.on=false;cb();};
+    document.head.appendChild(sc);
+  },
+  /* which mesh axis is up for this orientation (lab's upAxisKey) */
+  _upAxis:function(q){
+    var best=null,bd=-2;
+    for(var v=1;v<=6;v++){
+      var n=this.FACE[v][2];
+      var w=new CANNON.Vec3(n[0],n[1],n[2]);
+      var r=q.vmult(w);
+      if(r.y>bd){bd=r.y;best=v;}
+    }
+    return best;
+  },
+  /* a die is cocked when no face is properly up */
+  _cocked:function(q){
+    var bd=-2;
+    for(var v=1;v<=6;v++){
+      var n=this.FACE[v][2];
+      var r=q.vmult(new CANNON.Vec3(n[0],n[1],n[2]));
+      if(r.y>bd)bd=r.y;
+    }
+    return bd<0.985;
+  },
+  /* rotation (a cube symmetry) putting `want` where `got` currently is, so
+     the die LOOKS untouched but the painted face on top is the right one */
+  _relabel:function(got,want){
+    if(got===want)return new THREE.Quaternion();
+    var a=this.FACE[got][2],b=this.FACE[want][2];
+    var va=new THREE.Vector3(a[0],a[1],a[2]),vb=new THREE.Vector3(b[0],b[1],b[2]);
+    var q=new THREE.Quaternion().setFromUnitVectors(vb,va);
+    /* snap to the nearest exact cube symmetry so faces stay axis aligned */
+    var m=new THREE.Matrix4().makeRotationFromQuaternion(q);
+    var e=m.elements;
+    for(var i=0;i<12;i++){if(i%4===3)continue;e[i]=Math.round(e[i]);}
+    return new THREE.Quaternion().setFromRotationMatrix(m);
+  },
+  /* solve one throw. slots = target x per die in die-widths, values = the
+     faces the game rolled. Returns {steps, frames:[[{p,q}]], rest:[{p,q}]} */
+  _physSolve:function(slotX,values){
+    var P=this.PHYS,N=values.length;
+    var world=new CANNON.World();
+    world.gravity.set(0,P.gravity,0);
+    world.broadphase=new CANNON.NaiveBroadphase();
+    world.solver.iterations=16;
+    var mDesk=new CANNON.Material('desk'),mDie=new CANNON.Material('die'),mWall=new CANNON.Material('wall');
+    world.addContactMaterial(new CANNON.ContactMaterial(mDesk,mDie,{friction:.01,restitution:.5}));
+    world.addContactMaterial(new CANNON.ContactMaterial(mDie,mDie,{friction:0,restitution:.5}));
+    world.addContactMaterial(new CANNON.ContactMaterial(mWall,mDie,{friction:0,restitution:.8}));
+    var ground=new CANNON.Body({mass:0,material:mDesk,shape:new CANNON.Plane()});
+    ground.quaternion.setFromAxisAngle(new CANNON.Vec3(1,0,0),-Math.PI/2);
+    world.add(ground);
+    var halfW=Math.max.apply(null,slotX)+1.2;
+    var wall=function(x,z,sx,sz){
+      var b=new CANNON.Body({mass:0,material:mWall,
+        shape:new CANNON.Box(new CANNON.Vec3(sx,2.5,sz))});
+      b.position.set(x,2.5,z);world.add(b);
+    };
+    wall(0,-P.trayZ-P.wallPad,halfW+1,P.wallPad);
+    wall(0, P.trayZ+P.wallPad,halfW+1,P.wallPad);
+    wall(-halfW-P.wallPad,0,P.wallPad,P.trayZ+1);
+    wall( halfW+P.wallPad,0,P.wallPad,P.trayZ+1);
+    var HALF=.5,bodies=[];
+    for(var i=0;i<N;i++){
+      var b=new CANNON.Body({mass:1,material:mDie,
+        shape:new CANNON.Box(new CANNON.Vec3(HALF*.96,HALF*.96,HALF*.96))});
+      b.position.set(slotX[i]+(Math.random()*.2-.1),P.restY+1.7+(i%3)*.35,.75+Math.random()*.25);
+      b.velocity.set(Math.random()*1-.5,-2-Math.random()*2,-(4.5+Math.random()*2.2));
+      b.angularVelocity.set(-(8+Math.random()*10),Math.random()*8-4,Math.random()*10-5);
+      var q=new CANNON.Quaternion();
+      q.setFromEuler(Math.random()*6.28,Math.random()*6.28,Math.random()*6.28);
+      b.quaternion.copy(q);
+      b.linearDamping=.1;b.angularDamping=.1;
+      world.add(b);bodies.push(b);
+    }
+    var frames=[],it=0,over=0,boostFrom=-1;
+    var settled=function(){
+      for(var k=0;k<N;k++){
+        if(bodies[k].velocity.norm()>P.stopV||bodies[k].angularVelocity.norm()>P.stopW)return false;
+      }
+      return true;
+    };
+    while(it<P.cap){
+      var hot=(boostFrom>=0&&it>=boostFrom);
+      for(var k=0;k<N;k++){
+        var b2=bodies[k];
+        b2.linearDamping=hot?.55:.1;b2.angularDamping=hot?.5:.1;
+        var sp=b2.velocity.norm(),g2=Math.min(2.2,Math.max(1,2.2-sp*.35));
+        b2.force.x+=(-P.laneKX*(b2.position.x-slotX[k])-P.laneCX*b2.velocity.x)*g2;
+        b2.force.z+=(-P.laneKZ*b2.position.z-P.laneCZ*b2.velocity.z)*g2;
+      }
+      /* mutual shove: spring MINUS damper, so they never buzz */
+      for(var a2=0;a2<N;a2++)for(var c2=a2+1;c2<N;c2++){
+        var A=bodies[a2],B=bodies[c2];
+        var dx=B.position.x-A.position.x,dz=B.position.z-A.position.z;
+        var dd=Math.sqrt(dx*dx+dz*dz)||1e-4;
+        if(dd>=P.sepMin)continue;
+        var ux=dx/dd,uz=dz/dd,pen=P.sepMin-dd;
+        var rv=(B.velocity.x-A.velocity.x)*ux+(B.velocity.z-A.velocity.z)*uz;
+        var f=P.sepK*pen-P.sepC*rv;
+        if(f<0)f=0;
+        A.force.x-=ux*f;A.force.z-=uz*f;
+        B.force.x+=ux*f;B.force.z+=uz*f;
+      }
+      world.step(P.dt);
+      var fr=[];
+      for(var k2=0;k2<N;k2++)fr.push({
+        x:bodies[k2].position.x,y:bodies[k2].position.y,z:bodies[k2].position.z,
+        qx:bodies[k2].quaternion.x,qy:bodies[k2].quaternion.y,
+        qz:bodies[k2].quaternion.z,qw:bodies[k2].quaternion.w});
+      frames.push(fr);it++;
+      if(settled()){
+        var anyCocked=false;
+        for(var k3=0;k3<N;k3++)if(this._cocked(bodies[k3].quaternion)){anyCocked=true;break;}
+        if(!anyCocked)break;
+        if(boostFrom<0)boostFrom=it;
+        if(++over>140)break;
+      }
+    }
+    /* read what landed, then relabel so the game's numbers are on top */
+    var rest=[];
+    for(var k4=0;k4<N;k4++){
+      var bq=bodies[k4].quaternion;
+      var got=this._upAxis(bq);
+      /* a die that stopped a few degrees off flat never reads clean. Tip
+         it the minimum amount to sit square - this keeps its yaw, so the
+         row stays as randomly turned as it landed. */
+      var n=this.FACE[got][2];
+      var w=bq.vmult(new CANNON.Vec3(n[0],n[1],n[2]));
+      var flat=new THREE.Quaternion().setFromUnitVectors(
+        new THREE.Vector3(w.x,w.y,w.z).normalize(),new THREE.Vector3(0,1,0));
+      rest.push({got:got,fix:this._relabel(got,values[k4]),flat:flat});
+    }
+    return {steps:it,frames:frames,rest:rest,slotX:slotX};
+  },
   _need:[],
   boot:function(cb){
     if(this.ready){cb&&cb();return;}
