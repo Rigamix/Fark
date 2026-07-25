@@ -3015,3 +3015,41 @@ settle and the same ~1.0 minimum separation, so the tightening is free:
 Verified in a live match at 28: faces correct, screen-Y spread **7.6px**
 (was ~27), yaw spread 316 degrees, gaps still uneven.
 
+## P177 — rerolls stop landing on the kept dice
+
+**The reroll bug.** `_physStart` built its slots as a freshly CENTRED row of
+however many dice were in the batch. Reroll 3 of 6 and those 3 were aimed
+across the middle of the table — straight through the dice being kept, which
+the sim did not know existed. Three fixes:
+
+- every die now owns a **persistent pose** (`d.phys`), so a die that is not
+  being rolled stays exactly where it landed;
+- a throw targets **each die's own column**, measured off its DOM slot rather
+  than a recentred row;
+- dice staying put go into the sim as **static bodies**, so the thrown ones
+  bounce off them instead of through them.
+
+Scoped by row: the player line, the kept tray and the opponent line are
+separate tables with their own centres, and mixing their dice into one sim
+would have put obstacles at meaningless positions.
+
+Measured over 30 rerolls (90 thrown dice against 3 kept each): **0 landed on
+a kept die**, closest approach 1.02 die-widths, 0 wrong faces.
+
+**Start timing.** The batch fires on a zero-delay timeout, which can beat the
+tick that registers the new hosts — and the first retry scheme gave up after
+600ms of wall clock. A parked throw is now picked up by `tick()` itself, so a
+stalled frame loop delays the roll instead of dropping it.
+
+**Angle.** `TABLE.tilt 58 -> 50`. Worth recording why 58 read as "too high"
+even though it matched the old proportions: the top face's share of the
+silhouette is `sin(t)/(sin(t)+cos(t))`, which at 58 is 62% — almost exactly
+the 61% of P168. But back then that 62% was the *non-value* face and the
+number sat on the front; now the number is ON the top face, so the same
+proportion reads as looking down much harder. 50 gives 54%.
+
+**Size.** `MSCALE 0.86 -> 0.77` — 10% smaller, more room to move.
+
+Live match at these settings: 6 settled, faces correct, hit-box offset 0.0px,
+vertical scatter 12.4px, gaps 48/40/55/68/54px — uneven, which is the point.
+

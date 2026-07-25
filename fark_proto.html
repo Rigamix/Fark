@@ -15443,7 +15443,7 @@ var D3X={
   },
   /* solve one throw. slots = target x per die in die-widths, values = the
      faces the game rolled. Returns {steps, frames:[[{p,q}]], rest:[{p,q}]} */
-  _physSolve:function(slotX,values){
+  _physSolve:function(slotX,values,obstacles){
     var P=this.PHYS,N=values.length;
     var world=new CANNON.World();
     world.gravity.set(0,P.gravity,0);
@@ -15467,6 +15467,14 @@ var D3X={
     wall(-halfW-P.wallPad,0,P.wallPad,P.trayZ+1);
     wall( halfW+P.wallPad,0,P.wallPad,P.trayZ+1);
     var HALF=.5,bodies=[];
+    /* dice being kept are immovable furniture, not absent */
+    (obstacles||[]).forEach(function(o){
+      var b=new CANNON.Body({mass:0,material:mDie,
+        shape:new CANNON.Box(new CANNON.Vec3(HALF*.96,HALF*.96,HALF*.96))});
+      b.position.set(o.x,o.y,o.z);
+      if(o.q)b.quaternion.set(o.q.x,o.q.y,o.q.z,o.q.w);
+      world.add(b);
+    });
     for(var i=0;i<N;i++){
       var b=new CANNON.Body({mass:1,material:mDie,
         shape:new CANNON.Box(new CANNON.Vec3(HALF*.96,HALF*.96,HALF*.96))});
@@ -15541,7 +15549,11 @@ var D3X={
   },
 
   /* ═══ the table: dice lie on it, it leans back toward the lens ═══ */
-  TABLE:{tilt:58, pitch:1.38, ease:0.22},
+  /* tilt = how far the table leans back toward the lens. It sets how much
+     of the top face you see: share = sin(t)/(sin(t)+cos(t)), so 58 gave 62%
+     and 50 gives 54%. The value lives on the top face now, so this is the
+     dial for the whole read of the table. */
+  TABLE:{tilt:50, pitch:1.38, ease:0.22},
   _tbl:null,_play:null,_pend:null,
   _tableRoot:function(){
     if(!this._tbl){
@@ -15567,13 +15579,72 @@ var D3X={
       });
     },0);
   },
-  _physStart:function(b){
-    var N=b.dice.length;
-    var pitch=this.TABLE.pitch;
-    var slots=[];
-    for(var i=0;i<N;i++)slots.push((i-(N-1)/2)*pitch);
-    var sol=this._physSolve(slots,b.vals);
-    this._play={sol:sol,dice:b.dice,vals:b.vals,t0:performance.now(),step:0};
+  _physStart:function(b,tries){
+    var self=this,N=b.dice.length;
+    var mine=[];
+    b.dice.forEach(function(e){
+      var d=null;
+      self.dice.forEach(function(x){if(x.chip._d3===e)d=x;});
+      mine.push(d);
+    });
+    if(mine.indexOf(null)>=0){
+      /* the dice were only just created; the 3D layer registers them on its
+         next tick, so park the throw and let tick() pick it up. Waiting on
+         the tick rather than on a timer means a stalled frame loop delays
+         the roll instead of dropping it. */
+      b.waited=(b.waited||0)+1;
+      this._waiting=(b.waited<600)?b:null;
+      return;
+    }
+    this._waiting=null;
+    /* the row re-centres itself as dice leave, so homes are re-measured
+       every roll rather than cached across one */
+    this._measureHomes();
+    var mr=this.mount.getBoundingClientRect();
+    var sz=mine[0].chip.getBoundingClientRect().width*this.MSCALE;
+    var key=this._rowKey(mine[0]);
+    var mid=this._rowMid(key);
+    var slots=mine.map(function(d){return (d.hx-mid)/sz;});
+    /* whatever is staying on THIS table is an obstacle, not empty space.
+       The kept tray is a different table with its own centre, so its dice
+       must never be handed to this sim. */
+    var obst=[];
+    this.dice.forEach(function(d){
+      if(!d.match||!d.phys)return;
+      if(b.dice.indexOf(d.chip._d3)>=0)return;
+      if(self._rowKey(d)!==key)return;
+      obst.push(d.phys);
+    });
+    var sol=this._physSolve(slots,b.vals,obst);
+    this._play={sol:sol,dice:b.dice,hosts:mine,vals:b.vals,
+      t0:performance.now(),step:0,sz:sz,mid:mid,key:key};
+  },
+  /* untransformed centre of every tracked match die, in mount space */
+  _measureHomes:function(){
+    var mr=this.mount.getBoundingClientRect();
+    this.dice.forEach(function(d){
+      if(!d.match)return;
+      var t=d.chip.style.transform;
+      d.chip.style.transition='none';
+      d.chip.style.transform='';
+      var r=d.chip.getBoundingClientRect();
+      d.hx=r.left-mr.left+r.width/2;d.hy=r.top-mr.top+r.height/2;
+      if(t)d.chip.style.transform=t;
+    });
+  },
+  /* the player line, the kept tray and the opponent line are separate
+     tables; their dice must never be mixed into one sim */
+  _rowKey:function(d){
+    var el=d.chip.closest&&d.chip.closest('#playerDiceRow,#keptTray,#oppDiceRow');
+    return el?el.id:'loose';
+  },
+  _rowMid:function(key){
+    var self=this,xs=[];
+    this.dice.forEach(function(d){
+      if(d.match&&d.hx!==undefined&&(!key||self._rowKey(d)===key))xs.push(d.hx);
+    });
+    if(!xs.length)return 0;
+    return (Math.min.apply(null,xs)+Math.max.apply(null,xs))/2;
   },
   /* where a physics die sits/points right now, in table-local space */
   _physPose:function(i){
@@ -15584,6 +15655,8 @@ var D3X={
     if(done){
       var r=P.sol.rest[i];
       q=r.flat.clone().multiply(q).multiply(r.fix);
+      var h=P.hosts&&P.hosts[i];
+      if(h)h.phys={x:f.x,y:f.y,z:f.z,q:q.clone()};
     }
     return {x:f.x,y:f.y,z:f.z,q:q,done:done};
   },
@@ -15740,7 +15813,7 @@ var D3X={
     g.add(m);
     return g;
   },
-  focus:null,SHADOW:false,FOV:40,FOV_MATCH:44,RISE_MATCH:20,MSCALE:0.86,_matchOn:false,
+  focus:null,SHADOW:false,FOV:40,FOV_MATCH:44,RISE_MATCH:20,MSCALE:0.77,_matchOn:false,
   _bindDrag:function(){
     if(this._dragBound)return;this._dragBound=true;
     var self=this,down=null;
@@ -15775,6 +15848,7 @@ var D3X={
   /* one owner for "which surface holds the dice", run every frame */
   tick:function(){
     if(!this.ready||this.fail)return;
+    if(this._waiting){var w=this._waiting;this._waiting=null;this._physStart(w);}
     if(this._liveChips(document).length){
       this._matchOn=false;
       this.sync(document);
@@ -15931,15 +16005,29 @@ var D3X={
           var root=D3X._tableRoot();
           root.rotation.set(THREE.MathUtils.degToRad(D3X.TABLE.tilt),0,0);
           root.scale.setScalar(sz2);
-          if(d.home===undefined){d.home=null;}
           var hc=D3X._homeOf(d);
-          root.position.set(hc.x,-hc.y,0);
+          root.position.set(P.mid!==undefined?P.mid:hc.x,-hc.y,0);
           if(d.obj.parent!==root)root.add(d.obj);
           d.obj.visible=true;
           d.obj.scale.setScalar(1);
           d.obj.position.set(pose.x,pose.y,pose.z);
           d.obj.quaternion.copy(pose.q);
           D3X._slaveHost(d,root);
+          return;
+        }
+        if(d.phys){
+          /* settled: hold the place physics gave it */
+          var sz3=cr.width*D3X.MSCALE;
+          var root3=D3X._tableRoot();
+          root3.rotation.set(THREE.MathUtils.degToRad(D3X.TABLE.tilt),0,0);
+          root3.scale.setScalar(sz3);
+          var mid3=D3X._rowMid(D3X._rowKey(d));
+          root3.position.set(mid3,-D3X._homeOf(d).y,0);
+          if(d.obj.parent!==root3)root3.add(d.obj);
+          d.obj.visible=true;d.obj.scale.setScalar(1);
+          d.obj.position.set(d.phys.x,d.phys.y,d.phys.z);
+          d.obj.quaternion.copy(d.phys.q);
+          D3X._slaveHost(d,root3);
           return;
         }
         if(d.obj.parent&&d.obj.parent!==D3X.scene){
