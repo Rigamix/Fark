@@ -2454,3 +2454,17 @@ MEASURING GOTCHA: at rail size a die is only ~40px, so pip sampling
 windows either clip the outer pips (undercount) or spill onto the
 side faces (overcount). Scale one chip up (CSS transform) before
 counting.
+
+## die_texture_lab.html (local only, gitignored)
+
+Standalone texture bench for the die: drag any PNG onto the page to
+apply it (filenames containing "norm" load as the normal map, anything
+else as the colour map), or use the file pickers. Shows the die big
+(orbit + slow spin, pick which face is up) and/or as a rail of six in
+the game's rest pose, under the game's exact lighting rig and face
+table, so what you see is what the shelf will show. Buttons: stock
+maps, UV guide (the wireframe overlay, to check island alignment),
+normals off, tint (the game tints this one texture per material -
+white shows it as painted), light level, background colour. Ships the
+stock maps inline so reset always works; self-contained like the roll
+lab, no server needed.
