@@ -13884,6 +13884,9 @@ D3.rotv=function(n,pitch,yaw,spin,turn,tilt){
   return[x,y3,z3];
 };
 D3.draw=function(d){
+  /* the 3D layer draws this die; its cube is hidden and every style write
+     here would be work nobody sees */
+  if(d._d3xOwned)return;
   /* selection glow mirrors the host's .selected class — single source of
      truth so every select/deselect path stays honest */
   try{
@@ -14038,7 +14041,7 @@ D3.start=function(){
   function frame(now){
     var dt=1/60;
     D3.list.forEach(function(d){
-      if(!d.slot.isConnected)return;
+      if(!d.slot.isConnected||d._d3xOwned)return;
       if(d.phase==='roll'){
         var t=now-d.t0;
         if(t>=0){
@@ -14060,7 +14063,11 @@ D3.start=function(){
     });
     /* neighbour shove within a group, mid-flight */
     var groups={};
-    D3.list.forEach(function(d){if(d.group){(groups[d.group]=groups[d.group]||[]).push(d);}});
+    D3.list.forEach(function(d){
+      /* physics owns separation for 3D dice - this shove would fight it */
+      if(d._d3xOwned)return;
+      if(d.group){(groups[d.group]=groups[d.group]||[]).push(d);}
+    });
     Object.keys(groups).forEach(function(g){
       var arr=groups[g];
       arr.forEach(function(d){var rct=d.slot.getBoundingClientRect();d.slotX=rct.left+rct.width/2;});
@@ -14076,7 +14083,7 @@ D3.start=function(){
         }
       }
     });
-    D3.list.forEach(function(d){if(d.slot.isConnected)D3.draw(d);});
+    D3.list.forEach(function(d){if(d.slot.isConnected&&!d._d3xOwned)D3.draw(d);});
     /* prune dead nodes */
     for(var i2=D3.list.length-1;i2>=0;i2--)if(!D3.list[i2].slot.isConnected)D3.list.splice(i2,1);
     requestAnimationFrame(frame);
@@ -15712,37 +15719,7 @@ var D3X={
      dial for the whole read of the table. */
   TABLE:{tilt:42, pitch:1.38, ease:0.22, land:10},
   _tbl:null,_play:null,_pend:null,
-  /* a sharp contact shadow: one soft-edged quad lying under the die,
-     turned with it and fading as the die leaves the table */
-  /* Straight under the die the shadow is almost entirely hidden BEHIND it
-     at this camera angle, so it is nudged away from the candle - the same
-     offset silhouette the painted dice use. */
-  CONTACT3D:false, SHADOW_COL:0x5a2c12, SHADOW_OP:0.62, SHADOW_SIZE:1.3,
-  SHADOW_OFF:{x:0.13,z:0.20},
-  _shadowTex:function(){
-    if(this._shTex)return this._shTex;
-    var c=document.createElement('canvas');c.width=c.height=128;
-    var x=c.getContext('2d');
-    /* a rounded square with a tight falloff - a contact shadow, not a blob */
-    var g=x.createRadialGradient(64,64,26,64,64,62);
-    g.addColorStop(0,'rgba(255,255,255,1)');
-    g.addColorStop(.62,'rgba(255,255,255,.92)');
-    g.addColorStop(1,'rgba(255,255,255,0)');
-    x.fillStyle=g;
-    x.beginPath();
-    if(x.roundRect)x.roundRect(8,8,112,112,26);else x.rect(8,8,112,112);
-    x.fill();
-    var t=new THREE.CanvasTexture(c);
-    t.needsUpdate=true;this._shTex=t;return t;
-  },
-  _mkShadowQuad:function(){
-    var m=new THREE.Mesh(new THREE.PlaneGeometry(1,1),
-      new THREE.MeshBasicMaterial({map:this._shadowTex(),transparent:true,
-        color:new THREE.Color(this.SHADOW_COL),opacity:this.SHADOW_OP,
-        depthWrite:false,depthTest:false}));
-    m.rotation.x=-Math.PI/2;m.renderOrder=-2;
-    return m;
-  },
+
   /* a silhouette in the die's own colour, drawn as a back-face hull just
      behind it - the same per-material outline the painted dice had */
   OUTLINE:0.055,
@@ -15788,23 +15765,7 @@ var D3X={
     grp.add(g);grp.renderOrder=-1;
     return grp;
   },
-  /* retired: the 2D pass paints these now, masking the unlit table.
-     Kept only so an old saved reference to it cannot throw. */
-  _contact:function(d,root,x,y,z,q){
-    if(!this.CONTACT3D)return;
-    if(!d.sq)d.sq=this._mkShadowQuad();
-    if(d.sq.parent!==root)root.add(d.sq);
-    var lift=Math.max(0,y-0.5);
-    var k=Math.max(0,1-lift*0.85);
-    d.sq.visible=k>0.02;
-    if(!d.sq.visible)return;
-    var e2=new THREE.Euler().setFromQuaternion(q,'YXZ');
-    d.sq.position.set(x+this.SHADOW_OFF.x,0.012,z+this.SHADOW_OFF.z);
-    d.sq.rotation.set(-Math.PI/2,0,-e2.y);
-    var sp=this.SHADOW_SIZE*(1+lift*0.5);
-    d.sq.scale.set(sp,sp,1);
-    d.sq.material.opacity=this.SHADOW_OP*k;
-  },
+
   _tableRoot:function(){
     if(!this._tbl){
       this._tbl=new THREE.Group();
@@ -16020,28 +15981,7 @@ var D3X={
         5:[[-1,0,0],[0,0,-1],[0,-1,0]],
         6:[[0,-1,0],[0,0,-1],[1,0,0]]},
   ISO:null,TILT:25,TILT_MATCH:38,YAW:0,ROLL:90,
-  /* the CSS engine's orientation as a three quaternion. Its rotv applies
-     yaw, then pitch, then spin, then turn, then the global tilt - and its y
-     axis points DOWN the screen, so x and z rotations flip sign here. */
-  _cssQ:function(tilt,turn,spin,pitch,yaw){
-    var R=THREE.MathUtils.degToRad,X=this._X||(this._X=new THREE.Vector3(1,0,0)),
-        Y=this._Y||(this._Y=new THREE.Vector3(0,1,0)),Z=this._Z||(this._Z=new THREE.Vector3(0,0,1));
-    var q=new THREE.Quaternion().setFromAxisAngle(X,-R(tilt));
-    if(turn)q.multiply(new THREE.Quaternion().setFromAxisAngle(Y,R(turn)));
-    if(spin)q.multiply(new THREE.Quaternion().setFromAxisAngle(Z,-R(spin)));
-    q.multiply(new THREE.Quaternion().setFromAxisAngle(X,-R(pitch)));
-    q.multiply(new THREE.Quaternion().setFromAxisAngle(Y,R(yaw)));
-    return q;
-  },
-  /* how far the cube has turned away from where it RESTS for this value.
-     That same world-space turn is then applied to the 3D die's rest pose,
-     so a roll tumbles identically and lands on the right face. */
-  _deltaQ:function(e,val){
-    var tl=(e.tilt!=null?e.tilt:D3.cfg.tilt),fr=D3.FACE_ROT[val]||[0,0];
-    var now=this._cssQ(tl,e.turn||0,e.spin||0,e.pitch||0,e.yaw||0);
-    var rest=this._cssQ(tl,e.turn||0,0,fr[0]+(e.restTop?90:0),fr[1]);
-    return now.multiply(rest.invert());
-  },
+
   _isoQ:function(val,tilt){
     /* cached per tilt so the dial stays live and the two surfaces can
        differ - the table is seen from higher up than the shelf */
@@ -16069,19 +16009,6 @@ var D3X={
     var roll=new THREE.Quaternion().setFromAxisAngle(
       new THREE.Vector3(0,0,1),THREE.MathUtils.degToRad(this.ROLL));
     return this.ISO.clone().multiply(roll.multiply(face));
-  },
-  _mkShadow:function(){
-    /* the game's die-shaped offset silhouette, rebuilt in 3D: a flat
-       dark copy of the die drawn behind it, nudged down-right */
-    var g=new THREE.Group();
-    var m=this.proto.clone(true);
-    m.traverse(function(o){
-      if(o.isMesh)o.material=new THREE.MeshBasicMaterial({
-        color:0x241610,transparent:true,opacity:.34,
-        depthWrite:false,depthTest:false});
-    });
-    g.add(m);g.renderOrder=-1;
-    return g;
   },
   _mkDie:function(mat){
     var g=new THREE.Group();
@@ -16112,7 +16039,7 @@ var D3X={
     g.userData.sel=sel;
     return g;
   },
-  focus:null,SHADOW:false,FOV:40,FOV_MATCH:54,RISE_MATCH:20,MSCALE:0.77,_matchOn:false,
+  focus:null,FOV:40,FOV_MATCH:54,RISE_MATCH:20,MSCALE:0.77,_matchOn:false,
   _bindDrag:function(){
     if(this._dragBound)return;this._dragBound=true;
     var self=this,down=null;
@@ -16189,9 +16116,7 @@ var D3X={
       var obj=self._mkDie(mat);
       obj.quaternion.copy(self._isoQ(val));
       self.scene.add(obj);
-      var sh=null;
-      if(self.SHADOW){sh=self._mkShadow();sh.quaternion.copy(obj.quaternion);self.scene.add(sh);}
-      self.dice.push({chip:ch,obj:obj,sh:sh,mat:mat,val:val,
+      self.dice.push({chip:ch,obj:obj,mat:mat,val:val,
         uYaw:0,uPit:0,t0:performance.now()});
     });
     this._bindDrag();
@@ -16225,7 +16150,7 @@ var D3X={
       var obj=self._mkDie(mat);
       obj.quaternion.copy(self._isoQ(val));
       self.scene.add(obj);
-      try{el._d3.die.style.visibility='hidden';}catch(e){}
+      try{el._d3.slot.style.visibility='hidden';}catch(e){}
       self.dice.push({chip:el,obj:obj,sh:null,mat:mat,val:val,match:true,
         uYaw:0,uPit:0,t0:performance.now()});
     });
@@ -16235,7 +16160,7 @@ var D3X={
     /* A die on the table is parented to the TABLE group, not the scene, so
        scene.remove() was a no-op and every destroyed die left a ghost that
        kept rendering. Always detach from the actual parent. */
-    [d.obj,d.sh,d.sq].forEach(function(o){if(o&&o.parent)o.parent.remove(o);});
+    [d.obj].forEach(function(o){if(o&&o.parent)o.parent.remove(o);});
     /* materials are made per die; geometry is shared with the proto and
        must NOT be disposed */
     if(d.obj)d.obj.traverse(function(o){
@@ -16243,7 +16168,7 @@ var D3X={
     });
     d.roll=null;d.phys=null;
     if(d.match){try{
-      if(d.chip._d3){d.chip._d3.die.style.visibility='';d.chip._d3._d3xOwned=false;}
+      if(d.chip._d3){d.chip._d3.slot.style.visibility='';d.chip._d3._d3xOwned=false;}
       d.chip.style.translate='';d.tx=0;d.ty=0;
     }catch(e){}}
   },
@@ -16363,19 +16288,21 @@ var D3X={
         var mvis=mcs.visibility!=='hidden'&&mcs.display!=='none'&&+mcs.opacity>.02;
         d.obj.visible=mvis;
         if(!mvis)return;
+        /* not been through physics (first paint, or a surface that never
+           rolls): sit at the DOM slot in the shared rest pose. This used to
+           mirror the hidden CSS cube frame by frame, which is the only
+           reason that engine had to keep running for match dice. */
         var val=d.chip._trueVal||e.result||1;
-        var hv=e.h||0;
-        d.obj.scale.setScalar(cr.width*D3X.MSCALE*(1+hv*0.004));
-        d.obj.position.set(
-          cr.left-mr.left+cr.width/2+(e.x||0)+(e.ox||0),
-          -(cr.top-mr.top+cr.height/2+((e.y||0)-hv*0.55*e.s)));
-        d.obj.quaternion.copy(D3X._deltaQ(e,val)).multiply(D3X._isoQ(val,D3X.TILT_MATCH));
+        d.obj.scale.setScalar((d.w0||cr.width)*D3X.MSCALE);
+        d.obj.position.set(cr.left-mr.left+cr.width/2,
+                           -(cr.top-mr.top+cr.height/2));
+        d.obj.quaternion.copy(D3X._isoQ(val,D3X.TILT_MATCH));
         return;
       }
       var cs=getComputedStyle(d.chip);
       var vis=cr.width>=1&&cs.visibility!=='hidden'&&cs.display!=='none'&&+cs.opacity>.02;
       if(zoomed&&d!==zoomed)vis=false;/* the rest vanish while focusing */
-      d.obj.visible=vis;if(d.sh)d.sh.visible=vis;
+      d.obj.visible=vis;
       if(!vis)return;
       var sz=cr.width*(d===zoomed?0.92:0.80);
       d.obj.scale.setScalar(sz);
@@ -16397,12 +16324,6 @@ var D3X={
       }else{
         d.obj.quaternion.copy(D3X._isoQ(d.val));
         d.obj.userData.posed=d.val;
-      }
-      if(d.sh){
-        d.sh.visible=vis&&d!==zoomed;/* no twin behind the focused die */
-        d.sh.scale.setScalar(sz);
-        d.sh.quaternion.copy(D3X._isoQ(d.val));
-        d.sh.position.set(x+sz*0.055,y-sz*0.075,-1);
       }
     });
     r.render(this.scene,this.cam);

@@ -3300,3 +3300,32 @@ cache key was the live projected extent of a tumbling cube, which sweeps
 Verified worst hit-box gap across all six dice: **0.06px idle, 2.47px during
 a tap animation, 0.09px after a die is removed mid-turn** (was ~25px).
 
+## P188 — the legacy engine stops animating match dice
+
+The review's most useful finding was not a bug: the CSS-cube engine was still
+fully animating every match die — integration, neighbour shove and ~24 style
+writes per die per frame, measured at **0.5 ms/frame across 54 elements** —
+on a subtree that is hidden. It could not simply be switched off, because
+D3X CONSUMED its output: the mirror branch read `e.pitch/yaw/spin/h/x/ox` to
+pose any die that had not been through physics. That entanglement was the
+complexity, so the fix is a deletion rather than another guard.
+
+The 3D path now owns it outright. A match die with no physics pose sits at
+its DOM slot in the shared rest pose — no mirroring, no shove — and the
+legacy engine skips owned dice in `D3.draw`, in the integration loop and in
+the group shove. Its whole slot is hidden now rather than just the cube,
+which also disposes of the old ellipse shadow.
+
+Deleted with it:
+- `_cssQ` + `_deltaQ` — the entire y-down-to-y-up mirror, the one piece of
+  code that required the two engines to agree about anything
+- `_contact`, `_mkShadowQuad`, `_shadowTex` and the `SHADOW_*` dials, dead
+  since the 2D shadow pass took over in P182
+- `_mkShadow` and the shadow-twin (`SHADOW:false` was hardcoded, so the twin
+  had never been built)
+
+D3X is 967 lines, down from 993, and does strictly less per frame. Verified
+in a live match: 6/6 dice settled, faces correct, all six skipped by the
+legacy loop (`D3.draw` for them costs 0.000 ms), all six slots hidden, frame
+time 0.21 ms (was 0.24).
+
