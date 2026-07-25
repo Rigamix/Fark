@@ -2779,3 +2779,26 @@ requestAnimationFrame, so a roll never actually animates to its landing —
 every measurement was taken with the dice still at spin 0. Landing state has
 to be checked against `d.to`, not against whatever the frozen dice show.
 
+## P167 — the table dice sit higher, on a wider lens
+
+Denis: *"all aligned now thanks. But they need to be seen more from the top to
+match the table angle, and you can push the lens a bit wider"*.
+
+"More from the top" is the die's own pitch, which the shelf shares — so the
+match now has its own: `TILT_MATCH = 38` against the shelf's `TILT = 25`.
+`_isoQ(val, tilt)` caches a pose per tilt value, so both dials stay live.
+Lens: `FOV_MATCH = 24 -> 34`.
+
+Measuring this needed a different instrument. A cube's SILHOUETTE barely
+changes with pitch — 36px wide at both 25° and 45°, height only 44 -> 47 —
+so the outline says nothing about how much top face shows. That lives in the
+shading, so the boundary is found as the luminance step down a column beside
+the pips. Top-face share then reads 16% / 22% / 24% / 26% / 26% across tilt
+25 / 30 / 35 / 38 / 40 — climbing, and flattening by 38, which is where it
+sits. That also stays clear of the ~45° trap from P159: at 45 the front and
+top faces are equal and the shape reads as reverse perspective.
+
+Final state on the table: widths 39/38/36/36/38/39 (spread 3px, up from 2 —
+the cost of the wider lens), heights all 46, tops and bottoms dead level,
+gaps even, max row-by-row difference between any two dice 3px.
+

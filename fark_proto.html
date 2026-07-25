@@ -15319,7 +15319,7 @@ var D3X={
         4:[[0,-1,0],[1,0,0],[0,0,1]],
         5:[[-1,0,0],[0,0,-1],[0,-1,0]],
         6:[[0,-1,0],[0,0,-1],[1,0,0]]},
-  ISO:null,TILT:25,YAW:0,ROLL:90,
+  ISO:null,TILT:25,TILT_MATCH:38,YAW:0,ROLL:90,
   /* the CSS engine's orientation as a three quaternion. Its rotv applies
      yaw, then pitch, then spin, then turn, then the global tilt - and its y
      axis points DOWN the screen, so x and z rotations flip sign here. */
@@ -15342,14 +15342,19 @@ var D3X={
     var rest=this._cssQ(tl,e.turn||0,0,fr[0]+(e.restTop?90:0),fr[1]);
     return now.multiply(rest.invert());
   },
-  _isoQ:function(val){
-    if(!this.ISO){
+  _isoQ:function(val,tilt){
+    /* cached per tilt so the dial stays live and the two surfaces can
+       differ - the table is seen from higher up than the shelf */
+    var t=(tilt===undefined?this.TILT:tilt);
+    var cache=this._isoC||(this._isoC={});
+    if(!cache[t]){
       var yaw=new THREE.Quaternion().setFromAxisAngle(
         new THREE.Vector3(0,1,0),THREE.MathUtils.degToRad(this.YAW));
       var tip=new THREE.Quaternion().setFromAxisAngle(
-        new THREE.Vector3(1,0,0),THREE.MathUtils.degToRad(this.TILT));
-      this.ISO=tip.multiply(yaw);/* turn a little, then tip a little */
+        new THREE.Vector3(1,0,0),THREE.MathUtils.degToRad(t));
+      cache[t]=tip.multiply(yaw);/* turn a little, then tip a little */
     }
+    this.ISO=cache[t];
     /* the value face looks AT the camera; the tilt/yaw only reveal a
        sliver of the top and one side, like the painted dice */
     var f=this.FACE[val]||this.FACE[1];
@@ -15396,7 +15401,7 @@ var D3X={
     g.add(m);
     return g;
   },
-  focus:null,SHADOW:false,FOV:40,FOV_MATCH:24,MSCALE:0.86,_matchOn:false,
+  focus:null,SHADOW:false,FOV:40,FOV_MATCH:34,MSCALE:0.86,_matchOn:false,
   _bindDrag:function(){
     if(this._dragBound)return;this._dragBound=true;
     var self=this,down=null;
@@ -15577,7 +15582,7 @@ var D3X={
         d.obj.position.set(
           cr.left-mr.left+cr.width/2+(e.x||0)+(e.ox||0),
           -(cr.top-mr.top+cr.height/2+((e.y||0)-hv*0.55*e.s)));
-        d.obj.quaternion.copy(D3X._deltaQ(e,val)).multiply(D3X._isoQ(val));
+        d.obj.quaternion.copy(D3X._deltaQ(e,val)).multiply(D3X._isoQ(val,D3X.TILT_MATCH));
         return;
       }
       var cs=getComputedStyle(d.chip);
