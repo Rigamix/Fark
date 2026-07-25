@@ -2615,3 +2615,50 @@ camera-distance-to-die ratio (34.5 die-widths) so the dice show the same
 perspective, just magnified — verified 110x135 px, outer dice 6.4% wider,
 matching the game's proportions.
 
+## P163 — real 3D dice on the match table
+
+Match dice are not `.d3chip` placeholders: each is a `.die` host owning a
+CSS-cube instance (`el._d3`) driven by the D3 engine — roll, hop, neighbour
+shove, hover, settle, reroll, scatter. Rather than write a second animation
+system, **D3X mirrors that engine**:
+
+- `_cssQ(tilt,turn,spin,pitch,yaw)` rebuilds the engine's orientation as a
+  quaternion. Its `rotv` applies yaw → pitch → spin → turn → tilt, and its y
+  axis points DOWN the screen, so x and z rotations flip sign.
+- `_deltaQ(e,val)` = how far the cube has turned from where it RESTS for that
+  value. That same world-space turn is applied to the 3D die's rest pose, so
+  a roll tumbles identically and lands on exactly the face the game says.
+- position, hop and the hover scale are read straight off the engine
+  (`x + ox`, `y - h*0.55*s`, `1 + h*0.004`).
+
+Every existing roll/reroll/settle/scatter path therefore drives the 3D dice
+with no new animation code, and the CSS cube is hidden per-die (its ground
+shadow stays).
+
+Surface arbitration is now one `tick()` per frame: a `.d3chip` only counts if
+it actually has a box, so a CLOSED panel can no longer steal the canvas from
+the table (that fought every frame). Dropping a die always restores the cube
+it was covering.
+
+Selection: the cube used to draw its own glow, so the game's gold outline
+(`.die-wrap::after`) was switched off for cube dice. It is back on for 3D
+dice — 3px `--gold`, inset -4px, octagon clip, z 5 over the canvas.
+
+`D3X.FOV_MATCH = 55` — the table gets the wider lens Denis asked for (the
+shelf stays at 40). `D3X.MSCALE = 0.86` sizes a die against its host box.
+
+Verified in a live match, from rendered pixels:
+- orientation mirror is **exact to 1.7e-15 across 1200 random poses** (every
+  face normal, checked against `D3.rotv` itself).
+- all six dice show the **correct face** (pip-counted off the canvas twice,
+  after independent rolls: 3/1/4/1/6/2 and 4/6/4/3/2/1).
+- hop/shove/scale mirror exact: dx 17 vs 17, dy 18.2 vs 18.2, scale 1.088 vs
+  1.088; restoring the engine values returns the die to 0.00 degrees error.
+- 25 consecutive ticks hold one state (`screen-match/6/true`) — no thrash.
+- ~0.33 ms per tick+frame for six dice.
+
+NOT yet exercised: a live roll animation (this pane freezes rAF, so the
+tumble was verified mathematically rather than watched), and the kept-tray /
+opponent rows, which take the same code path but were not reached in test.
+Next: port the lab's silhouette outline+glow to replace the box ring.
+

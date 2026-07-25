@@ -1188,6 +1188,11 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 /* ── real 3D dice: the CSS cube stays for layout/hit-testing but is
    not painted; #d3xCanvas draws the actual dice over the same box ── */
 html.fk3d .d3chip .die,html.fk3d .nrdie .d3host .die{visibility:hidden}
+/* match dice: only the CUBE hides - the host keeps its hit box and its
+   ground shadow, and the gold selection ring (which the cube used to draw
+   for itself) comes back on */
+html.fk3d #screen-match .die-wrap:has(.die.d3on.selected)::after{display:block !important}
+#screen-match #d3xCanvas{z-index:2}
 #d3xCanvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;
   z-index:2}
 #ptPanelSheet #d3xCanvas{z-index:2}
@@ -15300,6 +15305,28 @@ var D3X={
         5:[[-1,0,0],[0,0,-1],[0,-1,0]],
         6:[[0,-1,0],[0,0,-1],[1,0,0]]},
   ISO:null,TILT:25,YAW:0,ROLL:90,
+  /* the CSS engine's orientation as a three quaternion. Its rotv applies
+     yaw, then pitch, then spin, then turn, then the global tilt - and its y
+     axis points DOWN the screen, so x and z rotations flip sign here. */
+  _cssQ:function(tilt,turn,spin,pitch,yaw){
+    var R=THREE.MathUtils.degToRad,X=this._X||(this._X=new THREE.Vector3(1,0,0)),
+        Y=this._Y||(this._Y=new THREE.Vector3(0,1,0)),Z=this._Z||(this._Z=new THREE.Vector3(0,0,1));
+    var q=new THREE.Quaternion().setFromAxisAngle(X,-R(tilt));
+    if(turn)q.multiply(new THREE.Quaternion().setFromAxisAngle(Y,R(turn)));
+    if(spin)q.multiply(new THREE.Quaternion().setFromAxisAngle(Z,-R(spin)));
+    q.multiply(new THREE.Quaternion().setFromAxisAngle(X,-R(pitch)));
+    q.multiply(new THREE.Quaternion().setFromAxisAngle(Y,R(yaw)));
+    return q;
+  },
+  /* how far the cube has turned away from where it RESTS for this value.
+     That same world-space turn is then applied to the 3D die's rest pose,
+     so a roll tumbles identically and lands on the right face. */
+  _deltaQ:function(e,val){
+    var tl=(e.tilt!=null?e.tilt:D3.cfg.tilt),fr=D3.FACE_ROT[val]||[0,0];
+    var now=this._cssQ(tl,e.turn||0,e.spin||0,e.pitch||0,e.yaw||0);
+    var rest=this._cssQ(tl,e.turn||0,0,fr[0]+(e.restTop?90:0),fr[1]);
+    return now.multiply(rest.invert());
+  },
   _isoQ:function(val){
     if(!this.ISO){
       var yaw=new THREE.Quaternion().setFromAxisAngle(
@@ -15354,7 +15381,7 @@ var D3X={
     g.add(m);
     return g;
   },
-  focus:null,SHADOW:false,FOV:40,
+  focus:null,SHADOW:false,FOV:40,FOV_MATCH:55,MSCALE:0.86,_matchOn:false,
   _bindDrag:function(){
     if(this._dragBound)return;this._dragBound=true;
     var self=this,down=null;
@@ -15379,11 +15406,28 @@ var D3X={
     this.mount=el;
     el.appendChild(this.renderer.domElement);
   },
+  /* a chip inside a closed panel still exists but has no box - it must not
+     be allowed to claim the canvas away from whatever is on screen */
+  _liveChips:function(root){
+    return [].slice.call((root||document).querySelectorAll('.d3chip')).filter(function(c){
+      var r=c.getBoundingClientRect();return r.width>1&&r.height>1;
+    });
+  },
+  /* one owner for "which surface holds the dice", run every frame */
+  tick:function(){
+    if(!this.ready||this.fail)return;
+    if(this._liveChips(document).length){
+      this._matchOn=false;
+      this.sync(document);
+    }else{
+      this.syncMatch();
+    }
+  },
   /* rebuild the die list from the .d3chip placeholders inside the mount */
   sync:function(root){
     if(!this.ready){var self=this;this.boot(function(){self.sync(root);});return;}
     root=root||document;
-    var chips=[].slice.call(root.querySelectorAll('.d3chip'));
+    var chips=this._liveChips(root);
     if(!chips.length)return;
     /* the surface that owns these chips = nearest painted stage */
     var host=chips[0].closest('#loStage,#ptPanelSheet,#stStage,#gbSheet,#nrStage,#screen-match')
@@ -15393,8 +15437,8 @@ var D3X={
     /* drop dice whose chip is gone */
     var self=this;
     this.dice=this.dice.filter(function(d){
-      if(d.chip.isConnected&&host.contains(d.chip))return true;
-      self.scene.remove(d.obj);if(d.sh)self.scene.remove(d.sh);return false;
+      if(!d.match&&d.chip.isConnected&&host.contains(d.chip))return true;
+      self._drop(d);return false;
     });
     chips.forEach(function(ch){
       if(!host.contains(ch))return;
@@ -15413,13 +15457,50 @@ var D3X={
     this.on=true;
     this.frame();
   },
+  syncMatch:function(){
+    var sc=document.getElementById('screen-match');
+    var live=sc&&sc.classList.contains('active')&&sc.querySelector('.die.d3on');
+    if(!live){
+      if(this._matchOn){this._matchOn=false;this.detach();}
+      return;
+    }
+    if(!this.ready){var self0=this;this.boot(function(){self0.syncMatch();});return;}
+    var self=this;
+    if(!this._matchOn||this.mount!==sc){
+      this.dice.forEach(function(d){self._drop(d);});
+      this.dice=[];
+      this._matchOn=true;
+    }
+    this.attachTo(sc);
+    document.documentElement.classList.add('fk3d');
+    var live3=[].slice.call(sc.querySelectorAll('.die.d3on')).filter(function(el){return !!el._d3;});
+    this.dice=this.dice.filter(function(d){
+      if(live3.indexOf(d.chip)>=0)return true;
+      self._drop(d);return false;
+    });
+    live3.forEach(function(el){
+      if(self.dice.some(function(d){return d.chip===el;}))return;
+      var mat=el._trueMat||'bone',val=el._trueVal||1;
+      var obj=self._mkDie(mat);
+      obj.quaternion.copy(self._isoQ(val));
+      self.scene.add(obj);
+      try{el._d3.die.style.visibility='hidden';}catch(e){}
+      self.dice.push({chip:el,obj:obj,sh:null,mat:mat,val:val,match:true,
+        uYaw:0,uPit:0,t0:performance.now()});
+    });
+    this.on=true;
+  },
+  _drop:function(d){
+    this.scene.remove(d.obj);if(d.sh)this.scene.remove(d.sh);
+    if(d.match){try{if(d.chip._d3)d.chip._d3.die.style.visibility='';}catch(e){}}
+  },
   detach:function(){
     this.on=false;
     var c=this.renderer&&this.renderer.domElement;
     if(c&&c.parentNode)c.parentNode.removeChild(c);
     this.mount=null;
     var self=this;
-    this.dice.forEach(function(d){self.scene.remove(d.obj);if(d.sh)self.scene.remove(d.sh);});
+    this.dice.forEach(function(d){self._drop(d);});
     this.dice=[];
     document.documentElement.classList.remove('fk3d');
   },
@@ -15429,13 +15510,15 @@ var D3X={
     var mr=this.mount.getBoundingClientRect();
     if(mr.width<2||mr.height<2)return;
     var r=this.renderer;
-    if(this._w!==mr.width||this._h!==mr.height){
+    var fov=this._matchOn?this.FOV_MATCH:this.FOV;
+    if(this._w!==mr.width||this._h!==mr.height||this._fov!==fov){
+      this._fov=fov;
       r.setSize(mr.width,mr.height,false);
       /* one camera, a normal lens (~50mm): far enough back that a die is
          not distorted, close enough that it is not flat orthographic.
          One world unit stays one CSS pixel on the dice plane. */
-      var dist=(mr.height/2)/Math.tan(THREE.MathUtils.degToRad(this.FOV)/2);
-      this.cam.fov=this.FOV;
+      var dist=(mr.height/2)/Math.tan(THREE.MathUtils.degToRad(fov)/2);
+      this.cam.fov=fov;
       this.cam.aspect=mr.width/mr.height;
       this.cam.near=Math.max(1,dist*.5);this.cam.far=dist*1.5;
       this.cam.position.set(mr.width/2,-mr.height/2,dist);
@@ -15466,6 +15549,22 @@ var D3X={
     var now=performance.now();
     this.dice.forEach(function(d){
       var cr=d.chip.getBoundingClientRect();
+      if(d.match){
+        var e=d.chip._d3;
+        if(!e||cr.width<1){d.obj.visible=false;return;}
+        var mcs=getComputedStyle(d.chip);
+        var mvis=mcs.visibility!=='hidden'&&mcs.display!=='none'&&+mcs.opacity>.02;
+        d.obj.visible=mvis;
+        if(!mvis)return;
+        var val=d.chip._trueVal||e.result||1;
+        var hv=e.h||0;
+        d.obj.scale.setScalar(cr.width*D3X.MSCALE*(1+hv*0.004));
+        d.obj.position.set(
+          cr.left-mr.left+cr.width/2+(e.x||0)+(e.ox||0),
+          -(cr.top-mr.top+cr.height/2+((e.y||0)-hv*0.55*e.s)));
+        d.obj.quaternion.copy(D3X._deltaQ(e,val)).multiply(D3X._isoQ(val));
+        return;
+      }
       var cs=getComputedStyle(d.chip);
       var vis=cr.width>=1&&cs.visibility!=='hidden'&&cs.display!=='none'&&+cs.opacity>.02;
       if(zoomed&&d!==zoomed)vis=false;/* the rest vanish while focusing */
@@ -15505,6 +15604,7 @@ var D3X={
 /* keep the 3D layer in step with the DOM */
 (function(){
   var raf=function(){
+    try{D3X.tick();}catch(e){}
     try{if(D3X.on)D3X.frame();}catch(e){}
     requestAnimationFrame(raf);
   };
