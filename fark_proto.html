@@ -14237,6 +14237,9 @@ function _drawDiceShadows(tSec){
   (D3.list||[]).forEach(function(d){
     if(d.group!=='match'||!d.slot||!d.slot.isConnected)return;
     if(d.slot.offsetParent===null)return;
+    /* the 3D layer casts a real shadow for this one - drawing the flat
+       blob as well would double it, at the wrong place and angle */
+    if(d._d3xOwned)return;
     var h=d.h||0,s2=d.s;
     var sr=d.slot.getBoundingClientRect();
     if(!sr.width)return;
@@ -15597,6 +15600,19 @@ var D3X={
   _tableRoot:function(){
     if(!this._tbl){
       this._tbl=new THREE.Group();
+      /* a shadow catcher lying on the table: invisible except where a die
+         darkens it, so the painted table shows through everywhere else */
+      var g=new THREE.PlaneGeometry(40,40);
+      var m=new THREE.ShadowMaterial({opacity:0.34});
+      var pl=new THREE.Mesh(g,m);
+      pl.rotation.x=-Math.PI/2;
+      pl.position.y=0;
+      pl.receiveShadow=true;
+      this._tbl.add(pl);
+      /* the key light travels with the table so the shadow always falls
+         across it, whatever angle the table is set to */
+      if(this._key){this._tbl.add(this._key);this._key.position.set(1.2,9,3.2);
+        this._key.target.position.set(0,0,0);this._tbl.add(this._key.target);}
       this.scene.add(this._tbl);
     }
     return this._tbl;
@@ -15742,6 +15758,8 @@ var D3X={
     var self=this;
     var r=new THREE.WebGLRenderer({antialias:true,alpha:true});
     r.setPixelRatio(Math.min(devicePixelRatio,2));
+    r.shadowMap.enabled=true;
+    r.shadowMap.type=THREE.PCFSoftShadowMap;
     r.outputEncoding=THREE.sRGBEncoding;
     r.toneMapping=THREE.NoToneMapping;
     r.domElement.id='d3xCanvas';
@@ -15750,6 +15768,14 @@ var D3X={
     /* the tavern's candle rig, matched to the painted screens */
     /* soft warm key from above, warm ambient so shadows stay warm */
     var key=new THREE.DirectionalLight(0xfff1d6,.95);key.position.set(.12,1,.42);sc.add(key);
+    /* the candle overhead: casts the dice shadows onto the table. The
+       shadow camera is sized in die-widths and re-aimed with the table. */
+    key.castShadow=true;
+    key.shadow.mapSize.set(1024,1024);
+    var sh=key.shadow.camera;
+    sh.near=-20;sh.far=40;sh.left=-9;sh.right=9;sh.top=9;sh.bottom=-9;
+    key.shadow.bias=-0.0022;key.shadow.normalBias=0.03;
+    this._key=key;
     var warm=new THREE.DirectionalLight(0xffd9a8,.28);warm.position.set(-.6,.25,.5);sc.add(warm);
     sc.add(new THREE.AmbientLight(0xb08a5e,.85));
     this.cam=new THREE.PerspectiveCamera(this.FOV,1,1,20000);
@@ -15862,6 +15888,7 @@ var D3X={
           map:src.map||null,normalMap:src.normalMap||null,
           color:new THREE.Color(col),specular:0x000000,shininess:0,
           reflectivity:0});
+        o.castShadow=true;o.receiveShadow=false;
         self._dress(o.material,mat,sk);
       }
     });
@@ -16067,6 +16094,7 @@ var D3X={
           d.obj.scale.setScalar(1);
           d.obj.position.set(pose.x,pose.y,pose.z);
           d.obj.quaternion.copy(pose.q);
+          e._d3xOwned=true;
           D3X._slaveHost(d,root);
           return;
         }
@@ -16082,6 +16110,7 @@ var D3X={
           d.obj.visible=true;d.obj.scale.setScalar(1);
           d.obj.position.set(d.phys.x,d.phys.y,d.phys.z);
           d.obj.quaternion.copy(d.phys.q);
+          if(e)e._d3xOwned=true;
           D3X._slaveHost(d,root3);
           return;
         }

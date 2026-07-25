@@ -3099,3 +3099,30 @@ Note the slot pitch is now 1.6 die-widths, not the 1.38 in `TABLE.pitch` —
 the dice got 10% smaller in P177 while the DOM row kept its 51px spacing.
 Slots are measured off the DOM, so that constant is now unused.
 
+## P180 — real shadows for the physics dice
+
+The old dice shadows are painted on a 2D canvas from the CSS cubes' SLOT
+positions. Those cubes are hidden and no longer where the dice are, so the
+blobs sat under the wrong places and never turned with a die.
+
+Physics dice now cast a genuine shadow onto the table they are lying on:
+`shadowMap` on with PCF soft filtering, the key light casts, dice cast, and a
+`ShadowMaterial` plane lies flat in the table group as a catcher — invisible
+except where a die darkens it, so the painted table shows through. The light
+and the catcher are both CHILDREN of the table group, so they follow whatever
+angle `TABLE.tilt` is set to and the shadow always falls across the table.
+
+The legacy 2D pass now skips any die the 3D layer owns (`_d3xOwned`), which
+would otherwise double the shadow at the wrong place and angle.
+
+Verified in a live match: shadow map on, key casting, catcher present, dice
+casting, legacy blob suppressed, and 128 semi-transparent pixels of cast
+shadow around a die that previously had none of its own.
+
+STILL OPEN: the selection outline+glow. The lab's is a screen-space pipeline
+— a mask layer rendered to a target, two tight blur passes for the
+anti-aliased silhouette and outline band, four wide passes for the falloff,
+then an additive glow pass and an alpha line pass composited over the frame.
+The game currently falls back to the DOM gold octagon ring from P163. That
+port is the next job.
+
