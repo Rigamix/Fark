@@ -15299,15 +15299,7 @@ var D3X={
         4:[[0,-1,0],[1,0,0],[0,0,1]],
         5:[[-1,0,0],[0,0,-1],[0,-1,0]],
         6:[[0,-1,0],[0,0,-1],[1,0,0]]},
-  ISO:null,TILT:42,YAW:0,ROLL:90,
-  /* a die away from the middle of the screen is seen slightly from the
-     side; turn it to face the lens so the row still reads square-on */
-  _aimQ:function(x,y){
-    var v=this._v||(this._v=new THREE.Vector3());
-    v.set(this.cam.position.x-x,this.cam.position.y-y,this.cam.position.z).normalize();
-    var q=this._aq||(this._aq=new THREE.Quaternion());
-    return q.setFromUnitVectors(this._z||(this._z=new THREE.Vector3(0,0,1)),v);
-  },
+  ISO:null,TILT:0,YAW:0,ROLL:90,EL:40,
   _isoQ:function(val){
     if(!this.ISO){
       var yaw=new THREE.Quaternion().setFromAxisAngle(
@@ -15362,7 +15354,7 @@ var D3X={
     g.add(m);
     return g;
   },
-  focus:null,SHADOW:false,FOV:40,
+  focus:null,SHADOW:false,LENS:7,PAD:2.6,
   _bindDrag:function(){
     if(this._dragBound)return;this._dragBound=true;
     var self=this,down=null;
@@ -15439,14 +15431,6 @@ var D3X={
     var r=this.renderer;
     if(this._w!==mr.width||this._h!==mr.height){
       r.setSize(mr.width,mr.height,false);
-      /* place the lens so one world unit is still one CSS pixel on the
-         dice plane - everything else (sizes, positions) keeps working */
-      var dist=(mr.height/2)/Math.tan(THREE.MathUtils.degToRad(this.FOV)/2);
-      this.cam.fov=this.FOV;
-      this.cam.aspect=mr.width/mr.height;
-      this.cam.position.set(mr.width/2,-mr.height/2,dist);
-      this.cam.lookAt(mr.width/2,-mr.height/2,0);
-      this.cam.updateProjectionMatrix();
       this._w=mr.width;this._h=mr.height;
     }
     /* a die in focus owns the screen: everything else steps aside */
@@ -15468,7 +15452,7 @@ var D3X={
       if(zoomed){zoomed.uYaw=0;zoomed.uPit=0;zoomed.t0=performance.now();}
       this.focus=zoomed;
     }
-    var now=performance.now();
+    var now=performance.now(),shots=[];
     this.dice.forEach(function(d){
       var cr=d.chip.getBoundingClientRect();
       var cs=getComputedStyle(d.chip);
@@ -15481,32 +15465,66 @@ var D3X={
       var x=cr.left-mr.left+cr.width/2,y=-(cr.top-mr.top+cr.height/2);
       d.obj.position.set(x,y,0);
       /* focus: a slow turn, plus whatever the player has dragged */
-      var aim=D3X._aimQ(x,y);
       if(d===zoomed){
         /* the slow turn never stops; dragging just adds to it */
         var idle=(now-d.t0)*0.00042;
         var extra=new THREE.Quaternion().setFromEuler(
           new THREE.Euler(d.uPit||0,(d.uYaw||0)+idle,0,'YXZ'));
-        d.obj.quaternion.copy(aim).multiply(extra).multiply(D3X._isoQ(d.val));
+        d.obj.quaternion.copy(extra).multiply(D3X._isoQ(d.val));
       }else if(d.retT0){
         var rk=Math.min(1,(now-d.retT0)/450);
         var re=1-Math.pow(1-rk,3);
-        var home=aim.clone().multiply(D3X._isoQ(d.val));
-        d.obj.quaternion.copy(d.retFrom).slerp(home,re);
+        d.obj.quaternion.copy(d.retFrom).slerp(D3X._isoQ(d.val),re);
         if(rk>=1){d.retT0=0;d.retFrom=null;}
         d.obj.userData.posed=-1;
       }else{
-        d.obj.quaternion.copy(aim).multiply(D3X._isoQ(d.val));
+        d.obj.quaternion.copy(D3X._isoQ(d.val));
         d.obj.userData.posed=d.val;
       }
       if(d.sh){
         d.sh.visible=vis&&d!==zoomed;/* no twin behind the focused die */
         d.sh.scale.setScalar(sz);
-        d.sh.quaternion.copy(aim).multiply(D3X._isoQ(d.val));
+        d.sh.quaternion.copy(D3X._isoQ(d.val));
         d.sh.position.set(x+sz*0.055,y-sz*0.075,-1);
       }
+      shots.push({d:d,cx:cr.left-mr.left+cr.width/2,cy:cr.top-mr.top+cr.height/2,
+        sz:sz,sh:!!(d.sh&&d.sh.visible)});
     });
-    r.render(this.scene,this.cam);
+    /* Every die gets its OWN little lens, aimed dead-on at it, so all of
+       them render IDENTICALLY - one shared angle, all aligned - while each
+       still shows real near/far perspective. One camera at screen scale
+       can't do that: a 24px die 800px away tapers 4%, which reads as no
+       perspective at all and the far edge looks the wrong size. The lens
+       sits LENS die-widths away, so the taper is the same for every die
+       whatever the screen size. */
+    var cam=this.cam,LENS=this.LENS,PAD=this.PAD,EL=this.EL;
+    this.dice.forEach(function(d){d.obj.visible=false;if(d.sh)d.sh.visible=false;});
+    r.autoClear=false;
+    r.clear();
+    r.setScissorTest(true);
+    shots.forEach(function(s){
+      var vw=s.sz*PAD,vh=s.sz*PAD;
+      var vx=s.cx-vw/2,vy=mr.height-(s.cy+vh/2);
+      var dist=s.sz*LENS,rise=dist*Math.tan(EL*Math.PI/180);
+      /* shift lens: the lens is raised by `rise` but NOT tilted down, so
+         the value face stays parallel to the film and renders square.
+         The frustum is widened and an off-centre slice of it is taken. */
+      var fh=vh+2*rise;
+      cam.fov=2*Math.atan((fh/2)/dist)*180/Math.PI;
+      cam.aspect=vw/fh;
+      cam.near=Math.max(.5,dist-s.sz*2);cam.far=dist+s.sz*2;
+      cam.setViewOffset(vw,fh,0,fh/2+rise-vh/2,vw,vh);
+      cam.position.set(s.d.obj.position.x,s.d.obj.position.y+rise,dist);
+      cam.rotation.set(0,0,0);
+      cam.updateMatrixWorld(true);
+      cam.updateProjectionMatrix();
+      s.d.obj.visible=true;if(s.d.sh)s.d.sh.visible=s.sh;
+      r.setViewport(vx,vy,vw,vh);r.setScissor(vx,vy,vw,vh);
+      r.render(D3X.scene,cam);
+      s.d.obj.visible=false;if(s.d.sh)s.d.sh.visible=false;
+    });
+    r.setScissorTest(false);
+    r.setViewport(0,0,mr.width,mr.height);
   }
 };
 /* keep the 3D layer in step with the DOM */

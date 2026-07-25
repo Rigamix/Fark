@@ -2531,3 +2531,55 @@ Verified by projecting all 8 cube corners per die:
 
 `D3X.FOV` is the single dial: higher = more taper, lower = flatter.
 
+## P160-P161 — the dice stop reading as reverse-perspective
+
+Denis, twice: *"the front of the die (closer) is smaller than the back
+(further)"* / *"still gives the same effect"*, then the diagnosis that
+cracked it: *"I think they all have a slight different angle, trying to face
+camera. Just have one angle for all, all aligned."*
+
+Two separate faults, both now fixed.
+
+**1. Per-die aim (P159) gave every die its own angle.** Removed. `_aimQ` is
+gone.
+
+**2. The pose itself could never read right.** Measured off the actual
+rendered pixels (silhouette width per row, alpha > 140), the die at TILT=42
+came out **24 → 26 → 24 px**: widest in the middle. Tipping a die back makes
+its NEAREST point the top-front edge, so the silhouette bulges at the centre
+and the bottom (front) and top (back) land at the same width. No lens
+strength fixes it — at TILT=42 the front-bottom and top-back edges sit within
+0.074 die-widths of each other in depth, so they project the same size by
+construction.
+
+**The fix: a shift lens.** The die now stands upright and dead-on (TILT=0,
+YAW=0) and the from-above look comes from a *raised but untilted* camera —
+the film plane stays parallel to the value face, the way dice are drawn:
+
+- per die: `dist = LENS * sz`, `rise = dist * tan(EL)`, camera at
+  `(x, y + rise, dist)` with **no** `lookAt` (rotation stays zero), and
+  `setViewOffset` takes an off-centre slice of a taller frustum.
+- each die renders into its own scissored viewport, so all six are
+  pixel-identical: **one angle, all aligned.**
+
+Dials: `D3X.EL` (40) = how far above; `D3X.LENS` (7) = lens distance in
+die-widths, lower = stronger taper; `D3X.PAD` (2.6) = viewport margin.
+
+Verified from rendered pixels, not from intent:
+- profile is now monotone — `20 21 23 23 … 25 25 25 … 25 23 20`: the top face
+  narrows toward the back, the value face is a constant-width rectangle.
+- bottom edge **6.9%** wider than the top edge (was 0%, and briefly a 4%
+  taper at P159 that Denis correctly called as no change).
+- **max row difference between the six dice: 0 px.**
+- focus die and the eased return home still land exactly on the shared rest
+  angle.
+
+### Texture lab (local, not shipped)
+Defaults are now what the work actually needs: **rail of six**, normal map
+**off**, and the rail is drawn with the game's own rig (same EL/LENS/PAD,
+same per-die shift lens) so a texture is judged in the shape it will ship in.
+Added a **specular map** slot — file picker plus drag-drop on any name
+containing spec/rough/gloss — with strength and gloss sliders. White in the
+map = shiny. Strength is 0 (fully matte) until a map is loaded, then it
+auto-lifts to 45 so the effect is visible immediately.
+
