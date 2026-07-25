@@ -2384,3 +2384,19 @@ dice"). The model now ships as assets/models/die_glb.js (base64 in a
 script tag - script loading is allowed on file://) and D3X parses it
 with GLTFLoader.parse(); it falls back to .load() if the script is
 absent. Same trick the standalone lab uses.
+
+## P151 - 3D dice: pose, size and lighting pass (done)
+
+Denis: angle wrong, too big, no specular. (1) POSE - the tilt sign
+was inverted, tipping each die AWAY from the camera, which is why
+they read face-on. The rest pose is now built explicitly: value face
+up, yaw 45deg, then tip +38deg toward the camera (D3X.TILT/YAW), so
+the value sits on top with two side faces showing, like the painted
+reference. (2) SIZE - a tipped cube's silhouette runs ~1.35x its edge
+length, so scale went 0.92 -> 0.60 of the chip; measured silhouette
+is now 0.78 of the chip box. (3) MATERIAL - MeshPhongMaterial with
+specular black and shininess 0 = pure diffuse, keeping the GLB's
+normal map for pip depth; tone mapping off; bone tints white so the
+texture reads as painted. Rig is a soft warm key from above, a warm
+side fill and warm ambient, so shadows stay warm (verified: top face
+is the brightest, every face samples warm).

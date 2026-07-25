@@ -15225,7 +15225,7 @@ var D3X={
   ready:false,loading:false,on:false,
   mount:null,dice:[],proto:null,
   MATCOL:{
-    bone:0xf2e9d2, iron:0x9aa4b0, flint:0xbba888, lead:0x8f8f9c,
+    bone:0xffffff, iron:0x9aa4b0, flint:0xbba888, lead:0x8f8f9c,
     amber:0xffb43c, jade:0x46c46e, jade2:0x66e08a, silver:0xdfe8f2,
     obsidian:0x2c1a16, starstone:0x6f9ff0, vagabond:0xe0574e,
     lucky:0xffd270,
@@ -15257,16 +15257,15 @@ var D3X={
     var r=new THREE.WebGLRenderer({antialias:true,alpha:true});
     r.setPixelRatio(Math.min(devicePixelRatio,2));
     r.outputEncoding=THREE.sRGBEncoding;
-    r.toneMapping=THREE.ACESFilmicToneMapping;
-    r.toneMappingExposure=1.1;
+    r.toneMapping=THREE.NoToneMapping;
     r.domElement.id='d3xCanvas';
     this.renderer=r;
     var sc=new THREE.Scene();this.scene=sc;
     /* the tavern's candle rig, matched to the painted screens */
-    var key=new THREE.DirectionalLight(0xffc27a,2.1);key.position.set(-.45,1,.75);sc.add(key);
-    var fill=new THREE.DirectionalLight(0x7d90c0,.55);fill.position.set(.7,.35,-.5);sc.add(fill);
-    sc.add(new THREE.AmbientLight(0x6b5238,1.05));
-    var ember=new THREE.DirectionalLight(0xc4571f,.5);ember.position.set(.2,-.9,.35);sc.add(ember);
+    /* soft warm key from above, warm ambient so shadows stay warm */
+    var key=new THREE.DirectionalLight(0xfff1d6,.95);key.position.set(.12,1,.42);sc.add(key);
+    var warm=new THREE.DirectionalLight(0xffd9a8,.28);warm.position.set(-.6,.25,.5);sc.add(warm);
+    sc.add(new THREE.AmbientLight(0xb08a5e,.85));
     this.cam=new THREE.OrthographicCamera(0,100,0,-100,-2000,2000);
     this.cam.position.set(0,0,600);
     var onModel=function(g){
@@ -15291,11 +15290,14 @@ var D3X={
     }else ld.load('assets/models/die.glb',onModel,undefined,onErr);
   },
   /* value-up isometric rest pose, the painted screens' reference look */
-  ISO:null,
+  ISO:null,TILT:38,YAW:45,
   _isoQ:function(val){
     if(!this.ISO){
-      this.ISO=new THREE.Quaternion().setFromEuler(
-        new THREE.Euler(THREE.MathUtils.degToRad(-52),THREE.MathUtils.degToRad(-36),0,'YXZ'));
+      var yaw=new THREE.Quaternion().setFromAxisAngle(
+        new THREE.Vector3(0,1,0),THREE.MathUtils.degToRad(this.YAW));
+      var tip=new THREE.Quaternion().setFromAxisAngle(
+        new THREE.Vector3(1,0,0),THREE.MathUtils.degToRad(this.TILT));
+      this.ISO=tip.multiply(yaw);/* spin, then tip the top toward us */
     }
     var AX={1:[0,1,0],6:[0,-1,0],2:[1,0,0],5:[-1,0,0],3:[0,0,1],4:[0,0,-1]};
     var a=AX[val]||AX[1];
@@ -15310,10 +15312,12 @@ var D3X={
     var rough=this.ROUGH[mat]!==undefined?this.ROUGH[mat]:.62;
     m.traverse(function(o){
       if(o.isMesh){
-        o.material=o.material.clone();
-        o.material.color=new THREE.Color(col);
-        o.material.roughness=rough;
-        o.material.metalness=(mat==='silver'||mat==='iron')?.35:.05;
+        var src=o.material;
+        /* diffuse only - the texture does the talking, no specular */
+        o.material=new THREE.MeshPhongMaterial({
+          map:src.map||null,normalMap:src.normalMap||null,
+          color:new THREE.Color(col),specular:0x000000,shininess:0,
+          reflectivity:0});
       }
     });
     g.add(m);
@@ -15386,7 +15390,7 @@ var D3X={
       d.obj.visible=cs.visibility!=='hidden'&&cs.display!=='none'&&+cs.opacity>.02;
       if(!d.obj.visible)return;
       live++;
-      var sz=cr.width*0.92;/* the die fills its chip a touch more than the cube did */
+      var sz=cr.width*0.60;/* the tipped cube's silhouette runs ~1.35x its edge */
       d.obj.scale.setScalar(sz);
       d.obj.position.set(cr.left-mr.left+cr.width/2,-(cr.top-mr.top+cr.height/2),0);
     });
