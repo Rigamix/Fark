@@ -2345,3 +2345,32 @@ discovered interactively), the game's iso rest pose, and BAKE:
 renders the six posed faces to a transparent PNG strip + a 40px
 game-size preview. Proves both the live-3D and the pre-baked-sprite
 (renderDieAtRest swap, match brief 1.4) integration paths.
+
+## P150 - REAL 3D DICE, phase 1 (rest dice) (done)
+
+Denis's call: one 3D die asset everywhere dice are shown as objects,
+so the shop/shelf/panel match the match table and the focus zoom can
+actually rotate. Architecture, from the renderer mapping pass: every
+dice surface is its own stacking context and only ONE is on screen at
+a time, so D3X keeps a SINGLE WebGL canvas and re-parents it into the
+live surface (#loStage / #ptPanelSheet / #stStage / #gbSheet /
+#nrStage / #screen-match). Layout stays in the DOM: each .d3chip is
+still the hit target and still defines the die's box; the canvas
+draws the real die at that rect through an orthographic camera mapped
+1:1 to CSS pixels. The CSS cube stays in the DOM but hidden
+(html.fk3d .d3chip .die{visibility:hidden}) so every existing sizing,
+state and hit path keeps working and one flag rolls the whole thing
+back. three.js + GLTFLoader + die.glb are vendored under assets/ and
+LAZY-loaded on first dice surface (no cost on the title screen).
+Per-material colour/roughness replaces the CSS TINT filters (D3X.
+MATCOL/ROUGH, relics mapped to their family colour). Hooked into
+_d3ChipScan so every rebuild path (including the loadout zero-width
+retry and the panel settle rebuild) re-syncs the 3D layer.
+
+Verified on the shelf: canvas mounts in #loStage, six dice track
+their chip rects, they render (opaque pixels at each die centre,
+transparent elsewhere) and the CSS cubes are hidden.
+
+TEST GOTCHA: the pane serves fark_proto.html from cache - a stale
+copy had D3 but not D3X, which reads exactly like a scope bug. Add a
+query string to bust it.

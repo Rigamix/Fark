@@ -1184,6 +1184,15 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 .d3f .d3wash{position:absolute;inset:0;background:#f0d8a8;opacity:0;border-radius:3px}
 .d3f .d3grnd{position:absolute;inset:0;border-radius:3px;opacity:0;
   background:linear-gradient(to top,rgba(30,18,10,.4) 0%,rgba(30,18,10,0) 55%)}
+
+/* ── real 3D dice: the CSS cube stays for layout/hit-testing but is
+   not painted; #d3xCanvas draws the actual dice over the same box ── */
+html.fk3d .d3chip .die,html.fk3d .nrdie .d3host .die{visibility:hidden}
+#d3xCanvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;
+  z-index:2}
+#ptPanelSheet #d3xCanvas{z-index:2}
+#ptPanelSheet.pt-focus #d3xCanvas{z-index:55}
+#gbShop.st-focus #d3xCanvas,#gbLoadout.lo-focus #d3xCanvas{z-index:60}
 /* ═══ PROTO GREYBOX SKIN ═══ */
 @media (min-width:520px){
   body.phone-framed{background:#222 !important;display:flex;align-items:center;justify-content:center;min-height:100vh}
@@ -15204,7 +15213,184 @@ function _d3ChipScan(root){
     if(ph.classList.contains('stdim'))die.classList.add('stdim');
     ph.appendChild(die);
   });
+  /* hand the same placeholders to the real 3D layer */
+  try{if(window.D3X)D3X.sync(root||document);}catch(e){}
 }
+
+/* ═══════ D3X — real 3D dice (three.js), phase 1: rest poses ═══════
+   One renderer, one canvas, re-parented into the live dice surface.
+   Dice are positioned from their .d3chip rects, so all existing
+   layout, sizing, hit-testing and focus code keeps working. ═══════ */
+var D3X={
+  ready:false,loading:false,on:false,
+  mount:null,dice:[],proto:null,
+  MATCOL:{
+    bone:0xf2e9d2, iron:0x9aa4b0, flint:0xbba888, lead:0x8f8f9c,
+    amber:0xffb43c, jade:0x46c46e, jade2:0x66e08a, silver:0xdfe8f2,
+    obsidian:0x2c1a16, starstone:0x6f9ff0, vagabond:0xe0574e,
+    lucky:0xffd270,
+    grogs_tooth:0x3a1f18, mabels_thimble:0xffc45c, finnicks_palm:0xe0574e,
+    corvus_ledger:0x6f9ff0, brutus_shield:0xdfe8f2, aldrics_square:0x46c46e,
+    whispers_fang:0xe0574e, ambrose_weight:0xffb43c
+  },
+  ROUGH:{obsidian:.35,silver:.3,starstone:.45,jade:.5,jade2:.45,amber:.5,lucky:.4},
+  _need:[],
+  boot:function(cb){
+    if(this.ready){cb&&cb();return;}
+    this._need.push(cb);
+    if(this.loading)return;
+    this.loading=true;
+    var self=this;
+    var add=function(src,next){
+      var sc=document.createElement('script');sc.src=src;
+      sc.onload=next;sc.onerror=function(){self.loading=false;self.fail=true;};
+      document.head.appendChild(sc);
+    };
+    add('assets/vendor/three.min.js',function(){
+      add('assets/vendor/GLTFLoader.js',function(){self._init();});
+    });
+  },
+  _init:function(){
+    var self=this;
+    var r=new THREE.WebGLRenderer({antialias:true,alpha:true});
+    r.setPixelRatio(Math.min(devicePixelRatio,2));
+    r.outputEncoding=THREE.sRGBEncoding;
+    r.toneMapping=THREE.ACESFilmicToneMapping;
+    r.toneMappingExposure=1.1;
+    r.domElement.id='d3xCanvas';
+    this.renderer=r;
+    var sc=new THREE.Scene();this.scene=sc;
+    /* the tavern's candle rig, matched to the painted screens */
+    var key=new THREE.DirectionalLight(0xffc27a,2.1);key.position.set(-.45,1,.75);sc.add(key);
+    var fill=new THREE.DirectionalLight(0x7d90c0,.55);fill.position.set(.7,.35,-.5);sc.add(fill);
+    sc.add(new THREE.AmbientLight(0x6b5238,1.05));
+    var ember=new THREE.DirectionalLight(0xc4571f,.5);ember.position.set(.2,-.9,.35);sc.add(ember);
+    this.cam=new THREE.OrthographicCamera(0,100,0,-100,-2000,2000);
+    this.cam.position.set(0,0,600);
+    new THREE.GLTFLoader().load('assets/models/die.glb',function(g){
+      var proto=g.scene;
+      var box=new THREE.Box3().setFromObject(proto);
+      var size=box.getSize(new THREE.Vector3()),c=box.getCenter(new THREE.Vector3());
+      var k=1/Math.max(size.x,size.y,size.z);/* unit cube */
+      proto.scale.setScalar(k);proto.position.sub(c.multiplyScalar(k));
+      self.proto=proto;self.ready=true;self.loading=false;
+      var q=self._need;self._need=[];
+      q.forEach(function(f){f&&f();});
+      self.frame();
+    },undefined,function(){self.loading=false;self.fail=true;});
+  },
+  /* value-up isometric rest pose, the painted screens' reference look */
+  ISO:null,
+  _isoQ:function(val){
+    if(!this.ISO){
+      this.ISO=new THREE.Quaternion().setFromEuler(
+        new THREE.Euler(THREE.MathUtils.degToRad(-52),THREE.MathUtils.degToRad(-36),0,'YXZ'));
+    }
+    var AX={1:[0,1,0],6:[0,-1,0],2:[1,0,0],5:[-1,0,0],3:[0,0,1],4:[0,0,-1]};
+    var a=AX[val]||AX[1];
+    var up=new THREE.Quaternion().setFromUnitVectors(
+      new THREE.Vector3(a[0],a[1],a[2]),new THREE.Vector3(0,1,0));
+    return this.ISO.clone().multiply(up);
+  },
+  _mkDie:function(mat){
+    var g=new THREE.Group();
+    var m=this.proto.clone(true);
+    var col=this.MATCOL[mat]||this.MATCOL.bone;
+    var rough=this.ROUGH[mat]!==undefined?this.ROUGH[mat]:.62;
+    m.traverse(function(o){
+      if(o.isMesh){
+        o.material=o.material.clone();
+        o.material.color=new THREE.Color(col);
+        o.material.roughness=rough;
+        o.material.metalness=(mat==='silver'||mat==='iron')?.35:.05;
+      }
+    });
+    g.add(m);
+    return g;
+  },
+  /* attach the canvas to a surface (only one is ever on screen) */
+  attachTo:function(el){
+    if(!this.ready||!el)return;
+    if(this.mount===el&&this.renderer.domElement.parentNode===el)return;
+    this.mount=el;
+    el.appendChild(this.renderer.domElement);
+  },
+  /* rebuild the die list from the .d3chip placeholders inside the mount */
+  sync:function(root){
+    if(!this.ready){var self=this;this.boot(function(){self.sync(root);});return;}
+    root=root||document;
+    var chips=[].slice.call(root.querySelectorAll('.d3chip'));
+    if(!chips.length)return;
+    /* the surface that owns these chips = nearest painted stage */
+    var host=chips[0].closest('#loStage,#ptPanelSheet,#stStage,#gbSheet,#nrStage,#screen-match')
+      ||chips[0].offsetParent||document.body;
+    this.attachTo(host);
+    document.documentElement.classList.add('fk3d');
+    /* drop dice whose chip is gone */
+    var self=this;
+    this.dice=this.dice.filter(function(d){
+      if(d.chip.isConnected&&host.contains(d.chip))return true;
+      self.scene.remove(d.obj);return false;
+    });
+    chips.forEach(function(ch){
+      if(!host.contains(ch))return;
+      if(self.dice.some(function(d){return d.chip===ch;}))return;
+      var mat=ch.getAttribute('data-mat')||'bone';
+      var val=parseInt(ch.getAttribute('data-val'),10)||_d3MatFace(mat);
+      var obj=self._mkDie(mat);
+      obj.quaternion.copy(self._isoQ(val));
+      self.scene.add(obj);
+      self.dice.push({chip:ch,obj:obj,mat:mat,val:val,sh:null});
+    });
+    this.on=true;
+    this.frame();
+  },
+  detach:function(){
+    this.on=false;
+    var c=this.renderer&&this.renderer.domElement;
+    if(c&&c.parentNode)c.parentNode.removeChild(c);
+    this.mount=null;
+    var self=this;
+    this.dice.forEach(function(d){self.scene.remove(d.obj);});
+    this.dice=[];
+    document.documentElement.classList.remove('fk3d');
+  },
+  /* one frame: place every die at its chip's rect, then draw */
+  frame:function(){
+    if(!this.ready||!this.on||!this.mount||!this.mount.isConnected)return;
+    var mr=this.mount.getBoundingClientRect();
+    if(mr.width<2||mr.height<2)return;
+    var r=this.renderer;
+    if(this._w!==mr.width||this._h!==mr.height){
+      r.setSize(mr.width,mr.height,false);
+      this.cam.left=0;this.cam.right=mr.width;this.cam.top=0;this.cam.bottom=-mr.height;
+      this.cam.updateProjectionMatrix();
+      this._w=mr.width;this._h=mr.height;
+    }
+    var live=0;
+    this.dice.forEach(function(d){
+      var cr=d.chip.getBoundingClientRect();
+      if(cr.width<1){d.obj.visible=false;return;}
+      var cs=getComputedStyle(d.chip);
+      d.obj.visible=cs.visibility!=='hidden'&&cs.display!=='none'&&+cs.opacity>.02;
+      if(!d.obj.visible)return;
+      live++;
+      var sz=cr.width*0.92;/* the die fills its chip a touch more than the cube did */
+      d.obj.scale.setScalar(sz);
+      d.obj.position.set(cr.left-mr.left+cr.width/2,-(cr.top-mr.top+cr.height/2),0);
+    });
+    r.render(this.scene,this.cam);
+  }
+};
+/* keep the 3D layer in step with the DOM */
+(function(){
+  var raf=function(){
+    try{if(D3X.on)D3X.frame();}catch(e){}
+    requestAnimationFrame(raf);
+  };
+  requestAnimationFrame(raf);
+})();
+
 function mkDie(val,mat,sizeClass,still){
   if(window.D3_MATCH!==false){
     const host=document.createElement('div');
