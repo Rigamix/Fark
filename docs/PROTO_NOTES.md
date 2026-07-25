@@ -2962,3 +2962,34 @@ real horizontal table: a camera looking down at a tray, dice projected from
 world XZ onto the screen, and the DOM hosts slaved to those projected
 positions so hit-testing and selection follow the dice where they land.
 
+## P175 — physics roll, stage 2: the dice land on a table
+
+The camera Denis tuned is untouched. Instead of rebuilding it, the match dice
+now live in a GROUP tilted back about X (`TABLE.tilt = 58`): the table
+recedes, dice lie flat on it with the value up and whatever yaw they landed
+with, and the far side of the tray sits higher on screen. Much less invasive
+than moving to a look-down camera, and the lens stays exactly as approved.
+
+A roll is intercepted at `D3.roll`: match dice are queued and the whole batch
+is solved together on the next tick (they are rolled in one loop, so a
+zero-delay timeout catches them all), then the recorded frames play back off
+the clock. The CSS cube keeps running underneath, hidden, so every existing
+state path — selection, scoring, bust, reroll — still works untouched.
+
+**The DOM box follows the die.** `_slaveHost` projects each die's world
+position and translates its `.die` host so it stays clickable exactly where it
+is drawn. Two bugs found doing it:
+- `.die` carries `transition:transform .08s`, so the box lagged the die every
+  frame AND the one-time "home" rect was read mid-transition. The transition
+  is now disabled while physics owns the die, and restored when it lets go.
+- `_slaveHost` projected through the table group before three had updated the
+  group's world matrix, so the first frame's positions were a frame stale.
+
+Verified at rest in a live match: **faces correct on all six**, worst
+hit-box offset **0.0px**, yaw spread **253 degrees**, uneven gaps.
+
+Testing note: an intermediate check reported wrong faces, which was the probe
+being wrong, not the code — playback was at step 58 of 74, and mid-flight the
+die is SUPPOSED to show its raw tumbling orientation; the relabel only lands
+on the final frame. Force `P.t0` into the past to measure the settled state.
+
