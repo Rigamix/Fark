@@ -15290,7 +15290,9 @@ var D3X={
     }else ld.load('assets/models/die.glb',onModel,undefined,onErr);
   },
   /* value-up isometric rest pose, the painted screens' reference look */
-  ISO:null,TILT:15,YAW:20,
+  /* measured off the GLB: which mesh axis carries which value */
+  AX:{1:[-1,0,0],6:[1,0,0],2:[0,1,0],5:[0,-1,0],3:[0,0,-1],4:[0,0,1]},
+  ISO:null,TILT:11,YAW:15,
   _isoQ:function(val){
     if(!this.ISO){
       var yaw=new THREE.Quaternion().setFromAxisAngle(
@@ -15301,8 +15303,7 @@ var D3X={
     }
     /* the value face looks AT the camera; the tilt/yaw only reveal a
        sliver of the top and one side, like the painted dice */
-    var AX={1:[0,1,0],6:[0,-1,0],2:[1,0,0],5:[-1,0,0],3:[0,0,1],4:[0,0,-1]};
-    var a=AX[val]||AX[1];
+    var a=(this.AX[val]||this.AX[1]);
     var face=new THREE.Quaternion().setFromUnitVectors(
       new THREE.Vector3(a[0],a[1],a[2]),new THREE.Vector3(0,0,1));
     return this.ISO.clone().multiply(face);
@@ -15314,7 +15315,7 @@ var D3X={
     var m=this.proto.clone(true);
     m.traverse(function(o){
       if(o.isMesh)o.material=new THREE.MeshBasicMaterial({
-        color:0x241610,transparent:true,opacity:.42,
+        color:0x241610,transparent:true,opacity:.34,
         depthWrite:false,depthTest:false});
     });
     g.add(m);g.renderOrder=-1;
@@ -15451,9 +15452,10 @@ var D3X={
         d.obj.userData.posed=d.val;
       }
       if(d.sh){
+        d.sh.visible=vis&&d!==zoomed;/* no twin behind the focused die */
         d.sh.scale.setScalar(sz);
-        d.sh.quaternion.copy(d.obj.quaternion);
-        d.sh.position.set(x+sz*0.10,y-sz*0.13,-1);
+        d.sh.quaternion.copy(D3X._isoQ(d.val));
+        d.sh.position.set(x+sz*0.055,y-sz*0.075,-1);
       }
     });
     r.render(this.scene,this.cam);

@@ -2416,3 +2416,23 @@ FOCUS: the zoomed die turns slowly on its own, can be DRAGGED to
 rotate (document-level pointer handlers, ignored on the back button;
 dragging cancels the idle spin), is rendered bigger, and every other
 die simply disappears while a focus is open.
+
+## P153 - the 3D dice were showing the WRONG FACES (fixed)
+
+Root cause of "it's all broken": D3X's value->axis table was a guess
+carried over from the lab (where it was calibrated by hand), and it
+was wrong for this model - so every die pointed an arbitrary face at
+the camera. Derived the real layout offline from the GLB itself:
+group triangles by normal, take each face's UV island, count pips in
+the baseColor texture. Result 1=-X, 6=+X, 2=+Y, 5=-Y, 3=-Z, 4=+Z -
+cross-checked against the opposite-faces-sum-to-7 rule. Verified in
+the browser by rendering values 1..6 dead-on and counting pips in the
+rendered pixels: 1->1, 2->2 ... 6->6.
+Also: pose calmed to TILT 11 / YAW 15 (just a sliver of top and
+side), and the offset shadow is now a whisper (0.055/0.075 of size,
+alpha .34), never rotates with the focus spin, and is hidden behind
+the focused die so it can't read as a twin.
+
+DEBUG NOTE: pip-counting from screen pixels needs a sample window
+>= ~0.36 of the chip and a dead-on face, or 5s and 6s undercount
+(their corner pips fall outside a tighter window) and the test lies.
