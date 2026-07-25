@@ -2720,3 +2720,37 @@ overlay — island bounds, where the flat face ends, wireframe, numbers) and
 padding is **10.4% each side**. Authoring res is free — the layout is
 normalised, so paint at whatever size and it downsamples.
 
+## P165 — match dice line up; prop placement tool
+
+**Dice alignment.** Measured off the rendered pixels: the row was already
+perfectly level (bottom spread 0px, even 51px gaps) and all engine offsets
+were zero. The fault was WIDTH — 42/39/37/37/39/42, the outer dice 13.5%
+wider because at `FOV_MATCH = 55` they sit off-axis and show a sliver of
+their side face. Note that in this rig FOV changes nothing about framing (one
+world unit stays one CSS pixel at the dice plane) — it only sets how much the
+outer dice turn. Swept it: spread is 5px at 55, 4px at 40, 3px at 32, and
+bottoms out at 2px by 22. Set `FOV_MATCH = 24`: widths now 38/37/36/36/37/38,
+identical heights, tops and bottoms dead level. 2px is the floor for one
+shared camera; going below would need per-die aim, which was rejected in P162.
+
+**prop_lab.html** (local, gitignored like the other labs) — place, move,
+rotate and scale the table props by hand and save templates.
+- the stage runs at the game's exact aspect (319x691) so every % matches
+- guides for the dice band and the placer's margins; optional candle falloff
+  and shadow offset previews using the game's own formulas
+- drag to move, gold handle to scale about the centre, blue handle to rotate;
+  arrows nudge, Shift+arrows rotate, Delete removes
+- layer list + "sort by depth" (the painter's order the game uses)
+- templates persist in localStorage; export writes `assets/prop_templates.js`
+
+Game side: `window.FK_PROP_TEMPLATES` (loaded from `assets/prop_templates.js`,
+shipped empty). If it holds any templates, `_matchDress` picks one per match
+and uses it **exactly as saved** — the override lands after the procedural
+sort, so nothing is nudged by the separation pass and array order is the draw
+order. Empty = the procedural dressing as before. Verified end to end: placed
+three props in the tool, exported, and the game rendered identical n/x/y/w/rot
+in the same order.
+
+Still open (Denis): scored dice leaving the line — he'd rather they stay put
+and get a treatment instead; deferred.
+
