@@ -2468,3 +2468,16 @@ normals off, tint (the game tints this one texture per material -
 white shows it as painted), light level, background colour. Ships the
 stock maps inline so reset always works; self-contained like the roll
 lab, no server needed.
+
+## P156 - more top-down pose, focus returns home (done)
+
+Pose: TILT 11->21, YAW 15->7, so the dice are seen more from above
+and much less from the side (verified: the value face sits square to
+the camera at 0.93, the reveal is 21deg of top against 7deg of side).
+NOTE when reading these numbers: the ROLL=90 correction swaps the
+face basis's "up" and "right", so F[1] measures the SIDE reveal and
+F[0] the TOP - easy to misread.
+Focus: closing the panel now resets the die's dragged rotation and
+re-poses it, so it drops back into the row at exactly the same angle
+as its neighbours instead of keeping whatever angle it was spun to
+(verified: 0.0deg difference from the rest pose after a 74deg spin).
