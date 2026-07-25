@@ -14218,6 +14218,56 @@ function _drawPropShadows(tSec){
 /* dice shadows: the die's true silhouette (8 corners through the same
    rotation chain as the faces, convex hull), revealing the darkened
    table, breathing with the flare like the prop shadows */
+/* paint one die's shadow: the hull masks the UNLIT table image, so the
+   shadow is the same painting the props darken to, never a grey blob */
+function _diceShadowPaint(pts,scx,scy,size,d){
+  var st=window._dsState;if(!st)return;
+  var x=st.x,sc=st.sc,ml=st.ml,dpr=st.dpr,f=st.f,alphaB=st.alphaB;
+  /* nudge away from the candle, like the props do */
+  var lx=ml.ox-sc.left+ml.bw/2,ly=ml.oy-sc.top+ml.bh*0.44;
+  var ddx=scx-lx,ddy=scy-ly,dl=Math.sqrt(ddx*ddx+ddy*ddy)||1;
+  var pm=Math.min(3.5,1.2+dl*0.012)+1.5*f;
+  scx+=ddx/dl*pm;scy+=ddy/dl*pm+size*0.10;
+  /* gift-wrap the 8 projected corners */
+  var hull=[],start=0;
+  for(var i2=1;i2<8;i2++)if(pts[i2][0]<pts[start][0]||(pts[i2][0]===pts[start][0]&&pts[i2][1]<pts[start][1]))start=i2;
+  var cur=start,guard=0;
+  do{
+    hull.push(pts[cur]);
+    var next=(cur+1)%8;
+    for(var k2=0;k2<8;k2++){
+      var a2=pts[next],b2=pts[k2],o2=pts[cur];
+      if(k2===cur)continue;
+      var cr=(a2[0]-o2[0])*(b2[1]-o2[1])-(a2[1]-o2[1])*(b2[0]-o2[0]);
+      if(cr<0)next=k2;
+    }
+    cur=next;guard++;
+  }while(cur!==start&&guard<9);
+  var side=Math.ceil(size*1.9);
+  var TW=Math.max(2,Math.round(side*dpr));
+  if(!d._dsc||d._dsc.width!==TW){d._dsc=document.createElement('canvas');d._dsc.width=TW;d._dsc.height=TW;}
+  var tw=TW/dpr;
+  var tx2=d._dsc.getContext('2d');tx2.setTransform(dpr,0,0,dpr,0,0);
+  tx2.globalCompositeOperation='source-over';
+  tx2.clearRect(0,0,tw,tw);
+  var fill=function(offx,offy){
+    tx2.beginPath();
+    hull.forEach(function(p2,i3){var hx=tw/2+p2[0]+offx,hy=tw/2+p2[1]+offy;
+      if(i3)tx2.lineTo(hx,hy);else tx2.moveTo(hx,hy);});
+    tx2.closePath();tx2.fill();
+  };
+  tx2.fillStyle='#000';fill(0,0);
+  tx2.globalAlpha=0.16;
+  var br=Math.max(3,size*0.07);
+  for(var r2=0;r2<8;r2++){var an=r2*Math.PI/4;fill(Math.cos(an)*br,Math.sin(an)*br);}
+  tx2.globalAlpha=1;
+  tx2.globalCompositeOperation='source-in';
+  var tlx=scx-tw/2,tly=scy-tw/2;
+  tx2.drawImage(_tblImg,(ml.ox-sc.left)-tlx,(ml.oy-sc.top)-tly,ml.bw,ml.bh);
+  tx2.globalCompositeOperation='source-atop';
+  tx2.fillStyle='rgba(8,4,2,'+(alphaB*1.25).toFixed(3)+')';tx2.fillRect(0,0,tw,tw);
+  x.drawImage(d._dsc,0,0,TW,TW,tlx,tly,tw,tw);
+}
 function _drawDiceShadows(tSec){
   var cv=document.getElementById('dsCanvas'),ml=window._mLight;
   if(!cv||!ml||!ml.on)return;
@@ -14234,6 +14284,36 @@ function _drawDiceShadows(tSec){
   x.clearRect(0,0,W,H);
   if(!_tblImg.complete||!_tblImg.naturalWidth)return;
   var C=[[-1,-1,-1],[1,-1,-1],[-1,1,-1],[1,1,-1],[-1,-1,1],[1,-1,1],[-1,1,1],[1,1,1]];
+  window._dsState={x:x,sc:sc,ml:ml,dpr:dpr,f:f,alphaB:alphaB};
+  /* the 3D dice: project the real cube through the live camera and hand
+     the silhouette to the same masking code the props use */
+  try{
+    if(window.D3X&&D3X.on&&D3X._tbl&&D3X.dice.length){
+      var mrx=D3X.mount?D3X.mount.getBoundingClientRect():null;
+      D3X._tbl.updateMatrixWorld(true);
+      D3X.dice.forEach(function(dd){
+        if(!dd.match||!dd.obj.visible||!mrx)return;
+        if(dd.obj.parent!==D3X._tbl)return;
+        dd.obj.updateMatrixWorld(true);
+        var pts=[],L=[[-.5,-.5,-.5],[.5,-.5,-.5],[-.5,.5,-.5],[.5,.5,-.5],
+                      [-.5,-.5,.5],[.5,-.5,.5],[-.5,.5,.5],[.5,.5,.5]];
+        var cx3=0,cy3=0;
+        for(var ci3=0;ci3<8;ci3++){
+          var v3=new THREE.Vector3(L[ci3][0],L[ci3][1],L[ci3][2])
+            .applyMatrix4(dd.obj.matrixWorld).project(D3X.cam);
+          var px3=(v3.x*.5+.5)*mrx.width+(mrx.left-sc.left);
+          var py3=(-v3.y*.5+.5)*mrx.height+(mrx.top-sc.top);
+          pts.push([px3,py3]);cx3+=px3;cy3+=py3;
+        }
+        cx3/=8;cy3/=8;
+        for(var pi3=0;pi3<8;pi3++){pts[pi3][0]-=cx3;pts[pi3][1]-=cy3;}
+        var sizeP=0;
+        for(var si=0;si<8;si++)sizeP=Math.max(sizeP,Math.abs(pts[si][0]),Math.abs(pts[si][1]));
+        sizeP*=2;
+        _diceShadowPaint(pts,cx3,cy3,sizeP,dd);
+      });
+    }
+  }catch(e3){}
   (D3.list||[]).forEach(function(d){
     if(d.group!=='match'||!d.slot||!d.slot.isConnected)return;
     if(d.slot.offsetParent===null)return;
@@ -15604,7 +15684,7 @@ var D3X={
   /* Straight under the die the shadow is almost entirely hidden BEHIND it
      at this camera angle, so it is nudged away from the candle - the same
      offset silhouette the painted dice use. */
-  SHADOW_COL:0x5a2c12, SHADOW_OP:0.62, SHADOW_SIZE:1.3,
+  CONTACT3D:false, SHADOW_COL:0x5a2c12, SHADOW_OP:0.62, SHADOW_SIZE:1.3,
   SHADOW_OFF:{x:0.13,z:0.20},
   _shadowTex:function(){
     if(this._shTex)return this._shTex;
@@ -15650,8 +15730,10 @@ var D3X={
     grp.add(g);grp.renderOrder=-1;
     return grp;
   },
-  /* park the die's contact shadow under it, turned the same way */
+  /* retired: the 2D pass paints these now, masking the unlit table.
+     Kept only so an old saved reference to it cannot throw. */
   _contact:function(d,root,x,y,z,q){
+    if(!this.CONTACT3D)return;
     if(!d.sq)d.sq=this._mkShadowQuad();
     if(d.sq.parent!==root)root.add(d.sq);
     var lift=Math.max(0,y-0.5);
@@ -15837,7 +15919,7 @@ var D3X={
        the light and the sides fall away. Ambient is a warm brown at low
        strength: the shaded faces go dark but stay SATURATED, where a grey
        ambient would just wash them out. */
-    var key=new THREE.DirectionalLight(0xfff2dc,1.5);key.position.set(.16,1,.34);sc.add(key);
+    var key=new THREE.DirectionalLight(0xffd9a2,1.02);key.position.set(.16,1,.34);sc.add(key);
     var warm=new THREE.DirectionalLight(0xffb469,.20);warm.position.set(-.6,.15,.5);sc.add(warm);
     sc.add(new THREE.AmbientLight(0x8a4f22,.58));
     this.cam=new THREE.PerspectiveCamera(this.FOV,1,1,20000);
@@ -16144,6 +16226,8 @@ var D3X={
       if(d.match){
         var e=d.chip._d3;
         if(!e||cr.width<1){d.obj.visible=false;return;}
+        /* the flat blob is never right for a die the 3D layer is drawing */
+        e._d3xOwned=true;
         var P=D3X._play,pi=P?P.dice.indexOf(e):-1;
         if(P&&pi>=0){
           /* physics owns this die: place it on the tilted table */
@@ -16159,7 +16243,6 @@ var D3X={
           d.obj.scale.setScalar(1);
           d.obj.position.set(pose.x,pose.y,pose.z);
           d.obj.quaternion.copy(pose.q);
-          D3X._contact(d,root,pose.x,pose.y,pose.z,pose.q);
           e._d3xOwned=true;
           D3X._slaveHost(d,root);
           return;
@@ -16176,7 +16259,6 @@ var D3X={
           d.obj.visible=true;d.obj.scale.setScalar(1);
           d.obj.position.set(d.phys.x,d.phys.y,d.phys.z);
           d.obj.quaternion.copy(d.phys.q);
-          D3X._contact(d,root3,d.phys.x,d.phys.y,d.phys.z,d.phys.q);
           if(e)e._d3xOwned=true;
           D3X._slaveHost(d,root3);
           return;

@@ -3155,3 +3155,31 @@ luminance on a die: 87 in shade against 250 lit.
 **Skins.** `SKIN_ALL` is off, so each material wears its own art again;
 `bone` and `amber` are both embedded (bone 97KB, amber 216KB as JPEG).
 
+## P182 — dice shadows use the game's own technique
+
+Denis: shadows should work like the props — the UNLIT table png revealed
+through the shape as a mask — they were overlapping the dice, one die still
+had the old blob, and they wanted to be darker.
+
+**Why they overlapped.** The contact quads were `transparent:true`, so three
+put them in the TRANSPARENT queue, which draws after every opaque mesh.
+`renderOrder` only sorts within that queue, so a die's shadow always painted
+over the dice. Drawing on the 2D shadow canvas *underneath* the WebGL canvas
+removes the problem by construction.
+
+**The leftover blob** was a die the 3D layer draws but had never marked as
+owned — ownership was only set on the physics paths. Every match die the
+layer draws is now marked, so the legacy pass never doubles it.
+
+**The technique.** The 3D quads are retired (`CONTACT3D:false`). Each die now
+projects its eight corners through the LIVE camera, they are gift-wrapped
+into a silhouette, and that hull masks the unlit table image — the same
+`source-in` + feathered-ring approach `_drawPropShadows` uses, so dice and
+props are lit by one idea. Darkened 25% over the prop pass on top.
+
+Measured on the shadow canvas: **13,485 px** at average RGB(65,40,20) —
+warm brown, not grey — alpha 206.
+
+**Light.** The key was blowing out the top faces: intensity 1.5 -> 1.02 and
+its colour warmed from 0xfff2dc to 0xffd9a2.
+
