@@ -2583,3 +2583,35 @@ containing spec/rough/gloss — with strength and gloss sliders. White in the
 map = shiny. Strength is 0 (fully matte) until a map is loaded, then it
 auto-lifts to 45 so the effect is visible immediately.
 
+## P162 — one camera, one normal lens (supersedes P161's shift lens)
+
+Denis: *"no now they're stretched and all their backs pointing in a different
+direction... is it one camera per dice or something? Why is it so
+complicated? Just need a slight wide angle, like a 50mm"*. Fair — P161 was
+over-built. The whole per-die rig is gone.
+
+- one `PerspectiveCamera` over the surface, `D3X.FOV = 40` (a ~50mm look),
+  placed at `dist = (surfaceH/2)/tan(FOV/2)` so one world unit is still one
+  CSS pixel on the dice plane. One `render()` call, no viewports, no
+  scissors, no `setViewOffset`, no `_aimQ`.
+- `D3X.TILT = 25` — a modest lean back. The point of P161's measurement still
+  holds: at TILT≈45 the silhouette bulges in the middle (the near/far edges
+  land at the same depth) and reads as reverse perspective. 25 keeps the top
+  face a sliver and the silhouette clean.
+
+Measured off the rendered pixels:
+- die is **24 x 31 px**, stretch **1.29** (P161 was 1.68 — that was the
+  "stretched" Denis saw).
+- profile is flat: `21 22 24 24 … 24 24 23 21`. No bulge.
+- outer dice are **2 px wider** than the middle pair: with one lens the outer
+  dice sit 5.3 degrees off-axis and show a sliver of side. That is what one
+  camera does; the only cure is a longer lens (lower `FOV`).
+
+Dials: `D3X.FOV` (40) = lens; lower is longer/flatter and squares up the
+outer dice. `D3X.TILT` (25) = how much top face shows.
+
+Texture lab follows the same rig, holding the game's measured
+camera-distance-to-die ratio (34.5 die-widths) so the dice show the same
+perspective, just magnified — verified 110x135 px, outer dice 6.4% wider,
+matching the game's proportions.
+
