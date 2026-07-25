@@ -2993,3 +2993,25 @@ being wrong, not the code — playback was at step 58 of 74, and mid-flight the
 die is SUPPOSED to show its raw tumbling orientation; the relabel only lands
 on the final frame. Force `P.t0` into the past to measure the settled state.
 
+## P176 — the pile was depth, not scatter
+
+*"it's all jumbled up"*. Measured over 180 dice, the physics was actually
+healthy: no die ever stacked on another (max rest height 0.67 of a die), the
+closest pair never came under 1.03 die-widths, and x held its lane (median
+drift 0.13). The problem was **z** — depth wandered up to 1.05 die-widths,
+and the table is seen from 58 degrees, so depth reads as VERTICAL jumble on
+screen (z x 37px x sin58 = 31px per die-width) rather than as distance.
+
+The lab could afford a loose depth lane because its camera sat much lower.
+Here the depth lane is stiffened — `laneKZ 8 -> 28`, `laneCZ 2.4 -> 5` —
+while x stays exactly as loose as it was, because x is where the rough line
+lives. Swept it first; every setting held 0 wrong faces, the same ~73-step
+settle and the same ~1.0 minimum separation, so the tightening is free:
+
+    laneKZ    8      14     20     28     40
+    z p90     0.87   0.68   0.46   0.35   0.25
+    on screen ±27px  ±21px  ±14px  ±11px  ±8px
+
+Verified in a live match at 28: faces correct, screen-Y spread **7.6px**
+(was ~27), yaw spread 316 degrees, gaps still uneven.
+
