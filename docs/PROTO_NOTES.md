@@ -3183,3 +3183,28 @@ warm brown, not grey — alpha 206.
 **Light.** The key was blowing out the top faces: intensity 1.5 -> 1.02 and
 its colour warmed from 0xfff2dc to 0xffd9a2.
 
+## P183 — the two real bugs behind "it's all very broken"
+
+Both were mine, and both were structural rather than tuning.
+
+**Half the dice never landed** (so half had no shadow — the shadow pass only
+draws dice that are on the table). There was ONE global `_play`. Dice are
+created one at a time, and `_d3InitHost` RETRIES on a timer when a die's box
+is not measurable yet, so their rolls can land in two different ticks — two
+batches — and the second **overwrote the first**. The orphaned dice never got
+a resting pose. Playback is now stored **per die** (`d.roll`), so batching
+only matters for the collision solve and nothing can be dropped. Verified:
+6/6 settled, 0 left rolling, 0 in neither state.
+
+**Jitter when selecting.** The table's origin was read from the ROW's
+bounding box every frame — but that box is the union of the dice, which this
+code moves. Dice move, row box moves, origin moves, dice move: a feedback
+loop, and selecting a die perturbed it enough to show. The origin now comes
+from the cached untransformed homes, which nothing downstream can disturb.
+Verified: 0.00px drift over 10 frames, idle and with a die selected.
+
+Also: no normal map anywhere (Denis), outlines darkened 0.72 and saturated
+1.45 with a grain texture, and the shadow tucked in close under the die
+(offset roughly a third of what it was, alpha down from 1.25x the prop pass
+to 0.95x) so it reads as contact rather than a cast shadow.
+
