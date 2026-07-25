@@ -3262,3 +3262,41 @@ now sit at angles.
 and still be fully visible, derived from the mount width — and clamps the
 relaxed positions to it. Verified: 0 dice off either edge, nearest 11px in.
 
+## P187 — review findings fixed: hit boxes stop drifting off the dice
+
+A four-lens review (lifecycle / per-frame cost / physics correctness /
+integration), each finding then attacked by a skeptic: 19 raised, 3 survived.
+Both player-facing ones were confirmed against the code before fixing.
+
+**1. The game animates `transform` on the very element we slave.**
+`@keyframes pxDieTap{0%{transform:scale(.92)}...}` fires on EVERY tap, plus
+die-sel-pop, die-pos-pulse, die-freeze-shake and die-shatter. A running
+animation outranks inline style, so for its duration our translate was wiped
+and the hit box snapped back to its flex slot while the die stayed where
+physics put it — measured drift up to a third of a die.
+
+Fixed by moving to the **`translate` property** instead of `transform`. They
+are separate properties, so the two compose rather than fight: during a tap
+the die now carries `transform: matrix(0.92,...)` AND `translate: 98.6px
+-12.1px` at once. Also stopped deriving the table's scale from the live
+(tap-scaled) box — a single tap was rescaling the whole table group — and
+cached the untransformed width instead. The `transition:none` override is
+gone too, since `transition:transform` never applied to `translate`; the
+game's own tap feel is restored.
+
+**2. A die leaving mid-turn shifted every survivor's hit box.**
+`.die-wrap:not(:has(.die)){display:none}` collapses the emptied wrapper, so
+the centred flex row re-centres and every cached home is stale by half a slot
+(~25px measured). Live paths: obsidian/lucky shatter, the Sacrifice card, and
+cutpurse — all during the choosing phase, while the survivors are clickable.
+Homes are now re-measured when the row's die count changes. First attempt
+counted the row's CHILD ELEMENTS, which never changes — the empty wrapper
+stays — so it counts `.die` elements now.
+
+**3. The shadow scratch canvas was rebuilt nearly every frame** mid-roll: its
+cache key was the live projected extent of a tumbling cube, which sweeps
+1.0-1.73x its width. Quantised to 32px steps.
+
+Verified worst hit-box gap across all six dice: **0.06px idle, 2.47px during
+a tap animation, 0.09px after a die is removed mid-turn** (was ~25px).
+

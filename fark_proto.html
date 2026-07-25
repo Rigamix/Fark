@@ -14255,7 +14255,10 @@ function _diceShadowPaint(pts,scx,scy,size,d){
     }
     cur=next;guard++;
   }while(cur!==start&&guard<9);
-  var side=Math.ceil(size*1.9);
+  /* quantised: `size` is the live projected extent of a tumbling cube, which
+     sweeps 1.0-1.73x its width, so an exact size rebuilt the canvas nearly
+     every frame mid-roll */
+  var side=Math.ceil(size*1.9/32)*32;
   var TW=Math.max(2,Math.round(side*dpr));
   if(!d._dsc||d._dsc.width!==TW){d._dsc=document.createElement('canvas');d._dsc.width=TW;d._dsc.height=TW;}
   var tw=TW/dpr;
@@ -15463,15 +15466,19 @@ var D3X={
     var p=w.project(this.cam);
     var sx=(p.x*.5+.5)*mr.width, sy=(-p.y*.5+.5)*mr.height;
     if(d.hx===undefined){
-      /* .die carries a transform transition, so the slaved box would lag
-         the die; kill it while physics owns this one */
-      d.chip.style.transition='none';
       var r0=d.chip.getBoundingClientRect();
       d.hx=r0.left-mr.left+r0.width/2-(d.tx||0);
       d.hy=r0.top-mr.top+r0.height/2-(d.ty||0);
+      d.w0=r0.width;/* the die's box with no tap animation running */
     }
     d.tx=sx-d.hx;d.ty=sy-d.hy;
-    d.chip.style.transform='translate('+d.tx.toFixed(1)+'px,'+d.ty.toFixed(1)+'px)';
+    /* `translate`, NOT `transform`: the game animates transform on this very
+       element (die-tap-pop fires on every tap, die-sel-pop, die-pos-pulse,
+       die-shatter) and a running animation outranks inline style, which
+       wiped the offset and snapped the hit box back to its flex slot for the
+       animation's duration. translate is a separate property, so the two
+       compose instead of fighting. */
+    d.chip.style.translate=d.tx.toFixed(1)+'px '+d.ty.toFixed(1)+'px';
   },
   /* one-line health check for a browser that is showing the wrong dice */
   diag:function(){
@@ -16140,6 +16147,15 @@ var D3X={
   /* one owner for "which surface holds the dice", run every frame */
   tick:function(){
     if(!this.ready||this.fail)return;
+    /* A die leaving mid-turn (shatter, sacrifice, cutpurse) collapses its
+       wrapper - .die-wrap:not(:has(.die)) is display:none - so the flex row
+       re-centres and every surviving die's cached home is stale by half a
+       slot. Re-measure whenever the row's population changes. */
+    /* count the DICE, not the row's children: a removed die leaves its
+       (now display:none) wrapper behind, so childElementCount never moves */
+    var row=document.getElementById('playerDiceRow');
+    var n=row?row.getElementsByClassName('die').length:0;
+    if(n!==this._rowN){this._rowN=n;if(this.dice.length)this._measureHomes();}
     if(this._waiting){var w=this._waiting;this._waiting=null;this._physStart(w);}
     if(this._liveChips(document).length){
       this._matchOn=false;
@@ -16228,7 +16244,7 @@ var D3X={
     d.roll=null;d.phys=null;
     if(d.match){try{
       if(d.chip._d3){d.chip._d3.die.style.visibility='';d.chip._d3._d3xOwned=false;}
-      d.chip.style.transform='';d.chip.style.transition='';d.tx=0;d.ty=0;
+      d.chip.style.translate='';d.tx=0;d.ty=0;
     }catch(e){}}
   },
   detach:function(){
@@ -16307,7 +16323,7 @@ var D3X={
         if(d.roll){
           /* physics owns this die: place it on the tilted table */
           var pose=D3X._physPose(d);
-          var sz2=cr.width*D3X.MSCALE;
+          var sz2=(d.w0||cr.width)*D3X.MSCALE;/* not the live, tap-scaled box */
           var root=D3X._tableRoot();
           root.rotation.set(THREE.MathUtils.degToRad(D3X.TABLE.tilt),0,0);
           root.scale.setScalar(sz2);
@@ -16324,7 +16340,7 @@ var D3X={
         }
         if(d.phys){
           /* settled: hold the place physics gave it */
-          var sz3=cr.width*D3X.MSCALE;
+          var sz3=(d.w0||cr.width)*D3X.MSCALE;/* not the live, tap-scaled box */
           var root3=D3X._tableRoot();
           root3.rotation.set(THREE.MathUtils.degToRad(D3X.TABLE.tilt),0,0);
           root3.scale.setScalar(sz3);
@@ -16340,7 +16356,7 @@ var D3X={
         }
         if(d.obj.parent&&d.obj.parent!==D3X.scene){
           D3X.scene.add(d.obj);d.obj.scale.setScalar(1);
-          d.chip.style.transform='';d.chip.style.transition='';
+          d.chip.style.translate='';d.chip.style.transition='';
           d.hx=undefined;d.tx=0;d.ty=0;
         }
         var mcs=getComputedStyle(d.chip);
