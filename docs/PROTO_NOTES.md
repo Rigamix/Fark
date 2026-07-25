@@ -3208,3 +3208,32 @@ Also: no normal map anywhere (Denis), outlines darkened 0.72 and saturated
 (offset roughly a third of what it was, alpha down from 1.25x the prop pass
 to 0.95x) so it reads as contact rather than a cast shadow.
 
+## P184-P185 — review pass fixes, and a 3D selection outline
+
+Two bugs found by MEASURING rather than reading, both from the review pass:
+
+**Ghost dice.** `_drop` called `scene.remove(d.obj)` — but a die on the table
+is parented to the TABLE GROUP, not the scene, so that was a no-op and every
+destroyed die left a fully-rendering ghost. Measured: removing all six hosts
+left `dice:0` but the table still holding 6 groups and 25 draw calls. The
+game recreates dice hosts on every roll, so these accumulated for a whole
+match. Now detaches from the real parent and disposes the per-die materials
+(geometry is SHARED with the proto and must not be disposed). Table children
+7 -> 1 after removal.
+
+**78 THREE objects allocated per frame** (4,680/sec at 60fps): fresh
+Vector3/Quaternion in `_slaveHost` and `_physPose`, which run per die per
+frame, plus the landing pose being rebuilt every frame although it never
+changes for a given roll. Scratch objects + the landing pose cached on the
+solve. Measured after: **0 allocations per frame**, faces still correct.
+
+Baseline for reference: 0.24 ms/frame, 13 draw calls, 13 rect reads, no
+computed-style reads, no resource growth across repeated rolls.
+
+**Selection outline.** Reuses the outline hull that already works: a second,
+thicker copy at scale 1.15 (the material outline is 1.055) in gold #ffd98a,
+no grain, shown only while the host carries `.selected`. It hugs the die
+silhouette wherever physics left it, which the DOM ring never could now that
+dice sit at angles — so that ring stays hidden and there is no double outline
+(verified: wrap::after computes to display:none while selected).
+

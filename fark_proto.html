@@ -1191,7 +1191,8 @@ html.fk3d .d3chip .die,html.fk3d .nrdie .d3host .die{visibility:hidden}
 /* match dice: only the CUBE hides - the host keeps its hit box and its
    ground shadow, and the gold selection ring (which the cube used to draw
    for itself) comes back on */
-html.fk3d #screen-match .die-wrap:has(.die.d3on.selected)::after{display:block !important}
+/* selection is drawn in 3D now (a gold hull around the die silhouette),
+   so the DOM ring stays hidden - it could only ever be an upright box */
 #screen-match #d3xCanvas{z-index:2}
 #d3xCanvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;
   z-index:2}
@@ -15725,6 +15726,10 @@ var D3X={
      the painted dice's own OUT table */
   OUTCOL:{bone:'#291d11', amber:'#3f1000'},
   OUT_DARK:0.72, OUT_SAT:1.45,
+  /* selection: the same hull trick, thicker and gold, so the ring hugs the
+     die silhouette wherever physics has left it - a box drawn on the DOM
+     host cannot, now that the dice sit at angles */
+  SEL_COL:'#ffd98a', SEL_W:0.15,
   /* a little tooth so the outline is not a dead flat band */
   _grainTex:function(){
     if(this._grn)return this._grn;
@@ -15739,16 +15744,19 @@ var D3X={
     t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(3,3);
     this._grn=t;return t;
   },
-  _mkOutline:function(mat){
-    var col=this.OUTCOL[mat]||(window.D3&&D3.OUT&&D3.OUT[mat])||'#241407';
+  _mkOutline:function(mat,forceCol,grain){
+    var col=forceCol||this.OUTCOL[mat]||(window.D3&&D3.OUT&&D3.OUT[mat])||'#241407';
     var g=this.proto.clone(true),grp=new THREE.Group();
     g.traverse(function(o){
       if(!o.isMesh)return;
       var c3=new THREE.Color(col);
-      var hsl={};c3.getHSL(hsl);
-      c3.setHSL(hsl.h,Math.min(1,hsl.s*D3X.OUT_SAT),hsl.l*D3X.OUT_DARK);
+      if(!forceCol){
+        var hsl={};c3.getHSL(hsl);
+        c3.setHSL(hsl.h,Math.min(1,hsl.s*D3X.OUT_SAT),hsl.l*D3X.OUT_DARK);
+      }
       o.material=new THREE.MeshBasicMaterial({
-        color:c3,side:THREE.BackSide,map:D3X._grainTex()});
+        color:c3,side:THREE.BackSide,
+        map:(grain===false?null:D3X._grainTex())});
       /* the skin pass walks the whole die group, and would happily paint
          the outline with the die's texture - it is not a face */
       o.userData.outline=true;
@@ -16066,6 +16074,12 @@ var D3X={
     var out=this._mkOutline(mat);
     out.scale.setScalar(1+this.OUTLINE);
     g.add(out);
+    /* and a thicker gold one outside it, shown only while selected */
+    var sel=this._mkOutline(mat,this.SEL_COL,false);
+    sel.scale.setScalar(1+this.SEL_W);
+    sel.visible=false;
+    g.add(sel);
+    g.userData.sel=sel;
     return g;
   },
   focus:null,SHADOW:false,FOV:40,FOV_MATCH:54,RISE_MATCH:20,MSCALE:0.77,_matchOn:false,
@@ -16265,6 +16279,8 @@ var D3X={
         if(!e||cr.width<1){d.obj.visible=false;return;}
         /* the flat blob is never right for a die the 3D layer is drawing */
         e._d3xOwned=true;
+        if(d.obj.userData.sel)
+          d.obj.userData.sel.visible=d.chip.classList.contains('selected');
         if(d.roll){
           /* physics owns this die: place it on the tilted table */
           var pose=D3X._physPose(d);
