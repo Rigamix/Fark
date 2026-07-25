@@ -3074,3 +3074,28 @@ continuous the whole way in. Faces still correct.
 `TABLE.tilt 50 -> 42` (top-face share 54% -> 47%) and `FOV_MATCH 44 -> 54`.
 `TABLE.land` is the new dial for how many frames the squaring-up takes.
 
+## P179 — dice keep their distance
+
+`sepMin` was a CENTRE distance of 1.04, so two dice were 0.04 of a width
+apart at the edges — kissing. And a die turned 45 degrees needs 1.414 between
+centres just to not overlap, so the real requirement was never being met.
+
+Raising the shove alone does not fix it: once the dice are resting, the lane
+spring pulls them back and a "keep stepping until they spread" phase
+deadlocks against it — measured, it burned its whole 70-step cap and doubled
+the roll (145 steps against 73) while only getting the closest pair from 1.11
+to 1.13.
+
+So the resting positions are relaxed directly along the line instead, then
+the correction is blended into the last 16 frames on a cubic curve — it plays
+back as the die sliding its last few pixels home rather than teleporting.
+
+Over 30 rolls: closest centres **1.50** (the target, exactly), worst-case
+edge clearance **+0.09 with both dice at 45 degrees**, **0/450 pairs able to
+touch**, max slide 0.4 die-widths (~13px), roll back to 69 steps, x drift
+tighter than before (p90 0.25), 0 wrong faces.
+
+Note the slot pitch is now 1.6 die-widths, not the 1.38 in `TABLE.pitch` —
+the dice got 10% smaller in P177 while the DOM row kept its 51px spacing.
+Slots are measured off the DOM, so that constant is now unused.
+

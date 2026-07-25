@@ -15393,7 +15393,12 @@ var D3X={
        58 degrees here, so wander in z reads as vertical jumble rather than
        as depth. x stays loose - that is where the rough line lives. */
     laneKX:9, laneCX:2.4, laneKZ:28, laneCZ:5,
-    sepK:22, sepC:5.5, sepMin:1.04,
+    sepK:22, sepC:5.5, sepMin:1.45,
+    /* a die turned 45 degrees needs 1.41 between centres just to not
+       overlap, so settle is followed by a bounded spread phase that keeps
+       stepping until there is a real gap. Recorded like any other frame,
+       so the nudge plays back rather than snapping. */
+    spreadTo:1.5, spreadCap:70,
     trayZ:1.7, wallPad:.3, restY:.5
   },
   _cannon:false,
@@ -15530,6 +15535,40 @@ var D3X={
         if(boostFrom<0)boostFrom=it;
         if(++over>140)break;
       }
+    }
+    /* Nobody likes dice kissing. Forces cannot fix this once they are
+       resting - the lane spring just fights back and it deadlocks - so the
+       resting positions are relaxed directly along the line, and the
+       correction is blended into the last frames. It plays back as the die
+       sliding the last few pixels home. */
+    var fin=[],rest2=[];
+    for(var r1=0;r1<N;r1++){
+      fin.push({x:bodies[r1].position.x});
+      rest2.push({x:bodies[r1].position.x,i:r1});
+    }
+    rest2.sort(function(a,b){return a.x-b.x;});
+    for(var pass=0;pass<60;pass++){
+      var moved=false;
+      for(var oi=1;oi<N;oi++){
+        var gapNow=rest2[oi].x-rest2[oi-1].x;
+        if(gapNow<P.spreadTo){
+          var push=(P.spreadTo-gapNow)/2;
+          rest2[oi-1].x-=push;rest2[oi].x+=push;moved=true;
+        }
+      }
+      if(!moved)break;
+    }
+    /* keep the group centred on the slots it was aimed at */
+    var cNow=0,cWant=0;
+    for(var c1=0;c1<N;c1++){cNow+=rest2[c1].x;cWant+=slotX[c1];}
+    var shift=(cWant-cNow)/N;
+    var want=[];
+    for(var w1=0;w1<N;w1++)want[rest2[w1].i]=rest2[w1].x+shift;
+    var K=Math.min(16,frames.length);
+    for(var fi=0;fi<K;fi++){
+      var wgt=(fi+1)/K;wgt=1-Math.pow(1-wgt,3);
+      var row=frames[frames.length-K+fi];
+      for(var k5=0;k5<N;k5++)row[k5].x+=(want[k5]-fin[k5].x)*wgt;
     }
     /* read what landed, then relabel so the game's numbers are on top */
     var rest=[];
