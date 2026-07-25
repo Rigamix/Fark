@@ -13990,7 +13990,15 @@ D3.roll=function(d,val,opts){
      as a thrown die - but on a 3D die that same roll reads as stopped
      mid-tumble, resting on an edge. Land the spin on a whole turn so every
      die settles square, still spinning the whole way there. */
-  if(window.D3X&&D3X.ready)d.to.spin=Math.round(d.to.spin/360)*360;
+  if(window.D3X&&D3X.ready){
+    d.to.spin=Math.round(d.to.spin/360)*360;
+    var _st=D3X.SETTLE;
+    if(_st&&d.group==='match'){
+      d.to.x+=(Math.random()*2-1)*_st.x*d.s;
+      d.to.y+=(Math.random()*2-1)*_st.y*d.s;
+      if(_st.rot)d.to.spin+=(Math.random()*2-1)*_st.rot;
+    }
+  }
   d.phase='roll';d.t0=now+(opts.delay||0);
   d.dur=(opts.dur||cfg.dur)*(0.7+Math.random()*0.6);
   d.kc=0.28+Math.random()*0.14;
@@ -15254,26 +15262,94 @@ var D3X={
     whispers_fang:0xe0574e, ambrose_weight:0xffb43c
   },
   ROUGH:{obsidian:.35,silver:.3,starstone:.45,jade:.5,jade2:.45,amber:.5,lucky:.4},
-  /* One painted skin on every die, tint ignored - for looking at a new
-     texture in place. SKIN:null goes back to the tinted stock texture. */
-  SKIN:{map:'assets/models/die_amber.webp',spec:'assets/models/die_amber_spec.webp',
-        specular:0x736e66,shininess:30},
-  _skin:null,
-  _loadSkin:function(done){
-    if(!this.SKIN||this._skin){done();return;}
-    var self=this,tl=new THREE.TextureLoader(),left=0,out={};
+  /* Painted texture sets, one per die material, rendered exactly as
+     authored - no tint, no colour multiply. A material with no set here
+     keeps the old tinted stock texture until its art lands. */
+  SKINS:{
+    amber:{map:'assets/models/dice/amber_diffuse.jpg',
+           spec:'assets/models/dice/amber_spec.jpg'}
+  },
+  /* put one material's art on EVERY die (a look-see); null = per material */
+  SKIN_ALL:'amber',
+  /* specular strength + gloss, matching the texture lab's defaults so what
+     is painted there is what ships */
+  SPEC:{color:0x736e66,shininess:30},
+  /* dice that just bounced do not sit in a ruler-straight row. Scatter
+     where each one comes to rest (in die-widths); the engine's own
+     neighbour shove then stops them overlapping, so the line stays
+     readable but rough. `rot` is in-plane roll - keep it small or they
+     read as stopped on an edge rather than settled flat. */
+  SETTLE:{x:7,y:4,rot:0},
+  _sk:{},_skBusy:{},
+  /* returns the loaded set for a material, or null while it loads. Loading
+     NEVER blocks the dice: when a set arrives the dice wearing it are
+     re-skinned in place. */
+  _skinFor:function(mat){
+    var key=this.SKIN_ALL||mat;
+    var def=this.SKINS[key];
+    if(!def)return null;
+    if(this._sk[key])return this._sk[key];
+    if(this._skBusy[key])return null;
+    this._skBusy[key]=1;
+    var self=this,tl=new THREE.TextureLoader(),left=0,out={},any=false;
+    var fin=function(){
+      if(--left)return;
+      self._sk[key]=out;
+      try{self._reskin();}catch(e){}
+    };
     var take=function(k,url,srgb){
-      left++;
+      left++;any=true;
       tl.load(url,function(t){
         t.flipY=false;/* glTF convention, same as the baked maps */
         if(srgb)t.encoding=THREE.sRGBEncoding;
-        out[k]=t;
-        if(!--left){self._skin=out;done();}
-      },undefined,function(){if(!--left){self._skin=out;done();}});
+        out[k]=t;fin();
+      },undefined,function(){
+        try{console.warn('[D3X] die texture failed to load:',url);}catch(e){}
+        fin();
+      });
     };
-    if(this.SKIN.map)take('map',this.SKIN.map,true);
-    if(this.SKIN.spec)take('spec',this.SKIN.spec,false);
-    if(!left)done();
+    if(def.map)take('map',def.map,true);
+    if(def.spec)take('spec',def.spec,false);
+    if(def.normal)take('normal',def.normal,false);
+    if(!any)this._sk[key]=out;
+    return null;
+  },
+  /* rebuild the materials of dice already on screen */
+  _reskin:function(){
+    var self=this;
+    this.dice.forEach(function(d){
+      var sk=self._skinFor(d.mat);
+      d.obj.traverse(function(o){if(o.isMesh)self._dress(o.material,d.mat,sk);});
+    });
+    this.frame();
+  },
+  /* wire one material: painted set as-is, else the stock texture + tint */
+  _dress:function(m,mat,sk){
+    if(sk&&sk.map){
+      m.map=sk.map;
+      m.color=new THREE.Color(0xffffff);/* as painted */
+      m.specularMap=sk.spec||null;
+      if(sk.normal)m.normalMap=sk.normal;
+      m.specular=new THREE.Color(sk.spec?this.SPEC.color:0x000000);
+      m.shininess=sk.spec?this.SPEC.shininess:0;
+    }else{
+      m.color=new THREE.Color(this.MATCOL[mat]||this.MATCOL.bone);
+      m.specular=new THREE.Color(0x000000);m.shininess=0;
+    }
+    m.needsUpdate=true;
+  },
+  /* one-line health check for a browser that is showing the wrong dice */
+  diag:function(){
+    var sk=this._sk,out={ready:this.ready,failed:!!this.fail,onScreen:this.dice.length,
+      mount:this.mount&&(this.mount.id||this.mount.className),
+      skinAll:this.SKIN_ALL,loaded:Object.keys(sk)};
+    Object.keys(sk).forEach(function(k){out['maps_'+k]=Object.keys(sk[k]);});
+    if(this.dice[0])this.dice[0].obj.traverse(function(o){
+      if(o.isMesh&&!out.firstDie)out.firstDie={
+        colour:o.material.color.getHexString(),
+        hasMap:!!o.material.map,hasSpec:!!o.material.specularMap};
+    });
+    return out;
   },
   _need:[],
   boot:function(cb){
@@ -15314,13 +15390,10 @@ var D3X={
       var size=box.getSize(new THREE.Vector3()),c=box.getCenter(new THREE.Vector3());
       var k=1/Math.max(size.x,size.y,size.z);/* unit cube */
       proto.scale.setScalar(k);proto.position.sub(c.multiplyScalar(k));
-      self.proto=proto;
-      self._loadSkin(function(){
-        self.ready=true;self.loading=false;
-        var q=self._need;self._need=[];
-        q.forEach(function(f){f&&f();});
-        self.frame();
-      });
+      self.proto=proto;self.ready=true;self.loading=false;
+      var q=self._need;self._need=[];
+      q.forEach(function(f){f&&f();});
+      self.frame();
     };
     var onErr=function(){self.loading=false;self.fail=true;};
     var ld=new THREE.GLTFLoader();
@@ -15412,22 +15485,15 @@ var D3X={
     var m=this.proto.clone(true);
     var col=this.MATCOL[mat]||this.MATCOL.bone;
     var rough=this.ROUGH[mat]!==undefined?this.ROUGH[mat]:.62;
-    var sk=this._skin,SK=this.SKIN||{};
+    var self=this,sk=this._skinFor(mat);
     m.traverse(function(o){
       if(o.isMesh){
         var src=o.material;
-        /* diffuse only - the texture does the talking, no specular */
         o.material=new THREE.MeshPhongMaterial({
-          map:(sk&&sk.map)||src.map||null,normalMap:src.normalMap||null,
-          color:new THREE.Color(sk?0xffffff:col),specular:0x000000,shininess:0,
+          map:src.map||null,normalMap:src.normalMap||null,
+          color:new THREE.Color(col),specular:0x000000,shininess:0,
           reflectivity:0});
-        if(sk&&sk.spec){
-          /* painted specular: white in the map = shiny, same as the lab */
-          o.material.specularMap=sk.spec;
-          o.material.specular=new THREE.Color(SK.specular!==undefined?SK.specular:0x736e66);
-          o.material.shininess=(SK.shininess!==undefined?SK.shininess:30);
-        }
-        o.material.needsUpdate=true;
+        self._dress(o.material,mat,sk);
       }
     });
     g.add(m);

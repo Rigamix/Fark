@@ -2862,3 +2862,40 @@ Verified in a live match: both maps bound, material carries map + specularMap,
 colour forced to white, and the rendered faces average RGB(238,132,39) with a
 red:blue ratio of 3.3-7.8 across the six dice.
 
+## P170-P171 — painted dice per material, and a rough settle
+
+**Why every die went bone.** P169 gated `self.ready` on the skin finishing to
+load. If a texture never resolved, D3X never became ready, no 3D dice were
+ever built, and the whole game fell back to the CSS cubes — which are the
+painted BONE die. So "still all bone" was not a texture problem at all, it
+was the 3D layer never starting. Skins now load in the background and are
+applied to dice already on screen when they arrive; a slow or broken texture
+costs a texture, never the dice. Trial webp files dropped for jpg to take
+that variable off the table too.
+
+**Per-material texture sets.** Denis supplies the art per die material now, so
+D3X stops colouring anything. `D3X.SKINS[mat] = {map, spec, normal}` is wired
+straight through with a white base colour — as painted. A material with no
+set keeps the old tinted stock texture until its art lands, so nothing else
+regresses. `SKIN_ALL:'amber'` forces one material's art onto every die for a
+look-see; set it to null for per-material behaviour.
+
+Specular: the die material is `MeshPhongMaterial`, whose `specularMap` reads
+white = shiny — the same convention the texture lab uses — so the map ships
+exactly as painted. `SPEC:{color:0x736e66,shininess:30}` matches the lab's
+defaults so the two agree.
+
+`D3X.diag()` returns ready/failed/dice-count/mount/loaded-sets and the first
+die's actual material, for when a browser is showing the wrong thing.
+
+**Rough settle.** `D3X.SETTLE = {x:7, y:4, rot:0}` (in die-widths) scatters
+where each die comes to rest, since dice that just bounced don't sit in a
+ruler-straight row. The engine's existing neighbour shove keeps them from
+overlapping. `rot` is in-plane roll and stays at 0 — that is the one that made
+them read as stopped on an edge (P166), so the roughness is positional only.
+Measured on the game's own roll path: x ±5.3px, y ±2.9px, and all 30 sampled
+landings still exactly flat.
+
+Verified in a live match: ready before textures resolve, amber bound with map
++ spec, base colour ffffff, rendered faces RGB ~(243,152,53) across all six.
+
