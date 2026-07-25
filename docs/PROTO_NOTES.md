@@ -2899,3 +2899,23 @@ landings still exactly flat.
 Verified in a live match: ready before textures resolve, amber bound with map
 + spec, base colour ffffff, rendered faces RGB ~(243,152,53) across all six.
 
+## P172 — die skins ship embedded (the real reason no texture appeared)
+
+Firefox gives every local file its own origin (`privacy.file_unique_origin`),
+so an image fetched from `assets/` into a `file://` page is CROSS-ORIGIN and
+**WebGL refuses to upload it as a texture**. The die's own maps come out of
+the base64-embedded model, so those were fine — which is exactly why bone
+rendered and the painted skin did not. Nothing to do with the file format.
+
+Skins now ship the same way the model does: `assets/models/dice/skins.js`
+defines `window.FK_DIE_SKINS = {name:{map,spec}}` as base64 data URIs, which
+are same-origin everywhere. `_skinFor` prefers those and falls back to a URL
+path, so a set can still be pointed at a loose file during development.
+
+Sources stay as Denis's PNGs in `Art/Assets/3D/textures/<name>/`; the shipped
+copy is JPEG at 960x640 (310px per face, against a die that never renders
+above ~200px): amber diffuse 141KB, spec 76KB, 290KB as base64.
+
+Verified: map source starts `data:image/jpeg;base64,`, and the dice render
+RGB(209,117,24).
+
