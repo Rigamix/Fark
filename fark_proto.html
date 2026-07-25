@@ -15553,7 +15553,7 @@ var D3X={
      of the top face you see: share = sin(t)/(sin(t)+cos(t)), so 58 gave 62%
      and 50 gives 54%. The value lives on the top face now, so this is the
      dial for the whole read of the table. */
-  TABLE:{tilt:50, pitch:1.38, ease:0.22},
+  TABLE:{tilt:42, pitch:1.38, ease:0.22, land:10},
   _tbl:null,_play:null,_pend:null,
   _tableRoot:function(){
     if(!this._tbl){
@@ -15649,12 +15649,28 @@ var D3X={
   /* where a physics die sits/points right now, in table-local space */
   _physPose:function(i){
     var P=this._play;if(!P)return null;
-    var f=P.sol.frames[Math.min(P.step,P.sol.frames.length-1)][i];
-    var q=new THREE.Quaternion(f.qx,f.qy,f.qz,f.qw);
-    var done=P.step>=P.sol.frames.length-1;
+    var last=P.sol.frames.length-1;
+    var idx=Math.min(P.step,last);
+    var f=P.sol.frames[idx][i];
+    var r=P.sol.rest[i];
+    /* The relabel is a cube symmetry, so it can ride along from the FIRST
+       frame: the silhouette is identical either way and only the painted
+       faces move, which is invisible mid-tumble. Applying it at the end
+       instead made the die flip its face in a single frame. */
+    var q=new THREE.Quaternion(f.qx,f.qy,f.qz,f.qw).multiply(r.fix);
+    var done=idx>=last;
+    /* the last few frames ease into sitting square rather than snapping */
+    var n=Math.max(1,this.TABLE.land||10);
+    var k=(idx-(last-n))/n;
+    if(k>0){
+      var lf=P.sol.frames[last][i];
+      var home=r.flat.clone()
+        .multiply(new THREE.Quaternion(lf.qx,lf.qy,lf.qz,lf.qw))
+        .multiply(r.fix);
+      var e=k>=1?1:(1-Math.pow(1-k,3));
+      q.slerp(home,e);
+    }
     if(done){
-      var r=P.sol.rest[i];
-      q=r.flat.clone().multiply(q).multiply(r.fix);
       var h=P.hosts&&P.hosts[i];
       if(h)h.phys={x:f.x,y:f.y,z:f.z,q:q.clone()};
     }
@@ -15813,7 +15829,7 @@ var D3X={
     g.add(m);
     return g;
   },
-  focus:null,SHADOW:false,FOV:40,FOV_MATCH:44,RISE_MATCH:20,MSCALE:0.77,_matchOn:false,
+  focus:null,SHADOW:false,FOV:40,FOV_MATCH:54,RISE_MATCH:20,MSCALE:0.77,_matchOn:false,
   _bindDrag:function(){
     if(this._dragBound)return;this._dragBound=true;
     var self=this,down=null;

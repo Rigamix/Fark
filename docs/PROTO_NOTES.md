@@ -3053,3 +3053,24 @@ proportion reads as looking down much harder. 50 gives 54%.
 Live match at these settings: 6 settled, faces correct, hit-box offset 0.0px,
 vertical scatter 12.4px, gaps 48/40/55/68/54px — uneven, which is the point.
 
+## P178 — the settle stops popping; lower table, wider lens
+
+*"Dice seem to switch face in one frame when they settle"* — real bug, and an
+obvious one in hindsight. `_physPose` applied the relabel ONLY on the final
+frame, so the die tumbled showing whatever face physics gave it and then
+snapped to the value the game rolled — a cube symmetry, so up to 180 degrees
+in a single frame.
+
+The relabel is a cube symmetry, which means it can ride along from frame ONE:
+the silhouette is identical either way and only the painted faces move, which
+is invisible while the die is tumbling. The `flat` correction (the small tip
+that squares a die up) is separate and can't be applied early, so it eases in
+over the last 10 frames with a cubic curve instead of snapping.
+
+Measured over the last 24 frames of a live roll: **final-frame turn 0.0
+degrees** on all six dice, with the settle moving 4-12 degrees per frame —
+continuous the whole way in. Faces still correct.
+
+`TABLE.tilt 50 -> 42` (top-face share 54% -> 47%) and `FOV_MATCH 44 -> 54`.
+`TABLE.land` is the new dial for how many frames the squaring-up takes.
+
