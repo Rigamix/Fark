@@ -2288,6 +2288,35 @@ so the tier chip (and badge) sway WITH the card. Sheen keyframes
 travel 170% -> -170% over a 300% canvas: the shine exits the
 letters completely on both ends, so the loop restart is invisible.
 
+## SIDE LAB v3 - die3d_lab.html (local only, gitignored)
+
+Self-contained (three r128 + cannon.js + the GLB, all inline) 3D dice
+sandbox. REAL rigid-body physics with the teal-dice deterministic
+technique: all randomness up front -> hidden fixed-step sim to rest ->
+read each die's natural up-face -> pre-rotate the MESH inside the body
+so the wanted value shows -> reset and replay the identical sim
+visibly. Dice collide with each other and invisible tray walls that
+bound a fixed horizontal band (UI can never be hit). The LINE forms
+inside the roll: per-die lane springs + soft mutual repulsion, both
+scaled up as a die loses speed (chaos while fast, order as it dies) -
+no tidy tween anywhere. Cocked dice are detected and re-thrown.
+Selection = the game's look in 3D: inverted-hull shells (one opaque
+#ffd98a outline at 1.035 + seven additive #ffb45e shells 1.06-1.36
+whose overlap makes the outward falloff); the die itself is never
+tinted. Long-press lifts a die (back-out spring + squash), dragging
+swaps slots live (position IS loadout order - the next roll uses the
+new lanes), drop lands with an ease-out-bounce and a landing squash.
+
+PERF GOTCHA worth remembering: the settle loop originally ran until
+'all stopped AND nothing too close', which deadlocked whenever a lane
+spring balanced the separation force - 700-step caps, four retries,
+~120ms of blocked main thread per roll (the ROLL button felt dead).
+Fixed with a bounded 'overtime' phase (stronger separation for <=140
+steps, then accept) and retries only for genuinely cocked dice: 7ms
+average, 12ms worst, no caps, no retries across 16 rolls. The boost
+schedule is recorded so the visible replay reproduces the hidden sim
+exactly.
+
 ## SIDE LAB - die3d_test.html (not part of the game)
 
 Standalone 3D-die ideation lab for Art/Assets/3D/die.glb (216 verts,
