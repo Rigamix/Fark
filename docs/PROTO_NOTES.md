@@ -3237,3 +3237,28 @@ silhouette wherever physics left it, which the DOM ring never could now that
 dice sit at angles — so that ring stays hidden and there is no double outline
 (verified: wrap::after computes to display:none while selected).
 
+## P186 — selection outline, the mass jitter, and dice leaving the frame
+
+**Mass jitter on selecting.** `_measureHomes` CLEARED every match die's
+transform in order to measure its untransformed box — so every die jumped for
+a frame. And `_homeOf` calls it whenever any die lacks a cached home, which
+can be every frame (a die that physics does not own has its home cleared each
+pass). One homeless die therefore shook the whole row. It never needed to
+touch the DOM: we know exactly what translate we applied, so the home is now
+`rect - appliedTranslate` (`d.tx/d.ty`). No writes, no jump. Verified:
+selecting a die moves **0 dice, 0.00px**, stable across frames.
+
+**Two outlines.** The gold hull was at scale 1.15 against the material
+outline's 1.055 — far enough out that it read as a second box rather than an
+outline. Now 1.085. Colour was `#ffd98a`, which against a bone die reads as
+white; now `#e1a755`. And every DOM selection decoration (ring, halo, box
+shadow, both pseudos on the die and on its wrap) is switched off for a 3D
+die — verified all five compute to none while selected. A DOM ring can only
+ever be an upright box, which is exactly what was appearing around dice that
+now sit at angles.
+
+**Dice off the edge.** The relax pass could push an end die past the screen.
+`_physSolve` now takes a `limitX` — how far from the row centre a die can sit
+and still be fully visible, derived from the mount width — and clamps the
+relaxed positions to it. Verified: 0 dice off either edge, nearest 11px in.
+

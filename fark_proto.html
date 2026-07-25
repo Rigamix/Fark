@@ -1191,8 +1191,18 @@ html.fk3d .d3chip .die,html.fk3d .nrdie .d3host .die{visibility:hidden}
 /* match dice: only the CUBE hides - the host keeps its hit box and its
    ground shadow, and the gold selection ring (which the cube used to draw
    for itself) comes back on */
-/* selection is drawn in 3D now (a gold hull around the die silhouette),
-   so the DOM ring stays hidden - it could only ever be an upright box */
+/* Selection is drawn in 3D now: a gold hull around the die's real
+   silhouette. Every DOM selection decoration is switched off for a 3D die -
+   a ring or halo on the host can only ever be an upright box, which is what
+   was reading as a second outline. */
+html.fk3d #screen-match .die.d3on.selected,
+html.fk3d #screen-match .die-wrap:has(.die.d3on.selected){
+  box-shadow:none !important;outline:none !important}
+html.fk3d #screen-match .die.d3on.selected::before,
+html.fk3d #screen-match .die.d3on.selected::after,
+html.fk3d #screen-match .die-wrap:has(.die.d3on.selected)::before,
+html.fk3d #screen-match .die-wrap:has(.die.d3on.selected)::after{
+  display:none !important;content:none !important}
 #screen-match #d3xCanvas{z-index:2}
 #d3xCanvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;
   z-index:2}
@@ -15453,15 +15463,15 @@ var D3X={
     var p=w.project(this.cam);
     var sx=(p.x*.5+.5)*mr.width, sy=(-p.y*.5+.5)*mr.height;
     if(d.hx===undefined){
-      /* .die carries `transition:transform .08s`, so the box would lag the
-         die every frame AND the home rect would be read mid-transition.
-         Kill the transition while physics owns this die. */
+      /* .die carries a transform transition, so the slaved box would lag
+         the die; kill it while physics owns this one */
       d.chip.style.transition='none';
-      d.chip.style.transform='';
       var r0=d.chip.getBoundingClientRect();
-      d.hx=r0.left-mr.left+r0.width/2;d.hy=r0.top-mr.top+r0.height/2;
+      d.hx=r0.left-mr.left+r0.width/2-(d.tx||0);
+      d.hy=r0.top-mr.top+r0.height/2-(d.ty||0);
     }
-    d.chip.style.transform='translate('+(sx-d.hx).toFixed(1)+'px,'+(sy-d.hy).toFixed(1)+'px)';
+    d.tx=sx-d.hx;d.ty=sy-d.hy;
+    d.chip.style.transform='translate('+d.tx.toFixed(1)+'px,'+d.ty.toFixed(1)+'px)';
   },
   /* one-line health check for a browser that is showing the wrong dice */
   diag:function(){
@@ -15542,8 +15552,9 @@ var D3X={
   },
   /* solve one throw. slots = target x per die in die-widths, values = the
      faces the game rolled. Returns {steps, frames:[[{p,q}]], rest:[{p,q}]} */
-  _physSolve:function(slotX,values,obstacles){
-    var P=this.PHYS,N=values.length;
+  _physSolve:function(slotX,values,obstacles,limitX){
+    var P=Object.create(this.PHYS),N=values.length;
+    P.limitX=limitX||0;
     var world=new CANNON.World();
     world.gravity.set(0,P.gravity,0);
     world.broadphase=new CANNON.NaiveBroadphase();
@@ -15652,6 +15663,12 @@ var D3X={
       }
       if(!moved)break;
     }
+    /* keep every die inside the visible table: the relax can push the end
+       dice past the edge of the screen otherwise */
+    if(P.limitX){
+      for(var lc=0;lc<N;lc++)
+        rest2[lc].x=Math.max(-P.limitX,Math.min(P.limitX,rest2[lc].x));
+    }
     /* keep the group centred on the slots it was aimed at */
     var cNow=0,cWant=0;
     for(var c1=0;c1<N;c1++){cNow+=rest2[c1].x;cWant+=slotX[c1];}
@@ -15729,7 +15746,7 @@ var D3X={
   /* selection: the same hull trick, thicker and gold, so the ring hugs the
      die silhouette wherever physics has left it - a box drawn on the DOM
      host cannot, now that the dice sit at angles */
-  SEL_COL:'#ffd98a', SEL_W:0.15,
+  SEL_COL:'#e1a755', SEL_W:0.085,
   /* a little tooth so the outline is not a dead flat band */
   _grainTex:function(){
     if(this._grn)return this._grn;
@@ -15854,23 +15871,29 @@ var D3X={
       if(self._rowKey(d)!==key)return;
       obst.push(d.phys);
     });
-    var sol=this._physSolve(slots,b.vals,obst);
+    /* how far from the row centre a die can sit and still be fully on
+       screen, in die-widths (the die is 1 wide, plus its outline) */
+    var mrw=this.mount.getBoundingClientRect().width;
+    var limitX=Math.max(1,(mrw/2-mid-sz*0.85)/sz);
+    var sol=this._physSolve(slots,b.vals,obst,limitX);
     /* one playback per die: two throws can be in the air at once without
        either being dropped */
     var t0=performance.now();
     mine.forEach(function(d,i){d.roll={sol:sol,i:i,t0:t0};d.phys=null;});
   },
   /* untransformed centre of every tracked match die, in mount space */
+  /* A die's home is where its box sits with no transform. Clearing the
+     transform to measure it made every die JUMP for a frame - and because
+     _homeOf calls this whenever any die lacks a home, that could happen
+     every frame, which is the mass jitter. We know exactly what translate
+     we applied, so subtract it instead and never touch the DOM. */
   _measureHomes:function(){
     var mr=this.mount.getBoundingClientRect();
     this.dice.forEach(function(d){
       if(!d.match)return;
-      var t=d.chip.style.transform;
-      d.chip.style.transition='none';
-      d.chip.style.transform='';
       var r=d.chip.getBoundingClientRect();
-      d.hx=r.left-mr.left+r.width/2;d.hy=r.top-mr.top+r.height/2;
-      if(t)d.chip.style.transform=t;
+      d.hx=r.left-mr.left+r.width/2-(d.tx||0);
+      d.hy=r.top-mr.top+r.height/2-(d.ty||0);
     });
   },
   /* the player line, the kept tray and the opponent line are separate
@@ -16205,7 +16228,7 @@ var D3X={
     d.roll=null;d.phys=null;
     if(d.match){try{
       if(d.chip._d3){d.chip._d3.die.style.visibility='';d.chip._d3._d3xOwned=false;}
-      d.chip.style.transform='';d.chip.style.transition='';
+      d.chip.style.transform='';d.chip.style.transition='';d.tx=0;d.ty=0;
     }catch(e){}}
   },
   detach:function(){
@@ -16317,7 +16340,8 @@ var D3X={
         }
         if(d.obj.parent&&d.obj.parent!==D3X.scene){
           D3X.scene.add(d.obj);d.obj.scale.setScalar(1);
-          d.chip.style.transform='';d.chip.style.transition='';d.hx=undefined;
+          d.chip.style.transform='';d.chip.style.transition='';
+          d.hx=undefined;d.tx=0;d.ty=0;
         }
         var mcs=getComputedStyle(d.chip);
         var mvis=mcs.visibility!=='hidden'&&mcs.display!=='none'&&+mcs.opacity>.02;
