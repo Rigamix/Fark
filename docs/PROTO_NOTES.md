@@ -2307,6 +2307,23 @@ tinted. Long-press lifts a die (back-out spring + squash), dragging
 swaps slots live (position IS loadout order - the next roll uses the
 new lanes), drop lands with an ease-out-bounce and a landing squash.
 
+SELECTION GLOW, final form (worth copying if this ever ships): the
+camera never moves, so it is a 2D pass, not geometry. Selected dice
+render alone into a full-res silhouette mask; a TIGHT gaussian blur
+of that mask yields both an anti-aliased silhouette and the outline
+band (smoothstep(.50,.63) minus smoothstep(.13,.48) - no hard
+dilation anywhere, which is what made earlier versions stair-step);
+a WIDE blur gives the falloff. Both composite in ONE gold with
+NORMAL alpha blending - additive was saturating the band to white
+and breaking the seam between outline and glow. Measured: die face
+untouched, band peak at the edge, smooth tail to ~30px, hue constant
+(G/R .77-.79) from band to tail, 0.5ms per frame. Dead ends worth
+not repeating: inverted-hull shells (3D, wrong for a fixed camera,
+and the emissive lift washed the die); ring-sampling for the blur
+(only the arc facing the die ever hits it, so the falloff never
+builds value); amplifying the blur BEFORE subtracting the mask
+(glow bleeds over the die's own face).
+
 PERF GOTCHA worth remembering: the settle loop originally ran until
 'all stopped AND nothing too close', which deadlocked whenever a lane
 spring balanced the separation force - 700-step caps, four retries,
