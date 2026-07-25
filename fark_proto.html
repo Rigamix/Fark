@@ -16173,8 +16173,20 @@ var D3X={
     this.on=true;
   },
   _drop:function(d){
-    this.scene.remove(d.obj);if(d.sh)this.scene.remove(d.sh);
-    if(d.match){try{if(d.chip._d3)d.chip._d3.die.style.visibility='';}catch(e){}}
+    /* A die on the table is parented to the TABLE group, not the scene, so
+       scene.remove() was a no-op and every destroyed die left a ghost that
+       kept rendering. Always detach from the actual parent. */
+    [d.obj,d.sh,d.sq].forEach(function(o){if(o&&o.parent)o.parent.remove(o);});
+    /* materials are made per die; geometry is shared with the proto and
+       must NOT be disposed */
+    if(d.obj)d.obj.traverse(function(o){
+      if(o.isMesh&&o.material&&o.material.dispose)o.material.dispose();
+    });
+    d.roll=null;d.phys=null;
+    if(d.match){try{
+      if(d.chip._d3){d.chip._d3.die.style.visibility='';d.chip._d3._d3xOwned=false;}
+      d.chip.style.transform='';d.chip.style.transition='';
+    }catch(e){}}
   },
   detach:function(){
     this.on=false;
