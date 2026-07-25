@@ -15266,8 +15266,7 @@ var D3X={
     var key=new THREE.DirectionalLight(0xfff1d6,.95);key.position.set(.12,1,.42);sc.add(key);
     var warm=new THREE.DirectionalLight(0xffd9a8,.28);warm.position.set(-.6,.25,.5);sc.add(warm);
     sc.add(new THREE.AmbientLight(0xb08a5e,.85));
-    this.cam=new THREE.OrthographicCamera(0,100,0,-100,-2000,2000);
-    this.cam.position.set(0,0,600);
+    this.cam=new THREE.PerspectiveCamera(this.FOV,1,1,20000);
     var onModel=function(g){
       var proto=g.scene;
       var box=new THREE.Box3().setFromObject(proto);
@@ -15301,6 +15300,14 @@ var D3X={
         5:[[-1,0,0],[0,0,-1],[0,-1,0]],
         6:[[0,-1,0],[0,0,-1],[1,0,0]]},
   ISO:null,TILT:42,YAW:0,ROLL:90,
+  /* a die away from the middle of the screen is seen slightly from the
+     side; turn it to face the lens so the row still reads square-on */
+  _aimQ:function(x,y){
+    var v=this._v||(this._v=new THREE.Vector3());
+    v.set(this.cam.position.x-x,this.cam.position.y-y,this.cam.position.z).normalize();
+    var q=this._aq||(this._aq=new THREE.Quaternion());
+    return q.setFromUnitVectors(this._z||(this._z=new THREE.Vector3(0,0,1)),v);
+  },
   _isoQ:function(val){
     if(!this.ISO){
       var yaw=new THREE.Quaternion().setFromAxisAngle(
@@ -15355,7 +15362,7 @@ var D3X={
     g.add(m);
     return g;
   },
-  focus:null,SHADOW:false,
+  focus:null,SHADOW:false,FOV:40,
   _bindDrag:function(){
     if(this._dragBound)return;this._dragBound=true;
     var self=this,down=null;
@@ -15432,7 +15439,13 @@ var D3X={
     var r=this.renderer;
     if(this._w!==mr.width||this._h!==mr.height){
       r.setSize(mr.width,mr.height,false);
-      this.cam.left=0;this.cam.right=mr.width;this.cam.top=0;this.cam.bottom=-mr.height;
+      /* place the lens so one world unit is still one CSS pixel on the
+         dice plane - everything else (sizes, positions) keeps working */
+      var dist=(mr.height/2)/Math.tan(THREE.MathUtils.degToRad(this.FOV)/2);
+      this.cam.fov=this.FOV;
+      this.cam.aspect=mr.width/mr.height;
+      this.cam.position.set(mr.width/2,-mr.height/2,dist);
+      this.cam.lookAt(mr.width/2,-mr.height/2,0);
       this.cam.updateProjectionMatrix();
       this._w=mr.width;this._h=mr.height;
     }
@@ -15468,25 +15481,28 @@ var D3X={
       var x=cr.left-mr.left+cr.width/2,y=-(cr.top-mr.top+cr.height/2);
       d.obj.position.set(x,y,0);
       /* focus: a slow turn, plus whatever the player has dragged */
+      var aim=D3X._aimQ(x,y);
       if(d===zoomed){
         /* the slow turn never stops; dragging just adds to it */
         var idle=(now-d.t0)*0.00042;
         var extra=new THREE.Quaternion().setFromEuler(
           new THREE.Euler(d.uPit||0,(d.uYaw||0)+idle,0,'YXZ'));
-        d.obj.quaternion.copy(extra.multiply(D3X._isoQ(d.val)));
+        d.obj.quaternion.copy(aim).multiply(extra).multiply(D3X._isoQ(d.val));
       }else if(d.retT0){
         var rk=Math.min(1,(now-d.retT0)/450);
         var re=1-Math.pow(1-rk,3);
-        d.obj.quaternion.copy(d.retFrom).slerp(D3X._isoQ(d.val),re);
-        if(rk>=1){d.retT0=0;d.retFrom=null;d.obj.userData.posed=d.val;}
-      }else if(d.obj.userData.posed!==d.val){
-        d.obj.quaternion.copy(D3X._isoQ(d.val));
+        var home=aim.clone().multiply(D3X._isoQ(d.val));
+        d.obj.quaternion.copy(d.retFrom).slerp(home,re);
+        if(rk>=1){d.retT0=0;d.retFrom=null;}
+        d.obj.userData.posed=-1;
+      }else{
+        d.obj.quaternion.copy(aim).multiply(D3X._isoQ(d.val));
         d.obj.userData.posed=d.val;
       }
       if(d.sh){
         d.sh.visible=vis&&d!==zoomed;/* no twin behind the focused die */
         d.sh.scale.setScalar(sz);
-        d.sh.quaternion.copy(D3X._isoQ(d.val));
+        d.sh.quaternion.copy(aim).multiply(D3X._isoQ(d.val));
         d.sh.position.set(x+sz*0.055,y-sz*0.075,-1);
       }
     });

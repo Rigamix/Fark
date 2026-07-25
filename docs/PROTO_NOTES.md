@@ -2504,3 +2504,30 @@ PANEL is open (#gbLoadout.lo-focus / #gbShop.st-focus /
 home during the flight. Measured from the close: 68.8 -> 34.4 ->
 13.8 -> 3.7 -> 0.3 degrees, square by the time it lands (450ms, the
 same duration as the CSS travel).
+
+## P159 — real perspective on the rest dice (no more reverse-perspective read)
+
+Denis: *"is the view isometric? They look like the front of the die (closer)
+is smaller than the back (further) somehow"*. Correct diagnosis — the D3X
+camera was an **OrthographicCamera**, so near and far edges projected to
+exactly the same width (measured: 24.3px / 24.3px). The eye expects the far
+edge to be smaller, so equal edges read as *reverse* perspective.
+
+- `THREE.OrthographicCamera` → `THREE.PerspectiveCamera`, `D3X.FOV = 40`.
+  The lens is placed at `dist = (mountH/2) / tan(FOV/2)` so **one world unit
+  is still one CSS pixel on the dice plane** — every existing size and
+  position calculation keeps working untouched.
+- New `D3X._aimQ(x,y)`: a wider lens would make dice away from screen centre
+  read as seen-from-the-side (the thing Denis fought for four rounds). Each
+  die is now turned to look straight down the lens, pre-multiplied onto its
+  pose (and onto the shadow twin + the focus-return slerp target, so the
+  flight home still lands square).
+
+Verified by projecting all 8 cube corners per die:
+- near/far taper **+4.1%** on every die (near edge 24.89 vs far 23.91) —
+  physically what a real die photographed at table distance does.
+- sideways skew across the row **≤0.07px** with the aim correction, vs up to
+  **1.67px** (7% of the die) without it.
+
+`D3X.FOV` is the single dial: higher = more taper, lower = flatter.
+
