@@ -15254,6 +15254,27 @@ var D3X={
     whispers_fang:0xe0574e, ambrose_weight:0xffb43c
   },
   ROUGH:{obsidian:.35,silver:.3,starstone:.45,jade:.5,jade2:.45,amber:.5,lucky:.4},
+  /* One painted skin on every die, tint ignored - for looking at a new
+     texture in place. SKIN:null goes back to the tinted stock texture. */
+  SKIN:{map:'assets/models/die_amber.webp',spec:'assets/models/die_amber_spec.webp',
+        specular:0x736e66,shininess:30},
+  _skin:null,
+  _loadSkin:function(done){
+    if(!this.SKIN||this._skin){done();return;}
+    var self=this,tl=new THREE.TextureLoader(),left=0,out={};
+    var take=function(k,url,srgb){
+      left++;
+      tl.load(url,function(t){
+        t.flipY=false;/* glTF convention, same as the baked maps */
+        if(srgb)t.encoding=THREE.sRGBEncoding;
+        out[k]=t;
+        if(!--left){self._skin=out;done();}
+      },undefined,function(){if(!--left){self._skin=out;done();}});
+    };
+    if(this.SKIN.map)take('map',this.SKIN.map,true);
+    if(this.SKIN.spec)take('spec',this.SKIN.spec,false);
+    if(!left)done();
+  },
   _need:[],
   boot:function(cb){
     if(this.ready){cb&&cb();return;}
@@ -15293,10 +15314,13 @@ var D3X={
       var size=box.getSize(new THREE.Vector3()),c=box.getCenter(new THREE.Vector3());
       var k=1/Math.max(size.x,size.y,size.z);/* unit cube */
       proto.scale.setScalar(k);proto.position.sub(c.multiplyScalar(k));
-      self.proto=proto;self.ready=true;self.loading=false;
-      var q=self._need;self._need=[];
-      q.forEach(function(f){f&&f();});
-      self.frame();
+      self.proto=proto;
+      self._loadSkin(function(){
+        self.ready=true;self.loading=false;
+        var q=self._need;self._need=[];
+        q.forEach(function(f){f&&f();});
+        self.frame();
+      });
     };
     var onErr=function(){self.loading=false;self.fail=true;};
     var ld=new THREE.GLTFLoader();
@@ -15388,14 +15412,22 @@ var D3X={
     var m=this.proto.clone(true);
     var col=this.MATCOL[mat]||this.MATCOL.bone;
     var rough=this.ROUGH[mat]!==undefined?this.ROUGH[mat]:.62;
+    var sk=this._skin,SK=this.SKIN||{};
     m.traverse(function(o){
       if(o.isMesh){
         var src=o.material;
         /* diffuse only - the texture does the talking, no specular */
         o.material=new THREE.MeshPhongMaterial({
-          map:src.map||null,normalMap:src.normalMap||null,
-          color:new THREE.Color(col),specular:0x000000,shininess:0,
+          map:(sk&&sk.map)||src.map||null,normalMap:src.normalMap||null,
+          color:new THREE.Color(sk?0xffffff:col),specular:0x000000,shininess:0,
           reflectivity:0});
+        if(sk&&sk.spec){
+          /* painted specular: white in the map = shiny, same as the lab */
+          o.material.specularMap=sk.spec;
+          o.material.specular=new THREE.Color(SK.specular!==undefined?SK.specular:0x736e66);
+          o.material.shininess=(SK.shininess!==undefined?SK.shininess:30);
+        }
+        o.material.needsUpdate=true;
       }
     });
     g.add(m);

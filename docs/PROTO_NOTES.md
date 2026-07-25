@@ -2836,3 +2836,29 @@ top-down we go the smaller the face carrying the number gets (39% of the
 height now). Past this point the value really wants to move to the TOP face,
 the way a die on a real table works — a bigger change, his call.
 
+## P169 — SKIN: one painted texture on every die
+
+Denis painted an amber set against the new unwrap (1536x1024, exactly the
+guide sheet) and wanted it on all dice to look at.
+
+`D3X.SKIN = {map, spec, specular, shininess}` puts one texture on every die
+and bypasses the per-material tint (so a special die is amber too, which is
+the point of the look). `SKIN:null` restores the tinted stock texture — that
+is the whole revert.
+
+The die material is `MeshPhongMaterial` with specular black, and **Phong's
+specularMap takes white = shiny**, which is exactly how the texture lab
+authors it. So the spec map ships as painted — no inversion. (First pass I
+inverted it into a roughness map, which would have been right for a Standard
+material and wrong here.) `specular: 0x736e66`, `shininess: 30` — the lab's
+defaults, so the lab preview and the game agree.
+
+Shipped as WebP next to the model: `die_amber.webp` 313KB, `die_amber_spec.webp`
+59KB. Loaded through `TextureLoader` (an <img> under the hood, so file:// is
+fine) with `flipY=false` to match the baked maps, and the skin resolves before
+`ready` fires so no die is ever built with the wrong material.
+
+Verified in a live match: both maps bound, material carries map + specularMap,
+colour forced to white, and the rendered faces average RGB(238,132,39) with a
+red:blue ratio of 3.3-7.8 across the six dice.
+
