@@ -2400,3 +2400,19 @@ normal map for pip depth; tone mapping off; bone tints white so the
 texture reads as painted. Rig is a soft warm key from above, a warm
 side fill and warm ambient, so shadows stay warm (verified: top face
 is the brightest, every face samples warm).
+
+## P152 - 3D dice: pose to match the painted reference + focus (done)
+
+POSE: the painted dice look nearly straight-on, so the rest pose is
+no longer a steep three-quarter view. The value face now looks AT the
+camera and TILT/YAW (15/20 deg) only reveal a sliver of the top and
+one side - verified in a rendered silhouette dump (big flat face,
+bright top edge, dark side edge). SIZE up to 0.80 of the chip (0.92
+in focus); measured die height is now ~1.07 chip.
+SHADOW: the game's sharp offset silhouette is back as a flat dark
+clone of the die drawn behind it, nudged down-right (0.10/0.13 of
+size), alpha .42 - the 3D twin of the old .d3dsl layer.
+FOCUS: the zoomed die turns slowly on its own, can be DRAGGED to
+rotate (document-level pointer handlers, ignored on the back button;
+dragging cancels the idle spin), is rendered bigger, and every other
+die simply disappears while a focus is open.

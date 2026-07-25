@@ -15290,20 +15290,35 @@ var D3X={
     }else ld.load('assets/models/die.glb',onModel,undefined,onErr);
   },
   /* value-up isometric rest pose, the painted screens' reference look */
-  ISO:null,TILT:38,YAW:45,
+  ISO:null,TILT:15,YAW:20,
   _isoQ:function(val){
     if(!this.ISO){
       var yaw=new THREE.Quaternion().setFromAxisAngle(
         new THREE.Vector3(0,1,0),THREE.MathUtils.degToRad(this.YAW));
       var tip=new THREE.Quaternion().setFromAxisAngle(
         new THREE.Vector3(1,0,0),THREE.MathUtils.degToRad(this.TILT));
-      this.ISO=tip.multiply(yaw);/* spin, then tip the top toward us */
+      this.ISO=tip.multiply(yaw);/* turn a little, then tip a little */
     }
+    /* the value face looks AT the camera; the tilt/yaw only reveal a
+       sliver of the top and one side, like the painted dice */
     var AX={1:[0,1,0],6:[0,-1,0],2:[1,0,0],5:[-1,0,0],3:[0,0,1],4:[0,0,-1]};
     var a=AX[val]||AX[1];
-    var up=new THREE.Quaternion().setFromUnitVectors(
-      new THREE.Vector3(a[0],a[1],a[2]),new THREE.Vector3(0,1,0));
-    return this.ISO.clone().multiply(up);
+    var face=new THREE.Quaternion().setFromUnitVectors(
+      new THREE.Vector3(a[0],a[1],a[2]),new THREE.Vector3(0,0,1));
+    return this.ISO.clone().multiply(face);
+  },
+  _mkShadow:function(){
+    /* the game's die-shaped offset silhouette, rebuilt in 3D: a flat
+       dark copy of the die drawn behind it, nudged down-right */
+    var g=new THREE.Group();
+    var m=this.proto.clone(true);
+    m.traverse(function(o){
+      if(o.isMesh)o.material=new THREE.MeshBasicMaterial({
+        color:0x241610,transparent:true,opacity:.42,
+        depthWrite:false,depthTest:false});
+    });
+    g.add(m);g.renderOrder=-1;
+    return g;
   },
   _mkDie:function(mat){
     var g=new THREE.Group();
@@ -15322,6 +15337,25 @@ var D3X={
     });
     g.add(m);
     return g;
+  },
+  focus:null,
+  _bindDrag:function(){
+    if(this._dragBound)return;this._dragBound=true;
+    var self=this,down=null;
+    document.addEventListener('pointerdown',function(e){
+      if(!self.focus)return;
+      if(e.target.closest&&e.target.closest('#loFBack,#stBackBtn,#ptFBack,#nrBackBtn,button'))return;
+      down={x:e.clientX,y:e.clientY,yaw:self.focus.uYaw||0,pit:self.focus.uPit||0};
+    },true);
+    document.addEventListener('pointermove',function(e){
+      if(!down||!self.focus)return;
+      self.focus.uYaw=down.yaw+(e.clientX-down.x)*.011;
+      self.focus.uPit=down.pit+(e.clientY-down.y)*.011;
+      self.focus.spun=true;
+    },true);
+    var up=function(){down=null;};
+    document.addEventListener('pointerup',up,true);
+    document.addEventListener('pointercancel',up,true);
   },
   /* attach the canvas to a surface (only one is ever on screen) */
   attachTo:function(el){
@@ -15345,7 +15379,7 @@ var D3X={
     var self=this;
     this.dice=this.dice.filter(function(d){
       if(d.chip.isConnected&&host.contains(d.chip))return true;
-      self.scene.remove(d.obj);return false;
+      self.scene.remove(d.obj);if(d.sh)self.scene.remove(d.sh);return false;
     });
     chips.forEach(function(ch){
       if(!host.contains(ch))return;
@@ -15355,8 +15389,13 @@ var D3X={
       var obj=self._mkDie(mat);
       obj.quaternion.copy(self._isoQ(val));
       self.scene.add(obj);
-      self.dice.push({chip:ch,obj:obj,mat:mat,val:val,sh:null});
+      var sh=self._mkShadow();
+      sh.quaternion.copy(obj.quaternion);
+      self.scene.add(sh);
+      self.dice.push({chip:ch,obj:obj,sh:sh,mat:mat,val:val,
+        uYaw:0,uPit:0,t0:performance.now()});
     });
+    this._bindDrag();
     this.on=true;
     this.frame();
   },
@@ -15366,7 +15405,7 @@ var D3X={
     if(c&&c.parentNode)c.parentNode.removeChild(c);
     this.mount=null;
     var self=this;
-    this.dice.forEach(function(d){self.scene.remove(d.obj);});
+    this.dice.forEach(function(d){self.scene.remove(d.obj);if(d.sh)self.scene.remove(d.sh);});
     this.dice=[];
     document.documentElement.classList.remove('fk3d');
   },
@@ -15382,17 +15421,40 @@ var D3X={
       this.cam.updateProjectionMatrix();
       this._w=mr.width;this._h=mr.height;
     }
-    var live=0;
+    /* a die in focus owns the screen: everything else steps aside */
+    var zoomed=null;
+    this.dice.forEach(function(d){if(d.chip.classList.contains('zoom'))zoomed=d;});
+    if(this.focus!==zoomed){
+      if(zoomed){zoomed.uYaw=0;zoomed.uPit=0;zoomed.spun=false;zoomed.t0=performance.now();}
+      this.focus=zoomed;
+    }
+    var now=performance.now();
     this.dice.forEach(function(d){
       var cr=d.chip.getBoundingClientRect();
-      if(cr.width<1){d.obj.visible=false;return;}
       var cs=getComputedStyle(d.chip);
-      d.obj.visible=cs.visibility!=='hidden'&&cs.display!=='none'&&+cs.opacity>.02;
-      if(!d.obj.visible)return;
-      live++;
-      var sz=cr.width*0.60;/* the tipped cube's silhouette runs ~1.35x its edge */
+      var vis=cr.width>=1&&cs.visibility!=='hidden'&&cs.display!=='none'&&+cs.opacity>.02;
+      if(zoomed&&d!==zoomed)vis=false;/* the rest vanish while focusing */
+      d.obj.visible=vis;if(d.sh)d.sh.visible=vis;
+      if(!vis)return;
+      var sz=cr.width*(d===zoomed?0.92:0.80);
       d.obj.scale.setScalar(sz);
-      d.obj.position.set(cr.left-mr.left+cr.width/2,-(cr.top-mr.top+cr.height/2),0);
+      var x=cr.left-mr.left+cr.width/2,y=-(cr.top-mr.top+cr.height/2);
+      d.obj.position.set(x,y,0);
+      /* focus: a slow turn, plus whatever the player has dragged */
+      if(d===zoomed){
+        var idle=d.spun?0:(now-d.t0)*0.00042;
+        var extra=new THREE.Quaternion().setFromEuler(
+          new THREE.Euler(d.uPit||0,(d.uYaw||0)+idle,0,'YXZ'));
+        d.obj.quaternion.copy(extra.multiply(D3X._isoQ(d.val)));
+      }else if(d.obj.userData.posed!==d.val){
+        d.obj.quaternion.copy(D3X._isoQ(d.val));
+        d.obj.userData.posed=d.val;
+      }
+      if(d.sh){
+        d.sh.scale.setScalar(sz);
+        d.sh.quaternion.copy(d.obj.quaternion);
+        d.sh.position.set(x+sz*0.10,y-sz*0.13,-1);
+      }
     });
     r.render(this.scene,this.cam);
   }
