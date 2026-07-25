@@ -15446,8 +15446,10 @@ var D3X={
     var mr=this.mount.getBoundingClientRect();
     root.updateMatrixWorld(true);
     d.obj.updateMatrixWorld(true);
-    var w=new THREE.Vector3();d.obj.getWorldPosition(w);
-    var p=w.clone().project(this.cam);
+    /* scratch, not fresh objects: this runs per die per frame */
+    var w=this._sv||(this._sv=new THREE.Vector3());
+    d.obj.getWorldPosition(w);
+    var p=w.project(this.cam);
     var sx=(p.x*.5+.5)*mr.width, sy=(-p.y*.5+.5)*mr.height;
     if(d.hx===undefined){
       /* .die carries `transition:transform .08s`, so the box would lag the
@@ -15889,19 +15891,23 @@ var D3X={
        frame: the silhouette is identical either way and only the painted
        faces move, which is invisible mid-tumble. Applying it at the end
        instead made the die flip its face in a single frame. */
-    var q=new THREE.Quaternion(f.qx,f.qy,f.qz,f.qw).multiply(r.fix);
+    var q=(this._pq||(this._pq=new THREE.Quaternion()))
+      .set(f.qx,f.qy,f.qz,f.qw).multiply(r.fix);
     var done=idx>=last;
-    var P={sol:R.sol};
-    /* the last few frames ease into sitting square rather than snapping */
+    /* the last few frames ease into sitting square rather than snapping.
+       The landing pose never changes, so it is computed ONCE per roll and
+       cached on the solve rather than rebuilt every frame. */
     var n=Math.max(1,this.TABLE.land||10);
     var k=(idx-(last-n))/n;
     if(k>0){
-      var lf=P.sol.frames[last][i];
-      var home=r.flat.clone()
-        .multiply(new THREE.Quaternion(lf.qx,lf.qy,lf.qz,lf.qw))
-        .multiply(r.fix);
+      if(!r.home){
+        var lf=R.sol.frames[last][i];
+        r.home=r.flat.clone()
+          .multiply(new THREE.Quaternion(lf.qx,lf.qy,lf.qz,lf.qw))
+          .multiply(r.fix);
+      }
       var e=k>=1?1:(1-Math.pow(1-k,3));
-      q.slerp(home,e);
+      q.slerp(r.home,e);
     }
     if(done){d.phys={x:f.x,y:f.y,z:f.z,q:q.clone()};d.roll=null;}
     return {x:f.x,y:f.y,z:f.z,q:q,done:done};
