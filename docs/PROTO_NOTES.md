@@ -3812,3 +3812,23 @@ the `<img>` transform and the shadow job carry them now: measured
 
 `assets/prop_templates.js` is still an empty array — the game falls back to
 procedural placement until the real file is dropped in.
+
+## P206 — 001 is live
+
+Denis's dressing is in: 11 props, three of them mirrored (bread, mug01,
+pouch02), authored to bleed off both edges — x runs -19.1 to 90.5, so on a
+319px screen the props sit from L-61 to L289. Verified in a real match: all
+11 render in template order with `pin:"001"`, the flips come through as
+`scale(-1, 1)`, the rotations (spoon 15, coins 356, package -3) survive, and
+11 shadow jobs are queued.
+
+**It arrived as `assets/001.js`.** The game loads `assets/prop_templates.js`,
+so that is where it lives now; `001.js` is left alone as Denis's own copy. The
+lab exports every saved template into ONE file, so per-name files are not the
+model — `FK_PROP_PIN` is what chooses between them.
+
+**The dev cache will hide it.** After dropping a new file in, the browser
+serves the previously cached `prop_templates.js` even though the page itself
+reloads — measured `FK_PROP_TEMPLATES.length === 0` against a file that was
+correct on the wire. A `fetch(src,{cache:'reload'})` proved it. Hard-reload
+after replacing the file.
