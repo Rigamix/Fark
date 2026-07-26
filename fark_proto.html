@@ -14288,11 +14288,14 @@ function _diceShadowPaint(pts,scx,scy,size,d){
       if(i3)tx2.lineTo(hx,hy);else tx2.moveTo(hx,hy);});
     tx2.closePath();tx2.fill();
   };
+  /* blur the mask so the shadow reads as cast light, not a cut-out */
+  tx2.filter='blur('+Math.max(1.5,size*0.05).toFixed(1)+'px)';
   tx2.fillStyle='#000';fill(0,0);
   tx2.globalAlpha=0.16;
   var br=Math.max(3,size*0.07);
   for(var r2=0;r2<8;r2++){var an=r2*Math.PI/4;fill(Math.cos(an)*br,Math.sin(an)*br);}
   tx2.globalAlpha=1;
+  tx2.filter='none';
   tx2.globalCompositeOperation='source-in';
   var tlx=scx-tw/2,tly=scy-tw/2;
   /* the unlit table, pre-scaled ONCE per layout instead of being resampled
@@ -15790,7 +15793,7 @@ var D3X={
   /* selection: the same hull trick, thicker and gold, so the ring hugs the
      die silhouette wherever physics has left it - a box drawn on the DOM
      host cannot, now that the dice sit at angles */
-  SEL_COL:'#ffeec2', SEL_SOFT:'#ffb552', SEL_W:0.085,
+  SEL_COL:'#ffd98a', SEL_SOFT:'#ffa63a', SEL_W:0.085,
   /* a little tooth so the outline is not a dead flat band */
   _grainTex:function(){
     if(this._grn)return this._grn;
@@ -15846,7 +15849,10 @@ var D3X={
      only partially clears an antialiased boundary, and with the rim passes
      stacked that leftover reads as glow on the face - so the cut is widened
      by a pixel and a half. */
-  GLOW:{soft:22, rim:6, rimPasses:7, softPasses:2, line:2.4, grow:1.004, clear:1.6, strength:1.0},
+  /* clear is SMALLER than the line's half-width now, so the halo starts
+     UNDER the stroke rather than just outside it - the thin dark seam was
+     the gap between where the cut-out ended and the stroke began. */
+  GLOW:{soft:22, rim:6, rimPasses:7, softPasses:2, line:2.8, grow:1.004, clear:0.7, strength:1.0},
   _glowCv:function(){
     var sc=document.getElementById('screen-match');
     if(!sc)return null;
@@ -15900,7 +15906,7 @@ var D3X={
   },
   /* 0 while the dice are still flying, ramping to 1 as they come down, so
      the shadows arrive gradually and a little before everything stops */
-  SHADOW_FADE:{from:0.55, to:0.92},
+  SHADOW_FADE:{from:0.32, to:1.0},
   _settleK:function(){
     var k=1,F=this.SHADOW_FADE;
     for(var i=0;i<this.dice.length;i++){
@@ -15996,18 +16002,17 @@ var D3X={
     gx.globalCompositeOperation='destination-out';
     sel.forEach(function(h){trace(gx,h,-G.clear);gx.fill();});
     gx.globalCompositeOperation='source-over';
+    /* the line goes on the SAME surface as the halo, after the cut-out, so
+       the two composite as one glow - stroking onto the main canvas
+       afterwards left a hairline of bare table between them */
+    gx.strokeStyle=self.SEL_COL;gx.lineWidth=G.line;gx.lineJoin='round';
+    gx.globalAlpha=1;
+    sel.forEach(function(h){trace(gx,h,0);gx.stroke();});
     /* additive, so it reads as light rather than paint */
     x.save();
     x.globalCompositeOperation='lighter';
     x.globalAlpha=G.strength;
     x.drawImage(g,0,0,sc.width,sc.height);
-    x.restore();
-    /* and the crisp line on the silhouette itself */
-    /* the line sits ON the painted edge */
-    x.save();
-    x.strokeStyle=self.SEL_COL;x.lineWidth=G.line;x.lineJoin='round';
-    x.globalAlpha=1;
-    sel.forEach(function(h){trace(x,h,0);x.stroke();});
     x.restore();
   },
   _tableRoot:function(){

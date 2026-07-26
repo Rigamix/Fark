@@ -3569,3 +3569,32 @@ flight progress 0 to 1 — starts at 60% of the flight, seven distinct steps.
 **Outline wobble removed**: the per-die random weight is gone, every die's
 outline is a uniform 1.04. The screen-space top/bottom weighting stays.
 
+
+## P198 — the glow goes gold, the seam closes, the shadow softens
+
+**Warmer.** `SEL_COL` `#ffeec2` → `#ffd98a`, `SEL_SOFT` `#ffb552` → `#ffa63a`.
+The off-white rim read as a lamp, not as gold.
+
+**The hairline between outline and halo.** Two causes, one fix each. The
+stroke was painted on the MAIN canvas after the halo surface had already
+been composited, so the two were separate layers with nothing guaranteeing
+they met; and the `destination-out` punch cleared `clear:1.6` inward while
+the stroke only reached `line/2 = 1.2` — a 0.4px ring of bare table between
+them. The stroke now goes onto the SAME offscreen surface, after the punch,
+so both composite as one additive layer; and `clear` is `0.7` against a
+`line` of `2.8`, so the stroke covers the cut with room to spare.
+
+Measured on a scan running outward from a selected die's centre: alpha
+`0,0,…,0, 26, 228, 255, 254, 250, 245, 237, …, 4, 2, 0` — monotonic from the
+rim out, no zero in the middle. Colour at the peak is exactly (255,217,138)
+= `#ffd98a`, drifting to (255,166,58) = `#ffa63a` through the falloff, which
+runs ~58px.
+
+**Shadow fade earlier and longer**: `SHADOW_FADE` `{0.55, 0.92}` →
+`{0.32, 1.0}`. It now starts a third of the way through the tumble and only
+reaches full on the last frame.
+
+**The drop shadow is blurred**: the hull mask in `_diceShadowPaint` is filled
+through a `blur(max(1.5, size*0.05))` filter. Measured down through a die:
+alpha `255 … 194, 106, 104, 65, 22, 0` — a five-pixel ramp at a 32px die,
+scaling with the die.
