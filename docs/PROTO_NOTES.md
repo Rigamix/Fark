@@ -3445,3 +3445,38 @@ what the reference does. Screen space, so it reads identically whatever angle
 the die landed at. Verified: 4107 lit pixels while selected, gold
 RGB(226,167,85), 0 when deselected.
 
+## P194 — the pips were a stale build; glow rebuilt as a real halo
+
+**Pips vs code — Denis was right, and it was a stale asset.** Traced it
+properly rather than guessing:
+
+- his SOURCE `bone_diffuse.png`: islands hold 1,2,3,4,5,6 — correct
+- the SHIPPED skin: 1,**4**,3,**5**,**2**,6 — a 2/4/5 three-cycle
+- the atlas baked into the GLB: correct
+- feeding the current source through the current remap: correct
+
+So the remap was innocent (proved separately on a synthetic sheet where each
+island is a solid colour — nothing moves between islands). `skins.js` was
+simply built from an OLDER version of the PNG, before Denis repainted it, and
+never rebuilt. Regenerated from the current sources; the shipped skin now
+reads 1-6 in order.
+
+Worth keeping: the first in-game probe reported wrong faces for a different
+reason — it projected `d.obj`'s local +Y as "the top face", but the object's
+local axes are the MESH's, not the pose's. The corrected probe finds the top
+face by testing each painted face's normal against the table's up vector, and
+confirmed `codeAgreesWithGame: true` — the up-face has always matched the
+value the game rolled. Only the paint was stale.
+
+**Selection glow.** It was filling the silhouette and blurring in place,
+which put the glow INSIDE the die - hence the washed-out faces. It is now
+built the right way round: blur the silhouettes on their own surface, then
+PUNCH THE DICE BACK OUT (inset ~2.5px so the glow laps the edge), and
+composite with `lighter` so it reads as light rather than paint. Three blur
+passes, since the punch-out removes the inner half of every blur and without
+a tight pass the rim never gets bright. Measured through the bottom edge:
+0 inside the die, 253 at the edge, falling 79 / 47 / 20 / 2 outward.
+
+**Kept-tray preview** above the row is hidden — the running total under the
+row already says it.
+

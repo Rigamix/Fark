@@ -1195,6 +1195,9 @@ html.fk3d .d3chip .die,html.fk3d .nrdie .d3host .die{visibility:hidden}
    silhouette. Every DOM selection decoration is switched off for a 3D die -
    a ring or halo on the host can only ever be an upright box, which is what
    was reading as a second outline. */
+/* the kept-tray preview above the row duplicated the running total that
+   already sits under the row */
+html.fk3d #screen-match #keptTray{display:none !important}
 html.fk3d #screen-match .die.d3on.selected,
 html.fk3d #screen-match .die-wrap:has(.die.d3on.selected){
   box-shadow:none !important;outline:none !important}
@@ -15801,7 +15804,7 @@ var D3X={
   /* ═══ selection glow: a soft bloom around the die's real silhouette with
      a crisp line of the same colour. Screen space, so it reads the same
      whatever angle the die landed at. ═══ */
-  GLOW:{blur:11, inner:5, spread:0.62, line:2.2, bleed:0.3},
+  GLOW:{blur:16, inner:7, core:3, line:2.6, lap:2.5, strength:1.0},
   _glowCv:function(){
     var sc=document.getElementById('screen-match');
     if(!sc)return null;
@@ -15856,26 +15859,65 @@ var D3X={
     x.setTransform(dpr,0,0,dpr,0,0);
     x.clearRect(0,0,sc.width,sc.height);
     var self=this,G=this.GLOW;
+    var sel=[];
     this.dice.forEach(function(d){
       if(!d.match||!d.obj.visible)return;
       if(!d.chip.classList.contains('selected'))return;
-      var hull=self._hullOf(d,sc);if(!hull)return;
-      var path=function(){
-        x.beginPath();
-        hull.forEach(function(p,i){if(i)x.lineTo(p[0],p[1]);else x.moveTo(p[0],p[1]);});
-        x.closePath();
-      };
-      x.save();
-      x.fillStyle=self.SEL_COL;
-      x.filter='blur('+G.blur+'px)';x.globalAlpha=G.spread;path();x.fill();
-      x.filter='blur('+G.inner+'px)';x.globalAlpha=G.spread*0.85;path();x.fill();
-      x.restore();
-      /* a little of it washes over the die itself, gently */
-      x.save();x.globalAlpha=G.bleed;x.fillStyle=self.SEL_COL;
-      x.filter='blur(2px)';path();x.fill();x.restore();
-      x.save();x.strokeStyle=self.SEL_COL;x.lineWidth=G.line;
-      x.lineJoin='round';x.globalAlpha=0.95;path();x.stroke();x.restore();
+      var hull=self._hullOf(d,sc);
+      if(hull)sel.push(hull);
     });
+    if(!sel.length)return;
+    /* build the halo on its own surface: blur the silhouettes, then PUNCH
+       THE DICE BACK OUT. Filling the silhouette and blurring it in place
+       is what put the glow inside the die instead of around it. */
+    var g=this._glowTmp||(this._glowTmp=document.createElement('canvas'));
+    if(g.width!==cv.width||g.height!==cv.height){g.width=cv.width;g.height=cv.height;}
+    var gx=g.getContext('2d');
+    gx.setTransform(dpr,0,0,dpr,0,0);
+    gx.globalCompositeOperation='source-over';
+    gx.clearRect(0,0,sc.width,sc.height);
+    var trace=function(ctx,hull,shrink){
+      var cx=0,cy=0;
+      hull.forEach(function(p){cx+=p[0];cy+=p[1];});
+      cx/=hull.length;cy/=hull.length;
+      ctx.beginPath();
+      hull.forEach(function(p,i){
+        var dx=p[0]-cx,dy=p[1]-cy,L=Math.sqrt(dx*dx+dy*dy)||1;
+        var k=shrink?Math.max(0,(L-shrink))/L:1;
+        var px=cx+dx*k,py=cy+dy*k;
+        if(i)ctx.lineTo(px,py);else ctx.moveTo(px,py);
+      });
+      ctx.closePath();
+    };
+    gx.fillStyle=self.SEL_COL;
+    gx.globalAlpha=1;
+    gx.filter='blur('+G.blur+'px)';
+    sel.forEach(function(h){trace(gx,h,0);gx.fill();});
+    gx.filter='blur('+G.inner+'px)';
+    sel.forEach(function(h){trace(gx,h,0);gx.fill();});
+    /* a third, tight pass: the punch-out below removes the inner half of
+       every blur, so without this the rim never gets bright */
+    gx.filter='blur('+G.core+'px)';
+    sel.forEach(function(h){trace(gx,h,0);gx.fill();});
+    sel.forEach(function(h){trace(gx,h,0);gx.fill();});
+    /* the die keeps its own face: cut it out, leaving the halo. The cut is
+       inset a little so the glow laps over the edge, as in the reference. */
+    gx.filter='none';
+    gx.globalCompositeOperation='destination-out';
+    sel.forEach(function(h){trace(gx,h,G.lap);gx.fill();});
+    gx.globalCompositeOperation='source-over';
+    /* additive, so it reads as light rather than paint */
+    x.save();
+    x.globalCompositeOperation='lighter';
+    x.globalAlpha=G.strength;
+    x.drawImage(g,0,0,sc.width,sc.height);
+    x.restore();
+    /* and the crisp line on the silhouette itself */
+    x.save();
+    x.strokeStyle=self.SEL_COL;x.lineWidth=G.line;x.lineJoin='round';
+    x.globalAlpha=0.98;
+    sel.forEach(function(h){trace(x,h,0);x.stroke();});
+    x.restore();
   },
   _tableRoot:function(){
     if(!this._tbl){
