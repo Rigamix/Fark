@@ -15762,6 +15762,11 @@ var D3X={
      the painted dice's own OUT table */
   OUTCOL:{bone:'#291d11', amber:'#3f1000'},
   OUT_DARK:0.42, OUT_SAT:1.6,
+  /* an inked line is heavier where the form turns away from the light.
+     Nudging the outline hull DOWN the screen thins it along the top edge
+     and thickens it along the bottom - in screen space, whatever way the
+     die happens to be turned. */
+  OUT_WEIGHT:0.055,
   /* selection: the same hull trick, thicker and gold, so the ring hugs the
      die silhouette wherever physics has left it - a box drawn on the DOM
      host cannot, now that the dice sit at angles */
@@ -15801,10 +15806,27 @@ var D3X={
     return grp;
   },
 
+  /* shift a die's outline hull toward screen-down, so the line reads
+     thinner at the top and heavier at the bottom */
+  _weightOutline:function(d){
+    var out=d.obj.userData.out;if(!out)return;
+    var q=this._wq||(this._wq=new THREE.Quaternion());
+    d.obj.getWorldQuaternion(q);
+    var v=this._wv||(this._wv=new THREE.Vector3());
+    /* world -Y is screen-down for this camera (no roll) */
+    v.set(0,-1,0).applyQuaternion(q.invert());
+    out.position.copy(v).multiplyScalar(this.OUT_WEIGHT);
+  },
   /* ═══ selection glow: a soft bloom around the die's real silhouette with
      a crisp line of the same colour. Screen space, so it reads the same
      whatever angle the die landed at. ═══ */
-  GLOW:{blur:16, inner:7, core:3, line:2.6, lap:2.5, strength:1.0},
+  /* soft: the wide falloff. rim: the bright band hugging the die.
+     grow: a hair beyond the painted outline so nothing bleeds onto the face. */
+  /* clear: how far PAST the painted edge the cut-out reaches. destination-out
+     only partially clears an antialiased boundary, and with the rim passes
+     stacked that leftover reads as glow on the face - so the cut is widened
+     by a pixel and a half. */
+  GLOW:{soft:16, rim:4, rimPasses:4, line:2.4, grow:1.004, clear:1.6, strength:1.0},
   _glowCv:function(){
     var sc=document.getElementById('screen-match');
     if(!sc)return null;
@@ -15818,12 +15840,16 @@ var D3X={
     return cv;
   },
   /* the die's 8 corners projected to screen space, gift-wrapped */
-  _hullOf:function(d,sc){
+  _hullOf:function(d,sc,grow){
     var mr=this.mount&&this.mount.getBoundingClientRect();
     if(!mr)return null;
     d.obj.updateMatrixWorld(true);
-    var L=[[-.5,-.5,-.5],[.5,-.5,-.5],[-.5,.5,-.5],[.5,.5,-.5],
-           [-.5,-.5,.5],[.5,-.5,.5],[-.5,.5,.5],[.5,.5,.5]];
+    /* the die is DRAWN with its outline hull around it, so the visible edge
+       is further out than the bare cube corners - the glow has to start
+       from that edge or it lands on the face */
+    var e=0.5*(grow||1)*(d.obj.userData.outScale||1);
+    var L=[[-e,-e,-e],[e,-e,-e],[-e,e,-e],[e,e,-e],
+           [-e,-e,e],[e,-e,e],[-e,e,e],[e,e,e]];
     var pts=[];
     for(var i=0;i<8;i++){
       var v=new THREE.Vector3(L[i][0],L[i][1],L[i][2])
@@ -15863,7 +15889,7 @@ var D3X={
     this.dice.forEach(function(d){
       if(!d.match||!d.obj.visible)return;
       if(!d.chip.classList.contains('selected'))return;
-      var hull=self._hullOf(d,sc);
+      var hull=self._hullOf(d,sc,G.grow);
       if(hull)sel.push(hull);
     });
     if(!sel.length)return;
@@ -15891,20 +15917,19 @@ var D3X={
     };
     gx.fillStyle=self.SEL_COL;
     gx.globalAlpha=1;
-    gx.filter='blur('+G.blur+'px)';
+    /* the wide, soft falloff */
+    gx.filter='blur('+G.soft+'px)';
     sel.forEach(function(h){trace(gx,h,0);gx.fill();});
-    gx.filter='blur('+G.inner+'px)';
-    sel.forEach(function(h){trace(gx,h,0);gx.fill();});
-    /* a third, tight pass: the punch-out below removes the inner half of
-       every blur, so without this the rim never gets bright */
-    gx.filter='blur('+G.core+'px)';
-    sel.forEach(function(h){trace(gx,h,0);gx.fill();});
-    sel.forEach(function(h){trace(gx,h,0);gx.fill();});
-    /* the die keeps its own face: cut it out, leaving the halo. The cut is
-       inset a little so the glow laps over the edge, as in the reference. */
+    /* then the bright rim, stacked - the punch-out below throws away the
+       inner half of every blur, so a single pass never reads as strong */
+    gx.filter='blur('+G.rim+'px)';
+    for(var rp=0;rp<G.rimPasses;rp++)
+      sel.forEach(function(h){trace(gx,h,0);gx.fill();});
+    /* cut the die back out EXACTLY on its painted edge: everything left is
+       outside the shape, which is the whole point */
     gx.filter='none';
     gx.globalCompositeOperation='destination-out';
-    sel.forEach(function(h){trace(gx,h,G.lap);gx.fill();});
+    sel.forEach(function(h){trace(gx,h,-G.clear);gx.fill();});
     gx.globalCompositeOperation='source-over';
     /* additive, so it reads as light rather than paint */
     x.save();
@@ -15913,9 +15938,10 @@ var D3X={
     x.drawImage(g,0,0,sc.width,sc.height);
     x.restore();
     /* and the crisp line on the silhouette itself */
+    /* the line sits ON the painted edge */
     x.save();
     x.strokeStyle=self.SEL_COL;x.lineWidth=G.line;x.lineJoin='round';
-    x.globalAlpha=0.98;
+    x.globalAlpha=1;
     sel.forEach(function(h){trace(x,h,0);x.stroke();});
     x.restore();
   },
@@ -16187,7 +16213,10 @@ var D3X={
     /* silhouette outline: a slightly fatter copy drawn back-faces-only */
     var out=this._mkOutline(mat);
     /* a hand-inked line is never the same weight twice */
-    out.scale.setScalar(1+this.OUTLINE*(0.78+Math.random()*0.5));
+    var ow=1+this.OUTLINE*(0.78+Math.random()*0.5);
+    out.scale.setScalar(ow);
+    g.userData.outScale=ow;/* the glow must start OUTSIDE this, not the cube */
+    g.userData.out=out;
     g.add(out);
     return g;
   },
@@ -16427,6 +16456,7 @@ var D3X={
           d.obj.scale.setScalar(1);
           d.obj.position.set(pose.x,pose.y,pose.z);
           d.obj.quaternion.copy(pose.q);
+          D3X._weightOutline(d);
           e._d3xOwned=true;
           D3X._slaveHost(d,root);
           return;
@@ -16443,6 +16473,7 @@ var D3X={
           d.obj.visible=true;d.obj.scale.setScalar(1);
           d.obj.position.set(d.phys.x,d.phys.y,d.phys.z);
           d.obj.quaternion.copy(d.phys.q);
+          D3X._weightOutline(d);
           if(e)e._d3xOwned=true;
           D3X._slaveHost(d,root3);
           return;

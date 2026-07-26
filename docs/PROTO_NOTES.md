@@ -3480,3 +3480,33 @@ a tight pass the rim never gets bright. Measured through the bottom edge:
 **Kept-tray preview** above the row is hidden — the running total under the
 row already says it.
 
+## P195 — the glow finally sits outside; rounder die; weighted outline
+
+**Why the glow kept landing on the face.** Two causes, both mine:
+1. the halo was built from the die's GEOMETRIC hull (its cube corners), but
+   the die is DRAWN with an outline hull around it at ~1.068 — so the painted
+   edge was outside my glow boundary and the punch-out landed on the face.
+   `_hullOf` now expands by the die's own recorded `outScale`.
+2. `destination-out` only partially clears an ANTIALIASED boundary, and with
+   the rim passes stacked that leftover read as glow on the die. The cut-out
+   is widened 1.6px past the edge.
+
+Rebuilt as: one wide soft pass for the falloff, four tight passes for the
+rim (the punch throws away the inner half of every blur, so a single pass
+never reads bright), cut the die out, composite with `lighter`. Measured
+outward from the painted edge: **0 at 4/8/14px inside**, 255 at the edge,
+then 179 / 102 / 53 / 28 / 12 / 3. The 255 exactly at 1px inside is the crisp
+outline stroke, which is meant to sit on the edge.
+
+Still to add, per Denis: a very subtle inner glow at the edges to fake bounce.
+
+**Rounder again**: bevel 8% -> 12% of the half-size, same reshape-not-rebuild
+approach, UVs rebuilt, and the art remapped **from Denis's sources in one
+hop** (flat share 79.3% -> 90.3%) rather than remapping the already-remapped
+copy, so nothing compounds.
+
+**Weighted outline**: the outline hull is nudged toward screen-down each
+frame, in the die's own local space, so the ink reads thin along the top edge
+and heavy along the bottom whatever way the die is turned. Measured across
+four dice: top band 2.75px, bottom band 4.75px.
+
