@@ -3360,3 +3360,35 @@ Measured over 20 rolls at each count, with the real screen limit:
 - 3 and 2 dice: 0 wrong, 0 offscreen, a clean 1.75 every time
 - worst-case silhouette overlap 1 pair in 300, at 45 degrees to each other
 
+## P190 — the magnet was a broken limit; the tap bounce was a shared scale
+
+Two call-site bugs. My P189 test passed the screen limit in by hand, so it
+verified the function and never saw what the game actually computes.
+
+**"Pulled magnetically together."** The limit was
+
+    limitX = Math.max(1, (mrw/2 - mid - sz*0.75)/sz)
+
+but `mid` is ALREADY the row centre in mount space, so `mrw/2 - mid` is about
+zero, the whole thing clamped to 1, and the adaptive spacing cap
+`(2*limitX)/(N-1)` came out at **0.4 die-widths for six dice** — the relax was
+actively pulling them into a pile. It is the distance from the row centre to
+the nearer edge: `(Math.min(mid, mrw-mid) - sz*0.75)/sz`, which measures 4.25
+in game where it used to give 1.
+
+**Then they came out ruler-straight** — every gap exactly 1.70. `spreadTo` is
+a FLOOR, and 1.75 sits above the row's natural pitch (~1.6), so every pair was
+below it and every pair got pushed to precisely the floor. Now 1.45: below the
+pitch, so only genuinely-close pairs are nudged, and still clear of the 1.414
+two dice need when both are turned 45 degrees. Measured live over four rolls:
+gaps 1.45 / 1.45 / 1.45 / 1.45 / 1.5 / 1.59 / 1.68 / 1.73 / 1.74 — six
+distinct values, min 1.45.
+
+**"Tap the amber and they all bounce."** The table is ONE shared group, and
+its scale was being set per die from that die's box — so the last die
+iterated won, and a die mid tap-animation (`pxDieTap` scales 0.92 to 1.04)
+rescaled every die on the table. The scale is now computed once per frame
+from a width captured when the die was first tracked, before any animation
+can touch it. Verified: table scale 31.967 before and during a tap, and every
+die's position identical.
+

@@ -15508,7 +15508,11 @@ var D3X={
        overlap, so settle is followed by a bounded spread phase that keeps
        stepping until there is a real gap. Recorded like any other frame,
        so the nudge plays back rather than snapping. */
-    spreadTo:1.75, spreadCap:70,
+    /* A FLOOR, not a target. It must sit BELOW the row's natural pitch
+       (~1.6) or every pair gets pushed to exactly this value and the line
+       comes out ruler-straight - 1.45 still clears the 1.414 two dice need
+       when both are turned 45 degrees. */
+    spreadTo:1.45, spreadCap:70,
     trayZ:1.7, wallPad:.3, restY:.5
   },
   _cannon:false,
@@ -15835,10 +15839,13 @@ var D3X={
       if(self._rowKey(d)!==key)return;
       obst.push(d.phys);
     });
-    /* how far from the row centre a die can sit and still be fully on
-       screen, in die-widths (the die is 1 wide, plus its outline) */
+    /* How far from the ROW CENTRE a die can sit and still be fully on
+       screen, in die-widths. `mid` is already the centre in mount space, so
+       the room available is the distance to the nearer edge - the old
+       `mrw/2 - mid` was ~0 and clamped to 1, which capped the spacing at
+       2/(N-1) and pulled the dice into a pile. */
     var mrw=this.mount.getBoundingClientRect().width;
-    var limitX=Math.max(1,(mrw/2-mid-sz*0.85)/sz);
+    var limitX=Math.max(1.2,(Math.min(mid,mrw-mid)-sz*0.75)/sz);
     var sol=this._physSolve(slots,b.vals,obst,limitX);
     /* one playback per die: two throws can be in the air at once without
        either being dropped */
@@ -16148,7 +16155,8 @@ var D3X={
       obj.quaternion.copy(self._isoQ(val));
       self.scene.add(obj);
       try{el._d3.slot.style.visibility='hidden';}catch(e){}
-      self.dice.push({chip:el,obj:obj,sh:null,mat:mat,val:val,match:true,
+      self.dice.push({chip:el,obj:obj,mat:mat,val:val,match:true,
+        w0:el.getBoundingClientRect().width,/* measured before any tap pop */
         uYaw:0,uPit:0,t0:performance.now()});
     });
     this.on=true;
@@ -16233,6 +16241,14 @@ var D3X={
       this.focus=zoomed;
     }
     var now=performance.now();
+    /* the table is ONE shared group, so its scale must not be derived from
+       a die that might be mid tap-animation - setting it per die meant the
+       last one iterated won, and a single tap rescaled every die */
+    var tblSz=0;
+    for(var ti=0;ti<this.dice.length;ti++){
+      var td=this.dice[ti];
+      if(td.match&&td.w0){tblSz=td.w0*this.MSCALE;break;}
+    }
     this.dice.forEach(function(d){
       var cr=d.chip.getBoundingClientRect();
       if(d.match){
@@ -16245,7 +16261,7 @@ var D3X={
         if(d.roll){
           /* physics owns this die: place it on the tilted table */
           var pose=D3X._physPose(d);
-          var sz2=(d.w0||cr.width)*D3X.MSCALE;/* not the live, tap-scaled box */
+          var sz2=tblSz||(d.w0||cr.width)*D3X.MSCALE;
           var root=D3X._tableRoot();
           root.rotation.set(THREE.MathUtils.degToRad(D3X.TABLE.tilt),0,0);
           root.scale.setScalar(sz2);
@@ -16262,7 +16278,7 @@ var D3X={
         }
         if(d.phys){
           /* settled: hold the place physics gave it */
-          var sz3=(d.w0||cr.width)*D3X.MSCALE;/* not the live, tap-scaled box */
+          var sz3=tblSz||(d.w0||cr.width)*D3X.MSCALE;
           var root3=D3X._tableRoot();
           root3.rotation.set(THREE.MathUtils.degToRad(D3X.TABLE.tilt),0,0);
           root3.scale.setScalar(sz3);
