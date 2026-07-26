@@ -1079,8 +1079,17 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 #matchDark{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
 /* shadows reveal the UNLIT table through the prop's own silhouette;
    the layer breathes about the light centre in sync with the mask */
-#matchShadows{position:absolute;inset:0;z-index:0;pointer-events:none}
+/* z-index:auto, NOT 0. A positioned element with a z-index creates a
+   stacking context, and mix-blend-mode only blends against the backdrop
+   INSIDE its own context - so a multiplying #dsCanvas would have found
+   nothing behind it but its own container. With auto it still paints in DOM
+   order, after #matchDark and before #matchProps, exactly as before. */
+#matchShadows{position:absolute;inset:0;z-index:auto;pointer-events:none}
 #matchShadows canvas{position:absolute;inset:0;width:100%;height:100%}
+/* the dice shadows darken the table rather than painting over it: the grain
+   stays visible through them and they can never come out lighter than the
+   wood, which is what the masked-table trick was for the long way round */
+#dsCanvas{mix-blend-mode:multiply}
 #matchProps{position:absolute;inset:0;z-index:0;pointer-events:none}
 #matchProps img{position:absolute;transition:filter .12s linear}
 #matchPause{position:absolute;left:2.2%;bottom:calc(21cqw + env(safe-area-inset-bottom,0px));top:auto;right:auto;
@@ -1158,14 +1167,16 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 #screen-match .die.sm{width:8.7cqw;height:8.7cqw}
 #screen-match #diceArea{--sp-before:1.75;--sp-after:1.75}
 /* the kept line: smaller dice, close together, and the turn total under it */
-#screen-match .kept-zone{padding-top:2.6cqw}
+/* down and to the left, off the throwing line entirely - the reference has
+   them tucked in the bottom corner with the turn total under them */
+#screen-match .kept-zone{padding-top:6.4cqw;padding-left:7cqw}
 /* A flex gap cannot go negative, and it has to: the 3D die is drawn at 0.77
    of its DOM box, so touching boxes still leave a third of a die of air.
    Overlap the boxes instead - Denis wants a tight line. */
 #screen-match .kept-row{min-height:9cqw}
 #screen-match .kept-row .die-wrap+.die-wrap{margin-left:-1.1cqw}
 #screen-match .kept-row .die{width:8.6cqw;height:8.6cqw}
-#screen-match .kept-total{font-size:5cqw;margin-top:0.4cqw}
+#screen-match .kept-total{font-size:5.2cqw;margin-top:0.6cqw;margin-left:0.6cqw}
 /* a kept die is out of play: no tap pop, no float, no selection anything */
 #screen-match .kept-row .die{cursor:default!important;animation:none!important}
 html.fk3d #screen-match .kept-row .die-wrap::before,
@@ -2123,7 +2134,7 @@ html.fk3d #screen-match .die-wrap:has(.die.d3on.selected)::after{
    into is .dice-area's bottom padding, which is otherwise empty. */
 .kept-zone{
   position:absolute;top:100%;left:0;width:100%;
-  display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
+  display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;
   pointer-events:none;
 }
 .kept-row{
@@ -2136,6 +2147,7 @@ html.fk3d #screen-match .die-wrap:has(.die.d3on.selected)::after{
 }
 .sel-fly{
   position:absolute;z-index:7;pointer-events:none;white-space:nowrap;
+  transform-origin:50% 50%;
   font-family:'JMH Beda',serif;color:#ffd98a;
   text-shadow:0 0 12px rgba(255,190,90,.7),0 2px 0 rgba(58,32,8,.85);
 }
@@ -14322,47 +14334,28 @@ function _diceShadowPaint(pts,scx,scy,size,d){
     }
     cur=next;guard++;
   }while(cur!==start&&guard<9);
-  /* quantised: `size` is the live projected extent of a tumbling cube, which
-     sweeps 1.0-1.73x its width, so an exact size rebuilt the canvas nearly
-     every frame mid-roll */
-  var side=Math.ceil(size*1.9/32)*32;
-  var TW=Math.max(2,Math.round(side*dpr));
-  if(!d._dsc||d._dsc.width!==TW){d._dsc=document.createElement('canvas');d._dsc.width=TW;d._dsc.height=TW;}
-  var tw=TW/dpr;
-  var tx2=d._dsc.getContext('2d');tx2.setTransform(dpr,0,0,dpr,0,0);
-  tx2.globalCompositeOperation='source-over';
-  tx2.clearRect(0,0,tw,tw);
-  var fill=function(offx,offy){
-    tx2.beginPath();
-    hull.forEach(function(p2,i3){var hx=tw/2+p2[0]+offx,hy=tw/2+p2[1]+offy;
-      if(i3)tx2.lineTo(hx,hy);else tx2.moveTo(hx,hy);});
-    tx2.closePath();tx2.fill();
-  };
-  /* blur the mask so the shadow reads as cast light, not a cut-out */
-  tx2.filter='blur('+Math.max(1.5,size*0.05).toFixed(1)+'px)';
-  tx2.fillStyle='#000';fill(0,0);
-  tx2.globalAlpha=0.16;
-  var br=Math.max(3,size*0.07);
-  for(var r2=0;r2<8;r2++){var an=r2*Math.PI/4;fill(Math.cos(an)*br,Math.sin(an)*br);}
-  tx2.globalAlpha=1;
-  tx2.filter='none';
-  tx2.globalCompositeOperation='source-in';
-  var tlx=scx-tw/2,tly=scy-tw/2;
-  /* the unlit table, pre-scaled ONCE per layout instead of being resampled
-     from a 1080x2011 source for every die on every pass */
-  var pre=window._tblPre;
-  if(!pre||pre.w!==Math.round(ml.bw)||pre.h!==Math.round(ml.bh)){
-    var pc=document.createElement('canvas');
-    pc.width=Math.max(1,Math.round(ml.bw));pc.height=Math.max(1,Math.round(ml.bh));
-    pc.getContext('2d').drawImage(_tblImg,0,0,pc.width,pc.height);
-    pre=window._tblPre={cv:pc,w:pc.width,h:pc.height};
-  }
-  tx2.drawImage(pre.cv,(ml.ox-sc.left)-tlx,(ml.oy-sc.top)-tly);
-  tx2.globalCompositeOperation='source-atop';
-  tx2.fillStyle='rgba(8,4,2,'+(alphaB*0.95*(window._dsFade===undefined?1:window._dsFade)).toFixed(3)+')';
-  tx2.fillRect(0,0,tw,tw);
-  x.drawImage(d._dsc,0,0,TW,TW,tlx,tly,tw,tw);
+  /* ONE blurred fill, straight onto the shared canvas, in the shadow's own
+     dark brown. The canvas multiplies against the table (see #dsCanvas), so
+     the wood reads through it - which is what the old per-die offscreen +
+     table-mask + darkening-rect was doing at about ten times the cost. */
+  var a=(st.alphaB||0.5)*(window._dsFade===undefined?1:window._dsFade);
+  if(a<=0.004)return;
+  x.save();
+  x.globalAlpha=a>1?1:a;
+  x.filter='blur('+Math.max(1.2,size*0.055).toFixed(1)+'px)';
+  x.fillStyle=window.DICE_SHADOW_COL||'#3a2110';
+  x.beginPath();
+  hull.forEach(function(p2,i3){
+    var hx=scx+p2[0],hy=scy+p2[1];
+    if(i3)x.lineTo(hx,hy);else x.moveTo(hx,hy);
+  });
+  x.closePath();x.fill();
+  x.filter='none';
+  x.restore();
 }
+/* the shadow's colour, as a multiplier on the table. Darker = deeper. */
+window.DICE_SHADOW_COL='#3a2110';
+
 function _drawDiceShadows(tSec){
   var cv=document.getElementById('dsCanvas'),ml=window._mLight;
   if(!cv||!ml||!ml.on)return;
@@ -14391,7 +14384,12 @@ function _drawDiceShadows(tSec){
       D3X.dice.forEach(function(dd){
         if(fade<0.02)return;/* still high in the air: nothing to ground yet */
         if(!dd.match||!dd.obj.visible||!mrx)return;
-        if(dd.obj.parent!==D3X._tbl)return;
+        /* No parent test at all. It used to demand the single shared table
+           group, which threw away every kept die twice over: they are in a
+           different group now AND a die with no physics pose is parented
+           straight to the scene. `match` + `visible` is the real question,
+           and the silhouette is projected through the camera either way. */
+        if(!dd.obj.parent)return;
         dd.obj.updateMatrixWorld(true);
         var pts=[],L=[[-.5,-.5,-.5],[.5,-.5,-.5],[-.5,.5,-.5],[.5,.5,-.5],
                       [-.5,-.5,.5],[.5,-.5,.5],[-.5,.5,.5],[.5,.5,.5]];
@@ -15579,7 +15577,11 @@ var D3X={
        58 degrees here, so wander in z reads as vertical jumble rather than
        as depth. x stays loose - that is where the rough line lives. */
     laneKX:9, laneCX:2.4, laneKZ:28, laneCZ:5,
-    sepK:22, sepC:5.5, sepMin:1.45,
+    /* The collision box is WIDER THAN THE DIE in the plane of the table, so
+       two dice simply cannot end up closer than this - no force acting at a
+       distance, no push after they have landed. Not taller: a uniformly
+       bigger cube would rest 0.58 above the table and float. */
+    proxy:1.28, tall:0.96,
     /* a die turned 45 degrees needs 1.41 between centres just to not
        overlap, so settle is followed by a bounded spread phase that keeps
        stepping until there is a real gap. Recorded like any other frame,
@@ -15589,7 +15591,9 @@ var D3X={
        degrees is 1.41 wide where a square-on one is 1.0 - the same centre
        distance reads as touching or as roomy depending on the spin. Each
        die's own footprint is measured from the yaw it landed on. */
-    gap:0.3, spreadCap:70,
+    /* the proxy already guarantees the spacing; this is only a floor for the
+       obstacle and fit-to-frame passes, which the sim knows nothing about */
+    gap:0.06, spreadCap:70,
     /* ONE epsilon for "is it still moving". The sim break used 0.0025 and
        the blend window used 0.02, and a die drifting between the two tripped
        neither - so the solve kept recording, the blend finished early, and
@@ -15677,10 +15681,11 @@ var D3X={
     wall(-halfW-P.wallPad,0,P.wallPad,P.trayZ+1);
     wall( halfW+P.wallPad,0,P.wallPad,P.trayZ+1);
     var HALF=.5,bodies=[];
+    var PX=HALF*P.proxy,PY=HALF*P.tall;
     /* dice being kept are immovable furniture, not absent */
     (obstacles||[]).forEach(function(o){
       var b=new CANNON.Body({mass:0,material:mDie,
-        shape:new CANNON.Box(new CANNON.Vec3(HALF*.96,HALF*.96,HALF*.96))});
+        shape:new CANNON.Box(new CANNON.Vec3(PX,PY,PX))});
       b.position.set(o.x,o.y,o.z);
       if(o.q)b.quaternion.set(o.q.x,o.q.y,o.q.z,o.q.w);
       world.add(b);
@@ -15702,7 +15707,7 @@ var D3X={
     };
     for(var i=0;i<N;i++){
       var b=new CANNON.Body({mass:1,material:mDie,
-        shape:new CANNON.Box(new CANNON.Vec3(HALF*.96,HALF*.96,HALF*.96))});
+        shape:new CANNON.Box(new CANNON.Vec3(PX,PY,PX))});
       b.position.set(clearOf(slotX[i])+(Math.random()*.2-.1),P.restY+1.7+(i%3)*.35,.75+Math.random()*.25);
       b.velocity.set(Math.random()*1-.5,-2-Math.random()*2,-(4.5+Math.random()*2.2));
       b.angularVelocity.set(-(8+Math.random()*10),Math.random()*8-4,Math.random()*10-5);
@@ -15728,19 +15733,11 @@ var D3X={
         b2.force.x+=(-P.laneKX*(b2.position.x-slotX[k])-P.laneCX*b2.velocity.x)*g2;
         b2.force.z+=(-P.laneKZ*b2.position.z-P.laneCZ*b2.velocity.z)*g2;
       }
-      /* mutual shove: spring MINUS damper, so they never buzz */
-      for(var a2=0;a2<N;a2++)for(var c2=a2+1;c2<N;c2++){
-        var A=bodies[a2],B=bodies[c2];
-        var dx=B.position.x-A.position.x,dz=B.position.z-A.position.z;
-        var dd=Math.sqrt(dx*dx+dz*dz)||1e-4;
-        if(dd>=P.sepMin)continue;
-        var ux=dx/dd,uz=dz/dd,pen=P.sepMin-dd;
-        var rv=(B.velocity.x-A.velocity.x)*ux+(B.velocity.z-A.velocity.z)*uz;
-        var f=P.sepK*pen-P.sepC*rv;
-        if(f<0)f=0;
-        A.force.x-=ux*f;A.force.z-=uz*f;
-        B.force.x+=ux*f;B.force.z+=uz*f;
-      }
+      /* No mutual-shove spring any more. It reached 1.45 - three times a
+         die's own half-width - so dice repelled each other across a visible
+         gap of bare table, and it went on pushing after they had landed.
+         The oversized collision box does the same job by contact, during the
+         tumble, where it reads as dice knocking into each other. */
       world.step(P.dt);
       var fr=[];
       for(var k2=0;k2<N;k2++)fr.push({
@@ -15766,8 +15763,23 @@ var D3X={
         var anyCocked=false;
         for(var k3=0;k3<N;k3++)if(this._cocked(bodies[k3].quaternion)){anyCocked=true;break;}
         if(!anyCocked)break;
-        if(boostFrom<0)boostFrom=it;
-        if(++over>140)break;
+        if(boostFrom<0){
+          boostFrom=it;
+          /* Topple it rather than wait it out. A die balanced on an edge is
+             at equilibrium: raising the damping only makes it sit there
+             longer, which is the "lingering" - it needs a reason to fall. */
+          for(var k6=0;k6<N;k6++){
+            var bc=bodies[k6];
+            if(!this._cocked(bc.quaternion))continue;
+            /* a tip, not a hop. A vertical kick made the die bounce into its
+               neighbours and restart the whole pile - measured a 6.3s tail. */
+            bc.angularVelocity.set((Math.random()*2-1)*2.2,0,
+                                   (Math.random()*2-1)*2.2);
+          }
+        }
+        /* and then stop asking. Whatever is still cocked gets squared by the
+           TABLE.land slerp anyway, so waiting it out only adds dead time. */
+        if(++over>22)break;
       }
     }
     /* Cut the tape at the last frame anything actually moved. Everything
@@ -16777,10 +16789,15 @@ var D3X={
     /* the table is ONE shared group, so its scale must not be derived from
        a die that might be mid tap-animation - setting it per die meant the
        last one iterated won, and a single tap rescaled every die */
-    var tblSz=0;
+    /* PER ROW. This took the first match die in the list whatever row it was
+       in, so as soon as a kept die sorted first the throwing row was drawn at
+       tray scale - the dice visibly shrank to the size of the kept ones. */
+    var tblSz={};
     for(var ti=0;ti<this.dice.length;ti++){
       var td=this.dice[ti];
-      if(td.match&&td.w0){tblSz=td.w0*this.MSCALE;break;}
+      if(!td.match||!td.w0)continue;
+      var rk0=this._rowKey(td);
+      if(tblSz[rk0]===undefined)tblSz[rk0]=td.w0*this.MSCALE;
     }
     this.dice.forEach(function(d){
       var cr=d.chip.getBoundingClientRect();
@@ -16803,7 +16820,7 @@ var D3X={
         if(d.roll){
           /* physics owns this die: place it on the tilted table */
           var pose=D3X._physPose(d);
-          var sz2=tblSz||(d.w0||cr.width)*D3X.MSCALE;
+          var sz2=tblSz[rkNow]||(d.w0||cr.width)*D3X.MSCALE;
           var root=D3X._tableRoot(D3X._rowKey(d));
           root.rotation.set(THREE.MathUtils.degToRad(D3X.TABLE.tilt),0,0);
           root.scale.setScalar(sz2);
@@ -16821,7 +16838,7 @@ var D3X={
         }
         if(d.phys){
           /* settled: hold the place physics gave it */
-          var sz3=tblSz||(d.w0||cr.width)*D3X.MSCALE;
+          var sz3=tblSz[rkNow]||(d.w0||cr.width)*D3X.MSCALE;
           var root3=D3X._tableRoot(D3X._rowKey(d));
           root3.rotation.set(THREE.MathUtils.degToRad(D3X.TABLE.tilt),0,0);
           root3.scale.setScalar(sz3);
@@ -17857,6 +17874,10 @@ function _dropKeptToTray(){
     /* tell the 3D layer where the die is NOW - once the DOM node moves, the
        slot it was sitting at is gone and there is nothing to animate from */
     try{if(window.D3X&&D3X.toTray)D3X.toTray(d.el);}catch(e){}
+    /* the "+100" tags are children of the die, so they rode down with it.
+       Once a die is kept its individual score stops mattering - the running
+       total under the line is the number that does. */
+    d.el.querySelectorAll('.selTag').forEach(function(t){t.remove();});
     d.el.classList.add('in-tray');
     tray.appendChild(wrap);moved++;
   });
@@ -17871,7 +17892,7 @@ function _flySelTotal(){
   var tot=(G&&G.turnPts)||0;
   var src=document.getElementById('selTotal');
   var txt=src?src.textContent:('+'+tot.toLocaleString());
-  dst.textContent=tot?tot.toLocaleString():'';
+  dst.textContent=tot?(tot.toLocaleString()+' TURN'):'';
   if(!src){dst.style.visibility='';return;}
   var sr=src.getBoundingClientRect(),ar=area.getBoundingClientRect();
   var dr=dst.getBoundingClientRect();
@@ -18175,7 +18196,7 @@ function refreshKeptTray(){
   const _kt=document.getElementById('keptTotal');
   if(_kt&&_kt.style.visibility!=='hidden')
     _kt.textContent=(G&&G.turnPts&&document.querySelector('#keptRow .die'))
-      ?G.turnPts.toLocaleString():'';
+      ?(G.turnPts.toLocaleString()+' TURN'):'';
   /* the hidden preview is fully replaced by #keptRow under the 3D layer;
      building it anyway made a throwaway 3D die per kept die, every refresh */
   if(document.documentElement.classList.contains('fk3d')){
@@ -19222,7 +19243,7 @@ function handleRoll(){
        The turn total lives in G.kept and carries on across it. */
     G.pool=[];clearRow('playerDiceRow');
     (function(){var kt=document.getElementById('keptTotal');
-      if(kt)kt.textContent=(G.turnPts||0)?(G.turnPts).toLocaleString():'';})();
+      if(kt)kt.textContent=(G.turnPts||0)?(G.turnPts.toLocaleString()+' TURN'):'';})();
     G.numDice=G.matchDice?G.matchDice.length:6;G.phase='rolling';
     G._lastHotDice=true;
     G._featHotDiceCount=(G._featHotDiceCount||0)+1;

@@ -3723,3 +3723,62 @@ three and two all **0**, worst clearance `+0.27` to `+0.30`, **0 off-frame**,
 the middle of the row (worst `-0.40`); with a single frozen die it is `-0.06`,
 a 6% kiss. A row that genuinely cannot hold its dice has to give somewhere,
 and an even squeeze is the right place for it to give.
+
+## P202–P204 — the tray matches the reference, real collision proxies, flat shadows
+
+**The dice shrank to tray size.** `tblSz` was taken from whichever match die
+happened to be first in `D3X.dice`, whatever row it was in — so the moment a
+kept die sorted first, the throwing row was drawn at tray scale. It is a map
+keyed by row now.
+
+**The kept line goes bottom-left**, per the reference: `align-items:flex-start`
+with `padding-left:7cqw`, `padding-top:6.4cqw`. Measured on a 319px screen —
+row left 28px (8.8%), total left 30px, row top 369 against the throwing row's
+348. The throwing row itself does not move.
+
+**Only the total.** The `+100 +300` tags are children of the die, so they rode
+into the tray on the dice they were anchored to. Stripped on migration; the
+running total reads `650 TURN` the way the reference does.
+
+**Real collision proxies instead of a spring.** Denis: *"can't you just have a
+perfect simple square invisible proxy box around each die that is used for the
+physics? Meaning they never get too close because the proxies are a bit larger
+than the die itself."* — which is exactly right, and is what the mutual-shove
+spring was a poor substitute for. That spring acted at `sepMin` 1.45, three
+times a die's own half-width, and went on acting after the dice had landed:
+that is the forcefield he could see. The collision box is `proxy:1.28` wide in
+the plane of the table now and the spring is gone. Not taller — a uniformly
+bigger cube would rest 0.58 above the table and float.
+
+At the row's real slot pitch (1.598 die-widths — `.die` is 13cqw, the row gap
+3cqw, `sz` is `13cqw * MSCALE`) the settled clearance is **0.36–0.41 die-widths
+of visible air**, 0 overlapping pairs across 6/5/4/3/2 dice, 0 off-frame.
+
+**No more dithering on an edge.** The cocked branch raised damping and then
+waited up to 140 frames — but a die balanced on an edge is at equilibrium, so
+damping only makes it sit there longer. It gets a horizontal tip now (no
+vertical component: a hop bounced it into its neighbours and restarted the
+pile, measured a 6.3s tail) and the wait is 22 frames, since anything still
+cocked is squared by the `TABLE.land` slerp anyway. Settle time: **median
+~1.0s, p90 1.7s, max 2.9s**.
+
+**Shadows are dark brown, multiplied, one fill each.** Per die per frame the
+old pass allocated an offscreen canvas, filled the silhouette **nine times**
+through a blur filter, blitted a pre-scaled copy of the whole table in as a
+`source-in` mask, painted a darkening rect over that, and blitted the result.
+It is now one blurred fill in `#3a2110` straight onto the shared canvas, with
+`mix-blend-mode:multiply` doing what the table-mask was there for.
+**0.04 ms per pass against 0.30 ms** (and 1.37 ms before that was optimised).
+
+`#matchShadows` had to drop to `z-index:auto`: a positioned element with a
+z-index creates a stacking context, and `mix-blend-mode` only blends against
+the backdrop inside its own context — a multiplying `#dsCanvas` would have
+found nothing behind it but its own container. With `auto` it still paints in
+DOM order, after `#matchDark` and before `#matchProps`.
+
+**The tray had no shadows at all.** The pass tested
+`dd.obj.parent !== D3X._tbl` — the single old table group. Kept dice fail that
+twice over: the rows have a group each now, and a die with no physics pose is
+parented straight to the scene. `match` + `visible` is the real question and
+the silhouette is projected through the camera either way. Measured 1060 ink
+pixels under the kept line where there were 0.
