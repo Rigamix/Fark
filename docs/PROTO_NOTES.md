@@ -3392,3 +3392,27 @@ from a width captured when the die was first tracked, before any animation
 can touch it. Verified: table scale 31.967 before and during a tap, and every
 die's position identical.
 
+## P191 — the settle shift hides in the tumble; shadows leave with the dice
+
+**The shift when settling.** The spacing correction was blended into the LAST
+16 frames — which is precisely when the dice are nearly still, so it read as
+them sliding into place. It now blends between 22% and 62% of the flight, on
+a smoothstep, while they are still bouncing: by the time they come down they
+are already at the corrected positions and nothing moves afterwards.
+
+Measured over 20 rolls: drift across the last 10% of the flight is **0.044
+die-widths (1.4px)** — that is the dice's own settling, not the correction.
+Gaps stay varied: 39 distinct values, 1.45 to 2.26.
+
+**Shadow outliving the die.** The 2D shadow canvas is only repainted on the
+candle timer, so when a die left (passing the turn, banking) its shadow stayed
+behind. `_drop` now marks the pass dirty and it repaints immediately. Two
+details mattered:
+- it has to run in `tick()`, not at the end of `frame()` — `frame()` returns
+  early once the last die is gone, which is exactly the case that matters;
+- and AFTER the sync that drops the die, not before, or the repaint happens a
+  frame ahead of the removal and you still get one stale frame.
+
+Verified: 4772 shadow pixels with dice, **0 on the same frame** the dice are
+removed.
+

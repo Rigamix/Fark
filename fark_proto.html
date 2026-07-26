@@ -15689,11 +15689,22 @@ var D3X={
       for(var lc=0;lc<N;lc++)
         want[lc]=Math.max(-P.limitX,Math.min(P.limitX,want[lc]));
     }
-    var K=Math.min(16,frames.length);
-    for(var fi=0;fi<K;fi++){
-      var wgt=(fi+1)/K;wgt=1-Math.pow(1-wgt,3);
-      var row=frames[frames.length-K+fi];
-      for(var k5=0;k5<N;k5++)row[k5].x+=(want[k5]-fin[k5].x)*wgt;
+    /* Blend the correction in WHILE THE DICE ARE STILL TUMBLING, not over
+       the last frames - applied at the end it reads as the dice sliding
+       into place, which is exactly the tell we are trying to avoid. It is
+       fully applied by ~65% of the flight, so the whole settle happens at
+       the corrected positions and nothing moves once they are down. */
+    var total=frames.length;
+    var fa=Math.floor(total*0.22),fb=Math.floor(total*0.62);
+    if(fb<=fa)fb=Math.min(total-1,fa+1);
+    for(var fi=0;fi<total;fi++){
+      var w2;
+      if(fi<=fa)w2=0;
+      else if(fi>=fb)w2=1;
+      else {var tt=(fi-fa)/(fb-fa);w2=tt*tt*(3-2*tt);}
+      if(!w2)continue;
+      var row=frames[fi];
+      for(var k5=0;k5<N;k5++)row[k5].x+=(want[k5]-fin[k5].x)*w2;
     }
     /* read what landed, then relabel so the game's numbers are on top */
     var rest=[];
@@ -16094,6 +16105,14 @@ var D3X={
     }else{
       this.syncMatch();
     }
+    /* A die that just left keeps its shadow on the 2D canvas until the next
+       candle tick, so the shadow outlives the die. Repaint AFTER the sync
+       that dropped it, and here rather than in frame(), which returns early
+       once the last die is gone - exactly when it matters. */
+    if(this._shDirty){
+      this._shDirty=false;
+      try{_mLightCalc();_drawDiceShadows(performance.now()/1000);}catch(e){}
+    }
   },
   /* rebuild the die list from the .d3chip placeholders inside the mount */
   sync:function(root){
@@ -16162,6 +16181,7 @@ var D3X={
     this.on=true;
   },
   _drop:function(d){
+    if(d.match)this._shDirty=true;/* its shadow is still on the 2D canvas */
     /* A die on the table is parented to the TABLE group, not the scene, so
        scene.remove() was a no-op and every destroyed die left a ghost that
        kept rendering. Always detach from the actual parent. */
@@ -16340,6 +16360,7 @@ var D3X={
       }
     });
     r.render(this.scene,this.cam);
+
   }
 };
 /* keep the 3D layer in step with the DOM */
