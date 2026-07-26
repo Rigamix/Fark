@@ -3543,3 +3543,29 @@ thins, and darkened again (`OUT_DARK` 0.42 -> 0.26, saturation 1.7).
 **Rounder still**: bevel 12% -> 16%, art remapped from Denis's sources in one
 hop (flat share 87.0%).
 
+## P197 — the red glow found, a brighter halo, shadows that fade in
+
+**The vagabond's red glow.** Not the selection glow at all: premium materials
+paint a coloured halo on their WRAPPER —
+`:where(.die-wrap,...)[data-mat="vagabond"]::before` with
+`rgba(255,80,100,.55)`. It is drawn at the DOM slot rather than where the die
+landed, and 3D dice have their own glow, so both wrapper pseudos are switched
+off for match dice. Verified: the wrap's ::before computes to
+`background:none, box-shadow:none`.
+
+**Glow brightness.** A mid gold on a warm table just blends. It is two-tone
+now: the wide falloff spreads in gold (`SEL_SOFT #ffb552`) and the rim is
+near off-white (`SEL_COL #ffeec2`), both composited additively. Measured:
+peak alpha **255** at colour (255,238,194), average across the halo
+(255,195,110).
+
+**Shadows fade in, and early.** They were appearing in a single frame the
+moment the last die stopped. `_settleK()` now ramps from 0 to 1 across the
+last stretch of the flight (55% to 92%), the shadow alpha is multiplied by
+it, and the pass keeps repainting while the ramp is mid-way. Measured across
+a real solve: 0 / 0 / 0 / 0 / 0.12 / 0.40 / 0.66 / 0.81 / 0.94 / 1 / 1 at
+flight progress 0 to 1 — starts at 60% of the flight, seven distinct steps.
+
+**Outline wobble removed**: the per-die random weight is gone, every die's
+outline is a uniform 1.04. The screen-space top/bottom weighting stays.
+

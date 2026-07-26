@@ -1198,6 +1198,13 @@ html.fk3d .d3chip .die,html.fk3d .nrdie .d3host .die{visibility:hidden}
 /* the kept-tray preview above the row duplicated the running total that
    already sits under the row */
 html.fk3d #screen-match #keptTray{display:none !important}
+/* premium materials paint a coloured halo on their wrapper (vagabond's is
+   red). It is drawn at the DOM slot, not where the die actually landed, and
+   3D dice have their own selection glow - so it goes for match dice. */
+html.fk3d #screen-match .die-wrap::before,
+html.fk3d #screen-match .die-wrap::after{
+  background:none !important;box-shadow:none !important;
+  animation:none !important;filter:none !important}
 html.fk3d #screen-match .die.d3on.selected,
 html.fk3d #screen-match .die-wrap:has(.die.d3on.selected){
   box-shadow:none !important;outline:none !important}
@@ -14299,7 +14306,8 @@ function _diceShadowPaint(pts,scx,scy,size,d){
   }
   tx2.drawImage(pre.cv,(ml.ox-sc.left)-tlx,(ml.oy-sc.top)-tly);
   tx2.globalCompositeOperation='source-atop';
-  tx2.fillStyle='rgba(8,4,2,'+(alphaB*0.95).toFixed(3)+')';tx2.fillRect(0,0,tw,tw);
+  tx2.fillStyle='rgba(8,4,2,'+(alphaB*0.95*(window._dsFade===undefined?1:window._dsFade)).toFixed(3)+')';
+  tx2.fillRect(0,0,tw,tw);
   x.drawImage(d._dsc,0,0,TW,TW,tlx,tly,tw,tw);
 }
 function _drawDiceShadows(tSec){
@@ -14325,9 +14333,10 @@ function _drawDiceShadows(tSec){
     if(window.D3X&&D3X.on&&D3X._tbl&&D3X.dice.length){
       var mrx=D3X.mount?D3X.mount.getBoundingClientRect():null;
       D3X._tbl.updateMatrixWorld(true);
-      var flying=D3X._rolling();
+      var fade=D3X._settleK();
+      window._dsFade=fade;
       D3X.dice.forEach(function(dd){
-        if(flying)return;/* no shadows mid-air: unreadable, and the costly bit */
+        if(fade<0.02)return;/* still high in the air: nothing to ground yet */
         if(!dd.match||!dd.obj.visible||!mrx)return;
         if(dd.obj.parent!==D3X._tbl)return;
         dd.obj.updateMatrixWorld(true);
@@ -15781,7 +15790,7 @@ var D3X={
   /* selection: the same hull trick, thicker and gold, so the ring hugs the
      die silhouette wherever physics has left it - a box drawn on the DOM
      host cannot, now that the dice sit at angles */
-  SEL_COL:'#e1a755', SEL_W:0.085,
+  SEL_COL:'#ffeec2', SEL_SOFT:'#ffb552', SEL_W:0.085,
   /* a little tooth so the outline is not a dead flat band */
   _grainTex:function(){
     if(this._grn)return this._grn;
@@ -15889,6 +15898,22 @@ var D3X={
     for(var i=0;i<this.dice.length;i++)if(this.dice[i].roll)return true;
     return false;
   },
+  /* 0 while the dice are still flying, ramping to 1 as they come down, so
+     the shadows arrive gradually and a little before everything stops */
+  SHADOW_FADE:{from:0.55, to:0.92},
+  _settleK:function(){
+    var k=1,F=this.SHADOW_FADE;
+    for(var i=0;i<this.dice.length;i++){
+      var R=this.dice[i].roll;if(!R)continue;
+      var last=R.sol.frames.length-1;
+      var idx=Math.min(Math.floor((performance.now()-R.t0)/(this.PHYS.dt*1000)),last);
+      var p=last?idx/last:1;
+      var kk=(p-F.from)/(F.to-F.from);
+      kk=kk<0?0:(kk>1?1:kk);
+      if(kk<k)k=kk;
+    }
+    return k;
+  },
   _drawGlow:function(){
     var cv=document.getElementById('dgCanvas');
     /* clear-and-leave: no selection, mid-roll, or no dice at all */
@@ -15951,7 +15976,9 @@ var D3X={
       });
       ctx.closePath();
     };
-    gx.fillStyle=self.SEL_COL;
+    /* gold spreading out, near-white at the rim: a mid gold on its own just
+       blends into a warm table */
+    gx.fillStyle=self.SEL_SOFT;
     gx.globalAlpha=1;
     /* the wide, soft falloff */
     gx.filter='blur('+G.soft+'px)';
@@ -15959,6 +15986,7 @@ var D3X={
       sel.forEach(function(h){trace(gx,h,0);gx.fill();});
     /* then the bright rim, stacked - the punch-out below throws away the
        inner half of every blur, so a single pass never reads as strong */
+    gx.fillStyle=self.SEL_COL;
     gx.filter='blur('+G.rim+'px)';
     for(var rp=0;rp<G.rimPasses;rp++)
       sel.forEach(function(h){trace(gx,h,0);gx.fill();});
@@ -16253,7 +16281,7 @@ var D3X={
     /* silhouette outline: a slightly fatter copy drawn back-faces-only */
     var out=this._mkOutline(mat);
     /* a hand-inked line is never the same weight twice */
-    var ow=1+this.OUTLINE*(0.78+Math.random()*0.5);
+    var ow=1+this.OUTLINE;/* uniform: the random per-die weight read as wobble */
     out.scale.setScalar(ow);
     g.userData.outScale=ow;/* the glow must start OUTSIDE this, not the cube */
     g.userData.out=out;
@@ -16315,6 +16343,8 @@ var D3X={
        canvases until something repaints them, so both outlive the die.
        Both are driven from here, not from frame(), which returns early once
        the last die is gone - exactly when it matters. */
+    var fk=this._settleK();
+    if(fk>0.02&&fk<1)this._shDirty=true;/* mid-fade: keep it moving */
     if(this._shDirty){
       this._shDirty=false;
       try{_mLightCalc();_drawDiceShadows(performance.now()/1000);}catch(e){}
