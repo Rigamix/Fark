@@ -3656,3 +3656,70 @@ rows on screen the last die iterated decided where both of them sat.
 6 dice min 1.6 — no overlapping pairs, nothing off-frame. And the hidden
 `#keptTray` preview no longer builds a throwaway 3D die per kept die on
 every refresh: `#keptTray .die` is 0 and `D3X.dice.length` is exactly 6.
+
+## P201 — five things the review pass found in P199/P200
+
+A review agent read the dice code against the fresh changes. Five findings
+survived being reproduced; all five are fixed here, each with the measurement
+that proved it.
+
+**The `limitX` correction first**, because it reframes everything below:
+`limitX` works out to **4.25 on every viewport** — it is scale-invariant,
+because the die is sized in `cqw` and so is the container. Earlier tuning was
+measured against 3.2, which is 25% tighter than any real screen.
+
+**1. The recording ran past the point the dice stopped.** Two motion
+thresholds that did not meet: the sim break used `0.0025` and the blend
+window used `0.02`, so a die drifting between them tripped neither — the
+solve kept recording, the blend finished early, and every drifting frame
+after it replayed verbatim. One `PHYS.stillEps` (0.006) now drives both, and
+the tape is **cut** at the last moving frame, so there are no post-blend
+frames left at all. Worst replayed tail **8.7px → 0.41px**; longest solve
+**235 → 134 frames**.
+
+**2. `halfW` could go negative.** `Math.max(slotX)+1.2` is the right-most
+slot, not a half-width. A die held on the right of the row — a frozen die, or
+a batch thrown a tick later — makes every rerolled slot negative, and this
+went with them: the side walls swapped sides and `clearOf` degenerated to
+`return -halfW` for every input. Verified: slots `[-3.1, -2.4]` gave
+`halfW = -1.2` and `clearOf` returned `1.2` for `-3.1`, `-2.4`, `0` and `2.5`
+alike, piling the batch into one column. `Math.max(|slotX|)` fixes it — those
+two dice now land at `-3.15` and `-1.61`, **0/80 overlapping**.
+
+**3. The fit-to-frame scaled centres but not footprints.** Squeezing the
+centres to make the row fit while the dice stayed full size meant every unit
+it saved came straight out of the gaps. And the obstacle path ended on an
+*unbounded* relax, which could put a die back off the table. The relax takes
+an `edge` now and clamps **inside** its loop, so an unavoidable squeeze is
+shared out evenly — separate, push back on screen, separate again. Off-frame
+dice **24–35 → 0** across every row shape.
+
+**4. `wantY` missed an edge-rester.** The old guard only caught a die parked
+on another one (`y > 0.8`); a die stopped on an edge rests near `0.68` and
+slipped through, and the `TABLE.land` slerp then flattened its angle while
+leaving it hanging with its shadow detached. Every die is slerped flat, and a
+flat die's centre is exactly half its box up, so `wantY` is now `HALF*0.96`
+unconditionally. Resting `y` is **0.48 for every die, 0 floaters**.
+
+**5. Homes were measured off the animated element.** `_measureHomes` read
+`getBoundingClientRect()` on the die and subtracted only our own `translate`
+— but CSS composes `translate → rotate → scale → transform`, and the game
+runs `transform` keyframes on that very element. Because `hx` feeds
+`_rowMid`, one die mid-pop moved the table origin for the **whole row**.
+Measured during a real `die-sel-pop`: the die read **5px off in y and 4.15px
+too wide** (so `w0` cached 10% large as well).
+
+Undoing the matrix by hand does not work — it needs the *untransformed*
+origin, which is the thing being solved for; that attempt still carried 3.4px
+of error. Measuring the `.die-wrap` instead does: its box is exactly the
+die's layout box, every one of those keyframes targets the inner `.die`, and
+a child's transform cannot affect its parent's border box. Error **0.00, 0.00**
+on every keyframe.
+
+**Where it lands.** At the real `limitX` of 4.25, with the kept dice off the
+table: opening roll of six **0/250 overlapping pairs**, rerolls of five, four,
+three and two all **0**, worst clearance `+0.27` to `+0.30`, **0 off-frame**,
+**0 floating**. The one case that still overlaps is two frozen dice pinning
+the middle of the row (worst `-0.40`); with a single frozen die it is `-0.06`,
+a 6% kiss. A row that genuinely cannot hold its dice has to give somewhere,
+and an even squeeze is the right place for it to give.

@@ -15541,10 +15541,10 @@ var D3X={
     var p=w.project(this.cam);
     var sx=(p.x*.5+.5)*mr.width, sy=(-p.y*.5+.5)*mr.height;
     if(d.hx===undefined){
-      var r0=d.chip.getBoundingClientRect();
-      d.hx=r0.left-mr.left+r0.width/2-(d.tx||0);
-      d.hy=r0.top-mr.top+r0.height/2-(d.ty||0);
-      d.w0=r0.width;/* the die's box with no tap animation running */
+      var c0=this._rawCentre(d.chip,d.tx,d.ty);
+      d.hx=c0.x-mr.left;
+      d.hy=c0.y-mr.top;
+      d.w0=c0.w;/* the die's box with no tap animation running */
     }
     d.tx=sx-d.hx;d.ty=sy-d.hy;
     /* `translate`, NOT `transform`: the game animates transform on this very
@@ -15590,6 +15590,12 @@ var D3X={
        distance reads as touching or as roomy depending on the spin. Each
        die's own footprint is measured from the yaw it landed on. */
     gap:0.3, spreadCap:70,
+    /* ONE epsilon for "is it still moving". The sim break used 0.0025 and
+       the blend window used 0.02, and a die drifting between the two tripped
+       neither - so the solve kept recording, the blend finished early, and
+       every drifting frame after it was replayed verbatim. Measured up to
+       8.7px of slide over 0.77s after the dice had visibly landed. */
+    stillEps:0.006,
     trayZ:1.7, wallPad:.3, restY:.5
   },
   _cannon:false,
@@ -15653,7 +15659,14 @@ var D3X={
     var ground=new CANNON.Body({mass:0,material:mDesk,shape:new CANNON.Plane()});
     ground.quaternion.setFromAxisAngle(new CANNON.Vec3(1,0,0),-Math.PI/2);
     world.add(ground);
-    var halfW=Math.max.apply(null,slotX)+1.2;
+    /* the widest slot FROM THE CENTRE, not the right-most one. A die held
+       on the right of the row - a frozen die, or a batch thrown a tick after
+       its neighbours - makes every rerolled slot negative, and this went
+       negative with them: the side walls swapped sides and clearOf() below
+       degenerated into `return -halfW` for EVERY input, spawning the whole
+       batch in one column. Verified: slots [-3.1,-2.4] gave halfW -1.2 and
+       clearOf returned 1.2 for -3.1, -2.4, 0 and 2.5 alike. */
+    var halfW=Math.max.apply(null,slotX.map(Math.abs))+1.2;
     var wall=function(x,z,sx,sz){
       var b=new CANNON.Body({mass:0,material:mWall,
         shape:new CANNON.Box(new CANNON.Vec3(sx,2.5,sz))});
@@ -15746,7 +15759,7 @@ var D3X={
                 +Math.abs(fr[m1].z-pf[m1].z);
           if(dm>mvx)mvx=dm;
         }
-        still=(mvx<0.0025)?still+1:0;
+        still=(mvx<P.stillEps)?still+1:0;
         if(still>=14&&it>36)break;
       }
       if(settled()){
@@ -15757,11 +15770,28 @@ var D3X={
         if(++over>140)break;
       }
     }
+    /* Cut the tape at the last frame anything actually moved. Everything
+       past it is the solver grinding under its own stop test, and it was
+       being played back frame for frame. Cutting here also hands the blend
+       below a real end frame, so the last frame the player sees IS the
+       corrected position rather than something on the way to it. */
+    for(var ci=frames.length-1;ci>1;ci--){
+      var cm=0;
+      for(var c9=0;c9<N;c9++){
+        var ca=frames[ci-1][c9],cb=frames[ci][c9];
+        var cd=Math.abs(cb.x-ca.x)+Math.abs(cb.y-ca.y)+Math.abs(cb.z-ca.z);
+        if(cd>cm)cm=cd;
+      }
+      if(cm>P.stillEps){frames.length=ci+1;break;}
+    }
+    var END=frames[frames.length-1];
     /* the squaring-up rotation per die, needed before the relax so the
-       footprint can be measured from the yaw each die actually landed on */
+       footprint can be measured from the yaw each die actually landed on.
+       Read off the CUT frame - bodies[] still holds the uncut end. */
     var rest=[];
     for(var q0=0;q0<N;q0++){
-      var bq0=bodies[q0].quaternion;
+      var eq0=END[q0];
+      var bq0=new CANNON.Quaternion(eq0.qx,eq0.qy,eq0.qz,eq0.qw);
       var got0=this._upAxis(bq0);
       var n0=this.FACE[got0][2];
       var w0v=bq0.vmult(new CANNON.Vec3(n0[0],n0[1],n0[2]));
@@ -15777,8 +15807,8 @@ var D3X={
        sliding the last few pixels home. */
     var fin=[],rest2=[];
     for(var r1=0;r1<N;r1++){
-      fin.push({x:bodies[r1].position.x,y:bodies[r1].position.y});
-      rest2.push({x:bodies[r1].position.x,i:r1});
+      fin.push({x:END[r1].x,y:END[r1].y});
+      rest2.push({x:END[r1].x,i:r1});
     }
     rest2.sort(function(a,b){return a.x-b.x;});
     /* the wanted spacing has to fit on screen: asking for more than the
@@ -15820,7 +15850,7 @@ var D3X={
       var room=2*P.limitX+srt[0].e+srt[srt.length-1].e-span;
       if(room<gap*(node.length-1))gap=Math.max(0.06,room/(node.length-1));
     }
-    var relax=function(){
+    var relax=function(edge){
       for(var pass=0;pass<80;pass++){
         node.sort(function(a,b){return a.x-b.x;});
         var moved=false;
@@ -15835,10 +15865,21 @@ var D3X={
           else {A.x-=push/2;B.x+=push/2;}
           moved=true;
         }
+        /* Clamping INSIDE the loop is what shares an unavoidable squeeze out
+           evenly: separate, push back on screen, separate again. Clamping
+           once at the end dumped the whole shortfall into the two end pairs,
+           and clamping BEFORE an unbounded relax let the relax put a die
+           straight back off the table. */
+        if(edge)node.forEach(function(n9){
+          if(n9.fix)return;
+          var lo9=-edge+n9.e,hi9=edge-n9.e;
+          if(lo9>hi9){n9.x=0;return;}
+          if(n9.x<lo9)n9.x=lo9;else if(n9.x>hi9)n9.x=hi9;
+        });
         if(!moved)break;
       }
     };
-    relax();
+    relax(0);
     /* keep the group centred on the slots it was aimed at - but only when
        the table is empty. With kept dice on it THEY are the anchor, and
        sliding the thrown ones sideways just walks them back into contact. */
@@ -15857,42 +15898,44 @@ var D3X={
        instead of two dice losing all of theirs.
        limitX is the furthest a CENTRE may sit, which leaves 0.75 of a die
        width of margin, so the real edge bound is limitX + 0.75. */
-    if(P.limitX&&!(obstacles&&obstacles.length)){
+    if(P.limitX){
       var edge=P.limitX+0.55;/* 0.2 of a die of air, not flush to the bezel */
-      for(var ft=0;ft<3;ft++){
+      /* Rigid slide first, and only when nothing is pinned to this table: it
+         keeps the spacing the relax just worked out and moves the row back on
+         screen in one piece, which is what keeps it aimed at the DOM slots.
+         A single die rerolled on its own was otherwise dragged to mid-table
+         and landed on its neighbour. */
+      if(!(obstacles&&obstacles.length)){
         var lo=Infinity,hi=-Infinity;
         node.forEach(function(n3){
           if(n3.x-n3.e<lo)lo=n3.x-n3.e;
           if(n3.x+n3.e>hi)hi=n3.x+n3.e;
         });
-        var mid2=(lo+hi)/2;
         if(hi-lo<=2*edge){
-          /* It fits. Slide it ONLY as far as it takes to get back on screen -
-             re-centring it on the table would undo the centring above, which
-             aims at the DOM slots. A single die rerolled on its own was being
-             dragged to mid-table and landing on its neighbour. */
           var slide=0;
           if(hi>edge)slide=edge-hi;
           else if(lo<-edge)slide=-edge-lo;
           if(slide)node.forEach(function(n4){n4.x+=slide;});
-          break;
         }
-        var k6=(2*edge)/(hi-lo);
-        node.forEach(function(n5){n5.x=(n5.x-mid2)*k6;});
       }
-    }else if(P.limitX){
-      node.forEach(function(n3){
-        if(!n3.fix)n3.x=Math.max(-P.limitX,Math.min(P.limitX,n3.x));
-      });
-      relax();
+      /* then a BOUNDED relax, which replaces the old scale-to-fit. That
+         squeezed the CENTRES together to make the row fit but left the dice
+         full size, so every unit it saved came straight out of the gaps. */
+      relax(edge);
     }
     node.forEach(function(n4){if(!n4.fix)want[n4.i]=n4.x;});
     /* a die that came to rest ON a kept die is put back on the table; the
        relax above has already moved it clear in x, so it reads as sliding
        off rather than sinking through */
+    /* Every die is squared flat by the TABLE.land slerp, and a flat die's
+       centre sits exactly half its box above the table - so that is where it
+       has to end up whatever height the solver left it at. The old test only
+       caught a die parked ON another one (y > 0.8); a die resting on an EDGE
+       stops around 0.68 and slipped through, and the slerp then flattened it
+       while leaving it hanging, shadow detached underneath. 0.48, not restY:
+       the collision box is built at HALF*0.96. */
     var wantY=[];
-    for(var y1=0;y1<N;y1++)
-      wantY[y1]=(fin[y1].y>P.restY+0.3)?P.restY:fin[y1].y;
+    for(var y1=0;y1<N;y1++)wantY[y1]=HALF*0.96;
     /* Blend the correction in WHILE THE DICE ARE STILL TUMBLING, not over
        the last frames - applied at the end it reads as the dice sliding
        into place, which is exactly the tell we are trying to avoid.
@@ -15901,17 +15944,11 @@ var D3X={
        throw but not for one that jams: a 649-frame solve put the end of the
        blend at frame 402, so the dice were still being slid around nearly
        seven seconds after they looked settled. */
-    var total=frames.length,qf=total-1;
-    for(var qi=total-1;qi>1;qi--){
-      var mv=0;
-      for(var q2=0;q2<N;q2++){
-        var a3=frames[qi-1][q2],b3=frames[qi][q2];
-        var dq=Math.abs(b3.x-a3.x)+Math.abs(b3.y-a3.y)+Math.abs(b3.z-a3.z);
-        if(dq>mv)mv=dq;
-      }
-      if(mv>0.02){qf=qi;break;}
-    }
-    var fb=Math.max(4,Math.min(total-1,qf));
+    /* the tape is already cut at the last moving frame, so the blend only
+       has to be finished by the time it runs out - and then there are no
+       frames left after it to replay any drift */
+    var total=frames.length;
+    var fb=total-1;
     var fa=Math.floor(fb*0.35);
     if(fb<=fa)fb=Math.min(total-1,fa+1);
     for(var fi=0;fi<total;fi++){
@@ -16319,13 +16356,35 @@ var D3X={
      _homeOf calls this whenever any die lacks a home, that could happen
      every frame, which is the mass jitter. We know exactly what translate
      we applied, so subtract it instead and never touch the DOM. */
+  /* The untransformed centre of an element the game is busy animating.
+     Subtracting our own `translate` is not enough: CSS composes
+     translate -> rotate -> scale -> transform, and the game runs `transform`
+     keyframes on this very element - pxDiePop is translateY(-5px), pxDieFreeze
+     is translateX(+/-3px). Those ride along in the rect, and because hx feeds
+     _rowMid, one die mid-pop moved the table origin for the WHOLE row.
+
+     The fix is to measure the WRAPPER. Every match die sits in a .die-wrap
+     whose box is exactly the die's layout box, and every one of those
+     keyframes targets the inner .die - so the wrap is the same rectangle with
+     none of the animation in it. Undoing the transform matrix by hand instead
+     needs the UNtransformed origin, which is the thing being solved for;
+     measured 3.4px of residual error that way against 0.0 for this. */
+  _rawCentre:function(el,tx,ty){
+    var w=el.parentElement;
+    if(w&&w.classList&&w.classList.contains('die-wrap')){
+      var rw=w.getBoundingClientRect();
+      if(rw.width>0.5)return {x:rw.left+rw.width/2,y:rw.top+rw.height/2,w:rw.width};
+    }
+    var r=el.getBoundingClientRect();
+    return {x:r.left+r.width/2-(tx||0),y:r.top+r.height/2-(ty||0),w:r.width};
+  },
   _measureHomes:function(){
-    var mr=this.mount.getBoundingClientRect();
+    var mr=this.mount.getBoundingClientRect(),self=this;
     this.dice.forEach(function(d){
       if(!d.match)return;
-      var r=d.chip.getBoundingClientRect();
-      d.hx=r.left-mr.left+r.width/2-(d.tx||0);
-      d.hy=r.top-mr.top+r.height/2-(d.ty||0);
+      var c=self._rawCentre(d.chip,d.tx,d.ty);
+      d.hx=c.x-mr.left;
+      d.hy=c.y-mr.top;
     });
   },
   /* the player line, the kept tray and the opponent line are separate
