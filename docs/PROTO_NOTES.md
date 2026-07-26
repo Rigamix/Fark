@@ -3932,3 +3932,51 @@ still applied, for anything that wants to know it is installed.
 
 **Not verified on device.** Everything here is the browser side of it; the
 band itself only exists in the installed iOS app.
+
+## P212–P213 — the throw queue was a single slot
+
+Denis: *"I play a turn and it's fine, when it's my turn again and I roll,
+there is no physics on none of the dice apart from the rightmost one."*
+
+Instrumented `_physStart` and played real turns on a real 60Hz clock. Two
+separate faults, both visible in the trace.
+
+**1. The retry ran before the dice existed.** `tick()` did
+
+```js
+if(this._waiting){ …_physStart(w); }   // retry
+… this.syncMatch();                    // register the dice
+```
+
+so a throw waiting on its dice was retried against the list as it stood
+*before* they were registered — it could only ever fail on the tick that
+would have fixed it. Logged: `start batch:6 resolved:0 d3xDice:0 ready:true`,
+with the dice sitting right there on screen. On a second turn that is every
+die in the row: the old ones are gone and the new ones are not in the list
+yet. `syncMatch()` runs first now.
+
+**2. `_waiting` held ONE batch.** A single throw does not always arrive as
+one: a reroll reuses the free dice and creates new ones for any that left,
+and the two reach the queue on different turns of the event loop. When the
+second batch deferred it **overwrote the first**, and those dice never rolled
+at all. Caught it exactly:
+
+```
+deferred  batch:4  resolved:0     <- lost
+deferred  batch:2  resolved:0
+ok        batch:2  resolved:2     <- only these two ever roll
+```
+
+Four aligned dice and two rolled ones — Denis's screenshot with different
+numbers. It is a list now, drained each tick. (The same shape of bug as the
+single global `_play` slot fixed back in P183.)
+
+**And the give-up rule is no longer a clock.** It was 8 seconds, which was a
+guess: too short and a throw is silently binned and its dice sit in the rest
+pose, too long and a dead batch is retried forever. A batch is now kept for
+exactly as long as any of its dice is still connected to the document, which
+is the actual question being asked.
+
+Verified over four consecutive rolls on real timing: turn 1 **6/6**, a
+mid-turn reroll **4/6** (the other two are in the kept tray, which is
+correct — checked by row), turn 2 **6/6**, turn 3 **6/6**. Never aligned.
