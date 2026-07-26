@@ -3416,3 +3416,32 @@ details mattered:
 Verified: 4772 shadow pixels with dice, **0 on the same frame** the dice are
 removed.
 
+## P192-P193 — real gaps, lower row and pool, rougher outlines, 2D glow
+
+**Minimum gap, measured edge to edge.** A centre distance cannot express "a
+finger of table between them": a die turned 45 degrees is 1.41 wide where a
+square-on one is 1.0, so the same centre distance reads as touching or as
+roomy depending purely on spin. Each die's footprint is now derived from the
+yaw it actually landed on — `(|cos y| + |sin y|)/2` — and the relax enforces
+`extA + extB + gap`. The squaring-up rotation had to move ahead of the relax,
+since the yaws are its input. `PHYS.gap = 0.3` die-widths, shrunk only if the
+row genuinely cannot hold it. Measured over 20 rolls: min gap 6px, median
+9.6px, **none touching**, 0 wrong faces, 0 offscreen.
+
+**Row and candlelight.** Dice row lowered (`--sp-before` 1.1 -> 1.75), and the
+candle pool moved down with it (centre 0.44 -> 0.52 of the screen) and scaled
+30% (rx 0.52 -> 0.676, ry 0.27 -> 0.351). The prop-darkening falloff uses the
+same centre and radii, so props and dice stay lit by one light.
+
+**Outlines** darkened hard (`OUT_DARK` 0.72 -> 0.42, saturation up to 1.6) and
+roughened: the grain texture's contrast is doubled and each die's outline
+weight varies +/-25%, so no two lines are the same.
+
+**Selection glow, in 2D.** The 3D gold hull is gone. The die's eight corners
+are projected and gift-wrapped into its real silhouette, then drawn on a
+canvas above the dice: a wide blurred fill, a tighter brighter one, a gentle
+wash over the die itself, and a crisp line — all in the same colour, which is
+what the reference does. Screen space, so it reads identically whatever angle
+the die landed at. Verified: 4107 lit pixels while selected, gold
+RGB(226,167,85), 0 when deselected.
+

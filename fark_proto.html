@@ -1153,7 +1153,7 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 #screen-match .player-dice-row{gap:3cqw}
 #screen-match .opp-dice-row{gap:3cqw}
 #screen-match .die.sm{width:8.7cqw;height:8.7cqw}
-#screen-match #diceArea{--sp-before:1.1;--sp-after:2.4}
+#screen-match #diceArea{--sp-before:1.75;--sp-after:1.75}
 /* ═══ iOS safe areas — art bleeds under the notch, HUD steps clear ═══ */
 #ptHearts{top:max(1.8%,env(safe-area-inset-top))}
 #ptGold{top:max(1.8%,env(safe-area-inset-top))}
@@ -14112,10 +14112,10 @@ function _candleF(t){t*=1.75;return 0.6*Math.sin(t*1.1)+0.3*Math.sin(t*2.3+2)+0.
    dark; breathes with the flare like everything else */
 function _litProps(f){
   var pr=document.getElementById('matchProps');if(!pr)return;
-  var k=1+0.08*f,rx=0.95*k,ry=0.5*k;
+  var k=1+0.08*f,rx=1.235*k,ry=0.65*k;/* matches the bigger pool */
   [].forEach.call(pr.children,function(im2){
     if(im2._pcx===undefined)return;
-    var dx=(im2._pcx-0.5)/rx,dy=(im2._pcy-0.44)/ry;
+    var dx=(im2._pcx-0.5)/rx,dy=(im2._pcy-0.52)/ry;
     var r=Math.sqrt(dx*dx+dy*dy);
     var L=r<=0.28?1:Math.max(0,1-(r-0.28)/0.72);
     im2.style.filter='brightness('+(0.55+0.45*L).toFixed(3)+') saturate('+(0.8+0.2*L).toFixed(3)+')';
@@ -14143,9 +14143,9 @@ function _drawCandle(tSec){
   /* breathing pool: a soft circle radially expanding/contracting */
   var f=_candleF(tSec);
   var cx=W*0.5+W*0.012*Math.sin(tSec*0.7);
-  var cy=H*0.44+H*0.004*Math.sin(tSec*1.3+3);
+  var cy=H*0.52+H*0.004*Math.sin(tSec*1.3+3);/* down with the dice row */
   var fb=Math.max(f,-0.4);/* the pool contracts less than it flares */
-  var rx=W*0.52*(1+0.08*fb),ry=H*0.27*(1+0.08*fb);
+  var rx=W*0.676*(1+0.08*fb),ry=H*0.351*(1+0.08*fb);/* 30% wider pool */
   x.globalCompositeOperation='destination-out';
   x.save();x.translate(cx,cy);x.scale(1,ry/rx);
   var g=x.createRadialGradient(0,0,rx*0.22,0,0,rx);
@@ -15508,11 +15508,12 @@ var D3X={
        overlap, so settle is followed by a bounded spread phase that keeps
        stepping until there is a real gap. Recorded like any other frame,
        so the nudge plays back rather than snapping. */
-    /* A FLOOR, not a target. It must sit BELOW the row's natural pitch
-       (~1.6) or every pair gets pushed to exactly this value and the line
-       comes out ruler-straight - 1.45 still clears the 1.414 two dice need
-       when both are turned 45 degrees. */
-    spreadTo:1.45, spreadCap:70,
+    /* The gap is measured EDGE TO EDGE now. A centre distance cannot
+       express "a finger of table between them", because a die turned 45
+       degrees is 1.41 wide where a square-on one is 1.0 - the same centre
+       distance reads as touching or as roomy depending on the spin. Each
+       die's own footprint is measured from the yaw it landed on. */
+    gap:0.3, spreadCap:70,
     trayZ:1.7, wallPad:.3, restY:.5
   },
   _cannon:false,
@@ -15651,6 +15652,19 @@ var D3X={
         if(++over>140)break;
       }
     }
+    /* the squaring-up rotation per die, needed before the relax so the
+       footprint can be measured from the yaw each die actually landed on */
+    var rest=[];
+    for(var q0=0;q0<N;q0++){
+      var bq0=bodies[q0].quaternion;
+      var got0=this._upAxis(bq0);
+      var n0=this.FACE[got0][2];
+      var w0v=bq0.vmult(new CANNON.Vec3(n0[0],n0[1],n0[2]));
+      rest.push({got:got0,
+        flat:new THREE.Quaternion().setFromUnitVectors(
+          new THREE.Vector3(w0v.x,w0v.y,w0v.z).normalize(),
+          new THREE.Vector3(0,1,0))});
+    }
     /* Nobody likes dice kissing. Forces cannot fix this once they are
        resting - the lane spring just fights back and it deadlocks - so the
        resting positions are relaxed directly along the line, and the
@@ -15664,14 +15678,32 @@ var D3X={
     rest2.sort(function(a,b){return a.x-b.x;});
     /* the wanted spacing has to fit on screen: asking for more than the
        row can hold made the clamp below stack dice on top of each other */
-    var want=P.spreadTo;
-    if(P.limitX&&N>1)want=Math.min(want,(2*P.limitX)/(N-1));
+    /* half-width of each die along the row, from the yaw it landed on:
+       a square of side 1 turned by y measures |cos y| + |sin y| across */
+    var ext=[];
+    for(var e1=0;e1<N;e1++){
+      var rq=rest[e1].flat.clone()
+        .multiply(new THREE.Quaternion(frames[frames.length-1][e1].qx,
+          frames[frames.length-1][e1].qy,frames[frames.length-1][e1].qz,
+          frames[frames.length-1][e1].qw));
+      var ey=new THREE.Euler().setFromQuaternion(rq,'YXZ').y;
+      ext[e1]=(Math.abs(Math.cos(ey))+Math.abs(Math.sin(ey)))/2;
+    }
+    /* shrink the gap if the row genuinely cannot hold it */
+    var gap=P.gap;
+    if(P.limitX&&N>1){
+      var need=0;
+      for(var e2=0;e2<N;e2++)need+=2*ext[e2];
+      var room=2*P.limitX+ext[0]+ext[N-1]-need;
+      if(room<gap*(N-1))gap=Math.max(0.06,room/(N-1));
+    }
     for(var pass=0;pass<60;pass++){
       var moved=false;
       for(var oi=1;oi<N;oi++){
+        var needIJ=ext[rest2[oi-1].i]+ext[rest2[oi].i]+gap;
         var gapNow=rest2[oi].x-rest2[oi-1].x;
-        if(gapNow<want){
-          var push=(want-gapNow)/2;
+        if(gapNow<needIJ){
+          var push=(needIJ-gapNow)/2;
           rest2[oi-1].x-=push;rest2[oi].x+=push;moved=true;
         }
       }
@@ -15706,20 +15738,9 @@ var D3X={
       var row=frames[fi];
       for(var k5=0;k5<N;k5++)row[k5].x+=(want[k5]-fin[k5].x)*w2;
     }
-    /* read what landed, then relabel so the game's numbers are on top */
-    var rest=[];
-    for(var k4=0;k4<N;k4++){
-      var bq=bodies[k4].quaternion;
-      var got=this._upAxis(bq);
-      /* a die that stopped a few degrees off flat never reads clean. Tip
-         it the minimum amount to sit square - this keeps its yaw, so the
-         row stays as randomly turned as it landed. */
-      var n=this.FACE[got][2];
-      var w=bq.vmult(new CANNON.Vec3(n[0],n[1],n[2]));
-      var flat=new THREE.Quaternion().setFromUnitVectors(
-        new THREE.Vector3(w.x,w.y,w.z).normalize(),new THREE.Vector3(0,1,0));
-      rest.push({got:got,fix:this._relabel(got,values[k4]),flat:flat});
-    }
+    /* relabel so the game's numbers end up on top (the squaring-up
+       rotation was computed before the relax, which needed the yaws) */
+    for(var k4=0;k4<N;k4++)rest[k4].fix=this._relabel(rest[k4].got,values[k4]);
     return {steps:it,frames:frames,rest:rest,slotX:slotX};
   },
 
@@ -15737,7 +15758,7 @@ var D3X={
   /* Denis's outline colours per die type; anything not listed falls back to
      the painted dice's own OUT table */
   OUTCOL:{bone:'#291d11', amber:'#3f1000'},
-  OUT_DARK:0.72, OUT_SAT:1.45,
+  OUT_DARK:0.42, OUT_SAT:1.6,
   /* selection: the same hull trick, thicker and gold, so the ring hugs the
      die silhouette wherever physics has left it - a box drawn on the DOM
      host cannot, now that the dice sit at angles */
@@ -15748,7 +15769,7 @@ var D3X={
     var c=document.createElement('canvas');c.width=c.height=64;
     var x=c.getContext('2d'),im=x.createImageData(64,64);
     for(var i=0;i<64*64;i++){
-      var v=200+((Math.random()*55)|0);
+      var v=150+((Math.random()*105)|0);/* coarser tooth */
       im.data[i*4]=im.data[i*4+1]=im.data[i*4+2]=v;im.data[i*4+3]=255;
     }
     x.putImageData(im,0,0);
@@ -15777,6 +15798,85 @@ var D3X={
     return grp;
   },
 
+  /* ═══ selection glow: a soft bloom around the die's real silhouette with
+     a crisp line of the same colour. Screen space, so it reads the same
+     whatever angle the die landed at. ═══ */
+  GLOW:{blur:11, inner:5, spread:0.62, line:2.2, bleed:0.3},
+  _glowCv:function(){
+    var sc=document.getElementById('screen-match');
+    if(!sc)return null;
+    var cv=document.getElementById('dgCanvas');
+    if(!cv){
+      cv=document.createElement('canvas');cv.id='dgCanvas';
+      cv.style.cssText='position:absolute;inset:0;width:100%;height:100%;'
+        +'pointer-events:none;z-index:3';
+      sc.appendChild(cv);
+    }
+    return cv;
+  },
+  /* the die's 8 corners projected to screen space, gift-wrapped */
+  _hullOf:function(d,sc){
+    var mr=this.mount&&this.mount.getBoundingClientRect();
+    if(!mr)return null;
+    d.obj.updateMatrixWorld(true);
+    var L=[[-.5,-.5,-.5],[.5,-.5,-.5],[-.5,.5,-.5],[.5,.5,-.5],
+           [-.5,-.5,.5],[.5,-.5,.5],[-.5,.5,.5],[.5,.5,.5]];
+    var pts=[];
+    for(var i=0;i<8;i++){
+      var v=new THREE.Vector3(L[i][0],L[i][1],L[i][2])
+        .applyMatrix4(d.obj.matrixWorld).project(this.cam);
+      pts.push([(v.x*.5+.5)*mr.width+(mr.left-sc.left),
+                (-v.y*.5+.5)*mr.height+(mr.top-sc.top)]);
+    }
+    var hull=[],start=0;
+    for(var a=1;a<8;a++)if(pts[a][0]<pts[start][0])start=a;
+    var cur=start,guard=0;
+    do{
+      hull.push(pts[cur]);
+      var next=(cur+1)%8;
+      for(var k=0;k<8;k++){
+        if(k===cur)continue;
+        var o=pts[cur],p1=pts[next],p2=pts[k];
+        if((p1[0]-o[0])*(p2[1]-o[1])-(p1[1]-o[1])*(p2[0]-o[0])<0)next=k;
+      }
+      cur=next;guard++;
+    }while(cur!==start&&guard<9);
+    return hull;
+  },
+  _drawGlow:function(){
+    var cv=this._glowCv();if(!cv)return;
+    var scEl=document.getElementById('screen-match');
+    var sc=scEl.getBoundingClientRect();
+    if(sc.width<10)return;
+    var dpr=Math.min(devicePixelRatio||1,2);
+    if(cv.width!==Math.round(sc.width*dpr)||cv.height!==Math.round(sc.height*dpr)){
+      cv.width=Math.round(sc.width*dpr);cv.height=Math.round(sc.height*dpr);
+    }
+    var x=cv.getContext('2d');
+    x.setTransform(dpr,0,0,dpr,0,0);
+    x.clearRect(0,0,sc.width,sc.height);
+    var self=this,G=this.GLOW;
+    this.dice.forEach(function(d){
+      if(!d.match||!d.obj.visible)return;
+      if(!d.chip.classList.contains('selected'))return;
+      var hull=self._hullOf(d,sc);if(!hull)return;
+      var path=function(){
+        x.beginPath();
+        hull.forEach(function(p,i){if(i)x.lineTo(p[0],p[1]);else x.moveTo(p[0],p[1]);});
+        x.closePath();
+      };
+      x.save();
+      x.fillStyle=self.SEL_COL;
+      x.filter='blur('+G.blur+'px)';x.globalAlpha=G.spread;path();x.fill();
+      x.filter='blur('+G.inner+'px)';x.globalAlpha=G.spread*0.85;path();x.fill();
+      x.restore();
+      /* a little of it washes over the die itself, gently */
+      x.save();x.globalAlpha=G.bleed;x.fillStyle=self.SEL_COL;
+      x.filter='blur(2px)';path();x.fill();x.restore();
+      x.save();x.strokeStyle=self.SEL_COL;x.lineWidth=G.line;
+      x.lineJoin='round';x.globalAlpha=0.95;path();x.stroke();x.restore();
+    });
+  },
   _tableRoot:function(){
     if(!this._tbl){
       this._tbl=new THREE.Group();
@@ -16044,14 +16144,9 @@ var D3X={
     g.add(m);
     /* silhouette outline: a slightly fatter copy drawn back-faces-only */
     var out=this._mkOutline(mat);
-    out.scale.setScalar(1+this.OUTLINE);
+    /* a hand-inked line is never the same weight twice */
+    out.scale.setScalar(1+this.OUTLINE*(0.78+Math.random()*0.5));
     g.add(out);
-    /* and a thicker gold one outside it, shown only while selected */
-    var sel=this._mkOutline(mat,this.SEL_COL,false);
-    sel.scale.setScalar(1+this.SEL_W);
-    sel.visible=false;
-    g.add(sel);
-    g.userData.sel=sel;
     return g;
   },
   focus:null,FOV:40,FOV_MATCH:54,RISE_MATCH:20,MSCALE:0.77,_matchOn:false,
@@ -16276,8 +16371,6 @@ var D3X={
         if(!e||cr.width<1){d.obj.visible=false;return;}
         /* the flat blob is never right for a die the 3D layer is drawing */
         e._d3xOwned=true;
-        if(d.obj.userData.sel)
-          d.obj.userData.sel.visible=d.chip.classList.contains('selected');
         if(d.roll){
           /* physics owns this die: place it on the tilted table */
           var pose=D3X._physPose(d);
@@ -16360,6 +16453,7 @@ var D3X={
       }
     });
     r.render(this.scene,this.cam);
+    if(this._matchOn)try{this._drawGlow();}catch(e){}
 
   }
 };
