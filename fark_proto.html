@@ -2,9 +2,18 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<!-- NO viewport-fit=cover, and an OPAQUE status bar. Together those two are
+     what pushed the game up under the status bar on standalone iOS and left
+     the ~47px band at the bottom: WebKit hands the page a surface that
+     reaches the top of the display but reports a height short of it. The
+     layout then differed from every other browser, which makes authoring
+     anything by percentage - prop templates especially - guesswork.
+     Without them the web view starts below the status bar, the viewport is
+     the whole of it, and every env(safe-area-inset-*) resolves to 0, so the
+     max()/calc() fallbacks throughout fall back to their design values. -->
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="assets/Menu_Art/iOS icon.png">
 <meta name="theme-color" content="#1e120a">
@@ -113,13 +122,12 @@ body{
   -webkit-font-smoothing:none;
 }
 @supports (height:100dvh){body{height:100dvh}}
-/* standalone iOS clips its render surface ~47px short at the bottom
-   (WebKit bug with black-translucent + cover). The game stays inside the
-   real viewport; the vignettes below fade the bottom edge to near-black
-   so the system band blends instead of reading as a crop. */
-html.fkSA #hsStage::after{background:linear-gradient(to top,#060402 0%,#060402 6%,rgba(6,4,2,.85) 34%,rgba(6,4,2,0) 100%)}
-html.fkSA #ptStage::after{background:linear-gradient(to top,#060402 0%,#060402 6%,rgba(6,4,2,.85) 34%,rgba(6,4,2,0) 100%) !important}
-html.fkSA #gbSheet,html.fkSA #peekSheet{padding-bottom:env(safe-area-inset-bottom)}
+/* The heavy bottom vignettes that used to live here existed only to blend
+   the ~47px system band that black-translucent + viewport-fit=cover left
+   below the game. There is no band now, so fading the bottom of the screen
+   to near-black would just be darkening the table for nothing.
+   `fkSA` is still set, for anything that needs to know it is installed. */
+html.fkSA #gbSheet,html.fkSA #peekSheet{padding-bottom:env(safe-area-inset-bottom,0px)}
 
 /* ─── TOP BAR ─── */
 .top-bar{

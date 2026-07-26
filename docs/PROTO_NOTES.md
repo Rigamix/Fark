@@ -3905,3 +3905,30 @@ a phantom bug that has now cost two rounds.
 The lab's download button POSTs there first and falls back to a download if no
 server is listening. Verified: valid save 200, unknown target 404, path
 traversal 404, oversize 413, static serving unaffected.
+
+## P211 — the game lives in the ordinary viewport again
+
+P60 (13 July) chose to live inside standalone iOS's real render surface and
+fade the bottom edge to near-black, because `black-translucent` +
+`viewport-fit=cover` hands the page a surface that reaches the top of the
+display but reports a height short of it. That is the raised game and the
+blank band at the bottom — and it means the installed app's layout does not
+match any other browser's, which makes authoring anything by percentage
+(prop templates above all) guesswork.
+
+Both meta tags are gone: no `viewport-fit=cover`, and the status bar is
+opaque `black`. The web view now starts below the status bar and the viewport
+is all of it. Every `env(safe-area-inset-*)` resolves to 0, so the
+`max()` / `calc()` fallbacks scattered through the CSS fall back to their
+design values — verified: `max(1.8%, env(safe-area-inset-top))` resolves to
+12.44px against a 691px stage, which is 1.8% exactly.
+
+The two `html.fkSA` stage vignettes went with it. They existed only to blend
+that band; with no band they would just be darkening the bottom of the table.
+The base `#hsStage::after` / `#ptStage::after` vignettes are untouched —
+confirmed the computed background is the base
+`rgba(6,4,2,.8) -> rgba(6,4,2,0)` and not the near-black override. `fkSA` is
+still applied, for anything that wants to know it is installed.
+
+**Not verified on device.** Everything here is the browser side of it; the
+band itself only exists in the installed iOS app.
