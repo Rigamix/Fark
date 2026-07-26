@@ -15380,9 +15380,6 @@ var D3X={
   SKINS:{},/* filled from assets/models/dice/skins.js (base64, file:// safe) */
   /* put one material's art on EVERY die (a look-see); null = per material */
   SKIN_ALL:null,
-  /* specular strength + gloss, matching the texture lab's defaults so what
-     is painted there is what ships */
-  SPEC:{color:0x736e66,shininess:30},
   /* dice that just bounced do not sit in a ruler-straight row. Scatter
      where each one comes to rest (in die-widths); the engine's own
      neighbour shove then stops them overlapping, so the line stays
@@ -15418,7 +15415,6 @@ var D3X={
       });
     };
     if(def.map)take('map',def.map,true);
-    if(def.spec)take('spec',def.spec,false);
     if(def.normal)take('normal',def.normal,false);
     if(!any)this._sk[key]=out;
     return null;
@@ -15439,12 +15435,8 @@ var D3X={
     if(sk&&sk.map){
       m.map=sk.map;
       m.color=new THREE.Color(0xffffff);/* as painted */
-      m.specularMap=sk.spec||null;
-      m.specular=new THREE.Color(sk.spec?this.SPEC.color:0x000000);
-      m.shininess=sk.spec?this.SPEC.shininess:0;
     }else{
       m.color=new THREE.Color(this.MATCOL[mat]||this.MATCOL.bone);
-      m.specular=new THREE.Color(0x000000);m.shininess=0;
     }
     m.needsUpdate=true;
   },
@@ -15516,7 +15508,7 @@ var D3X={
        overlap, so settle is followed by a bounded spread phase that keeps
        stepping until there is a real gap. Recorded like any other frame,
        so the nudge plays back rather than snapping. */
-    spreadTo:1.5, spreadCap:70,
+    spreadTo:1.75, spreadCap:70,
     trayZ:1.7, wallPad:.3, restY:.5
   },
   _cannon:false,
@@ -15666,22 +15658,20 @@ var D3X={
       rest2.push({x:bodies[r1].position.x,i:r1});
     }
     rest2.sort(function(a,b){return a.x-b.x;});
+    /* the wanted spacing has to fit on screen: asking for more than the
+       row can hold made the clamp below stack dice on top of each other */
+    var want=P.spreadTo;
+    if(P.limitX&&N>1)want=Math.min(want,(2*P.limitX)/(N-1));
     for(var pass=0;pass<60;pass++){
       var moved=false;
       for(var oi=1;oi<N;oi++){
         var gapNow=rest2[oi].x-rest2[oi-1].x;
-        if(gapNow<P.spreadTo){
-          var push=(P.spreadTo-gapNow)/2;
+        if(gapNow<want){
+          var push=(want-gapNow)/2;
           rest2[oi-1].x-=push;rest2[oi].x+=push;moved=true;
         }
       }
       if(!moved)break;
-    }
-    /* keep every die inside the visible table: the relax can push the end
-       dice past the edge of the screen otherwise */
-    if(P.limitX){
-      for(var lc=0;lc<N;lc++)
-        rest2[lc].x=Math.max(-P.limitX,Math.min(P.limitX,rest2[lc].x));
     }
     /* keep the group centred on the slots it was aimed at */
     var cNow=0,cWant=0;
@@ -15689,6 +15679,12 @@ var D3X={
     var shift=(cWant-cNow)/N;
     var want=[];
     for(var w1=0;w1<N;w1++)want[rest2[w1].i]=rest2[w1].x+shift;
+    /* clamp AFTER the centring shift, not before - shifting a clamped row
+       just pushed the end dice back off screen */
+    if(P.limitX){
+      for(var lc=0;lc<N;lc++)
+        want[lc]=Math.max(-P.limitX,Math.min(P.limitX,want[lc]));
+    }
     var K=Math.min(16,frames.length);
     for(var fi=0;fi<K;fi++){
       var wgt=(fi+1)/K;wgt=1-Math.pow(1-wgt,3);
@@ -16019,10 +16015,11 @@ var D3X={
     m.traverse(function(o){
       if(o.isMesh){
         var src=o.material;
-        o.material=new THREE.MeshPhongMaterial({
-          map:src.map||null,normalMap:null,/* Denis: no normals at all */
-          color:new THREE.Color(col),specular:0x000000,shininess:0,
-          reflectivity:0});
+        /* Lambert, not Phong: diffuse only, so there is no specular term
+           to leak back in - the painted dice never had a highlight and the
+           3D ones were reading as too CG. */
+        o.material=new THREE.MeshLambertMaterial({
+          map:src.map||null,color:new THREE.Color(col)});
         self._dress(o.material,mat,sk);
       }
     });

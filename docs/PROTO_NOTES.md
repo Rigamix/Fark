@@ -3329,3 +3329,34 @@ in a live match: 6/6 dice settled, faces correct, all six skipped by the
 legacy loop (`D3.draw` for them costs 0.000 ms), all six slots hidden, frame
 time 0.21 ms (was 0.24).
 
+## P189 — tighter edges, no specular anywhere, dice stop bunching
+
+**Tighter model.** The bevel was 25% of the half-size, which is what made the
+die read soft. Now 8%. The mesh is not regenerated but RESHAPED: every vertex
+sits at `P = a + r*dir` with `a` on the core box, so shrinking the round-over
+is just recomputing that with a smaller r and a larger core. Topology, the
+vertex ring at the seam and the six-island unwrap all survive. Overall size
+is unchanged to six decimals.
+
+The art is remapped rather than left to shift. The flat face now takes
+**93.6%** of each island, up from 79.3%, so a straight copy would have left
+the pips looking ~14% small. The remap is piecewise linear in island space —
+flat to flat, curve to curve — so pips keep the size they were painted at.
+Both bone and amber were rebuilt from Denis's PNG sources.
+
+**No specular.** The die material is `MeshLambertMaterial` now, not Phong —
+Lambert has no specular term at all, so there is nothing to leak back in.
+`SPEC` and the spec-map plumbing are deleted with it.
+
+**Bunching.** `spreadTo` 1.5 -> 1.75, but that alone made it worse: six dice
+at 1.75 need 8.75 die-widths and the row only has 8.26, so the on-screen
+clamp stacked them on top of each other (measured: two dice at an identical
+x). Two fixes — the wanted spacing is now capped at what the row can actually
+hold, `(2*limitX)/(N-1)`, and the clamp runs AFTER the centring shift instead
+of before, since shifting a clamped row just pushed the end dice back off.
+
+Measured over 20 rolls at each count, with the real screen limit:
+- 6 dice: 0 wrong faces, **0 offscreen**, gaps 1.39-1.65 median
+- 3 and 2 dice: 0 wrong, 0 offscreen, a clean 1.75 every time
+- worst-case silhouette overlap 1 pair in 300, at 45 degrees to each other
+
