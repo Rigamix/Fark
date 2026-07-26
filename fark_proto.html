@@ -14621,10 +14621,24 @@ function _matchDress(isBoss){
   /* a hand-made template wins over the procedural dressing, used exactly
      as saved: same order, same offsets, nothing nudged */
   if(window.FK_PROP_TEMPLATES&&FK_PROP_TEMPLATES.length){
-    var _tpl=FK_PROP_TEMPLATES[(rnd()*FK_PROP_TEMPLATES.length)|0];
+    var _pool=FK_PROP_TEMPLATES;
+    /* Lives HERE, not in prop_templates.js: that file gets replaced wholesale
+       every time a fresh one is downloaded out of the lab, and the pin would
+       go with it. */
+    if(window.FK_PROP_PIN===undefined)window.FK_PROP_PIN='001';
+    /* FK_PROP_PIN: dress every table with this one template instead of
+       picking at random. Set it to null to go back to variety. */
+    if(window.FK_PROP_PIN){
+      var _hit=_pool.filter(function(t){return t&&t.name===window.FK_PROP_PIN;});
+      /* named entries are new; a file exported before that is a bare array
+         with the name only in a comment, so fall back to the first one */
+      _pool=_hit.length?_hit:[_pool[0]];
+    }
+    var _tpl=_pool.length===1?_pool[0]:_pool[(rnd()*_pool.length)|0];
     var _tp=(_tpl&&_tpl.props)||_tpl;
     if(_tp&&_tp.length)placed=_tp.map(function(q){
-      return {n:q.n,x:+q.x,y:+q.y,w:+q.w,rot:+(q.rot||0)};});
+      return {n:q.n,x:+q.x,y:+q.y,w:+q.w,rot:+(q.rot||0),
+              fx:+(q.fx||1),fy:+(q.fy||1)};});
   }
   var _jobs=window._shJobs=[];
   placed.forEach(function(q){
@@ -14632,7 +14646,7 @@ function _matchDress(isBoss){
     var img=document.createElement('img');
     img.src=PP+q.n+'.png?v=2';
     img.style.cssText='left:'+q.x.toFixed(1)+'%;top:'+q.y.toFixed(1)+'%;width:'+w.toFixed(1)+'%;'
-      +'transform:rotate('+q.rot+'deg)';
+      +'transform:rotate('+q.rot+'deg) scale('+(q.fx||1)+','+(q.fy||1)+')';
     pr.appendChild(img);
     /* silhouette shadow job: offset radially away from the overhead
        light centre (50%/44%); drawn on the shadow canvas */
@@ -14644,7 +14658,7 @@ function _matchDress(isBoss){
     var mag=Math.max(0.7,len*0.045);
     var ox=dx/len*mag,oy=(dy/len*mag)/1.9;
     _jobs.push({src:PP+q.n+'.png?v=2',x:+(q.x+ox).toFixed(2),y:+(q.y+oy).toFixed(2),
-      w:+(w*1.1).toFixed(1),rot:q.rot,a:a,
+      w:+(w*1.1).toFixed(1),rot:q.rot,fx:q.fx||1,fy:q.fy||1,a:a,
       ux:+(dx/len).toFixed(3),uy:+((dy/len)/1.9).toFixed(3),
       bl:+Math.min(1.6,0.4+len*0.02).toFixed(2)});
   });

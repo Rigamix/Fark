@@ -3782,3 +3782,33 @@ twice over: the rows have a group each now, and a die with no physics pose is
 parented straight to the scene. `match` + `visible` is the real question and
 the silhouette is projected through the camera either way. Measured 1060 ink
 pixels under the kept line where there were 0.
+
+## P205 — one named template, pinned
+
+Denis saved a dressing called **001** and wants every table to use it. Two
+things were in the way.
+
+**Templates had no names.** The lab's export wrote the name as a *comment* and
+the entry as a bare array, so nothing downstream could tell one from another.
+It emits `{name:"001",props:[...]}` now. The game already read `_tpl.props`,
+so a file exported the old way still loads — it just cannot be pinned by name,
+and falls back to the first entry.
+
+**`FK_PROP_PIN`** names the one template to dress with; `null` goes back to
+picking from the list. It lives in `fark_proto.html`, **not** in
+`prop_templates.js`, because that file gets replaced wholesale every time a
+fresh one is downloaded out of the lab and the pin would go with it.
+
+Verified against three stand-in templates: pin `001` gave the same three props
+five times out of five, pin `002` gave the candle, and a name that is not in
+the file fell back to the first entry. With the pin off, selection is seeded
+per match — same dressing across redraws within a match, which is the existing
+behaviour, not something this changed.
+
+**Flips reach the game.** The lab could mirror a prop but the game ignored
+`fx`/`fy`, so a mirrored prop came out unmirrored and its shadow with it. Both
+the `<img>` transform and the shadow job carry them now: measured
+`bread.png | rotate(-8deg) scale(-1, 1)` with a matching `fx-1` on the job.
+
+`assets/prop_templates.js` is still an empty array — the game falls back to
+procedural placement until the real file is dropped in.
