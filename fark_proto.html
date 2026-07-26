@@ -1013,6 +1013,9 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 #screen-match #keptTray .kept-pts{font-family:'JMH Beda',serif;font-size:3.6cqw;color:#f0e3c6;
   letter-spacing:.06em;text-shadow:0 2px 0 rgba(16,9,3,.75);background:none;border:none;padding:0 0 0 1.6cqw}
 #keptTray.bust-wipe .die:not(.d3on){filter:grayscale(1) brightness(.6)}
+/* NB the kept dice are drawn on the WebGL canvas, so a filter here would
+   reach nothing - D3X reads this class and pushes the tint instead */
+.kept-total.bust-wipe{animation:keptWipe .45s ease-in forwards}
 #keptTray.bust-wipe .kept-pts{animation:keptWipe .45s ease-in forwards}
 @keyframes keptWipe{to{opacity:0;transform:translateY(4px) scale(.8)}}
 /* concept scoring tags: medieval numbers under the selected dice */
@@ -1154,6 +1157,19 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 #screen-match .opp-dice-row{gap:3cqw}
 #screen-match .die.sm{width:8.7cqw;height:8.7cqw}
 #screen-match #diceArea{--sp-before:1.75;--sp-after:1.75}
+/* the kept line: smaller dice, close together, and the turn total under it */
+#screen-match .kept-zone{padding-top:2.6cqw}
+/* A flex gap cannot go negative, and it has to: the 3D die is drawn at 0.77
+   of its DOM box, so touching boxes still leave a third of a die of air.
+   Overlap the boxes instead - Denis wants a tight line. */
+#screen-match .kept-row{min-height:9cqw}
+#screen-match .kept-row .die-wrap+.die-wrap{margin-left:-1.1cqw}
+#screen-match .kept-row .die{width:8.6cqw;height:8.6cqw}
+#screen-match .kept-total{font-size:5cqw;margin-top:0.4cqw}
+/* a kept die is out of play: no tap pop, no float, no selection anything */
+#screen-match .kept-row .die{cursor:default!important;animation:none!important}
+html.fk3d #screen-match .kept-row .die-wrap::before,
+html.fk3d #screen-match .kept-row .die-wrap::after{display:none!important}
 /* ═══ iOS safe areas — art bleeds under the notch, HUD steps clear ═══ */
 #ptHearts{top:max(1.8%,env(safe-area-inset-top))}
 #ptGold{top:max(1.8%,env(safe-area-inset-top))}
@@ -2095,6 +2111,33 @@ html.fk3d #screen-match .die-wrap:has(.die.d3on.selected)::after{
   display:flex;flex-wrap:nowrap;gap:clamp(4px,1.8vw,8px);
   justify-content:center;align-items:center;
   flex-shrink:0;overflow:visible;
+}
+
+/* the scored dice, in their own line below the throwing row. The height is
+   RESERVED, not grown into: letting it size to its contents made the whole
+   throwing row hop upward the moment the first die was kept. */
+/* Hangs BELOW the throwing row instead of sitting under it in the flow. In
+   the flow it stole 24px of height from a zone that is already pinned to the
+   bottom of its content box, so the throwing row rode up out of the candle
+   pool - and Denis had asked for it lower, not higher. The space it hangs
+   into is .dice-area's bottom padding, which is otherwise empty. */
+.kept-zone{
+  position:absolute;top:100%;left:0;width:100%;
+  display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
+  pointer-events:none;
+}
+.kept-row{
+  display:flex;flex-wrap:nowrap;justify-content:center;align-items:center;
+  flex-shrink:0;overflow:visible;pointer-events:none;
+}
+.kept-total{
+  font-family:'JMH Beda',serif;color:#e0b877;white-space:nowrap;
+  text-shadow:0 2px 0 rgba(38,20,6,.9);
+}
+.sel-fly{
+  position:absolute;z-index:7;pointer-events:none;white-space:nowrap;
+  font-family:'JMH Beda',serif;color:#ffd98a;
+  text-shadow:0 0 12px rgba(255,190,90,.7),0 2px 0 rgba(58,32,8,.85);
 }
 
 /* ─── DIE STYLES ─── */
@@ -8092,6 +8135,13 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
     </div>
     <!-- Player dice row -->
     <div class="player-dice-row" id="playerDiceRow"></div>
+    <!-- Scored dice drop out of the row into this one, with the turn total
+         under them. Fixed height so the throwing row never moves when the
+         first die lands in it. -->
+    <div class="kept-zone" id="keptZone">
+      <div class="kept-row" id="keptRow"></div>
+      <div class="kept-total" id="keptTotal"></div>
+    </div>
   </div>
 
   <!-- Bottom spacer reduced to flex:0 — dice naturally sit at the bottom of
@@ -15622,10 +15672,25 @@ var D3X={
       if(o.q)b.quaternion.set(o.q.x,o.q.y,o.q.z,o.q.w);
       world.add(b);
     });
+    /* A die aimed at a slot a kept die already occupies lands ON it and
+       stays there - measured y=1.46 against a table at 0.48. Nudge the drop
+       point clear of anything static before it is ever thrown. */
+    var clearOf=function(x){
+      for(var t=0;t<6;t++){
+        var worst=0,dir=0;
+        (obstacles||[]).forEach(function(o){
+          var dxo=x-o.x,ad=Math.abs(dxo);
+          if(ad<1.05&&(1.05-ad)>worst){worst=1.05-ad;dir=(dxo>=0?1:-1);}
+        });
+        if(!worst)break;
+        x+=dir*worst;
+      }
+      return Math.max(-halfW,Math.min(halfW,x));
+    };
     for(var i=0;i<N;i++){
       var b=new CANNON.Body({mass:1,material:mDie,
         shape:new CANNON.Box(new CANNON.Vec3(HALF*.96,HALF*.96,HALF*.96))});
-      b.position.set(slotX[i]+(Math.random()*.2-.1),P.restY+1.7+(i%3)*.35,.75+Math.random()*.25);
+      b.position.set(clearOf(slotX[i])+(Math.random()*.2-.1),P.restY+1.7+(i%3)*.35,.75+Math.random()*.25);
       b.velocity.set(Math.random()*1-.5,-2-Math.random()*2,-(4.5+Math.random()*2.2));
       b.angularVelocity.set(-(8+Math.random()*10),Math.random()*8-4,Math.random()*10-5);
       var q=new CANNON.Quaternion();
@@ -15634,7 +15699,7 @@ var D3X={
       b.linearDamping=.1;b.angularDamping=.1;
       world.add(b);bodies.push(b);
     }
-    var frames=[],it=0,over=0,boostFrom=-1;
+    var frames=[],it=0,over=0,boostFrom=-1,still=0;
     var settled=function(){
       for(var k=0;k<N;k++){
         if(bodies[k].velocity.norm()>P.stopV||bodies[k].angularVelocity.norm()>P.stopW)return false;
@@ -15670,6 +15735,20 @@ var D3X={
         qx:bodies[k2].quaternion.x,qy:bodies[k2].quaternion.y,
         qz:bodies[k2].quaternion.z,qw:bodies[k2].quaternion.w});
       frames.push(fr);it++;
+      /* Cannon's velocity test never fires for a die wedged against a static
+         body: it buzzes under the threshold and the solve runs to the cap.
+         Stop on actual displacement instead - 14 frames of nothing moving is
+         a stopped die whatever the solver thinks. */
+      if(frames.length>1){
+        var mvx=0,pf=frames[frames.length-2];
+        for(var m1=0;m1<N;m1++){
+          var dm=Math.abs(fr[m1].x-pf[m1].x)+Math.abs(fr[m1].y-pf[m1].y)
+                +Math.abs(fr[m1].z-pf[m1].z);
+          if(dm>mvx)mvx=dm;
+        }
+        still=(mvx<0.0025)?still+1:0;
+        if(still>=14&&it>36)break;
+      }
       if(settled()){
         var anyCocked=false;
         for(var k3=0;k3<N;k3++)if(this._cocked(bodies[k3].quaternion)){anyCocked=true;break;}
@@ -15698,7 +15777,7 @@ var D3X={
        sliding the last few pixels home. */
     var fin=[],rest2=[];
     for(var r1=0;r1<N;r1++){
-      fin.push({x:bodies[r1].position.x});
+      fin.push({x:bodies[r1].position.x,y:bodies[r1].position.y});
       rest2.push({x:bodies[r1].position.x,i:r1});
     }
     rest2.sort(function(a,b){return a.x-b.x;});
@@ -15715,45 +15794,125 @@ var D3X={
       var ey=new THREE.Euler().setFromQuaternion(rq,'YXZ').y;
       ext[e1]=(Math.abs(Math.cos(ey))+Math.abs(Math.sin(ey)))/2;
     }
-    /* shrink the gap if the row genuinely cannot hold it */
-    var gap=P.gap;
-    if(P.limitX&&N>1){
-      var need=0;
-      for(var e2=0;e2<N;e2++)need+=2*ext[e2];
-      var room=2*P.limitX+ext[0]+ext[N-1]-need;
-      if(room<gap*(N-1))gap=Math.max(0.06,room/(N-1));
-    }
-    for(var pass=0;pass<60;pass++){
-      var moved=false;
-      for(var oi=1;oi<N;oi++){
-        var needIJ=ext[rest2[oi-1].i]+ext[rest2[oi].i]+gap;
-        var gapNow=rest2[oi].x-rest2[oi-1].x;
-        if(gapNow<needIJ){
-          var push=(needIJ-gapNow)/2;
-          rest2[oi-1].x-=push;rest2[oi].x+=push;moved=true;
-        }
+    /* The dice that are STAYING on this table are part of the row, not
+       empty space. The relax used to run over the thrown dice alone, so it
+       would slide one straight onto a kept die - 61% of adjacent pairs came
+       out closer than 1.3 die-widths, worst 0.615. They go in as nodes that
+       everything else has to make room around but that never move. */
+    var node=[];
+    for(var r3=0;r3<N;r3++)node.push({x:rest2[r3].x,i:rest2[r3].i,e:ext[rest2[r3].i],fix:0});
+    (obstacles||[]).forEach(function(o){
+      var oyw=0;
+      if(o.q){
+        oyw=new THREE.Euler().setFromQuaternion(
+          new THREE.Quaternion(o.q.x,o.q.y,o.q.z,o.q.w),'YXZ').y;
       }
-      if(!moved)break;
+      node.push({x:o.x,i:-1,e:(Math.abs(Math.cos(oyw))+Math.abs(Math.sin(oyw)))/2,fix:1});
+    });
+    /* shrink the gap if the row genuinely cannot hold it. The ends are the
+       ends OF THE SORTED ROW - reading ext[0]/ext[N-1] took whichever dice
+       happened to be first and last in throw order. */
+    var gap=P.gap;
+    if(P.limitX&&node.length>1){
+      var span=0;
+      node.forEach(function(n0){span+=2*n0.e;});
+      var srt=node.slice().sort(function(a,b){return a.x-b.x;});
+      var room=2*P.limitX+srt[0].e+srt[srt.length-1].e-span;
+      if(room<gap*(node.length-1))gap=Math.max(0.06,room/(node.length-1));
     }
-    /* keep the group centred on the slots it was aimed at */
-    var cNow=0,cWant=0;
-    for(var c1=0;c1<N;c1++){cNow+=rest2[c1].x;cWant+=slotX[c1];}
-    var shift=(cWant-cNow)/N;
+    var relax=function(){
+      for(var pass=0;pass<80;pass++){
+        node.sort(function(a,b){return a.x-b.x;});
+        var moved=false;
+        for(var oi=1;oi<node.length;oi++){
+          var A=node[oi-1],B=node[oi];
+          var needIJ=A.e+B.e+gap,gapNow=B.x-A.x;
+          if(gapNow>=needIJ)continue;
+          var push=needIJ-gapNow;
+          if(A.fix&&B.fix)continue;
+          if(A.fix)B.x+=push;
+          else if(B.fix)A.x-=push;
+          else {A.x-=push/2;B.x+=push/2;}
+          moved=true;
+        }
+        if(!moved)break;
+      }
+    };
+    relax();
+    /* keep the group centred on the slots it was aimed at - but only when
+       the table is empty. With kept dice on it THEY are the anchor, and
+       sliding the thrown ones sideways just walks them back into contact. */
     var want=[];
-    for(var w1=0;w1<N;w1++)want[rest2[w1].i]=rest2[w1].x+shift;
-    /* clamp AFTER the centring shift, not before - shifting a clamped row
-       just pushed the end dice back off screen */
-    if(P.limitX){
-      for(var lc=0;lc<N;lc++)
-        want[lc]=Math.max(-P.limitX,Math.min(P.limitX,want[lc]));
+    if(!(obstacles&&obstacles.length)){
+      var cNow=0,cWant=0;
+      node.forEach(function(n1){cNow+=n1.x;});
+      for(var c1=0;c1<N;c1++)cWant+=slotX[c1];
+      var shift=(cWant-cNow)/N;
+      node.forEach(function(n2){n2.x+=shift;});
     }
+    /* Fit the row to the frame. A hard clamp per die is what used to stack
+       them: it pulls the two end dice back onto their neighbours and calls
+       it done. Slide the row in first, and only if it STILL will not fit
+       squeeze it evenly about its centre - every die loses a little gap
+       instead of two dice losing all of theirs.
+       limitX is the furthest a CENTRE may sit, which leaves 0.75 of a die
+       width of margin, so the real edge bound is limitX + 0.75. */
+    if(P.limitX&&!(obstacles&&obstacles.length)){
+      var edge=P.limitX+0.55;/* 0.2 of a die of air, not flush to the bezel */
+      for(var ft=0;ft<3;ft++){
+        var lo=Infinity,hi=-Infinity;
+        node.forEach(function(n3){
+          if(n3.x-n3.e<lo)lo=n3.x-n3.e;
+          if(n3.x+n3.e>hi)hi=n3.x+n3.e;
+        });
+        var mid2=(lo+hi)/2;
+        if(hi-lo<=2*edge){
+          /* It fits. Slide it ONLY as far as it takes to get back on screen -
+             re-centring it on the table would undo the centring above, which
+             aims at the DOM slots. A single die rerolled on its own was being
+             dragged to mid-table and landing on its neighbour. */
+          var slide=0;
+          if(hi>edge)slide=edge-hi;
+          else if(lo<-edge)slide=-edge-lo;
+          if(slide)node.forEach(function(n4){n4.x+=slide;});
+          break;
+        }
+        var k6=(2*edge)/(hi-lo);
+        node.forEach(function(n5){n5.x=(n5.x-mid2)*k6;});
+      }
+    }else if(P.limitX){
+      node.forEach(function(n3){
+        if(!n3.fix)n3.x=Math.max(-P.limitX,Math.min(P.limitX,n3.x));
+      });
+      relax();
+    }
+    node.forEach(function(n4){if(!n4.fix)want[n4.i]=n4.x;});
+    /* a die that came to rest ON a kept die is put back on the table; the
+       relax above has already moved it clear in x, so it reads as sliding
+       off rather than sinking through */
+    var wantY=[];
+    for(var y1=0;y1<N;y1++)
+      wantY[y1]=(fin[y1].y>P.restY+0.3)?P.restY:fin[y1].y;
     /* Blend the correction in WHILE THE DICE ARE STILL TUMBLING, not over
        the last frames - applied at the end it reads as the dice sliding
-       into place, which is exactly the tell we are trying to avoid. It is
-       fully applied by ~65% of the flight, so the whole settle happens at
-       the corrected positions and nothing moves once they are down. */
-    var total=frames.length;
-    var fa=Math.floor(total*0.22),fb=Math.floor(total*0.62);
+       into place, which is exactly the tell we are trying to avoid.
+       The window is anchored to the frame the motion ACTUALLY dies at. It
+       used to be a flat 22%..62% of the total, which is fine for a clean
+       throw but not for one that jams: a 649-frame solve put the end of the
+       blend at frame 402, so the dice were still being slid around nearly
+       seven seconds after they looked settled. */
+    var total=frames.length,qf=total-1;
+    for(var qi=total-1;qi>1;qi--){
+      var mv=0;
+      for(var q2=0;q2<N;q2++){
+        var a3=frames[qi-1][q2],b3=frames[qi][q2];
+        var dq=Math.abs(b3.x-a3.x)+Math.abs(b3.y-a3.y)+Math.abs(b3.z-a3.z);
+        if(dq>mv)mv=dq;
+      }
+      if(mv>0.02){qf=qi;break;}
+    }
+    var fb=Math.max(4,Math.min(total-1,qf));
+    var fa=Math.floor(fb*0.35);
     if(fb<=fa)fb=Math.min(total-1,fa+1);
     for(var fi=0;fi<total;fi++){
       var w2;
@@ -15762,7 +15921,10 @@ var D3X={
       else {var tt=(fi-fa)/(fb-fa);w2=tt*tt*(3-2*tt);}
       if(!w2)continue;
       var row=frames[fi];
-      for(var k5=0;k5<N;k5++)row[k5].x+=(want[k5]-fin[k5].x)*w2;
+      for(var k5=0;k5<N;k5++){
+        row[k5].x+=(want[k5]-fin[k5].x)*w2;
+        row[k5].y+=(wantY[k5]-fin[k5].y)*w2;
+      }
     }
     /* relabel so the game's numbers end up on top (the squaring-up
        rotation was computed before the relax, which needed the yaws) */
@@ -16015,7 +16177,17 @@ var D3X={
     x.drawImage(g,0,0,sc.width,sc.height);
     x.restore();
   },
-  _tableRoot:function(){
+  /* ONE GROUP PER ROW. This used to be a single shared group whose position
+     and scale were written per die inside the frame loop, so with two rows
+     on screen the last die iterated decided where both of them sat. */
+  _tableRoot:function(key){
+    key=key||'playerDiceRow';
+    this._tbls=this._tbls||{};
+    if(this._tbls[key])return this._tbls[key];
+    if(key!=='playerDiceRow'){
+      var g2=new THREE.Group();this.scene.add(g2);
+      return (this._tbls[key]=g2);
+    }
     if(!this._tbl){
       this._tbl=new THREE.Group();
       /* a shadow catcher lying on the table: invisible except where a die
@@ -16033,7 +16205,37 @@ var D3X={
         this._key.target.position.set(0,0,0);this._tbl.add(this._key.target);}
       this.scene.add(this._tbl);
     }
-    return this._tbl;
+    return (this._tbls[key]=this._tbl);
+  },
+  /* how a kept die differs from a thrown one: smaller, and out of the
+     candle pool so darker and a touch warmer-dead */
+  TRAY:{dim:[0.54,0.47,0.40], ms:440},
+  /* remember where a die is on screen before its DOM slot moves out from
+     under it, so the drop has something to animate FROM */
+  toTray:function(el){
+    var d=null;this.dice.forEach(function(q){if(q.chip===el)d=q;});
+    if(!d||!this.mount)return;
+    d.obj.updateMatrixWorld(true);
+    var w=new THREE.Vector3();d.obj.getWorldPosition(w);
+    var sc=new THREE.Vector3();d.obj.getWorldScale(sc);
+    var mr=this.mount.getBoundingClientRect();
+    var p=w.clone().project(this.cam);
+    d.drop={t0:performance.now(),
+      x:(p.x*.5+.5)*mr.width, y:-((-p.y*.5+.5)*mr.height),
+      q:d.obj.quaternion.clone(), s:sc.x||1};
+  },
+  /* k=0 is the die as painted, k=1 is fully out of the light, and k>1 is the
+     bust wipe pushing it past that into the dark */
+  _trayTint:function(d,k){
+    var dm=this.TRAY.dim,c=function(v){return v<0?0:(v>1?1:v);};
+    d.obj.traverse(function(o){
+      if(!o.isMesh||!o.material||!o.material.color)return;
+      if(!o.userData.baseCol)o.userData.baseCol=o.material.color.clone();
+      var b=o.userData.baseCol;
+      o.material.color.setRGB(c(b.r*(1-k*(1-dm[0]))),
+                              c(b.g*(1-k*(1-dm[1]))),
+                              c(b.b*(1-k*(1-dm[2]))));
+    });
   },
   /* queue a match die's roll; the batch solves together next tick */
   _physQueue:function(e,val){
@@ -16083,10 +16285,20 @@ var D3X={
        must never be handed to this sim. */
     var obst=[];
     this.dice.forEach(function(d){
-      if(!d.match||!d.phys)return;
+      if(!d.match)return;
       if(b.dice.indexOf(d.chip._d3)>=0)return;
       if(self._rowKey(d)!==key)return;
-      obst.push(d.phys);
+      if(d.phys){obst.push(d.phys);return;}
+      /* A die that is still IN THE AIR is not empty space: its whole flight
+         is already solved, so we know exactly where it is going to stop.
+         Skipping it is how a die thrown one tick later ended up solving as
+         if the table were bare. */
+      if(d.roll){
+        var R=d.roll,lf=R.sol.frames[R.sol.frames.length-1][R.i],rr=R.sol.rest[R.i];
+        obst.push({x:lf.x,y:lf.y,z:lf.z,
+          q:rr.flat.clone().multiply(new THREE.Quaternion(lf.qx,lf.qy,lf.qz,lf.qw))
+             .multiply(rr.fix)});
+      }
     });
     /* How far from the ROW CENTRE a die can sit and still be fully on
        screen, in die-widths. `mid` is already the centre in mount space, so
@@ -16119,7 +16331,7 @@ var D3X={
   /* the player line, the kept tray and the opponent line are separate
      tables; their dice must never be mixed into one sim */
   _rowKey:function(d){
-    var el=d.chip.closest&&d.chip.closest('#playerDiceRow,#keptTray,#oppDiceRow');
+    var el=d.chip.closest&&d.chip.closest('#playerDiceRow,#keptRow,#keptTray,#oppDiceRow');
     return el?el.id:'loose';
   },
   _rowMid:function(key){
@@ -16516,13 +16728,24 @@ var D3X={
       if(d.match){
         var e=d.chip._d3;
         if(!e||cr.width<1){d.obj.visible=false;return;}
+        /* it changed tables: the physics pose it is holding was measured
+           against a different row centre and scale, so it is meaningless
+           here. Drop it and let the die sit at its new slot. */
+        var rkNow=D3X._rowKey(d);
+        if(d.rk!==rkNow){
+          d.rk=rkNow;d.phys=null;d.roll=null;
+          d.w0=cr.width;d.hx=undefined;d.tx=0;d.ty=0;
+          if(d.obj.parent&&d.obj.parent!==D3X.scene)D3X.scene.add(d.obj);
+          d.chip.style.translate='';
+          D3X._shDirty=true;
+        }
         /* the flat blob is never right for a die the 3D layer is drawing */
         e._d3xOwned=true;
         if(d.roll){
           /* physics owns this die: place it on the tilted table */
           var pose=D3X._physPose(d);
           var sz2=tblSz||(d.w0||cr.width)*D3X.MSCALE;
-          var root=D3X._tableRoot();
+          var root=D3X._tableRoot(D3X._rowKey(d));
           root.rotation.set(THREE.MathUtils.degToRad(D3X.TABLE.tilt),0,0);
           root.scale.setScalar(sz2);
           var hc=D3X._homeOf(d);
@@ -16540,7 +16763,7 @@ var D3X={
         if(d.phys){
           /* settled: hold the place physics gave it */
           var sz3=tblSz||(d.w0||cr.width)*D3X.MSCALE;
-          var root3=D3X._tableRoot();
+          var root3=D3X._tableRoot(D3X._rowKey(d));
           root3.rotation.set(THREE.MathUtils.degToRad(D3X.TABLE.tilt),0,0);
           root3.scale.setScalar(sz3);
           var mid3=D3X._rowMid(D3X._rowKey(d));
@@ -16568,10 +16791,35 @@ var D3X={
            mirror the hidden CSS cube frame by frame, which is the only
            reason that engine had to keep running for match dice. */
         var val=d.chip._trueVal||e.result||1;
-        d.obj.scale.setScalar((d.w0||cr.width)*D3X.MSCALE);
-        d.obj.position.set(cr.left-mr.left+cr.width/2,
-                           -(cr.top-mr.top+cr.height/2));
-        d.obj.quaternion.copy(D3X._isoQ(val,D3X.TILT_MATCH));
+        var inTray=D3X._rowKey(d)==='keptRow';
+        /* a kept die is measured live: d.w0 was cached from the big slot it
+           used to sit in, and the tray's is smaller */
+        var tS=(inTray?cr.width:(d.w0||cr.width))*D3X.MSCALE;
+        var tX=cr.left-mr.left+cr.width/2,tY=-(cr.top-mr.top+cr.height/2);
+        var tQ=D3X._isoQ(val,D3X.TILT_MATCH);
+        if(d.drop){
+          var dk=(now-d.drop.t0)/D3X.TRAY.ms;
+          if(dk>=1){d.drop=null;}
+          else{
+            var de=1-Math.pow(1-dk,3);
+            d.obj.scale.setScalar(d.drop.s+(tS-d.drop.s)*de);
+            d.obj.position.set(d.drop.x+(tX-d.drop.x)*de,
+                               d.drop.y+(tY-d.drop.y)*de,0);
+            d.obj.quaternion.copy(d.drop.q).slerp(tQ,de);
+            D3X._trayTint(d,de);
+            return;
+          }
+        }
+        /* busted: the scored dice go dark with the turn they belonged to */
+        var kw=1;
+        if(inTray){
+          var krEl=document.getElementById('keptRow');
+          if(krEl&&krEl.classList.contains('bust-wipe'))kw=1.55;
+        }
+        D3X._trayTint(d,inTray?kw:0);
+        d.obj.scale.setScalar(tS);
+        d.obj.position.set(tX,tY);
+        d.obj.quaternion.copy(tQ);
         return;
       }
       var cs=getComputedStyle(d.chip);
@@ -17521,7 +17769,79 @@ function newG(rung,pCards,oCards,pStake,oStake){
 }
 
 /* ═══════ UI HELPERS ═══════ */
-function clearRow(id){const el=document.getElementById(id);if(el)el.innerHTML='';}
+function clearRow(id){
+  const el=document.getElementById(id);if(el)el.innerHTML='';
+  /* The kept line is part of the player's dice, not a separate widget. Bank,
+     bust, hot dice and end-of-turn all clear the throwing row; every one of
+     them must clear this too or the scored dice outlive the turn. */
+  if(id==='playerDiceRow'){
+    const k=document.getElementById('keptRow');if(k){k.innerHTML='';k.classList.remove('bust-wipe');}
+    const kt=document.getElementById('keptTotal');
+    if(kt){kt.textContent='';kt.style.visibility='';kt.classList.remove('bust-wipe');}
+    document.querySelectorAll('#screen-match .sel-fly').forEach(function(f){f.remove();});
+  }
+}
+/* Move every committed die out of the throwing row and into the kept line.
+   Called on the reroll, which is when Denis wants to see them go: the row
+   you are about to throw into is left holding only the dice being thrown -
+   which is also what stops the sim landing a die on top of a kept one. */
+function _dropKeptToTray(){
+  var tray=document.getElementById('keptRow');
+  /* G is a `let`, so it is NOT on window - `window.G` is undefined here and
+     the whole migration silently no-opped */
+  if(!tray||typeof G==='undefined'||!G||!G.pool)return;
+  var moved=0;
+  G.pool.forEach(function(d){
+    if(!d.committed||!d.el)return;
+    var wrap=d.el.parentElement;
+    if(!wrap||wrap.parentElement===tray)return;
+    /* tell the 3D layer where the die is NOW - once the DOM node moves, the
+       slot it was sitting at is gone and there is nothing to animate from */
+    try{if(window.D3X&&D3X.toTray)D3X.toTray(d.el);}catch(e){}
+    d.el.classList.add('in-tray');
+    tray.appendChild(wrap);moved++;
+  });
+  if(moved)_flySelTotal();
+}
+/* the selection total travels down with the dice it was counting and lands
+   centred under them as the running turn total */
+function _flySelTotal(){
+  var dst=document.getElementById('keptTotal');
+  var area=document.querySelector('#screen-match .dice-area');
+  if(!dst||!area)return;
+  var tot=(G&&G.turnPts)||0;
+  var src=document.getElementById('selTotal');
+  var txt=src?src.textContent:('+'+tot.toLocaleString());
+  dst.textContent=tot?tot.toLocaleString():'';
+  if(!src){dst.style.visibility='';return;}
+  var sr=src.getBoundingClientRect(),ar=area.getBoundingClientRect();
+  var dr=dst.getBoundingClientRect();
+  if(!sr.width||!dr.width){src.remove();dst.style.visibility='';return;}
+  var fly=document.createElement('div');
+  fly.className='sel-fly';fly.textContent=txt;
+  fly.style.left=(sr.left-ar.left+sr.width/2)+'px';
+  fly.style.top=(sr.top-ar.top)+'px';
+  fly.style.fontSize=getComputedStyle(src).fontSize;
+  fly.style.transform='translate(-50%,0)';
+  area.appendChild(fly);
+  src.remove();
+  dst.style.visibility='hidden';
+  var dx=(dr.left+dr.width/2)-(sr.left+sr.width/2);
+  var dy=dr.top-sr.top;
+  var done=function(){try{fly.remove();}catch(e){}dst.style.visibility='';};
+  try{
+    var an=fly.animate([
+      {transform:'translate(-50%,0) scale(1)',color:'#ffd98a'},
+      {transform:'translate(calc(-50% + '+dx.toFixed(1)+'px),'+dy.toFixed(1)+'px) scale(.74)',
+       color:'#e0b877'}
+    ],{duration:_trayMs(),easing:'cubic-bezier(.32,.72,.3,1)',fill:'forwards'});
+    an.onfinish=done;
+    /* fill:forwards keeps the node alive if onfinish never fires */
+    setTimeout(done,_trayMs()+400);
+  }catch(e){done();}
+}
+/* the number and the dice travel together, so one duration owns both */
+function _trayMs(){return (window.D3X&&D3X.TRAY&&D3X.TRAY.ms)||440;}
 /* Wrap a match die in a `.die-wrap[data-mat="X"]` parent before adding it to
    the dice row. The wrap hosts the per-material flair pseudo-elements
    (halos, smoke) so the inner die can tumble during rolls without the
@@ -17789,6 +18109,19 @@ function updHUD(){
 }
 function refreshKeptTray(){
   const t=document.getElementById('keptTray');t.querySelectorAll('.die,.kept-pts').forEach(e=>e.remove());
+  /* The running total under the kept line, kept in step with G.kept - cards
+     can add to it mid-turn (Anchor, the bonus paths) without any dice moving,
+     and the number has to follow. Left alone while a die is on its way down,
+     because _flySelTotal owns it for that half second. */
+  const _kt=document.getElementById('keptTotal');
+  if(_kt&&_kt.style.visibility!=='hidden')
+    _kt.textContent=(G&&G.turnPts&&document.querySelector('#keptRow .die'))
+      ?G.turnPts.toLocaleString():'';
+  /* the hidden preview is fully replaced by #keptRow under the 3D layer;
+     building it anyway made a throwaway 3D die per kept die, every refresh */
+  if(document.documentElement.classList.contains('fk3d')){
+    t.classList.remove('has-items');return;
+  }
   /* brief §9: every kept die is a persistent object — own material and
      readable face in the pile, never one anonymous die per group */
   G.kept.forEach(k=>{
@@ -18826,7 +19159,12 @@ function handleRoll(){
   }
   // Hot dice check
   if(G.pool.filter(d=>!d.committed).length===0&&G.pool.length>0){
-    G.pool=[];clearRow('playerDiceRow');G.numDice=G.matchDice?G.matchDice.length:6;G.phase='rolling';
+    /* hot dice: a whole new set of six, so the kept line starts empty again.
+       The turn total lives in G.kept and carries on across it. */
+    G.pool=[];clearRow('playerDiceRow');
+    (function(){var kt=document.getElementById('keptTotal');
+      if(kt)kt.textContent=(G.turnPts||0)?(G.turnPts).toLocaleString():'';})();
+    G.numDice=G.matchDice?G.matchDice.length:6;G.phase='rolling';
     G._lastHotDice=true;
     G._featHotDiceCount=(G._featHotDiceCount||0)+1;
     /* Skip the hot-dice fanfare sound if a bust-save (Martyr / Iron
@@ -18871,6 +19209,9 @@ function handleRoll(){
      and must SURVIVE rerolls keeping its face. Only clear transient anim
      state on non-frozen dice. */
   row.querySelectorAll('.die').forEach(el=>{if(el.classList.contains('die-frozen'))return;el.getAnimations().forEach(a=>a.cancel());el.style.transform='';el.style.opacity='';el.style.animation='';el.classList.remove('scatter','bust');});
+  /* the scored dice leave the throwing row before anything is thrown into
+     it - see _dropKeptToTray */
+  _dropKeptToTray();
   const freeDice=G.pool.filter(d=>!d.committed);const needNew=G.numDice-G.pool.length;
   SFX.roll(freeDice.filter(d=>!d._frozen).length+Math.max(0,needNew));
   // Reuse existing free dice: start spin, crossfade face at 90° (edge-on)
@@ -19719,6 +20060,12 @@ function doBust(){
     if(_tsBov){_alignOverlayWord(_tsBov.querySelector('.bust-word'));_tsBov.classList.add('flash');setTimeout(function(){_tsBov.classList.remove('flash');},1100);}
     try{SFX.bust&&SFX.bust();}catch(e){}
     try{Haptic.bust&&Haptic.bust();}catch(e){}
+    /* the scored dice die with the turn: grey them out for the bust beat
+       before clearRow takes them away */
+    try{var _kr=document.getElementById('keptRow');
+      if(_kr)_kr.classList.add('bust-wipe');
+      var _ktt=document.getElementById('keptTotal');
+      if(_ktt)_ktt.classList.add('bust-wipe');}catch(e){}
     try{var _kt=document.getElementById('keptTray');
       if(_kt){_kt.classList.add('bust-wipe');
         _kt.querySelectorAll('.die').forEach(function(el){if(el._d3)D3.draw(el._d3);});
@@ -19757,6 +20104,12 @@ function doBust(){
     if(_lsBov){_alignOverlayWord(_lsBov.querySelector('.bust-word'));_lsBov.classList.add('flash');setTimeout(function(){_lsBov.classList.remove('flash');},1100);}
     try{SFX.bust&&SFX.bust();}catch(e){}
     try{Haptic.bust&&Haptic.bust();}catch(e){}
+    /* the scored dice die with the turn: grey them out for the bust beat
+       before clearRow takes them away */
+    try{var _kr=document.getElementById('keptRow');
+      if(_kr)_kr.classList.add('bust-wipe');
+      var _ktt=document.getElementById('keptTotal');
+      if(_ktt)_ktt.classList.add('bust-wipe');}catch(e){}
     try{var _kt=document.getElementById('keptTray');
       if(_kt){_kt.classList.add('bust-wipe');
         _kt.querySelectorAll('.die').forEach(function(el){if(el._d3)D3.draw(el._d3);});
@@ -19927,6 +20280,12 @@ function doBust(){
       });
     }
     var _bov=document.getElementById('bust-ov');_alignOverlayWord(_bov.querySelector('.bust-word'));_bov.classList.add('flash');SFX.bust();Haptic.bust();
+    /* the scored dice die with the turn: grey them out for the bust beat
+       before clearRow takes them away */
+    try{var _kr=document.getElementById('keptRow');
+      if(_kr)_kr.classList.add('bust-wipe');
+      var _ktt=document.getElementById('keptTotal');
+      if(_ktt)_ktt.classList.add('bust-wipe');}catch(e){}
     try{var _kt=document.getElementById('keptTray');
       if(_kt){_kt.classList.add('bust-wipe');
         _kt.querySelectorAll('.die').forEach(function(el){if(el._d3)D3.draw(el._d3);});

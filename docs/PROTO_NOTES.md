@@ -3598,3 +3598,61 @@ reaches full on the last frame.
 through a `blur(max(1.5, size*0.05))` filter. Measured down through a die:
 alpha `255 … 194, 106, 104, 65, 22, 0` — a five-pixel ramp at a 32px die,
 scaling with the die.
+
+## P199–P200 — the kept dice get their own row, which is also the overlap fix
+
+**The bug, measured.** Throw one die at a kept die's exact position and it
+ended at `x=0.000` — dead on top of it — `y=1.46` against a table at `0.48`,
+after running the full 700-frame cap: **11.7 seconds** of recorded playback.
+Across 30 realistic rerolls (roll six, keep three, reroll three) **92 of 150
+adjacent pairs** came out closer than 1.3 die-widths, worst 0.615. The same
+code with nothing on the table gives **0 of 60** and a worst of 1.444.
+
+Every one of those overlaps came from the dice that were staying. Three
+causes, one fix each:
+
+1. **The relax was blind to them.** `_physSolve` separates the resting X
+   positions after the sim, and it only ever iterated the dice it was
+   throwing. The kept dice go in now as nodes with a footprint that
+   everything makes room around but that never move.
+2. **A die that landed on one stayed there.** Nothing pulled it back down.
+   The drop point is nudged clear of anything static before the throw, and
+   any die that still ends above the table is blended back down to it.
+3. **A jammed die buzzes forever.** Cannon's velocity test never fires for a
+   die wedged against a static body, so the solve ran to the cap — and the
+   relax blend, a flat 22%–62% of the total, was still sliding dice around
+   at frame 402 of 649, nearly seven seconds after they looked settled. That
+   is the "I see them shifting slowly". The solve now stops on actual
+   displacement (14 frames of nothing moving), and the blend window is
+   anchored to the frame the motion really dies at.
+
+**And the frame fit.** The old last step clamped each die to `±limitX`
+individually, which is what pulled the two end dice back onto their
+neighbours. The row is slid in as a group now, and only if it still will not
+fit is it squeezed evenly about its centre — every die loses a little gap
+instead of two dice losing all of theirs.
+
+**The kept line.** Scored dice used to sit in the throwing row greyed out,
+which is exactly what the physics had to treat as furniture. On the reroll
+they now drop out of it into their own line below: `#keptRow`, in a new
+`.kept-zone` that is absolutely positioned at `top:100%` of the player zone.
+In the normal flow it stole 24px from a zone already pinned to the bottom of
+its content box and the throwing row rode up out of the candle pool —
+measured `rowCentreFrac` 0.469 against 0.504 before. Hanging it below, the
+throwing row does not move at all: **0.504, unchanged**.
+
+Measured after the drop: kept dice drawn at **21.1px against 32px** in the
+row (66%), pitch **1.13 drawn-die widths** (0.13 of a die of air — a tight
+line), all at the same y, centred on the table. Colour `897766` against
+`ffffff`: the `TRAY.dim` multiplier `[0.54, 0.47, 0.40]`, darker and warmer
+as they leave the light. The selection total flies down with them and lands
+as the running turn total under the line.
+
+**One table group per row.** `_tableRoot()` was a single shared group whose
+position and scale were written per die inside the frame loop, so with two
+rows on screen the last die iterated decided where both of them sat.
+
+**Reroll spacing, after:** 3 dice min gap 1.62 die-widths, 4 dice min 1.49,
+6 dice min 1.6 — no overlapping pairs, nothing off-frame. And the hidden
+`#keptTray` preview no longer builds a throwaway 3D die per kept die on
+every refresh: `#keptTray .die` is 0 and `D3X.dice.length` is exactly 6.
