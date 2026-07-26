@@ -14288,7 +14288,16 @@ function _diceShadowPaint(pts,scx,scy,size,d){
   tx2.globalAlpha=1;
   tx2.globalCompositeOperation='source-in';
   var tlx=scx-tw/2,tly=scy-tw/2;
-  tx2.drawImage(_tblImg,(ml.ox-sc.left)-tlx,(ml.oy-sc.top)-tly,ml.bw,ml.bh);
+  /* the unlit table, pre-scaled ONCE per layout instead of being resampled
+     from a 1080x2011 source for every die on every pass */
+  var pre=window._tblPre;
+  if(!pre||pre.w!==Math.round(ml.bw)||pre.h!==Math.round(ml.bh)){
+    var pc=document.createElement('canvas');
+    pc.width=Math.max(1,Math.round(ml.bw));pc.height=Math.max(1,Math.round(ml.bh));
+    pc.getContext('2d').drawImage(_tblImg,0,0,pc.width,pc.height);
+    pre=window._tblPre={cv:pc,w:pc.width,h:pc.height};
+  }
+  tx2.drawImage(pre.cv,(ml.ox-sc.left)-tlx,(ml.oy-sc.top)-tly);
   tx2.globalCompositeOperation='source-atop';
   tx2.fillStyle='rgba(8,4,2,'+(alphaB*0.95).toFixed(3)+')';tx2.fillRect(0,0,tw,tw);
   x.drawImage(d._dsc,0,0,TW,TW,tlx,tly,tw,tw);
@@ -14316,7 +14325,9 @@ function _drawDiceShadows(tSec){
     if(window.D3X&&D3X.on&&D3X._tbl&&D3X.dice.length){
       var mrx=D3X.mount?D3X.mount.getBoundingClientRect():null;
       D3X._tbl.updateMatrixWorld(true);
+      var flying=D3X._rolling();
       D3X.dice.forEach(function(dd){
+        if(flying)return;/* no shadows mid-air: unreadable, and the costly bit */
         if(!dd.match||!dd.obj.visible||!mrx)return;
         if(dd.obj.parent!==D3X._tbl)return;
         dd.obj.updateMatrixWorld(true);
@@ -15757,16 +15768,16 @@ var D3X={
 
   /* a silhouette in the die's own colour, drawn as a back-face hull just
      behind it - the same per-material outline the painted dice had */
-  OUTLINE:0.055,
+  OUTLINE:0.040,
   /* Denis's outline colours per die type; anything not listed falls back to
      the painted dice's own OUT table */
   OUTCOL:{bone:'#291d11', amber:'#3f1000'},
-  OUT_DARK:0.42, OUT_SAT:1.6,
+  OUT_DARK:0.26, OUT_SAT:1.7,
   /* an inked line is heavier where the form turns away from the light.
      Nudging the outline hull DOWN the screen thins it along the top edge
      and thickens it along the bottom - in screen space, whatever way the
      die happens to be turned. */
-  OUT_WEIGHT:0.055,
+  OUT_WEIGHT:0.022,
   /* selection: the same hull trick, thicker and gold, so the ring hugs the
      die silhouette wherever physics has left it - a box drawn on the DOM
      host cannot, now that the dice sit at angles */
@@ -15826,7 +15837,7 @@ var D3X={
      only partially clears an antialiased boundary, and with the rim passes
      stacked that leftover reads as glow on the face - so the cut is widened
      by a pixel and a half. */
-  GLOW:{soft:16, rim:4, rimPasses:4, line:2.4, grow:1.004, clear:1.6, strength:1.0},
+  GLOW:{soft:22, rim:6, rimPasses:7, softPasses:2, line:2.4, grow:1.004, clear:1.6, strength:1.0},
   _glowCv:function(){
     var sc=document.getElementById('screen-match');
     if(!sc)return null;
@@ -15872,8 +15883,33 @@ var D3X={
     }while(cur!==start&&guard<9);
     return hull;
   },
+  /* any die still in the air? while they are, the decoration is skipped:
+     it cannot be read at that speed and it is the expensive part */
+  _rolling:function(){
+    for(var i=0;i<this.dice.length;i++)if(this.dice[i].roll)return true;
+    return false;
+  },
   _drawGlow:function(){
-    var cv=this._glowCv();if(!cv)return;
+    var cv=document.getElementById('dgCanvas');
+    /* clear-and-leave: no selection, mid-roll, or no dice at all */
+    var skip=!this._matchOn||this._rolling();
+    if(!skip){
+      skip=true;
+      for(var i=0;i<this.dice.length;i++){
+        var q=this.dice[i];
+        if(q.match&&q.obj.visible&&q.chip.classList.contains('selected')){skip=false;break;}
+      }
+    }
+    if(skip){
+      if(cv&&this._glowInk){
+        var c0=cv.getContext('2d');
+        c0.setTransform(1,0,0,1,0,0);c0.clearRect(0,0,cv.width,cv.height);
+        this._glowInk=false;
+      }
+      return;
+    }
+    cv=this._glowCv();if(!cv)return;
+    this._glowInk=true;
     var scEl=document.getElementById('screen-match');
     var sc=scEl.getBoundingClientRect();
     if(sc.width<10)return;
@@ -15919,7 +15955,8 @@ var D3X={
     gx.globalAlpha=1;
     /* the wide, soft falloff */
     gx.filter='blur('+G.soft+'px)';
-    sel.forEach(function(h){trace(gx,h,0);gx.fill();});
+    for(var sp=0;sp<(G.softPasses||1);sp++)
+      sel.forEach(function(h){trace(gx,h,0);gx.fill();});
     /* then the bright rim, stacked - the punch-out below throws away the
        inner half of every blur, so a single pass never reads as strong */
     gx.filter='blur('+G.rim+'px)';
@@ -16090,7 +16127,10 @@ var D3X={
       var e=k>=1?1:(1-Math.pow(1-k,3));
       q.slerp(r.home,e);
     }
-    if(done){d.phys={x:f.x,y:f.y,z:f.z,q:q.clone()};d.roll=null;}
+    if(done){
+      d.phys={x:f.x,y:f.y,z:f.z,q:q.clone()};d.roll=null;
+      if(!this._rolling())this._shDirty=true;/* they have landed: draw them */
+    }
     return {x:f.x,y:f.y,z:f.z,q:q,done:done};
   },
   _need:[],
@@ -16271,14 +16311,15 @@ var D3X={
     }else{
       this.syncMatch();
     }
-    /* A die that just left keeps its shadow on the 2D canvas until the next
-       candle tick, so the shadow outlives the die. Repaint AFTER the sync
-       that dropped it, and here rather than in frame(), which returns early
-       once the last die is gone - exactly when it matters. */
+    /* A die that just left keeps its shadow AND its glow on their 2D
+       canvases until something repaints them, so both outlive the die.
+       Both are driven from here, not from frame(), which returns early once
+       the last die is gone - exactly when it matters. */
     if(this._shDirty){
       this._shDirty=false;
       try{_mLightCalc();_drawDiceShadows(performance.now()/1000);}catch(e){}
     }
+    try{this._drawGlow();}catch(e){}
   },
   /* rebuild the die list from the .d3chip placeholders inside the mount */
   sync:function(root){
@@ -16526,7 +16567,6 @@ var D3X={
       }
     });
     r.render(this.scene,this.cam);
-    if(this._matchOn)try{this._drawGlow();}catch(e){}
 
   }
 };

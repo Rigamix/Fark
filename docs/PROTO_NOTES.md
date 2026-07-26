@@ -3510,3 +3510,36 @@ frame, in the die's own local space, so the ink reads thin along the top edge
 and heavy along the bottom whatever way the die is turned. Measured across
 four dice: top band 2.75px, bottom band 4.75px.
 
+## P196 — the lag, the leftover glow, and the outline weight
+
+**The leftover glow (and probably the "vagabond glow").** The glow canvas was
+only drawn from `frame()`, which returns early once the dice are gone — so
+whatever was last painted stayed on screen with no dice under it. Denis saw
+two glowing outlines floating on an empty table after passing his turn; the
+"glow around the vagabond die" was almost certainly the same stale paint. It
+is driven from `tick()` now, like the shadows, and clears itself whenever
+there is no selection, no match, or the dice are mid-air.
+
+**The lag.** Two real costs, both in the 2D passes rather than the 3D:
+- `_diceShadowPaint` re-scaled the **1080x2011** table PNG for every die on
+  every pass — six resamples of a 2Mpx source, 25 times a second. The unlit
+  table is now pre-scaled ONCE per layout and blitted 1:1. Measured: the
+  whole dice-shadow pass **1.37ms -> 0.30ms**, a 4x cut, and it is the kind
+  of work Firefox is much slower at than Chromium.
+- shadows and glow are now skipped entirely while any die is in the air
+  (`_rolling()`), which is when the frame budget matters and when neither can
+  be read anyway. The shadows repaint the moment the last die settles.
+
+Verified: shadow ink 0 in the air, 14319 once landed, 0 after the dice leave;
+glow 0 idle, 8003 selected, 0 deselected, **0 after the dice leave while
+still selected** — the exact case Denis hit.
+
+**Outline** base thinned (0.055 -> 0.040) with a gentler screen-down weight
+(0.055 -> 0.022) so the heavy side lands back where it was and only the top
+thins, and darkened again (`OUT_DARK` 0.42 -> 0.26, saturation 1.7).
+
+**Glow brighter**: soft blur 16 -> 22 with two passes, rim 4 -> 6 with seven.
+
+**Rounder still**: bevel 12% -> 16%, art remapped from Denis's sources in one
+hop (flat share 87.0%).
+
