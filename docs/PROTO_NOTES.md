@@ -3832,3 +3832,76 @@ serves the previously cached `prop_templates.js` even though the page itself
 reloads — measured `FK_PROP_TEMPLATES.length === 0` against a file that was
 correct on the wire. A `fetch(src,{cache:'reload'})` proved it. Hard-reload
 after replacing the file.
+
+## P207–P210 — one light, dice that always roll, and a tray that reads as shadow
+
+**Every shadow now points away from the same place.** P192 brought the candle
+pool down to 52% of the screen, and nothing else moved with it: all three
+shadow passes still radiated from `0.44` — and from 44% of the *table image*,
+which is a different point again. The art is 1080x2011 cover-fit, so on a
+319x691 screen `ly` came out 304 against a pool centred at 359. Fifty-five
+pixels off, and every prop's shadow angled wrong by whatever that subtends.
+`window.FK_LIGHT={cx:0.50, cy:0.52}` is the one source now, in screen space,
+read by the pool, the prop shadows and the dice shadows alike.
+
+**Flips reached the prop but not its shadow.** P205 put `fx`/`fy` on the
+shadow job; `_drawPropShadows` only ever applied `j.rot`, so a mirrored prop
+cast the silhouette of its unmirrored self.
+
+**THE PINK.** A colour multiply cannot desaturate — it does the opposite. The
+bone texture is cream (250,235,210), saturation 0.160; multiplied by the old
+warm `TRAY.dim` it came out (135,110,84), saturation **0.378**. The "darken"
+was more than doubling the saturation. A die in shadow needs its *texture* to
+lose colour, so a desaturated, brown-shifted, darkened copy of each skin is
+baked once (`_shadeMap`) and swapped in for the tray. The tint's own
+saturation becomes the die's, so it is solved rather than eyeballed: at 0.11 a
+bone die lands at **0.125** against its normal 0.160 — slightly *less*
+colourful than in the light, which is what shadow does — and amber drops
+0.755 → 0.203. Measured on the live texture: luminance 207 → 63.
+
+Kept dice also sit lower (`padding-top` 6.4 → 11cqw), lost the word TURN, and
+cast no drop shadow at all — measured 0 ink under the tray.
+
+**Props are 24% darker** (`brightness` 0.55+0.45L → 0.40+0.36L), and flat ones
+keep their shadow underneath instead of throwing it out to one side, which is
+what made them read as hovering: `FLAT_PROPS` scales both the offset and the
+blur — coins 0.22, singleCoin 0.18, towel 0.25, spoon 0.28 against 1.0 for
+anything tall.
+
+**The row of perfectly aligned dice.** Two causes, both real.
+
+1. `_physQueue` was gated on `D3X.ready`, and D3X boots asynchronously — four
+   requests for three.js, GLTFLoader, the model and cannon. A roll that
+   happened before they landed got **no physics at all**, and those dice then
+   sat at their DOM slots in the shared rest pose. Any die rolled after the
+   boot finished scattered normally beside them, which is exactly the
+   screenshot. The throw is queued regardless now; the queue already knew how
+   to wait for the dice to register.
+2. `if(d.rk!==rkNow)` fired on a die's **first** frame, because `d.rk` starts
+   undefined — throwing away the roll `_physStart` had just handed it. First
+   sight is not a change.
+
+And the deferral is time-based (8s, or the moment `fail` is set) rather than a
+600-*tick* count, which means ten seconds on a healthy loop and never on a
+stalled one.
+
+Verified end to end: `queued:6, skipped:[], deferred:0`, **6/6 dice with
+physics**, y-spread 18px, not aligned.
+
+**NPC dice are 79% of the player's** (33px against 42) — `.opp-dice-row .die`
+sets a hard `48px !important`, so the override needed `!important` too; the id
+selector out-specifies it.
+
+## Tooling — the lab saves in place
+
+`tools/dev_server.py` is `python -m http.server` plus exactly one route:
+`POST /__save/prop_templates` writes `assets/prop_templates.js`. The target
+name is not taken from the request, so nothing a page sends can make it write
+anywhere else; the body is capped at 1MB and written via a temp file and
+`os.replace`, so a half-written file can never be what the game loads. It also
+sends `Cache-Control: no-store`, because a stale cached `prop_templates.js` is
+a phantom bug that has now cost two rounds.
+
+The lab's download button POSTs there first and falls back to a download if no
+server is listening. Verified: valid save 200, unknown target 404, path
+traversal 404, oversize 413, static serving unaffected.

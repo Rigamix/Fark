@@ -1163,13 +1163,18 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 /* dice: bigger and raised toward the centre band */
 #screen-match .die{width:13cqw;height:13cqw}
 #screen-match .player-dice-row{gap:3cqw}
-#screen-match .opp-dice-row{gap:3cqw}
+/* The opponent is across the table: further from the lens, so smaller.
+   !important because `.opp-dice-row .die` sets a hard 48px !important (and a
+   41px one in the short-screen media query) - the id here out-specifies both,
+   but only once this is important too. */
+#screen-match .opp-dice-row{gap:2.4cqw}
+#screen-match .opp-dice-row .die{width:10.2cqw!important;height:10.2cqw!important}
 #screen-match .die.sm{width:8.7cqw;height:8.7cqw}
 #screen-match #diceArea{--sp-before:1.75;--sp-after:1.75}
 /* the kept line: smaller dice, close together, and the turn total under it */
 /* down and to the left, off the throwing line entirely - the reference has
    them tucked in the bottom corner with the turn total under them */
-#screen-match .kept-zone{padding-top:6.4cqw;padding-left:7cqw}
+#screen-match .kept-zone{padding-top:11cqw;padding-left:7cqw}
 /* A flex gap cannot go negative, and it has to: the 3D die is drawn at 0.77
    of its DOM box, so touching boxes still leave a third of a die of air.
    Overlap the boxes instead - Denis wants a tight line. */
@@ -14077,13 +14082,21 @@ D3.roll=function(d,val,opts){
      as a thrown die - but on a 3D die that same roll reads as stopped
      mid-tumble, resting on an edge. Land the spin on a whole turn so every
      die settles square, still spinning the whole way there. */
-  if(window.D3X&&D3X.ready){
+  /* QUEUE THE THROW EVEN IF THE 3D LAYER IS STILL LOADING. This used to be
+     gated on D3X.ready, and D3X boots asynchronously - three.js, GLTFLoader,
+     the model and cannon, four requests. A roll that happened before they
+     landed got no physics at all, and those dice then sat at their DOM slots
+     in the shared rest pose: a row of perfectly aligned dice, with any die
+     rolled after the boot finished scattered normally beside them. The queue
+     already defers until the dice are registered, so it just has to be
+     allowed to start. */
+  if(window.D3X&&d.group==='match'&&D3X.PHYS&&D3X.PHYS.on&&!D3X.fail){
+    if(D3X.ready)d.to.spin=Math.round(d.to.spin/360)*360;
+    else if(D3X.boot)try{D3X.boot();}catch(e){}
+    D3X._physQueue(d,d.result);
+  }else if(window.D3X&&D3X.ready){
     d.to.spin=Math.round(d.to.spin/360)*360;
-    if(d.group==='match'&&D3X.PHYS&&D3X.PHYS.on){
-      /* physics places this die; the CSS cube keeps running underneath
-         (hidden) so every existing state path still works */
-      D3X._physQueue(d,d.result);
-    }else{
+    {
       var _st=D3X.SETTLE;
       if(_st&&d.group==='match'){
         d.to.x+=(Math.random()*2-1)*_st.x*d.s;
@@ -14167,6 +14180,10 @@ D3.start=function(){
    band at the bottom. Measure the deficit and stretch the body over it. */
 if(navigator.standalone===true)document.documentElement.classList.add('fkSA');
 /* match dressing: plate + seeded props + opponent portrait token */
+/* WHERE THE CANDLE IS, as a fraction of the match screen. Everything that
+   casts a shadow reads it from here: the pool, the prop shadows and the dice
+   shadows drifted apart once the pool was moved and nothing else was. */
+window.FK_LIGHT={cx:0.50, cy:0.52};
 function _mLightCalc(){
   var sc=document.getElementById('screen-match');
   var pl=document.getElementById('matchPlate');
@@ -14187,10 +14204,11 @@ function _litProps(f){
   var k=1+0.08*f,rx=1.235*k,ry=0.65*k;/* matches the bigger pool */
   [].forEach.call(pr.children,function(im2){
     if(im2._pcx===undefined)return;
-    var dx=(im2._pcx-0.5)/rx,dy=(im2._pcy-0.52)/ry;
+    var dx=(im2._pcx-FK_LIGHT.cx)/rx,dy=(im2._pcy-FK_LIGHT.cy)/ry;
     var r=Math.sqrt(dx*dx+dy*dy);
     var L=r<=0.28?1:Math.max(0,1-(r-0.28)/0.72);
-    im2.style.filter='brightness('+(0.55+0.45*L).toFixed(3)+') saturate('+(0.8+0.2*L).toFixed(3)+')';
+    /* darker across the board - they were competing with the dice */
+    im2.style.filter='brightness('+(0.40+0.36*L).toFixed(3)+') saturate('+(0.74+0.18*L).toFixed(3)+')';
   });
 }
 /* the dark layer: unlit table with the candle pool punched out */
@@ -14215,7 +14233,7 @@ function _drawCandle(tSec){
   /* breathing pool: a soft circle radially expanding/contracting */
   var f=_candleF(tSec);
   var cx=W*0.5+W*0.012*Math.sin(tSec*0.7);
-  var cy=H*0.52+H*0.004*Math.sin(tSec*1.3+3);/* down with the dice row */
+  var cy=H*FK_LIGHT.cy+H*0.004*Math.sin(tSec*1.3+3);/* down with the dice row */
   var fb=Math.max(f,-0.4);/* the pool contracts less than it flares */
   var rx=W*0.676*(1+0.08*fb),ry=H*0.351*(1+0.08*fb);/* 30% wider pool */
   x.globalCompositeOperation='destination-out';
@@ -14272,7 +14290,8 @@ function _drawPropShadows(tSec){
       if(!_tblImg.complete)_tblImg.addEventListener('load',function(){_drawPropShadows(tSec);},{once:true});
       return;}
     var w0=j.w/100*W,h0=w0*j.a[1]/j.a[0];
-    var cx=(j.x+(j.ux||0)*push)/100*W+w0/2,cy=(j.y+(j.uy||0)*push)/100*H+h0/2;
+    var pf=push*(j.flat===undefined?1:j.flat);
+    var cx=(j.x+(j.ux||0)*pf)/100*W+w0/2,cy=(j.y+(j.uy||0)*pf)/100*H+h0/2;
     var w=w0*sMul,h=h0*sMul;
     /* square tmp big enough for the rotated silhouette */
     var side=Math.ceil(Math.sqrt(w0*w0+h0*h0)*1.08);
@@ -14288,7 +14307,11 @@ function _drawPropShadows(tSec){
        stays axis-aligned, pixel-identical to the base table.
        Radial blur: solid core + 8 low-alpha ring stamps feather the
        rim; fringe radius grows with distance from the light. */
+    /* mirror the MASK the same way the prop is mirrored - the flip reached
+       the <img> in P205 but never got here, so a flipped prop threw the
+       silhouette of its unflipped self */
     tx2.save();tx2.translate(tw/2,th/2);tx2.rotate(j.rot*Math.PI/180);
+    if((j.fx||1)<0||(j.fy||1)<0)tx2.scale(j.fx||1,j.fy||1);
     tx2.drawImage(im,-w/2,-h/2,w,h);
     var bpx=(j.bl||0.8)*W/100;
     tx2.globalAlpha=0.16;
@@ -14314,7 +14337,10 @@ function _diceShadowPaint(pts,scx,scy,size,d){
   var st=window._dsState;if(!st)return;
   var x=st.x,sc=st.sc,ml=st.ml,dpr=st.dpr,f=st.f,alphaB=st.alphaB;
   /* nudge away from the candle, like the props do */
-  var lx=ml.ox-sc.left+ml.bw/2,ly=ml.oy-sc.top+ml.bh*0.44;
+  /* the candle, in SCREEN space. This used to be 44% down the table IMAGE,
+     which is a different place from 52% down the screen - the dice sat
+     between the two, so their shadows pointed the wrong way entirely. */
+  var lx=sc.width*FK_LIGHT.cx,ly=sc.height*FK_LIGHT.cy;
   var ddx=scx-lx,ddy=scy-ly,dl=Math.sqrt(ddx*ddx+ddy*ddy)||1;
   /* kept close under the die: a contact shadow, not a cast one */
   var pm=Math.min(1.6,0.5+dl*0.005)+0.6*f;
@@ -14390,6 +14416,9 @@ function _drawDiceShadows(tSec){
            straight to the scene. `match` + `visible` is the real question,
            and the silhouette is projected through the camera either way. */
         if(!dd.obj.parent)return;
+        /* Denis: keep the tray simple - the kept dice are out of the light,
+           so a cast shadow under them reads as a second light source */
+        if(D3X._rowKey(dd)==='keptRow')return;
         dd.obj.updateMatrixWorld(true);
         var pts=[],L=[[-.5,-.5,-.5],[.5,-.5,-.5],[-.5,.5,-.5],[.5,.5,-.5],
                       [-.5,-.5,.5],[.5,-.5,.5],[-.5,.5,.5],[.5,.5,.5]];
@@ -14422,7 +14451,7 @@ function _drawDiceShadows(tSec){
     var scx=sr.left-sc.left+sr.width/2+(d.x+d.ox);
     var scy=sr.top-sc.top+sr.height/2+d.y+7*s2;
     /* radial nudge from the light + flare push */
-    var lx=ml.ox-sc.left+ml.bw/2,ly=ml.oy-sc.top+ml.bh*0.44;
+    var lx=sc.width*FK_LIGHT.cx,ly=sc.height*FK_LIGHT.cy;
     var ddx=scx-lx,ddy=scy-ly,dl=Math.sqrt(ddx*ddx+ddy*ddy)||1;
     var pm=Math.min(3.5,1.2+dl*0.012)+1.5*f;
     scx+=ddx/dl*pm;scy+=ddy/dl*pm+d.size*0.10;
@@ -14640,6 +14669,9 @@ function _matchDress(isBoss){
       return {n:q.n,x:+q.x,y:+q.y,w:+q.w,rot:+(q.rot||0),
               fx:+(q.fx||1),fy:+(q.fy||1)};});
   }
+  /* how far a prop's shadow is allowed to travel, as a fraction of normal.
+     1 = a tall object, 0.2 = something lying flat on the wood. */
+  var FLAT_PROPS={coins:0.22,singleCoin:0.18,towel:0.25,spoon:0.28};
   var _jobs=window._shJobs=[];
   placed.forEach(function(q){
     var w=q.w;
@@ -14653,14 +14685,19 @@ function _matchDress(isBoss){
     var a=ASPECT[q.n]||[1,1];
     var cx=q.x+w/2,cy=q.y+w*(a[1]/a[0])*0.26;   /* prop centre, approx (h% ~ w%*ratio/1.9) */
     img._pcx=cx/100;img._pcy=cy/100;
-    var dx=cx-50,dy=(cy-44)*1.9;                 /* direction in width-pct space */
+    /* away from the candle. 44 was left behind when the pool moved to 52. */
+    var dx=cx-FK_LIGHT.cx*100,dy=(cy-FK_LIGHT.cy*100)*1.9;
     var len=Math.sqrt(dx*dx+dy*dy)||1;
-    var mag=Math.max(0.7,len*0.045);
+    /* A flat thing lying ON the table cannot throw its shadow out to one
+       side - the gap is what makes it read as hovering. Coins, the towel and
+       the spoon keep theirs tucked underneath. */
+    var flat=FLAT_PROPS[q.n]?FLAT_PROPS[q.n]:1;
+    var mag=Math.max(0.7,len*0.045)*flat;
     var ox=dx/len*mag,oy=(dy/len*mag)/1.9;
     _jobs.push({src:PP+q.n+'.png?v=2',x:+(q.x+ox).toFixed(2),y:+(q.y+oy).toFixed(2),
-      w:+(w*1.1).toFixed(1),rot:q.rot,fx:q.fx||1,fy:q.fy||1,a:a,
+      w:+(w*1.1).toFixed(1),rot:q.rot,fx:q.fx||1,fy:q.fy||1,a:a,flat:flat,
       ux:+(dx/len).toFixed(3),uy:+((dy/len)/1.9).toFixed(3),
-      bl:+Math.min(1.6,0.4+len*0.02).toFixed(2)});
+      bl:+(Math.min(1.6,0.4+len*0.02)*flat).toFixed(2)});
   });
   _mLightCalc();_drawPropShadows();_litProps(_candleF(0.8));_drawDiceShadows(0.8);_candleLoop();
   try{_drawCandle(0.8);}catch(e){}
@@ -16270,9 +16307,17 @@ var D3X={
     }
     return (this._tbls[key]=this._tbl);
   },
-  /* how a kept die differs from a thrown one: smaller, and out of the
-     candle pool so darker and a touch warmer-dead */
-  TRAY:{dim:[0.54,0.47,0.40], ms:440},
+  /* How a kept die differs from a thrown one: smaller, and sitting in the
+     table's shadow. `sat` is how much colour it keeps (0 = grey), `tint` is
+     the brown it is shifted toward, `lum` how dark. Baked into a copy of the
+     skin, NOT applied as a colour multiply - multiplying a cream texture by a
+     warm brown raises its saturation rather than lowering it, which is where
+     the pink came from. */
+  /* Solved, not eyeballed: the tint's OWN saturation becomes the die's, once
+     the texture has been flattened toward grey. At 0.11 a bone die lands at
+     0.125 against its normal 0.160 - slightly less colourful than in the
+     light, which is what shadow does - and amber drops 0.755 -> 0.203. */
+  TRAY:{sat:0.10, tint:[0.58,0.552,0.516], lum:0.55, ms:440},
   /* remember where a die is on screen before its DOM slot moves out from
      under it, so the drop has something to animate FROM */
   toTray:function(el){
@@ -16287,17 +16332,61 @@ var D3X={
       x:(p.x*.5+.5)*mr.width, y:-((-p.y*.5+.5)*mr.height),
       q:d.obj.quaternion.clone(), s:sc.x||1};
   },
-  /* k=0 is the die as painted, k=1 is fully out of the light, and k>1 is the
-     bust wipe pushing it past that into the dark */
+  /* A desaturated, brown-shifted, darkened copy of a skin's texture: what
+     the die would look like lying in the table's shadow. Built once per skin
+     and cached - the pixels never change. */
+  _shadeMap:function(tex){
+    if(!tex||!tex.image)return null;
+    if(tex.userData&&tex.userData.trayMap)return tex.userData.trayMap;
+    var im=tex.image;
+    var w=im.width||im.naturalWidth,h=im.height||im.naturalHeight;
+    if(!w||!h)return null;
+    var cv=document.createElement('canvas');cv.width=w;cv.height=h;
+    var cx=cv.getContext('2d');
+    cx.drawImage(im,0,0,w,h);
+    var T=this.TRAY,d0;
+    try{d0=cx.getImageData(0,0,w,h);}catch(e){return null;}
+    var px=d0.data;
+    for(var i=0;i<px.length;i+=4){
+      var r=px[i],g=px[i+1],b=px[i+2];
+      var y=0.299*r+0.587*g+0.114*b;         /* luminance */
+      r=y+(r-y)*T.sat;g=y+(g-y)*T.sat;b=y+(b-y)*T.sat;   /* toward grey */
+      px[i]  =r*T.tint[0]*T.lum;
+      px[i+1]=g*T.tint[1]*T.lum;
+      px[i+2]=b*T.tint[2]*T.lum;
+    }
+    cx.putImageData(d0,0,0);
+    var out=new THREE.CanvasTexture(cv);
+    out.flipY=tex.flipY;out.wrapS=tex.wrapS;out.wrapT=tex.wrapT;
+    out.encoding=tex.encoding;out.needsUpdate=true;
+    if(!tex.userData)tex.userData={};
+    tex.userData.trayMap=out;
+    return out;
+  },
+  /* k=0 is the die as painted, k=1 is fully in shadow, k>1 is the bust wipe
+     pushing it past that into the dark. The map is swapped at the halfway
+     point of the drop rather than cross-faded: two maps cannot be blended in
+     a Lambert material without a shader, and at 440ms nobody sees the step. */
   _trayTint:function(d,k){
-    var dm=this.TRAY.dim,c=function(v){return v<0?0:(v>1?1:v);};
+    var self=this,T=this.TRAY,c=function(v){return v<0?0:(v>1?1:v);};
+    var shaded=k>=0.5;
     d.obj.traverse(function(o){
-      if(!o.isMesh||!o.material||!o.material.color)return;
-      if(!o.userData.baseCol)o.userData.baseCol=o.material.color.clone();
+      if(!o.isMesh||!o.material)return;
+      var m=o.material;
+      if(!o.userData.baseMap&&m.map)o.userData.baseMap=m.map;
+      if(!o.userData.baseCol&&m.color)o.userData.baseCol=m.color.clone();
+      if(o.userData.baseMap){
+        var want=shaded?(self._shadeMap(o.userData.baseMap)||o.userData.baseMap)
+                       :o.userData.baseMap;
+        if(m.map!==want){m.map=want;m.needsUpdate=true;}
+      }
+      if(!m.color)return;
       var b=o.userData.baseCol;
-      o.material.color.setRGB(c(b.r*(1-k*(1-dm[0]))),
-                              c(b.g*(1-k*(1-dm[1]))),
-                              c(b.b*(1-k*(1-dm[2]))));
+      /* the map carries the shading once it is swapped, so the colour only
+         has to carry the ramp before that and the bust wipe after it */
+      var f=shaded?(k<=1?1:(1-(k-1)*0.55)):(1-k*(1-T.lum));
+      if(!o.userData.baseMap)f=1-k*(1-T.lum);/* untextured: colour does it all */
+      m.color.setRGB(c(b.r*f),c(b.g*f),c(b.b*f));
     });
   },
   /* queue a match die's roll; the batch solves together next tick */
@@ -16330,8 +16419,16 @@ var D3X={
          next tick, so park the throw and let tick() pick it up. Waiting on
          the tick rather than on a timer means a stalled frame loop delays
          the roll instead of dropping it. */
-      b.waited=(b.waited||0)+1;
-      this._waiting=(b.waited<600)?b:null;
+      /* give up after a SECOND, not after 600 ticks. A tick count means
+         nothing: on a fast loop 600 of them go by in ten seconds, on a
+         stalled one they never do - and when it does give up, the dice it
+         was holding never roll and sit in the row perfectly aligned. */
+      /* Long enough to outlast a cold boot of three + the model + cannon,
+         and it gives up at once if that boot has failed. A tick count meant
+         nothing here: 600 of them pass in ten seconds on a healthy loop and
+         never on a stalled one. */
+      if(!b.waitT)b.waitT=performance.now();
+      this._waiting=(!this.fail&&performance.now()-b.waitT<8000)?b:null;
       return;
     }
     this._waiting=null;
@@ -16822,7 +16919,14 @@ var D3X={
            against a different row centre and scale, so it is meaningless
            here. Drop it and let the die sit at its new slot. */
         var rkNow=D3X._rowKey(d);
-        if(d.rk!==rkNow){
+        /* FIRST SIGHT IS NOT A CHANGE. d.rk starts undefined, so this fired
+           on the die's very first frame and threw away the roll _physStart
+           had just handed it - the die then sat at its DOM slot in the shared
+           rest pose, which is the row of perfectly aligned dice. It only bit
+           when the roll was assigned before the die's first frame, hence
+           some dice in the row and not others. */
+        if(d.rk===undefined){d.rk=rkNow;}
+        else if(d.rk!==rkNow){
           d.rk=rkNow;d.phys=null;d.roll=null;
           d.w0=cr.width;d.hx=undefined;d.tx=0;d.ty=0;
           if(d.obj.parent&&d.obj.parent!==D3X.scene)D3X.scene.add(d.obj);
@@ -17906,7 +18010,7 @@ function _flySelTotal(){
   var tot=(G&&G.turnPts)||0;
   var src=document.getElementById('selTotal');
   var txt=src?src.textContent:('+'+tot.toLocaleString());
-  dst.textContent=tot?(tot.toLocaleString()+' TURN'):'';
+  dst.textContent=tot?tot.toLocaleString():'';
   if(!src){dst.style.visibility='';return;}
   var sr=src.getBoundingClientRect(),ar=area.getBoundingClientRect();
   var dr=dst.getBoundingClientRect();
@@ -18210,7 +18314,7 @@ function refreshKeptTray(){
   const _kt=document.getElementById('keptTotal');
   if(_kt&&_kt.style.visibility!=='hidden')
     _kt.textContent=(G&&G.turnPts&&document.querySelector('#keptRow .die'))
-      ?(G.turnPts.toLocaleString()+' TURN'):'';
+      ?G.turnPts.toLocaleString():'';
   /* the hidden preview is fully replaced by #keptRow under the 3D layer;
      building it anyway made a throwaway 3D die per kept die, every refresh */
   if(document.documentElement.classList.contains('fk3d')){
@@ -19257,7 +19361,7 @@ function handleRoll(){
        The turn total lives in G.kept and carries on across it. */
     G.pool=[];clearRow('playerDiceRow');
     (function(){var kt=document.getElementById('keptTotal');
-      if(kt)kt.textContent=(G.turnPts||0)?(G.turnPts.toLocaleString()+' TURN'):'';})();
+      if(kt)kt.textContent=(G.turnPts||0)?G.turnPts.toLocaleString():'';})();
     G.numDice=G.matchDice?G.matchDice.length:6;G.phase='rolling';
     G._lastHotDice=true;
     G._featHotDiceCount=(G._featHotDiceCount||0)+1;
