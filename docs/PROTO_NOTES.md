@@ -4435,3 +4435,39 @@ Tithe carries `doubles`.
 
 **Zero Hour — CONFIRMED.** Arms on an icon keep while Grog's badge is worn,
 and not otherwise.
+
+## P236–P237 — second audit pass
+
+**One place removes a die now.** Removal was happening in two places that each
+maintained a different subset of the seat-indexed arrays. `_breakDie` kept
+`matchDice` + `_enchArr` + the run save + pool seats; the Obsidian shatter kept
+`matchDice` alone, **spliced it by `indexOf(d.mat)`** — the first die of that
+material, not necessarily the one that shattered — and left `_enchArr` and the
+pool's seat stamps untouched. A brand therefore migrated onto a different
+material, and a later Break spliced the wrong entry out of the *persisted run*.
+`_removeDieAt(lane, {permanent})` is the only remover; the shatter is
+match-only, Break is permanent.
+
+**It also stops refunding per-turn dice penalties.** `_breakDie` assigned
+`G.numDice = matchDice.length`, wiping Tar Pit's and Pocket Sand's reductions
+and eating Seven Dice's bonus. It decrements.
+
+**Breaking a borrowed die no longer eats the wrong one.** Fair Trade swaps only
+the *match* array, so `_breakDie`'s `S.run.dice.splice(lane,1)` deleted the
+player's own die at that seat, left the borrowed one in the stash, and then
+`startPTurn` wrote the deleted die back over its neighbour. A loaned seat now
+consumes the stash die and clears the loan.
+
+**Break resolves on the BANK press.** Only `handleRoll` read `_breakPending`,
+so banking a skull armed it and `startPTurn` wiped it — 300g for nothing — or
+worse left it live to fire out of nowhere several rolls later.
+
+**Targeting is modal and always recoverable.** ROLL and BANK are disabled while
+it waits, and every route out rebinds the dice and restores the buttons, so
+Silver's bank-now on a zero-point turn can no longer leave the table dead.
+
+Verified: seats stay aligned through a removal (`_enchArr` keeps Break on
+silver), the run save matches the match loadout, seats resequence, `numDice`
+decrements rather than resetting, a per-turn penalty survives, and breaking a
+loaned seat consumes the stash die while the player's own die and their
+six-die loadout survive intact.
