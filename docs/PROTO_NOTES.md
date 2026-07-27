@@ -4311,3 +4311,56 @@ brief, and beats an abbreviation nothing else uses.
 
 `quicksilver.png` has no face to sit on (it is a whole-die passive) but is used
 as its shop glyph, so all eight services show real art.
+
+## P232–P234 — the rest of the audit
+
+**Break could never fire.** `_breakBegin` hung tap handlers on the live dice
+from *inside* the commit — and the caller then carried straight on and
+re-threw the row, wiping every handler in the same call that set them. Break
+was unusable on its primary path. It arms a pending flag now; `handleRoll`
+stops there and waits, and `_breakDie` resumes the roll once a die is tapped.
+Verified: 4 dice outlined and clickable after the commit, where the count was
+previously zero.
+
+**Break and Trade were only match-deep.** Both wrote `G.matchDice` and neither
+touched the run loadout, so "permanently destroys" quietly undid itself at the
+final whistle. Both write through to `S.run.dice` now, with `S.run.dieEnch`
+moving in lockstep — splicing one without the other re-attaches every later
+brand to the wrong material. Verified: loadout 5→4, run 6→5, enchant array
+6→5, seats resequenced `0..3`, outlines cleared.
+
+**Snare and Fog never expired.** Both cleared only when they *fired*, which is
+precisely the "until it fires" version the design rejected as *"97.7% inside
+six turns, i.e. not a real bet"*. Each is stamped with the opponent turn it is
+for and swept at the top of the next one, bitten or not. Snare also only
+halves when the marked seat's die is actually used in the scoring set.
+
+**Amber's immunity could hard-softlock.** It rerolled the free dice and set
+`phase='choosing'` without ever asking whether the new faces score — and
+immunity suppresses the only exit, so a dead reroll left the player with no
+legal move and no bust. It now rerolls until the hand is playable, with a
+bounded fallback that banks rather than hangs.
+
+**Ward's bookkeeping.** It halved only `G.kept`, so the Stakes Rising seed
+vanished instead of being halved; a half-save could win the match and the game
+played on; and the bust never registered, quietly preserving the Hot Hand
+chain. All three fixed.
+
+**Retired rules could come back.** `_ruleActive` honours `_sleeve` and
+`_sealRule`, so a sealed seat or a sleeve carrying `last_call`, `counterfeit`,
+`confession` or `in_arrears` re-enabled behaviour that no longer exists.
+Gated on the badge itself. Verified: retired via sleeve → false, retired via
+sealed seat → false, live badge → true, and non-retired rules unaffected
+through both routes.
+
+**First Strike revealed nothing** — it set an unstyled class and stopped. The
+reveal *is* the effect, so it draws both six-seat layouts now; measured 12
+seats rendered, and it survives re-entry to the match screen.
+
+Also: the NPC's Insurance branch called `famDef('insurance')` on a card that
+no longer exists and would have thrown the moment an NPC held it; the sim
+harness still modelled Silver's deleted bust-forgiveness; the bust-save
+rescue roll rebuilt the pool without enchants (same class as the Mabel's
+Stitch bug); Fair Trade's "borrow" was permanent and duplicated the stash die,
+and is now returned at turn start; and `_measureIconState` was called but
+never existed.

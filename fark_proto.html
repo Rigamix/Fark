@@ -2137,6 +2137,14 @@ html.fk3d #screen-match .die-wrap:has(.die.d3on.selected)::after{
   flex-shrink:0;overflow:visible;
 }
 
+/* FIRST STRIKE — both hands, open on the table. */
+#fsReveal{position:absolute;left:50%;top:11%;transform:translateX(-50%);z-index:14;
+  pointer-events:none;display:flex;flex-direction:column;gap:3px;
+  background:rgba(18,12,6,.82);padding:6px 9px;border:1px solid rgba(200,164,92,.45)}
+#fsReveal .fs-row{display:flex;align-items:center;gap:3px}
+#fsReveal .fs-lbl{font-family:var(--font-px);font-size:8px;color:#c8a45c;width:34px;letter-spacing:1px}
+#fsReveal .fs-die{width:15px;height:15px;display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-px);font-size:7px;color:#150e06;border-radius:2px}
 /* SEAT MARK — where a lane-targeting icon has reached. Deliberately NOT a
    lane stripe: Denis wants the dice area to read as one continuous surface,
    so this is a soft squircle sitting under the seat rather than a division
@@ -10118,8 +10126,13 @@ function _tellById(id){
 }
 /* is a table rule live for this side? boss tell binds the player only;
    a sleeved tell binds BOTH sides (brief §7) */
+/* the four rules the rework replaced. Their ids still exist (the badge
+   objects kept them) but the OLD behaviour is gone, so nothing may switch it
+   back on through a sleeve or a sealed seat. */
+var _RETIRED_RULES={last_call:1,counterfeit:1,confession:1,in_arrears:1};
 function _ruleActive(id,side){
   if(!G)return false;
+  if(_RETIRED_RULES[id]&&!(G._tell&&G._tell.id===id))return false;
   if(G._sealRule===id)return true;/* sealed seat: symmetric, brief §1 */
   if(G._sleeve===id)return true;
   if(side==='p'&&G._tell&&G._tell.id===id)return true;
@@ -11551,7 +11564,9 @@ CFX.fair_trade={
     var best=0;
     inv.forEach(function(m,i){if(dieRank(m)>dieRank(inv[best]))best=i;});
     if(dieRank(inv[best])<=dieRank(G.matchDice[worst]))return false;
-    G._fairTrade={lane:worst,was:G.matchDice[worst]};
+    /* a LOAN, not a gift: the stash die goes back after this roll and the
+       original returns. Restored in startPTurn. */
+    G._fairTrade={lane:worst,was:G.matchDice[worst],borrowed:inv[best]};
     G.matchDice[worst]=inv[best];
     try{famLog('FAIR TRADE — '+(getDie(G._fairTrade.was)||{}).name+' OUT, '+(getDie(inv[best])||{}).name+' IN');}catch(e){}
     return true;
@@ -14809,6 +14824,7 @@ function _matchDress(isBoss){
       ux:+(dx/len).toFixed(3),uy:+((dy/len)/1.9).toFixed(3),
       bl:+(Math.min(1.6,0.4+len*0.02)*flat).toFixed(2)});
   });
+  try{_firstStrikeRender();}catch(e){}
   _mLightCalc();_drawPropShadows();_litProps(_candleF(0.8));_drawDiceShadows(0.8);_candleLoop();
   try{_drawCandle(0.8);}catch(e){}
   /* redraw once the screen transition settles */
@@ -15528,7 +15544,10 @@ var ENCH_ICONS={
   snare:{name:'Snare',price:400,glyph:'\u2442',ink:'#a888c0',
     desc:'Brand a snare on one face. Keep it: it banks nothing and sets a trap in this lane for the rival\u2019s next turn.',
     fire:function(c){
-      G._snare={lane:c.lane,live:true};
+      /* stamped with the opponent turn it is FOR. "Until it fires" tested at
+         97.7% inside six turns - not a bet at all - so the window has to be
+         one turn whether it bites or not. */
+      G._snare={lane:c.lane,live:true,turn:(G.oppTurnCount||0)};
       _firstStrike(c.side);
       try{famLog('SNARE SET — LANE '+(c.lane+1));}catch(e){}
     }},
@@ -15541,7 +15560,11 @@ var ENCH_ICONS={
      abbreviation nothing else uses. */
   'break':{name:'Break',price:300,glyph:'\u2620',ink:'#c66058',
     desc:'Brand a skull on one face. Keep it: it banks nothing and breaks another of your dice for good — and whatever that die was dies loudly.',
-    fire:function(c){_breakBegin(c.die);}},
+    /* only ARMS here. Targeting cannot start inside the commit: the caller
+       carries on and re-throws the row, wiping the tap handlers in the same
+       call that set them. handleRoll/handleBank pick this up once the commit
+       has settled. */
+    fire:function(c){G._breakPending={src:c.die};}},
 
   /* PERMANENTLY swaps the player's die in this lane with the opponent's.
      Not a blind gamble - landing order is loadout order and the peek shows
@@ -15555,6 +15578,12 @@ var ENCH_ICONS={
       _firstStrike(c.side);
       var mine=G.matchDice[L],theirs=G.matchOppDice[L];
       G.matchDice[L]=theirs;G.matchOppDice[L]=mine;
+      /* and for the rest of the RUN, not just the match. The brand stays on
+         the seat, which is the point - you traded the die, not the work. */
+      try{
+        _getS();_enchInit();
+        if(S.run.dice&&L<S.run.dice.length){S.run.dice[L]=theirs;save();}
+      }catch(e){}
       /* the die on the table becomes what was traded for, from now on */
       try{c.die.mat=theirs;reDrawDieFace(c.die);}catch(e){}
       try{famLog('TRADE — '+(getDie(mine)||{}).name+' FOR '+(getDie(theirs)||{}).name);}catch(e){}
@@ -15566,7 +15595,7 @@ var ENCH_ICONS={
   snuff:{name:'Snuff',price:300,glyph:'\u2716',ink:'#b09470',
     desc:'Brand a snuffed candle on one face. Keep it: it banks nothing and takes the rival\u2019s die in this seat away for one turn.',
     fire:function(c){
-      G._snuff={lane:c.lane,live:true};
+      G._snuff={lane:c.lane,live:true,turn:(G.oppTurnCount||0)};
       _firstStrike(c.side);
       try{famLog('SNUFFED — THEY PLAY A DIE SHORT');}catch(e){}
     }},
@@ -15577,7 +15606,7 @@ var ENCH_ICONS={
   fog:{name:'Fog',price:250,glyph:'\u2601',ink:'#a8b0b8',
     desc:'Brand a cloud on one face. Keep it: it banks nothing and hides this seat from the rival\u2019s reckoning next turn.',
     fire:function(c){
-      G._fog={lane:c.lane,live:true};
+      G._fog={lane:c.lane,live:true,turn:(G.oppTurnCount||0)};
       _firstStrike(c.side);
       try{famLog('FOG — THEY WILL NOT SEE THAT SEAT');}catch(e){}
     }}
@@ -15624,6 +15653,11 @@ function _splitIcons(dice){
 function _iconOnTable(pool){
   return (pool||[]).some(function(d){return !d.committed&&_dieIsIcon(d);});
 }
+/* the row carries a live brand: used to keep the ROLL button honest when the
+   only legal move on the table is a zero-point keep */
+function _iconRescuesRow(){
+  try{return _iconOnTable(G&&G.pool);}catch(e){return false;}
+}
 /* CORVUS — FIRST STRIKE. Whoever FIRST reaches across the table with a
    seat-targeting icon (Snare, Trade, Snuff, Fog) opens both hands: each side
    sees the other's full six-seat material layout for the rest of the match.
@@ -15636,6 +15670,26 @@ function _firstStrike(side){
   try{famLog('FIRST STRIKE — THE BOOKS ARE OPEN');}catch(e){}
   try{setStatusMsg('FIRST STRIKE — BOTH HANDS SHOWING','gold');}catch(e){}
   try{document.documentElement.classList.add('fkFirstStrike');}catch(e){}
+  try{_firstStrikeRender();}catch(e){}
+}
+/* The reveal IS the effect - a class on its own was a badge that did nothing
+   anyone could see. Both six-seat layouts, side by side, for the rest of the
+   match. */
+function _firstStrikeRender(){
+  if(!G||!G._firstStrikeOpen)return;
+  var host=document.getElementById('screen-match');if(!host)return;
+  var box=document.getElementById('fsReveal');
+  if(!box){
+    box=document.createElement('div');box.id='fsReveal';
+    host.appendChild(box);
+  }
+  var line=function(label,mats){
+    return '<div class="fs-row"><span class="fs-lbl">'+label+'</span>'
+      +(mats||[]).map(function(m){
+        return '<span class="fs-die" style="background:'+((FAMILIES[_matFam(m)]||{}).color||'#6b5a44')+'">'
+          +((getDie(m)||{}).name||'?').slice(0,2)+'</span>';}).join('')+'</div>';
+  };
+  box.innerHTML=line('YOU',G.matchDice)+line('THEM',G.matchOppDice);
 }
 /* ALDRIC — STILL WATERS. A worked die's FAMILY TRAIT is suppressed for the
    match; its enchant still fires normally. One helper, so every consumer of
@@ -15698,19 +15752,37 @@ function _breakBegin(src){
     d.el.onclick=function(){_breakDie(d);};
   });
 }
+function _breakClear(){
+  if(!G||!G.pool)return;
+  G._breakArmed=false;
+  G.pool.forEach(function(q){if(q.el)q.el.classList.remove('break-target');});
+}
 function _breakDie(d){
   if(!G._breakArmed)return;
-  G._breakArmed=false;
-  G.pool.forEach(function(q){if(q.el){q.el.classList.remove('break-target');q.el.onclick=null;}});
+  _breakClear();
+  G.pool.forEach(function(q){if(q.el)q.el.onclick=null;});
   var fam=_matFam(d.mat);
   var lane=_laneOf(d);
-  /* gone for the REST OF THE MATCH: the loadout drops to five */
+  /* GONE FOR GOOD. matchDice alone only lasts the match - the run loadout has
+     to lose it too or "permanently destroys" quietly undoes itself at the
+     final whistle. dieEnch moves in lockstep or every later brand is attached
+     to the wrong material. */
   if(lane>=0&&G.matchDice&&lane<G.matchDice.length){
     G.matchDice.splice(lane,1);
     if(G._enchArr&&lane<G._enchArr.length)G._enchArr.splice(lane,1);
     G.numDice=G.matchDice.length;
+    try{
+      _getS();_enchInit();
+      if(S.run.dice&&lane<S.run.dice.length){
+        S.run.dice.splice(lane,1);
+        if(S.run.dieEnch&&lane<S.run.dieEnch.length)S.run.dieEnch.splice(lane,1);
+        save();
+      }
+    }catch(e){}
   }
   var i=G.pool.indexOf(d);if(i>=0)G.pool.splice(i,1);
+  /* survivors re-seat, or every later seat effect aims at a hole */
+  G.pool.forEach(function(q,qi){q.lane=qi;});
   try{if(d.el){d.el.classList.add('die-shatter');var _w=d.el.parentElement;
     setTimeout(function(){try{(_w||d.el).remove();}catch(e){}},400);}}catch(e){}
   try{SFX.err&&SFX.err();}catch(e){}
@@ -15720,8 +15792,9 @@ function _breakDie(d){
   /* Silver's row cashes out immediately, so it has to run after the die is
      actually gone or the bank would count a die that no longer exists. */
   if(G._breakBankNow){G._breakBankNow=false;setTimeout(function(){try{handleBank();}catch(e){}},260);return;}
+  /* resume the roll Break interrupted */
   try{refreshSelUI();}catch(e){}
-  try{_measureIconState&&_measureIconState();}catch(e){}
+  setTimeout(function(){try{if(G&&G.phase==='choosing')handleRoll();}catch(e){}},320);
 }
 /* A die's LANE: its left-to-right seat in the loadout, which is the order
    the peek panel shows and the order the landing solver puts them in. Lane
@@ -19483,6 +19556,13 @@ function startPTurn(){
      here - they are armed on the player's turn to resolve on the rival's,
      and clear themselves when they fire. */
   G._wardArmed=false;G._bustImmuneTurn=false;G._zeroHourEnds=false;G._breakArmed=false;
+  G._breakPending=null;
+  /* Fair Trade was for one roll - put the borrowed die back */
+  if(G._fairTrade){
+    if(G.matchDice&&G._fairTrade.lane<G.matchDice.length)
+      G.matchDice[G._fairTrade.lane]=G._fairTrade.was;
+    G._fairTrade=null;
+  }
   /* THE TAB: release any bank the rival escrowed last turn. It was held for
      one turn; credit it now and check the win it may complete (the rival
      already had their answering turn while it was on the tab). */
@@ -19603,6 +19683,7 @@ function startPTurn(){
       if(eff.mode==='best_for_worst'){
         var pBestIdx=0;G.matchDice.forEach(function(d,i){if(dieRank(d)>dieRank(G.matchDice[pBestIdx]))pBestIdx=i;});
         var oWorstIdx=0;G.matchOppDice.forEach(function(d,i){if(dieRank(d)<dieRank(G.matchOppDice[oWorstIdx]))oWorstIdx=i;});
+        /* a swap, not a splice - lanes and brands stay aligned */
         var pOld=G.matchDice[pBestIdx],oOld=G.matchOppDice[oWorstIdx];
         G.matchDice[pBestIdx]=oOld;G.matchOppDice[oWorstIdx]=pOld;
         triggerCard(cid,npc.name+': SWAPPED '+pOld.toUpperCase()+' ↔ '+oOld.toUpperCase(),false);
@@ -19841,6 +19922,19 @@ function handleRoll(){
        here, after the points for the rest of the selection are settled, so
        nothing an icon does can be mistaken for a score. */
     _iconSel.forEach(function(d){_iconFire(d,'p');});
+    /* Break stops the turn here and waits for a target. _breakDie resumes
+       the roll once one is tapped. */
+    if(G._breakPending){
+      var _bp=G._breakPending;G._breakPending=null;
+      selDice.forEach(function(d){d.committed=true;d.sel=false;
+        if(d.el){d.el.classList.remove('selected');d.el.classList.add('committed');d.el.onclick=null;}});
+      if(pts>0){G.kept.push({vals:_selVals,mat:(_scoreDice[0]||selDice[0]).mat,pts:pts,
+        dice:_scoreDice.map(function(dd){return{val:dd.val,mat:dd.mat};})});
+        G.turnPts=G.kept.reduce(function(a,k){return a+k.pts;},0)+(G._stakesRisingBonus||0);
+        try{updHUD();refreshKeptTray();}catch(e){}}
+      _breakBegin(_bp.src);
+      return;
+    }
     /* TELL: Counterfeit (Whisper) — halve groups containing cursed dice + skull puff */
     var _cfHit=false;
     if(false&&selDice.some(function(d){return d.cursed;})){
@@ -20678,22 +20772,54 @@ function doBust(){
      anything is cleared, so the turn continues untouched. */
   if(G._bustImmuneTurn){
     try{setStatusMsg('AMBER HOLDS — NO BUST','gold');famLog('AMBER — THE TURN SURVIVES');}catch(e){}
-    try{G.pool.filter(function(d){return !d.committed;}).forEach(function(d){
-      d.val=_rollD(d);d.sel=false;try{reDrawDieFace(d);}catch(e){}});}catch(e){}
-    G.phase='choosing';try{refreshSelUI();}catch(e){}
+    var _amFree=G.pool.filter(function(d){return !d.committed;});
+    /* Keep rerolling until the hand can actually be played. Without this the
+       reroll could land dead and leave the player with no legal move and no
+       bust - a hard softlock - because immunity suppresses the only exit. */
+    var _amTries=0,_amOK=false;
+    while(_amTries++<40){
+      _amFree.forEach(function(d){d.val=_rollD(d);d.sel=false;});
+      if(anyScoring(_amFree.map(function(d){return d.val;}),effectiveCards(),
+                    _amFree.map(function(d){return d.mat;}),_amFree)){_amOK=true;break;}
+    }
+    _amFree.forEach(function(d){try{reDrawDieFace(d);}catch(e){}});
+    if(!_amOK){
+      /* astronomically unlikely, but never leave the turn unplayable: bank
+         what is there rather than hang. */
+      G._bustImmuneTurn=false;
+      try{famLog('AMBER GIVES OUT');}catch(e){}
+      setTimeout(function(){try{handleBank();}catch(e){}},400);
+      return;
+    }
+    G.phase='choosing';
+    try{G.pool.forEach(function(d){if(!d.committed&&d.el)d.el.onclick=function(){toggleDie(d);};});}catch(e){}
+    try{refreshSelUI();}catch(e){}
     return;
   }
   /* WARD: never a full save - the bank is HALVED, not kept. One ward per
      turn, armed by the first branded face kept. */
   if(G._wardArmed){
     G._wardArmed=false;
-    var _half=Math.floor(_bustLost/2);
+    /* the whole turn, not just G.kept - the Stakes Rising seed lives outside
+       it and was being dropped rather than halved */
+    var _wardTotal=_bustLost+(G._stakesRisingBonus||0);
+    var _half=Math.floor(_wardTotal/2);
     try{setStatusMsg('WARD HOLDS — HALF SURVIVES: '+_half,'gold');famLog('WARD — HALF THE TURN SURVIVES ('+_half+')');}catch(e){}
     G.pPts=(G.pPts||0)+_half;
-    G.turnPts=0;G.kept=[];
+    G.turnPts=0;G.kept=[];G._stakesRisingBonus=0;
     try{updHUD();refreshKeptTray();}catch(e){}
     G.safeTurnStreak=0;
-    setTimeout(function(){try{clearRow('playerDiceRow');G.pool=[];endPTurn();}catch(e){}},900);
+    /* it is still a bust: the chain breaks and the feat counter ticks, which
+       a silent half-save was quietly preserving */
+    G._hotHandChain=0;
+    setTimeout(function(){
+      try{
+        clearRow('playerDiceRow');G.pool=[];
+        /* half a turn can be enough to win - check before handing over */
+        if(G.pPts>=G.target){endMatch(true);return;}
+        endPTurn();
+      }catch(e){}
+    },900);
     return;
   }
   /* Feat tracking: count player busts for "Untouchable" feat */
@@ -20783,9 +20909,10 @@ function doBust(){
       var _swMats=[],_swVals=[];
       for(var _swi=0;_swi<3;_swi++){
         var _swM=(G.matchDice&&G.matchDice[_swi])||'bone';
-        var _swV=rollFace(_swM);
+        var _swEn=(G._enchArr||[])[_swi]||null;
+        var _swV=_enchRollM(_swM,_swEn);
         _swMats.push(_swM);_swVals.push(_swV);
-        if(_swRow){var _swEl=mkDie(_swV,_swM);_swEl.classList.add('rolling');_appendDie(_swRow,_swEl);}
+        if(_swRow){var _swEl=mkDie(_swV,_swM,null,false,_swEn);_swEl.classList.add('rolling');_appendDie(_swRow,_swEl);}
       }
       try{SFX.roll&&SFX.roll(3);}catch(e){}
       setTimeout(function(){
@@ -22176,6 +22303,11 @@ function runOppTurn(){
      the remaining-charge count persists on the object across turns. */
   crowsCtx.crowsLuck=G.pCards.includes('crows_luck');
   G.oppTurnCount=(G.oppTurnCount||0)+1;
+  /* a seat effect covers exactly ONE opposing turn - the one after it was
+     set - and is swept whether or not it ever bit */
+  ['_snare','_fog','_snuff'].forEach(function(k){
+    if(G[k]&&G[k].live&&G.oppTurnCount>(G[k].turn||0)+1)G[k]=null;
+  });
   /* Synergy: The Sting — opponent loses 100 every 4th turn */
   if(G.activeSynergies&&G.activeSynergies.includes('dirty_pair')&&G.oppTurnCount%4===0){G.oPts=Math.max(0,G.oPts-100);spawnPop('-100 \uD83D\uDC1D');}
   /* SNUFF: the rival's die in the snared seat is gone for THIS TURN ONLY,
@@ -22322,11 +22454,10 @@ function runOppTurn(){
          physically there and still rolls - the AI's maths simply cannot see
          its value, so that seat resolves to whatever the rest implies. */
       var _fogV=fV.slice(),_fogM=fMats.slice();
-      if(G._fog&&G._fog.live){
+      if(G._fog&&G._fog.live&&G._fog.turn===G.oppTurnCount){
         var _fi=-1;
         for(var _fj=0;_fj<_oFree.length;_fj++)if(_oFree[_fj].lane===G._fog.lane){_fi=_fj;break;}
         if(_fi>=0&&_fogV.length>1){
-          G._fog.live=false;
           _fogV.splice(_fi,1);_fogM.splice(_fi,1);
           try{famLog('FOG — THEY MISREAD A SEAT');}catch(e){}
         }
@@ -22339,13 +22470,10 @@ function runOppTurn(){
          during this turn. The mark then clears whether it fired or not -
          "until it fires" tested at 97.7% inside six turns, which is not a
          bet. One opposing turn is what makes it a wager. */
-      if(G._snare&&G._snare.live&&total>0){
-        /* which slot of THIS roll's free dice is sitting in the snared seat.
-           Indexing _oFree by the lane number was wrong the moment they kept
-           anything: that array re-indexes every roll. */
+      if(G._snare&&G._snare.live&&G._snare.turn===G.oppTurnCount){
         var _snIdx=-1;
         for(var _si=0;_si<_oFree.length;_si++)if(_oFree[_si].lane===G._snare.lane){_snIdx=_si;break;}
-        if(_snIdx>=0&&used&&used[_snIdx]){
+        if(total>0&&_snIdx>=0&&used&&used[_snIdx]){
           total=Math.floor(total/2);
           G._snare.live=false;
           try{famLog('THE SNARE BITES — HALVED');}catch(e){}
@@ -22960,10 +23088,8 @@ function runOppTurn(){
         var r=famDef('retort').p[c.tier-1];
         G.pPts=Math.max(0,G.pPts-r);setStatusMsg('THEIR RETORT — YOU LOSE '+r,'red');
       }
-      if(pts<=0&&(c=_npcFamCard('insurance'))){
-        var keep=Math.round(oppBank*famDef('insurance').p[c.tier-1]);
-        if(keep>0){G.oPts+=keep;setStatusMsg('THEIR INSURANCE KEEPS '+keep,'red');}
-      }
+      /* Insurance was retired with Silver's rework - famDef('insurance') is
+         undefined now and this would have thrown the moment an NPC held it. */
       try{updHUD();}catch(e){}
     })();
     /* ILL OMEN resolution: declared before this rival turn */
@@ -30800,7 +30926,7 @@ function _runBalanceSim(cfg){
   function bossCardsFor(rung,ti){
     var pool={obsidian:['short_fuse','double_or_nothing'],amber:['slow_cook','double_or_nothing'],
       vagabond:['pickpocket','slow_cook'],starstone:['falling_star','encore'],
-      silver:['insurance','retort'],jade:['bloom','transmute']};
+      silver:['steady_hand','retort'],jade:['bloom','transmute']};
     var fam=(rung.key&&BOSS_FAM[rung.key])||'silver';
     var t=ti<=3?1:(ti<=5?2:3);
     return (pool[fam]||[]).slice(0,ti<=2?1:2).map(function(id){return{id:id,tier:t};});
@@ -30834,7 +30960,8 @@ function _runBalanceSim(cfg){
     function bust(){
       out.busted=true;out.rolls=rolls;
       if(lit())out.selfBurn=turn;/* short fuse: the fire spreads to the bank */
-      if(cs.ids.insurance)out.banked=Math.round(turn*cardP(cs,'insurance'));
+      /* insurance retired: a bust takes the turn, and Ward - the enchant that
+         replaced it - halves rather than rescuing, and is not modelled here */
       return out;
     }
     while(true){
