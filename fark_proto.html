@@ -10331,7 +10331,7 @@ function _maybeFireCutpurse(){
   var _safeCandidates=free.filter(function(cand){
     var _remaining=free.filter(function(d){return d!==cand;});
     if(_remaining.length===0)return false;
-    return anyScoring(_remaining.map(function(d){return d.val;}),effectiveCards(),_remaining.map(function(d){return d.mat;}));
+    return anyScoring(_remaining.map(function(d){return d.val;}),effectiveCards(),_remaining.map(function(d){return d.mat;}),_remaining);
   });
   /* If every candidate would force a bust, skip the palm entirely this roll.
      Worth firing only when at least one safe target exists. */
@@ -10356,7 +10356,7 @@ function _maybeFireCutpurse(){
        scoring option remains after a single palm. This re-check is a
        belt-and-braces guard for edge cases (e.g. weird die materials). */
     var fv=G.pool.filter(function(d){return !d.committed;});
-    if(fv.length===0||(!anyScoring(fv.map(function(d){return d.val;}),effectiveCards(),fv.map(function(d){return d.mat;}))&&!_anchorRescues(effectiveCards()))){
+    if(fv.length===0||(!anyScoring(fv.map(function(d){return d.val;}),effectiveCards(),fv.map(function(d){return d.mat;}),fv)&&!_anchorRescues(effectiveCards()))){
       /* Offer the bust saves (Martyr/Iron Stomach/Grit) here too — every
          bust path must, or a save-holder loses the turn to a palm-induced
          bust with the save never offered. */
@@ -11504,7 +11504,7 @@ CFX.encore={
     setTimeout(function(){
       var fv=free.map(function(d){return d.val;}),fm=free.map(function(d){return d.mat;});
       var cards=effectiveCards();
-      if(!anyScoring(fv,cards,fm)){if(_tryBustSave(free))return;_delayedDoBust(free);return;}
+      if(!anyScoring(fv,cards,fm,free)){if(_tryBustSave(free))return;_delayedDoBust(free);return;}
       free.forEach(function(d){if(d.el)d.el.onclick=function(){toggleDie(d);};});
       G.phase='choosing';refreshSelUI();
     },500);
@@ -12091,7 +12091,7 @@ function famCommitBonus(selD,pts){
     if(grown>0){pts+=grown;_famPop('+'+grown+' CULTIVATE');}
     else _famPop('CULTIVATE GROWS');
   }
-  var _tempered=selD.filter(function(d){return d.ench&&d.ench.t==='tempering'&&d.ench.r==='hard';});
+  var _tempered=[];/* tempering was cut - a flat scoring adjustment, not a verb */
   if(_tempered.length){var _tb=_tempered.length*100;pts+=_tb;_famPop('+'+_tb+' TEMPERED');}
   var first=G.pool[0],last=G.pool[G.pool.length-1];
   var hitFirst=first&&selD.indexOf(first)>=0,hitLast=last&&selD.indexOf(last)>=0;
@@ -12142,7 +12142,7 @@ function famFoolsGold(free){
   famLog("FOOL'S GOLD — EVERYTHING REROLLS");
   free.forEach(function(d){d.val=_rollD(d);try{reDrawDieFace(d);}catch(e){}});
   var fv=free.map(function(d){return d.val;}),fm=free.map(function(d){return d.mat;});
-  if(anyScoring(fv,effectiveCards(),fm)){
+  if(anyScoring(fv,effectiveCards(),fm,free)){
     free.forEach(function(d){if(d.el)d.el.onclick=function(){toggleDie(d);};});
     G.phase='choosing';try{refreshSelUI();}catch(e){}
     return true;
@@ -12190,7 +12190,7 @@ CFX.powder_keg={
       var fv=free.map(function(d){return d.val;}),fm=free.map(function(d){return d.mat;});
       var cc={};fv.forEach(function(v){cc[v]=(cc[v]||0)+1;});
       if(Object.keys(cc).some(function(v){return cc[v]>=3;}))G._famKegTriple=true;
-      if(!anyScoring(fv,effectiveCards(),fm)){if(_tryBustSave(free))return;_delayedDoBust(free);return;}
+      if(!anyScoring(fv,effectiveCards(),fm,free)){if(_tryBustSave(free))return;_delayedDoBust(free);return;}
       free.forEach(function(d){if(d.el)d.el.onclick=function(){toggleDie(d);};});
       G.phase='choosing';try{refreshSelUI();}catch(e){}
     },500);
@@ -15328,7 +15328,14 @@ function scoreSelection(selVals,cards,locked,context,dieMats){
   var _gc=G&&G.activeSynergies&&G.activeSynergies.includes('gilded_pair')?Math.floor(_bestValid*0.1):0;
   return _bestValid+_gc;
 }
-function anyScoring(vals,cards,dieMats){return scoreRoll(vals,cards||[],0,{},dieMats).total>0;}
+function anyScoring(vals,cards,dieMats,dice){
+  if(scoreRoll(vals,cards||[],0,{},dieMats).total>0)return true;
+  /* A branded face is a legal keep worth nothing, so a roll showing one is
+     NOT a bust - without this the icon could never fire on the roll that
+     would matter most. `dice` is passed explicitly rather than read off
+     G.pool: several callers probe hypothetical subsets. */
+  return !!(dice&&dice.some(_dieIsIcon));
+}
 /* BOOKENDS player-side eligibility: true only when the selection contains
    BOTH actual row-end dice (G.pool first/last) and they match — the card text
    is "leftmost and rightmost dice in your ROLL". Stamped onto the scoring
@@ -15383,14 +15390,100 @@ function isCombo(vals){
 /* ═══ ENCHANTS — innkeep services, NOT cards (brief §3). One per die,
    ever; travels with the die; never a quiet +X. ═══ */
 var ENCHANTS={
-  amber_cast:{name:'Amber Cast',price:200,desc:'Trap one face in amber and replace another of its faces with the copy.'},
-  quicksilver:{name:'Quicksilver',price:250,desc:'Coat a die; once per turn you may reroll it alone, free.'},
-  tempering:{name:'Tempering',price:150,desc:'Hold it to the fire. Half the time it hardens (+100 to all its scores, for good), half the time it cracks and loses its highest face.'},
-  loaded:{name:'Loaded',price:400,desc:'Shave it; pick a face, it rolls that face twice as often.'}
+  /* The only enchant with no face. A whole-die passive, so the
+     one-face law below cannot apply to it and it skips the face step. */
+  quicksilver:{name:'Quicksilver',price:250,desc:'Coat a die; once per turn you may reroll it alone, free.'}
 };
+/* ═══ ICON ENCHANTS ═══
+   Branded onto ONE natural face. When that face lands and is kept it banks
+   ZERO and fires its effect instead - never both. That sentence is the whole
+   system, and `_iconFire` below is the only place it is implemented, so the
+   law holds by construction rather than by seven people remembering it.
+
+   `doubles` marks an effect Whisper's Kindred badge can meaningfully
+   double. Only Tithe qualifies: "twice as much gold" is obvious, "twice a
+   die-destruction" is not. See the brief's open items - the others are a
+   design decision, not a default to guess. */
+var ENCH_ICONS={
+  tithe:{name:'Tithe',price:150,glyph:'\u25C9',ink:'#d8b054',doubles:true,
+    desc:'Brand a coin on one face. Keep it: it banks nothing and pays you 15 gold.',
+    fire:function(c){
+      _getS();var g=15*(c.mult||1);
+      S.run.gold=(S.run.gold||0)+g;try{save();}catch(e){}
+      try{famLog('TITHE — +'+g+'g');}catch(e){}
+    }}
+};
+/* every service the innkeep sells, icons included */
+function _enchDef(k){return ENCHANTS[k]||ENCH_ICONS[k]||null;}
+function _isIcon(ench){return !!(ench&&ENCH_ICONS[ench.t]);}
+/* is this die SHOWING its branded face right now? */
+function _dieIsIcon(d){return !!(d&&_isIcon(d.ench)&&d.val===d.ench.face);}
+/* Whisper's Kindred: 2+ enchanted dice on EITHER side doubles icon effects
+   for both. Only the additive-numeric ones - see ENCH_ICONS.doubles. */
+function _kindredActive(){
+  try{
+    if(!G||!G._tell||G._tell.id!=='counterfeit')return false;
+    var mine=(G._enchArr||[]).filter(Boolean).length;
+    return mine>=2;
+  }catch(e){return false;}
+}
+/* ═══ THE UNIVERSAL RULE ═══
+   Banks zero, fires the effect, never both. Three callers: the roll commit,
+   the bank commit, and the NPC keep loop. None of them may add points for an
+   icon die, and none of them may implement an effect themselves. */
+function _iconFire(d,side){
+  var def=ENCH_ICONS[d&&d.ench&&d.ench.t];
+  if(!def)return 0;
+  var mult=(def.doubles&&_kindredActive())?2:1;
+  try{def.fire({die:d,side:side||'p',lane:_laneOf(d),mult:mult});}
+  catch(e){try{console.error('icon '+d.ench.t,e);}catch(e2){}}
+  /* Grog's Zero Hour: keeping any icon face ends the acting side's turn */
+  try{if(G&&G._tell&&G._tell.id==='last_call')G._zeroHourEnds=true;}catch(e){}
+  return 0;/* ALWAYS zero */
+}
+/* Split a selection into the dice the scoring engine should see and the
+   icon dice it must not. An icon die withheld here can never be scored and
+   can never be reported as "unused", which is what makes a zero-point keep
+   legal without touching the engine. */
+function _splitIcons(dice){
+  var icons=[],rest=[];
+  (dice||[]).forEach(function(d){(_dieIsIcon(d)?icons:rest).push(d);});
+  return {icons:icons,rest:rest};
+}
+/* is any FREE die showing its branded face? Then the roll is not a bust:
+   there is a legal keep on the table even though it scores nothing. */
+function _iconOnTable(pool){
+  return (pool||[]).some(function(d){return !d.committed&&_dieIsIcon(d);});
+}
+/* A die's LANE: its left-to-right seat in the loadout, which is the order
+   the peek panel shows and the order the landing solver puts them in. Lane
+   identity is what Snare/Trade/Snuff/Fog target, so it must survive a die
+   being kept, committed or removed - the pool index does not. */
+function _laneOf(d){
+  if(!d)return -1;
+  if(d.lane!==undefined&&d.lane!==null)return d.lane;
+  try{return (G.pool||[]).indexOf(d);}catch(e){return -1;}
+}
 function _enchInit(){
   _getS();
   S.run.dieEnch=S.run.dieEnch||[];S.run.dieEnchInv=S.run.dieEnchInv||[];
+  /* MIGRATION. A run in progress may carry amber_cast, tempering or loaded,
+     none of which exist any more. Strip them and refund what was paid, so a
+     save is never left pointing at a mechanic the code has forgotten. Runs
+     once per save, guarded by _enchV. */
+  if(S.run._enchV!==2){
+    var _refund=0,_gone={amber_cast:200,tempering:150,loaded:400};
+    ['dieEnch','dieEnchInv'].forEach(function(key){
+      (S.run[key]||[]).forEach(function(e,i){
+        if(e&&_gone[e.t]!==undefined){_refund+=_gone[e.t];S.run[key][i]=null;}
+      });
+    });
+    if(_refund>0){
+      S.run.gold=(S.run.gold||0)+_refund;
+      try{famLog('THE INNKEEP REFUNDS '+_refund+'g — THAT WORK IS NO LONGER DONE');}catch(e){}
+    }
+    S.run._enchV=2;try{save();}catch(e){}
+  }
   while(S.run.dieEnch.length<(S.run.dice||[]).length)S.run.dieEnch.push(null);
   S.run.dieEnch.length=(S.run.dice||[]).length;
   while(S.run.dieEnchInv.length<(S.run.diceInv||[]).length)S.run.dieEnchInv.push(null);
@@ -15405,11 +15498,11 @@ function _rollTable(mat){
   return (dt.rollTable||dt.faces||[1,2,3,4,5,6]);
 }
 function _enchFaces(mat,ench){
+  /* An icon rides a natural face - it never adds, removes or reweights one.
+     That is the line between an enchant and a family trait (brief section 0),
+     and the three enchants that crossed it (amber_cast, tempering, loaded)
+     are exactly the three that were cut. */
   var f=_rollTable(mat).slice();
-  if(!ench)return f;
-  if(ench.t==='amber_cast')f=f.map(function(x){return x===ench.faceB?ench.faceA:x;});
-  if(ench.t==='tempering'&&ench.r==='crack'){var mx=Math.max.apply(null,f);f.splice(f.indexOf(mx),1);}
-  if(ench.t==='loaded')f.push(ench.face);
   return f.length?f:[1];
 }
 function _enchRollM(mat,ench){var f=_enchFaces(mat,ench);return f[Math.floor(Math.random()*f.length)];}
@@ -15424,7 +15517,7 @@ function famQuicksilver(){
   famLog('QUICKSILVER — IT ROLLS ALONE, FREE');
   var free=G.pool.filter(function(x){return !x.committed&&!x._frozen;});
   var fv=free.map(function(x){return x.val;}),fm=free.map(function(x){return x.mat;});
-  if(!anyScoring(fv,effectiveCards(),fm)){if(!_tryBustSave(free))_delayedDoBust(free);return;}
+  if(!anyScoring(fv,effectiveCards(),fm,free)){if(!_tryBustSave(free))_delayedDoBust(free);return;}
   try{refreshSelUI();}catch(e){}try{famRenderRow();}catch(e){}
 }
 function rollFace(mat){
@@ -19285,7 +19378,7 @@ function handleRoll(){
     SFX.roll();G.turnRollCount++;
     setTimeout(function(){
       var free2=G.pool.filter(function(d){return !d.committed;});var fv=free2.map(function(d){return d.val;});var fm=free2.map(function(d){return d.mat;});var cards=effectiveCards();
-      if(!anyScoring(fv,cards,fm)&&!_anchorRescues(cards)){if(_tryBustSave(free2))return;_delayedDoBust(free2);return;}
+      if(!anyScoring(fv,cards,fm,free2)&&!_anchorRescues(cards)){if(_tryBustSave(free2))return;_delayedDoBust(free2);return;}
       free2.forEach(function(d){d.el.onclick=function(){toggleDie(d);};});
       G.phase='choosing';refreshSelUI();
     },600);
@@ -19340,7 +19433,9 @@ function handleRoll(){
      other die; excluding it here used to silently drop it ("NO SCORE"). */
   const selDice=G.pool.filter(d=>d.sel&&!d.committed);
   if(selDice.length){
-    var _selVals=selDice.map(d=>d.val);var _selMats=selDice.map(d=>d.mat);const locked=G.kept.reduce((a,k)=>a+k.pts,0);const cards=effectiveCards();
+    /* icons are withheld from scoring entirely - see _splitIcons */
+    var _sp=_splitIcons(selDice),_iconSel=_sp.icons,_scoreDice=_sp.rest;
+    var _selVals=_scoreDice.map(d=>d.val);var _selMats=_scoreDice.map(d=>d.mat);const locked=G.kept.reduce((a,k)=>a+k.pts,0);const cards=effectiveCards();
     /* ── ANCHOR pre-processing ──
        Position-last die showing a 6, when committed, gets a +150 bonus.
        Implementation: first check if the 6 is already consumed by normal scoring
@@ -19382,15 +19477,22 @@ function handleRoll(){
     }else{
       pts=scoreSelection(_selVals,cards,locked,_cw,_selMats);
     }
-    /* Reject if base scoring returned -1 (unused dice) OR returned 0 without anchor firing */
-    if(pts<0||(pts===0&&!_anchorDie)){SFX.err();setStatusMsg('NO SCORE — TRY AGAIN','red');return;}
+    /* Reject if base scoring returned -1 (unused dice) OR returned 0 without
+       anchor firing - unless the selection carries an icon, which is a legal
+       keep worth nothing by design. */
+    if(_scoreDice.length===0&&_iconSel.length)pts=0;
+    if(pts<0||(pts===0&&!_anchorDie&&!_iconSel.length)){SFX.err();setStatusMsg('NO SCORE — TRY AGAIN','red');return;}
     pts+=_anchorPts;
     _pCrowsCommit(_cw);/* selection accepted → spend the NPC's Crow's Luck charge if a straight was downgraded */
     if(_anchorDie){triggerCard('anchor','ANCHOR +600',true);spawnPop('+600 ANCHOR');}
     /* Per-commit card bonuses (Vanguard/Sequence/Flanks/Hot Hand/Perfect
        Storm/Triple Hunter/Tempting Fate/Vow/Echo) — extracted into
        _applyCommitBonuses, shared with handleBank's selection commit. */
-    pts=_applyCommitBonuses(selDice,pts,cards);
+    pts=_applyCommitBonuses(_scoreDice,pts,cards);
+    /* THE UNIVERSAL RULE: each icon banks nothing and fires instead. Fired
+       here, after the points for the rest of the selection are settled, so
+       nothing an icon does can be mistaken for a score. */
+    _iconSel.forEach(function(d){_iconFire(d,'p');});
     /* TELL: Counterfeit (Whisper) — halve groups containing cursed dice + skull puff */
     var _cfHit=false;
     if(G._tell&&G._tell.id==='counterfeit'&&selDice.some(function(d){return d.cursed;})){
@@ -19784,7 +19886,7 @@ function _afterRollImpl(){
   /* Re-read freeV — Loaded Die / Gambler's Ghost / Gambler's Thumb / Hot Streak above
      mutate d.val in place, so the snapshot taken at function entry would be stale. */
   freeV=free.map(d=>d.val);
-  if(!anyScoring(freeV,cards,freeMats)&&!_anchorRescues(cards)){
+  if(!anyScoring(freeV,cards,freeMats,free)&&!_anchorRescues(cards)){
     if(famFoolsGold(free))return;
     if(_tryBustSave(free))return;
     _delayedDoBust(free);return;
@@ -19899,7 +20001,7 @@ function _afterRollImpl(){
   var freeVN=free.map(function(d){return d.val;});
   var freeMatsN=free.map(function(d){return d.mat;});
   var cardsN=effectiveCards();
-  if(!anyScoring(freeVN,cardsN,freeMatsN)&&!_anchorRescues(cardsN)){if(_tryBustSave(free))return;setTimeout(function(){_delayedDoBust(free);},150);return;}
+  if(!anyScoring(freeVN,cardsN,freeMatsN,free)&&!_anchorRescues(cardsN)){if(_tryBustSave(free))return;setTimeout(function(){_delayedDoBust(free);},150);return;}
 
   /* Reckless die tracking (Brass): busts cost extra from banked total */
   /* (penalty applied in doBust, no forced bust here) */
@@ -19996,8 +20098,13 @@ function refreshSelUI(){
   /* Guard: don't update selection-status text outside the player's choosing/idle phases.
      Otherwise stale 'NO SCORE' from the player UI bleeds into NPC turn status messages. */
   if(G&&G.phase!=='choosing'&&G.phase!=='idle'&&G.phase!=='gamblers_eye')return;
-  const selD=G.pool.filter(d=>d.sel&&!d.committed);const selV=selD.map(d=>d.val);const selMats=selD.map(d=>d.mat);const locked=G.kept.reduce((a,k)=>a+k.pts,0);const cards=effectiveCards();
-  if(!selV.length){G.turnPts=locked+(G._stakesRisingBonus||0);updHUD();setBtns(false,locked>0||(G._stakesRisingBonus||0)>0);setStatusMsg('','');_renderSelTags([],0,true);_clearDieEffects();G.pool.forEach(d=>{d.el.classList.remove('combo-glow');d.el.style.removeProperty('--gd');});G._comboGlow=false;return;}
+  const selD=G.pool.filter(d=>d.sel&&!d.committed);
+  /* icons are withheld from the maths here for the same reason as at commit:
+     the engine must never see a die it would happily score. Without this a
+     branded 1 previewed as +100 and then banked nothing. */
+  const _pvSplit=_splitIcons(selD),_scoreD=_pvSplit.rest,_pvIcons=_pvSplit.icons;
+  const selV=_scoreD.map(d=>d.val);const selMats=_scoreD.map(d=>d.mat);const locked=G.kept.reduce((a,k)=>a+k.pts,0);const cards=effectiveCards();
+  if(!selV.length&&!_pvIcons.length){G.turnPts=locked+(G._stakesRisingBonus||0);updHUD();setBtns(false,locked>0||(G._stakesRisingBonus||0)>0);setStatusMsg('','');_renderSelTags([],0,true);_clearDieEffects();G.pool.forEach(d=>{d.el.classList.remove('combo-glow');d.el.style.removeProperty('--gd');});G._comboGlow=false;return;}
   /* Bookends row-eligibility stamp (see handleRoll) — preview must agree
      with the commit/bank paths. */
   var _beE=_bookendsEligible(selD);
@@ -20029,7 +20136,10 @@ function refreshSelUI(){
       }
     }
   }
-  const ok=pts>0;G.turnPts=locked+(ok?pts:0)+(G._stakesRisingBonus||0);updHUD();
+  /* an icon-only selection is legal and worth zero */
+  const _selHasIcon=_pvIcons.length>0;
+  if(!selV.length&&_selHasIcon)pts=0;
+  const ok=pts>0||_selHasIcon;G.turnPts=locked+(pts>0?pts:0)+(G._stakesRisingBonus||0);updHUD();
   /* Die effect visuals */
   _clearDieEffects();
   if(ok&&_sr.effects&&_sr.effects.length){_showDieEffects(selD,_sr.effects);}
@@ -20692,7 +20802,10 @@ function handleBank(){
         }
       }
     }
-    if(pts>0){
+    var _bkIcons=selD.filter(_dieIsIcon);
+    if(pts>0||_bkIcons.length){
+      _bkIcons.forEach(function(d){_iconFire(d,'p');});
+      if(pts<0)pts=0;
       _pCrowsCommit(_cw);/* banked straight downgraded by NPC's Crow's Luck → spend a charge */
       if(_bkAnchorFired){triggerCard('anchor','ANCHOR +600',true);spawnPop('+600 ANCHOR');}
       /* Per-commit card bonuses — same helper as the ROLL commit path.
@@ -24868,7 +24981,7 @@ function activateGrogsFlask(){
   SFX.roll();
   setTimeout(()=>{
     const newFree=G.pool.filter(d=>!d.committed);const newFV=newFree.map(d=>d.val);const newFMats=newFree.map(d=>d.mat);
-    if(!anyScoring(newFV,cards,newFMats)&&!_anchorRescues(cards)){if(_tryBustSave(newFree))return;_delayedDoBust(newFree);return;}
+    if(!anyScoring(newFV,cards,newFMats,newFree)&&!_anchorRescues(cards)){if(_tryBustSave(newFree))return;_delayedDoBust(newFree);return;}
     G.phase='choosing';refreshSelUI();
   },600);
 }
@@ -26950,9 +27063,30 @@ function _gbDieInspect(mat){
   _gbSheetOpen(h);
 }
 /* enchant flow: service → pick YOUR die → (faces) → confirm, permanent */
+/* which faces may carry an icon on this die. ONE place decides. */
+function _iconFaces(mat){
+  var base=((getDie(mat)||{}).faces||[1,2,3,4,5,6]);
+  var out=[];
+  base.forEach(function(f){if((f===1||f===5)&&out.indexOf(f)<0)out.push(f);});
+  return out;
+}
+/* a loadout may hold at most ONE Ward-branded die. The single-save cap is
+   not enough on its own: a second Ward die is a second CHANCE TO ARM, which
+   sim measured at a 28% save rate against 17% for one. */
+function _wardOwned(skipIdx){
+  _getS();
+  var hit=false;
+  ['dieEnch','dieEnchInv'].forEach(function(key){
+    (S.run[key]||[]).forEach(function(e,i){
+      if(key==='dieEnch'&&i===skipIdx)return;
+      if(e&&e.t==='ward')hit=true;
+    });
+  });
+  return hit;
+}
 function _gbEnchantPick(k){
   _getS();_enchInit();
-  var e=ENCHANTS[k];if(!e)return;
+  var e=_enchDef(k);if(!e)return;
   if((S.run.gold||0)<e.price){famLog('NOT ENOUGH GOLD');return;}
   var h='<div class="gbx-box" style="min-height:60px;padding:10px"><b>'+e.name.toUpperCase()+' — '+e.price+'g</b>'
     +'<div class="gbx-label">'+e.desc+'</div></div>'
@@ -26963,7 +27097,10 @@ function _gbEnchantPick(k){
     /* getDie(mt).fam has never existed - DICE_TYPES carries no fam field, so
        every one of these accents fell through to grey. */
     var col=(FAMILIES[_matFam(mt)]||{}).color||'#777';
-    if(en)h+='<div class="gbx-box sub" style="width:78px;height:64px;font-size:11px;opacity:.5"><span class="d3chip" data-mat="'+mt+'" style="width:26px;height:26px"></span>'+getDie(mt).name+'<br><span class="gbx-label">worked</span></div>';
+    /* an icon needs a natural 1 or 5 to sit on; a die with neither cannot
+       take one, and says so rather than silently offering an empty step */
+    var noFace=!!ENCH_ICONS[k]&&!_iconFaces(mt).length;
+    if(en||noFace)h+='<div class="gbx-box sub" style="width:78px;height:64px;font-size:11px;opacity:.5"><span class="d3chip" data-mat="'+mt+'" style="width:26px;height:26px"></span>'+getDie(mt).name+'<br><span class="gbx-label">'+(en?'worked':'no 1 or 5')+'</span></div>';
     else h+='<div class="gbx-box" style="width:78px;height:64px;font-size:11px;cursor:pointer;border-bottom:3px solid '+col+'" '
       +'onclick="_gbEnchantDie(\''+k+'\','+i+')"><span class="d3chip" data-mat="'+mt+'" style="width:26px;height:26px"></span>'+getDie(mt).name+'</div>';
   });
@@ -26971,47 +27108,47 @@ function _gbEnchantPick(k){
   _gbSheetOpen(h);
 }
 function _gbEnchantDie(k,i){
-  _getS();var mat=S.run.dice[i],faces=((getDie(mat)||{}).faces||[1,2,3,4,5,6]);
-  if(k==='amber_cast')return _gbEnchantFace(k,i,'a',null);
-  if(k==='loaded')return _gbEnchantFace(k,i,'l',null);
-  _gbEnchantConfirm(k,i,null,null);
+  _getS();
+  if(ENCH_ICONS[k])return _gbEnchantFace(k,i,'icon',null);
+  _gbEnchantConfirm(k,i,null,null);/* quicksilver: no face to pick */
 }
 function _gbEnchantFace(k,i,step,fa){
-  _getS();var mat=S.run.dice[i],faces=((getDie(mat)||{}).faces||[1,2,3,4,5,6]);
-  var uniq=[];faces.forEach(function(f){if(uniq.indexOf(f)<0)uniq.push(f);});
-  var title=step==='a'?'trap which face in amber?':(step==='b'?'replace which face with the copy?':'shave it toward which face?');
-  var h='<div class="gbx-box" style="height:50px"><b>'+getDie(mat).name+' — '+title+'</b></div>'
-    +'<div style="display:flex;gap:8px;justify-content:center;padding:12px 0">';
+  _getS();var mat=S.run.dice[i];
+  var uniq=_iconFaces(mat);
+  var def=ENCH_ICONS[k]||{};
+  var h='<div class="gbx-box" style="min-height:56px;padding:8px"><b>'+getDie(mat).name+' — brand which face?</b>'
+    +'<div class="gbx-label">that face stops scoring: it pays the '+(def.name||k).toLowerCase()+' instead</div></div>'
+    +'<div style="display:flex;gap:12px;justify-content:center;padding:14px 0">';
   uniq.forEach(function(f){
-    if(step==='b'&&f===fa)return;
-    var next=step==='a'?('_gbEnchantFace(\''+k+'\','+i+',\'b\','+f+')')
-      :('_gbEnchantConfirm(\''+k+'\','+i+','+(step==='b'?fa:f)+','+(step==='b'?f:'null')+')');
-    h+='<div class="gbx-box" style="width:48px;height:48px;font-size:18px;cursor:pointer" onclick="'+next+'">'+f+'</div>';
+    h+='<div class="gbx-box" style="width:64px;height:64px;font-size:22px;cursor:pointer" '
+      +'onclick="_gbEnchantConfirm(\''+k+'\','+i+','+f+',null)">'+f+'</div>';
   });
-  h+='</div>';
+  h+='</div><div class="gbx-label" style="text-align:center">only a natural 1 or 5 can take a brand</div>';
   _gbSheetOpen(h);
 }
 function _gbEnchantConfirm(k,i,a,b){
   _gbSheetClose();
-  var e=ENCHANTS[k],mat=S.run.dice[i];
+  var e=_enchDef(k),mat=S.run.dice[i];
   var line=e.name.toUpperCase()+' on '+getDie(mat).name
-    +(k==='amber_cast'?' — every '+b+' becomes a '+a:'')
-    +(k==='loaded'?' — the '+a+' face rolls twice as often':'');
+    +(ENCH_ICONS[k]?' — on its '+a:'');
   _gbModalOpen('<b>'+line+'</b><div class="gbx-label">permanent — one enchant per die, ever</div>'
     +'<div class="gbx-btn primary" style="height:48px" onclick="_gbModalClose();_gbEnchantApply(\''+k+'\','+i+','+(a==null?'null':a)+','+(b==null?'null':b)+')">PAY '+e.price+'g — DO THE WORK</div>'
     +'<div class="gbx-btn" style="height:48px" onclick="_gbModalClose()">look again</div>');
 }
 function _gbEnchantApply(k,i,a,b){
   _getS();_enchInit();
-  var e=ENCHANTS[k];if(!e||S.run.dieEnch[i])return;
+  var e=_enchDef(k);if(!e||S.run.dieEnch[i])return;
   if((S.run.gold||0)<e.price){famLog('NOT ENOUGH GOLD');return;}
+  /* the restriction re-asserted at the point of sale, not just in the UI
+     that offered it - the picker can be reached from a stale sheet */
+  if(ENCH_ICONS[k]){
+    if(_iconFaces(S.run.dice[i]).indexOf(a)<0){famLog('THAT FACE CANNOT TAKE A BRAND');return;}
+    if(k==='ward'&&_wardOwned(i)){famLog('ONE WARDED DIE AT A TIME');return;}
+  }
   var ench={t:k};
-  if(k==='amber_cast'){ench.faceA=a;ench.faceB=b;}
-  if(k==='loaded')ench.face=a;
-  if(k==='tempering')ench.r=Math.random()<0.5?'hard':'crack';
+  if(ENCH_ICONS[k])ench.face=a;
   S.run.gold-=e.price;S.run.dieEnch[i]=ench;save();
-  if(k==='tempering')famLog(ench.r==='hard'?'IT HARDENS — +100 TO ALL ITS SCORES, FOR GOOD':'IT CRACKS — ITS HIGHEST FACE IS GONE');
-  else famLog(e.name.toUpperCase()+' — THE WORK IS DONE');
+  famLog(e.name.toUpperCase()+' — THE WORK IS DONE');
   _gbShop();
 }
 function _gbBuyDie(mat){

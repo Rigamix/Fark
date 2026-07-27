@@ -4066,3 +4066,65 @@ deleting Silver's safety is that it "makes every bust-reactive card
 meaningless" — and Retort and Reprisal, which the brief KEEPS, were already
 meaningless for an unrelated reason. It would also have vanished entirely
 once that branch became unreachable.
+
+## P217–P221 — the enchant spine (brief §2)
+
+**Cut**, with the reasons kept in the code: `amber_cast` (duplicated Jade's
+entire reason for existing — face manipulation is Jade's identity),
+`tempering` (a flat scoring adjustment, not a verb), `loaded` (mechanically
+identical to owning two copies of that face). All three failed §0's law: an
+effect true regardless of which face showed is a family trait in a costume.
+`quicksilver` is kept byte for byte — it has no face, so the restriction
+cannot apply to it and it skips the face step.
+
+**`_enchFaces` is now a passthrough.** An icon rides a natural face; it never
+adds, removes or reweights one. That is the line between an enchant and a
+family trait, and the three that crossed it are exactly the three cut.
+
+**The universal rule lives in one function.** `_iconFire(d, side)` banks
+zero, fires the effect, applies Kindred, and returns `0` unconditionally. No
+caller may add points for an icon die and no enchant may implement its own
+resolution — the law holds by construction, not by seven people remembering.
+
+**How a zero-point keep was made legal.** The scoring engine has no notion of
+a die worth nothing but still legal: `scoreSelection` returns −1 when any
+selected die goes unused, and three separate gates reject a commit worth 0.
+Rather than thread a `dieIcons` array through `scoreRoll`'s call sites, icon
+dice are **withheld from the values handed to scoring** (`_splitIcons`). The
+engine never sees them, so it cannot score them and cannot call them unused.
+Four gates moved together: the roll commit, the bank commit, the selection
+preview, and bust detection.
+
+The preview needed the same treatment as the commit and not just a relaxed
+gate — first pass fixed only the gate and a branded 1 previewed as **+100**
+and then banked nothing, which is the worst kind of lie to tell a player.
+
+**Bust detection** takes an optional `dice` array now, passed explicitly at
+all 10 call sites rather than read off `G.pool`, because several callers probe
+hypothetical subsets and must not be told "an icon rescued you" about dice
+they were not asking about. A roll showing only branded faces is not a bust —
+without that the icon could never fire on the roll where it matters most.
+
+**The 1/5 restriction** is enforced in one place, `_iconFaces(mat)`, which
+reads the die's **base** `faces` — never `_enchFaces`, never `rollTable`. That
+automatically excludes a Jade wild-6 and any relic-altered face without naming
+either. Re-asserted at the point of sale, since the picker can be reached from
+a stale sheet. Ward additionally carries a loadout-level cap (`_wardOwned`)
+checking both the rack and the stash: the single-save cap alone is not enough,
+because a second Ward die is a second *chance to arm* — sim measured 28%
+against 17%.
+
+**Save migration**: a run carrying a cut enchant is stripped and refunded
+(200/150/400), guarded by `S.run._enchV`, so a save is never left pointing at
+a mechanic the code has forgotten.
+
+Verified end to end on a live match:
+
+| | result |
+|---|---|
+| icon-only preview | `0`, ROLL enabled |
+| icon-only commit | gold **+15**, points **0** |
+| mixed (icon 1 + plain 5) | preview `+50`, commit gold +15 **and** 50 points |
+| illegal face (3) at point of sale | rejected |
+| legal face (5) | accepted |
+| Kindred off / on | 15g / **30g** |
