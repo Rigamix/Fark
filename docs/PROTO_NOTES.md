@@ -4623,3 +4623,46 @@ on the left, `('p')` on the right, confirmed by intercepting the function and
 checking which side each click reports. `.tok` is `pointer-events:none` now, so
 the disc is pure decoration and the flag above it owns the whole unit including
 the portrait area. The centre of the bar stays untappable.
+
+## P245–P246 — the rival's side of the table, and two offsets counted twice
+
+**Scores centred in the ribbons.** The ring bottoms at 50.7% of the bar and the
+ribbon runs to its notch at 96.2% (left) / 90.2% (right), so **73%** sits the
+number in the middle of the visible band on both sides. It was at 83.8%, down
+by the notch.
+
+That 83.8% was a bug of mine. `.hud-score` is a child of `#raceWrap`, exactly
+like `#targetScore`, so its `top` already resolves against the bar — and P243
+added `var(--bar-top)` to it while retargeting the whole HUD, counting the bar's
+own offset a second time. It is a plain percentage now, which is what the
+sibling `#targetScore` uses and what cannot drift.
+
+**The plaque clears the diamond.** The centre plate's ink runs y 0–53.26% of the
+canvas and scales 1.34 about 26.63%, so it reaches **62.31%** of the bar — which
+was exactly where the plaque's top edge sat (66.4px against 66.1px). Measure the
+diamond from the *art*, not from `.rbCentre`'s rect: that element is the whole
+3795×950 canvas scaled, so its bounding box bottom is far below the visible
+point.
+
+**The rival's cards, on the rival's side.** Their portrait is on the left, so the
+row belonged there — it was pinned `right:2.5cqw`, sitting over the player's own
+flag. They use `famCardArt` now, the same call the player's row uses. There is
+no painted family back to fall back on (only `Icons/back.png` and the mockup
+backs), so the CSS-drawn `.mcBack` placeholder was the only alternative and it
+read as a bug next to the player's art. `.mcBack`'s styling is left in place for
+whenever painted backs land. **This reveals the rival's hand** — worth a second
+look if the face-down state was load-bearing.
+
+Four family cards have no art and fall back to a broken image in either row:
+`steady_hand`, `fair_trade`, `anchor_f`, `bookends_f` (28 of 32 are present).
+
+**Portraits scaled back down.** The sources are 443px wide, so a square crop
+cannot go below `background-size:100%` without the disc showing through at the
+sides; **104%** is the floor that still covers the edges, and the heads read as
+busts again instead of filling the circle edge to edge.
+
+**ROLL takes the left hand**, text 8.6 → 12.9cqw (the 50% asked for), stroke
+scaled with it so the outline keeps its weight. `bank-to-win` sets `order:1` as
+well as the wide plate, or the big button would swap hands on the deciding
+press. The pause needed **32.5cqw**, not the 29 that cleared BANK — ROLL is the
+tall plate and now sits on that side, reaching 20px higher.
