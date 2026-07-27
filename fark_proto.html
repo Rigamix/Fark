@@ -15743,7 +15743,9 @@ var BREAK_TRIGGERS={
    matching mundane dice being baseline-weak everywhere else. */
 function _breakBegin(src){
   var live=G.pool.filter(function(d){return !d.committed&&d!==src;});
-  if(!live.length){try{famLog('NOTHING LEFT TO BREAK');}catch(e){}return;}
+  /* false = nothing to break, so the caller must carry on rather than wait
+     for a tap that can never come */
+  if(!live.length){try{famLog('NOTHING LEFT TO BREAK');}catch(e){}return false;}
   G._breakArmed=true;
   try{setStatusMsg('BREAK — TAP A DIE TO DESTROY IT','red');}catch(e){}
   live.forEach(function(d){
@@ -15751,6 +15753,7 @@ function _breakBegin(src){
     d.el.classList.add('break-target');
     d.el.onclick=function(){_breakDie(d);};
   });
+  return true;
 }
 function _breakClear(){
   if(!G||!G.pool)return;
@@ -19922,19 +19925,6 @@ function handleRoll(){
        here, after the points for the rest of the selection are settled, so
        nothing an icon does can be mistaken for a score. */
     _iconSel.forEach(function(d){_iconFire(d,'p');});
-    /* Break stops the turn here and waits for a target. _breakDie resumes
-       the roll once one is tapped. */
-    if(G._breakPending){
-      var _bp=G._breakPending;G._breakPending=null;
-      selDice.forEach(function(d){d.committed=true;d.sel=false;
-        if(d.el){d.el.classList.remove('selected');d.el.classList.add('committed');d.el.onclick=null;}});
-      if(pts>0){G.kept.push({vals:_selVals,mat:(_scoreDice[0]||selDice[0]).mat,pts:pts,
-        dice:_scoreDice.map(function(dd){return{val:dd.val,mat:dd.mat};})});
-        G.turnPts=G.kept.reduce(function(a,k){return a+k.pts;},0)+(G._stakesRisingBonus||0);
-        try{updHUD();refreshKeptTray();}catch(e){}}
-      _breakBegin(_bp.src);
-      return;
-    }
     /* TELL: Counterfeit (Whisper) — halve groups containing cursed dice + skull puff */
     var _cfHit=false;
     if(false&&selDice.some(function(d){return d.cursed;})){
@@ -19956,6 +19946,14 @@ function handleRoll(){
        1000+ commonplace, so the bright SFX.crit was firing constantly
        and reading as a "random" sound. */
     if(pts>=1500){showCritFlash(pts);Haptic.crit();}
+  }
+  /* BREAK takes its target here - AFTER the commit has fully run, so nothing
+     is duplicated and nothing is skipped, and BEFORE the row is rethrown, so
+     the tap handlers survive. _breakBegin returns false when there is nothing
+     left to break, and the turn simply carries on. */
+  if(G._breakPending){
+    var _bp=G._breakPending;G._breakPending=null;
+    if(_breakBegin(_bp.src))return;
   }
   // Hot dice check
   if(G.pool.filter(d=>!d.committed).length===0&&G.pool.length>0){
@@ -21331,6 +21329,7 @@ function handleBank(){
       }
     }
     var _bkIcons=_bkSplit.icons;
+    /* a Break kept on the BANK press resolves before the bank lands */
     if(_bkScore.length===0&&_bkIcons.length)pts=0;
     if(pts>0||_bkIcons.length){
       _bkIcons.forEach(function(d){_iconFire(d,'p');});

@@ -4364,3 +4364,74 @@ rescue roll rebuilt the pool without enchants (same class as the Mabel's
 Stitch bug); Fair Trade's "borrow" was permanent and duplicated the stash die,
 and is now returned at turn start; and `_measureIconState` was called but
 never existed.
+
+## P235 — Break's target is taken after the commit, not instead of it
+
+Found by reading the diff rather than running it. The early-return I added
+duplicated the commit and therefore skipped `_firstRollCommitted` (Opening
+Shot), the frozen-flag/cursor/D3 cleanup, and the hot-dice check — and worse,
+if the branded die was the **last free die**, `_breakBegin` found nothing to
+break, returned, and the turn **hung**, because the early return had already
+skipped everything after it.
+
+Restructured: the real commit runs in full, then Break takes its target just
+before the row is rethrown. `_breakBegin` returns false when there is nothing
+to break and the turn simply carries on.
+
+## SIMS — every numeric claim in the brief, re-run against the live engine
+
+Run in-page so they use the shipped `scoreRoll` / `anyScoring` / `_rollTable`
+and cannot drift from the rules.
+
+**Silver (§1) — CONFIRMED.** Bone busts **53.3%** of turns, silver **28.3%**:
+a **47% reduction**, exactly the brief's 49.5→26. The harness also reproduces
+the brief's *rejected* 3× variant at **15.5%** against their 14%, so the small
+absolute offset is a consistent policy difference, not an error.
+
+**The 1/5 restriction (§2) — CONFIRMED, and stronger than stated.** The brief
+frames branding a 2/3/4/6 as "nearly free" (EV 32–54). Measured, it is
+**better than free**: branding a junk face is worth **+71 to +99** per turn,
+because it converts a dead die into a free discard. Branding a 1 costs **−137**
+and a 5 costs **−56**. So the restriction is not "raising a low floor" — it is
+removing an exploit that was *actively profitable*. The residual 1-vs-5 gap the
+brief flags is real and measures **2.4×**, which is the multiplier per-face
+pricing should use.
+
+**Break's timing (§4) — HALF CONFIRMED, and turn-count dependent.**
+
+| turns left | never break | break early | verdict |
+|---|---|---|---|
+| 4 | 1,461 | 2,025 | net **gain** |
+| 8 | 2,973 | 3,072 | ~break-even |
+| 12 | 4,419 | 4,135 | net **loss** |
+| 16 | 5,881 | 5,160 | net **loss** |
+
+The last-turn case flips hard positive as the brief says (**367 → 1,259**).
+But "a net loss across a whole match" is only true from roughly **8–12
+remaining turns**; in a short match breaking on sight is correct. Notably my
+never-break figure at 12 turns is **4,419** against the brief's **4,425** — the
+baselines agree almost exactly, so the harnesses match and it is the *length
+assumption* that differs.
+
+**One brief claim I could not reproduce, and believe is backwards:** §4 says
+breaking on the last turn drops bust from 46% to 8% because "removing the die
+also removes it from that turn's bust-risk pool". Fewer dice bust *more* in
+Farkle — single-roll bust is 2.3% on six dice and 7.7% on five — and measured
+over whole turns it goes **53% → 66%**. Break's last-turn value comes from the
+guaranteed +1000, not from reduced risk. Worth re-checking before that
+sentence guides any tuning.
+
+**Ward's loadout cap (§2) — CONFIRMED.** A second warded die is armed **43%
+more often** (43.5% → 62.3% of turns). The save-cap alone cannot close that,
+because the second die is a second *chance to arm* — exactly the brief's
+argument for the loadout-level cap.
+
+**Snuff — CONFIRMED.** Pulling one die costs **30%** of the turn's average
+value (brief: ~36%), and lifts bust 53% → 66%.
+
+**Kindred — CONFIRMED exactly.** Tithe pays 15g with the badge off, **30g**
+with it on and 2+ enchanted dice, and 15g with only one enchanted die. Only
+Tithe carries `doubles`.
+
+**Zero Hour — CONFIRMED.** Arms on an icon keep while Grog's badge is worn,
+and not otherwise.
