@@ -3980,3 +3980,41 @@ is the actual question being asked.
 Verified over four consecutive rolls on real timing: turn 1 **6/6**, a
 mid-turn reroll **4/6** (the other two are in the kept tray, which is
 correct — checked by row), turn 2 **6/6**, turn 3 **6/6**. Never aligned.
+
+## P214 — Silver: reliability, not safety (enchant/badge brief §1)
+
+The old bust-save is gone. Not a balance change — the brief's finding is that
+a freely available safe keep makes a turn's last roll effectively bust-proof,
+which defeats push-your-luck and makes every bust-reactive card (Retort,
+Reprisal) meaningless. The OPTION being free is the problem, not its size.
+
+**Modelled as a weight table, not as eight faces.** The brief writes Silver's
+new distribution as `[1,5,1,5,2,3,4,6]`, but putting that in `faces` would
+break three places that walk a die's six *physical* faces: the two 3D preview
+builders (`for f=0..5` over `dice.faces`) and the sim harness, which rolled
+`f[Math.floor(Math.random()*6)]` — with an 8-entry array the last two entries
+would never come up even once. So `faces` stays `[1..6]` and a new
+`rollTable` carries the weighting, read only by `_rollTable()` where a value
+is generated. Every display path still sees a six-faced die. The hardcoded
+`*6` is fixed to `f.length` regardless — it was a latent trap for any future
+weighted family.
+
+Measured out of the game's own roller over 200k rolls: **1 and 5 at 25.1%
+each, 2/3/4/6 at 12.5% each**; bone unchanged at 16.7% across the board.
+
+**The brief's headline number reproduces.** Extracted the real `scoreRoll`
+and ran whole turns under several banking policies. At a 500-point threshold:
+bone busts **53.3%** of turns, silver **28.2%** — against the brief's 49.5%
+and 26%. Slightly hotter in absolute terms (my greedy keep-everything policy
+is more aggressive than theirs), but the *ratio* is identical: a 47%
+reduction either way. Single-roll rates are the classic Farkle figures (2.3%
+on six fair dice), which is why the brief's number is per TURN, not per roll.
+
+**The shield machinery stays** — Brutus's relic still uses
+`mechanic:'shield'` and the brief explicitly leaves that alone ("flagged, not
+resolved here"). Silver simply stops opting in, so it no longer contributes
+to `_pShields`/`dieShieldsPlayer`. Verified Brutus still reports 2 saves.
+
+Useful discovery for the Ward enchant later: **`bustBankHalf` already exists**
+on the NPC side (~line 21894, `mabels_stitch`) — "halve the bank instead of
+zeroing it" has a working precedent to mirror rather than invent.

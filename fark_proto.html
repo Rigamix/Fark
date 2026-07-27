@@ -11053,10 +11053,17 @@ const DICE_TYPES=[
    faces:[1,1,5,5,3,4],
    effect:{type:'risk_reward',mechanic:'reckless',penaltyPct:0.15},
    desc:'Extra 1 and 5 faces. Each Brass die in your loadout costs 15% of your total when you bust.'},
+  /* RELIABILITY, NOT SAFETY. The old bust-save is gone: a free safe keep
+     made the last roll of a turn effectively bust-proof and made every
+     bust-reactive card pointless. It rolls 1s and 5s at twice the weight of
+     2/3/4/6 instead - measured over 200k turns at a 500-point banking
+     policy, an all-silver hand busts 28.2% of turns against bone's 53.3%.
+     It never removes the zero; every roll is still a real roll. */
   {id:'silver',name:'SILVER',icon:'🔘',cost:580,
    faces:[1,2,3,4,5,6],
-   effect:{type:'utility',mechanic:'shield'},
-   desc:'Saves you from one bust per match.'},
+   rollTable:[1,5,1,5,2,3,4,6],
+   effect:null,
+   desc:'Weighted to 1s and 5s — busts far less often, but never safely.'},
   {id:'crystal',name:'CRYSTAL',icon:'💎',cost:750,
    faces:[1,1,2,3,5,5],
    effect:{type:'scoring_boost',mechanic:'single1_bonus',amount:50},
@@ -11106,6 +11113,7 @@ function _dieEffectLabel(eff){
     case'single5_bonus':return'5s score '+(SCORING_BASE.single5+(eff.amount||25));
     case'wild_triple':return'6s are wild for triples';
     case'reckless':return'Busts cost −'+Math.round((eff.penaltyPct||0.04)*100)+'% of total';
+    /* Brutus's relic still uses this; Silver no longer does. */
     case'shield':return'Saves one bust per match';
     default:return eff.mechanic.replace(/_/g,' ');
   }
@@ -15380,8 +15388,16 @@ function _enchInit(){
   while(S.run.dieEnchInv.length<(S.run.diceInv||[]).length)S.run.dieEnchInv.push(null);
   S.run.dieEnchInv.length=(S.run.diceInv||[]).length;
 }
+/* What a die actually ROLLS, which is not always what it shows. A family may
+   weight its outcomes (Silver) without gaining or losing physical faces, so
+   `rollTable` wins over `faces` here and nowhere else - every display path
+   keeps reading `faces` and keeps seeing six of them. */
+function _rollTable(mat){
+  var dt=getDie(mat)||{};
+  return (dt.rollTable||dt.faces||[1,2,3,4,5,6]);
+}
 function _enchFaces(mat,ench){
-  var f=((getDie(mat)||{}).faces||[1,2,3,4,5,6]).slice();
+  var f=_rollTable(mat).slice();
   if(!ench)return f;
   if(ench.t==='amber_cast')f=f.map(function(x){return x===ench.faceB?ench.faceA:x;});
   if(ench.t==='tempering'&&ench.r==='crack'){var mx=Math.max.apply(null,f);f.splice(f.indexOf(mx),1);}
@@ -30101,7 +30117,9 @@ function _runBalanceSim(cfg){
   var _savedG=window.G; window.G=null; /* oppShouldBank guards on G — neutral during sim */
 
   function rollFaces(mats){
-    return mats.map(function(m){var f=getDie(m).faces;return f[Math.floor(Math.random()*6)];});
+    /* f.length, not 6: a weighted family's roll table is longer than its
+       face count and the last entries would never come up. */
+    return mats.map(function(m){var f=_rollTable(m);return f[Math.floor(Math.random()*f.length)];});
   }
   /* ═══ HARNESS EXT 2 (brief §9 / audit 3.2): deterministic card effects,
      player AND NPC symmetric. Modeled: bloom, slow_cook, short_fuse,
