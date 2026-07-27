@@ -4471,3 +4471,35 @@ silver), the run save matches the match loadout, seats resequence, `numDice`
 decrements rather than resetting, a per-turn penalty survives, and breaking a
 loaned seat consumes the stash die while the player's own die and their
 six-die loadout survive intact.
+
+## P238 — the new match dressing
+
+Eight new pieces in: `Table_new`, `ScoreBar_new` (frame / fill / centre /
+portraits), `ROLL_new`, `bank_new`, `turn_number`.
+
+**The scorebar is one painting in four layers.** All four share a 3795×950
+canvas, so they are pre-registered: every layer is `inset:0` and nothing needs
+aligning by hand. Everything placed on top was measured off the art rather
+than eyeballed:
+
+| | in the art | rendered |
+|---|---|---|
+| portrait wells | x 7.93% / 92.03%, y ~35% | **7.9 / 92.0, y 35.2** |
+| score plaques | x 7.9% / 91.8%, y 79% | **7.9 / 91.8, y 80.7** |
+| centre plate | x 50%, y 26.6% | **50.0, y 26.6** |
+
+The portrait art draws its own frame and score shields, so the old ring image
+and text label are switched off rather than layered on top of them.
+
+**Two things Denis's set does not include, handled rather than faked:**
+
+- *No unlit table.* The candle rig works by drawing an UNLIT copy over the lit
+  one and punching a hole in it. There is only one new painting, so the dark
+  layer uses the same image and leans on the tint the pass already applies —
+  better than shipping a mismatched pair.
+- *No pressed/disabled button states.* The old art had four files per button;
+  the new set has one each, so pressed is a brightness knock-down and disabled
+  a desaturation, derived from the single plate.
+
+Aspect ratios come from the files themselves — ROLL 2392/1020, BANK 1401/912,
+turn plaque 969/307 — so nothing is stretched.
