@@ -15719,6 +15719,9 @@ function _breakDie(d){
 function _laneOf(d){
   if(!d)return -1;
   if(d.lane!==undefined&&d.lane!==null)return d.lane;
+  /* Fallback only. Every die made by the game is stamped now; anything that
+     lands here is a die built by a card path that predates seats, and its
+     position is at least a sane guess. */
   try{return (G.pool||[]).indexOf(d);}catch(e){return -1;}
 }
 function _enchInit(){
@@ -19811,7 +19814,8 @@ function handleRoll(){
       for(let i=0;i<hotN;i++){const mat=G.matchDice[i%G.matchDice.length]||'bone';
         const _en=(G._enchArr||[])[i%G.matchDice.length]||null;
         const val=hotSpur?rollFaceSpur(mat):_enchRollM(mat,_en);
-        const el=mkDie(val,mat);el.classList.add('rolling');_appendDie(row,el);G.pool.push({val,mat,ench:_en,sel:false,committed:false,el});}
+        const el=mkDie(val,mat);el.classList.add('rolling');_appendDie(row,el);
+        G.pool.push({val,mat,ench:_en,sel:false,committed:false,el,lane:i%G.matchDice.length});}
       SFX.roll(hotN);
       setTimeout(()=>{G.pool.forEach(d=>{if(!d.committed)settleDie(d.el);});afterRoll();},480);
     },700);
@@ -19890,8 +19894,9 @@ function handleRoll(){
   var _blockadeFire=(G.oCards.includes('blockade')&&G.turnRollCount===0&&G.pool.length===0&&Math.random()<0.25);
   var _blockadePattern=[2,3,4,2,3,4];
   const newEntries=[];
-  for(let i=0;i<needNew;i++){const mat=G.matchDice[(G.pool.length+i)%G.matchDice.length]||'bone';
-    const _en=(G._enchArr||[])[(G.pool.length+i)%G.matchDice.length]||null;
+  for(let i=0;i<needNew;i++){const _lane=(G.pool.length+i)%G.matchDice.length;
+    const mat=G.matchDice[_lane]||'bone';
+    const _en=(G._enchArr||[])[_lane]||null;
     var val;
     if(_blockadeFire){val=_blockadePattern[i%_blockadePattern.length];}
     else{val=useSpur?rollFaceSpur(mat):_enchRollM(mat,_en);}
@@ -19908,7 +19913,7 @@ function handleRoll(){
     /* Force layout so the browser commits the dice to the next paint
        before any subsequent setTimeout fires. */
     el.offsetWidth;
-    newEntries.push({val,mat,ench:_en,sel:false,committed:false,el});}
+    newEntries.push({val,mat,ench:_en,sel:false,committed:false,el,lane:_lane});}
   if(_blockadeFire){
     triggerCard('blockade','BLOCKADE — ROLL DENIED!',false);
     setStatusMsg('BLOCKADE — '+(G.rung?G.rung.name:'RIVAL')+' BLOCKED YOUR OPENING!','red');
@@ -20838,7 +20843,7 @@ function doBust(){
         const mat=G.matchDice[i%G.matchDice.length]||'bone';
         const val=useSpur?rollFaceSpur(mat):rollFace(mat);
         const el=mkDie(val,mat);el.classList.add('rolling');_appendDie(row,el);
-        G.pool.push({val,mat,sel:false,committed:false,el});
+        G.pool.push({val,mat,sel:false,committed:false,el,lane:i%G.matchDice.length});
       }
       SFX.roll(hotN);
       setTimeout(function(){G.pool.forEach(function(d){if(!d.committed)settleDie(d.el);});afterRoll();},480);
@@ -22079,7 +22084,7 @@ function runOppTurn(){
   if(G._snuff&&G._snuff.live){
     _snuffLane=G._snuff.lane;G._snuff.live=false;
     if(_snuffLane>=0&&left>1){
-      left--;
+      left--;/* the seat itself is dropped where rungDice is built, below */
       try{setStatusMsg('THEIR '+(_snuffLane+1)+(_snuffLane===0?'ST':(_snuffLane===1?'ND':(_snuffLane===2?'RD':'TH')))+' DIE IS SNUFFED','gold');}catch(e){}
       try{famLog('SNUFF — THEY PLAY ONE SHORT');}catch(e){}
     }
@@ -22113,7 +22118,16 @@ function runOppTurn(){
       triggerCard(_psPlayerCardId,_psPlayerName.toUpperCase()+' — 5 DICE!',true);
     }
     const row=document.getElementById('oppDiceRow');
-    const rungDice=G.matchOppDice||((G.rung&&G.rung.dice)||['bone','bone','bone','bone','bone','bone']);
+    /* SNUFF removes the die in a SEAT, not just a head off the count - and
+       the surviving dice must keep their real seat numbers, or every later
+       seat effect would be off by one for the rest of the turn. */
+    const _rungAll=G.matchOppDice||((G.rung&&G.rung.dice)||['bone','bone','bone','bone','bone','bone']);
+    var _rungMats=_rungAll.slice(),rungLanes=[];
+    for(var _rl=0;_rl<_rungAll.length;_rl++)rungLanes.push(_rl);
+    if(_snuffLane>=0&&_rungMats.length>1){
+      _rungMats.splice(_snuffLane,1);rungLanes.splice(_snuffLane,1);
+    }
+    const rungDice=_rungMats;
     var _sawdustCount=0;
     for(let i=0;i<rollDice;i++){const dieMat=rungDice[i]||'bone';let val=rollFace(dieMat);var _wasDampened=false;
       if(sootyActive){while(val===1)val=rollFace(dieMat);}
@@ -22127,7 +22141,7 @@ function runOppTurn(){
       if(_wasDampened){el.classList.add('die-dampened','die-dampened-fresh');setTimeout(function(){el.classList.remove('die-dampened-fresh');},_oppDelay(600));}
       /* Broken Lantern: hide dice faces */
       if(G._lanternActive)el.classList.add('die-blind');
-      G.oppDice.push({val,el,kept:false,mat:dieMat});}
+      G.oppDice.push({val,el,kept:false,mat:dieMat,lane:(rungLanes[i]!==undefined?rungLanes[i]:i)});}
     sootyActive=false;
     /* BULLISH honeytrap: pull one fresh die into the modal face (P5/P9) */
     (function(){
@@ -22206,17 +22220,18 @@ function runOppTurn(){
          than assuming threat-assessment it does not have. The die is still
          physically there and still rolls - the AI's maths simply cannot see
          its value, so that seat resolves to whatever the rest implies. */
-      var _fogV=fV.slice();
+      var _fogV=fV.slice(),_fogM=fMats.slice();
       if(G._fog&&G._fog.live){
-        G._fog.live=false;
-        var _fi=_oFree.findIndex(function(d,i){return i===G._fog.lane;});
+        var _fi=-1;
+        for(var _fj=0;_fj<_oFree.length;_fj++)if(_oFree[_fj].lane===G._fog.lane){_fi=_fj;break;}
         if(_fi>=0&&_fogV.length>1){
-          _fogV.splice(_fi,1);
+          G._fog.live=false;
+          _fogV.splice(_fi,1);_fogM.splice(_fi,1);
           try{famLog('FOG — THEY MISREAD A SEAT');}catch(e){}
         }
       }
       crowsCtx.crowsLuckFiredThisRoll=false;
-      var{total,used,context:newCtx}=scoreRoll(_fogV,G.oCards,oppBank,crowsCtx,fMats.length===_fogV.length?fMats:undefined);crowsCtx=newCtx||crowsCtx;
+      var{total,used,context:newCtx}=scoreRoll(_fogV,G.oCards,oppBank,crowsCtx,_fogM);crowsCtx=newCtx||crowsCtx;
       if(crowsCtx.crowsLuckFiredThisRoll)triggerCard('crows_luck',"CROW'S LUCK — STRAIGHT DOWNGRADED",true);
       G._oUnbanked=oppBank;/* what Vagabond's break-trigger steals */
       /* SNARE: their die in the marked seat is halved once if it scores
@@ -22224,8 +22239,12 @@ function runOppTurn(){
          "until it fires" tested at 97.7% inside six turns, which is not a
          bet. One opposing turn is what makes it a wager. */
       if(G._snare&&G._snare.live&&total>0){
-        var _snIdx=G._snare.lane;
-        if(_snIdx>=0&&_snIdx<_oFree.length&&used&&used[_snIdx]){
+        /* which slot of THIS roll's free dice is sitting in the snared seat.
+           Indexing _oFree by the lane number was wrong the moment they kept
+           anything: that array re-indexes every roll. */
+        var _snIdx=-1;
+        for(var _si=0;_si<_oFree.length;_si++)if(_oFree[_si].lane===G._snare.lane){_snIdx=_si;break;}
+        if(_snIdx>=0&&used&&used[_snIdx]){
           total=Math.floor(total/2);
           G._snare.live=false;
           try{famLog('THE SNARE BITES — HALVED');}catch(e){}

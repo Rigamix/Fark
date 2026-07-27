@@ -4193,3 +4193,28 @@ One test failure turned out to be the test, not the code: a Ward stashed in
 `dieEnchInv` without a matching `diceInv` entry is truncated away by
 `_enchInit`, so the fixture never existed. With a real stash die the cap
 holds.
+
+## P228 — a seat is a property of the die, not its slot in an array
+
+Found while double-checking, before the audit came back. `_laneOf` fell back
+to `G.pool.indexOf(d)` because **nothing ever set `d.lane`** — and the
+resolution side then indexed into the opponent's *unkept* dice, an array that
+shrinks and re-indexes on every roll as they keep. So a snare set on seat 3
+halved whichever die happened to be third in whatever was left of their hand,
+and Fog blinded the wrong seat. Both were silently wrong the moment the
+opponent kept a single die, which is almost immediately.
+
+Every die is stamped with its seat where it is built now — all four player
+paths (first roll, the reroll fill, and both hot-dice paths) and the
+opponent's — and Snare and Fog match on `d.lane === markedLane` rather than an
+array position. Verified: seats `0..5` stamped, unique, `_laneOf` agrees, and
+they still hold after a commit and a reroll.
+
+Snuff removes the die in that **seat** rather than taking a head off the
+count: `rungDice` is rebuilt without it and a parallel `rungLanes` keeps the
+survivors' true seat numbers, so later seat effects in the same turn are not
+all off by one.
+
+The first-roll path needed a second pass — it builds through `newEntries`,
+not `G.pool.push`, so the first patch computed the seat and then never wrote
+it. Caught because the check reported `seatundefined` six times.
