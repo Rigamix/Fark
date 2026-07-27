@@ -4598,3 +4598,28 @@ frame would overlap the photo's edge, on the reasoning that the bar's layers are
 a plain div covering the whole bar — so the portraits stopped taking taps
 entirely. The z-order was checked at the time; the hit-test was not. `#raceWrap`
 is `pointer-events:none` as a whole now: nothing in the bar is interactive.
+
+## P244 — the flags take the tap
+
+Denis split the portraits layer into a left and a right file, each still on the
+full 3795×950 canvas with only its own half painted. Painting them as two
+elements is what lets a flag light up on its own press — one combined image
+never could.
+
+Registration is the whole trick. Each container is clipped to its flag's ink
+box, and the image inside is drawn at the **full bar width** and pinned to the
+matching edge, so it lands exactly where the combined layer used to:
+
+| | ink box | container | image width |
+|---|---|---|---|
+| left | x 0–15.86% | `left:0;width:15.86%` | `630.52%` (=100/0.1586) |
+| right | x 83.85–100% | `right:0;width:16.15%` | `619.20%` (=100/0.1615) |
+
+Verified rendered rather than assumed: both images measure 0→100% of the bar,
+and the clips land on 0–15.86% and 83.85–100%.
+
+The tap moved off the portrait disc and onto the flag — `showBankSummary('o')`
+on the left, `('p')` on the right, confirmed by intercepting the function and
+checking which side each click reports. `.tok` is `pointer-events:none` now, so
+the disc is pure decoration and the flag above it owns the whole unit including
+the portrait area. The centre of the bar stays untappable.
