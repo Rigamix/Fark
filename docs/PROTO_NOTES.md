@@ -4128,3 +4128,68 @@ Verified end to end on a live match:
 | illegal face (3) at point of sale | rejected |
 | legal face (5) | accepted |
 | Kindred off / on | 15g / **30g** |
+
+## P222–P227 — the rest of the rework
+
+**The six remaining icons**, all `fire()` bodies against the contract
+`_iconFire` already enforces. Ward (halves a bust, never saves it, first keep
+only, one warded die per loadout), Snare (marks a seat, halves their die
+there once on their VERY NEXT turn, then clears either way), Break, Trade
+(permanent seat swap), Snuff (their seat gone for one turn), Fog.
+
+**Fog corrupts the input to maths that already exists** rather than assuming
+threat-assessment the NPC does not have — the die still rolls, but its value
+is withheld from the array handed to `scoreRoll` at the NPC's decision point.
+That is why the earlier Whisper concept was cut: it needed an opponent smart
+enough to be fooled.
+
+**Break's seven death-triggers**, each a distinct verb chosen to match its
+family rather than reskin Obsidian's: flat value / temporary invincibility /
+an extra turn / a safe cash-out / a free reroll / theft / nothing at all.
+Only Obsidian's row has sim numbers; the other five are unvalidated proposals
+and are commented as such.
+
+**The timing finding is preserved deliberately.** Across a match, breaking on
+sight is a net loss (~3,471 against ~4,425) because losing a sixth die costs
+more over future turns than 1,000 is worth. On a turn with no future turn it
+flips hard positive (1,140 against 409, bust 46% → 8%). The correct play is a
+timing read, and the code does nothing to average those two.
+
+**Silver's suite**: Ward-the-card and Insurance-the-card retired — their job
+moved to the Ward enchant, and two systems competing to do one job is what
+this rework exists to stop. Steady Hand and Fair Trade replace them; neither
+touches bust odds. Retort and Reprisal stay, and Retort is live for the first
+time now that `famFire('bust')` fires on busts (P216).
+
+**Four badge rules swapped, art untouched** — the rule id is rebound to the
+existing badge object, so The Boot, The Serpent, The Antler Crown and The
+Tipped Scales need no new painting. Old rule logic removed: Counterfeit's
+cursing machinery, Confession's card-sealing, In Arrears' per-roll gold
+drain, Last Call's under-threshold rejection.
+
+**No lane grid.** Denis: the dice area should read as one continuous surface,
+so a seat mark is a soft squircle sitting under the die (`.seat-mark`,
+`border-radius:42%`) rather than a stripe drawn across the table.
+
+### Verified against the brief's §7 checklist
+
+| check | result |
+|---|---|
+| only 1/5 brandable, all 11 materials | pass |
+| Jade wild-6 excluded | pass |
+| faces 3 and 6 refused at point of sale | pass |
+| two Ward dice impossible (rack **and** stash) | pass |
+| all seven icons return 0 from `_iconFire` | pass |
+| six family triggers + mundane no-op, no cross-contamination | **10/10** |
+| die removed from pool *and* loadout (6→5) | pass |
+| Ward halves (kept 400 of 800), never saves in full | pass |
+| Ward does not stack within a turn | pass |
+| Amber immunity survives a bust intact | pass |
+| Zero Hour arms off any icon keep | pass |
+| Still Waters strips the family, keeps the enchant | pass |
+| First Strike opens on the first seat icon | pass |
+
+One test failure turned out to be the test, not the code: a Ward stashed in
+`dieEnchInv` without a matching `diceInv` entry is truncated away by
+`_enchInit`, so the fixture never existed. With a real stash die the cap
+holds.

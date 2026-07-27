@@ -2137,6 +2137,24 @@ html.fk3d #screen-match .die-wrap:has(.die.d3on.selected)::after{
   flex-shrink:0;overflow:visible;
 }
 
+/* SEAT MARK — where a lane-targeting icon has reached. Deliberately NOT a
+   lane stripe: Denis wants the dice area to read as one continuous surface,
+   so this is a soft squircle sitting under the seat rather than a division
+   drawn across the table. */
+.seat-mark{
+  position:absolute;pointer-events:none;z-index:1;
+  border-radius:42%;
+  transform:translate(-50%,-50%);
+  background:radial-gradient(closest-side,var(--sm-ink,rgba(200,150,255,.34)) 0%,
+             var(--sm-ink,rgba(200,150,255,.34)) 42%,transparent 78%);
+  animation:seatMarkPulse 2.4s ease-in-out infinite;
+}
+@keyframes seatMarkPulse{
+  0%,100%{opacity:.55;transform:translate(-50%,-50%) scale(1)}
+  50%    {opacity:.85;transform:translate(-50%,-50%) scale(1.06)}
+}
+/* a die about to be broken, or picked for a reroll */
+.die.break-target{outline:2px solid #c66058;outline-offset:2px;cursor:pointer}
 /* the scored dice, in their own line below the throwing row. The height is
    RESERVED, not grown into: letting it size to its contents made the whole
    throwing row hop upward the moment the first die was kept. */
@@ -9722,7 +9740,9 @@ const RUNGS=[
     agg:.56,cardRarity:null,wager:false,wagerCount:0,wagerMode:'none',minBank:150,diceStop:2,chaotic:true,adaptive:false,
     dice:['bone','bone','bone','iron','iron','iron'],
     cardPool:['her_lucky_coin','one_more_round','grogs_bump'],cardCount:2,cardChance:1,
-    tell:{id:'last_call',name:'LAST CALL',desc:"“Bank under 500 at my table and it won't count.”",icon:'🍻',threshold:500}},
+    /* GROG — ZERO HOUR (was Last Call, which tested weakest in the roster).
+       Same theme, urgency, but aimed at a system that now exists. */
+    tell:{id:'last_call',name:'ZERO HOUR',desc:"“Take a marked face at my table and your turn is over.”",icon:'🍻'}},
   {id:1,name:'MABEL',key:'peasant',icon:'👨‍🌾',tier:'regular',target:5600,gold:175,buyIn:20,
     boss:null,bossDesc:null,
     agg:.58,cardRarity:'tin',wager:true,wagerCount:1,wagerMode:'best',minBank:200,diceStop:2,chaotic:false,adaptive:false,
@@ -9748,7 +9768,11 @@ const RUNGS=[
        Player feedback B1+B2: "make every roll costs 5g. Lower his target
        score a bit." On victory, the drained gold is refunded as a bonus
        reward (handled in endMatch — see B3). */
-    tell:{id:'in_arrears',name:'IN ARREARS',desc:"“Every roll costs you 5 gold — beat me and win it all back.”",icon:'📒',perRoll:5}},
+    /* CORVUS — FIRST STRIKE (was In Arrears, untested). Pure information,
+       no scoring signature to measure, validated qualitatively only.
+       REAL COST: In Arrears was the only economy tell in the roster, so no
+       badge taxes gold any more. Needs a new home if it is missed. */
+    tell:{id:'in_arrears',name:'FIRST STRIKE',desc:"“Reach across the table and we both see everything.”",icon:'📒'}},
   {id:4,name:'BRUTUS',key:'soldier',icon:'⚔️',tier:'respected',target:9500,gold:500,buyIn:70,
     boss:null,bossDesc:null,
     agg:.75,cardRarity:'silver',wager:true,wagerCount:1,wagerMode:'best',minBank:550,diceStop:2,chaotic:false,adaptive:true,
@@ -9760,13 +9784,21 @@ const RUNGS=[
     agg:.80,cardRarity:'gold',wager:true,wagerCount:2,wagerMode:'best',minBank:700,diceStop:1,chaotic:false,adaptive:true,
     dice:['amber','jade','jade','jade','starstone','flint'],
     cardPool:['the_verdict_npc','point_of_order','fathers_die','the_oath_npc','family_crest'],cardCount:4,
-    tell:{id:'confession',name:'CONFESSION',desc:"“Each turn, I seal one of your cards shut.”",icon:'⛪'}},
+    /* ALDRIC — STILL WATERS (was Confession, never validated). An enchanted
+       die loses its FAMILY trait for the match; its enchant still fires.
+       Sim, Obsidian only: strips ~644 points, ~14.5% of that build's match
+       value. The other families' suppression is inferred, not validated. */
+    tell:{id:'confession',name:'STILL WATERS',desc:"“A worked die forgets what it was made of.”",icon:'⛪'}},
   {id:6,name:'WHISPER',key:'noble',icon:'👑',tier:'renowned',target:11250,gold:950,buyIn:140,
     boss:null,bossDesc:null,
     agg:.84,cardRarity:'gold',wager:true,wagerCount:2,wagerMode:'best',minBank:800,diceStop:1,chaotic:false,adaptive:true,
     dice:['amber','jade','jade','jade2','starstone','flint'],
     cardPool:['the_royal_purse','crown_authority','the_quiet_decree','sundays_rest','old_roads','royal_seizure'],cardCount:4,
-    tell:{id:'counterfeit',name:'COUNTERFEIT COIN',desc:"“I curse your dice — each cursed one banks at half.”",icon:'💀',startCount:1,addEvery:3}},
+    /* WHISPER — KINDRED (was Counterfeit, never validated). Doubles icon
+       effects for BOTH sides when either holds 2+ enchanted dice. Only
+       cleanly defined for additive-numeric effects, so only Tithe doubles;
+       the rest are an open design decision, not a default to guess. */
+    tell:{id:'counterfeit',name:'KINDRED',desc:"“Marked dice sing louder here — for both of us.”",icon:'💀'}},
   {id:7,name:'AMBROSE',key:'bishop',icon:'✝️',tier:'renowned',target:12500,gold:1300,buyIn:200,
     boss:null,bossDesc:null,
     agg:.88,cardRarity:'gold',wager:true,wagerCount:3,wagerMode:'all',minBank:900,diceStop:1,chaotic:false,adaptive:true,
@@ -10268,7 +10300,12 @@ function _flashTellRule(){
 }
 
 /* ── COUNTERFEIT (Whisper): cursed dice expand on schedule ── */
+/* RETIRED with Counterfeit. Kindred does not curse dice, it amplifies
+   marked ones - so nothing here has a job any more. Kept as a no-op rather
+   than deleted, because several turn-start paths call it unconditionally. */
 function _maybeAdvanceCounterfeit(){
+  return;
+  /* eslint-disable no-unreachable */
   if(!G||!G._tell||G._tell.id!=='counterfeit')return;
   if(!G._tellState)G._tellState={cursedDice:[],lastCurseTurn:0};
   var t=G._tell;
@@ -10290,6 +10327,8 @@ function _maybeAdvanceCounterfeit(){
   }
 }
 function _markCounterfeitDice(){
+  return;/* retired with Counterfeit - see _maybeAdvanceCounterfeit */
+  /* eslint-disable no-unreachable */
   if(!G||!G._tell||G._tell.id!=='counterfeit'||!G._tellState||!G.pool)return;
   var cursed=G._tellState.cursedDice||[];
   G.pool.forEach(function(d,i){
@@ -11312,9 +11351,13 @@ var FAM_CARDS=[
         'Every roll past your second adds +250 to your turn total. Bust and it all spills.',
         'Every roll past your second adds +400 to your turn total. Bust and it all spills.']},
  /* SILVER */
- {id:'ward',fam:'silver',kind:'active',name:'Ward',charges:[1,2,2],
-  text:["A visible shield over your dice. Absorbs your next bust, or the opponent's next trick.",
-        'As tier one, two charges.','As tier two, and absorbed tricks rebound: the attacker loses 300.']},
+ /* RETIRED: Ward-the-card and Insurance-the-card both did bust mitigation,
+    which is now the Ward ENCHANT's job. Two systems competing to do the same
+    job is what this rework exists to stop. Replaced by two cards that touch
+    bust odds not at all. */
+ {id:'steady_hand',fam:'silver',kind:'active',name:'Steady Hand',charges:[1,2,3],
+  text:['Reroll a single die of your choice. You keep the new result, better or worse.',
+        'As tier one, twice a match.','As tier one, three times a match.']},
  {id:'retort',fam:'silver',kind:'passive',name:'Retort',p:[400,700,1000],
   text:['When you bust or are hit by an opponent card, they lose 400.',
         'When you bust or are hit by an opponent card, they lose 700.',
@@ -11322,10 +11365,9 @@ var FAM_CARDS=[
  {id:'reprisal',fam:'silver',kind:'passive',name:'Reprisal',p:[0.25,0.40,0.60],
   text:['While trailing by 1000 or more, your banks TAKE their points instead of just gaining. A quarter of each bank is stolen from them.',
         'As tier one, but two fifths.','As tier one, but three fifths.']},
- {id:'insurance',fam:'silver',kind:'passive',name:'Insurance',p:[0.25,0.45,0.75],
-  text:['When you bust, keep a quarter of the points you would have lost.',
-        'When you bust, keep nearly half of the points you would have lost.',
-        'When you bust, keep most of the points you would have lost.']},
+ {id:'fair_trade',fam:'silver',kind:'active',name:'Fair Trade',charges:[1,1,2],
+  text:['Before you roll, swap one of your six dice for another from your stash. For this roll only.',
+        'As tier one, and the swap lasts the whole turn.','As tier two, twice a match.']},
  /* OBSIDIAN */
  {id:'powder_keg',fam:'obsidian',kind:'active',name:'Powder Keg',charges:[1,2,2],
   text:['Blow up your whole roll: every die rerolls, kept ones included. Once per match.',
@@ -11391,7 +11433,7 @@ var _FAM_ALIAS={anchor_f:'vanguard_f',bookends_f:'vanguard_f'};/* vanguard colla
 function famDef(id){id=_FAM_ALIAS[id]||id;
   for(var i=0;i<FAM_CARDS.length;i++)if(FAM_CARDS[i].id===id)return FAM_CARDS[i];return null;}
 /* implemented set — only these are offered/equipped-usable (grows per phase) */
-var FAM_LIVE={slow_cook:1,insurance:1,retort:1,reprisal:1,pickpocket:1,falling_star:1,
+var FAM_LIVE={slow_cook:1,steady_hand:1,fair_trade:1,retort:1,reprisal:1,pickpocket:1,falling_star:1,
               encore:1,double_or_nothing:1};
 var BOSS_FAM={grog:'obsidian',mabel:'amber',finnick:'vagabond',corvus:'starstone',
   brutus:'silver',aldric:'jade',whisper:'vagabond',ambrose:'amber'};
@@ -11463,10 +11505,56 @@ CFX.slow_cook={
   turnStart:function(ev){if(ev.owner==='p')ev.me.state.acc=0;},
   bust:function(ev){if(ev.owner==='p')ev.me.state.acc=0;}
 };
-CFX.insurance={
-  bust:function(ev){if(!ev.mine||ev.owner!=='p')return;
-    var k=Math.round((ev.lost||0)*ev.P);
-    if(k>0){G.pPts+=k;famLog('INSURANCE SAVES '+k);_famPop('+'+k+' INSURANCE');try{updHUD();}catch(e){}}}
+/* STEADY HAND — precision, not luck. Rerolls one chosen die and you live
+   with it, so it does not touch bust odds: it can just as easily make the
+   hand worse. Must run the bust check itself, exactly as famQuicksilver
+   does, or a reroll into a dead hand softlocks the turn. */
+CFX.steady_hand={
+  canUse:function(inst){return !!(G&&G.phase==='choosing'&&
+    (G.pool||[]).some(function(d){return !d.committed&&!d._frozen;}));},
+  use:function(inst){
+    var free=(G.pool||[]).filter(function(d){return !d.committed&&!d._frozen;});
+    if(!free.length)return false;
+    G._steadyArmed=true;
+    try{setStatusMsg('STEADY HAND — TAP THE DIE TO REROLL','gold');}catch(e){}
+    free.forEach(function(d){
+      if(!d.el)return;
+      d.el.classList.add('break-target');
+      d.el.onclick=function(){
+        if(!G._steadyArmed)return;
+        G._steadyArmed=false;
+        free.forEach(function(q){if(q.el){q.el.classList.remove('break-target');q.el.onclick=function(){toggleDie(q);};}});
+        d.val=_rollD(d);d.sel=false;try{reDrawDieFace(d);}catch(e){}
+        try{famLog('STEADY HAND — '+d.val);}catch(e){}
+        var fv=free.map(function(x){return x.val;}),fm=free.map(function(x){return x.mat;});
+        if(!anyScoring(fv,effectiveCards(),fm,free)){if(!_tryBustSave(free))_delayedDoBust(free);return;}
+        try{refreshSelUI();}catch(e){}try{famRenderRow();}catch(e){}
+      };
+    });
+    return true;
+  }
+};
+/* FAIR TRADE — build flexibility, before the dice are thrown. Swaps a seat
+   for something out of the stash for this roll, then puts it back. */
+CFX.fair_trade={
+  canUse:function(inst){
+    _getS();
+    return !!(G&&(G.phase==='idle'||G.turnRollCount===0)&&(S.run.diceInv||[]).length);},
+  use:function(inst){
+    _getS();
+    var inv=(S.run.diceInv||[]);
+    if(!inv.length||!G.matchDice||!G.matchDice.length)return false;
+    /* the weakest seat out, the best thing in the stash in */
+    var worst=0;
+    G.matchDice.forEach(function(m,i){if(dieRank(m)<dieRank(G.matchDice[worst]))worst=i;});
+    var best=0;
+    inv.forEach(function(m,i){if(dieRank(m)>dieRank(inv[best]))best=i;});
+    if(dieRank(inv[best])<=dieRank(G.matchDice[worst]))return false;
+    G._fairTrade={lane:worst,was:G.matchDice[worst]};
+    G.matchDice[worst]=inv[best];
+    try{famLog('FAIR TRADE — '+(getDie(G._fairTrade.was)||{}).name+' OUT, '+(getDie(inv[best])||{}).name+' IN');}catch(e){}
+    return true;
+  }
 };
 CFX.retort={
   bust:function(ev){if(!ev.mine||ev.owner!=='p')return;
@@ -11589,7 +11677,7 @@ function famOppTap(i){
 }
 function famUse(i){
   if(!G||!G.pF||!G.pF[i])return;
-  if(_ruleActive('confession','p')&&G._fSealIdx===i){famLog('SEALED SHUT THIS TURN');return;}
+  /* (Confession's seal retired with the rule) */
   var inst=G.pF[i],d=famDef(inst.id),fx=CFX[inst.id];
   if(!d||d.kind!=='active'||!fx||!fx.use)return;
   if(inst.charges<=0)return;
@@ -12214,13 +12302,10 @@ CFX.sacrifice={
     return true;
   }
 };
-CFX.ward={
-  canUse:function(){return G&&G.phase!=='opp';},
-  use:function(inst){
-    G.dieShieldsPlayer=(G.dieShieldsPlayer||0)+1;
-    famLog('WARD RAISED — THE NEXT BUST IS ABSORBED');
-    return true;
-  }
+/* RETIRED with the card - bust mitigation is the Ward ENCHANT's job now. */
+CFX._ward_retired={
+  canUse:function(){return false;},
+  use:function(inst){return false;}
 };
 CFX.stargazer={
   canUse:function(){return G&&G.phase==='choosing';},
@@ -12302,7 +12387,7 @@ CFX.preserve={
   }
 };
 /* update the live set */
-['transmute','fools_gold_f','bloom','preserve','honeytrap','tar_pit','ward','powder_keg','sacrifice','short_fuse','stargazer','ill_omen','sleight','vanguard_f','anchor_f','bookends_f','for_keeps','double_stakes','the_tab','hair_of_the_dog','marked_table','high_table'].forEach(function(id){FAM_LIVE[id]=1;});
+['transmute','fools_gold_f','bloom','preserve','honeytrap','tar_pit','powder_keg','sacrifice','short_fuse','stargazer','ill_omen','sleight','vanguard_f','anchor_f','bookends_f','for_keeps','double_stakes','the_tab','hair_of_the_dog','marked_table','high_table'].forEach(function(id){FAM_LIVE[id]=1;});
 FAM_LIVE.cultivate=1;/* P2: jade dice exist */
 FAM_LIVE.tamper=1;/* P5: opponent cards visible */
 /* ── PROTO greybox loadout: six dice, reorder + swap ── */
@@ -14742,7 +14827,7 @@ if(/hsdebug/.test(location.search))try{localStorage.setItem('fk_dbg','1');}catch
   window._fkSeedPanel=function(){_getS();_ensureNight();
     var n=S.run.night;n.handicapSeat=0;
     n.sealTell=n.sealTell||'last_call';
-    if(n.roster[0]){n.roster[0].fcards=[{id:'ward',tier:1},{id:'slow_cook',tier:2},{id:'tar_pit',tier:1}];n.roster[0].gone=false;}
+    if(n.roster[0]){n.roster[0].fcards=[{id:'steady_hand',tier:1},{id:'slow_cook',tier:2},{id:'tar_pit',tier:1}];n.roster[0].gone=false;}
     if(n.seatsPlayed)n.seatsPlayed[0]=false;
     save();showScreen('gauntlet');};
   /* seed 'just won these' feats: earned, never pinned - open the shelf
@@ -15411,6 +15496,79 @@ var ENCH_ICONS={
       _getS();var g=15*(c.mult||1);
       S.run.gold=(S.run.gold||0)+g;try{save();}catch(e){}
       try{famLog('TITHE — +'+g+'g');}catch(e){}
+    }},
+
+  /* Never a full save - that was the old, broken Silver behaviour. Only the
+     FIRST ward kept in a turn counts; a second does nothing extra. The
+     loadout may hold only one warded die, enforced at the shop (_wardOwned),
+     because a second warded die is a second CHANCE TO ARM and the save-cap
+     alone does not restrict that. */
+  ward:{name:'Ward',price:350,glyph:'\u25B2',ink:'#9ab0d0',
+    desc:'Brand a shield on one face. Keep it: it banks nothing and arms this turn — a bust halves your bank instead of taking it all.',
+    fire:function(c){
+      if(G._wardArmed){try{famLog('ALREADY WARDED THIS TURN');}catch(e){}return;}
+      G._wardArmed=true;
+      try{famLog('WARD — A BUST WILL ONLY TAKE HALF');}catch(e){}
+      try{setStatusMsg('WARDED — A BUST COSTS HALF','gold');}catch(e){}
+    }},
+
+  /* Marks the PLAYER's own lane. Resolves against the opponent's VERY NEXT
+     TURN ONLY: their die in that lane is halved once if it scores, and the
+     mark clears either way. The original "until it fires" version tested at
+     97.7% within six turns - not a bet at all. The short window is what
+     makes it a wager. */
+  snare:{name:'Snare',price:400,glyph:'\u2442',ink:'#a888c0',
+    desc:'Brand a snare on one face. Keep it: it banks nothing and sets a trap in this lane for the rival\u2019s next turn.',
+    fire:function(c){
+      G._snare={lane:c.lane,live:true};
+      _firstStrike(c.side);
+      try{famLog('SNARE SET — LANE '+(c.lane+1));}catch(e){}
+    }},
+
+  /* PERMANENTLY destroys one other live die, and fires that die's family
+     death-trigger. Widened from Obsidian-only so every build has a real
+     partner rather than one solved answer. */
+  brk:{name:'Break',price:300,glyph:'\u2620',ink:'#c66058',
+    desc:'Brand a skull on one face. Keep it: it banks nothing and breaks another of your dice for good — and whatever that die was dies loudly.',
+    fire:function(c){_breakBegin(c.die);}},
+
+  /* PERMANENTLY swaps the player's die in this lane with the opponent's.
+     Not a blind gamble - landing order is loadout order and the peek shows
+     their dice before the match - so it is a commitment risk, not a
+     hidden-information one. */
+  trade:{name:'Trade',price:350,glyph:'\u21C4',ink:'#8cb28c',
+    desc:'Brand crossed arrows on one face. Keep it: it banks nothing and trades this die for the rival\u2019s, in the same seat, for good.',
+    fire:function(c){
+      var L=c.lane;
+      if(L<0||!G.matchDice||!G.matchOppDice||L>=G.matchDice.length||L>=G.matchOppDice.length)return;
+      _firstStrike(c.side);
+      var mine=G.matchDice[L],theirs=G.matchOppDice[L];
+      G.matchDice[L]=theirs;G.matchOppDice[L]=mine;
+      /* the die on the table becomes what was traded for, from now on */
+      try{c.die.mat=theirs;reDrawDieFace(c.die);}catch(e){}
+      try{famLog('TRADE — '+(getDie(mine)||{}).name+' FOR '+(getDie(theirs)||{}).name);}catch(e){}
+    }},
+
+  /* Removes the opponent's die in this lane for their NEXT TURN ONLY, then
+     it returns. Pulling one die from a six-die hand drops that turn's
+     average value ~36%. */
+  snuff:{name:'Snuff',price:300,glyph:'\u2716',ink:'#b09470',
+    desc:'Brand a snuffed candle on one face. Keep it: it banks nothing and takes the rival\u2019s die in this seat away for one turn.',
+    fire:function(c){
+      G._snuff={lane:c.lane,live:true};
+      _firstStrike(c.side);
+      try{famLog('SNUFFED — THEY PLAY A DIE SHORT');}catch(e){}
+    }},
+
+  /* Corrupts the INPUT to the keep/bank maths the NPC already runs, rather
+     than assuming threat-assessment it does not have. (Whisper, an earlier
+     concept, was cut for needing an opponent smart enough to be fooled.) */
+  fog:{name:'Fog',price:250,glyph:'\u2601',ink:'#a8b0b8',
+    desc:'Brand a cloud on one face. Keep it: it banks nothing and hides this seat from the rival\u2019s reckoning next turn.',
+    fire:function(c){
+      G._fog={lane:c.lane,live:true};
+      _firstStrike(c.side);
+      try{famLog('FOG — THEY WILL NOT SEE THAT SEAT');}catch(e){}
     }}
 };
 /* every service the innkeep sells, icons included */
@@ -15455,6 +15613,105 @@ function _splitIcons(dice){
 function _iconOnTable(pool){
   return (pool||[]).some(function(d){return !d.committed&&_dieIsIcon(d);});
 }
+/* CORVUS — FIRST STRIKE. Whoever FIRST reaches across the table with a
+   seat-targeting icon (Snare, Trade, Snuff, Fog) opens both hands: each side
+   sees the other's full six-seat material layout for the rest of the match.
+   Pure information - no scoring signature to sim, validated qualitatively
+   only, and it fits Corvus's counting-house-sees-all identity. */
+function _firstStrike(side){
+  if(!G||!G._tell||G._tell.id!=='in_arrears')return;
+  if(G._firstStrikeOpen)return;
+  G._firstStrikeOpen=true;
+  try{famLog('FIRST STRIKE — THE BOOKS ARE OPEN');}catch(e){}
+  try{setStatusMsg('FIRST STRIKE — BOTH HANDS SHOWING','gold');}catch(e){}
+  try{document.documentElement.classList.add('fkFirstStrike');}catch(e){}
+}
+/* ALDRIC — STILL WATERS. A worked die's FAMILY TRAIT is suppressed for the
+   match; its enchant still fires normally. One helper, so every consumer of
+   a die's effect honours it without knowing the badge exists.
+   Sim, Obsidian only: ~644 points, ~14.5% of that build's match value.
+   Suppressing Jade's wilds, Amber's triple bonus, Starstone's bank bonus or
+   Silver's odds-skew is INFERRED, not validated - retest before trusting. */
+function _stillWaters(){
+  try{return !!(G&&G._tell&&G._tell.id==='confession');}catch(e){return false;}
+}
+/* a die's family effect, or null when Still Waters has hushed it */
+function _dieEffect(d){
+  var dt=getDie(d&&d.mat)||{};
+  if(d&&d.ench&&_stillWaters())return null;
+  return dt.effect||null;
+}
+/* ═══ BREAK ═══
+   Destroys one OTHER live die of the player's choice, permanently, and fires
+   that die's family death-trigger. Every family has one, so Break has a real
+   partner in every build rather than one solved answer. Only Obsidian's row
+   is sim-validated; the other five follow the same design logic and are
+   unvalidated proposals (brief section 4). Each is a distinct VERB - flat
+   value / temporary invincibility / an extra turn / a safe cash-out / a free
+   reroll / theft - chosen to match that family's identity rather than being
+   a reskin of Obsidian's. */
+var BREAK_TRIGGERS={
+  obsidian:{msg:'OBSIDIAN SHATTERS — +1000',fire:function(){
+    G.turnPts=(G.turnPts||0)+1000;
+    G.kept.push({vals:[],mat:'obsidian',pts:1000,dice:[]});
+    try{updHUD();refreshKeptTray();}catch(e){}}},
+  amber:{msg:'AMBER SETS — NO BUST THIS TURN',fire:function(){
+    G._bustImmuneTurn=true;
+    try{setStatusMsg('AMBER — YOU CANNOT BUST THIS TURN','gold');}catch(e){}}},
+  starstone:{msg:'STARSTONE FALLS — ONE MORE TURN',fire:function(){
+    G._extraTurn=(G._extraTurn||0)+1;}},
+  silver:{msg:'SILVER CLOSES — BANKED',fire:function(){
+    G._breakBankNow=true;}},
+  jade:{msg:'JADE SCATTERS — EVERYTHING ROLLS AGAIN',fire:function(){
+    var free=G.pool.filter(function(d){return !d.committed;});
+    free.forEach(function(d){d.val=_rollD(d);d.sel=false;try{reDrawDieFace(d);}catch(e){}});
+    try{refreshSelUI();}catch(e){}}},
+  vagabond:{msg:'VAGABOND TAKES WHAT THEY HELD',fire:function(){
+    var steal=Math.max(0,G._oUnbanked||0);
+    if(steal>0){G.turnPts=(G.turnPts||0)+steal;
+      G.kept.push({vals:[],mat:'vagabond',pts:steal,dice:[]});
+      try{updHUD();refreshKeptTray();}catch(e){}}
+    try{famLog(steal>0?('STOLE '+steal+' FROM THEIR HAND'):'THEY HELD NOTHING TO TAKE');}catch(e){}}}
+};
+/* Enter targeting: the next die tapped is the one that breaks. Mundane dice
+   (bone, iron, flint, lead) have no trigger - confirmed the worst target,
+   matching mundane dice being baseline-weak everywhere else. */
+function _breakBegin(src){
+  var live=G.pool.filter(function(d){return !d.committed&&d!==src;});
+  if(!live.length){try{famLog('NOTHING LEFT TO BREAK');}catch(e){}return;}
+  G._breakArmed=true;
+  try{setStatusMsg('BREAK — TAP A DIE TO DESTROY IT','red');}catch(e){}
+  live.forEach(function(d){
+    if(!d.el)return;
+    d.el.classList.add('break-target');
+    d.el.onclick=function(){_breakDie(d);};
+  });
+}
+function _breakDie(d){
+  if(!G._breakArmed)return;
+  G._breakArmed=false;
+  G.pool.forEach(function(q){if(q.el){q.el.classList.remove('break-target');q.el.onclick=null;}});
+  var fam=_matFam(d.mat);
+  var lane=_laneOf(d);
+  /* gone for the REST OF THE MATCH: the loadout drops to five */
+  if(lane>=0&&G.matchDice&&lane<G.matchDice.length){
+    G.matchDice.splice(lane,1);
+    if(G._enchArr&&lane<G._enchArr.length)G._enchArr.splice(lane,1);
+    G.numDice=G.matchDice.length;
+  }
+  var i=G.pool.indexOf(d);if(i>=0)G.pool.splice(i,1);
+  try{if(d.el){d.el.classList.add('die-shatter');var _w=d.el.parentElement;
+    setTimeout(function(){try{(_w||d.el).remove();}catch(e){}},400);}}catch(e){}
+  try{SFX.err&&SFX.err();}catch(e){}
+  var trg=fam&&BREAK_TRIGGERS[fam];
+  if(trg){try{famLog(trg.msg);}catch(e){}try{trg.fire();}catch(e){}}
+  else{try{famLog('IT WAS ONLY BONE — NOTHING ANSWERS');}catch(e){}}
+  /* Silver's row cashes out immediately, so it has to run after the die is
+     actually gone or the bank would count a die that no longer exists. */
+  if(G._breakBankNow){G._breakBankNow=false;setTimeout(function(){try{handleBank();}catch(e){}},260);return;}
+  try{refreshSelUI();}catch(e){}
+  try{_measureIconState&&_measureIconState();}catch(e){}
+}
 /* A die's LANE: its left-to-right seat in the loadout, which is the order
    the peek panel shows and the order the landing solver puts them in. Lane
    identity is what Snare/Trade/Snuff/Fog target, so it must survive a die
@@ -15493,8 +15750,11 @@ function _enchInit(){
    weight its outcomes (Silver) without gaining or losing physical faces, so
    `rollTable` wins over `faces` here and nowhere else - every display path
    keeps reading `faces` and keeps seeing six of them. */
-function _rollTable(mat){
+function _rollTable(mat,d){
   var dt=getDie(mat)||{};
+  /* Still Waters: a worked die rolls as plain geometry. Silver's weighting
+     is a family trait, so it is exactly what this badge takes away. */
+  if(d&&d.ench&&typeof _stillWaters==='function'&&_stillWaters())return dt.faces||[1,2,3,4,5,6];
   return (dt.rollTable||dt.faces||[1,2,3,4,5,6]);
 }
 function _enchFaces(mat,ench){
@@ -15502,7 +15762,7 @@ function _enchFaces(mat,ench){
      That is the line between an enchant and a family trait (brief section 0),
      and the three enchants that crossed it (amber_cast, tempering, loaded)
      are exactly the three that were cut. */
-  var f=_rollTable(mat).slice();
+  var f=_rollTable(mat,ench?{mat:mat,ench:ench}:null).slice();
   return f.length?f:[1];
 }
 function _enchRollM(mat,ench){var f=_enchFaces(mat,ench);return f[Math.floor(Math.random()*f.length)];}
@@ -19117,11 +19377,8 @@ function startPTurn(){
   if(typeof famFire==='function'&&G){famFire('turnStart',{actor:'p'});try{famRenderRow();}catch(e){}}
   /* CONFESSION v2 (Aldric): ONE card sealed at a time, the seal moves
      every turn (old stacking seal is dead — it emptied a 3-slot loadout). */
-  if(G&&_ruleActive('confession','p')&&G.pF&&G.pF.length){
-    G._fSealIdx=((typeof G._fSealIdx==='number'?G._fSealIdx:-1)+1)%G.pF.length;
-    famLog('THE SEAL MOVES — '+(famDef(G.pF[G._fSealIdx].id).name.toUpperCase())+' IS SHUT');
-    try{famRenderRow();}catch(e){}
-  }
+  /* Confession's card-sealing retired; Still Waters suppresses a worked
+     die's FAMILY TRAIT instead - see _dieEffect. */
   if(G&&G._oTarPit>0){
     G._oTarPit--;G.numDice=Math.min(G.numDice||6,5);
     famLog('TAR PIT — YOU ROLL '+G.numDice);
@@ -19138,6 +19395,11 @@ function startPTurn(){
   if(!G||G._endMatchFired)return;
   if(typeof _checkDeadAir==='function')_checkDeadAir();
   G.phase='idle';G.turnPts=0;G.kept=[];G.numDice=G.matchDice?G.matchDice.length:6;G.pool=[];G.turnRollCount=0;G._slowHandUsedThisTurn=false;G._warmHandsActive=false;G._lastHotDice=false;G._firstRollCommitted=0;G._bustSavedThisTurn=false;
+  /* per-turn icon state. Ward and Amber's immunity last one turn by
+     definition; Zero Hour re-arms each turn. Snare/Snuff/Fog are NOT reset
+     here - they are armed on the player's turn to resolve on the rival's,
+     and clear themselves when they fire. */
+  G._wardArmed=false;G._bustImmuneTurn=false;G._zeroHourEnds=false;G._breakArmed=false;
   /* THE TAB: release any bank the rival escrowed last turn. It was held for
      one turn; credit it now and check the win it may complete (the rival
      already had their answering turn while it was on the tab). */
@@ -19495,7 +19757,7 @@ function handleRoll(){
     _iconSel.forEach(function(d){_iconFire(d,'p');});
     /* TELL: Counterfeit (Whisper) — halve groups containing cursed dice + skull puff */
     var _cfHit=false;
-    if(G._tell&&G._tell.id==='counterfeit'&&selDice.some(function(d){return d.cursed;})){
+    if(false&&selDice.some(function(d){return d.cursed;})){
       _cfHit=true;pts=Math.floor(pts/2);spawnPop('💀 −HALF');
       try{SFX.err&&SFX.err();}catch(e){}
     }
@@ -19553,6 +19815,16 @@ function handleRoll(){
       SFX.roll(hotN);
       setTimeout(()=>{G.pool.forEach(d=>{if(!d.committed)settleDie(d.el);});afterRoll();},480);
     },700);
+    return;
+  }
+  /* GROG — ZERO HOUR: keeping a branded face ends the turn on the spot.
+     Same theme as Last Call (time running out) but aimed at a system that
+     exists; Last Call tested neutral-to-negative. ~14% turn-bank tax on a
+     two-enchant hand, firing on ~32% of icon keeps. */
+  if(G._zeroHourEnds){
+    G._zeroHourEnds=false;
+    try{setStatusMsg('ZERO HOUR — THE TURN ENDS','red');famLog('ZERO HOUR — NO MORE ROLLS');}catch(e){}
+    setTimeout(function(){try{handleBank();}catch(e){}},700);
     return;
   }
   G.phase='rolling';setBtns(false,false);setStatusMsg('ROLLING...','active');
@@ -19694,7 +19966,9 @@ function _afterRollImpl(){
     }
     /* In Arrears (Corvus): −Xg per roll, gold can go negative.
        Also ticks the inline HUD value next to the Tell title. */
-    if(_ruleActive('in_arrears','p')&&S&&S.run){
+    /* First Strike is pure information - no gold drain. NOTE: In Arrears was
+       the only economy tell in the roster, so no badge taxes gold any more. */
+    if(false&&S&&S.run){
       if(!G._tellState)G._tellState={totalRollCost:0};
       var _iaCost=G._tell.perRoll||15;
       S.run.gold=(S.run.gold||0)-_iaCost;
@@ -20306,6 +20580,28 @@ function doBust(){
      Retort and Reprisal. */
   var _bustLost=(G.kept||[]).reduce(function(a,k){return a+(k.pts||0);},0);
   try{famFire('bust',{actor:'p',lost:_bustLost});}catch(e){}
+  /* AMBER's break-trigger: this turn simply cannot bust. Checked before
+     anything is cleared, so the turn continues untouched. */
+  if(G._bustImmuneTurn){
+    try{setStatusMsg('AMBER HOLDS — NO BUST','gold');famLog('AMBER — THE TURN SURVIVES');}catch(e){}
+    try{G.pool.filter(function(d){return !d.committed;}).forEach(function(d){
+      d.val=_rollD(d);d.sel=false;try{reDrawDieFace(d);}catch(e){}});}catch(e){}
+    G.phase='choosing';try{refreshSelUI();}catch(e){}
+    return;
+  }
+  /* WARD: never a full save - the bank is HALVED, not kept. One ward per
+     turn, armed by the first branded face kept. */
+  if(G._wardArmed){
+    G._wardArmed=false;
+    var _half=Math.floor(_bustLost/2);
+    try{setStatusMsg('WARD HOLDS — HALF SURVIVES: '+_half,'gold');famLog('WARD — HALF THE TURN SURVIVES ('+_half+')');}catch(e){}
+    G.pPts=(G.pPts||0)+_half;
+    G.turnPts=0;G.kept=[];
+    try{updHUD();refreshKeptTray();}catch(e){}
+    G.safeTurnStreak=0;
+    setTimeout(function(){try{clearRow('playerDiceRow');G.pool=[];endPTurn();}catch(e){}},900);
+    return;
+  }
   /* Feat tracking: count player busts for "Untouchable" feat */
   G._featBusts=(G._featBusts||0)+1;
   /* Rusty Spur: bias was earned by banking — a bust resets it so the bias doesn't carry past failure */
@@ -20812,7 +21108,7 @@ function handleBank(){
          handleBank used to skip all of them (Vanguard, Hot Hand, etc.). */
       pts=_applyCommitBonuses(selD,pts,cards);
       var _cfBank=false;
-      if(G._tell&&G._tell.id==='counterfeit'&&selD.some(function(d){return d.cursed;})){_cfBank=true;pts=Math.floor(pts/2);spawnPop('💀 −HALF');try{SFX.err&&SFX.err();}catch(e){}}
+      if(false&&selD.some(function(d){return d.cursed;})){_cfBank=true;pts=Math.floor(pts/2);spawnPop('💀 −HALF');try{SFX.err&&SFX.err();}catch(e){}}
       selD.forEach(d=>{d.committed=true;d._frozen=false;if(d.el){d.el.classList.remove('selected','die-frozen');d.el.classList.add('committed');d.el.onclick=null;if(d.el._d3)D3.draw(d.el._d3);}});
       G.kept.push({vals:selV,mat:selD[0].mat,pts,cursed:_cfBank,
         dice:selD.map(function(dd){return{val:dd.val,mat:dd.mat};})});
@@ -21271,10 +21567,11 @@ function handleBank(){
       _flashTellRule();
     }
     /* Last Call (Grog): bank below threshold scores 0 */
-    if(_ruleActive('last_call','p')&&total<(((G._tell&&G._tell.id==='last_call')?G._tell:_tellById('last_call')||{}).threshold||500)){
-      var _lcT=((G._tell&&G._tell.id==='last_call')?G._tell:_tellById('last_call')||{}).threshold||500;
-      total=0;bonusMsg=' LAST CALL <'+_lcT;
-      setStatusMsg("LAST CALL — UNDER "+_lcT+'!','red');
+    /* Zero Hour replaces Last Call's under-threshold rejection: the badge
+       now ends the turn on an icon keep instead of voiding small banks. */
+    if(false){
+      var _lcT=500;
+      total=0;bonusMsg='';
       /* Distinct harsh sound — was reusing SFX.bust which felt like a
          normal bust; this is a house-rule rejection and deserves its own
          tone (square-wave descending fail + thud). */
@@ -21418,6 +21715,15 @@ function _handBackOrCap(){
 function endPTurn(){
   /* Ghost-timer guard (see startPTurn) */
   if(!G||G._endMatchFired)return;
+  /* STARSTONE's break-trigger: one immediate extra turn, taken right after
+     this one instead of yielding the table. */
+  if(G._extraTurn>0){
+    G._extraTurn--;
+    try{setStatusMsg('STARSTONE — THE TABLE IS STILL YOURS','gold');famLog('AN EXTRA TURN');}catch(e){}
+    restoreRollButton();
+    setTimeout(function(){try{startPTurn();}catch(e){}},700);
+    return;
+  }
   restoreRollButton();
   try{_renderSelTags([],0,true);}catch(e){}
   /* TELL: Confession — restore the sealed card to G.pCards now that turn ends */
@@ -21495,7 +21801,7 @@ function endPTurn(){
 /* ═══════ OPPONENT AI ═══════ */
 function oppShouldBank(rung,oppBank,diceLeft,oppTotal,playerTotal,target){
   if((oppTotal+oppBank)>=target)return true;
-  if(typeof _ruleActive==='function'&&_ruleActive('last_call','o')&&oppBank<500&&diceLeft>=2)return false;
+  /* Zero Hour has no bank-threshold behaviour - it ends turns instead. */
   if(typeof _ruleActive==='function'&&_ruleActive('reckoning','o')&&typeof G!=='undefined'&&G&&(G._lastBankAmount||0)>0&&oppBank<G._lastBankAmount&&diceLeft>=2)return false;
   /* Huge bank protection — even when behind, an NPC banking 2500+ in a
      single turn risks too much by pushing further. Player feedback:
@@ -21766,12 +22072,24 @@ function runOppTurn(){
   G.oppTurnCount=(G.oppTurnCount||0)+1;
   /* Synergy: The Sting — opponent loses 100 every 4th turn */
   if(G.activeSynergies&&G.activeSynergies.includes('dirty_pair')&&G.oppTurnCount%4===0){G.oPts=Math.max(0,G.oPts-100);spawnPop('-100 \uD83D\uDC1D');}
+  /* SNUFF: the rival's die in the snared seat is gone for THIS TURN ONLY,
+     then returns. Pulling one die from a six-die hand costs that turn about
+     36% of its average value. */
+  var _snuffLane=-1;
+  if(G._snuff&&G._snuff.live){
+    _snuffLane=G._snuff.lane;G._snuff.live=false;
+    if(_snuffLane>=0&&left>1){
+      left--;
+      try{setStatusMsg('THEIR '+(_snuffLane+1)+(_snuffLane===0?'ST':(_snuffLane===1?'ND':(_snuffLane===2?'RD':'TH')))+' DIE IS SNUFFED','gold');}catch(e){}
+      try{famLog('SNUFF — THEY PLAY ONE SHORT');}catch(e){}
+    }
+  }
   clearRow('oppDiceRow');G.oppDice=[];
   function step(){
     if(G!==_matchG||!G||G._endMatchFired)return;/* ghost-timer guard */
     if(_ruleActive('drill_order','o')&&oppRollNum>=3){finOpp(oppBank);return;}
     clearRow('oppDiceRow');G.oppDice=[];oppRollNum++;
-    if(_ruleActive('in_arrears','o')){G._arrearsPot=(G._arrearsPot||0)+5;}
+    /* (In Arrears' pot retired with the rule) */
     if(_ruleActive('pickpocket','o')&&Math.random()<0.3&&left>1){left--;setStatusMsg('A DIE PALMED FROM THEIR HAND','gold');}
     const leakyActive=G.pCards.includes('leaky_cup')&&G.oppTurnCount%4===0&&G.oppTurnCount>0;
     /* Player-side reduce_first_roll cards (Pocket Sand 70%, Mabel's Pinch 50%):
@@ -21881,11 +22199,39 @@ function runOppTurn(){
           setStatusMsg(G.rung.name+': VOW — 300+ DOUBLES, ELSE LOSE PTS','red');
         }
       }
-      const fV=G.oppDice.filter(d=>!d.kept).map(d=>d.val);
-      const fMats=G.oppDice.filter(d=>!d.kept).map(d=>d.mat);
+      const _oFree=G.oppDice.filter(d=>!d.kept);
+      const fV=_oFree.map(d=>d.val);
+      const fMats=_oFree.map(d=>d.mat);
+      /* FOG: hide one seat from the reckoning the NPC ALREADY runs, rather
+         than assuming threat-assessment it does not have. The die is still
+         physically there and still rolls - the AI's maths simply cannot see
+         its value, so that seat resolves to whatever the rest implies. */
+      var _fogV=fV.slice();
+      if(G._fog&&G._fog.live){
+        G._fog.live=false;
+        var _fi=_oFree.findIndex(function(d,i){return i===G._fog.lane;});
+        if(_fi>=0&&_fogV.length>1){
+          _fogV.splice(_fi,1);
+          try{famLog('FOG — THEY MISREAD A SEAT');}catch(e){}
+        }
+      }
       crowsCtx.crowsLuckFiredThisRoll=false;
-      var{total,used,context:newCtx}=scoreRoll(fV,G.oCards,oppBank,crowsCtx,fMats);crowsCtx=newCtx||crowsCtx;
+      var{total,used,context:newCtx}=scoreRoll(_fogV,G.oCards,oppBank,crowsCtx,fMats.length===_fogV.length?fMats:undefined);crowsCtx=newCtx||crowsCtx;
       if(crowsCtx.crowsLuckFiredThisRoll)triggerCard('crows_luck',"CROW'S LUCK — STRAIGHT DOWNGRADED",true);
+      G._oUnbanked=oppBank;/* what Vagabond's break-trigger steals */
+      /* SNARE: their die in the marked seat is halved once if it scores
+         during this turn. The mark then clears whether it fired or not -
+         "until it fires" tested at 97.7% inside six turns, which is not a
+         bet. One opposing turn is what makes it a wager. */
+      if(G._snare&&G._snare.live&&total>0){
+        var _snIdx=G._snare.lane;
+        if(_snIdx>=0&&_snIdx<_oFree.length&&used&&used[_snIdx]){
+          total=Math.floor(total/2);
+          G._snare.live=false;
+          try{famLog('THE SNARE BITES — HALVED');}catch(e){}
+          try{setStatusMsg('YOUR SNARE CATCHES THEM — HALF','gold');}catch(e){}
+        }
+      }
       /* Snake Oil: zero out this roll's score */
       if(G._snakeOilActive){G._snakeOilActive=false;total=0;setStatusMsg('SNAKE OIL — SCORE ZEROED!','gold');}
       /* ALDRIC'S VOW NPC effect: if armed, this roll resolves the vow.
