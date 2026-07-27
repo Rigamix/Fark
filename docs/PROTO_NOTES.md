@@ -4503,3 +4503,49 @@ and text label are switched off rather than layered on top of them.
 
 Aspect ratios come from the files themselves — ROLL 2392/1020, BANK 1401/912,
 turn plaque 969/307 — so nothing is stretched.
+
+## P239–P242 — portraits, plaque lettering, and shadow under the top UI
+
+**Portraits.** Both `portrait_ring*.png` are gone from the markup: the scorebar's
+own portraits layer already paints a frame around each well, so the ring was
+drawing over the art it was meant to sit in. What is left is a flat disc with
+the character on it, at `z-index:14` — *under* `#raceWrap` (15), so the painted
+frame overlaps the photo's edge. The token stays tappable because every `.rb`
+layer is `pointer-events:none`. The rival's disc takes the same colour the peek
+panel gives that patron (`FRAME_COL`); the player's is neutral. The old
+`#120c08` fallback read as a hole punched in the bar and is now that same
+neutral.
+
+**The plaque.** `TURN 3/6` was one string, so it could only have one colour and
+one size. It is two spans now, written in one place (`_turnLabel`) rather than
+at the four call sites that used to set `.textContent`. Two measurements do the
+positioning:
+
+- `align-items:baseline` instead of `center`. Centring levelled the two
+  *middles*, which left the small word floating above the number's baseline and
+  needed a hand-tuned nudge to hide it. Baseline alignment is what was actually
+  wanted, and the browser computes the offset from the font.
+- The banner's cream writing field is centred at **39.1%** of the plaque, not at
+  50% — the red skirt takes the bottom third. `padding-top:2.75%` drops the
+  digits' ink centre onto that, measured with `TextMetrics` rather than judged
+  by eye. All four states fit inside the field: the widest, `TURN 10/10`, spans
+  19.4–80.6% against the field's 16.2–84.5%.
+
+**The score diamond.** `ScoreBar_new_centre.png` is a full 3795×950 canvas with
+only the diamond painted on it, so the scale pivots on the **diamond's** ink
+centre (50.45%, 26.63%) — scaling about the canvas centre would have slid it
+down the bar. `#targetScore` is pinned to that same point, so the number holds
+still while the diamond grows around it, which is what gave the score room.
+
+**Shadows.** Sharp (zero blur) and semi-transparent, straight down: these sit
+flat against the back wall rather than standing off it like the table props.
+`drop-shadow` traces the alpha, so each layer casts its own silhouette. On the
+buttons the label is inside an opaque region of the plate and adds nothing to
+that silhouette, so the filter outlines the plate alone.
+
+The catch was specificity. Three rules exist to strip the *old* canvas-drawn
+buttons' styling, and they outrank the per-button ones —
+`#screen-match .match-btn.disabled` is (1,2,0) against `#btnBank.disabled`'s
+(1,1,0) — so `filter:none` won and BANK lost its shadow the moment it went
+disabled. The plates are art now, so those rules carry the shadow instead of
+clearing it, and the redundant per-button copies are gone.
