@@ -4549,3 +4549,52 @@ buttons' styling, and they outrank the per-button ones —
 (1,1,0) — so `filter:none` won and BANK lost its shadow the moment it went
 disabled. The plates are art now, so those rules carry the shadow instead of
 clearing it, and the redundant per-button copies are gone.
+
+## P243 — the discs fill their wells, and the last dither fringe goes
+
+**The wells are rings with a transparent hole**, and the hole — not the ring's
+outer edge — is what the portrait has to fill. Measured off
+`ScoreBar_new_portraits.png`: **12.25%** of the bar width on the left, **12.86%**
+on the right. The disc was `9.4cqw`, about three quarters of that, which left a
+band of bare bar between the art and the frame. It is `13.2cqw` now —
+deliberately a shade *wider* than both holes, because the ring is opaque out to
+15.84% and crops the excess, whereas sizing to the hole exactly leaves a sliver
+showing on the wider side. Centres are unchanged (left 7.89%, right 91.91%), so
+the registration the frame layer expects still holds.
+
+**The crops were framing the plate, not the face.** All four patron sources are
+443×802 with the bust in the **top half** and the bottom ~38% empty, so a
+`background-size` of 106–118% fitted the whole canvas and left the head tiny.
+Recomputed from each file's ink box and the horizontal centre of its head:
+side = 0.94× the bust, a sliver of air above the crown, shoulders bleeding off
+the circle. These live in the JS `CROP` table, which is the value that actually
+renders — `_matchDress` writes `background-size`/`-position` inline, so the
+stylesheet's numbers are only a fallback and editing them alone does nothing.
+
+**One anchor for the top HUD.** The bar, plaque, shield numbers and discs each
+carried their own absolute `top`, so lowering the bar meant editing four numbers
+and hoping they agreed. They are offsets from `--bar-top` now.
+
+**The plaque was being nearest-neighboured.** `image-rendering` is inherited and
+`body` sets `pixelated` for the pixel-art UI; every other piece of the new match
+art opts back out through one shared list. The plaque is a `<div>` painted with
+a background-image, so — exactly like `.tokImg` — it has to be named there
+rather than caught by `#screen-match img`. It was the only one missing, which is
+why a 969×307 PNG nearest-neighboured down to ~83×26 looked jagged.
+
+**The dither fringe.** `.controls` used to be a solid `rgb(30,18,10)` bar and
+`.controls::before` dithered it into the table. `#screen-match .controls` kills
+that background, so the strip has been an orphan floating over the painted table
+ever since. Its twin below the HUD was already switched off; this was the one
+that got missed. A live sweep of every element and pseudo-element for painted
+repeating gradients returned exactly this one — the other nine dither layers
+(`body::after`, `#matchVignette`, `#feat-ov::before`, `#perfectGlow .perf-dither`,
+`#end-ov::before`, `.top-bar::after`, `.hud::after`, `#screen-menu::after`) are
+all either force-disabled or gated behind an event, and stay.
+
+**A tap regression this fixed.** P239 moved `.tok` to `z-index:14` so the painted
+frame would overlap the photo's edge, on the reasoning that the bar's layers are
+`pointer-events:none`. That was true of the `.rb` *images* but not of `.rbClip`,
+a plain div covering the whole bar — so the portraits stopped taking taps
+entirely. The z-order was checked at the time; the hit-test was not. `#raceWrap`
+is `pointer-events:none` as a whole now: nothing in the bar is interactive.

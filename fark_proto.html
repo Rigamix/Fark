@@ -1075,10 +1075,12 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 #screen-match #tellBadge .tb-desc{display:none}
 #screen-match #tellBadge .tb-val{font-size:3.2cqw;color:#8a2d1c;margin-left:.8cqw}
 #screen-match{container-type:size;overflow:hidden;/* one screen, never scrolls */
+  /* every piece of the top HUD hangs off this, so the bar moves as one */
+  --bar-top:2.7cqw;
   padding-top:calc(env(safe-area-inset-top,0px) + 8px);
   padding-bottom:calc(env(safe-area-inset-bottom,0px) + 6px)}
 #screen-match img,#matchPlate,#matchProps img,#screen-match .match-btn,#raceWrap,
-#screen-match .tokImg{image-rendering:auto;-webkit-font-smoothing:antialiased}
+#screen-match .tokImg,#screen-match #turnNum{image-rendering:auto;-webkit-font-smoothing:antialiased}
 #matchPlate{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0}
 /* candlelight (canvas): #matchPlate is the LIT table; #matchDark draws
    the UNLIT table with a soft breathing ellipse punched out — the pool
@@ -1106,14 +1108,17 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 #matchPause img{width:100%;height:100%;object-fit:contain}
 #screen-match .hud{display:block;position:relative;background:none;border-bottom:none;height:29cqw;z-index:15}
 #screen-match .hud::after{display:none}
+#screen-match .controls::before{display:none}
 /* the whole bar is one canvas: frame, fill, portraits and the centre plate
    are pre-registered layers of a single 3795x950 painting, so every one of
    them is inset:0 and nothing needs aligning by hand. */
-#raceWrap{position:absolute;left:0;right:0;top:0.4cqw;aspect-ratio:3795/950;z-index:15}
+#raceWrap{position:absolute;left:0;right:0;top:var(--bar-top);aspect-ratio:3795/950;z-index:15;
+  /* decoration only: the portrait tokens sit UNDER this and must stay tappable */
+  pointer-events:none}
 #raceWrap .rb{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none;
   filter:drop-shadow(0 0.5cqw 0 rgba(26,15,7,.34))}
 #raceWrap .rbPort{z-index:4;filter:drop-shadow(0 0.5cqw 0 rgba(26,15,7,.34))}
-#raceWrap .rbCentre{z-index:5;transform-origin:50.45% 26.63%;transform:scale(1.26,1.10);
+#raceWrap .rbCentre{z-index:5;transform-origin:50.45% 26.63%;transform:scale(1.34);
   filter:drop-shadow(0 0.5cqw 0 rgba(26,15,7,.34))}
 .rbClip{position:absolute;top:0;bottom:0;width:50%;overflow:hidden;container-type:size;z-index:2}
 .rbClip.o{left:0}
@@ -1130,11 +1135,14 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 /* the wells, measured off ScoreBar_new_portraits: left centre 7.9%, right
    centre 92.0%, each ~9.2% of the bar wide. The portrait art draws its own
    frame, so the old ring image is switched off below. */
-#screen-match .tok{position:absolute;width:9.4cqw;text-align:center;cursor:pointer;z-index:14}
-/* the well sits ~35% down the bar, and the bar is 25.04cqw tall (3795/950)
-   starting at 0.4cqw, so the well centre is 0.4 + 0.35*25.04 = 9.2cqw */
-#screen-match .tok.tokO{left:3.23cqw;top:9.2cqw;transform:translateY(-50%)}
-#screen-match .tok.tokP{right:3.33cqw;top:9.0cqw;transform:translateY(-50%)}
+#screen-match .tok{position:absolute;width:13.2cqw;text-align:center;cursor:pointer;z-index:14}
+/* hole centres: left (7.89%, 35.16%), right (91.91%, 34.05%) of the bar.
+   35.16% of 25.03cqw = 8.80cqw below the bar top; 34.05% = 8.52cqw. */
+/* deliberately a shade WIDER than the holes (12.25% / 12.86%): the ring is
+   opaque out to 15.84%, so the excess is cropped by the frame, and sizing to
+   the hole exactly would leave a sliver of bare bar on the wider side. */
+#screen-match .tok.tokO{left:1.29cqw;top:calc(var(--bar-top) + 8.80cqw);transform:translateY(-50%)}
+#screen-match .tok.tokP{right:1.49cqw;top:calc(var(--bar-top) + 8.52cqw);transform:translateY(-50%)}
 #screen-match .tok .tokRing{display:none}
 #screen-match .tok .hud-lbl{display:none}
 /* a flat colour disc with the character on top - no ring art, the scorebar
@@ -1142,25 +1150,26 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
    peek panel uses for that patron (FRAME_COL); the player's is neutral. */
 #screen-match .tokImg{position:absolute;left:0;top:50%;transform:translateY(-50%);
   width:100%;aspect-ratio:1;border-radius:50%;
-  background-color:#3f3a34;background-repeat:no-repeat;background-position:50% 0%;
+  background-color:#3f3a34;background-repeat:no-repeat;background-position:50% 14%;
+  /* a fallback only: _matchDress writes the per-character CROP inline */
   background-size:112%}
 #screen-match .tokPImg{background-color:#44403a}
 #screen-match .tok .tokRing{position:relative;width:100%;display:block;z-index:1}
 /* in the shields the portrait layer draws: centres x 7.9% / 91.8%, y 79% of
    the bar, measured off the art */
-#screen-match .hud-score{position:absolute;top:20.2cqw;transform:translate(-50%,-50%);z-index:18;
+#screen-match .hud-score{position:absolute;top:calc(var(--bar-top) + 19.8cqw);transform:translate(-50%,-50%);z-index:18;
   font-family:'JMH Beda',serif;font-size:4.4cqw;line-height:1;color:#f6ecd4;
   text-shadow:0 2px 0 rgba(16,9,3,.75);background:none}
 #screen-match .hud-score.o{left:7.9%}
 #screen-match .hud-score.p{left:91.8%}
 #screen-match .hud-lbl{display:none}
-#screen-match .hud-mid{position:absolute;left:50%;top:13.7cqw;transform:translateX(-50%);
+#screen-match .hud-mid{position:absolute;left:50%;top:calc(var(--bar-top) + 13.3cqw);transform:translateX(-50%);
   text-align:center;z-index:16}
 /* the plaque is art now; the text sits on it. padding-bottom lifts the line
    clear of the notch the banner is cut with along its bottom edge. */
 #screen-match #turnNum{font-family:'JMH Beda',serif;font-size:3.4cqw;letter-spacing:.06em;
   color:#3a2410;text-shadow:none;
-  background:url('Art/Assets/Match/turn_number.png') center/100% 100% no-repeat;
+  background:url('Art/Assets/Match/turn_number.png') center/contain no-repeat;
   aspect-ratio:969/307;width:26cqw;display:flex;align-items:baseline;justify-content:center;
   /* the banner's cream writing field is centred at 39.1% of the plaque, not at
      50% - the red skirt takes the bottom third. This padding drops the digits'
@@ -1170,8 +1179,9 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
    two middles level, which leaves the small word floating above the number's
    baseline - the nudge drops it back onto the line. */
 #screen-match #turnNum .tn-w{font-size:.60em;letter-spacing:.11em;color:#9a7c5a;
-  margin-right:.40em}
-#screen-match #turnNum .tn-n{font-size:1.34em;letter-spacing:.02em;color:#33200c}
+  margin-right:.40em;position:relative;top:-0.62cqw}
+#screen-match #turnNum .tn-n{font-size:1.34em;letter-spacing:.02em;color:#33200c;
+  position:relative;top:-0.22cqw}
 #screen-match #turnNum .tn-o{font-size:.92em;letter-spacing:.08em;color:#33200c}
 #screen-match .hud-mid{width:auto;padding:0}
 #btnQuit{display:none !important}
@@ -14693,9 +14703,11 @@ function _matchDress(isBoss){
   var tok=document.getElementById('tokOImg');
   if(tok){
     var art=window._lastSeatArt;
-    /* measured face crops: [bg-size%, pos-x%, pos-y%] per character */
-    var CROP={Krox:[109,100,0],Eira:[106,0,0],Nebb:[118,52,0],Regis:[106,100,0]};
-    var cr=CROP[art]||[175,50,10];
+    /* measured face crops: [bg-size%, pos-x%, pos-y%] per character.
+       Each source is 443x802 with the bust in the top half, so these frame
+       the head rather than the plate - see docs/PROTO_NOTES.md. */
+    var CROP={Krox:[115,88,16],Eira:[112,9,16],Nebb:[113,51,15],Regis:[103,100,7]};
+    var cr=CROP[art]||[112,50,14];
     tok.style.backgroundImage=(!isBoss&&art)?'url("Art/Assets/Frames/Patrons/'+art+'.png?v=2")':'none';
     tok.style.backgroundSize=cr[0]+'%';
     tok.style.backgroundPosition=cr[1]+'% '+cr[2]+'%';
