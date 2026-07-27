@@ -11682,15 +11682,23 @@ function famOffer(forceTier1){
 var _RELIC_FAM={grogs_tooth:'obsidian',mabels_thimble:'amber',finnicks_palm:'vagabond',
   corvus_ledger:'starstone',brutus_shield:'silver',aldrics_square:'jade',
   whispers_fang:'vagabond',ambrose_weight:'amber'};
+/* Which family a MATERIAL belongs to. DICE_TYPES entries carry no `fam`
+   field - only CARDS do - so anything that wanted this had to re-derive it
+   from the id prefix, and one place asked getDie(mat).fam and silently got
+   undefined every time. */
+var _MAT_FAMS=['jade','amber','silver','obsidian','starstone','vagabond'];
+function _matFam(mat){
+  if(!mat)return null;
+  if(_RELIC_FAM[mat])return _RELIC_FAM[mat];
+  for(var i=0;i<_MAT_FAMS.length;i++)if(mat.indexOf(_MAT_FAMS[i])===0)return _MAT_FAMS[i];
+  return null;
+}
 /* families the player is invested in: cards AND dice (brief §4) */
 function famOwnedFams(){
   var o={};
   famOwnedAll().forEach(function(c){var d=famDef(c.id);if(d&&d.fam!=='tavern')o[d.fam]=1;});
   (S.run.dice||[]).forEach(function(m){
-    if(!m)return;
-    if(_RELIC_FAM[m]){o[_RELIC_FAM[m]]=1;return;}
-    ['jade','amber','silver','obsidian','starstone','vagabond'].forEach(function(f){
-      if(m.indexOf(f)===0)o[f]=1;});
+    var f=_matFam(m);if(f)o[f]=1;
   });
   return o;
 }
@@ -15420,22 +15428,24 @@ function famQuicksilver(){
   try{refreshSelUI();}catch(e){}try{famRenderRow();}catch(e){}
 }
 function rollFace(mat){
-  const dt=getDie(mat);
-  const faces=dt.faces||[1,2,3,4,5,6];
+  /* _rollTable, not dt.faces: this is the NPC's only roller and the player's
+     hot-dice path, so reading raw faces meant a weighted family was weighted
+     for one side of the table and not the other. */
+  const faces=_rollTable(mat);
   return faces[Math.floor(Math.random()*faces.length)];
 }
 function rollFaceExclude(mat,exclude){
   /* Reroll that's guaranteed to differ from `exclude` — used by active cards
      (Grog's Flask, Gambler's Eye) so a reroll always looks like a reroll. */
-  const dt=getDie(mat);
-  const faces=(dt.faces||[1,2,3,4,5,6]).filter(f=>f!==exclude);
+  const faces=_rollTable(mat).filter(f=>f!==exclude);
   if(!faces.length)return rollFace(mat);/* fallback if die has only one face */
   return faces[Math.floor(Math.random()*faces.length)];
 }
 function rollFaceSpur(mat){
-  /* Spur: bias toward 1s and 5s by adding extra copies to the pool */
-  const dt=getDie(mat);
-  const faces=dt.faces||[1,2,3,4,5,6];
+  /* Spur: bias toward 1s and 5s by adding extra copies to the pool. Built on
+     the weight table, so Spur on a weighted family compounds with it rather
+     than flattening it back to fair. */
+  const faces=_rollTable(mat);
   const pool=[...faces];
   /* Add extra 1s and 5s from the existing faces */
   const extra1s=faces.filter(f=>f===1).length;
@@ -20175,6 +20185,17 @@ function _delayedDoBust(_freeArr){
 function doBust(){
   /* Ghost-timer guard (see startPTurn) */
   if(!G||G._endMatchFired)return;
+  /* THE bust event, fired here for EVERY bust and with the turn's total
+     still intact. It used to live inside the shield branch below, so it only
+     ever fired when a shield BLOCKED the bust - meaning slow_cook, insurance,
+     retort, reprisal and fools_gold all listened for something that never
+     reached them on a real bust. And it read G.kept one line after
+     `G.kept=[]`, so `lost` was 0 even then. This matters more now that
+     Silver's shield is gone: with that branch unreachable for most loadouts
+     the only dispatch would have disappeared with it, and the brief KEEPS
+     Retort and Reprisal. */
+  var _bustLost=(G.kept||[]).reduce(function(a,k){return a+(k.pts||0);},0);
+  try{famFire('bust',{actor:'p',lost:_bustLost});}catch(e){}
   /* Feat tracking: count player busts for "Untouchable" feat */
   G._featBusts=(G._featBusts||0)+1;
   /* Rusty Spur: bias was earned by banking — a bust resets it so the bias doesn't carry past failure */
@@ -20230,7 +20251,8 @@ function doBust(){
     setStatusMsg('SILVER SHIELD — BUST BLOCKED!','silver');
     spawnPop('🛡️ SHIELD');
     G.safeTurnStreak=0;G.turnPts=0;G.kept=[];updHUD();refreshKeptTray();setBtns(false,false);
-    famFire('bust',{actor:'p',lost:G.kept.reduce(function(a,k){return a+k.pts;},0)});
+    /* (the bust event now fires once at the top of doBust, before the
+       total is cleared - see there) */
     if(G._oIllOmen){/* they called your bust: pay them */
       var _ioP3=famDef('ill_omen').p[(G._oIllOmen.tier||1)-1];
       var takeO=Math.min(_ioP3[0],G.pPts);
@@ -26938,7 +26960,9 @@ function _gbEnchantPick(k){
     +'<div style="display:flex;gap:6px;flex-wrap:wrap">';
   (S.run.dice||[]).forEach(function(mt,i){
     var en=S.run.dieEnch[i];
-    var col=(FAMILIES[(getDie(mt)||{}).fam]||{}).color||'#777';
+    /* getDie(mt).fam has never existed - DICE_TYPES carries no fam field, so
+       every one of these accents fell through to grey. */
+    var col=(FAMILIES[_matFam(mt)]||{}).color||'#777';
     if(en)h+='<div class="gbx-box sub" style="width:78px;height:64px;font-size:11px;opacity:.5"><span class="d3chip" data-mat="'+mt+'" style="width:26px;height:26px"></span>'+getDie(mt).name+'<br><span class="gbx-label">worked</span></div>';
     else h+='<div class="gbx-box" style="width:78px;height:64px;font-size:11px;cursor:pointer;border-bottom:3px solid '+col+'" '
       +'onclick="_gbEnchantDie(\''+k+'\','+i+')"><span class="d3chip" data-mat="'+mt+'" style="width:26px;height:26px"></span>'+getDie(mt).name+'</div>';

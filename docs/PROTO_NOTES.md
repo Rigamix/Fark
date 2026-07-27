@@ -4018,3 +4018,51 @@ to `_pShields`/`dieShieldsPlayer`. Verified Brutus still reports 2 saves.
 Useful discovery for the Ward enchant later: **`bustBankHalf` already exists**
 on the NPC side (~line 21894, `mabels_stitch`) — "halve the bank instead of
 zeroing it" has a working precedent to mirror rather than invent.
+
+## P215 — the weighting has to reach every roller
+
+P214 only routed `_enchFaces`, which serves the player's normal roll. Three
+other rollers read `dt.faces` directly and kept rolling a fair 1-6:
+
+- `rollFace` — **the NPC's only roller**, and the player's hot-dice path, and
+  several card effects
+- `rollFaceExclude` — Grog's Flask, Gambler's Eye
+- `rollFaceSpur` — the Spur bias
+
+So an NPC holding silver dice rolled them as bone. A family trait that only
+applies to one side of the table is not a family trait. All four go through
+`_rollTable` now. Measured, faces 1/2/3/4/5/6:
+
+```
+rollFace  silver (NPC + hot dice)   25.0 / 12.6 / 12.4 / 12.6 / 24.8 / 12.6
+rollFace  bone                      16.6 / 16.6 / 16.6 / 16.7 / 16.7 / 16.8
+rollFaceSpur silver                 33.2 /  8.4 /  8.3 /  8.3 / 33.4 /  8.5
+rollFaceExclude(silver, 1)           0.0 / 16.8 / 16.6 / 16.7 / 33.2 / 16.7
+```
+
+Spur compounds on top of the weighting rather than flattening it back to
+fair, and Exclude keeps the 5's double weight after dropping the 1s.
+
+**`_matFam(mat)`** lands here too, because two places wanted "which family is
+this material" and one of them asked `getDie(mat).fam` — a field that has
+never existed on `DICE_TYPES` (zero occurrences; only CARDS carry `fam`). So
+every die chip in the enchant picker has always fallen through to grey.
+
+## P216 — the bust event never fired on a bust
+
+`famFire('bust')` is the only bust dispatch in the file, and it sat **inside
+the Silver shield branch** — so it fired only when a shield BLOCKED the bust,
+never on a real one. Five handlers listen for it (`slow_cook`, `insurance`,
+`retort`, `reprisal`, `fools_gold_f`) and none of them had been reachable on
+an ordinary bust. And even in the shield case it read `G.kept` on the line
+*after* `G.kept=[]`, so `lost` was always 0.
+
+Moved to the top of `doBust`, before anything is cleared. Measured on a live
+match: a plain bust with **zero shields** now fires `{actor:'p', lost:400}`
+where it previously fired nothing.
+
+This matters for the rework specifically: the brief's stated reason for
+deleting Silver's safety is that it "makes every bust-reactive card
+meaningless" — and Retort and Reprisal, which the brief KEEPS, were already
+meaningless for an unrelated reason. It would also have vanished entirely
+once that branch became unreachable.
