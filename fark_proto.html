@@ -14884,7 +14884,7 @@ if(/hsdebug/.test(location.search))try{localStorage.setItem('fk_dbg','1');}catch
 })();
 /* ═══════════════ end family engine ═══════════════ */
 
-function scoreRoll(vals,cards,locked,context,dieMats){
+function scoreRoll(vals,cards,locked,context,dieMats,dieEnchs){
   cards=cards||[];locked=locked||0;context=context||{};dieMats=dieMats||null;
   /* Multi-pass scoring flag — when set, ladder/ascending blocks run AFTER
      the triples loop instead of before. scoreSelection tries both
@@ -14909,7 +14909,14 @@ function scoreRoll(vals,cards,locked,context,dieMats){
   const _tavernTalesPartial=_ttColCount===2;
 
   /* Helper: get die effect for index i */
-  const dieEff=i=>{if(!dieMats||!dieMats[i])return null;const dt=getDie(dieMats[i]);return dt&&dt.effect?dt.effect:null;};
+  /* Still Waters (Aldric): a WORKED die forgets what it was made of. The
+     engine used to read the family effect raw, so the badge suppressed only
+     Silver's weighting and nothing else - Amber's triple bonus, Starstone's
+     bank bonus and the rest all still fired. */
+  const dieEff=i=>{
+    if(!dieMats||!dieMats[i])return null;
+    if(typeof _stillWaters==='function'&&_stillWaters()&&dieEnchs&&dieEnchs[i])return null;
+    const dt=getDie(dieMats[i]);return dt&&dt.effect?dt.effect:null;};
 
   /* ── Wild prep (Jade variants): 6s on wild_* dice become -1 (wild marker).
      Per-wild capability tracked in `wildLevel` so the scoring engine can
@@ -15381,7 +15388,7 @@ function scoreRoll(vals,cards,locked,context,dieMats){
   }
   return{total:pts,used,context,effects,_triplesFired,_bonusFired:_bonusFiredFlag};
 }
-function scoreSelection(selVals,cards,locked,context,dieMats){
+function scoreSelection(selVals,cards,locked,context,dieMats,dieEnchs){
   if(!selVals.length)return 0;
   cards=cards||[];
   /* Multi-pass: try standard ordering first (ladder/ascending BEFORE
@@ -15390,7 +15397,7 @@ function scoreSelection(selVals,cards,locked,context,dieMats){
      like [1,1,1,2,3,4] where standard gives 1000 but triples-first
      gives 1400. The second pass costs ~2x scoreRoll only when relevant
      cards are present. */
-  const _r1=scoreRoll(selVals,cards,locked,context,dieMats);
+  const _r1=scoreRoll(selVals,cards,locked,context,dieMats,dieEnchs);
   let _bestValid=-1;
   /* Validity: every selected die must be marked used. EXCEPTION: when a
      "consume-extras" pattern card fires (Bookends / Twin Fury / Sevens
@@ -15404,7 +15411,7 @@ function scoreSelection(selVals,cards,locked,context,dieMats){
   const _orderSensitive=cards.includes('the_ladder')||cards.includes('ascending');
   if(_orderSensitive){
     const _ctx2=Object.assign({},context||{},{_triplesFirst:true});
-    const _r2=scoreRoll(selVals,cards,locked,_ctx2,dieMats);
+    const _r2=scoreRoll(selVals,cards,locked,_ctx2,dieMats,dieEnchs);
     var _r2Valid=!_r2.used.some(u=>!u)||(_r2._bonusFired&&_r2.total>0);
     if(_r2Valid&&_r2.total>_bestValid)_bestValid=_r2.total;
   }
@@ -19436,7 +19443,10 @@ function startPTurn(){
     /* Reckoning: refresh floor display */
     if(G._tell.id==='reckoning'){_updateTellHUD();}
     /* Confession: pick a random equipped card to seal this turn */
-    if(G._tell.id==='confession'&&G.pCards&&G.pCards.length>0){
+    /* Confession's sealing is retired - Still Waters replaced it. This
+       block survived the first pass and was applying the OLD penalty on top
+       of the new rule every turn. */
+    if(false&&G.pCards&&G.pCards.length>0){
       /* Avoid sealing the same card twice in a row */
       var _confPool=G.pCards.filter(function(cid){return cid!==(G._tellState&&G._tellState.lastSealed);});
       if(_confPool.length===0)_confPool=G.pCards.slice();
@@ -19700,7 +19710,7 @@ function handleRoll(){
   if(selDice.length){
     /* icons are withheld from scoring entirely - see _splitIcons */
     var _sp=_splitIcons(selDice),_iconSel=_sp.icons,_scoreDice=_sp.rest;
-    var _selVals=_scoreDice.map(d=>d.val);var _selMats=_scoreDice.map(d=>d.mat);const locked=G.kept.reduce((a,k)=>a+k.pts,0);const cards=effectiveCards();
+    var _selVals=_scoreDice.map(d=>d.val);var _selMats=_scoreDice.map(d=>d.mat);var _selEnch=_scoreDice.map(d=>d.ench||null);const locked=G.kept.reduce((a,k)=>a+k.pts,0);const cards=effectiveCards();
     /* ── ANCHOR pre-processing ──
        Position-last die showing a 6, when committed, gets a +150 bonus.
        Implementation: first check if the 6 is already consumed by normal scoring
@@ -19740,7 +19750,7 @@ function handleRoll(){
         _anchorPts=600;
       }
     }else{
-      pts=scoreSelection(_selVals,cards,locked,_cw,_selMats);
+      pts=scoreSelection(_selVals,cards,locked,_cw,_selMats,_selEnch);
     }
     /* Reject if base scoring returned -1 (unused dice) OR returned 0 without
        anchor firing - unless the selection carries an icon, which is a legal
@@ -19821,7 +19831,10 @@ function handleRoll(){
     },700);
     return;
   }
-  /* GROG — ZERO HOUR: keeping a branded face ends the turn on the spot.
+  /* NB checked BEFORE the hot-dice branch below, which returns early - an
+     icon keep that cleared the row used to skip Zero Hour entirely and then
+     cut a later, unrelated roll instead.
+     GROG — ZERO HOUR: keeping a branded face ends the turn on the spot.
      Same theme as Last Call (time running out) but aimed at a system that
      exists; Last Call tested neutral-to-negative. ~14% turn-bank tax on a
      two-enchant hand, firing on ~32% of icon keeps. */
@@ -20170,7 +20183,10 @@ function _afterRollImpl(){
     if(_tryBustSave(free))return;
     _delayedDoBust(free);return;
   }
-  if(G.pCards.includes('last_stand')&&free.length===1&&(freeV[0]===1||freeV[0]===5)){
+  /* ...and not on a branded face: 1 and 5 are exactly the legal brand set,
+     so without this guard Last Stand banked 600 for a die that must bank
+     zero AND skipped its effect. */
+  if(G.pCards.includes('last_stand')&&free.length===1&&(freeV[0]===1||freeV[0]===5)&&!_dieIsIcon(free[0])){
     const d=free[0];d.committed=true;if(d.el){d.el.classList.add('committed');d.el.onclick=null;if(d.el._d3)D3.draw(d.el._d3);}
     G.kept.push({vals:[freeV[0]],mat:d.mat,pts:600,dice:[{val:freeV[0],mat:d.mat}]});G.turnPts=G.kept.reduce((a,k)=>a+k.pts,0)+(G._stakesRisingBonus||0);refreshKeptTray();updHUD();
     triggerCard('last_stand','LAST STAND! 600',true);if(window.DLG)setTimeout(function(){DLG.triggerCard('last_stand',true);},800);setBtns(false,true);return;
@@ -20382,7 +20398,7 @@ function refreshSelUI(){
      the engine must never see a die it would happily score. Without this a
      branded 1 previewed as +100 and then banked nothing. */
   const _pvSplit=_splitIcons(selD),_scoreD=_pvSplit.rest,_pvIcons=_pvSplit.icons;
-  const selV=_scoreD.map(d=>d.val);const selMats=_scoreD.map(d=>d.mat);const locked=G.kept.reduce((a,k)=>a+k.pts,0);const cards=effectiveCards();
+  const selV=_scoreD.map(d=>d.val);const selMats=_scoreD.map(d=>d.mat);const _pvEnch=_scoreD.map(d=>d.ench||null);const locked=G.kept.reduce((a,k)=>a+k.pts,0);const cards=effectiveCards();
   if(!selV.length&&!_pvIcons.length){G.turnPts=locked+(G._stakesRisingBonus||0);updHUD();setBtns(false,locked>0||(G._stakesRisingBonus||0)>0);setStatusMsg('','');_renderSelTags([],0,true);_clearDieEffects();G.pool.forEach(d=>{d.el.classList.remove('combo-glow');d.el.style.removeProperty('--gd');});G._comboGlow=false;return;}
   /* Bookends row-eligibility stamp (see handleRoll) — preview must agree
      with the commit/bank paths. */
@@ -20396,7 +20412,7 @@ function refreshSelUI(){
      (underreported totals), gilded-pair's +10%. _sr is kept only for the
      die-effect visuals below. */
   var _selCtx=_pCrowsForScore()||{};_selCtx._bookendsEligible=_beE;
-  let pts=scoreSelection(selV,cards,locked,_selCtx,selMats);
+  let pts=scoreSelection(selV,cards,locked,_selCtx,selMats,_pvEnch);
   /* ANCHOR preview: mirror handleRoll's commit pre-processing so the
      documented "lone last-row 6 commits for 600" is actually offerable.
      Without this the preview showed NO SCORE and dead buttons for a
@@ -20841,9 +20857,14 @@ function doBust(){
       const useSpur=!!G.spurActive;if(typeof G.spurActive==='number'&&G.spurActive>0)G.spurActive--;else G.spurActive=0;
       for(let i=0;i<hotN;i++){
         const mat=G.matchDice[i%G.matchDice.length]||'bone';
-        const val=useSpur?rollFaceSpur(mat):rollFace(mat);
+        const _stLane=i%G.matchDice.length;
+        const _stEn=(G._enchArr||[])[_stLane]||null;
+        const val=useSpur?rollFaceSpur(mat):_enchRollM(mat,_stEn);
         const el=mkDie(val,mat);el.classList.add('rolling');_appendDie(row,el);
-        G.pool.push({val,mat,sel:false,committed:false,el,lane:i%G.matchDice.length});
+        /* carries its enchant: without `ench` the rebuilt dice lose every
+           brand for the rest of the turn, so branded 1s and 5s quietly
+           scored as ordinary numbers and Quicksilver's chip vanished */
+        G.pool.push({val,mat,ench:_stEn,sel:false,committed:false,el,lane:_stLane});
       }
       SFX.roll(hotN);
       setTimeout(function(){G.pool.forEach(function(d){if(!d.committed)settleDie(d.el);});afterRoll();},480);
@@ -21078,11 +21099,17 @@ function handleBank(){
      state where the swap was visually mid-flight when the turn ended. */
   if(G&&G._palmAnimating)return;
   const selD=G.pool.filter(d=>d.sel&&!d.committed);
-  if(selD.length){const selV=selD.map(d=>d.val);const selMats=selD.map(d=>d.mat);const locked=G.kept.reduce((a,k)=>a+k.pts,0);const cards=effectiveCards();
+  if(selD.length){
+    /* Withhold icons from scoring exactly as the roll commit does. A brand
+       only sits on a natural 1 or 5, so an icon reaching the engine here
+       ALWAYS scored - 100 points banked and the effect fired, which is both
+       halves of the universal rule broken at once. */
+    const _bkSplit=_splitIcons(selD),_bkScore=_bkSplit.rest;
+    const selV=_bkScore.map(d=>d.val);const selMats=_bkScore.map(d=>d.mat);const _bkEnch=_bkScore.map(d=>d.ench||null);const locked=G.kept.reduce((a,k)=>a+k.pts,0);const cards=effectiveCards();
     var _cw=_pCrowsForScore()||{};
     /* Bookends row-eligibility stamp (see handleRoll) */
-    _cw._bookendsEligible=_bookendsEligible(selD);
-    let pts=scoreSelection(selV,cards,locked,_cw,selMats);
+    _cw._bookendsEligible=_bookendsEligible(_bkScore);
+    let pts=scoreSelection(selV,cards,locked,_cw,selMats,_bkEnch);
     /* ANCHOR mirror (see handleRoll's pre-processing): a selection containing
        the last-row 6 is valid via the +600 anchor bonus even when base
        scoring rejects it — the preview offers it, so BANK must accept it. */
@@ -21103,7 +21130,8 @@ function handleBank(){
         }
       }
     }
-    var _bkIcons=selD.filter(_dieIsIcon);
+    var _bkIcons=_bkSplit.icons;
+    if(_bkScore.length===0&&_bkIcons.length)pts=0;
     if(pts>0||_bkIcons.length){
       _bkIcons.forEach(function(d){_iconFire(d,'p');});
       if(pts<0)pts=0;
@@ -21111,7 +21139,7 @@ function handleBank(){
       if(_bkAnchorFired){triggerCard('anchor','ANCHOR +600',true);spawnPop('+600 ANCHOR');}
       /* Per-commit card bonuses — same helper as the ROLL commit path.
          handleBank used to skip all of them (Vanguard, Hot Hand, etc.). */
-      pts=_applyCommitBonuses(selD,pts,cards);
+      pts=_applyCommitBonuses(_bkScore,pts,cards);
       var _cfBank=false;
       if(false&&selD.some(function(d){return d.cursed;})){_cfBank=true;pts=Math.floor(pts/2);spawnPop('💀 −HALF');try{SFX.err&&SFX.err();}catch(e){}}
       selD.forEach(d=>{d.committed=true;d._frozen=false;if(d.el){d.el.classList.remove('selected','die-frozen');d.el.classList.add('committed');d.el.onclick=null;if(d.el._d3)D3.draw(d.el._d3);}});
@@ -27252,7 +27280,12 @@ function _gbShop(fresh){
       document.querySelector('.stTabLbl.L').classList.toggle('off',!d2);
       document.querySelector('.stTabLbl.R').classList.toggle('off',d2);
       var g=document.getElementById('stGoods');
-      g.innerHTML=d2?(window._stGoodsHTML||''):'';/* enchant layers pending */
+      /* The ENCHANTS tab rendered an empty string, and _gbEnchantPick - the
+         only entry to the whole pick-die-pick-face-confirm flow - had zero
+         call sites. Nothing could ever set S.run.dieEnch, so every icon,
+         Ward, Break, Trade, Snuff, Fog, Snare, Kindred and Zero Hour path
+         was unreachable in normal play. */
+      g.innerHTML=d2?(window._stGoodsHTML||''):_enchShopHTML();
       if(d2&&typeof _d3ChipScan==='function')_d3ChipScan(g);
     };
     var pick=function(ev){
@@ -27448,6 +27481,29 @@ function _wardOwned(skipIdx){
     });
   });
   return hit;
+}
+/* the innkeep's services: quicksilver plus the seven brands */
+function _enchShopHTML(){
+  _getS();_enchInit();
+  var gold=(S.run&&S.run.gold)||0;
+  var h='<div class="gbx-label" style="margin:2px 0 8px">the innkeep works one die at a time — a brand is permanent</div>';
+  var row=function(k,e,isIcon){
+    var afford=gold>=e.price;
+    var owned=isIcon&&k==='ward'&&_wardOwned(-1);
+    var dis=(!afford||owned);
+    h+='<div class="gbx-box'+(dis?' sub':'')+'" style="display:flex;gap:10px;align-items:center;padding:9px;margin-bottom:6px;'
+      +(dis?'opacity:.5;':'cursor:pointer;')+'border-left:3px solid '+(isIcon?(e.ink||'#c8a45c'):'#8fa8c8')+'"'
+      +(dis?'':' onclick="_gbEnchantPick(\''+k+'\')"')+'>'
+      +'<div style="font-size:20px;width:26px;text-align:center;color:'+(e.ink||'#c8a45c')+'">'+(e.glyph||'\u2726')+'</div>'
+      +'<div style="flex:1"><b>'+e.name.toUpperCase()+'</b>'
+      +'<div class="gbx-label">'+e.desc+'</div></div>'
+      +'<div style="white-space:nowrap;font-weight:bold;color:'+(afford?'#e8c874':'#8a7a5a')+'">'+e.price+'g</div>'
+      +(owned?'<div class="gbx-label">one only</div>':'')
+      +'</div>';
+  };
+  Object.keys(ENCHANTS).forEach(function(k){row(k,ENCHANTS[k],false);});
+  Object.keys(ENCH_ICONS).forEach(function(k){row(k,ENCH_ICONS[k],true);});
+  return h;
 }
 function _gbEnchantPick(k){
   _getS();_enchInit();

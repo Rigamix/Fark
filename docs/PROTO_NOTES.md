@@ -4218,3 +4218,54 @@ all off by one.
 The first-roll path needed a second pass — it builds through `newEntries`,
 not `G.pool.push`, so the first patch computed the seat and then never wrote
 it. Caught because the check reported `seatundefined` six times.
+
+## P229 — what the adversarial audit found
+
+Twelve agents over six lenses. Seven confirmed defects, all reproduced before
+fixing. Six were mine.
+
+**1. `handleBank` scored the full selection.** The roll commit and the preview
+both withheld icons; bank did not. Since a brand only ever sits on a natural
+1 or 5, an icon shown at bank time **always** scored — so this misfired on
+every single bank of an icon: 100 points banked *and* the effect fired. Both
+halves of the universal rule broken in one statement. Verified fixed on a
+live match: `+15 gold, 0 points` where it previously banked 100.
+
+**2. The entire system was unreachable.** `_gbEnchantPick` — the only door
+into pick-die → pick-face → confirm — had **zero call sites**, and the shop's
+ENCHANTS tab rendered `window._stGoodsHTML||''` behind a comment reading
+*"enchant layers pending"*. Nothing could ever write `S.run.dieEnch`, so
+every icon, Ward, Break, Trade, Snuff, Fog, Snare, Kindred and Zero Hour path
+was dead in normal play. Not mine — the tab was never wired — but it made the
+whole rework untestable by anyone but me. `_enchShopHTML()` now renders all
+eight services; measured 8 of 8 clickable, and Ward correctly greys out when
+one is already owned (including in the stash).
+
+**3. Still Waters suppressed nothing.** `_dieEffect` was defined and had zero
+callers; the engine read `getDie(mat).effect` raw. The badge was therefore
+"Silver weighting suppression" and nothing else — Amber's triple bonus,
+Starstone's bank bonus and the rest all still fired. `dieEnchs` is threaded
+through `scoreSelection` into `scoreRoll` now. Measured: a worked Amber
+triple scores **300 against 900** with the badge on.
+
+**4. Confession was still sealing a card every turn.** One block was removed
+in the first pass and a second, 56 lines further into the same function,
+survived — so Aldric applied the OLD penalty *and* claimed the new one.
+
+**5. The Last Stand banked 600 on a branded face.** Its trigger is
+`val===1||val===5`, which is exactly the legal brand set: it auto-committed
+for 600 and skipped the effect.
+
+**6. Zero Hour was skipped when the keep triggered hot dice.** The hot-dice
+branch returns before the Zero Hour check, so an icon keep that cleared the
+row skipped the badge and then cut a later, unrelated roll instead. Moved
+above the early return.
+
+**7. Mabel's Stitch rebuilt the pool without enchants.** No `ench:` field and
+`rollFace` instead of `_enchRollM`, so after a Stitch every brand vanished
+for the rest of the turn — branded 1s and 5s quietly scored as ordinary
+numbers and Quicksilver's chip disappeared.
+
+Two audit claims were **not** defects: the 7-of-8 shop count was Ward
+correctly disabled by a warded die in the stash, and an earlier Ward-cap
+"failure" was a test fixture `_enchInit` had truncated.
