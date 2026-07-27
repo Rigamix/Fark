@@ -8473,6 +8473,7 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
 </div>
 
 <script src="assets/prop_templates.js"></script>
+<script src="assets/models/dice/ench_icons.js"></script>
 <script src="assets/models/dice/skins.js"></script>
 <script>
 /* ════════════════════════════════════════════════════════════
@@ -15535,7 +15536,10 @@ var ENCH_ICONS={
   /* PERMANENTLY destroys one other live die, and fires that die's family
      death-trigger. Widened from Obsidian-only so every build has a real
      partner rather than one solved answer. */
-  brk:{name:'Break',price:300,glyph:'\u2620',ink:'#c66058',
+  /* quoted: `break` is a reserved word as an identifier but legal as a
+     property name, and matching the art filename beats inventing an
+     abbreviation nothing else uses. */
+  'break':{name:'Break',price:300,glyph:'\u2620',ink:'#c66058',
     desc:'Brand a skull on one face. Keep it: it banks nothing and breaks another of your dice for good — and whatever that die was dies loudly.',
     fire:function(c){_breakBegin(c.die);}},
 
@@ -15912,6 +15916,57 @@ var D3X={
   /* returns the loaded set for a material, or null while it loads. Loading
      NEVER blocks the dice: when a set arrives the dice wearing it are
      re-skinned in place. */
+  /* ═══ BRANDED FACE ═══
+     Paint an icon into one face's UV island on a copy of the material's map.
+     The sheet is a 3x2 grid of equal cells indexed by face VALUE, so the
+     island for face N is known geometry:
+        col = (N-1) % 3,  row = (N-1) / 3
+     Cached per (material, enchant, face) - a match only ever needs a few. */
+  _iconImgs:{},
+  _brandCache:{},
+  _iconImg:function(t){
+    var src=window.FK_ENCH_ICONS&&FK_ENCH_ICONS[t];
+    if(!src)return null;
+    var c=this._iconImgs[t];
+    if(c)return (c.complete&&c.naturalWidth)?c:null;
+    var im=new Image();im.src=src;this._iconImgs[t]=im;
+    var self=this;
+    im.onload=function(){try{self._reskin();}catch(e){}};
+    return null;
+  },
+  _brandedMap:function(baseTex,ench){
+    if(!baseTex||!baseTex.image||!ench||!ench.face)return baseTex;
+    var icon=this._iconImg(ench.t);
+    if(!icon)return baseTex;/* not decoded yet - the onload reskins */
+    var key=(baseTex.uuid||'x')+'|'+ench.t+'|'+ench.face;
+    if(this._brandCache[key])return this._brandCache[key];
+    var img=baseTex.image;
+    var W=img.width||img.naturalWidth,H=img.height||img.naturalHeight;
+    if(!W||!H)return baseTex;
+    var cv=document.createElement('canvas');cv.width=W;cv.height=H;
+    var x=cv.getContext('2d');
+    x.drawImage(img,0,0,W,H);
+    /* the island for this face, in sheet fractions */
+    var v=ench.face,col=(v-1)%3,row=Math.floor((v-1)/3);
+    var cw=W/3,ch=H/2;
+    var m=cw*(8/512);/* the sheet's 8px margin, at whatever size it ships */
+    var ix=col*cw+m, iy=row*ch+m, iw=cw-2*m, ih=ch-2*m;
+    /* wipe the pips, then lay the brand on the flat part of the face */
+    x.save();
+    x.beginPath();x.rect(ix,iy,iw,ih);x.clip();
+    /* sample the face's own corner as the blank colour so the wipe matches
+       whatever material this is - bone, amber, jade all differ */
+    var px=x.getImageData(Math.round(ix+iw*0.06),Math.round(iy+ih*0.06),1,1).data;
+    x.fillStyle='rgb('+px[0]+','+px[1]+','+px[2]+')';
+    x.fillRect(ix,iy,iw,ih);
+    x.drawImage(icon,ix,iy,iw,ih);
+    x.restore();
+    var out=new THREE.CanvasTexture(cv);
+    out.flipY=baseTex.flipY;out.wrapS=baseTex.wrapS;out.wrapT=baseTex.wrapT;
+    out.encoding=baseTex.encoding;out.needsUpdate=true;
+    this._brandCache[key]=out;
+    return out;
+  },
   _skinFor:function(mat){
     var key=this.SKIN_ALL||mat;
     var def=(window.FK_DIE_SKINS&&FK_DIE_SKINS[key])||this.SKINS[key];
@@ -15946,8 +16001,17 @@ var D3X={
     var self=this;
     this.dice.forEach(function(d){
       var sk=self._skinFor(d.mat);
+      var ench=(d.chip&&d.chip._ench)||null;
       d.obj.traverse(function(o){
-        if(o.isMesh&&!o.userData.outline)self._dress(o.material,d.mat,sk);
+        if(!o.isMesh||o.userData.outline)return;
+        self._dress(o.material,d.mat,sk);
+        /* re-apply the brand: _dress resets map to the base skin, and this
+           is the very callback an icon's decode fires, so without this the
+           brand could never survive the one event meant to apply it */
+        if(ench&&ench.face&&o.material.map){
+          o.material.map=self._brandedMap(o.material.map,ench);
+          o.material.needsUpdate=true;
+        }
       });
     });
     this.frame();
@@ -17071,7 +17135,7 @@ var D3X={
       new THREE.Vector3(0,0,1),THREE.MathUtils.degToRad(this.ROLL));
     return this.ISO.clone().multiply(roll.multiply(face));
   },
-  _mkDie:function(mat){
+  _mkDie:function(mat,ench){
     var g=new THREE.Group();
     var m=this.proto.clone(true);
     var col=this.MATCOL[mat]||this.MATCOL.bone;
@@ -17086,6 +17150,10 @@ var D3X={
         o.material=new THREE.MeshLambertMaterial({
           map:src.map||null,color:new THREE.Color(col)});
         self._dress(o.material,mat,sk);
+        if(ench&&ench.face&&o.material.map){
+          o.material.map=self._brandedMap(o.material.map,ench);
+          o.material.needsUpdate=true;
+        }
       }
     });
     g.add(m);
@@ -17227,7 +17295,8 @@ var D3X={
     live3.forEach(function(el){
       if(self.dice.some(function(d){return d.chip===el;}))return;
       var mat=el._trueMat||'bone',val=el._trueVal||1;
-      var obj=self._mkDie(mat);
+      var ench=(el._d3&&el._d3.ench)||el._ench||null;
+      var obj=self._mkDie(mat,ench);
       obj.quaternion.copy(self._isoQ(val));
       self.scene.add(obj);
       try{el._d3.slot.style.visibility='hidden';}catch(e){}
@@ -17478,12 +17547,16 @@ var D3X={
   requestAnimationFrame(raf);
 })();
 
-function mkDie(val,mat,sizeClass,still){
+function mkDie(val,mat,sizeClass,still,ench){
   if(window.D3_MATCH!==false){
     const host=document.createElement('div');
     host.className='die d3on dtype-'+(mat||'bone')+(sizeClass?' '+sizeClass:'');
     if(/^jade\d?$/.test(mat||'')&&val===6)host.classList.add('die-wild');
     host._trueVal=val;host._trueMat=mat;host._d3Still=!!still;
+    /* the brand travels with the host so the 3D layer can bake it into the
+       face's UV island when it builds the mesh */
+    host._ench=ench||null;
+    if(ench&&ench.face)host.classList.add('die-branded');
     host.style.position=host.style.position||'';
     _d3InitHost(host,0);
     return host;
@@ -19824,7 +19897,7 @@ function handleRoll(){
       for(let i=0;i<hotN;i++){const mat=G.matchDice[i%G.matchDice.length]||'bone';
         const _en=(G._enchArr||[])[i%G.matchDice.length]||null;
         const val=hotSpur?rollFaceSpur(mat):_enchRollM(mat,_en);
-        const el=mkDie(val,mat);el.classList.add('rolling');_appendDie(row,el);
+        const el=mkDie(val,mat,null,false,_en);el.classList.add('rolling');_appendDie(row,el);
         G.pool.push({val,mat,ench:_en,sel:false,committed:false,el,lane:i%G.matchDice.length});}
       SFX.roll(hotN);
       setTimeout(()=>{G.pool.forEach(d=>{if(!d.committed)settleDie(d.el);});afterRoll();},480);
@@ -19913,7 +19986,7 @@ function handleRoll(){
     var val;
     if(_blockadeFire){val=_blockadePattern[i%_blockadePattern.length];}
     else{val=useSpur?rollFaceSpur(mat):_enchRollM(mat,_en);}
-    const el=mkDie(val,mat);
+    const el=mkDie(val,mat,null,false,_en);
     el.classList.add('rolling');
     if(_blockadeFire)el.classList.add('die-dampened','die-dampened-fresh');
     /* Defensive: explicitly force visibility/opacity so no inherited or
@@ -20860,7 +20933,7 @@ function doBust(){
         const _stLane=i%G.matchDice.length;
         const _stEn=(G._enchArr||[])[_stLane]||null;
         const val=useSpur?rollFaceSpur(mat):_enchRollM(mat,_stEn);
-        const el=mkDie(val,mat);el.classList.add('rolling');_appendDie(row,el);
+        const el=mkDie(val,mat,null,false,_stEn);el.classList.add('rolling');_appendDie(row,el);
         /* carries its enchant: without `ench` the rebuilt dice lose every
            brand for the rest of the turn, so branded 1s and 5s quietly
            scored as ordinary numbers and Quicksilver's chip vanished */
@@ -27494,7 +27567,11 @@ function _enchShopHTML(){
     h+='<div class="gbx-box'+(dis?' sub':'')+'" style="display:flex;gap:10px;align-items:center;padding:9px;margin-bottom:6px;'
       +(dis?'opacity:.5;':'cursor:pointer;')+'border-left:3px solid '+(isIcon?(e.ink||'#c8a45c'):'#8fa8c8')+'"'
       +(dis?'':' onclick="_gbEnchantPick(\''+k+'\')"')+'>'
-      +'<div style="font-size:20px;width:26px;text-align:center;color:'+(e.ink||'#c8a45c')+'">'+(e.glyph||'\u2726')+'</div>'
+      +'<div style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:20px;color:'+(e.ink||'#c8a45c')+'">'
+        +((window.FK_ENCH_ICONS&&FK_ENCH_ICONS[k])
+            ?'<img src="'+FK_ENCH_ICONS[k]+'" style="max-width:32px;max-height:32px">'
+            :(e.glyph||'\u2726'))
+        +'</div>'
       +'<div style="flex:1"><b>'+e.name.toUpperCase()+'</b>'
       +'<div class="gbx-label">'+e.desc+'</div></div>'
       +'<div style="white-space:nowrap;font-weight:bold;color:'+(afford?'#e8c874':'#8a7a5a')+'">'+e.price+'g</div>'

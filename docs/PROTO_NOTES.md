@@ -4269,3 +4269,45 @@ numbers and Quicksilver's chip disappeared.
 Two audit claims were **not** defects: the 7-of-8 shop count was Ward
 correctly disabled by a warded die in the stash, and an earlier Ward-cap
 "failure" was a test fixture `_enchInit` had truncated.
+
+## P230–P231 — Denis's icons are on the dice
+
+Eight PNGs in `Art/Assets/Enchants` (his originals, never touched). A build
+step — `tools/build_ench_icons.py` — trims each to its ink, fits it inside the
+**432px flat area** of a face island preserving aspect, and emits base64 into
+`assets/models/dice/ench_icons.js`. Embedded because an external image is
+cross-origin over `file://` in Firefox and WebGL refuses it — the same reason
+`skins.js` is embedded.
+
+First bake was **883KB**, which is too much to ship. The shipped skin sheet is
+960×640, so a face island is only ~310px and a 512 tile was pure
+oversampling — rebaked at 256 with a 64-colour quantise (these are flat inked
+shapes, not photographs): **160KB for all eight**.
+
+**The brand is painted into the die's own UV island.** The sheet is a 3×2 grid
+of equal cells indexed by face *value* — `col=(v-1)%3, row=(v-1)/3` — which is
+exactly the unwrap built back in P16x, so the island for face N is known
+geometry rather than a guess. The pips are wiped with a colour sampled from
+that face's own corner (so it matches bone, amber or jade without a per-material
+variant) and the icon drawn on top. One texture per (material, enchant, face),
+cached.
+
+Two things it took a second pass to get right:
+
+- **`_reskin` wiped the brand.** It re-dresses every die from the base skin —
+  and it is the very callback an icon's decode fires, so the brand could never
+  survive the one event meant to apply it.
+- **`mkDie` never received the enchant**, so the host had nothing to tell the
+  3D layer. Threaded through as a fifth argument.
+
+Verified by pixel-reading the baked texture: the branded island's centre moves
+from a dark pip to the icon's colour (Tithe reads `rgb(247,189,79)`), the
+neighbouring island is byte-identical, and all six brands on a live table paint
+correctly with six cached textures.
+
+**One rename**: the enchant id was `brk` to dodge the reserved word. Quoted as
+`'break'` now — legal as a property name, matches the art filename and the
+brief, and beats an abbreviation nothing else uses.
+
+`quicksilver.png` has no face to sit on (it is a whole-die passive) but is used
+as its shop glyph, so all eight services show real art.
