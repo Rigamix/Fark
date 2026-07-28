@@ -896,7 +896,7 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
   bottom:calc(env(safe-area-inset-bottom,0px) + 13.5cqh)}
 #stEnchPickTray>img{width:100%;display:block;pointer-events:none}
 /* the same fit the BUY tray uses - both racks are dice_row.png */
-.stPickDie{position:absolute;top:44%;transform:translate(-50%,-50%);width:18.5%;aspect-ratio:1;
+.stPickDie{position:absolute;top:40%;transform:translate(-50%,-50%);width:18.5%;aspect-ratio:1;
   cursor:pointer;display:flex;align-items:center;justify-content:center}
 .stPickDie:active{transform:translate(-50%,-50%) scale(.92)}
 .stPickDie.taken{opacity:.38;cursor:default}
@@ -1181,10 +1181,14 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 #stTradeRow .slots{display:flex;justify-content:center;gap:2%}
 #stTradeRow .tray{position:relative;width:100%}
 #stTradeRow .tray>img{width:100%;display:block;pointer-events:none}
-.stTSlot{position:absolute;top:44%;transform:translate(-50%,-50%);width:18.5%;aspect-ratio:1;
-  border:2px solid transparent;border-radius:14%;
+.stTSlot{position:absolute;top:40%;transform:translate(-50%,-50%);width:18.5%;aspect-ratio:1;
   display:flex;align-items:center;justify-content:center;
-  transition:border-color .15s,transform .15s}
+  transition:transform .15s}
+/* the target ring, inset to the MESH rather than drawn round the whole slot
+   box - the mesh is 0.80 of the box, so a border on the box read as a frame
+   noticeably larger than the die it offers to swap */
+.stTSlot::before{content:'';position:absolute;inset:10%;border:2px solid transparent;
+  border-radius:16%;transition:border-color .15s,box-shadow .15s;pointer-events:none}
 /* the moment a trade lands - RESTATES the centring translate, like .hot does */
 .stTSlot.landed{animation:stSlotLand .85s cubic-bezier(.2,1.3,.35,1)}
 @keyframes stSlotLand{
@@ -1200,7 +1204,8 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 @keyframes stSlotGlow{0%{opacity:0;transform:scale(.4)}
                       25%{opacity:1;transform:scale(1)}
                       100%{opacity:0;transform:scale(1.45)}}
-.stTSlot.hot{border-color:#ffd98a;transform:translate(-50%,-50%) scale(1.12);
+.stTSlot.hot::before{border-color:#ffd98a;box-shadow:0 0 0.9cqh rgba(255,217,138,.55)}
+.stTSlot.hot{transform:translate(-50%,-50%) scale(1.12);
   box-shadow:0 0 12px rgba(255,217,138,.4)}
 .stTSlot .d3chip{width:78%;aspect-ratio:1;display:block;pointer-events:none}
 #stBackBtn,#loFBack,#ptFBack{position:relative;width:19%;margin:3cqh auto 0;cursor:pointer;transition:transform .1s}
@@ -28137,11 +28142,15 @@ function _gbShop(fresh){
       var r=strip.getBoundingClientRect();
       setTab(((ev.clientX-r.left)/r.width)<0.5?'dice':'ench');
     };
+    var swiping=false;
     strip.addEventListener('pointerdown',function(ev){
       if(strip.setPointerCapture)try{strip.setPointerCapture(ev.pointerId);}catch(e){}
-      pick(ev);
+      swiping=true;pick(ev);
     });
-    strip.addEventListener('pointermove',function(ev){if(ev.buttons)pick(ev);});
+    strip.addEventListener('pointermove',function(ev){if(swiping)pick(ev);});
+    ['pointerup','pointercancel','pointerleave'].forEach(function(t){
+      strip.addEventListener(t,function(){swiping=false;});
+    });
   }
   if(typeof _d3ChipScan==='function')_d3ChipScan(host);
 }
@@ -28231,12 +28240,14 @@ function _stFocus(i){
     if(typeof _d3ChipScan==='function')_d3ChipScan(row);
     var focusTf=stand.style.transform;
     var dragOn=false,slotEls=null,dragScale=1.35,dragEnd=0.8,dragDie=null;
+    var dragYaw0=0,dragPit0=0,dragAim=0;
     stand.style.touchAction='none';
     stand.onpointerdown=function(ev){
       if(!gb.classList.contains('st-focus'))return;
       ev.preventDefault();
       try{stand.setPointerCapture(ev.pointerId);}catch(e){}
       dragOn=true;
+      dragAim=0;/* re-measured per drag, in case the rack has moved */
       slotEls=[].slice.call(row.querySelectorAll('.stTSlot'));
       /* stop the idle turn for the drag: the die has to arrive at the same
          angle the tray draws its dice at, or the swap is a visible cut. */
@@ -28251,9 +28262,10 @@ function _stFocus(i){
              making rather than square in its bay like the others. */
           var _ch=stand.querySelector('.d3chip');
           dragDie=null;
-          (D3X.dice||[]).forEach(function(_d){
-            if(_d.chip===_ch){_d.uYaw=0;_d.uPit=0;dragDie=_d;}
-          });
+          (D3X.dice||[]).forEach(function(_d){if(_d.chip===_ch)dragDie=_d;});
+          /* keep the angle it was turned to - it unwinds on the way down
+             rather than snapping, which is the whole point */
+          if(dragDie){dragYaw0=dragDie.uYaw||0;dragPit0=dragDie.uPit||0;}
         }
       }catch(e){}
       /* how much to shrink by the time it reaches the rack: match the
@@ -28269,18 +28281,22 @@ function _stFocus(i){
     };
     stand.onpointermove=function(ev){
       if(!dragOn)return;
-      /* shrink on the way down: 1.35 in the hand, the slot's own size by the
-         time it is over the rack, so the drop is a landing not a cut */
+      /* one progress value drives BOTH the shrink and the straightening, so
+         the die arrives slot-sized and square together. The aim is the SLOT's
+         own centre line, not the tray's middle, or it is still oversized at
+         the moment it lands. */
       var _t=0;
       try{
-        var _tr=row.querySelector('.tray').getBoundingClientRect();
-        var _aim=_tr.top+_tr.height*0.5;
-        if(_aim>ncy)_t=Math.max(0,Math.min(1,(ev.clientY-ncy)/(_aim-ncy)));
+        if(!dragAim){var _sl0=slotEls&&slotEls[0]&&slotEls[0].getBoundingClientRect();
+          if(_sl0)dragAim=(_sl0.top+_sl0.bottom)/2;}
+        if(dragAim>ncy)_t=Math.max(0,Math.min(1,(ev.clientY-ncy)/(dragAim-ncy)));
       }catch(e){}
-      /* stay square the whole way down - D3X's rotate-on-drag is still live
-         and would turn it again between here and the rack */
-      if(dragDie){dragDie.uYaw=0;dragDie.uPit=0;}
-      var _sc=dragScale+(dragEnd-dragScale)*(_t*_t*(3-2*_t));
+      var _e=_t*_t*(3-2*_t);
+      /* written AFTER D3X's own handler: its listener is on document in the
+         capture phase, so it has already run by the time this bubble handler
+         does, and this is the value that survives the frame. */
+      if(dragDie){dragDie.uYaw=dragYaw0*(1-_e);dragDie.uPit=dragPit0*(1-_e);}
+      var _sc=dragScale+(dragEnd-dragScale)*_e;
       stand.style.transform='translate('+(ev.clientX-ncx)+'px,'+(ev.clientY-ncy)+'px) scale('+_sc.toFixed(3)+')';
       slotEls.forEach(function(el){
         var r=el.getBoundingClientRect();
