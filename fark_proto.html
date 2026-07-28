@@ -796,7 +796,7 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 #gbShop{position:absolute;inset:0;overflow:hidden;container-type:size;background:#120b06}
 /* ─── ENCHANTS TAB ─── */
 #stEnchGrid{position:absolute;inset:0;pointer-events:none;z-index:6}
-.stEnch{position:absolute;width:19%;aspect-ratio:221/414;pointer-events:auto;cursor:pointer;
+.stEnch{position:absolute;width:17%;aspect-ratio:221/414;pointer-events:auto;cursor:pointer;
   animation:stEnchIn 1.05s cubic-bezier(.17,.75,.25,1) backwards}
 /* The float-in and the idle sway are on DIFFERENT elements on purpose: both
    animate `transform`, and a second animation on the same element replaces
@@ -899,20 +899,28 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 .stPickDie{position:absolute;top:35%;transform:translate(-50%,-50%);width:18.5%;aspect-ratio:1;
   cursor:pointer;display:flex;align-items:center;justify-content:center}
 .stPickDie:active{transform:translate(-50%,-50%) scale(.92)}
-.stPickDie.taken{opacity:.72;cursor:default}
+.stPickDie.taken{cursor:default}
 /* 78%, exactly like .stTSlot .d3chip - at 100% these rendered 28% larger
    than the buy tray's on an identically sized slot, which is why the two
    racks never looked like the same rack */
 .stPickDie .d3chip{width:78%;aspect-ratio:1;display:block;pointer-events:none}
-/* Both racks label the same way. The box is the BAY PITCH (14.5% of the tray
-   against a slot's 18.5%, so 78% of the slot) - at -30%/-30% it was 144% of
-   the slot and neighbours ran straight through each other. Macondo, not the
-   blackletter: that face draws a capital I as a 1, which is why IRON read
-   as 1RON. */
-.stPickDie .pdLbl,.stTSlot .tsLbl{position:absolute;left:11%;right:11%;bottom:-62%;
-  text-align:center;font-family:'Macondo',serif;font-size:1.3cqh;letter-spacing:0;
-  color:#c8b088;white-space:nowrap;pointer-events:none;
-  text-shadow:0 1px 0 rgba(24,12,4,.75)}
+/* Both racks label the same way, and the names hang off the TRAY rather than
+   off the bays - a name inside a bay wears every transform the bay wears (the
+   1.12 hover scale, and .landed's 1.3 scale at brightness 2.1), so it
+   ballooned and flashed exactly when it was being read.
+   One bay pitch wide - 14.5% of the tray, where the bay itself is 18.5% - so
+   two names can never reach each other. Macondo, not the blackletter: that
+   face draws a capital I as a 1, which is why IRON read as 1RON. */
+.trayLbl{position:absolute;top:100%;margin-top:.7cqh;transform:translateX(-50%);
+  width:14.5%;text-align:center;font-family:'Macondo',serif;font-size:1.3cqh;
+  letter-spacing:0;color:#c8b088;white-space:nowrap;pointer-events:none;
+  /* a half-pixel stroke each side, so the stem gains a pixel overall - at
+     this size a full 1px stroke closes up the counters */
+  -webkit-text-stroke:.5px currentColor;
+  text-shadow:0 1px 0 rgba(24,12,4,.75);transition:opacity .25s,color .25s}
+/* a die that already carries a brand names itself in gold */
+.trayLbl.taken{color:#ffd98a}
+.trayLbl.dim{opacity:.22}
 /* The die is drawn on the WebGL canvas from this element's rect, so a CSS
    rotate here would spin the box and not the die. The turn is driven on the
    mesh's own uYaw in _stEnchSpin; this only lifts and swells the slot so the
@@ -922,9 +930,10 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
   0%{transform:translate(-50%,-50%) scale(1)}
   60%{transform:translate(-50%,-50%) scale(1.34)}
   100%{transform:translate(-50%,-50%) scale(1.18)}}
-.stPickDie.branded .pdLbl{color:#ffd98a}
-/* the label must not ride the bay's hover/landing scale */
-.stTSlot.hot .tsLbl{transform:scale(.893)}
+/* .taken used to carry opacity:.72, which dimmed the LABEL and nothing else -
+   the die is drawn on the WebGL canvas and frame() reads the chip's own
+   opacity, not its parent's. The state lives on the name now, where it was
+   always the only thing showing. */
 /* the same close the die panel uses, in the same place */
 #stEnchPickCancel{position:absolute;left:50%;transform:translateX(-50%);
   bottom:calc(env(safe-area-inset-bottom,0px) + 5cqh);width:14%;cursor:pointer;
@@ -1094,15 +1103,17 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 /* what the brand landed on, thrown off the die itself once it settles */
 .enchPop{position:absolute;z-index:60;pointer-events:none;white-space:nowrap;
   transform:translate(-50%,-50%);
-  font-family:'JMH Beda',serif;font-size:3.2cqh;color:#ffd98a;letter-spacing:.05em;
+  font-family:'JMH Beda',serif;font-size:2.4cqh;color:#ffd98a;letter-spacing:.05em;
   text-shadow:0 0.3cqh 0 rgba(24,12,4,.9),0 0 1.4cqh rgba(255,196,90,.5);
-  animation:enchPop 1.9s cubic-bezier(.2,1.4,.35,1) forwards}
+  animation:enchPop 3.4s cubic-bezier(.2,1.4,.35,1) forwards}
+/* the same beats, but the HOLD is most of it now: up, settle, and then it
+   just sits there being read for two seconds before it drifts off */
 @keyframes enchPop{
   0%{opacity:0;transform:translate(-50%,-50%) scale(.4) rotate(-8deg)}
-  22%{opacity:1;transform:translate(-50%,-90%) scale(1.18) rotate(3deg)}
-  36%{transform:translate(-50%,-96%) scale(1) rotate(-1.5deg)}
-  70%{opacity:1;transform:translate(-50%,-118%) scale(1)}
-  100%{opacity:0;transform:translate(-50%,-160%) scale(.94)}}
+  12%{opacity:1;transform:translate(-50%,-90%) scale(1.18) rotate(3deg)}
+  20%{transform:translate(-50%,-96%) scale(1) rotate(-1.5deg)}
+  84%{opacity:1;transform:translate(-50%,-112%) scale(1)}
+  100%{opacity:0;transform:translate(-50%,-142%) scale(.96)}}
 #gbShop.st-focus #stFocusScrim{opacity:1;pointer-events:auto}
 .stStand{transition:opacity .3s}
 #gbShop.st-focus .stStand:not(.zoom),#gbShop.st-focus .stPrice{opacity:0;pointer-events:none}
@@ -13006,7 +13017,7 @@ function famLoadoutShow(){
     +'<div id="loHud"><div class="hs">'+hearts+'</div>'
       +'<div class="gd"><img class="pl" src="'+PT_A+'plate_goldCounter.png" alt="">'
       +'<img class="co" src="Art/Assets/Icons/coin.png" alt=""><span>'+(S.run.gold||0)+'</span></div></div>'
-    +'<div class="stNavBtn L icon" id="loBack"><img src="Art/Assets/Icons/back.png" alt="back"></div>'
+    +'<div class="stNavBtn L icon" id="loBack"><img src="Art/Assets/Icons/close.png" alt="close"></div>'
     +'<div id="loTip"></div>';
   document.body.appendChild(ov);
   document.getElementById('loBack').onclick=function(){try{SFX.nav();}catch(e){}ov.remove();};
@@ -18194,7 +18205,7 @@ var D3X={
       if(!vis)return;
       /* the drop target: the die's own outline, gold and a shade heavier.
          It is the one marker that cannot be the wrong shape. */
-      var hot=!!(d.chip.closest&&d.chip.closest('.stTSlot.hot,.stPickDie.hot'));
+      var hot=!!(d.chip.closest&&d.chip.closest('.stTSlot.hot'));
       if(hot!==d._hot){
         d._hot=hot;
         var ol=d.obj.userData.out,ow=d.obj.userData.outScale||1;
@@ -28190,7 +28201,7 @@ function _gbShop(fresh){
     /* the loadout pouch is gone from here - it is reachable from the
        gauntlet, and two competing exits at the base of the shop had the
        back arrow reading as the secondary one. */
-    +'<div class="stNavBtn C icon" onclick="SFX.nav();showScreen(\'gauntlet\')"><img src="Art/Assets/Icons/back.png" alt="back"></div>';
+    +'<div class="stNavBtn C icon" onclick="SFX.nav();showScreen(\'gauntlet\')"><img src="Art/Assets/Icons/close.png" alt="close"></div>';
   host.classList.remove('st-focus');
   host.classList.toggle('tab-ench',!dOn);
   host.innerHTML=h;
@@ -28226,6 +28237,33 @@ function _gbShop(fresh){
       var r=strip.getBoundingClientRect();
       setTab(((ev.clientX-r.left)/r.width)<0.5?'dice':'ench');
     };
+    /* the whole shop answers a swipe, not just the strip */
+    host._setTab=setTab;
+    if(!host._swipeWired){
+      host._swipeWired=true;
+      var _sx=0,_sy=0,_live=false;
+      var _busy=function(){return host.classList.contains('st-focus')
+        ||host.classList.contains('st-epick');};
+      host.addEventListener('pointerdown',function(ev){
+        if(_busy()){_live=false;return;}
+        _sx=ev.clientX;_sy=ev.clientY;_live=true;
+      },true);
+      host.addEventListener('pointerup',function(ev){
+        if(!_live)return;_live=false;
+        if(_busy())return;
+        var dx=ev.clientX-_sx,dy=ev.clientY-_sy;
+        /* a real sideways throw: far enough to be deliberate, and more
+           across than down so a scroll or a die drag is never mistaken */
+        if(Math.abs(dx)<44||Math.abs(dx)<Math.abs(dy)*1.5)return;
+        host._swipedAt=Date.now();
+        if(host._setTab)host._setTab(dx<0?'ench':'dice');
+      },true);
+      /* a swipe that ends on a plaque must not also BUY it - capture phase,
+         so this runs before the plaque's own onclick */
+      host.addEventListener('click',function(ev){
+        if(Date.now()-(host._swipedAt||0)<450){ev.stopPropagation();ev.preventDefault();}
+      },true);
+    }
     var swiping=false;
     strip.addEventListener('pointerdown',function(ev){
       if(strip.setPointerCapture)try{strip.setPointerCapture(ev.pointerId);}catch(e){}
@@ -28317,8 +28355,9 @@ function _stFocus(i){
     var SLX=[13.3,27.8,42.3,56.8,71.3,85.8];/* the tray's six notch bays */
     (S.run.dice||[]).forEach(function(mt,ii){
       deck+='<div class="stTSlot" data-i="'+ii+'" style="left:'+(SLX[ii]||50)+'%">'
-        +'<span class="d3chip" data-iso="1" data-mat="'+mt+'" data-slot="'+ii+'"></span>'
-        +'<span class="tsLbl">'+_dieShortName(mt)+'</span></div>';
+        +'<span class="d3chip" data-iso="1" data-mat="'+mt+'" data-slot="'+ii+'"></span></div>'
+        +'<span class="trayLbl" data-i="'+ii+'" style="left:'+(SLX[ii]||50)+'%">'
+        +_dieShortName(mt)+'</span>';
     });
     row.innerHTML='<div class="cap">BUY \u2014 '+price+' \u00b7 drag onto the die it replaces</div>'
       +'<div class="tray"><img src="Art/Assets/Store/dice_row.png" alt="">'+deck+'</div>';
@@ -28479,6 +28518,8 @@ function _stTrade(mat,slot){
   try{
     var _sl=document.querySelector('#stTradeRow .stTSlot[data-i="'+slot+'"]');
     if(_sl){_sl.classList.remove('landed');void _sl.offsetWidth;_sl.classList.add('landed');}
+    var _lb=document.querySelector('#stTradeRow .trayLbl[data-i="'+slot+'"]');
+    if(_lb){_lb.textContent=_dieShortName(mat);_lb.classList.remove('taken');}
     var _cap=document.querySelector('#stTradeRow .cap');
     if(_cap)_cap.innerHTML=getDie(mat).name.toUpperCase()+' IS YOURS'
       +' <span class="capCost">-'+price+'g</span>';
@@ -28571,7 +28612,7 @@ function _enchShopHTML(){
   /* 4 x 2 on the cleared counter. A panel of width P% is P*1.054% tall
      because the stage keeps the canvas aspect; 19% wide lands the two rows
      inside y 49-91%, which is the counter plus a little overhang. */
-  var COLS=[4.5,28.5,52.5,76.5], ROWS=[49,71];
+  var COLS=[5.5,29.5,53.5,77.5], ROWS=[51.6,73.6];
   /* Hung by hand, not hung on a grid: a fixed per-panel nudge and lean, so
      the wall reads as eight separate plaques rather than a spreadsheet.
      Deterministic and not random - a repaint (buying a brand repaints the
@@ -28674,8 +28715,9 @@ function _stEnchTap(k){
        die can draw, so the label goes back to the material. */
     h+='<div class="stPickDie'+(en?' taken':'')+'" data-i="'+i+'" style="left:'+(SLX[i]||50)+'%"'
       +(en?'':' onclick="_stEnchChoose('+i+')"')+'>'
-      +'<span class="d3chip" data-mat="'+mt+'" data-iso="1" data-slot="'+i+'"></span>'
-      +'<span class="pdLbl">'+_dieShortName(mt)+'</span></div>';
+      +'<span class="d3chip" data-mat="'+mt+'" data-iso="1" data-slot="'+i+'"></span></div>'
+      +'<span class="trayLbl'+(en?' taken':'')+'" data-i="'+i+'" style="left:'+(SLX[i]||50)+'%">'
+      +_dieShortName(mt)+'</span>';
   });
   row.innerHTML=h;
   if(typeof _d3ChipScan==='function')try{_d3ChipScan(row);}catch(x){}
@@ -28725,8 +28767,8 @@ function _stEnchChoose(i){
   var el=document.querySelector('#stEnchPickTray .stPickDie[data-i="'+i+'"]');
   /* a second tap must not land a second brand while the first is in the air */
   if(el){ if(el.classList.contains('spinning'))return; el.classList.add('spinning'); }
-  document.querySelectorAll('#stEnchPickTray .stPickDie').forEach(function(d){
-    if(d!==el)d.style.opacity='.25';
+  document.querySelectorAll('#stEnchPickTray .trayLbl').forEach(function(l){
+    if(l.getAttribute('data-i')!==String(i))l.classList.add('dim');
   });
   var face=ENCH_ICONS[k]?_iconFaceRoll(mat):null;
   try{SFX.nav&&SFX.nav();}catch(x){}
@@ -28752,8 +28794,8 @@ function _stEnchChoose(i){
         D3X.sync(document.getElementById('gbShop'));
       }catch(x){}
     }
-    var lbl=el&&el.querySelector('.pdLbl');
-    if(lbl)lbl.textContent=(face?('on its '+face):'worked');
+    var lbl=document.querySelector('#stEnchPickTray .trayLbl[data-i="'+i+'"]');
+    if(lbl)lbl.classList.add('taken');/* gold: it carries a brand now */
     /* Thrown off the DIE, the moment it stops turning. A line under the rack
        was easy to miss and read as a caption rather than as the result of
        what the player just did. */
@@ -28766,7 +28808,7 @@ function _stEnchChoose(i){
       _pop.style.left=(((_er.left+_er.right)/2)-_hr.left)+'px';
       _pop.style.top=(_er.top-_hr.top)+'px';
       _host.appendChild(_pop);
-      setTimeout(function(){if(_pop.parentNode)_pop.parentNode.removeChild(_pop);},2000);
+      setTimeout(function(){if(_pop.parentNode)_pop.parentNode.removeChild(_pop);},3500);
     }catch(x){}
     var sub=document.getElementById('stEnchPickSub');
     if(sub)sub.textContent=(_enchDef(k)||{}).name+' is set \u2014 tap the cross when you are done';
@@ -28791,7 +28833,7 @@ function _gbEnchantPick(k){
     /* an icon needs a natural 1 or 5 to sit on; a die with neither cannot
        take one, and says so rather than silently offering an empty step */
     var noFace=!!ENCH_ICONS[k]&&!_iconFacesAny(mt).length;/* random face: any die qualifies */
-    if(en||noFace)h+='<div class="gbx-box sub" style="width:78px;height:64px;font-size:11px;opacity:.5"><span class="d3chip" data-mat="'+mt+'" style="width:26px;height:26px"></span>'+getDie(mt).name+'<br><span class="gbx-label">'+(en?'worked':'no 1 or 5')+'</span></div>';
+    if(en||noFace)h+='<div class="gbx-box sub" style="width:78px;height:64px;font-size:11px;opacity:.5"><span class="d3chip" data-mat="'+mt+'" style="width:26px;height:26px"></span>'+getDie(mt).name+'<br><span class="gbx-label">'+(en?((_enchDef(en.t)||{}).name||'branded'):'no 1 or 5')+'</span></div>';
     else h+='<div class="gbx-box" style="width:78px;height:64px;font-size:11px;cursor:pointer;border-bottom:3px solid '+col+'" '
       +'onclick="_gbEnchantDie(\''+k+'\','+i+')"><span class="d3chip" data-mat="'+mt+'" style="width:26px;height:26px"></span>'+getDie(mt).name+'</div>';
   });
