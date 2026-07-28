@@ -8622,6 +8622,19 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
 <script src="assets/models/dice/ench_icons.js"></script>
 <script src="assets/models/dice/skins.js"></script>
 <script>
+/* Does this engine implement CanvasRenderingContext2D.filter? WebKit shipped
+   it in Safari 18; before that the assignment silently does nothing, which
+   quietly broke both the selection glow and the dice ground shadows on
+   iPhones. Tested once, cached. */
+function _cfBlur(){
+  if(window.__cfBlur===undefined){
+    try{var c=document.createElement('canvas').getContext('2d');
+        c.filter='blur(2px)';window.__cfBlur=(c.filter==='blur(2px)');}
+    catch(e){window.__cfBlur=false;}
+  }
+  return window.__cfBlur;
+}
+
 /* ════════════════════════════════════════════════════════════
    MERGED JAVASCRIPT — ALL 4 PAGES
    ════════════════════════════════════════════════════════════ */
@@ -14637,15 +14650,39 @@ function _diceShadowPaint(pts,scx,scy,size,d){
   if(a<=0.004)return;
   x.save();
   x.globalAlpha=a>1?1:a;
-  x.filter='blur('+Math.max(1.2,size*0.055).toFixed(1)+'px)';
-  x.fillStyle=window.DICE_SHADOW_COL||'#3a2110';
-  x.beginPath();
-  hull.forEach(function(p2,i3){
-    var hx=scx+p2[0],hy=scy+p2[1];
-    if(i3)x.lineTo(hx,hy);else x.moveTo(hx,hy);
-  });
-  x.closePath();x.fill();
-  x.filter='none';
+  var _bl=Math.max(1.2,size*0.055);
+  var _col=window.DICE_SHADOW_COL||'#3a2110';
+  /* Same iOS story as the selection glow: ctx.filter is a silent no-op before
+     Safari 18, and without it these come out as hard-edged polygons instead
+     of soft blobs. shadowBlur is the portable equivalent - lay the hull down
+     off the top of the canvas and let only its shadow land in place. The
+     offset is in DEVICE px (shadowOffset ignores the CTM) while the path is
+     in user px, hence the dpr; shadowBlur's sigma is half filter:blur's, so
+     the radius doubles to match. */
+  if(_cfBlur()){
+    x.filter='blur('+_bl.toFixed(1)+'px)';
+    x.fillStyle=_col;
+    x.beginPath();
+    hull.forEach(function(p2,i3){
+      var hx=scx+p2[0],hy=scy+p2[1];
+      if(i3)x.lineTo(hx,hy);else x.moveTo(hx,hy);
+    });
+    x.closePath();x.fill();
+    x.filter='none';
+  }else{
+    var _d=1;try{var _t=x.getTransform&&x.getTransform();if(_t&&_t.a)_d=_t.a;}catch(e){}
+    var _off=(x.canvas.height/_d)+80;
+    x.shadowColor=_col;x.shadowBlur=_bl*2;
+    x.shadowOffsetX=0;x.shadowOffsetY=_off*_d;
+    x.fillStyle=_col;
+    x.beginPath();
+    hull.forEach(function(p2,i3){
+      var hx=scx+p2[0],hy=scy+p2[1]-_off;
+      if(i3)x.lineTo(hx,hy);else x.moveTo(hx,hy);
+    });
+    x.closePath();x.fill();
+    x.shadowColor='transparent';x.shadowBlur=0;x.shadowOffsetY=0;
+  }
   x.restore();
 }
 /* the shadow's colour, as a multiplier on the table. Darker = deeper. */
@@ -16831,6 +16868,10 @@ var D3X={
      UNDER the stroke rather than just outside it - the thin dark seam was
      the gap between where the cut-out ended and the stroke began. */
   GLOW:{soft:22, rim:6, rimPasses:7, softPasses:2, line:2.8, grow:1.004, clear:0.7, strength:1.0},
+  /* ctx.filter is the only thing that spreads the halo, and WebKit shipped it
+     in Safari 18 - before that the assignment is a silent no-op. See
+     window._cfBlur, tested once and shared with the dice shadows. */
+  _cf:_cfBlur(),
   _glowCv:function(){
     var sc=document.getElementById('screen-match');
     if(!sc)return null;
@@ -16947,15 +16988,15 @@ var D3X={
     gx.setTransform(dpr,0,0,dpr,0,0);
     gx.globalCompositeOperation='source-over';
     gx.clearRect(0,0,sc.width,sc.height);
-    var trace=function(ctx,hull,shrink){
+    var trace=function(ctx,hull,shrink,dy){
       var cx=0,cy=0;
       hull.forEach(function(p){cx+=p[0];cy+=p[1];});
       cx/=hull.length;cy/=hull.length;
       ctx.beginPath();
       hull.forEach(function(p,i){
-        var dx=p[0]-cx,dy=p[1]-cy,L=Math.sqrt(dx*dx+dy*dy)||1;
+        var dx=p[0]-cx,dyy=p[1]-cy,L=Math.sqrt(dx*dx+dyy*dyy)||1;
         var k=shrink?Math.max(0,(L-shrink))/L:1;
-        var px=cx+dx*k,py=cy+dy*k;
+        var px=cx+dx*k,py=cy+dyy*k+(dy||0);
         if(i)ctx.lineTo(px,py);else ctx.moveTo(px,py);
       });
       ctx.closePath();
@@ -16964,16 +17005,49 @@ var D3X={
        blends into a warm table */
     gx.fillStyle=self.SEL_SOFT;
     gx.globalAlpha=1;
-    /* the wide, soft falloff */
-    gx.filter='blur('+G.soft+'px)';
-    for(var sp=0;sp<(G.softPasses||1);sp++)
-      sel.forEach(function(h){trace(gx,h,0);gx.fill();});
-    /* then the bright rim, stacked - the punch-out below throws away the
-       inner half of every blur, so a single pass never reads as strong */
-    gx.fillStyle=self.SEL_COL;
-    gx.filter='blur('+G.rim+'px)';
-    for(var rp=0;rp<G.rimPasses;rp++)
-      sel.forEach(function(h){trace(gx,h,0);gx.fill();});
+    if(self._cf){
+      /* the wide, soft falloff */
+      gx.filter='blur('+G.soft+'px)';
+      for(var sp=0;sp<(G.softPasses||1);sp++)
+        sel.forEach(function(h){trace(gx,h,0);gx.fill();});
+      /* then the bright rim, stacked - the punch-out below throws away the
+         inner half of every blur, so a single pass never reads as strong */
+      gx.fillStyle=self.SEL_COL;
+      gx.filter='blur('+G.rim+'px)';
+      for(var rp=0;rp<G.rimPasses;rp++)
+        sel.forEach(function(h){trace(gx,h,0);gx.fill();});
+    }else{
+      /* No ctx.filter (iOS Safari < 18). Stack EXPANDED copies of the hull
+         instead - trace() already grows the outline on a negative shrink -
+         from the outside in, each one a little more opaque. That builds the
+         same outward falloff out of primitives every engine has, and it is
+         what the punch-out below expects to find: paint sitting outside the
+         die's edge. Widest ring first so the alpha accumulates toward the
+         rim rather than away from it. */
+      /* shadowBlur is a true gaussian and WebKit has always had it. The
+         catch is that it draws the SHAPE as well as its shadow, and we only
+         want the shadow - so lay the shape down a full canvas-height ABOVE
+         the top edge and push its shadow back down by the same amount. Note
+         shadowOffset is in device pixels and is NOT affected by the current
+         transform, while the path IS, so the offset carries the dpr.
+         Stacking expanded rings instead of this was tried and rejected:
+         radial vertex expansion grows edge midpoints by only ~0.7x, so the
+         halo reached 6px where the filter reaches 22. */
+      var OFF=sc.height+80;
+      var blob=function(col,blur,passes){
+        gx.shadowColor=col; gx.shadowBlur=blur;
+        gx.shadowOffsetX=0; gx.shadowOffsetY=OFF*dpr;
+        gx.fillStyle=col;
+        for(var i=0;i<passes;i++)
+          sel.forEach(function(h){trace(gx,h,0,-OFF);gx.fill();});
+      };
+      /* 2x: canvas shadowBlur is a gaussian of sigma = blur/2, while
+         filter:blur(N) is sigma = N, so the same number reads half as wide.
+         Measured against the desktop path to match its reach. */
+      blob(self.SEL_SOFT,G.soft*2,(G.softPasses||1));
+      blob(self.SEL_COL ,G.rim*2 ,G.rimPasses);
+      gx.shadowColor='transparent';gx.shadowBlur=0;gx.shadowOffsetY=0;
+    }
     /* cut the die back out EXACTLY on its painted edge: everything left is
        outside the shape, which is the whole point */
     gx.filter='none';
