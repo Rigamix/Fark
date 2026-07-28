@@ -900,8 +900,11 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
   cursor:pointer;display:flex;align-items:center;justify-content:center}
 .stPickDie:active{transform:translate(-50%,-50%) scale(.92)}
 .stPickDie.taken{opacity:.38;cursor:default}
-.stPickDie .d3chip{width:100%;height:100%}
-.stPickDie .pdLbl{position:absolute;left:-30%;right:-30%;bottom:-46%;text-align:center;
+/* 78%, exactly like .stTSlot .d3chip - at 100% these rendered 28% larger
+   than the buy tray's on an identically sized slot, which is why the two
+   racks never looked like the same rack */
+.stPickDie .d3chip{width:78%;aspect-ratio:1;display:block;pointer-events:none}
+.stPickDie .pdLbl{position:absolute;left:-30%;right:-30%;bottom:-88%;text-align:center;
   font-family:'JMH Beda',serif;font-size:1.7cqh;color:#c8b088;white-space:nowrap}
 /* The die is drawn on the WebGL canvas from this element's rect, so a CSS
    rotate here would spin the box and not the die. The turn is driven on the
@@ -913,9 +916,12 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
   60%{transform:translate(-50%,-50%) scale(1.34)}
   100%{transform:translate(-50%,-50%) scale(1.18)}}
 .stPickDie.branded .pdLbl{color:#ffd98a}
-#stEnchPickCancel{position:absolute;left:0;right:0;
-  bottom:calc(env(safe-area-inset-bottom,0px) + 4.5cqh);text-align:center;
-  font-family:'JMH Beda',serif;font-size:2.6cqh;color:#c0a67e;cursor:pointer}
+/* the same close the die panel uses, in the same place */
+#stEnchPickCancel{position:absolute;left:50%;transform:translateX(-50%);
+  bottom:calc(env(safe-area-inset-bottom,0px) + 1.4cqh);width:14%;cursor:pointer;
+  transition:transform .1s}
+#stEnchPickCancel img{width:100%;display:block;pointer-events:none}
+#stEnchPickCancel:active{transform:translateX(-50%) scale(.9)}
 #stBack{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 #stStage{position:absolute;left:50%;top:auto;bottom:0;transform:translateX(-50%);
   width:min(100cqw,56.25cqh);height:min(177.78cqw,100cqh);container-type:size}
@@ -1076,6 +1082,18 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 #gbShop.st-epick .stL,#gbShop.st-epick #stBack,#gbShop.st-epick .stTabLbl{
   filter:blur(5px) brightness(.62) saturate(.9)}
 #gbShop.st-epick .stEnch{filter:blur(5px) brightness(.42);transition:filter .3s}
+/* what the brand landed on, thrown off the die itself once it settles */
+.enchPop{position:absolute;z-index:60;pointer-events:none;white-space:nowrap;
+  transform:translate(-50%,-50%);
+  font-family:'JMH Beda',serif;font-size:3.2cqh;color:#ffd98a;letter-spacing:.05em;
+  text-shadow:0 0.3cqh 0 rgba(24,12,4,.9),0 0 1.4cqh rgba(255,196,90,.5);
+  animation:enchPop 1.9s cubic-bezier(.2,1.4,.35,1) forwards}
+@keyframes enchPop{
+  0%{opacity:0;transform:translate(-50%,-50%) scale(.4) rotate(-8deg)}
+  22%{opacity:1;transform:translate(-50%,-90%) scale(1.18) rotate(3deg)}
+  36%{transform:translate(-50%,-96%) scale(1) rotate(-1.5deg)}
+  70%{opacity:1;transform:translate(-50%,-118%) scale(1)}
+  100%{opacity:0;transform:translate(-50%,-160%) scale(.94)}}
 #gbShop.st-focus #stFocusScrim{opacity:1;pointer-events:auto}
 .stStand{transition:opacity .3s}
 #gbShop.st-focus .stStand:not(.zoom),#gbShop.st-focus .stPrice{opacity:0;pointer-events:none}
@@ -1190,8 +1208,9 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 /* the target ring, inset to the MESH rather than drawn round the whole slot
    box - the mesh is 0.80 of the box, so a border on the box read as a frame
    noticeably larger than the die it offers to swap */
-.stTSlot::before{content:'';position:absolute;inset:10%;border:2px solid transparent;
-  border-radius:16%;transition:border-color .15s,box-shadow .15s;pointer-events:none}
+.stTSlot::before{content:'';position:absolute;left:12%;right:12%;top:4.5%;bottom:4.5%;
+  border:2px solid transparent;border-radius:18%/15%;
+  transition:border-color .15s,box-shadow .15s;pointer-events:none}
 /* the moment a trade lands - RESTATES the centring translate, like .hot does */
 .stTSlot.landed{animation:stSlotLand .85s cubic-bezier(.2,1.3,.35,1)}
 @keyframes stSlotLand{
@@ -18153,6 +18172,14 @@ var D3X={
         d.obj.quaternion.copy(d.retFrom).slerp(D3X._isoQ(d.val),re);
         if(rk>=1){d.retT0=0;d.retFrom=null;}
         d.obj.userData.posed=-1;
+      }else if(d.uYaw||d.uPit){
+        /* not focused, but being turned deliberately (the enchant spin). This
+           branch used to be missing, so the pose was reset to iso every frame
+           and the animation was invisible however hard it drove uYaw. */
+        var sp=new THREE.Quaternion().setFromEuler(
+          new THREE.Euler(d.uPit||0,d.uYaw||0,0,'YXZ'));
+        d.obj.quaternion.copy(sp).multiply(D3X._isoQ(d.val));
+        d.obj.userData.posed=-1;
       }else{
         d.obj.quaternion.copy(D3X._isoQ(d.val));
         d.obj.userData.posed=d.val;
@@ -28276,9 +28303,18 @@ function _stFocus(i){
          stand's chip is 80% of the stand, the slot's chip is all of it. */
       dragScale=1.35;
       try{
-        var _sw=slotEls.length?slotEls[0].getBoundingClientRect().width:0;
-        var _so=stand.offsetWidth||1;
-        if(_sw)dragEnd=Math.max(.35,Math.min(1.35,_sw/(0.8*_so)));
+        /* Match the PAINTED sizes. This is NOT a chip-width ratio: frame()
+           draws the focused die at 0.92 of its chip and every other die at
+           0.80, so the same chip width paints two different sizes.
+              0.92 * standChip * S  ==  0.80 * trayChip
+           standChip comes from offsetWidth * 0.8 rather than a measured rect,
+           because the stand is carrying the focus transform and its rect is
+           already scaled - reading the rect and dividing by a scale parsed
+           back out of the style string was wrong wherever the two disagreed. */
+        var _tc=slotEls.length&&slotEls[0].querySelector('.d3chip');
+        var _tw=_tc?_tc.getBoundingClientRect().width:0;
+        var _sw0=0.8*(stand.offsetWidth||1);/* layout width: transform-free */
+        if(_tw&&_sw0)dragEnd=Math.max(.3,Math.min(1.35,(0.80*_tw)/(0.92*_sw0)));
       }catch(e){}
       stand.style.transition='transform .12s';
     };
@@ -28537,7 +28573,8 @@ function _stEnchTap(k){
       +'<div id="stEnchPickTitle"></div><div id="stEnchPickPrice"></div>'
       +'<div id="stEnchPickSub"></div>'
       +'<div id="stEnchPickTray"></div>'
-      +'<div id="stEnchPickCancel" onclick="_stEnchPickClose()">not tonight</div>';
+      +'<div id="stEnchPickCancel" onclick="_stEnchPickClose()">'
+        +'<img src="Art/Assets/Icons/close.png" alt="close"></div>';
     gbx.appendChild(box);
   }
   var _ic=document.getElementById('stEnchPickIcon');
@@ -28634,11 +28671,22 @@ function _stEnchChoose(i){
     }
     var lbl=el&&el.querySelector('.pdLbl');
     if(lbl)lbl.textContent=(face?('on its '+face):'worked');
+    /* Thrown off the DIE, the moment it stops turning. A line under the rack
+       was easy to miss and read as a caption rather than as the result of
+       what the player just did. */
+    try{
+      var _host=document.getElementById('stEnchPick');
+      var _er=el.getBoundingClientRect(), _hr=_host.getBoundingClientRect();
+      var _pop=document.createElement('div');
+      _pop.className='enchPop';
+      _pop.textContent=face?('ON ITS '+face+'!'):'WORKED!';
+      _pop.style.left=(((_er.left+_er.right)/2)-_hr.left)+'px';
+      _pop.style.top=(_er.top-_hr.top)+'px';
+      _host.appendChild(_pop);
+      setTimeout(function(){if(_pop.parentNode)_pop.parentNode.removeChild(_pop);},2000);
+    }catch(x){}
     var sub=document.getElementById('stEnchPickSub');
-    if(sub)sub.textContent=(_enchDef(k)||{}).name+(face?(' branded on the '+face):' worked')
-      +' \u2014 that face banks nothing now';
-    var cx=document.getElementById('stEnchPickCancel');
-    if(cx)cx.textContent='done';
+    if(sub)sub.textContent=(_enchDef(k)||{}).name+' is set \u2014 tap the cross when you are done';
     var gd=document.querySelector('#stHud .gd span');
     if(gd){_getS();gd.textContent=(S.run.gold||0);}
     _stEnchK=null;/* the panel is a result now, not a chooser */
