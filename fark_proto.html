@@ -870,12 +870,14 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
    shop art never eats taps meant for the stands, and a child of a
    pointer-events:none parent is not hit-testable unless it says so. Without
    it every tap fell straight through to #stStage and nothing happened. */
-/* left/top blown out past the stage so it covers the WHOLE screen: #stStage
-   is letterboxed, so an inset:0 child of it stopped short of the top strip
-   and the frame visibly ended under the hearts. */
-#stEnchPick{position:absolute;left:-60cqw;right:-60cqw;top:-100cqh;bottom:-60cqh;
-  z-index:40;display:none;pointer-events:none;background:rgba(8,5,2,.44);
-  -webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+/* inset:0 on #gbShop, which is itself inset:0 on the screen. It does NOT get
+   the -60cqw blow-out the scrims use: those are bare backdrops with no
+   children, whereas every child here is placed in percentages - blown out,
+   the icon's 34% and the tray's bottom resolved against a box twice the
+   screen and left the frame. */
+#stEnchPick{position:absolute;inset:0;
+  z-index:40;display:none;pointer-events:none;background:rgba(8,5,2,.58);
+  -webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
 #stEnchPick.on{display:block;pointer-events:auto;animation:stPickIn .25s ease-out}
 @keyframes stPickIn{from{opacity:0}to{opacity:1}}
 /* the icon, then the name, then the line - the same beats and the same type
@@ -893,9 +895,8 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 #stEnchPickTray{position:absolute;left:4%;right:4%;
   bottom:calc(env(safe-area-inset-bottom,0px) + 13.5cqh)}
 #stEnchPickTray>img{width:100%;display:block;pointer-events:none}
-/* 34%, not 42%: the dice were sitting low in the rack rather than standing
-   in its bays */
-.stPickDie{position:absolute;top:34%;transform:translate(-50%,-50%);width:14%;aspect-ratio:1;
+/* the same fit the BUY tray uses - both racks are dice_row.png */
+.stPickDie{position:absolute;top:50%;transform:translate(-50%,-50%);width:11.6%;aspect-ratio:1;
   cursor:pointer;display:flex;align-items:center;justify-content:center}
 .stPickDie:active{transform:translate(-50%,-50%) scale(.92)}
 .stPickDie.taken{opacity:.38;cursor:default}
@@ -1061,7 +1062,7 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 #gbShop.st-focus .stL,#gbShop.st-focus #stBack,#gbShop.st-focus .stTabLbl,
 #gbShop.st-epick .stL,#gbShop.st-epick #stBack,#gbShop.st-epick .stTabLbl{
   filter:blur(5px) brightness(.62) saturate(.9)}
-#gbShop.st-epick .stEnch{filter:blur(4px) brightness(.6);transition:filter .3s}
+#gbShop.st-epick .stEnch{filter:blur(5px) brightness(.42);transition:filter .3s}
 #gbShop.st-focus #stFocusScrim{opacity:1;pointer-events:auto}
 .stStand{transition:opacity .3s}
 #gbShop.st-focus .stStand:not(.zoom),#gbShop.st-focus .stPrice{opacity:0;pointer-events:none}
@@ -1168,7 +1169,7 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 #stTradeRow .slots{display:flex;justify-content:center;gap:2%}
 #stTradeRow .tray{position:relative;width:100%}
 #stTradeRow .tray>img{width:100%;display:block;pointer-events:none}
-.stTSlot{position:absolute;top:42%;transform:translate(-50%,-50%);width:14%;aspect-ratio:1;
+.stTSlot{position:absolute;top:50%;transform:translate(-50%,-50%);width:11.6%;aspect-ratio:1;
   border:2px solid transparent;border-radius:14%;
   display:flex;align-items:center;justify-content:center;
   transition:border-color .15s,transform .15s}
@@ -28205,7 +28206,7 @@ function _stFocus(i){
     gb.appendChild(row);
     if(typeof _d3ChipScan==='function')_d3ChipScan(row);
     var focusTf=stand.style.transform;
-    var dragOn=false,slotEls=null;
+    var dragOn=false,slotEls=null,dragScale=1.35,dragEnd=0.8;
     stand.style.touchAction='none';
     stand.onpointerdown=function(ev){
       if(!gb.classList.contains('st-focus'))return;
@@ -28213,11 +28214,36 @@ function _stFocus(i){
       try{stand.setPointerCapture(ev.pointerId);}catch(e){}
       dragOn=true;
       slotEls=[].slice.call(row.querySelectorAll('.stTSlot'));
+      /* stop the idle turn for the drag: the die has to arrive at the same
+         angle the tray draws its dice at, or the swap is a visible cut. */
+      try{
+        var _c=stand.querySelector('.die');
+        if(_c&&_c._d3){_c._d3.hover=false;_c._d3.h=0;}
+        if(window.D3X)D3X.focus=null;
+      }catch(e){}
+      /* how much to shrink by the time it reaches the rack: match the
+         RENDERED mesh, which is 0.80 of the chip box on both sides - the
+         stand's chip is 80% of the stand, the slot's chip is all of it. */
+      dragScale=1.35;
+      try{
+        var _sw=slotEls.length?slotEls[0].getBoundingClientRect().width:0;
+        var _so=stand.offsetWidth||1;
+        if(_sw)dragEnd=Math.max(.35,Math.min(1.35,_sw/(0.8*_so)));
+      }catch(e){}
       stand.style.transition='transform .12s';
     };
     stand.onpointermove=function(ev){
       if(!dragOn)return;
-      stand.style.transform='translate('+(ev.clientX-ncx)+'px,'+(ev.clientY-ncy)+'px) scale(1.35)';
+      /* shrink on the way down: 1.35 in the hand, the slot's own size by the
+         time it is over the rack, so the drop is a landing not a cut */
+      var _t=0;
+      try{
+        var _tr=row.querySelector('.tray').getBoundingClientRect();
+        var _aim=_tr.top+_tr.height*0.5;
+        if(_aim>ncy)_t=Math.max(0,Math.min(1,(ev.clientY-ncy)/(_aim-ncy)));
+      }catch(e){}
+      var _sc=dragScale+(dragEnd-dragScale)*(_t*_t*(3-2*_t));
+      stand.style.transform='translate('+(ev.clientX-ncx)+'px,'+(ev.clientY-ncy)+'px) scale('+_sc.toFixed(3)+')';
       slotEls.forEach(function(el){
         var r=el.getBoundingClientRect();
         el.classList.toggle('hot',ev.clientX>=r.left&&ev.clientX<=r.right&&ev.clientY>=r.top&&ev.clientY<=r.bottom);
