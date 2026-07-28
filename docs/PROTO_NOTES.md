@@ -4666,3 +4666,56 @@ scaled with it so the outline keeps its weight. `bank-to-win` sets `order:1` as
 well as the wide plate, or the big button would swap hands on the deciding
 press. The pause needed **32.5cqw**, not the 29 that cleared BANK — ROLL is the
 tall plate and now sits on that side, reaching 20px higher.
+
+## P260–P262 — the ENCHANTS tab, and the rival's hand
+
+**The tab is painted now.** Switching to ENCHANTS swaps `#stFront` for
+`Store_front_emptyForEnchats.png` — the dice stands are painted INTO the normal
+front, so leaving it up put the panels on top of merchandise that isn't for
+sale on that tab. Eight plaques hang on the cleared counter in a 4×2 grid.
+
+Geometry, measured rather than guessed: the panel art is 221×414 and carries
+its own hanging price tag with the coin already painted at x 18–33%, y 83–96%,
+so the number sits to the *right* of that and the icon sits in the plaque at
+33% down. A panel of width P% is **P×1.054%** tall because the stage keeps the
+1080×1920 canvas aspect — that's what lands the grid on the cleared counter
+(y 49–85%) instead of drifting off it.
+
+The float-in and the idle sway are on **different elements** on purpose. Both
+animate `transform`, and a second animation on one element replaces the first
+outright rather than composing — the same collision that threw the flag score
+sideways in P248.
+
+**A repaint used to blank the tab.** `_gbShop`'s initial render wrote
+`(dOn?goods:'')`, so the panels only ever existed via the tab-switch handler —
+and buying a brand repaints the shop, which left an empty counter. It builds
+the enchant side in both places now.
+
+**Random face instead of 1-or-5.** The brief restricts a brand to a natural 1
+or 5 so players can't brand a face that rarely scores (measured EV forfeited:
+face 2 ≈32, 3 ≈39, 4 ≈41, 6 ≈54, versus 5 ≈73 and 1 ≈125). A random face is a
+different answer to the same problem: the exploit was the player *choosing* the
+cheap face, and randomness removes the choice — which also closes the residual
+cheese the brief left open ("always brand the 5, not the 1", open item 2). The
+cost is that the average face is cheaper to give up than a forced 1-or-5 (~61
+vs ~99 EV), so **every icon is now worth more than its price** — flagged for
+the pricing pass, not resolved here.
+
+Two gates had to move with it. `_gbEnchantApply` re-asserts the face rule at
+the point of sale; left on `_iconFaces` it would have rejected roughly two
+brands in three, silently, after the spin. And `_iconFacesAny` collapses
+duplicates, because a Silver die lists 1 and 5 twice in its weighted table and
+must not be twice as likely to catch the brand.
+
+**The rival's cards.** P245 turned them face-up; they're face-down again on
+flat family colour. The brief specifies backs twice, and the second reason is
+the one that costs something: the NPC telegraph is "card back rises 6px with a
+red-edge glow" and then, on resolution, "flips face-up for ~1.2s" — a card
+already face-up has nothing left to flip.
+
+They sit on the rival's own side at 83% of the player's card width, hung off
+`--bar-top` like the rest of the HUD. That last part needed the screen padding
+added back by hand: `#raceWrap` lives inside `#hud`, which is in normal flow
+and starts *below* the padding, while this row is an absolute child of
+`#screen-match`, whose padding box starts at zero. Same variable, two origins,
+8px apart. Verified the gap holds at ~3px across design, tall and short shells.
