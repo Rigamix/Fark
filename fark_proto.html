@@ -896,7 +896,7 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
   bottom:calc(env(safe-area-inset-bottom,0px) + 13.5cqh)}
 #stEnchPickTray>img{width:100%;display:block;pointer-events:none}
 /* the same fit the BUY tray uses - both racks are dice_row.png */
-.stPickDie{position:absolute;top:50%;transform:translate(-50%,-50%);width:11.6%;aspect-ratio:1;
+.stPickDie{position:absolute;top:48%;transform:translate(-50%,-50%);width:13.2%;aspect-ratio:1;
   cursor:pointer;display:flex;align-items:center;justify-content:center}
 .stPickDie:active{transform:translate(-50%,-50%) scale(.92)}
 .stPickDie.taken{opacity:.38;cursor:default}
@@ -1166,19 +1166,30 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 #gbShop.st-focus #stTradeRow{opacity:1;pointer-events:auto;transform:none;transition-delay:.18s}
 #stTradeRow .cap{text-align:center;font-family:'JMH Beda',serif;font-size:2.2cqh;color:#ffd98a;
   letter-spacing:.06em;margin:1.1cqh 0 0;text-shadow:0 2px 0 rgba(58,32,8,.75)}
+/* what it cost, in the red the rest of the game spends gold in */
+#stTradeRow .cap .capCost{color:#e0705a;margin-left:.5em}
 #stTradeRow .slots{display:flex;justify-content:center;gap:2%}
 #stTradeRow .tray{position:relative;width:100%}
 #stTradeRow .tray>img{width:100%;display:block;pointer-events:none}
-.stTSlot{position:absolute;top:50%;transform:translate(-50%,-50%);width:11.6%;aspect-ratio:1;
+.stTSlot{position:absolute;top:48%;transform:translate(-50%,-50%);width:13.2%;aspect-ratio:1;
   border:2px solid transparent;border-radius:14%;
   display:flex;align-items:center;justify-content:center;
   transition:border-color .15s,transform .15s}
 /* the moment a trade lands - RESTATES the centring translate, like .hot does */
 .stTSlot.landed{animation:stSlotLand .85s cubic-bezier(.2,1.3,.35,1)}
 @keyframes stSlotLand{
-  0%{transform:translate(-50%,-50%) scale(1.45);filter:brightness(2.2)}
-  45%{transform:translate(-50%,-50%) scale(.94);filter:brightness(1.35)}
+  0%{transform:translate(-50%,-50%) scale(1.3);filter:brightness(2.1)}
+  45%{transform:translate(-50%,-50%) scale(.96);filter:brightness(1.3)}
   100%{transform:translate(-50%,-50%) scale(1);filter:none}}
+/* a ring of light that blooms out of the slot and fades - drawn on a
+   pseudo-element so it cannot fight the slot's own centring transform */
+.stTSlot.landed::after{content:'';position:absolute;inset:-30%;border-radius:50%;
+  pointer-events:none;background:radial-gradient(circle,rgba(255,217,138,.85) 0%,
+    rgba(255,196,90,.35) 45%,rgba(255,196,90,0) 70%);
+  animation:stSlotGlow .85s ease-out forwards}
+@keyframes stSlotGlow{0%{opacity:0;transform:scale(.4)}
+                      25%{opacity:1;transform:scale(1)}
+                      100%{opacity:0;transform:scale(1.45)}}
 .stTSlot.hot{border-color:#ffd98a;transform:translate(-50%,-50%) scale(1.12);
   box-shadow:0 0 12px rgba(255,217,138,.4)}
 .stTSlot .d3chip{width:78%;aspect-ratio:1;display:block;pointer-events:none}
@@ -28219,7 +28230,17 @@ function _stFocus(i){
       try{
         var _c=stand.querySelector('.die');
         if(_c&&_c._d3){_c._d3.hover=false;_c._d3.h=0;}
-        if(window.D3X)D3X.focus=null;
+        if(window.D3X){
+          D3X.focus=null;
+          /* and UNWIND the rotation the focus drag put on it. Clearing the
+             spin alone left uYaw/uPit wherever the player had turned the die,
+             so it arrived at the rack cocked over at some angle of their own
+             making rather than square in its bay like the others. */
+          var _ch=stand.querySelector('.d3chip');
+          (D3X.dice||[]).forEach(function(_d){
+            if(_d.chip===_ch){_d.uYaw=0;_d.uPit=0;}
+          });
+        }
       }catch(e){}
       /* how much to shrink by the time it reaches the rack: match the
          RENDERED mesh, which is 0.80 of the chip box on both sides - the
@@ -28257,7 +28278,21 @@ function _stFocus(i){
         if(commit&&ev.clientX>=r.left&&ev.clientX<=r.right&&ev.clientY>=r.top&&ev.clientY<=r.bottom)hit=el;
         el.classList.remove('hot');
       });
-      if(hit){_stTrade(mat,parseInt(hit.getAttribute('data-i'),10));return;}
+      if(hit){
+        /* Fly the die INTO the slot it replaces, at the slot's own size, and
+           only then hand over. It used to keep its drag transform for the
+           whole 900ms hold, so a big off-angle die sat over the rack while
+           the caption congratulated you. */
+        try{
+          var hr=hit.getBoundingClientRect();
+          var _sc=hr.width/(0.8*(stand.offsetWidth||1));
+          stand.style.transition='transform .26s cubic-bezier(.25,.9,.3,1),opacity .18s linear .22s';
+          stand.style.transform='translate('+(((hr.left+hr.right)/2)-ncx).toFixed(1)+'px,'
+            +(((hr.top+hr.bottom)/2)-ncy).toFixed(1)+'px) scale('+_sc.toFixed(3)+')';
+          stand.style.opacity='0';/* frame() reads opacity, so the mesh goes too */
+        }catch(e){}
+        _stTrade(mat,parseInt(hit.getAttribute('data-i'),10));return;
+      }
       stand.style.transition='transform .45s cubic-bezier(.3,1.2,.4,1)';
       stand.style.transform=focusTf;
     };
@@ -28288,7 +28323,8 @@ function _stTrade(mat,slot){
     var _sl=document.querySelector('#stTradeRow .stTSlot[data-i="'+slot+'"]');
     if(_sl){_sl.classList.remove('landed');void _sl.offsetWidth;_sl.classList.add('landed');}
     var _cap=document.querySelector('#stTradeRow .cap');
-    if(_cap)_cap.textContent=getDie(mat).name.toUpperCase()+' IS YOURS';
+    if(_cap)_cap.innerHTML=getDie(mat).name.toUpperCase()+' IS YOURS'
+      +' <span class="capCost">-'+price+'g</span>';
   }catch(e){}
   setTimeout(function(){try{_gbShop();}catch(e){}},900);
 }
