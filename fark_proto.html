@@ -903,13 +903,16 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 .stPickDie .d3chip{width:100%;height:100%}
 .stPickDie .pdLbl{position:absolute;left:-30%;right:-30%;bottom:-46%;text-align:center;
   font-family:'JMH Beda',serif;font-size:1.7cqh;color:#c8b088;white-space:nowrap}
-/* RESTATES the centring translate, or the die jumps half its width the moment
-   it starts turning */
+/* The die is drawn on the WebGL canvas from this element's rect, so a CSS
+   rotate here would spin the box and not the die. The turn is driven on the
+   mesh's own uYaw in _stEnchSpin; this only lifts and swells the slot so the
+   chosen die reads as picked up. */
 .stPickDie.spinning{animation:stDieSpin 1.15s cubic-bezier(.15,.85,.25,1) forwards}
 @keyframes stDieSpin{
-  0%{transform:translate(-50%,-50%) rotate(0) scale(1)}
-  70%{transform:translate(-50%,-50%) rotate(1080deg) scale(1.3)}
-  100%{transform:translate(-50%,-50%) rotate(1080deg) scale(1.14)}}
+  0%{transform:translate(-50%,-50%) scale(1)}
+  60%{transform:translate(-50%,-50%) scale(1.34)}
+  100%{transform:translate(-50%,-50%) scale(1.18)}}
+.stPickDie.branded .pdLbl{color:#ffd98a}
 #stEnchPickCancel{position:absolute;left:0;right:0;
   bottom:calc(env(safe-area-inset-bottom,0px) + 4.5cqh);text-align:center;
   font-family:'JMH Beda',serif;font-size:2.6cqh;color:#c0a67e;cursor:pointer}
@@ -17879,7 +17882,7 @@ var D3X={
       if(self.dice.some(function(d){return d.chip===ch;}))return;
       var mat=ch.getAttribute('data-mat')||'bone';
       var val=parseInt(ch.getAttribute('data-val'),10)||_d3MatFace(mat);
-      var obj=self._mkDie(mat);
+      var obj=self._mkDie(mat,(ch._d3&&ch._d3.ench)||ch._ench||null);
       obj.quaternion.copy(self._isoQ(val));
       self.scene.add(obj);
       self.dice.push({chip:ch,obj:obj,mat:mat,val:val,
@@ -28567,27 +28570,79 @@ function _stEnchPickClose(){
   var host=document.getElementById('gbShop');
   if(host)host.classList.remove('st-epick');
   _stEnchK=null;
+  /* catch the tab up with whatever the visit changed */
+  try{_gbShop(false);}catch(e){}
 }
-/* the die spins, then the brand lands on whatever face came up */
+/* Turn the mesh itself. frame() reads uYaw every frame, so animating it is
+   what actually spins the die - the CSS class only swells the slot. */
+/* `find` is called EVERY frame rather than resolved once: D3X registers a
+   chip on its own tick, so a chip that has only just been added has no entry
+   for a frame or two - and a quick tap would otherwise spin nothing at all.
+   The turn is applied to whatever the die is by then. */
+function _stEnchSpin(find,ms,turns,done){
+  var t0=null,y0=null,tgt=0;
+  var step=function(now){
+    var d=find();
+    if(t0===null)t0=now;
+    var k=Math.min(1,(now-t0)/ms);
+    if(d){
+      if(y0===null){y0=d.uYaw||0;tgt=y0+Math.PI*2*turns;}
+      var e=1-Math.pow(1-k,3);/* ease-out: fast away, drifts to a stop */
+      d.uYaw=y0+(tgt-y0)*e;
+      d.uPit=Math.sin(k*Math.PI)*0.35;/* a tumble, back to level */
+    }
+    if(k<1)requestAnimationFrame(step);
+    else{if(d){d.uYaw=0;d.uPit=0;}if(done)done();}
+  };
+  requestAnimationFrame(step);
+}
+/* the die spins, the brand lands, and the panel STAYS so it can be read */
 function _stEnchChoose(i){
   var k=_stEnchK; if(!k)return;
   _getS();
   var mat=S.run.dice[i]; if(!mat)return;
   var el=document.querySelector('#stEnchPickTray .stPickDie[data-i="'+i+'"]');
-  /* stop a second tap landing a second brand while the first is still
-     spinning - the apply is on a timer, so the guard has to be here */
+  /* a second tap must not land a second brand while the first is in the air */
   if(el){ if(el.classList.contains('spinning'))return; el.classList.add('spinning'); }
   document.querySelectorAll('#stEnchPickTray .stPickDie').forEach(function(d){
     if(d!==el)d.style.opacity='.25';
   });
   var face=ENCH_ICONS[k]?_iconFaceRoll(mat):null;
   try{SFX.nav&&SFX.nav();}catch(x){}
-  setTimeout(function(){
-    _stEnchPickClose();
-    /* _gbEnchantApply repaints the shop itself, which rebuilds this tab with
-       the new gold and the die marked worked - no second call needed */
-    _gbEnchantApply(k,i,face,null);
-  },1180);
+  var chip=el&&el.querySelector('.d3chip');
+  var findDie=function(){
+    var e2=null;
+    try{(D3X.dice||[]).forEach(function(d){if(d.chip===chip)e2=d;});}catch(x){}
+    return e2;
+  };
+  _stEnchSpin(findDie,1150,3.5,function(){
+    /* quiet: the shop must NOT repaint, or it would tear the panel down
+       around the result the player is being shown */
+    _gbEnchantApply(k,i,face,null,true);
+    if(el)el.classList.remove('spinning');
+    if(el)el.classList.add('branded');
+    if(chip){
+      /* rebuild this one die WITH its brand, turned to the branded face, so
+         the icon is on the side facing the player */
+      chip._ench={t:k,face:face};
+      if(face)chip.setAttribute('data-val',face);
+      try{
+        (D3X.dice||[]).slice().forEach(function(d){if(d.chip===chip)D3X._drop(d);});
+        D3X.dice=(D3X.dice||[]).filter(function(d){return d.chip!==chip;});
+        D3X.sync(document.getElementById('gbShop'));
+      }catch(x){}
+    }
+    var lbl=el&&el.querySelector('.pdLbl');
+    if(lbl)lbl.textContent=(face?('on its '+face):'worked');
+    var sub=document.getElementById('stEnchPickSub');
+    if(sub)sub.textContent=(_enchDef(k)||{}).name+(face?(' branded on the '+face):' worked')
+      +' \u2014 that face banks nothing now';
+    var cx=document.getElementById('stEnchPickCancel');
+    if(cx)cx.textContent='done';
+    var gd=document.querySelector('#stHud .gd span');
+    if(gd){_getS();gd.textContent=(S.run.gold||0);}
+    _stEnchK=null;/* the panel is a result now, not a chooser */
+  });
 }
 function _gbEnchantPick(k){
   _getS();_enchInit();
@@ -28640,7 +28695,7 @@ function _gbEnchantConfirm(k,i,a,b){
     +'<div class="gbx-btn primary" style="height:48px" onclick="_gbModalClose();_gbEnchantApply(\''+k+'\','+i+','+(a==null?'null':a)+','+(b==null?'null':b)+')">PAY '+e.price+'g — DO THE WORK</div>'
     +'<div class="gbx-btn" style="height:48px" onclick="_gbModalClose()">look again</div>');
 }
-function _gbEnchantApply(k,i,a,b){
+function _gbEnchantApply(k,i,a,b,quiet){
   _getS();_enchInit();
   var e=_enchDef(k);if(!e||S.run.dieEnch[i])return;
   if((S.run.gold||0)<e.price){famLog('NOT ENOUGH GOLD');return;}
@@ -28657,7 +28712,9 @@ function _gbEnchantApply(k,i,a,b){
   if(ENCH_ICONS[k])ench.face=a;
   S.run.gold-=e.price;S.run.dieEnch[i]=ench;save();
   famLog(e.name.toUpperCase()+' — THE WORK IS DONE');
-  _gbShop();
+  /* the picker shows the result itself and repaints when it closes; a repaint
+     here would tear the panel down mid-reveal */
+  if(!quiet)_gbShop();
 }
 function _gbBuyDie(mat){
   _getS();
