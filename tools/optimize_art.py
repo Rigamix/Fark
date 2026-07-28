@@ -117,19 +117,10 @@ def target_for(rel, cfg):
     return cfg.get("default_css_px")
 
 
-def encode_candidates(im, dest_stem, quality):
-    """Return [(suffix, bytes)] for every encoding worth considering."""
-    out = []
+def _enc(im, fmt, **kw):
     buf = io.BytesIO()
-    im.save(buf, "WEBP", quality=quality, method=6)
-    out.append((".webp", buf.getvalue(), "lossy"))
-    buf = io.BytesIO()
-    im.save(buf, "WEBP", lossless=True, method=6)
-    out.append((".webp", buf.getvalue(), "lossless"))
-    buf = io.BytesIO()
-    im.save(buf, "PNG", optimize=True)
-    out.append((".png", buf.getvalue(), "png"))
-    return out
+    im.save(buf, fmt, **kw)
+    return buf.getvalue()
 
 
 def process(src, cfg, args):
@@ -161,23 +152,25 @@ def process(src, cfg, args):
         else:
             small = im.copy()  # already small enough; re-encode only
 
-        cands = encode_candidates(small, src.stem, LOSSY_Q)
-        lossy = next(c for c in cands if c[2] == "lossy")
-        lossless = next(c for c in cands if c[2] == "lossless")
-        png = next(c for c in cands if c[2] == "png")
-
-        # is lossy honest about this picture?
+        # Lossy first, and the fallbacks only if it fails the gate - lossless
+        # WebP at method 6 costs seconds on a big image and almost never wins.
+        lossy = (".webp", _enc(small, "WEBP", quality=LOSSY_Q, method=6), "lossy")
         with Image.open(io.BytesIO(lossy[1])) as dec:
             err, aerr = visible_rmse(small, dec.convert("RGBA"))
 
         if err <= RMSE_LIMIT and aerr <= ALPHA_LIMIT:
             pick = lossy
+            if len(pick[1]) >= src_bytes and small.size == im.size:
+                return {"src": rel, "skipped": "master already smaller", "w": dims[0],
+                        "h": dims[1], "bytes": src_bytes}
         else:
+            lossless = (".webp", _enc(small, "WEBP", lossless=True, method=6), "lossless")
+            png = (".png", _enc(small, "PNG", optimize=True), "png")
             pick = lossless if len(lossless[1]) <= len(png[1]) else png
-        # never ship something heavier than the master
-        if len(pick[1]) >= src_bytes and len(png[1]) >= src_bytes and small.size == im.size:
-            return {"src": rel, "skipped": "master already smaller", "w": dims[0],
-                    "h": dims[1], "bytes": src_bytes}
+            # never ship something heavier than the master
+            if len(pick[1]) >= src_bytes and small.size == im.size:
+                return {"src": rel, "skipped": "master already smaller", "w": dims[0],
+                        "h": dims[1], "bytes": src_bytes}
 
         out_dir = src.parent / OUT_DIRNAME
         out_path = out_dir / (src.stem + OUT_SUFFIX + pick[0])
