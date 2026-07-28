@@ -899,7 +899,7 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 .stPickDie{position:absolute;top:35%;transform:translate(-50%,-50%);width:18.5%;aspect-ratio:1;
   cursor:pointer;display:flex;align-items:center;justify-content:center}
 .stPickDie:active{transform:translate(-50%,-50%) scale(.92)}
-.stPickDie.taken{opacity:.38;cursor:default}
+.stPickDie.taken{opacity:.72;cursor:default}
 /* 78%, exactly like .stTSlot .d3chip - at 100% these rendered 28% larger
    than the buy tray's on an identically sized slot, which is why the two
    racks never looked like the same rack */
@@ -12993,7 +12993,7 @@ function famLoadoutShow(){
   var dHtml='';
   for(var di=0;di<6;di++){
     var mt=(S.run.dice&&S.run.dice[di])||'bone';
-    dHtml+='<span class="d3chip loDie" data-iso="1" data-shadow="1" data-mat="'+mt+'" style="left:'+DX[di]+'%" onclick="_loFocus(this)"></span>';
+    dHtml+='<span class="d3chip loDie" data-iso="1" data-shadow="1" data-mat="'+mt+'" data-slot="'+di+'" style="left:'+DX[di]+'%" onclick="_loFocus(this)"></span>';
   }
   var hearts='';for(var hi=0;hi<3;hi++)hearts+='<img src="'+PT_A+(hi<(S.run.coins||0)?'heart_full':'heart_empty')+'.png" alt="">';
   ov.innerHTML=''
@@ -16551,7 +16551,7 @@ var D3X={
     var self=this;
     this.dice.forEach(function(d){
       var sk=self._skinFor(d.mat);
-      var ench=(d.chip&&d.chip._ench)||null;
+      var ench=self._deckEnch(d.chip);
       d.obj.traverse(function(o){
         if(!o.isMesh||o.userData.outline)return;
         self._dress(o.material,d.mat,sk);
@@ -17752,7 +17752,10 @@ var D3X={
      than hovering at eye level. */
   ISO:null,TILT:33,TILT_MATCH:38,YAW:0,ROLL:90,
 
-  _isoQ:function(val,tilt){
+  /* `lay` puts the face on the TOP of the cube rather than at the camera.
+     An enchant brand belongs in the light where it can be read at a glance;
+     on a side face it competes with the pips and can be turned away. */
+  _isoQ:function(val,tilt,lay){
     /* cached per tilt so the dial stays live and the two surfaces can
        differ - the table is seen from higher up than the shelf */
     var t=(tilt===undefined?this.TILT:tilt);
@@ -17778,7 +17781,24 @@ var D3X={
        lands on its side without this roll (a 6 reads 3x2, not 2x3) */
     var roll=new THREE.Quaternion().setFromAxisAngle(
       new THREE.Vector3(0,0,1),THREE.MathUtils.degToRad(this.ROLL));
-    return this.ISO.clone().multiply(roll.multiply(face));
+    var q=roll.multiply(face);
+    /* -90 about X takes the face normal from +Z (camera) to +Y (up); the
+       camera tilt then leans that top face back toward the viewer */
+    if(lay)q=new THREE.Quaternion().setFromAxisAngle(
+      new THREE.Vector3(1,0,0),-Math.PI/2).multiply(q);
+    return this.ISO.clone().multiply(q);
+  },
+  /* A chip that carries data-slot IS one of the player's six, so its brand
+     is whatever the run says right now - no call site has to remember to
+     pass it, and none of them can fall out of step. */
+  _deckEnch:function(ch){
+    if(!ch)return null;
+    var sl=ch.getAttribute&&ch.getAttribute('data-slot');
+    if(sl!==null&&sl!==undefined&&sl!==''){
+      try{return (S&&S.run&&S.run.dieEnch&&S.run.dieEnch[parseInt(sl,10)])||null;}
+      catch(e){return null;}
+    }
+    return (ch._d3&&ch._d3.ench)||ch._ench||null;
   },
   _mkDie:function(mat,ench){
     var g=new THREE.Group();
@@ -17906,10 +17926,13 @@ var D3X={
       if(self.dice.some(function(d){return d.chip===ch;}))return;
       var mat=ch.getAttribute('data-mat')||'bone';
       var val=parseInt(ch.getAttribute('data-val'),10)||_d3MatFace(mat);
-      var obj=self._mkDie(mat,(ch._d3&&ch._d3.ench)||ch._ench||null);
-      obj.quaternion.copy(self._isoQ(val));
+      var ench=self._deckEnch(ch);
+      var obj=self._mkDie(mat,ench);
+      /* a branded die rests with its brand up, not with its value forward */
+      var top=(ench&&ench.face)||0;
+      obj.quaternion.copy(top?self._isoQ(top,undefined,true):self._isoQ(val));
       self.scene.add(obj);
-      self.dice.push({chip:ch,obj:obj,mat:mat,val:val,
+      self.dice.push({chip:ch,obj:obj,mat:mat,val:val,top:top,
         uYaw:0,uPit:0,t0:performance.now()});
     });
     this._bindDrag();
@@ -18160,6 +18183,8 @@ var D3X={
       if(zoomed&&d!==zoomed&&!(d.chip.closest&&d.chip.closest('#stTradeRow,#stEnchPickTray')))vis=false;
       d.obj.visible=vis;
       if(!vis)return;
+      /* one rest pose for all the branches below: a branded die rests brand-up */
+      var rest=d.top?D3X._isoQ(d.top,undefined,true):D3X._isoQ(d.val);
       var sz=cr.width*(d===zoomed?0.92:0.80);
       d.obj.scale.setScalar(sz);
       var x=cr.left-mr.left+cr.width/2,y=-(cr.top-mr.top+cr.height/2);
@@ -18170,26 +18195,24 @@ var D3X={
         var idle=d.noIdle?0:(now-d.t0)*0.00042;
         var extra=new THREE.Quaternion().setFromEuler(
           new THREE.Euler(d.uPit||0,(d.uYaw||0)+idle,0,'YXZ'));
-        d.obj.quaternion.copy(extra).multiply(D3X._isoQ(d.val));
+        d.obj.quaternion.copy(extra).multiply(rest);
       }else if(d.retT0){
         var rk=Math.min(1,(now-d.retT0)/450);
         var re=1-Math.pow(1-rk,3);
-        d.obj.quaternion.copy(d.retFrom).slerp(D3X._isoQ(d.val),re);
+        d.obj.quaternion.copy(d.retFrom).slerp(rest,re);
         if(rk>=1){d.retT0=0;d.retFrom=null;}
         d.obj.userData.posed=-1;
-      }else if(d.uYaw||d.uPit||d.tip){
+      }else if(d.uYaw||d.uPit){
         /* not focused, but being turned deliberately (the enchant spin). This
            branch used to be missing, so the pose was reset to iso every frame
            and the animation was invisible however hard it drove uYaw. */
-        /* `tip` leans a branded die back so its icon face catches the light
-           from above rather than staring flat out of the screen */
         var sp=new THREE.Quaternion().setFromEuler(
-          new THREE.Euler((d.uPit||0)+(d.tip||0),d.uYaw||0,0,'YXZ'));
-        d.obj.quaternion.copy(sp).multiply(D3X._isoQ(d.val));
+          new THREE.Euler(d.uPit||0,d.uYaw||0,0,'YXZ'));
+        d.obj.quaternion.copy(sp).multiply(rest);
         d.obj.userData.posed=-1;
       }else{
-        d.obj.quaternion.copy(D3X._isoQ(d.val));
-        d.obj.userData.posed=d.val;
+        d.obj.quaternion.copy(rest);
+        d.obj.userData.posed=d.top?-1:d.val;
       }
     });
     r.render(this.scene,this.cam);
@@ -28269,7 +28292,7 @@ function _stFocus(i){
     var deck='';
     var SLX=[13.3,27.8,42.3,56.8,71.3,85.8];/* the tray's six notch bays */
     (S.run.dice||[]).forEach(function(mt,ii){
-      deck+='<div class="stTSlot" data-i="'+ii+'" style="left:'+(SLX[ii]||50)+'%"><span class="d3chip" data-iso="1" data-mat="'+mt+'"></span></div>';
+      deck+='<div class="stTSlot" data-i="'+ii+'" style="left:'+(SLX[ii]||50)+'%"><span class="d3chip" data-iso="1" data-mat="'+mt+'" data-slot="'+ii+'"></span></div>';
     });
     row.innerHTML='<div class="cap">BUY \u2014 '+price+' \u00b7 drag onto the die it replaces</div>'
       +'<div class="tray"><img src="Art/Assets/Store/dice_row.png" alt="">'+deck+'</div>';
@@ -28365,7 +28388,7 @@ function _stFocus(i){
         if(commit&&ev.clientX>=r.left&&ev.clientX<=r.right&&ev.clientY>=r.top&&ev.clientY<=r.bottom)hit=el;
         el.classList.remove('hot');
       });
-      if(dragDie){dragDie.uYaw=0;dragDie.uPit=0;dragDie.noIdle=false;}
+      if(dragDie){dragDie.uYaw=0;dragDie.uPit=0;}
       if(hit){
         /* Fly the die INTO the slot it replaces, at the slot's own size, and
            only then hand over. It used to keep its drag transform for the
@@ -28373,7 +28396,10 @@ function _stFocus(i){
            the caption congratulated you. */
         try{
           var hr=hit.getBoundingClientRect();
-          var _sc=hr.width/(0.8*(stand.offsetWidth||1));
+          /* dragEnd, NOT a fresh ratio off the slot box: the slot is wider
+             than its chip and the focused die is drawn larger than a tray
+             one, so measuring again here made it land oversized */
+          var _sc=dragEnd;
           stand.style.transition='transform .26s cubic-bezier(.25,.9,.3,1),opacity .18s linear .22s';
           stand.style.transform='translate('+(((hr.left+hr.right)/2)-ncx).toFixed(1)+'px,'
             +(((hr.top+hr.bottom)/2)-ncy).toFixed(1)+'px) scale('+_sc.toFixed(3)+')';
@@ -28381,6 +28407,10 @@ function _stFocus(i){
         }catch(e){}
         _stTrade(mat,parseInt(hit.getAttribute('data-i'),10));return;
       }
+      /* only on the way HOME does the slow turn resume - it is the focused
+         die again there. Cleared before the commit branch, it restarted for
+         the whole flight into the rack. */
+      if(dragDie)dragDie.noIdle=false;
       stand.style.transition='transform .45s cubic-bezier(.3,1.2,.4,1)';
       stand.style.transform=focusTf;
     };
@@ -28600,34 +28630,16 @@ function _stEnchTap(k){
   var h='<img src="Art/Assets/Store/dice_row.png" alt="">';
   (S.run.dice||[]).forEach(function(mt,i){
     var en=S.run.dieEnch[i];
-    /* An already-branded die shows its BRAND: data-val turns the branded face
-       to the camera and sync() hands the ench to _mkDie, which paints the
-       icon onto it. The label goes back to the material - "worked" was a word
-       standing in for a picture the die can draw itself. */
+    /* data-slot is all it takes: sync() looks the brand up itself and rests
+       the die brand-up. "worked" was a word standing in for a picture the
+       die can draw, so the label goes back to the material. */
     h+='<div class="stPickDie'+(en?' taken':'')+'" data-i="'+i+'" style="left:'+(SLX[i]||50)+'%"'
-      +(en&&en.face?' data-val="'+en.face+'"':'')
       +(en?'':' onclick="_stEnchChoose('+i+')"')+'>'
-      +'<span class="d3chip" data-mat="'+mt+'" data-iso="1"'
-      +(en&&en.face?' data-val="'+en.face+'"':'')+'></span>'
+      +'<span class="d3chip" data-mat="'+mt+'" data-iso="1" data-slot="'+i+'"></span>'
       +'<span class="pdLbl">'+getDie(mt).name+'</span></div>';
   });
   row.innerHTML=h;
-  /* hand each branded chip its enchant before the scan builds the dice */
-  (S.run.dice||[]).forEach(function(mt,i){
-    var en=S.run.dieEnch[i];if(!en)return;
-    var c=row.querySelector('.stPickDie[data-i="'+i+'"] .d3chip');
-    if(c)c._ench=en;
-  });
   if(typeof _d3ChipScan==='function')try{_d3ChipScan(row);}catch(x){}
-  /* every already-branded die leans the same way the freshly-branded one
-     will, so the rack reads consistently rather than one die standing apart */
-  try{
-    (S.run.dice||[]).forEach(function(mt,ii){
-      if(!S.run.dieEnch[ii])return;
-      var c2=row.querySelector('.stPickDie[data-i="'+ii+'"] .d3chip');
-      (D3X.dice||[]).forEach(function(d){if(d.chip===c2)d.tip=-0.42;});
-    });
-  }catch(x){}
   var host=document.getElementById('gbShop');
   if(host)host.classList.add('st-epick');/* lifts #d3xCanvas over the scrim */
   box.classList.add('on');
@@ -28692,17 +28704,13 @@ function _stEnchChoose(i){
     if(el)el.classList.remove('spinning');
     if(el)el.classList.add('branded');
     if(chip){
-      /* rebuild this one die WITH its brand, turned to the branded face, so
-         the icon is on the side facing the player */
-      chip._ench={t:k,face:face};
-      if(face)chip.setAttribute('data-val',face);
+      /* the brand is already saved, and the chip names its slot, so throwing
+         the die away and re-syncing is enough to bring it back branded and
+         resting brand-up - no second copy of the state to keep in step */
       try{
         (D3X.dice||[]).slice().forEach(function(d){if(d.chip===chip)D3X._drop(d);});
         D3X.dice=(D3X.dice||[]).filter(function(d){return d.chip!==chip;});
         D3X.sync(document.getElementById('gbShop'));
-        /* lean it back so the branded face reads from above, in the light,
-           instead of staring flat out of the screen */
-        (D3X.dice||[]).forEach(function(d){if(d.chip===chip)d.tip=-0.42;});
       }catch(x){}
     }
     var lbl=el&&el.querySelector('.pdLbl');
