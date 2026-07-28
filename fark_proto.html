@@ -19096,8 +19096,8 @@ function updHUD(){
   var pEl=document.getElementById('pScore');
   var oEl=document.getElementById('oScore');
   var tpEl=document.getElementById('turnPts');
-  pEl.textContent=G.pPts.toLocaleString();
-  oEl.textContent=G.oPts.toLocaleString();
+  _tweenScore(pEl,G.pPts);
+  _tweenScore(oEl,G.oPts);
   tpEl.textContent=G.turnPts>0?'+'+G.turnPts.toLocaleString():'';
   /* Comeback feat tracking — flag the moment opponent is up by 50% target.
      If the player still wins after that, the Comeback feat awards renown. */
@@ -19636,35 +19636,40 @@ function spawnPop(txt,anchorEl){
   d.style.top=y+'px';
   document.body.appendChild(d);setTimeout(()=>d.remove(),850);
 }
-function spawnBankPop(total){
-  /* Big "+N" that flies from the dice row up to the player score in the HUD */
-  var diceRow=document.getElementById('playerDiceRow');
-  var diceArea=document.getElementById('diceArea');
-  var pScoreEl=document.getElementById('pScore');
-  /* Align X with the player score element so it looks like it's adding to it */
-  var endRect=pScoreEl?pScoreEl.getBoundingClientRect():null;
-  var rowRect=diceRow?diceRow.getBoundingClientRect():(diceArea||document.body).getBoundingClientRect();
-  var startX=endRect?Math.round(endRect.left+endRect.width/2):60;
-  var startY=rowRect.top+rowRect.height/2;
-  var travelY=endRect?(endRect.top+endRect.height/2-startY):-Math.round(startY*0.6);
-  var el=document.createElement('div');
-  el.className='spop-bank';
-  el.textContent='+'+total.toLocaleString();
-  el.style.left=startX+'px';
-  el.style.top=startY+'px';
-  document.body.appendChild(el);
-  /* Position: chunky pixel steps */
-  el.animate(
-    [{transform:'translateX(-50%) translateY(0)'},
-     {transform:'translateX(-50%) translateY('+travelY+'px)'}],
-    {duration:620,easing:'steps(14,end)',fill:'forwards'}
-  );
-  /* Opacity: smooth linear fade, starts at 30% of the journey */
-  el.animate(
-    [{opacity:1},{opacity:1,offset:0.3},{opacity:0}],
-    {duration:620,easing:'linear',fill:'forwards'}
-  );
-  setTimeout(function(){el.remove();},640);
+/* RETIRED (playtest): the big "+N" used to fly from the dice row up to the
+   player's score. The count-up on the flag now carries that beat on its own,
+   and the two together read as the same number being announced twice. Kept
+   as a no-op rather than deleted so the three call sites stay honest about
+   where a bank lands - and so re-enabling it is one edit, not four. */
+function spawnBankPop(total){}
+/* Roll the flag number up to its new value instead of snapping. Reads the
+   number it is currently SHOWING rather than the last target, so a bank that
+   lands mid-tween continues from what the eye can see instead of jumping
+   back. updHUD runs constantly, so an unchanged score costs one compare. */
+function _tweenScore(el,to){
+  if(!el)return;
+  to=to||0;
+  /* Already on its way to this number? Leave it alone. updHUD runs on every
+     meaningful state change - which during a roll is every frame - and
+     cancel-and-restart on each call reset the tween before it could advance
+     a single step, so the number sat at its old value and then snapped. */
+  if(el._tw&&el._to===to)return;
+  var from=parseInt(String(el.textContent||'0').replace(/[^0-9-]/g,''),10);
+  if(!isFinite(from))from=to;
+  if(from===to){if(el._tw){cancelAnimationFrame(el._tw);el._tw=0;}
+    el._to=to;el.textContent=to.toLocaleString();return;}
+  if(el._tw)cancelAnimationFrame(el._tw);
+  el._to=to;
+  var t0=null,dur=Math.min(750,200+Math.abs(to-from)*0.55);
+  var step=function(now){
+    if(t0===null)t0=now;
+    var k=Math.min(1,(now-t0)/dur);
+    var e=1-Math.pow(1-k,3);/* ease-out: fast off the mark, settles gently */
+    el.textContent=Math.round(from+(to-from)*e).toLocaleString();
+    if(k<1)el._tw=requestAnimationFrame(step);
+    else{el._tw=0;el.textContent=to.toLocaleString();}
+  };
+  el._tw=requestAnimationFrame(step);
 }
 /* ── Big bank celebration ── */
 function _bankCelebrate(amount){
