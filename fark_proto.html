@@ -12045,6 +12045,24 @@ function famOfferHtml(offer,pickFn,declineGold){
       badge:(o.upgrade?'UPGRADE':null)});
   });
   h+='</div>';
+  /* what the player already holds, under the offer. Three cards is the cap,
+     so the empty ones show as slot outlines rather than as nothing - the
+     player needs to see "I have room" as clearly as "I have these". */
+  _getS();S.run.fcards=S.run.fcards||[];
+  h+='<div style="font-size:11px;letter-spacing:2px;color:#999;margin:12px 0 6px">YOUR DECK</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">';
+  for(var _s=0;_s<3;_s++){
+    var _c=S.run.fcards[_s];
+    if(_c){
+      var _cd=famDef(_c.id);
+      h+='<div style="cursor:pointer" onclick="famCardSheet(\''+_c.id+'\','+_c.tier+')">'
+        +famCardArt(_c.id,_c.tier,{tierAlways:(_cd&&_cd.fam!=='tavern')})+'</div>';
+    }else{
+      h+='<div style="aspect-ratio:911/1298;border:1px dashed #554;border-radius:6px;'
+        +'display:flex;align-items:center;justify-content:center;color:#554;font-size:20px">+</div>';
+    }
+  }
+  h+='</div>';
   if(declineGold!=null){
     h+='<div onclick="famDraftDecline()" style="cursor:pointer;margin-top:9px;padding:8px;'
       +'border:1px dashed #776;color:#dc5;text-align:center">DECLINE — TAKE '+declineGold+'g</div>';
@@ -12156,8 +12174,19 @@ function famSpoilsPick(kind){
   if(rc)rc.innerHTML='<div style="font-family:monospace;color:#dc5;padding:30px 10px;text-align:center">'+msg+'</div>';
   _famEndReady();
 }
+/* What declining a card is worth. Tied to the purse the player just won
+   rather than to the tier alone, so it stays a real choice against the card
+   at every stage of a run - and so handicap/double-stakes matches, which pay
+   double, also make declining worth more. The old flat tier formula is the
+   floor, never the whole answer. */
+function _famDeclineGold(){
+  _getS();
+  var base=5+((S.run.tier||0)+1)*5;
+  var won=S.run._lastWinGold||0;
+  return Math.max(base,Math.round(won*0.75));
+}
 function famDraftDecline(){
-  _getS();var g=5+((S.run.tier||0)+1)*5;
+  _getS();var g=_famDeclineGold();
   S.run.gold=(S.run.gold||0)+g;save();
   var rc=document.querySelector('#end-ov .res-card')||document.getElementById('resCard');
   if(rc)rc.innerHTML='<div style="font-family:monospace;color:#dc5;padding:30px 10px;text-align:center">DECLINED — +'+g+'g</div>';
@@ -24435,7 +24464,11 @@ function endMatch(win){
   }
   else if(win&&!isBoss){
     _famOffer=famOffer(false);
-    var _dg=5+((S.run.tier||0)+1)*5;
+    /* hand the purse forward: _patronGold is a local of endMatch, and
+       famDraftDecline runs later, on a tap, in another frame. Stashed here
+       rather than at the payout above so it captures the arrears fold too. */
+    _getS();S.run._lastWinGold=_patronGold;save();
+    var _dg=_famDeclineGold();
     if(resCard){resCard.innerHTML=famOfferHtml(_famOffer,'famDraftPick',_dg);resCard.classList.add('show');}
     if(endBtns)endBtns.style.display='none';
   }
