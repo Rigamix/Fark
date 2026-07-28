@@ -836,13 +836,14 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 @keyframes stEnchBob{
   0%,100%{transform:translateY(0) rotate(0deg)}
   50%{transform:translateY(-1.5%) rotate(.5deg)}}
-/* Four one-pixel drop-shadows in the rim colour = a thin outline that follows
-   the icon's alpha. Static, and .stEnchBod is a promoted layer, so this bakes
-   once rather than re-filtering under the sway. */
+/* NO filter here. The dark ring is baked into the PNG by
+   tools/build_ench_store_icons.py instead, for two reasons: four chained drop-shadows on an <img> that sits
+   inside a will-change layer which ITSELF carries a drop-shadow get
+   rasterised at the layer's resolution rather than the device's, which is
+   what kept these looking soft after the resampling fix - and it is four
+   filters per icon, times eight, on every frame of the sway. */
 .stEnchIcon{position:absolute;left:50%;top:33%;transform:translate(-50%,-50%);
-  width:56%;height:auto;image-rendering:auto;pointer-events:none;
-  filter:drop-shadow(0.13cqw 0 0 #1a1008) drop-shadow(-0.13cqw 0 0 #1a1008)
-         drop-shadow(0 0.13cqw 0 #1a1008) drop-shadow(0 -0.13cqw 0 #1a1008)}
+  width:58%;height:auto;image-rendering:auto;pointer-events:none}
 /* a 1px dark-brown line round the lettering, four offsets rather than a
    text-stroke: at this size a stroke fattens the glyphs and closes up the
    counters, while offset shadows keep the letterform and just edge it. The
@@ -1096,6 +1097,9 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 #gbShop.st-focus #stHud,#gbShop.st-focus .stNavBtn{opacity:0;pointer-events:none}
 #stHud,#loHud{transition:opacity .3s}
 #gbShop.st-focus #stFocusPanel{opacity:1;pointer-events:auto;transform:none;transition-delay:.18s}
+/* the shop's panel rides higher than the loadout's: it has a tray and a close
+   button below it to clear, which the others do not */
+#gbShop #stFocusPanel{top:44%}
 #stFocusPanel .fname,#loFocusPanel .fname,#ptFocusPanel .fname{
   position:absolute;left:0;right:0;top:-41cqh;font-size:6.4cqh !important}
 .fname .sheenTxt{position:absolute;left:0;right:0;top:0;color:transparent;pointer-events:none;
@@ -1130,7 +1134,9 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
   white-space:nowrap;max-width:72%;overflow:visible;text-align:center;
   color:#f7ecd2;text-shadow:0 2px 0 rgba(16,9,3,.85),0 4px 10px rgba(0,0,0,.55);transform:translateY(-4%)}
 #stBuyBtn.off span{font-size:2.1cqh}
-#stTradeRow{position:absolute;left:4%;right:4%;bottom:calc(env(safe-area-inset-bottom,0px) + 2.2cqh);
+/* lifted to leave room for the close underneath - it used to sit on the
+   bottom edge with the close stranded above it */
+#stTradeRow{position:absolute;left:4%;right:4%;bottom:calc(env(safe-area-inset-bottom,0px) + 12cqh);
   z-index:56;opacity:0;pointer-events:none;transform:translateY(4%);transition:opacity .4s,transform .4s}
 #gbShop.st-focus #stTradeRow{opacity:1;pointer-events:auto;transform:none;transition-delay:.18s}
 #stTradeRow .cap{text-align:center;font-family:'JMH Beda',serif;font-size:2.2cqh;color:#ffd98a;
@@ -1147,6 +1153,15 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 .stTSlot .d3chip{width:78%;aspect-ratio:1;display:block;pointer-events:none}
 #stBackBtn,#loFBack,#ptFBack{position:relative;width:19%;margin:3cqh auto 0;cursor:pointer;transition:transform .1s}
 #stBackBtn:active,#loFBack:active,#ptFBack:active{transform:scale(.9)}
+/* pinned under the tray instead of trailing the description. The :active
+   below RESTATES the centring translate - the shared rule above sets
+   `transform` outright, and a bare scale() would drop the -50% and throw the
+   button half its width to the right. */
+#stBackBtn{position:absolute;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 1.4cqh);
+  transform:translateX(-50%);width:14%;margin:0;z-index:57;
+  opacity:0;pointer-events:none;transition:opacity .4s}
+#gbShop.st-focus #stBackBtn{opacity:1;pointer-events:auto;transition-delay:.18s}
+#stBackBtn:active{transform:translateX(-50%) scale(.9)}
 #stBackBtn img,#loFBack img,#ptFBack img{width:100%;display:block;pointer-events:none}
 .stNavBtn.L{left:4%}
 .stNavBtn.R{right:4%}
@@ -28104,6 +28119,16 @@ function _stFocus(i){
     (document.getElementById('stStage')||gb).appendChild(scrim);}
   var pan=document.getElementById('stFocusPanel');
   if(!pan){pan=document.createElement('div');pan.id='stFocusPanel';gb.appendChild(pan);}
+  /* The close lives on the SHOP, not inside the panel. As a panel child its
+     `bottom` resolved against the panel box - which ends just under the
+     description - so it sat mid-screen above the tray however it was styled. */
+  var back=document.getElementById('stBackBtn');
+  if(!back){
+    back=document.createElement('div');back.id='stBackBtn';
+    back.onclick=_stUnfocus;
+    back.innerHTML='<img src="Art/Assets/Icons/close.png" alt="close">';
+    gb.appendChild(back);
+  }
   var acc=_accG;
   var _nm=String(dt.name||mat);_nm=_nm.charAt(0).toUpperCase()+_nm.slice(1).toLowerCase();_nm=_nm.replace(/\b(i{1,3}|iv|v|vi{0,3})$/i,function(m){return m.toUpperCase();});
   var nbh=function(t){return String(t).replace(/[\w]+(?:-[\w]+)+/g,function(m){return '<span style="white-space:nowrap">'+m+'</span>';});};
@@ -28113,12 +28138,14 @@ function _stFocus(i){
     +(afford
       ?''
       :'<div id="stBuyBtn" class="off"><img class="plq" src="Art/Assets/Buttons/Button_new_02.png" alt=""><span>'+price+' \u2014 NOT ENOUGH</span></div>')
-    +'<div id="stBackBtn" onclick="_stUnfocus()"><img src="Art/Assets/Icons/close.png" alt="close"></div>';
+    ;
   var gr=gb.getBoundingClientRect(),nr2=stand.getBoundingClientRect();
   var K=2.3;
   var ncx=nr2.left+nr2.width/2,ncy=nr2.top+nr2.height/2;
   var dx=(gr.left+gr.width/2)-ncx;
-  var dy=(gr.top+gr.height*0.42)-ncy;
+  /* 0.33, not 0.42: the focused die has to sit higher than the middle now
+     that the tray and the close button both live below the description. */
+  var dy=(gr.top+gr.height*0.33)-ncy;
   stand.style.transition='transform .55s cubic-bezier(.3,1.35,.35,1)';
   stand.style.transform='translate('+dx+'px,'+dy+'px) scale('+K+')';
   stand.classList.add('zoom');
