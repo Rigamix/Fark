@@ -19025,6 +19025,33 @@ function drawTierBtn(id){
 function drawAllTierBtns(){
   ['tierStandard','tierHandicap','tierBossBtn'].forEach(function(id){drawTierBtn(id);});
 }
+/* What BANK would actually pay, right now. Two things made the old
+   expression - turnPts + _selPts() - promise wins it could not deliver:
+
+   1. It counted the live selection TWICE. refreshSelUI folds the preview
+      points into G.turnPts and only then calls setBtns, so turnPts already
+      includes them; adding _selPts() on top lit BANK TO WIN a whole
+      selection early.
+   2. It ignored the tells that rewrite the bank at the last moment. THE
+      RECKONING zeroes a bank that falls under the rival's last one, so the
+      button could promise a win on a bank of nothing. Steeped goes the
+      other way and was being under-promised.
+
+   The match brief is explicit that BANK must display the exact amount it
+   would bank, rule adjustments included - so the caption reads from this
+   too, not just the win test. */
+function _projectedBank(){
+  if(!G)return 0;
+  var t=(G.turnPts||0);
+  try{
+    if(G._tell){
+      if(G._tell.id==='steeped'&&G._tellState&&G._tellState.bonus>0)t+=G._tellState.bonus;
+      if(typeof _ruleActive==='function'&&_ruleActive('reckoning','p')
+         &&G._tellState&&G._tellState.lastNpcBank>0&&t<G._tellState.lastNpcBank)return 0;
+    }
+  }catch(e){}
+  return t;
+}
 function setBtns(r,b){
   var rollBtn=document.getElementById('btnRoll');
   var bankBtn=document.getElementById('btnBank');
@@ -19033,8 +19060,8 @@ function setBtns(r,b){
      primary weight and says so — the win tap must be unmissable. */
   try{
     var _verb=document.getElementById('bankVerb'),_cap=document.getElementById('bankCap');
-    var _bpts=(G?(G.turnPts||0)+(typeof _selPts==='function'?_selPts():0):0);
-    var _wins=!!(G&&b&&(G.pPts+_bpts)>=G.target);
+    var _bpts=_projectedBank();
+    var _wins=!!(G&&b&&_bpts>0&&(G.pPts+_bpts)>=G.target);
     bankBtn.classList.toggle('bank-to-win',_wins);
     if(_verb)_verb.textContent=_wins?'BANK TO WIN':'BANK';
     if(_cap)_cap.textContent=(b&&_bpts>0)?('+'+_bpts.toLocaleString()):'';
