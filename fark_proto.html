@@ -797,7 +797,7 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 /* ─── ENCHANTS TAB ─── */
 #stEnchGrid{position:absolute;inset:0;pointer-events:none;z-index:6}
 .stEnch{position:absolute;width:19%;aspect-ratio:221/414;pointer-events:auto;cursor:pointer;
-  animation:stEnchIn .72s cubic-bezier(.22,.9,.28,1) backwards}
+  animation:stEnchIn 1.05s cubic-bezier(.17,.75,.25,1) backwards}
 /* The float-in and the idle sway are on DIFFERENT elements on purpose: both
    animate `transform`, and a second animation on the same element replaces
    the first outright rather than composing with it. */
@@ -817,27 +817,37 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 /* up from under the counter, overshoot, settle. 300% of a panel's own height
    clears the bottom of the frame from either row, and #gbShop is
    overflow:hidden so the start of the travel is genuinely off-screen. */
+/* Up from under the counter and DRIFTING to a stop. The old curve had three
+   reversals in 0.72s, which at this size read as a snap; one long ease with a
+   single soft overshoot reads as weight instead. No rotation here on purpose:
+   the resting tilt belongs to .stEnchBod, so the two never write `transform`
+   on the same element. */
 @keyframes stEnchIn{
-  0%{opacity:0;transform:translateY(300%) rotate(-5deg)}
-  45%{opacity:1}
-  72%{transform:translateY(-7%) rotate(2deg)}
-  86%{transform:translateY(3%) rotate(-.8deg)}
-  94%{transform:translateY(-1.2%) rotate(.3deg)}
-  100%{opacity:1;transform:translateY(0) rotate(0deg)}}
-@keyframes stEnchBob{0%,100%{transform:translateY(0) rotate(0deg)}
-                     50%{transform:translateY(-1.4%) rotate(.55deg)}}
+  0%{opacity:0;transform:translateY(260%)}
+  40%{opacity:1}
+  82%{transform:translateY(-2.2%)}
+  100%{opacity:1;transform:translateY(0)}}
+/* The resting tilt is folded INTO the sway rather than set separately: this
+   element's transform belongs to the animation, so a static rotate would be
+   overwritten. --tilt is stamped per panel by the builder. */
+@keyframes stEnchBob{
+  0%,100%{transform:translateY(0) rotate(var(--tilt,0deg))}
+  50%{transform:translateY(-1.5%) rotate(calc(var(--tilt,0deg) + .5deg))}}
 .stEnchIcon{position:absolute;left:50%;top:33%;transform:translate(-50%,-50%);
   width:56%;height:auto;image-rendering:auto;pointer-events:none}
-.stEnchName{position:absolute;left:5%;right:5%;top:56%;text-align:center;pointer-events:none;
-  font-family:'JMH Beda',serif;font-size:3.0cqw;letter-spacing:.04em;color:#f2e2be;
+.stEnchName{position:absolute;left:4%;right:4%;top:55%;text-align:center;pointer-events:none;
+  font-family:'JMH Beda',serif;font-size:3.7cqw;letter-spacing:.02em;color:#f2e2be;
   text-shadow:0 0.25cqw 0 rgba(24,12,4,.8);line-height:.98}
 /* the one name that will not fit on a plaque this wide */
-.stEnchName.two{top:52%;font-size:2.7cqw}
-/* right of the coin the tag already has painted at x 18-33% */
-.stEnchPrice{position:absolute;left:38%;right:8%;top:89%;transform:translateY(-50%);
+.stEnchName.two{top:50%;font-size:3.3cqw}
+/* Clear of the coin the tag has painted at x 18-33%, but centred on what is
+   left rather than shoved against the right edge. Same cream as the dice
+   side's .stPrice, so both halves of the shop price things alike. */
+.stEnchPrice{position:absolute;left:24%;right:9%;top:88.5%;transform:translateY(-50%);
   text-align:center;pointer-events:none;
-  font-family:'JMH Beda',serif;font-size:3.2cqw;color:#3a2410;white-space:nowrap}
-.stEnch.dim .stEnchPrice{color:#6b5a44}
+  font-family:'JMH Beda',serif;font-size:3.6cqw;color:#f0e3c6;letter-spacing:.05em;
+  text-shadow:0 0.22cqw 0 rgba(24,12,4,.75);white-space:nowrap}
+.stEnch.dim .stEnchPrice{color:#8d7c60}
 /* the die picker that opens on a tap */
 #stEnchPick{position:absolute;inset:0;z-index:40;display:none;
   background:rgba(10,6,3,.72);backdrop-filter:blur(2px)}
@@ -850,8 +860,11 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
   letter-spacing:.04em;margin-bottom:.6cqw}
 #stEnchPickSub{font-family:'JMH Beda',serif;font-size:2.6cqw;color:#c0a67e;text-align:center;
   margin-bottom:2.4cqw}
-#stEnchPickRow{display:flex;flex-wrap:wrap;gap:2.4cqw;justify-content:center}
-.stPickDie{width:17%;aspect-ratio:1;position:relative;cursor:pointer;
+/* a loadout is six dice: they go on ONE line, or the row reads as two
+   unrelated groups */
+#stEnchPickRow{display:flex;flex-wrap:nowrap;gap:2cqw;justify-content:center;
+  padding-bottom:4cqw}
+.stPickDie{width:13.5%;aspect-ratio:1;position:relative;cursor:pointer;
   display:flex;align-items:center;justify-content:center;
   transition:transform .14s}
 .stPickDie:active{transform:scale(.92)}
@@ -887,7 +900,7 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 #stTabStrip{position:absolute;left:6%;right:6%;top:41%;height:10%;z-index:5;
   touch-action:none;cursor:pointer}
 #stGoods{position:absolute;inset:0;pointer-events:none}
-.stStand{position:absolute;width:18%;aspect-ratio:1;display:flex;align-items:center;
+.stStand{position:absolute;width:15.5%;aspect-ratio:1;display:flex;align-items:center;
   justify-content:center;pointer-events:auto;cursor:pointer}
 .stStand .d3chip{width:80%;aspect-ratio:1;display:block;margin:0 auto}
 .stPrice{position:absolute;pointer-events:auto;cursor:pointer;
@@ -1490,6 +1503,10 @@ html.fk3d #screen-match .die-wrap:has(.die.d3on.selected)::after{
 #ptPanelSheet #d3xCanvas{z-index:2}
 #ptPanelSheet.pt-focus #d3xCanvas{z-index:55}
 #gbShop.st-focus #d3xCanvas,#gbLoadout.lo-focus #d3xCanvas{z-index:60}
+/* the die picker covers the shop at z-40, and the 3D canvas has to come up
+   with it or every chip in it renders behind the scrim - which is exactly
+   what "the overlay is broken" looked like: labels, no dice. */
+#gbShop.st-epick #d3xCanvas{z-index:60}
 /* ═══ PROTO GREYBOX SKIN ═══ */
 @media (min-width:520px){
   body.phone-framed{background:#222 !important;display:flex;align-items:center;justify-content:center;min-height:100vh}
@@ -27950,7 +27967,10 @@ function _gbShop(fresh){
     var mat=stock[i];
     if(!mat)continue;
     var price=_dicePrice(mat),afford=(S.run.gold||0)>=price,has=owned.indexOf(mat)>=0;
-    goods+='<div class="stStand" id="stStand'+i+'" data-mat="'+mat+'" style="left:'+(STANDS[i][0]-9).toFixed(1)+'%;top:'+(STANDS[i][1]-5.1).toFixed(1)+'%"'
+    /* -7.75 centres the narrower stand on the same painted spot; -8.4 lifts
+       the die off the counter line so it sits ON the wood rather than in it.
+       The price tags do NOT move - they are anchored to painted tag ink. */
+    goods+='<div class="stStand" id="stStand'+i+'" data-mat="'+mat+'" style="left:'+(STANDS[i][0]-7.75).toFixed(1)+'%;top:'+(STANDS[i][1]-8.4).toFixed(1)+'%"'
       +' onclick="SFX.nav();_stFocus('+i+')">'
       +'<span class="d3chip" data-iso="1" data-mat="'+mat+'"></span></div>'
       +'<div class="stPrice'+(afford?'':' dim')+'" style="left:'+TAGS[i][0].toFixed(1)+'%;top:'+TAGS[i][1].toFixed(1)+'%"'
@@ -28233,7 +28253,7 @@ function _wardOwned(skipIdx){
 var ENCH_GRID=['tithe','ward','snare','break','trade','snuff','fog','quicksilver'];
 var ENCH_ICON_DIR='Art/Assets/Enchants/storeIcons/';
 /* names that do not fit a plaque on one line, broken where they read best */
-var ENCH_LABEL={quicksilver:'QUICK<br>SILVER'};
+var ENCH_LABEL={quicksilver:'Quick<br>silver'};
 function _enchShopHTML(){
   _getS();_enchInit();
   var gold=(S.run&&S.run.gold)||0;
@@ -28241,20 +28261,27 @@ function _enchShopHTML(){
      because the stage keeps the canvas aspect; 19% wide lands the two rows
      inside y 49-91%, which is the counter plus a little overhang. */
   var COLS=[4.5,28.5,52.5,76.5], ROWS=[49,71];
+  /* Hung by hand, not hung on a grid: a fixed per-panel nudge and lean, so
+     the wall reads as eight separate plaques rather than a spreadsheet.
+     Deterministic and not random - a repaint (buying a brand repaints the
+     shop) would otherwise reshuffle the whole wall under the player. */
+  var JIT=[[ 0.0, 0.0,-1.6],[ 1.4,-1.3, 1.1],[-1.1, 1.5,-0.7],[ 0.9, 0.4, 2.0],
+           [-1.4, 1.1, 1.4],[ 0.6,-0.9,-1.9],[ 1.5, 1.4, 0.8],[-0.8,-0.4,-1.2]];
   var h='<div id="stEnchGrid">';
   ENCH_GRID.forEach(function(k,n){
     var e=_enchDef(k); if(!e)return;
     var afford=gold>=e.price;
     var owned=(k==='ward')&&_wardOwned(-1);
     var dis=(!afford||owned);
-    var L=COLS[n%4], T=ROWS[n>>2];
-    h+='<div class="stEnch'+(dis?' dim':'')+'" style="left:'+L+'%;top:'+T+'%;'
-      +'animation-delay:'+(60+n*55)+'ms"'
+    var j=JIT[n]||[0,0,0];
+    var L=COLS[n%4]+j[0], T=ROWS[n>>2]+j[1];
+    h+='<div class="stEnch'+(dis?' dim':'')+'" style="left:'+L.toFixed(2)+'%;top:'+T.toFixed(2)+'%;'
+      +'animation-delay:'+(60+n*70)+'ms"'
       +(dis?'':' onclick="SFX.nav();_stEnchTap(\''+k+'\')"')+'>'
-      +'<div class="stEnchBod" style="animation-delay:'+(n*430)+'ms">'
+      +'<div class="stEnchBod" style="--tilt:'+j[2]+'deg;animation-delay:'+(n*430)+'ms">'
         +'<img class="stEnchIcon" src="'+ENCH_ICON_DIR+k+'.png" alt="">'
         +'<div class="stEnchName'+(ENCH_LABEL[k]?' two':'')+'">'
-          +(ENCH_LABEL[k]||e.name.toUpperCase())+'</div>'
+          +(ENCH_LABEL[k]||e.name)+'</div>'
         +'<div class="stEnchPrice">'+e.price+'</div>'
       +'</div></div>';
   });
@@ -28316,11 +28343,15 @@ function _stEnchTap(k){
   });
   row.innerHTML=h;
   if(typeof _d3ChipScan==='function')try{_d3ChipScan(row);}catch(x){}
+  var host=document.getElementById('gbShop');
+  if(host)host.classList.add('st-epick');/* lifts #d3xCanvas over the scrim */
   box.classList.add('on');
 }
 function _stEnchPickClose(){
   var b=document.getElementById('stEnchPick');
   if(b)b.classList.remove('on');
+  var host=document.getElementById('gbShop');
+  if(host)host.classList.remove('st-epick');
   _stEnchK=null;
 }
 /* the die spins, then the brand lands on whatever face came up */
