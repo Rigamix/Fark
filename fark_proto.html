@@ -1164,8 +1164,10 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 .rbClip{position:absolute;top:0;bottom:0;width:50%;overflow:hidden;container-type:size;z-index:2}
 .rbClip.o{left:0}
 .rbClip.p{right:0}
-#screen-match #oProg{position:absolute;left:0;top:0;bottom:0;width:0%;overflow:hidden;background:none;border-radius:0}
-#screen-match #pProg{position:absolute;right:0;top:0;bottom:0;width:0%;overflow:hidden;background:none;border-radius:0}
+#screen-match #oProg{position:absolute;left:0;top:0;bottom:0;width:26.82%;overflow:hidden;background:none;border-radius:0;
+  transition:width .45s cubic-bezier(.25,.9,.3,1)}
+#screen-match #pProg{position:absolute;right:0;top:0;bottom:0;width:26.82%;overflow:hidden;background:none;border-radius:0;
+  transition:width .45s cubic-bezier(.25,.9,.3,1)}
 #oProg img{position:absolute;left:0;top:0;width:200cqw;height:100cqh;max-width:none}
 #pProg img{position:absolute;right:0;top:0;width:200cqw;height:100cqh;max-width:none}
 /* centred in the diamond: the plate spans y 0-53.3% of the canvas, so its
@@ -1301,13 +1303,22 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 /* the kept line: smaller dice, close together, and the turn total under it */
 /* down and to the left, off the throwing line entirely - the reference has
    them tucked in the bottom corner with the turn total under them */
-#screen-match .kept-zone{padding-top:11cqw;padding-left:7cqw}
+#screen-match .kept-zone{padding-top:19cqw;padding-left:6cqw}
 /* A flex gap cannot go negative, and it has to: the 3D die is drawn at 0.77
    of its DOM box, so touching boxes still leave a third of a die of air.
    Overlap the boxes instead - Denis wants a tight line. */
-#screen-match .kept-row{min-height:9cqw}
-#screen-match .kept-row .die-wrap+.die-wrap{margin-left:-1.1cqw}
-#screen-match .kept-row .die{width:8.6cqw;height:8.6cqw}
+/* a COLUMN now: the throwing line's old spot stays empty and the kept dice
+   read as a stack down the side. The negative margin goes vertical with it -
+   a flex gap cannot be negative, and it has to be, because the 3D die is
+   drawn at 0.77 of its DOM box so touching boxes still leave a third of a
+   die of air between them. */
+#screen-match .kept-row{flex-direction:column;align-items:center}
+/* -1.9cqw, not -1.1: a full six-die column cleared the buttons by only 7px
+   at the design viewport, which a shorter screen would eat. This keeps the
+   line low AND compact - 18% overlap still leaves every face readable, which
+   the match brief requires (players track curses and Preserve by looking). */
+#screen-match .kept-row .die-wrap+.die-wrap{margin-left:0;margin-top:-1.9cqw}
+#screen-match .kept-row .die{width:10.4cqw;height:10.4cqw}
 #screen-match .kept-total{font-size:5.2cqw;margin-top:0.6cqw;margin-left:0.6cqw}
 /* a kept die is out of play: no tap pop, no float, no selection anything */
 #screen-match .kept-row .die{cursor:default!important;animation:none!important}
@@ -2196,7 +2207,7 @@ html.fk3d #screen-match .die-wrap:has(.die.d3on.selected)::after{
 
 /* ─── DEAD AIR: match-point hush ─── */
 #screen-match.dead-air::after{
-  content:'';position:fixed;inset:0;pointer-events:none;z-index:80;
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:6;
   background:radial-gradient(ellipse at 50% 58%, transparent 36%, rgba(0,0,0,.5) 100%);
   animation:deadAirIn 1.8s ease-out forwards;
 }
@@ -8243,8 +8254,10 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
   <div id="raceWrap">
     <!-- four layers on one 3795x950 canvas, so they register themselves -->
     <img class="rb" src="Art/Assets/Match/ScoreBar_new.png" alt="">
-    <div class="rbClip o"><div class="prog-fill o" id="oProg" style="width:0%"><img src="Art/Assets/Match/ScoreBar_new_fill.png" alt=""></div></div>
-    <div class="rbClip p"><div class="prog-fill p" id="pProg" style="width:0%"><img src="Art/Assets/Match/ScoreBar_new_fill.png" alt=""></div></div>
+    <!-- 26.82% is empty, not zero: it is where the clip edge reaches the
+         first painted column of the fill art. -->
+    <div class="rbClip o"><div class="prog-fill o" id="oProg" style="width:26.82%"><img src="Art/Assets/Match/ScoreBar_new_fill.png" alt=""></div></div>
+    <div class="rbClip p"><div class="prog-fill p" id="pProg" style="width:26.82%"><img src="Art/Assets/Match/ScoreBar_new_fill.png" alt=""></div></div>
     <div class="rbFlag rbFlagL" onclick="showBankSummary('o')" title="Tap for rival bank history"><img src="Art/Assets/Match/ScoreBar_new_portraits_left.png" alt=""></div>
     <div class="rbFlag rbFlagR" onclick="showBankSummary('p')" title="Tap for bank history"><img src="Art/Assets/Match/ScoreBar_new_portraits_right.png" alt=""></div>
     <img class="rb rbCentre" src="Art/Assets/Match/ScoreBar_new_centre.png" alt="">
@@ -17020,7 +17033,11 @@ var D3X={
      the texture has been flattened toward grey. At 0.11 a bone die lands at
      0.125 against its normal 0.160 - slightly less colourful than in the
      light, which is what shadow does - and amber drops 0.755 -> 0.203. */
-  TRAY:{sat:0.10, tint:[0.58,0.552,0.516], lum:0.55, ms:440},
+  /* Baked into a copy of the die's texture, not a CSS filter - the kept dice
+     are drawn on the WebGL canvas, so a DOM filter would reach nothing.
+     Eased off per playtest: lum 0.55->0.72 darkens less, sat 0.10->0.30
+     keeps more of the material's own colour. */
+  TRAY:{sat:0.30, tint:[0.58,0.552,0.516], lum:0.72, ms:440},
   /* remember where a die is on screen before its DOM slot moves out from
      under it, so the drop has something to animate FROM */
   toTray:function(el){
@@ -19014,8 +19031,13 @@ function updHUD(){
     var _lcTgt=document.getElementById('targetScore');
     if(_lcTgt){_lcTgt.textContent=G.target.toLocaleString();_lcTgt.classList.add('lc-target');}
   }
-  document.getElementById('pProg').style.width=Math.min(100,G.pPts/G.target*100)+'%';
-  document.getElementById('oProg').style.width=Math.min(100,G.oPts/G.target*100)+'%';
+  /* onto the PAINTED band, not the whole clip - see the geometry note in
+     docs/PROTO_NOTES.md. f=0 must still show bare bar, so the floor is the
+     26.82% that gets the clip edge to where the art actually starts. */
+  var _pf=Math.max(0,Math.min(1,G.target?G.pPts/G.target:0));
+  var _of=Math.max(0,Math.min(1,G.target?G.oPts/G.target:0));
+  document.getElementById('pProg').style.width=(26.82+70.83*_pf).toFixed(2)+'%';
+  document.getElementById('oProg').style.width=(26.82+72.78*_of).toFixed(2)+'%';
   /* ── Escalation VFX ── */
   if(G.target){
     var pPct=G.pPts/G.target,oPct=G.oPts/G.target;
