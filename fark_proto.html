@@ -16652,7 +16652,7 @@ var D3X={
        sliding the last few pixels home. */
     var fin=[],rest2=[];
     for(var r1=0;r1<N;r1++){
-      fin.push({x:END[r1].x,y:END[r1].y});
+      fin.push({x:END[r1].x,y:END[r1].y,z:END[r1].z});
       rest2.push({x:END[r1].x,i:r1});
     }
     rest2.sort(function(a,b){return a.x-b.x;});
@@ -16769,6 +16769,22 @@ var D3X={
       relax(edge);
     }
     node.forEach(function(n4){if(!n4.fix)want[n4.i]=n4.x;});
+    /* LOADOUT ORDER, not landing order. The relax above spaces the row out
+       well, but it spaces it in whatever order the sim left the dice in:
+       rest2 is sorted by resting x and node inherits that, so a die that
+       crossed a neighbour mid-flight gets tidily spaced INTO the crossed
+       order and the crossing survives to the table. Slot 1 has to land
+       leftmost (match brief section 9), so the relax's x VALUES are kept -
+       they are the well-spaced part - and handed back to the dice sorted by
+       lane instead. Crossings stop being unlikely and become impossible. */
+    (function(){
+      var moving=node.filter(function(n){return !n.fix;});
+      if(moving.length<2)return;
+      var xs=moving.map(function(n){return n.x;}).sort(function(a,b){return a-b;});
+      var idx=moving.map(function(n){return n.i;})
+        .sort(function(a,b){return (slotX[a]||0)-(slotX[b]||0);});
+      for(var j=0;j<idx.length;j++)want[idx[j]]=xs[j];
+    })();
     /* a die that came to rest ON a kept die is put back on the table; the
        relax above has already moved it clear in x, so it reads as sliding
        off rather than sinking through */
@@ -16781,6 +16797,16 @@ var D3X={
        the collision box is built at HALF*0.96. */
     var wantY=[];
     for(var y1=0;y1<N;y1++)wantY[y1]=HALF*0.96;
+    /* y was already pinned for every die, so it contributes no scatter - but
+       z never was, and on a table seen from above z IS the visible up-down.
+       That is the jitter that made the row look ragged even when the gaps
+       were right. Settle on the MEAN of where the dice actually stopped
+       rather than on a constant: it keeps the row where the throw put it and
+       only removes the spread. */
+    var wantZ=[],zSum=0;
+    for(var z1=0;z1<N;z1++)zSum+=fin[z1].z;
+    var zMean=N?zSum/N:0;
+    for(var z2=0;z2<N;z2++)wantZ[z2]=zMean;
     /* Blend the correction in WHILE THE DICE ARE STILL TUMBLING, not over
        the last frames - applied at the end it reads as the dice sliding
        into place, which is exactly the tell we are trying to avoid.
@@ -16806,6 +16832,7 @@ var D3X={
       for(var k5=0;k5<N;k5++){
         row[k5].x+=(want[k5]-fin[k5].x)*w2;
         row[k5].y+=(wantY[k5]-fin[k5].y)*w2;
+        row[k5].z+=(wantZ[k5]-fin[k5].z)*w2;
       }
     }
     /* relabel so the game's numbers end up on top (the squaring-up
