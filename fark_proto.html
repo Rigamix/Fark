@@ -896,7 +896,7 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
   bottom:calc(env(safe-area-inset-bottom,0px) + 13.5cqh)}
 #stEnchPickTray>img{width:100%;display:block;pointer-events:none}
 /* the same fit the BUY tray uses - both racks are dice_row.png */
-.stPickDie{position:absolute;top:48%;transform:translate(-50%,-50%);width:13.2%;aspect-ratio:1;
+.stPickDie{position:absolute;top:44%;transform:translate(-50%,-50%);width:18.5%;aspect-ratio:1;
   cursor:pointer;display:flex;align-items:center;justify-content:center}
 .stPickDie:active{transform:translate(-50%,-50%) scale(.92)}
 .stPickDie.taken{opacity:.38;cursor:default}
@@ -918,6 +918,16 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
   width:min(100cqw,56.25cqh);height:min(177.78cqw,100cqh);container-type:size}
 #stStage .stL{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 #stChar{transform:scale(1.34);transform-origin:48.8% 44%}
+/* the enchant-side innkeeper. Same 1080x1920 canvas and the same ink top
+   (y 9.2% on both), so it takes the same transform and needs no alignment of
+   its own - it just crossfades over the other. The fade is on OPACITY only;
+   the scale lives on transform, which #stChar.enter animates, and the two
+   would fight if they shared a property. */
+#stCharE{transform:scale(1.34);transform-origin:48.8% 44%;opacity:0;
+  transition:opacity .34s ease}
+#stChar{transition:opacity .34s ease}
+#gbShop.tab-ench #stChar{opacity:0}
+#gbShop.tab-ench #stCharE{opacity:1}
 #stChar.enter{animation:stCharUp .8s cubic-bezier(.2,.8,.3,1) .12s both}
 @keyframes stCharUp{from{transform:translateY(8%) scale(1.34)}to{transform:translateY(0) scale(1.34)}}
 /* tabs scale about their baked bottom-centres */
@@ -1171,7 +1181,7 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 #stTradeRow .slots{display:flex;justify-content:center;gap:2%}
 #stTradeRow .tray{position:relative;width:100%}
 #stTradeRow .tray>img{width:100%;display:block;pointer-events:none}
-.stTSlot{position:absolute;top:48%;transform:translate(-50%,-50%);width:13.2%;aspect-ratio:1;
+.stTSlot{position:absolute;top:44%;transform:translate(-50%,-50%);width:18.5%;aspect-ratio:1;
   border:2px solid transparent;border-radius:14%;
   display:flex;align-items:center;justify-content:center;
   transition:border-color .15s,transform .15s}
@@ -28072,6 +28082,7 @@ function _gbShop(fresh){
     +'<img id="stBack" src="'+ST+'Store_back.png" alt="">'
     +'<div id="stStage">'
       +'<img class="stL'+(_stFresh?' enter':'')+'" id="stChar" src="'+ST+'Store_char.png" alt="">'
+      +'<img class="stL'+(_stFresh?' enter':'')+'" id="stCharE" src="'+ST+'enchant_char.png" alt="">'
       +'<img class="stL" id="stMid" src="'+ST+'Store_mid.png" alt="">'
       +'<img class="stL stTab'+(dOn?'':' off')+'" id="stTabL" src="'+ST+'Store_tab_left.png" alt="">'
       +'<img class="stL stTab'+(dOn?' off':'')+'" id="stTabR" src="'+ST+'Store_tab_right.png" alt="">'
@@ -28092,6 +28103,7 @@ function _gbShop(fresh){
        back arrow reading as the secondary one. */
     +'<div class="stNavBtn C icon" onclick="SFX.nav();showScreen(\'gauntlet\')"><img src="Art/Assets/Icons/back.png" alt="back"></div>';
   host.classList.remove('st-focus');
+  host.classList.toggle('tab-ench',!dOn);
   host.innerHTML=h;
   _stFresh=false;
   /* tabs: tap or slide a thumb across — in-place flip so the strip
@@ -28102,6 +28114,7 @@ function _gbShop(fresh){
       if(_gbShopTab===t)return;
       _gbShopTab=t;try{SFX.nav();}catch(e){}
       var d2=t==='dice';
+      host.classList.toggle('tab-ench',!d2);/* crossfades the innkeeper */
       document.getElementById('stTabL').classList.toggle('off',!d2);
       document.getElementById('stTabR').classList.toggle('off',d2);
       document.querySelector('.stTabLbl.L').classList.toggle('off',!d2);
@@ -28217,7 +28230,7 @@ function _stFocus(i){
     gb.appendChild(row);
     if(typeof _d3ChipScan==='function')_d3ChipScan(row);
     var focusTf=stand.style.transform;
-    var dragOn=false,slotEls=null,dragScale=1.35,dragEnd=0.8;
+    var dragOn=false,slotEls=null,dragScale=1.35,dragEnd=0.8,dragDie=null;
     stand.style.touchAction='none';
     stand.onpointerdown=function(ev){
       if(!gb.classList.contains('st-focus'))return;
@@ -28237,8 +28250,9 @@ function _stFocus(i){
              so it arrived at the rack cocked over at some angle of their own
              making rather than square in its bay like the others. */
           var _ch=stand.querySelector('.d3chip');
+          dragDie=null;
           (D3X.dice||[]).forEach(function(_d){
-            if(_d.chip===_ch){_d.uYaw=0;_d.uPit=0;}
+            if(_d.chip===_ch){_d.uYaw=0;_d.uPit=0;dragDie=_d;}
           });
         }
       }catch(e){}
@@ -28263,6 +28277,9 @@ function _stFocus(i){
         var _aim=_tr.top+_tr.height*0.5;
         if(_aim>ncy)_t=Math.max(0,Math.min(1,(ev.clientY-ncy)/(_aim-ncy)));
       }catch(e){}
+      /* stay square the whole way down - D3X's rotate-on-drag is still live
+         and would turn it again between here and the rack */
+      if(dragDie){dragDie.uYaw=0;dragDie.uPit=0;}
       var _sc=dragScale+(dragEnd-dragScale)*(_t*_t*(3-2*_t));
       stand.style.transform='translate('+(ev.clientX-ncx)+'px,'+(ev.clientY-ncy)+'px) scale('+_sc.toFixed(3)+')';
       slotEls.forEach(function(el){
@@ -28278,6 +28295,7 @@ function _stFocus(i){
         if(commit&&ev.clientX>=r.left&&ev.clientX<=r.right&&ev.clientY>=r.top&&ev.clientY<=r.bottom)hit=el;
         el.classList.remove('hot');
       });
+      if(dragDie){dragDie.uYaw=0;dragDie.uPit=0;}/* land flat, like its neighbours */
       if(hit){
         /* Fly the die INTO the slot it replaces, at the slot's own size, and
            only then hand over. It used to keep its drag transform for the
