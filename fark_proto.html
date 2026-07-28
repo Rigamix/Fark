@@ -797,7 +797,7 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 /* ─── ENCHANTS TAB ─── */
 #stEnchGrid{position:absolute;inset:0;pointer-events:none;z-index:6}
 .stEnch{position:absolute;width:19%;aspect-ratio:221/414;pointer-events:auto;cursor:pointer;
-  animation:stEnchIn .52s cubic-bezier(.2,1.25,.45,1) backwards}
+  animation:stEnchIn .72s cubic-bezier(.22,.9,.28,1) backwards}
 /* The float-in and the idle sway are on DIFFERENT elements on purpose: both
    animate `transform`, and a second animation on the same element replaces
    the first outright rather than composing with it. */
@@ -808,17 +808,31 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
   transform-origin:50% 3%;/* it hangs, so it swings from the hanger */
   transition:filter .16s}
 .stEnch:active .stEnchBod{filter:drop-shadow(0 0.4cqw 0 rgba(18,9,3,.36)) brightness(1.1)}
-.stEnch.dim .stEnchBod{filter:grayscale(.7) brightness(.62)}
+/* Out of reach greys the ICON and the number, never the wood - a whole
+   plaque going grey read as the shop being closed rather than as one brand
+   being unaffordable. */
 .stEnch.dim{cursor:default}
-@keyframes stEnchIn{from{opacity:0;transform:translateY(-13%) scale(.93)}to{opacity:1;transform:none}}
+.stEnch.dim .stEnchIcon{filter:grayscale(1) brightness(.62);opacity:.75}
+.stEnch.dim .stEnchName{color:#b3a58c}
+/* up from under the counter, overshoot, settle. 300% of a panel's own height
+   clears the bottom of the frame from either row, and #gbShop is
+   overflow:hidden so the start of the travel is genuinely off-screen. */
+@keyframes stEnchIn{
+  0%{opacity:0;transform:translateY(300%) rotate(-5deg)}
+  45%{opacity:1}
+  72%{transform:translateY(-7%) rotate(2deg)}
+  86%{transform:translateY(3%) rotate(-.8deg)}
+  94%{transform:translateY(-1.2%) rotate(.3deg)}
+  100%{opacity:1;transform:translateY(0) rotate(0deg)}}
 @keyframes stEnchBob{0%,100%{transform:translateY(0) rotate(0deg)}
                      50%{transform:translateY(-1.4%) rotate(.55deg)}}
 .stEnchIcon{position:absolute;left:50%;top:33%;transform:translate(-50%,-50%);
   width:56%;height:auto;image-rendering:auto;pointer-events:none}
-.stEnchName{position:absolute;left:6%;right:6%;top:56%;text-align:center;pointer-events:none;
+.stEnchName{position:absolute;left:5%;right:5%;top:56%;text-align:center;pointer-events:none;
   font-family:'JMH Beda',serif;font-size:3.0cqw;letter-spacing:.04em;color:#f2e2be;
-  text-shadow:0 0.25cqw 0 rgba(24,12,4,.8);white-space:nowrap;
-  overflow:hidden;text-overflow:clip}
+  text-shadow:0 0.25cqw 0 rgba(24,12,4,.8);line-height:.98}
+/* the one name that will not fit on a plaque this wide */
+.stEnchName.two{top:52%;font-size:2.7cqw}
 /* right of the coin the tag already has painted at x 18-33% */
 .stEnchPrice{position:absolute;left:38%;right:8%;top:89%;transform:translateY(-50%);
   text-align:center;pointer-events:none;
@@ -1105,6 +1119,13 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 #stBackBtn img,#loFBack img,#ptFBack img{width:100%;display:block;pointer-events:none}
 .stNavBtn.L{left:4%}
 .stNavBtn.R{right:4%}
+/* centred, and smaller now that it stands alone. The press state has to
+   RESTATE the centring translate: .stNavBtn:active sets `transform` outright,
+   and a bare scale() there would drop the -50% and throw the button half its
+   own width to the right - the same collision as the flag score in P248. */
+.stNavBtn.C{left:50%;transform:translateX(-50%)}
+.stNavBtn.C.icon{width:9%}
+.stNavBtn.C:active{transform:translateX(-50%) scale(.96)}
 .stNavBtn img{width:100%;display:block}
 .stNavBtn span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
   font-family:'JMH Beda',serif;font-size:3.6cqw;letter-spacing:.12em;color:#f7ecd2;
@@ -27887,6 +27908,15 @@ function _gbDieCard(mat,opts){
     +(opts.footer||'')
     +'</div>';
 }
+/* DEV ONLY - tap the gold counter in the shop for +500g, so the enchant
+   counter can be exercised without grinding a run for it first. To remove:
+   delete this function and the onclick on .gd in _gbShop. Nothing else
+   references it. */
+function _devGold(){
+  _getS();S.run.gold=(S.run.gold||0)+500;save();
+  try{famLog('+500g (dev)');}catch(e){}
+  try{_gbShop(false);}catch(e){}
+}
 var _gbShopTab='dice';
 var _stFresh=false;
 function _gbShop(fresh){
@@ -27949,10 +27979,12 @@ function _gbShop(fresh){
       +'<div id="stGoods">'+(dOn?goods:_enchShopHTML())+'</div>'
     +'</div>'
     +'<div id="stHud"><div class="hs">'+hearts+'</div>'
-      +'<div class="gd"><img class="pl" src="'+PT_A+'plate_goldCounter.png" alt="">'
+      +'<div class="gd" onclick="_devGold()" title="dev: +500g"><img class="pl" src="'+PT_A+'plate_goldCounter.png" alt="">'
       +'<img class="co" src="Art/Assets/Icons/coin.png" alt=""><span>'+(S.run.gold||0)+'</span></div></div>'
-    +'<div class="stNavBtn L icon" onclick="SFX.nav();showScreen(\'gauntlet\')"><img src="Art/Assets/Icons/back.png" alt="back"></div>'
-    +'<div class="stNavBtn R icon" onclick="famLoadoutShow()"><img src="Art/Assets/Icons/pouch.png" alt="loadout"></div>';
+    /* the loadout pouch is gone from here - it is reachable from the
+       gauntlet, and two competing exits at the base of the shop had the
+       back arrow reading as the secondary one. */
+    +'<div class="stNavBtn C icon" onclick="SFX.nav();showScreen(\'gauntlet\')"><img src="Art/Assets/Icons/back.png" alt="back"></div>';
   host.classList.remove('st-focus');
   host.innerHTML=h;
   _stFresh=false;
@@ -28196,6 +28228,8 @@ function _wardOwned(skipIdx){
    no face at all, so it skips the brand step entirely). */
 var ENCH_GRID=['tithe','ward','snare','break','trade','snuff','fog','quicksilver'];
 var ENCH_ICON_DIR='Art/Assets/Enchants/storeIcons/';
+/* names that do not fit a plaque on one line, broken where they read best */
+var ENCH_LABEL={quicksilver:'QUICK<br>SILVER'};
 function _enchShopHTML(){
   _getS();_enchInit();
   var gold=(S.run&&S.run.gold)||0;
@@ -28215,7 +28249,8 @@ function _enchShopHTML(){
       +(dis?'':' onclick="SFX.nav();_stEnchTap(\''+k+'\')"')+'>'
       +'<div class="stEnchBod" style="animation-delay:'+(n*430)+'ms">'
         +'<img class="stEnchIcon" src="'+ENCH_ICON_DIR+k+'.png" alt="">'
-        +'<div class="stEnchName">'+e.name.toUpperCase()+'</div>'
+        +'<div class="stEnchName'+(ENCH_LABEL[k]?' two':'')+'">'
+          +(ENCH_LABEL[k]||e.name.toUpperCase())+'</div>'
         +'<div class="stEnchPrice">'+e.price+'</div>'
       +'</div></div>';
   });
