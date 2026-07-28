@@ -4719,3 +4719,42 @@ added back by hand: `#raceWrap` lives inside `#hud`, which is in normal flow
 and starts *below* the padding, while this row is an absolute child of
 `#screen-match`, whose padding box starts at zero. Same variable, two origins,
 8px apart. Verified the gap holds at ~3px across design, tall and short shells.
+
+## P271–P272 — one host for the shop's dice, and a picker that takes taps
+
+Three separate bugs, all in the same place: **D3X draws every chip on ONE
+shared canvas, and `sync()` picks its host from the FIRST chip it is handed**,
+then does `if(!host.contains(ch))return;` — silently skipping the rest.
+
+- **The BUY tray was empty.** The stands live in `#stStage`; `#stTradeRow` is
+  appended to `#gbShop`. Whichever surface won, the other drew nothing. Hosting
+  on `#gbShop` covers both, since it contains `#stStage` — `frame()` maps chip
+  rects against the mount rect, so any positioned full-screen ancestor works.
+- **The canvas kept collapsing to 37×37.** For a `.stTSlot` nothing in the
+  `closest()` list matched, so the `||chips[0].offsetParent` fallback fired and
+  the host became *the first slot* — a 41px box — dropping every other die.
+  That fallback is gone; `document.body` is the backstop.
+- **The background dice never hid.** `frame()` already knows how: it looks for
+  the focused die and sets `vis=false` on everything else. But it tested
+  `d.chip.classList.contains('zoom')`, and `_stFocus` puts `.zoom` on the
+  `.stStand` div while `d.chip` is the `.d3chip` span inside it — so `zoomed`
+  stayed null and the branch never ran. Walking up with `closest('.zoom')`
+  covers both conventions (chip-level in the loadout, stand-level in the shop).
+  The same mismatch left `D3X.focus` null, which is why the focused die had no
+  idle turn and no drag.
+
+Measured after: 10 dice registered (4 stands + 6 tray), canvas 319×691 on
+`#gbShop`, 6 of 6 tray chips live, the three unfocused stands `visible:false`.
+
+**The picker could not be tapped at all.** `#stEnchPick` lives inside
+`#stGoods`, which is `pointer-events:none` so the shop art never eats taps
+meant for the stands — and a child of a `pointer-events:none` parent is not
+hit-testable unless it opts back in. Every tap fell through to `#stStage`. It
+is `pointer-events:auto` when open, and it now wears the buy panel's clothes:
+full-screen scrim, the focus panel's type sizes, and the dice laid in the same
+painted `dice_row.png` bays (verified landing on 13.3/27.8/42.3/56.8/71.3/85.8
+to the decimal) rather than in a bordered box no other screen has.
+
+Note the spin keyframes RESTATE `translate(-50%,-50%)`, because the slots are
+centred with a transform and an animation that omitted it threw each die half
+its width sideways the moment it began turning — the P248 collision again.
