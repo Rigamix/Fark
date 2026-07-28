@@ -1292,12 +1292,14 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 /* dice: bigger and raised toward the centre band */
 #screen-match .die{width:13cqw;height:13cqw}
 #screen-match .player-dice-row{gap:3cqw}
-/* The opponent is across the table: further from the lens, so smaller.
+/* Same size as the player's. They were shrunk to 78% to read as "further
+   across the table", but the two rows are the same throw in the same band and
+   the mismatch read as a different game rather than as depth.
    !important because `.opp-dice-row .die` sets a hard 48px !important (and a
    41px one in the short-screen media query) - the id here out-specifies both,
    but only once this is important too. */
-#screen-match .opp-dice-row{gap:2.4cqw}
-#screen-match .opp-dice-row .die{width:10.2cqw!important;height:10.2cqw!important}
+#screen-match .opp-dice-row{gap:3cqw}
+#screen-match .opp-dice-row .die{width:13cqw!important;height:13cqw!important}
 #screen-match .die.sm{width:8.7cqw;height:8.7cqw}
 #screen-match #diceArea{--sp-before:1.75;--sp-after:1.75}
 /* the kept line: smaller dice, close together, and the turn total under it */
@@ -17041,14 +17043,24 @@ var D3X={
     x.setTransform(dpr,0,0,dpr,0,0);
     x.clearRect(0,0,sc.width,sc.height);
     var self=this,G=this.GLOW;
-    var sel=[];
+    var sel=[],oppSel=false;
     this.dice.forEach(function(d){
       if(!d.match||!d.obj.visible)return;
       if(!d.chip.classList.contains('selected'))return;
+      if(d.chip.classList.contains('oppkeep'))oppSel=true;
       var hull=self._hullOf(d,sc,G.grow);
       if(hull)sel.push(hull);
     });
     if(!sel.length)return;
+    /* gold is the PLAYER's colour. A rival keep glows in their patron accent
+       instead, which is the same --patCol the portrait disc and the DOM
+       fallback rim already use - so the three readings of a rival agree. */
+    var SOFT=self.SEL_SOFT,COL=self.SEL_COL;
+    if(oppSel){
+      var _pc='';
+      try{_pc=(getComputedStyle(scEl).getPropertyValue('--patCol')||'').trim();}catch(e){}
+      COL=SOFT=(_pc||'#7a8a5c');
+    }
     /* build the halo on its own surface: blur the silhouettes, then PUNCH
        THE DICE BACK OUT. Filling the silhouette and blurring it in place
        is what put the glow inside the die instead of around it. */
@@ -17073,7 +17085,7 @@ var D3X={
     };
     /* gold spreading out, near-white at the rim: a mid gold on its own just
        blends into a warm table */
-    gx.fillStyle=self.SEL_SOFT;
+    gx.fillStyle=SOFT;
     gx.globalAlpha=1;
     if(self._cf){
       /* the wide, soft falloff */
@@ -17082,7 +17094,7 @@ var D3X={
         sel.forEach(function(h){trace(gx,h,0);gx.fill();});
       /* then the bright rim, stacked - the punch-out below throws away the
          inner half of every blur, so a single pass never reads as strong */
-      gx.fillStyle=self.SEL_COL;
+      gx.fillStyle=COL;
       gx.filter='blur('+G.rim+'px)';
       for(var rp=0;rp<G.rimPasses;rp++)
         sel.forEach(function(h){trace(gx,h,0);gx.fill();});
@@ -17114,8 +17126,8 @@ var D3X={
       /* 2x: canvas shadowBlur is a gaussian of sigma = blur/2, while
          filter:blur(N) is sigma = N, so the same number reads half as wide.
          Measured against the desktop path to match its reach. */
-      blob(self.SEL_SOFT,G.soft*2,(G.softPasses||1));
-      blob(self.SEL_COL ,G.rim*2 ,G.rimPasses);
+      blob(SOFT,G.soft*2,(G.softPasses||1));
+      blob(COL ,G.rim*2 ,G.rimPasses);
       gx.shadowColor='transparent';gx.shadowBlur=0;gx.shadowOffsetY=0;
     }
     /* cut the die back out EXACTLY on its painted edge: everything left is
@@ -17127,7 +17139,7 @@ var D3X={
     /* the line goes on the SAME surface as the halo, after the cut-out, so
        the two composite as one glow - stroking onto the main canvas
        afterwards left a hairline of bare table between them */
-    gx.strokeStyle=self.SEL_COL;gx.lineWidth=G.line;gx.lineJoin='round';
+    gx.strokeStyle=COL;gx.lineWidth=G.line;gx.lineJoin='round';
     gx.globalAlpha=1;
     sel.forEach(function(h){trace(gx,h,0);gx.stroke();});
     /* additive, so it reads as light rather than paint */
@@ -22771,6 +22783,10 @@ function runOppTurn(){
       if(G._lanternActive)el.classList.add('die-blind');
       G.oppDice.push({val,el,kept:false,mat:dieMat,lane:(rungLanes[i]!==undefined?rungLanes[i]:i)});}
     sootyActive=false;
+    /* Say whose turn it is, at the moment the dice land. setStatusMsg routes
+       to the TOP strip while G.phase==='opp', which is where the player is
+       already looking during a rival turn. */
+    try{setStatusMsg(((G&&G.rung&&G.rung.name)||'RIVAL').toUpperCase()+' IS ROLLING…','active');}catch(e){}
     /* BULLISH honeytrap: pull one fresh die into the modal face (P5/P9) */
     (function(){
       var c=_npcFamCard('honeytrap');
