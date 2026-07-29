@@ -1317,6 +1317,10 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
   text-shadow:0 0 12px rgba(255,190,90,.7),0 2px 0 rgba(58,32,8,.85);
   animation:selShake .16s linear infinite}
 #selTotal.zero{color:#9a8f7a;text-shadow:0 2px 0 rgba(20,12,6,.6);animation:none}
+/* a name, not a number: smaller, spaced, and still - the shake belongs to a
+   score that is climbing, and nothing here is climbing */
+#selTotal.cast{font-size:4.4cqw;letter-spacing:.08em;color:#e0cfa4;animation:none;
+  text-shadow:0 0 10px rgba(255,214,150,.4),0 2px 0 rgba(38,20,6,.9)}
 /* The rival's numbers: the same two elements, flipped to the other side of
    the line. No shake - the tremble is the player's own nerve, and putting it
    on the opponent's total made every rival roll feel like your own. The
@@ -1611,7 +1615,11 @@ html.fk3d #screen-match .kept-row .die-wrap::after{display:none!important}
 .d3chip{display:inline-block;position:relative;vertical-align:middle;flex-shrink:0}
 .d3chip .die{position:absolute;inset:0;width:100% !important;height:100% !important;cursor:inherit;box-shadow:none}
 .d3chip .die:active{transform:none}
-.d3slot{position:relative;will-change:transform}
+/* A picture of a die, not a die. It is 88% of the host box and it sits in
+   its own stacking context, so where two dice overlap it was swallowing taps
+   meant for the neighbour - measured, five of seven sample points. Nothing
+   listens on it; every handler is on the host. */
+.d3slot{position:relative;will-change:transform;pointer-events:none}
 .d3shadow{position:absolute;left:50%;top:50%;border-radius:50%;
   background:rgba(20,12,6,.5);filter:blur(3px);will-change:transform;pointer-events:none}
 .d3shadow.tblsh{background:url('Art/Assets/Match/Commoner/optimized/Table_opt.webp?v=2') no-repeat;
@@ -19704,6 +19712,39 @@ function _wrapDie(die){
   return wrap;
 }
 function _appendDie(row,die){if(row&&die)row.appendChild(_wrapDie(die));}
+/* ONE TAP, ONE DIE.
+   The die is drawn at 0.77 of its DOM box and the solver puts it anywhere
+   inside its slot, so two boxes overlap long before the dice do - and every
+   .die-wrap is its own stacking context, so in the overlap the LATER box
+   wins. Hit-test by distance instead: the die whose centre is nearest the
+   finger takes the tap, which is both what the eye expects and the thing a
+   z-order cannot say. Capture phase, so it lands before the box that would
+   otherwise have eaten it. */
+function _dieTapRouter(e){
+  /* a drag that just finished ends with a click; the row must not act on it */
+  if(window._dragEndedAt&&Date.now()-window._dragEndedAt<400)return;
+  var row=e.currentTarget;
+  var dice=row.querySelectorAll('.die');
+  if(dice.length<2)return;
+  var best=null,bd=Infinity,bw=0;
+  for(var i=0;i<dice.length;i++){
+    var r=dice[i].getBoundingClientRect();
+    if(r.width<1)continue;
+    var dx=e.clientX-(r.left+r.width/2),dy=e.clientY-(r.top+r.height/2);
+    var d2=dx*dx+dy*dy;
+    if(d2<bd){bd=d2;best=dice[i];bw=r.width;}
+  }
+  /* outside every die's reach is still a miss - the table stays tappable */
+  if(!best||bd>Math.pow(bw*0.75,2))return;
+  var hit=(e.target&&e.target.closest)?e.target.closest('.die'):null;
+  if(hit===best)return;/* the stack already agreed; leave it alone */
+  e.stopPropagation();
+  if(typeof best.onclick==='function')best.onclick(e);
+}
+(function(){
+  var r=document.getElementById('playerDiceRow');
+  if(r)r.addEventListener('click',_dieTapRouter,true);
+})();
 function _insertDie(row,die,refNode){
   if(!row||!die)return;
   var wrap=_wrapDie(die);
@@ -19852,8 +19893,15 @@ function setBtns(r,b){
     var _verb=document.getElementById('bankVerb'),_cap=document.getElementById('bankCap');
     var _bpts=_projectedBank();
     var _wins=!!(G&&b&&_bpts>0&&(G.pPts+_bpts)>=G.target);
+    /* Nothing to bank and only branded faces picked: the one thing this
+       button does is fire them, so it says so. Guarded on _bpts, because
+       with points already on the line it really is a bank - that just also
+       happens to cast. */
+    var _selNow=(G&&G.pool)?G.pool.filter(function(d){return d.sel&&!d.committed;}):[];
+    var _castOnly=!!(b&&_bpts<=0&&_selNow.length&&_selNow.every(_dieIsIcon));
     bankBtn.classList.toggle('bank-to-win',_wins);
-    if(_verb)_verb.textContent=_wins?'BANK TO WIN':'BANK';
+    bankBtn.classList.toggle('bank-cast',_castOnly);
+    if(_verb)_verb.textContent=_castOnly?'CAST':(_wins?'BANK TO WIN':'BANK');
     if(_cap)_cap.textContent=(b&&_bpts>0)?('+'+_bpts.toLocaleString()):'';
   }catch(e){}
   if(r)rollBtn.classList.remove('disabled');else rollBtn.classList.add('disabled');
@@ -21723,12 +21771,25 @@ function _renderSelTags(selD,total,valid){
   var area=document.querySelector('#screen-match .dice-area');
   if(!row||!area)return;
   if(!tot){tot=document.createElement('div');tot.id='selTotal';area.appendChild(tot);}
-  tot.className=(valid&&total>0)?'':'zero';
-  tot.textContent=(valid&&total>0)?('+'+total.toLocaleString()):'0';
+  /* A branded face banks NOTHING and fires its effect instead - that is the
+     whole system. Saying so with a grey "0" reads as a mistake rather than a
+     move, so it names the enchant instead, in the enchant's own ink. */
+  var _scored=!!(valid&&total>0),_cast=[],_ink='';
+  if(!_scored&&selD.length&&selD.every(_dieIsIcon)){
+    selD.forEach(function(d){
+      var ic=ENCH_ICONS[d.ench.t];if(!ic||!ic.name)return;
+      if(_cast.indexOf(ic.name)<0){_cast.push(ic.name);if(!_ink)_ink=ic.ink||'';}
+    });
+  }
+  var _isCast=_cast.length>0;
+  tot.className=_scored?'':(_isCast?'cast':'zero');
+  tot.textContent=_scored?('+'+total.toLocaleString())
+    :(_isCast?_cast.join(' + ').toUpperCase():'0');
   /* excitement ramp: ~200 is calm, ~2000 is full glow + shake */
-  var ex=(valid&&total>0)?Math.max(0,Math.min(1,(total-200)/1800)):0;
+  var ex=_scored?Math.max(0,Math.min(1,(total-200)/1800)):0;
   tot.style.setProperty('--sh',(ex*2.4).toFixed(2)+'px');
-  tot.style.textShadow=(valid&&total>0)
+  tot.style.color=(_isCast&&_cast.length===1&&_ink)?_ink:'';
+  tot.style.textShadow=_scored
     ?('0 0 '+(6+22*ex).toFixed(0)+'px rgba(255,190,90,'+(0.55+0.4*ex).toFixed(2)+')'
       +(ex>0?',0 0 '+(40*ex).toFixed(0)+'px rgba(255,150,40,'+(0.75*ex).toFixed(2)+')':'')
       +',0 2px 0 rgba(58,32,8,.85)')
