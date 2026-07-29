@@ -285,6 +285,10 @@ html.fkSA #gbSheet,html.fkSA #peekSheet{padding-bottom:env(safe-area-inset-botto
 /* Freeze: chunky shake so the player feels the action land */
 @keyframes pxDieFreeze{0%{transform:translateX(0) scale(1)}15%{transform:translateX(-3px) scale(1.08)}30%{transform:translateX(3px) scale(1.08)}45%{transform:translateX(-2px) scale(1.06)}60%{transform:translateX(2px) scale(1.04)}80%{transform:translateX(-1px) scale(1.02)}100%{transform:translateX(0) scale(1)}}
 .die-freeze-shake{animation:pxDieFreeze .45s ease-out forwards}
+/* The 3D layer breathes the mesh (D3X.pulse); this is for the flat die, and
+   it is deliberately the same shape - a swell and back, never a shrink. */
+@keyframes pxLoneCast{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+.die.lone-cast{animation:pxLoneCast 1.05s ease-in-out infinite}
 /* Obsidian shatter: the die crumbles — quick swell, then collapse + spin
    away as the shard burst (spawnShards) flies off. */
 @keyframes pxDieShatter{0%{transform:scale(1) rotate(0);opacity:1}25%{transform:scale(1.12) rotate(-6deg)}100%{transform:scale(0) rotate(35deg);opacity:0}}
@@ -16752,6 +16756,20 @@ var D3X={
       .setFromAxisAngle(d.burst.ax,B.spin*t*t);
     d.obj.quaternion.multiply(q);
   },
+  /* A die asking to be picked. Only ever grows - a swell reads as offering
+     itself, where a shrink reads as a die pulling away. */
+  PULSE:{amp:0.06,ms:1050},
+  pulse:function(el,on){
+    if(!el)return;
+    var d=null;this.dice.forEach(function(q){if(q.chip===el)d=q;});
+    if(!d)return;
+    if(!on){if(d.pulseOn){d.pulseOn=false;d.obj.scale.setScalar(1);}return;}
+    d.pulseOn=true;
+  },
+  _pulsePose:function(d){
+    var P=this.PULSE;
+    d.obj.scale.setScalar(1+P.amp*(0.5-0.5*Math.cos(performance.now()/P.ms*Math.PI*2)));
+  },
   /* move the DOM box under the die so it stays clickable where it is drawn */
   _slaveHost:function(d,root){
     var mr=this.mount.getBoundingClientRect();
@@ -18581,6 +18599,7 @@ var D3X={
           d.obj.quaternion.copy(d.phys.q);
           D3X._weightOutline(d);
           if(d.burst)D3X._burstPose(d);
+          else if(d.pulseOn)D3X._pulsePose(d);
           if(e)e._d3xOwned=true;
           D3X._slaveHost(d,root3);
           return;
@@ -21717,9 +21736,31 @@ function _afterRollImpl(){
 
   free.forEach(d=>{d.el.onclick=()=>toggleDie(d);});G.phase='choosing';
   setBtns(false,G.kept.length>0);setStatusMsg('','');
+  try{_markLoneCast();}catch(e){}
   updHUD();
 }
 
+/* THE ONLY MOVE ON THE TABLE. A row that scores nothing is not a bust while
+   a branded face is showing - that face is a legal keep worth zero. It is
+   also indistinguishable from the dead dice around it, which is the whole
+   problem: the player sees six blanks and reaches for ROLL.
+   Off the moment anything is selected, back if the selection is undone. */
+function _markLoneCast(){
+  if(!G||!G.pool)return;
+  var free=G.pool.filter(function(d){return !d.committed;});
+  var lone=false;
+  if(free.length&&!free.some(function(d){return d.sel;})){
+    try{
+      lone=scoreRoll(free.map(function(d){return d.val;}),effectiveCards(),0,{},
+                     free.map(function(d){return d.mat;})).total<=0;
+    }catch(e){lone=false;}
+  }
+  free.forEach(function(d){
+    var on=lone&&_dieIsIcon(d);
+    if(d.el)d.el.classList.toggle('lone-cast',on);
+    try{if(window.D3X&&D3X.pulse)D3X.pulse(d.el,on);}catch(e){}
+  });
+}
 function _clearDieEffects(){
   document.querySelectorAll('.die-eff-pop').forEach(function(e){e.remove();});
   document.querySelectorAll('.die').forEach(function(e){e.classList.remove('eff-glow-gold','eff-glow-green','eff-glow-red','eff-glow-blue');});
@@ -21874,6 +21915,8 @@ function refreshSelUI(){
   /* Guard: don't update selection-status text outside the player's choosing/idle phases.
      Otherwise stale 'NO SCORE' from the player UI bleeds into NPC turn status messages. */
   if(G&&G.phase!=='choosing'&&G.phase!=='idle'&&G.phase!=='gamblers_eye')return;
+  /* every toggle lands here, so this is the one place that has to ask */
+  try{_markLoneCast();}catch(e){}
   const selD=G.pool.filter(d=>d.sel&&!d.committed);
   /* icons are withheld from the maths here for the same reason as at commit:
      the engine must never see a die it would happily score. Without this a
