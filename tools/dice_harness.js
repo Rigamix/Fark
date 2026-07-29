@@ -53,7 +53,11 @@
     });
     var limitX = opt.limitX === undefined ? 3.1 : opt.limitX;
 
-    var sol = D3X._physSolve(slots, vals, obst, limitX);
+    /* `pitch` is the ROW's spacing, which the game measures off the DOM and
+       hands in. Without it the solver falls back to guessing from the slots
+       it was given - fine for a full row, wrong by a multiple for any subset
+       with a hole in it. Pass it to reproduce what the game actually does. */
+    var sol = D3X._physSolve(slots, vals, obst, limitX, opt.pitch || 0);
     var d = sol.dbg;
     if (!d) throw new Error('no dbg on the solve — is this build patched?');
 

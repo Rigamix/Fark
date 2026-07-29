@@ -16930,7 +16930,7 @@ var D3X={
   },
   /* solve one throw. slots = target x per die in die-widths, values = the
      faces the game rolled. Returns {steps, frames:[[{p,q}]], rest:[{p,q}]} */
-  _physSolve:function(slotX,values,obstacles,limitX){
+  _physSolve:function(slotX,values,obstacles,limitX,rowPitch){
     /* pitch from the slots themselves, so this follows the row rather than
        assuming it. One die on its own has no pitch: fall back to the middle
        of the allowed range rather than pinning it to a point. */
@@ -16941,8 +16941,17 @@ var D3X={
        pitch, so it came out four times too big and the boundaries effectively
        vanished: the dice wandered and drifted right. The tightest pair is what
        the radius has to respect. */
+    /* THE ROW'S pitch, when the caller knows it. A throw is almost never the
+       whole row - kept dice hold their places, and one loop of six dice can
+       still reach the queue as two batches - and every gap in a subset is a
+       MULTIPLE of the real pitch. Measured on a live 1.598 row: every-other
+       reads 3.196 and the radius comes out 3.1x too wide; ends-only reads
+       7.992 and a die that cannot claim a free slot is penned at 7.19, which
+       is no pen at all. Smallest-gap (P313) saves a CONTIGUOUS subset; a
+       subset with holes in it carries no pitch to find. */
     var _sp=slotX.slice().sort(function(a,b){return a-b;}),_pitch=0;
-    for(var _i9=1;_i9<_sp.length;_i9++){
+    if(rowPitch>1e-4)_pitch=rowPitch;
+    else for(var _i9=1;_i9<_sp.length;_i9++){
       var _g9=_sp[_i9]-_sp[_i9-1];
       if(_g9>1e-4&&(!_pitch||_g9<_pitch))_pitch=_g9;
     }
@@ -17082,9 +17091,11 @@ var D3X={
       b.velocity.set(Math.random()*.24-.12,
                      0.15+Math.random()*0.25,
                      -(2.2+Math.random()*0.6));
-      /* half the tumble. Eighteen radians a second on one axis is a blur, and
-         a blur that has to be killed before the die can settle. */
-      b.angularVelocity.set(-(2.4+Math.random()*3),Math.random()*2.4-1.2,Math.random()*3-1.5);
+      /* Roughly double what P307 left. That cut was made to stop the die
+         knocking around, but the knocking turned out to be the die landing on
+         TOP of an invisible wall (P310) - so the tumble was paying for
+         somebody else's crime. A thrown die should look thrown. */
+      b.angularVelocity.set(-(5+Math.random()*6),Math.random()*5-2.5,Math.random()*6-3);
       var q=new CANNON.Quaternion();
       q.setFromEuler(Math.random()*6.28,Math.random()*6.28,Math.random()*6.28);
       b.quaternion.copy(q);
@@ -18025,7 +18036,23 @@ var D3X={
        2/(N-1) and pulled the dice into a pile. */
     var mrw=this.mount.getBoundingClientRect().width;
     var limitX=Math.max(1.2,(Math.min(mid,mrw-mid)-sz*0.75)/sz);
-    var sol=this._physSolve(slots,b.vals,obst,limitX);
+    /* The row's own pitch, from EVERY die standing in it - kept ones included.
+       d.hx is the layout home (the wrapper's centre), which is the flex slot
+       and does not move when the solver puts a die somewhere inside it, so
+       this is the true spacing whatever is being thrown. */
+    var rowXs=[];
+    this.dice.forEach(function(d){
+      if(!d.match||d.hx===undefined)return;
+      if(self._rowKey(d)!==key)return;
+      rowXs.push((d.hx-mid)/sz);
+    });
+    rowXs.sort(function(a,b){return a-b;});
+    var rowPitch=0;
+    for(var _rp=1;_rp<rowXs.length;_rp++){
+      var _rg=rowXs[_rp]-rowXs[_rp-1];
+      if(_rg>1e-4&&(!rowPitch||_rg<rowPitch))rowPitch=_rg;
+    }
+    var sol=this._physSolve(slots,b.vals,obst,limitX,rowPitch);
     /* one playback per die: two throws can be in the air at once without
        either being dropped */
     var t0=performance.now();
