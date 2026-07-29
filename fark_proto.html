@@ -16892,13 +16892,24 @@ var D3X={
     (function(){
       var occ=(obstacles||[]).map(function(o){return o.x;});
       if(!occ.length)return;
-      var free=slotX.filter(function(x){
+      var isFree=function(x){
         return !occ.some(function(ox){return Math.abs(ox-x)<SLOT_R+0.5;});
-      }).sort(function(a,b){return a-b;});
-      /* nearest free slot first, so a die keeps the place it was aimed at
-         whenever that place is actually empty */
-      var order=slotX.map(function(x,i){return i;})
-        .sort(function(a,b){return slotX[a]-slotX[b];});
+      };
+      /* KEEP YOUR OWN SLOT if nothing is standing in it. Only the dice whose
+         slot is actually taken go looking, and they take the nearest empty
+         one. Running every die through a greedy nearest-free pass instead can
+         shunt the entire row one place along when the occupied slot is at an
+         end - which is how a second roll ended up bunched to one side. */
+      var free=slotX.filter(isFree).sort(function(a,b){return a-b;});
+      var needy=[];
+      slotX.forEach(function(x,i){
+        if(isFree(x)){
+          var k=free.indexOf(x);
+          if(k>=0){free.splice(k,1);slotC[i]=x;taken[i]=true;return;}
+        }
+        needy.push(i);
+      });
+      var order=needy.sort(function(a,b){return slotX[a]-slotX[b];});
       order.forEach(function(i){
         if(!free.length){taken[i]=false;return;}
         var bi=0,bd=Infinity;
@@ -17810,6 +17821,18 @@ var D3X={
          in this room and not as a greyed-out die */
       o.material.color.setRGB(
         b.r*(1-k)+0.129*k, b.g*(1-k)+0.078*k, b.b*(1-k)+0.039*k);
+    });
+  },
+  /* spent, but still on the table: see-through rather than moved away */
+  _keptLook:function(d,on){
+    if(!d||!d.obj||d._keptLook===on)return;
+    d._keptLook=on;
+    d.obj.traverse(function(o){
+      if(!o.isMesh||!o.material)return;
+      o.material.transparent=!!on;
+      o.material.opacity=on?(o.userData.outline?0.42:0.5):1;
+      o.material.depthWrite=!on;
+      o.material.needsUpdate=true;
     });
   },
   _trayTint:function(d,k){
@@ -19559,7 +19582,26 @@ function clearRow(id){
    Called on the reroll, which is when Denis wants to see them go: the row
    you are about to throw into is left holding only the dice being thrown -
    which is also what stops the sim landing a die on top of a kept one. */
+/* Kept dice STAY. A scored die holds the place and the angle it stopped at
+   and turns translucent - and because it stays it is an obstacle to the next
+   throw, so its circle is taken and the roll goes round it. With the slot
+   assignment above keeping every OTHER die on its own slot, that no longer
+   drags the row sideways. */
 function _dropKeptToTray(){
+  if(typeof G==='undefined'||!G||!G.pool)return;
+  var marked=0;
+  G.pool.forEach(function(d){
+    if(!d.committed||!d.el||d.el.classList.contains('kept-still'))return;
+    d.el.querySelectorAll('.selTag').forEach(function(t){t.remove();});
+    d.el.classList.add('kept-still');
+    d.el.classList.remove('selected');
+    try{if(window.D3X&&D3X.dice)D3X.dice.forEach(function(q){
+      if(q.chip===d.el)D3X._keptLook(q,true);});}catch(e){}
+    marked++;
+  });
+  if(marked)_flySelTotal();
+}
+function _dropKeptToTray_OLD(){
   var tray=document.getElementById('keptRow');
   /* G is a `let`, so it is NOT on window - `window.G` is undefined here and
      the whole migration silently no-opped */
