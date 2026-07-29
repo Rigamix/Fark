@@ -1317,6 +1317,18 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
   text-shadow:0 0 12px rgba(255,190,90,.7),0 2px 0 rgba(58,32,8,.85);
   animation:selShake .16s linear infinite}
 #selTotal.zero{color:#9a8f7a;text-shadow:0 2px 0 rgba(20,12,6,.6);animation:none}
+/* The rival's numbers: the same two elements, flipped to the other side of
+   the line. No shake - the tremble is the player's own nerve, and putting it
+   on the opponent's total made every rival roll feel like your own. The
+   accent colour is written from JS, out of the same --patCol the portrait
+   disc and the keep-glow already read. */
+.oppTag{position:absolute;bottom:calc(100% + 2.6cqw);left:50%;transform:translateX(-50%);z-index:6;
+  font-family:'JMH Beda',serif;font-size:3.4cqw;color:#f6ecd4;white-space:nowrap;pointer-events:none;
+  text-shadow:0 2px 0 rgba(16,10,4,.85)}
+#oppTotal{position:absolute;left:50%;transform:translateX(-50%);z-index:6;
+  font-family:'JMH Beda',serif;font-size:6.4cqw;color:#7a8a5c;pointer-events:none;white-space:nowrap;
+  text-shadow:0 2px 0 rgba(16,10,4,.85)}
+#oppTotal.zero{color:#9a8f7a;text-shadow:0 2px 0 rgba(20,12,6,.6)}
 @keyframes selShake{
   0%,100%{transform:translate(calc(-50% + var(--sh,0px)),0)}
   25%{transform:translate(calc(-50% - var(--sh,0px)),calc(var(--sh,0px)*.6))}
@@ -19575,6 +19587,11 @@ function newG(rung,pCards,oCards,pStake,oStake){
 /* ═══════ UI HELPERS ═══════ */
 function clearRow(id){
   const el=document.getElementById(id);if(el)el.innerHTML='';
+  /* the rival's "+N" tags are children of their dice and leave with them,
+     but the total hangs off .dice-area and would outlive the throw */
+  if(id==='oppDiceRow'){
+    const ot=document.getElementById('oppTotal');if(ot)ot.remove();
+  }
   /* The kept line is part of the player's dice, not a separate widget. Bank,
      bust, hot dice and end-of-turn all clear the throwing row; every one of
      them must clear this too or the scored dice outlive the turn. */
@@ -21623,27 +21640,81 @@ function _selPts(){
     return (r&&r.valid)?(r.total||0):0;
   }catch(e){return 0;}
 }
+/* Which die carries which number. A single 1 or 5 wears its own 100 or 50;
+   whatever the combo made lands on the middle die of the group that made it.
+   ONE owner, because both sides show it and the two readings must never
+   disagree - the opponent's dice carry the same {el,val} shape. */
+function _ptSplit(dice,total){
+  var counts={};dice.forEach(function(d){counts[d.val]=(counts[d.val]||0)+1;});
+  var comboDice=[],singleSum=0,planned=[];
+  dice.forEach(function(d){
+    if(!d.el)return;
+    if(counts[d.val]>=3){comboDice.push(d);return;}
+    if(d.val===1){singleSum+=100;planned.push([d.el,100]);}
+    else if(d.val===5){singleSum+=50;planned.push([d.el,50]);}
+    else comboDice.push(d);
+  });
+  var rest=total-singleSum;
+  if(rest>0&&comboDice.length){
+    comboDice.sort(function(a,b){return a.el.getBoundingClientRect().left-b.el.getBoundingClientRect().left;});
+    var mid=comboDice[(comboDice.length-1)>>1];
+    if(mid.el)planned.push([mid.el,rest]);
+  }
+  return planned;
+}
+/* the patron's accent, from the one place it is defined */
+function _oppAccent(){
+  var el=document.getElementById('screen-match'),c='';
+  try{c=(getComputedStyle(el).getPropertyValue('--patCol')||'').trim();}catch(e){}
+  return /^#[0-9a-f]{6}$/i.test(c)?c:'#7a8a5c';
+}
+/* The rival's roll, scored on the table instead of in a sentence. Mirrors
+   _renderSelTags exactly - same split, same "+N" tags, same big total - but
+   above the line and in their colour. */
+function _renderOppTags(rollPts){
+  document.querySelectorAll('.oppTag').forEach(function(e){e.remove();});
+  var tot=document.getElementById('oppTotal');
+  var row=document.getElementById('oppDiceRow');
+  var area=document.querySelector('#screen-match .dice-area');
+  var kept=(typeof G!=='undefined'&&G&&G.oppDice)
+    ?G.oppDice.filter(function(d){return d.kept&&d.el;}):[];
+  /* the row itself has to still be on the table. A match that ends mid-roll
+     leaves a timer that arrives here after clearRow, with G.oppDice still
+     full of dice that are no longer in the document - and the numbers went
+     up over an empty line. */
+  if(!kept.length||!row||!area||!row.querySelector('.die')){if(tot)tot.remove();return;}
+  if(rollPts>0){
+    var planned=_ptSplit(kept,rollPts);
+    /* one tag that just repeats the total is noise - the total suffices */
+    if(!(planned.length===1&&planned[0][1]===rollPts)){
+      planned.forEach(function(t){
+        var e=document.createElement('div');e.className='oppTag';
+        e.textContent='+'+t[1].toLocaleString();t[0].appendChild(e);
+      });
+    }
+  }
+  if(!tot){tot=document.createElement('div');tot.id='oppTotal';area.appendChild(tot);}
+  var acc=_oppAccent();
+  tot.className=rollPts>0?'':'zero';
+  tot.textContent=rollPts>0?('+'+rollPts.toLocaleString()):'0';
+  if(rollPts>0){
+    var c=parseCol(acc);
+    tot.style.color=acc;
+    tot.style.textShadow='0 0 12px rgba('+c[0]+','+c[1]+','+c[2]+',.7),0 2px 0 rgba(16,10,4,.85)';
+  }else{tot.style.color='';tot.style.textShadow='';}
+  /* anchored to the TOP of the row, so it rides above the dice however tall
+     the number itself turns out to be */
+  var rr=row.getBoundingClientRect(),ar=area.getBoundingClientRect();
+  tot.style.top='';
+  tot.style.bottom=(ar.bottom-rr.top+rr.height*0.55)+'px';
+}
 function _renderSelTags(selD,total,valid){
   document.querySelectorAll('.selTag').forEach(function(e){e.remove();});
   var tot=document.getElementById('selTotal');
   if(!selD.length){if(tot)tot.remove();return;}
   function _tag(host,txt){var t=document.createElement('div');t.className='selTag';t.textContent=txt;host.appendChild(t);}
-  var counts={};selD.forEach(function(d){counts[d.val]=(counts[d.val]||0)+1;});
   if(valid&&total>0){
-    var comboDice=[],singleSum=0,planned=[];
-    selD.forEach(function(d){
-      if(!d.el)return;
-      if(counts[d.val]>=3){comboDice.push(d);return;}
-      if(d.val===1){singleSum+=100;planned.push([d.el,100]);}
-      else if(d.val===5){singleSum+=50;planned.push([d.el,50]);}
-      else comboDice.push(d);
-    });
-    var rest=total-singleSum;
-    if(rest>0&&comboDice.length){
-      comboDice.sort(function(a,b){return a.el.getBoundingClientRect().left-b.el.getBoundingClientRect().left;});
-      var mid=comboDice[(comboDice.length-1)>>1];
-      if(mid.el)planned.push([mid.el,rest]);
-    }
+    var planned=_ptSplit(selD,total);
     /* one tag that just repeats the total is noise — the total suffices */
     if(!(planned.length===1&&planned[0][1]===total))
       planned.forEach(function(t2){_tag(t2[0],'+'+t2[1].toLocaleString());});
@@ -24128,6 +24199,11 @@ function runOppTurn(){
         }
       }
       oppBank+=total;setStatusMsg((G.rung?G.rung.name:'RIVAL')+' +'+total+' TOTAL: '+oppBank,'active');
+      /* the same numbers the player gets, over the same dice. Here rather
+         than at the keep, because every card that rewrites the roll - Quick
+         Hands, Grog's Bump, Slippery Table, Triple Hunter - has had its say
+         by this line, and a tag that changes twice is worse than none. */
+      try{_renderOppTags(total);}catch(e){}
       /* Accumulate the across-turn commit count (mirrors player's totalCommitted) */
       var _oRollKept=G.oppDice.filter(function(d){return d.kept;}).length;
       G._oTurnDiceCommitted=(G._oTurnDiceCommitted||0)+_oRollKept;
