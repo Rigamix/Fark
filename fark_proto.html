@@ -16699,6 +16699,12 @@ var D3X={
      1.599 pitch is 0.34 - see the note on P302. restitution is low on purpose:
      a die should die against this wall, not ping around inside a small circle. */
   slotRK:0.213, slotRMin:0.22, slotRMax:0.55, slotEngageY:2.2, slotRest:0.25,
+  /* thrown in from off the top of the frame. 4.6 was barely above the table at
+     this camera, which is why they read as coming up off it. */
+  dropY:9.4, dropZ:2.9,
+  /* how high a die has to be to be out of the candlelight, and how far the
+     brown goes at the top of that */
+  airDarkFrom:1.6, airDarkTo:6.5, airDark:0.35,
     /* The collision box is WIDER THAN THE DIE in the plane of the table, so
        two dice simply cannot end up closer than this - no force acting at a
        distance, no push after they have landed. Not taller: a uniformly
@@ -16889,15 +16895,17 @@ var D3X={
          does the rest: a real toss that rises, crests, and lands away from
          the player. The stagger keeps the six from moving as one slab. */
       b.position.set(clearOf(slotC[i])+(Math.random()*.2-.1),
-                     P.restY+4.6+(i%3)*.4,
-                     2.45+Math.random()*.35);
+                     P.restY+P.dropY+(i%3)*.45,
+                     P.dropZ+Math.random()*.4);
       /* barely any vertical kick: gravity here is -50, so even a 2.0 toss
          buys 0.04 of rise - it read as nothing while adding half a second of
          hang. The height IS the arc; the throw just carries it across the
          table. */
-      b.velocity.set(Math.random()*1-.5,
+      /* the fall is longer now, so the throw across the table is gentler -
+         the die still has to arrive over its own slot, not past it */
+      b.velocity.set(Math.random()*.8-.4,
                      0.2+Math.random()*0.4,
-                     -(5.4+Math.random()*1.4));
+                     -(4.0+Math.random()*1.0));
       b.angularVelocity.set(-(8+Math.random()*10),Math.random()*8-4,Math.random()*10-5);
       var q=new CANNON.Quaternion();
       q.setFromEuler(Math.random()*6.28,Math.random()*6.28,Math.random()*6.28);
@@ -17624,6 +17632,30 @@ var D3X={
      pushing it past that into the dark. The map is swapped at the halfway
      point of the drop rather than cross-faded: two maps cannot be blended in
      a Lambert material without a shader, and at 440ms nobody sees the step. */
+  /* A die high over the table is out of the candlelight: a brown multiply,
+     ramped by height and fully released by the time it lands. Shares
+     userData.baseCol with _trayTint so the two cannot cache each other's
+     darkened colour - they never overlap in practice (a die in the tray is
+     not in the air) but one of them caching the other's output would be a
+     very quiet bug. */
+  _airTint:function(d,y){
+    var P=this.PHYS;
+    var k=(y-P.airDarkFrom)/(P.airDarkTo-P.airDarkFrom);
+    k=k<0?0:(k>1?1:k);
+    k*=P.airDark;
+    if(!k&&!d._airK)return;/* nothing to do, and nothing to undo */
+    d._airK=k;
+    d.obj.traverse(function(o){
+      if(!o.isMesh||!o.material||!o.material.color)return;
+      if(o.userData.outline)return;/* the ink line stays ink */
+      if(!o.userData.baseCol)o.userData.baseCol=o.material.color.clone();
+      var b=o.userData.baseCol;
+      /* toward a dark brown rather than toward black, so it reads as shadow
+         in this room and not as a greyed-out die */
+      o.material.color.setRGB(
+        b.r*(1-k)+0.129*k, b.g*(1-k)+0.078*k, b.b*(1-k)+0.039*k);
+    });
+  },
   _trayTint:function(d,k){
     var self=this,T=this.TRAY,c=function(v){return v<0?0:(v>1?1:v);};
     var shaded=k>=0.5;
@@ -18274,6 +18306,7 @@ var D3X={
           d.obj.scale.setScalar(1);
           d.obj.position.set(pose.x,pose.y,pose.z);
           d.obj.quaternion.copy(pose.q);
+          D3X._airTint(d,pose.y);
           D3X._weightOutline(d);
           e._d3xOwned=true;
           D3X._slaveHost(d,root);
@@ -18303,6 +18336,14 @@ var D3X={
         }
         var mcs=getComputedStyle(d.chip);
         var mvis=mcs.visibility!=='hidden'&&mcs.display!=='none'&&+mcs.opacity>.02;
+        /* A die that has been thrown but has no tape yet must not be drawn.
+           It used to be painted at its REST POSE for as long as the four
+           delays before _physStart took - a 100ms timer, a >=40ms re-init
+           because the element is not in the DOM when mkDie first tries, a
+           setTimeout(0) batch, and a synchronous solve that blocks the frame
+           loop. That is the "couple of static frames": not frozen in the air,
+           sitting on the table waiting to be thrown. */
+        if(mvis&&!d.roll&&!d.phys&&d.chip.classList&&d.chip.classList.contains('rolling'))mvis=false;
         d.obj.visible=mvis;
         if(!mvis)return;
         /* not been through physics (first paint, or a surface that never
