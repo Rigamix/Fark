@@ -49,25 +49,44 @@ tap(document.getElementById('hsBtnBottom') ||
 await sleep(1800);
 trace.push('afterNewRun=' + screenNow());
 
-/* ── whatever the run screen offers: keep taking the first live control until
-   a match opens. Logs every choice so a wrong turn shows up in the trace
-   rather than being silently photographed. ── */
-for (let step = 0; step < 8; step++) {
-  if (vis(document.getElementById('screen-match'))) break;
-  const here = screenNow();
-  const cands = [...document.querySelectorAll('[onclick]')].filter(el => {
-    if (!vis(el)) return false;
-    const r = el.getBoundingClientRect();
-    if (r.top > window.innerHeight || r.bottom < 0) return false;   /* below the fold */
-    const oc = el.getAttribute('onclick') || '';
-    return !/hideRenownInfo|togglePouch|closeSettings|resetRun|_gbRules|_gbSettings|toggleAudio|toggleSetting/.test(oc);
-  });
-  if (!cands.length) { trace.push('step' + step + ' nothing tappable on ' + here); break; }
-  const go = cands.find(e => /launchSeat|Seat|PLAY|SIT|BEGIN|_gbSeat/i.test(
-      (e.getAttribute('onclick') || '') + ' ' + (e.textContent || ''))) || cands[0];
-  tap(go, 'step' + step + ' on ' + here + ' -> ' + (go.id || (go.getAttribute('onclick') || '').slice(0, 30)));
-  await sleep(1700);
-}
+/* ── THE FLOW, as played: take an offered die, CONFIRM it, pick a patron,
+   then SIT DOWN in the panel that opens. ── */
+const live = () => [...document.querySelectorAll('[onclick]')].filter(el => {
+  if (!vis(el)) return false;
+  const oc = el.getAttribute('onclick') || '';
+  return !/hideRenownInfo|togglePouch|closeSettings|resetRun|_gbRules|_gbSettings|toggleAudio|toggleSetting|showScreen\('menu'\)/.test(oc);
+});
+const wordTap = (re, why) => {
+  const hit = live().find(e => re.test(((e.textContent || '') + ' ' + (e.getAttribute('onclick') || '')).trim()));
+  if (hit) { tap(hit, why + ' [' + (hit.textContent || '').trim().slice(0, 18) + ']'); return true; }
+  trace.push('MISS ' + why + ' on ' + screenNow());
+  return false;
+};
+
+/* the offered dice float in, and _nrFocus refuses to open one until its own
+   animation has set _floatDone - tapping earlier is silently ignored */
+const floated = await until(() => { const d = document.querySelector('.nrdie'); return d && d._floatDone; }, 9000);
+trace.push('diceFloated=' + floated);
+tap(document.querySelector('.nrdie'), 'focus offered die');
+await sleep(1300);
+tap(document.getElementById('nrTakeBtn'), 'TAKE IT');
+await sleep(1900);
+trace.push('afterTake=' + screenNow());
+
+/* a patron, then SIT DOWN in the panel it opens. The patron cards are
+   .ptcard and carry no onclick attribute, so they have to be found by class
+   rather than by scanning [onclick]. */
+const patron = [...document.querySelectorAll('.ptcard')].filter(vis)[0];
+if (!patron) trace.push('MISS patron card on ' + screenNow());
+else { tap(patron, 'patron card'); await sleep(1700); }
+
+/* SIT DOWN is a bare <span> with no onclick of its own - its handler lives
+   further up, so scanning [onclick] never finds it. Match on the words. */
+const sit = [...document.querySelectorAll('span,div,button')]
+  .filter(e => vis(e) && e.children.length <= 1 && /^SIT\s*DOWN$/i.test((e.textContent || '').trim()))[0];
+if (sit) { tap(sit, 'SIT DOWN'); if (sit.parentElement) tap(sit.parentElement, 'SIT DOWN (parent)'); }
+else trace.push('MISS sit down on ' + screenNow());
+await until(() => vis(document.getElementById('screen-match')), 9000);
 trace.push('beforeMatch=' + screenNow());
 
 /* ── 4. roll ── */
