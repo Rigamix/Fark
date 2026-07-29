@@ -16456,11 +16456,67 @@ var D3X={
     im.onload=function(){try{self._reskin();}catch(e){}};
     return null;
   },
-  _brandedMap:function(baseTex,ench){
+  /* The brand as an EMISSIVE map: black everywhere, the icon in its own
+     colours on its own face. Emissive is added after the material colour has
+     multiplied the diffuse, so the brand is the one thing on the die the
+     material cannot tint. Dividing the icon by the colour was tried first and
+     works on silver, but obsidian multiplies by 0.086 - the icon clips at 255
+     long before it recovers, so it stays nearly black. */
+  _brandGlowMap:function(baseTex,ench){
+    if(!baseTex||!baseTex.image||!ench||!ench.face)return null;
+    var icon=this._iconImg(ench.t);
+    if(!icon)return null;
+    var key=(baseTex.uuid||'x')+'|glow|'+ench.t+'|'+ench.face;
+    this._glowCache=this._glowCache||{};
+    if(this._glowCache[key])return this._glowCache[key];
+    var img=baseTex.image;
+    var W=img.width||img.naturalWidth,H=img.height||img.naturalHeight;
+    if(!W||!H)return null;
+    var cv=document.createElement('canvas');cv.width=W;cv.height=H;
+    var x=cv.getContext('2d');
+    x.fillStyle='#000';x.fillRect(0,0,W,H);
+    var v=ench.face,col=(v-1)%3,row=Math.floor((v-1)/3);
+    var cw=W/3,ch=H/2,m=cw*(8/512);
+    x.drawImage(icon,col*cw+m,row*ch+m,cw-2*m,ch-2*m);
+    var out=new THREE.CanvasTexture(cv);
+    out.flipY=baseTex.flipY;out.wrapS=baseTex.wrapS;out.wrapT=baseTex.wrapT;
+    out.encoding=baseTex.encoding;out.needsUpdate=true;
+    this._glowCache[key]=out;
+    return out;
+  },
+  _iconUntinted:function(icon,col){
+    if(!col||col===0xffffff)return icon;
+    var key='u|'+col;
+    icon.__unt=icon.__unt||{};
+    if(icon.__unt[key])return icon.__unt[key];
+    var w=icon.width||icon.naturalWidth,h=icon.height||icon.naturalHeight;
+    if(!w||!h)return icon;
+    var c=document.createElement('canvas');c.width=w;c.height=h;
+    var x=c.getContext('2d');x.drawImage(icon,0,0);
+    var d;
+    try{d=x.getImageData(0,0,w,h);}catch(e){return icon;}
+    var p=d.data;
+    /* floored at 0.22: a channel the material multiplies to near zero cannot
+       be brought back, and dividing by it would just clip to white */
+    var r=Math.max(0.22,((col>>16)&255)/255),
+        g=Math.max(0.22,((col>>8)&255)/255),
+        b=Math.max(0.22,(col&255)/255);
+    for(var i=0;i<p.length;i+=4){
+      if(!p[i+3])continue;
+      p[i]  =Math.min(255,p[i]  /r);
+      p[i+1]=Math.min(255,p[i+1]/g);
+      p[i+2]=Math.min(255,p[i+2]/b);
+    }
+    x.putImageData(d,0,0);
+    icon.__unt[key]=c;
+    return c;
+  },
+  _brandedMap:function(baseTex,ench,col){
     if(!baseTex||!baseTex.image||!ench||!ench.face)return baseTex;
     var icon=this._iconImg(ench.t);
     if(!icon)return baseTex;/* not decoded yet - the onload reskins */
-    var key=(baseTex.uuid||'x')+'|'+ench.t+'|'+ench.face;
+    icon=this._iconUntinted(icon,col);
+    var key=(baseTex.uuid||'x')+'|'+ench.t+'|'+ench.face+'|'+(col||0);
     if(this._brandCache[key])return this._brandCache[key];
     var img=baseTex.image;
     var W=img.width||img.naturalWidth,H=img.height||img.naturalHeight;
@@ -16481,7 +16537,19 @@ var D3X={
     var px=x.getImageData(Math.round(ix+iw*0.06),Math.round(iy+ih*0.06),1,1).data;
     x.fillStyle='rgb('+px[0]+','+px[1]+','+px[2]+')';
     x.fillRect(ix,iy,iw,ih);
-    x.drawImage(icon,ix,iy,iw,ih);
+    /* The pips come off, and the icon's SILHOUETTE goes down in black. The
+       colour is carried by the emissive map alone; leaving the face colour
+       under it meant a pale die was already at 247 before the emissive was
+       added, so every icon pixel clipped to white. Black here, colour there,
+       and the sum is the icon's own colours on any die.
+       Built with source-in on a scratch canvas rather than ctx.filter, which
+       iOS Safari before 18 silently ignores. */
+    var sil=document.createElement('canvas');sil.width=Math.ceil(iw);sil.height=Math.ceil(ih);
+    var sx2=sil.getContext('2d');
+    sx2.drawImage(icon,0,0,sil.width,sil.height);
+    sx2.globalCompositeOperation='source-in';
+    sx2.fillStyle='#000';sx2.fillRect(0,0,sil.width,sil.height);
+    x.drawImage(sil,ix,iy,iw,ih);
     x.restore();
     var out=new THREE.CanvasTexture(cv);
     out.flipY=baseTex.flipY;out.wrapS=baseTex.wrapS;out.wrapT=baseTex.wrapT;
@@ -16568,7 +16636,10 @@ var D3X={
       if(!o.isMesh||o.userData.outline)return;
       self._dress(o.material,d.mat,sk);
       if(ench&&ench.face&&o.material.map){
-        o.material.map=self._brandedMap(o.material.map,ench);
+        o.material.map=self._brandedMap(o.material.map,ench,self.MATCOL[d.mat]);
+        var gm2=self._brandGlowMap(o.material.map,ench);
+        if(gm2){o.material.emissiveMap=gm2;
+          if(o.material.emissive)o.material.emissive.setRGB(1,1,1);}
         o.material.needsUpdate=true;
       }
       if(self._isWildMat(d.mat)&&o.material.map){
@@ -16591,7 +16662,10 @@ var D3X={
            is the very callback an icon's decode fires, so without this the
            brand could never survive the one event meant to apply it */
         if(ench&&ench.face&&o.material.map){
-          o.material.map=self._brandedMap(o.material.map,ench);
+          o.material.map=self._brandedMap(o.material.map,ench,self.MATCOL[d.mat]);
+          var gm3=self._brandGlowMap(o.material.map,ench);
+          if(gm3){o.material.emissiveMap=gm3;
+            if(o.material.emissive)o.material.emissive.setRGB(1,1,1);}
           o.material.needsUpdate=true;
         }
         if(self._isWildMat(d.mat)&&o.material.map){
@@ -16786,8 +16860,18 @@ var D3X={
     /* pitch from the slots themselves, so this follows the row rather than
        assuming it. One die on its own has no pitch: fall back to the middle
        of the allowed range rather than pinning it to a point. */
+    /* the SMALLEST gap, not the largest. On the second turn some dice have
+       been kept, so the thrown ones are no longer evenly spaced - a row of
+       [-2.4,-0.8,2.4,4.0] has a 3.2 hole where a die was taken out, and taking
+       the max read that hole as the pitch. The radius is derived from the
+       pitch, so it came out four times too big and the boundaries effectively
+       vanished: the dice wandered and drifted right. The tightest pair is what
+       the radius has to respect. */
     var _sp=slotX.slice().sort(function(a,b){return a-b;}),_pitch=0;
-    for(var _i9=1;_i9<_sp.length;_i9++)_pitch=Math.max(_pitch,_sp[_i9]-_sp[_i9-1]);
+    for(var _i9=1;_i9<_sp.length;_i9++){
+      var _g9=_sp[_i9]-_sp[_i9-1];
+      if(_g9>1e-4&&(!_pitch||_g9<_pitch))_pitch=_g9;
+    }
     /* the radius where the pen ceiling and the collision floor MEET: two
        square-on neighbours sitting on their facing rims are exactly a proxy
        apart, so neither constraint has to push against the other. */
@@ -18067,7 +18151,10 @@ var D3X={
           map:src.map||null,color:new THREE.Color(col)});
         self._dress(o.material,mat,sk);
         if(ench&&ench.face&&o.material.map){
-          o.material.map=self._brandedMap(o.material.map,ench);
+          o.material.map=self._brandedMap(o.material.map,ench,col);
+          var gm=self._brandGlowMap(o.material.map,ench);
+          if(gm){o.material.emissiveMap=gm;
+            if(o.material.emissive)o.material.emissive.setRGB(1,1,1);}
           o.material.needsUpdate=true;
         }
         if(self._isWildMat(mat)&&o.material.map){
