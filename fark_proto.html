@@ -1582,7 +1582,13 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 /* 23, not 19: the turn total used to land at 381.6 with the player's line of
    text at 370.9-390.1 - an 8.5px overlap. The words are the thing that has to
    sit close to the dice, so the total steps down under them. */
-#screen-match .kept-zone{padding-top:23cqw;padding-left:6cqw}
+/* And centred, not shoved into the left gutter. The 6cqw indent and the
+   flex-start below anchored it under a COLUMN of kept dice, which has been
+   empty since kept dice started staying on the throwing line - so it sat at
+   cx 49.8 while the dice, the selection total and the status line were all at
+   215, reading as a stray number rather than the running total. */
+#screen-match .kept-zone{padding-top:23cqw;padding-left:0}
+#screen-match .kept-zone{align-items:center}
 /* A flex gap cannot go negative, and it has to: the 3D die is drawn at 0.77
    of its DOM box, so touching boxes still leave a third of a die of air.
    Overlap the boxes instead - Denis wants a tight line. */
@@ -6232,6 +6238,12 @@ body::before,body::after{display:none!important}
 /* Hide the wrap-mounted halo when the die is selected — user doesn't want
    any glow inside the gold outline. */
 .die-wrap:has(.die.selected)::before{display:none!important}
+/* ...and in 3D the frame above is debris. It is an UPRIGHT octagon drawn at
+   inset:-4px of the die's DOM box, while the die is a rotated cube the solver
+   has moved somewhere inside that box - so all that survives is the corners
+   the cube fails to cover, which read as resize handles clinging to the die.
+   The WebGL glow traces the cube's actual silhouette and needs no help. */
+html.fk3d .die-wrap:has(.die.selected)::after{display:none!important}
 /* Suppress the old `.die.selected::before` outline on wrapped dice so we
    don't render two outlines (one inside, one outside). */
 .die-wrap .die.selected::before{
@@ -17910,13 +17922,26 @@ var D3X={
   },
   /* spent, but still on the table: see-through rather than moved away */
   _keptLook:function(d,on){
-    if(!d||!d.obj||d._keptLook===on)return;
+    /* COERCE. A die that has never been through here has _keptLook undefined,
+       and `undefined === false` is false, so the un-spent case fell through
+       and re-walked every material on every sync. */
+    on=!!on;
+    if(!d||!d.obj||!!d._keptLook===on)return;
     d._keptLook=on;
     d.obj.traverse(function(o){
       if(!o.isMesh||!o.material)return;
       o.material.transparent=!!on;
       o.material.opacity=on?(o.userData.outline?0.42:0.5):1;
-      o.material.depthWrite=!on;
+      /* DEPTH WRITES STAY ON for the die itself. Turning them off made a
+         closed cube composite in geometry order instead of depth order, so
+         its own far faces and the pips on the hidden side painted over the
+         near ones - a hard pale wedge across the top and ghost pips through
+         the middle. A convex cube at half opacity sorts against itself
+         perfectly well with depth on; only the near faces survive, which is
+         the look this is for. The outline is the exception: a back-faces-only
+         shell drawn fatter than the die, which would fight the body it wraps
+         if it wrote depth while translucent. */
+      o.material.depthWrite=o.userData.outline?!on:true;
       o.material.needsUpdate=true;
     });
   },
@@ -18467,6 +18492,16 @@ var D3X={
       self.dice.push({chip:el,obj:obj,mat:mat,val:val,match:true,
         w0:el.getBoundingClientRect().width,/* measured before any tap pop */
         uYaw:0,uPit:0,t0:performance.now()});
+    });
+    /* THE SPENT LOOK IS DERIVED, NOT APPLIED ONCE. Every reroll drops and
+       re-registers the match dice, so a die that was made translucent at the
+       commit came back opaque with nothing to re-apply it - measured, one die
+       marked .kept-still in the DOM and none translucent on the mesh. The
+       class is the fact and the material is a view of it, so it is re-read
+       here every sync and survives any rebuild. */
+    this.dice.forEach(function(d){
+      if(!d.match||!d.chip)return;
+      self._keptLook(d,d.chip.classList&&d.chip.classList.contains('kept-still'));
     });
     this.on=true;
   },
