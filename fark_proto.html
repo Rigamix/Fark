@@ -16612,6 +16612,19 @@ var D3X={
      that failed to load, and this has to read as deliberate. */
   _wildMap:function(baseTex){
     if(!baseTex||!baseTex.image)return baseTex;
+    /* ALREADY WILD: hand it straight back. Callers assign this function's
+       result into o.material.map, so every pass after the first is fed its own
+       output - and re-deriving comes back alpha 0 everywhere except the island
+       it fills by hand, which is a die you can see the table through. Only
+       jade gets here: the one material that is both wild AND unpainted, so
+       _dress never resets its map between passes the way it does for bone and
+       amber. Keeping the first pass IS the wanted end state.
+       A plain property, NOT texture.userData - Texture has no userData in this
+       three.js build, and assigning through it throws inside _mkDie, which
+       aborts syncMatch's registration loop at the jade die and leaves the rest
+       of the hand with no mesh at all. Measured: 6 dice registered before,
+       3 after, twice, with the frame loop swallowing the error. */
+    if(baseTex.__fkWild)return baseTex;
     var key=(baseTex.uuid||'x')+'|wild6';
     this._wildCache=this._wildCache||{};
     if(this._wildCache[key])return this._wildCache[key];
@@ -16640,6 +16653,7 @@ var D3X={
     var out=new THREE.CanvasTexture(cv);
     out.flipY=baseTex.flipY;out.wrapS=baseTex.wrapS;out.wrapT=baseTex.wrapT;
     out.encoding=baseTex.encoding;out.needsUpdate=true;
+    out.__fkWild=true;/* so a later pass recognises this and spares it */
     this._wildCache[key]=out;
     return out;
   },
