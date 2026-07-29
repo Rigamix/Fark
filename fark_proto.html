@@ -16694,6 +16694,11 @@ var D3X={
        58 degrees here, so wander in z reads as vertical jumble rather than
        as depth. x stays loose - that is where the rough line lives. */
     laneKX:9, laneCX:2.4, laneKZ:28, laneCZ:5,
+  /* the invisible slot: radius as a fraction of the slot pitch, the height it
+     reaches, and how much of a die's speed survives hitting it. 0.213 of a
+     1.599 pitch is 0.34 - see the note on P302. restitution is low on purpose:
+     a die should die against this wall, not ping around inside a small circle. */
+  slotRK:0.213, slotRMin:0.22, slotRMax:0.55, slotEngageY:2.2, slotRest:0.25,
     /* The collision box is WIDER THAN THE DIE in the plane of the table, so
        two dice simply cannot end up closer than this - no force acting at a
        distance, no push after they have landed. Not taller: a uniformly
@@ -16767,6 +16772,58 @@ var D3X={
   /* solve one throw. slots = target x per die in die-widths, values = the
      faces the game rolled. Returns {steps, frames:[[{p,q}]], rest:[{p,q}]} */
   _physSolve:function(slotX,values,obstacles,limitX){
+    /* pitch from the slots themselves, so this follows the row rather than
+       assuming it. One die on its own has no pitch: fall back to the middle
+       of the allowed range rather than pinning it to a point. */
+    var _sp=slotX.slice().sort(function(a,b){return a-b;}),_pitch=0;
+    for(var _i9=1;_i9<_sp.length;_i9++)_pitch=Math.max(_pitch,_sp[_i9]-_sp[_i9-1]);
+    var SLOT_R=_pitch?Math.max(this.PHYS.slotRMin,
+        Math.min(this.PHYS.slotRMax,this.PHYS.slotRK*_pitch)):0.45;
+    /* A slot holding a kept die is NOT free. Clamping a thrown die into an
+       occupied circle is unwinnable - the clamp pushes it in, contact pushes it
+       out - and it took 116 of 200 throws to the frame cap. Each die is moved
+       to the nearest circle nothing is standing in; anything left over rolls
+       unclamped, because a loose die is better than a throw that never ends. */
+    var slotC=slotX.slice(), taken=[];
+    (function(){
+      var occ=(obstacles||[]).map(function(o){return o.x;});
+      if(!occ.length)return;
+      var free=slotX.filter(function(x){
+        return !occ.some(function(ox){return Math.abs(ox-x)<SLOT_R+0.5;});
+      }).sort(function(a,b){return a-b;});
+      /* nearest free slot first, so a die keeps the place it was aimed at
+         whenever that place is actually empty */
+      var order=slotX.map(function(x,i){return i;})
+        .sort(function(a,b){return slotX[a]-slotX[b];});
+      order.forEach(function(i){
+        if(!free.length){taken[i]=false;return;}
+        var bi=0,bd=Infinity;
+        for(var f=0;f<free.length;f++){
+          var dd=Math.abs(free[f]-slotX[i]);
+          if(dd<bd){bd=dd;bi=f;}
+        }
+        slotC[i]=free.splice(bi,1)[0];taken[i]=true;
+      });
+    })();
+    for(var _t9=0;_t9<slotX.length;_t9++)if(taken[_t9]===undefined)taken[_t9]=true;
+    /* A die may sit up to SLOT_R from its centre, so the centre itself has to
+       keep that much back from the edge. The old on-screen rescue slid the
+       whole row in after the fact, which is one of the tidies that had to go -
+       this does the same job before a die is ever thrown, and moves nothing. */
+    if(limitX){
+      /* only when the row actually FITS. Squeezing slots that need more width
+         than the screen has just stacks them on top of each other, which is
+         how a clamp meant to keep dice on screen took 66 of 200 throws to the
+         frame cap. If it cannot fit, a little overhang is the lesser evil -
+         and in practice it cannot happen, because the slots are measured off
+         the DOM row, which is itself sized to the screen. */
+      var _need=0;
+      for(var _n9=0;_n9<slotC.length;_n9++)_need=Math.max(_need,Math.abs(slotC[_n9]));
+      if(_need+SLOT_R<=limitX+1e-6){
+        for(var _e9=0;_e9<slotC.length;_e9++)
+          slotC[_e9]=Math.max(-(limitX-SLOT_R),Math.min(limitX-SLOT_R,slotC[_e9]));
+      }
+    }
     var P=Object.create(this.PHYS),N=values.length;
     P.limitX=limitX||0;
     var world=new CANNON.World();
@@ -16831,7 +16888,7 @@ var D3X={
          leave the player's near edge (+z) high and moving UP now, and gravity
          does the rest: a real toss that rises, crests, and lands away from
          the player. The stagger keeps the six from moving as one slab. */
-      b.position.set(clearOf(slotX[i])+(Math.random()*.2-.1),
+      b.position.set(clearOf(slotC[i])+(Math.random()*.2-.1),
                      P.restY+4.6+(i%3)*.4,
                      2.45+Math.random()*.35);
       /* barely any vertical kick: gravity here is -50, so even a 2.0 toss
@@ -16860,15 +16917,42 @@ var D3X={
       for(var k=0;k<N;k++){
         var b2=bodies[k];
         b2.linearDamping=hot?.55:.1;b2.angularDamping=hot?.5:.1;
-        var sp=b2.velocity.norm(),g2=Math.min(2.2,Math.max(1,2.2-sp*.35));
-        b2.force.x+=(-P.laneKX*(b2.position.x-slotX[k])-P.laneCX*b2.velocity.x)*g2;
-        b2.force.z+=(-P.laneKZ*b2.position.z-P.laneCZ*b2.velocity.z)*g2;
+        /* The lane spring is gone. It pulled every die toward its slot for the
+           whole flight with a gain that ROSE from 1.0 to 2.2 as the die slowed -
+           strongest exactly while it was being watched settle, which is what
+           read as magnetic. The slot wall does the confining now, and does
+           nothing at all while the die is inside it. */
       }
       /* No mutual-shove spring any more. It reached 1.45 - three times a
          die's own half-width - so dice repelled each other across a visible
          gap of bare table, and it went on pushing after they had landed.
          The oversized collision box does the same job by contact, during the
          tumble, where it reads as dice knocking into each other. */
+      /* THE SLOT WALL. A hard clamp, not a spring: a spring is what the lane
+         force was, and a spring that has to be strong enough to hold a die is
+         strong enough to be seen pulling it. This cannot be overshot and costs
+         nothing when the die is inside, which is almost always. */
+      if(SLOT_R>0){
+        for(var kc=0;kc<N;kc++){
+          var bc=bodies[kc];
+          if(bc.position.y>P.slotEngageY)continue;/* still in the air: free */
+          /* no free slot: a wide circle rather than none, so it can share
+             space with a neighbour without being able to leave the table */
+          var myR=taken[kc]?SLOT_R:Math.max(SLOT_R,_pitch*0.9||1.4);
+          var ddx=bc.position.x-slotC[kc], ddz=bc.position.z;
+          var rr=Math.sqrt(ddx*ddx+ddz*ddz);
+          if(rr<=myR||rr<1e-6)continue;
+          var nx2=ddx/rr, nz2=ddz/rr;
+          bc.position.x=slotC[kc]+nx2*myR;
+          bc.position.z=nz2*myR;
+          var vn=bc.velocity.x*nx2+bc.velocity.z*nz2;
+          if(vn>0){
+            bc.velocity.x-=(1+P.slotRest)*vn*nx2;
+            bc.velocity.z-=(1+P.slotRest)*vn*nz2;
+            bc.angularVelocity.scale(0.82,bc.angularVelocity);
+          }
+        }
+      }
       world.step(P.dt);
       var fr=[];
       for(var k2=0;k2<N;k2++)fr.push({
@@ -17116,6 +17200,12 @@ var D3X={
     /* the tape is already cut at the last moving frame, so the blend only
        has to be finished by the time it runs out - and then there are no
        frames left after it to replay any drift */
+    /* WHERE IT LANDED IS WHERE IT STAYS. want[] and wantZ[] carried the four
+       tidy passes into the tape; the circle has already done their job, so the
+       correction is now the die's own resting position and the blend below
+       moves nothing sideways. Only y is still pinned, because a die has to end
+       up flat on the table whatever height the solver left it at. */
+    for(var w9=0;w9<N;w9++){want[w9]=fin[w9].x;wantZ[w9]=fin[w9].z;}
     var total=frames.length;
     var fb=total-1;
     var fa=Math.floor(fb*0.35);
