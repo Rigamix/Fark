@@ -1576,11 +1576,13 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 #screen-match .controls:has(#btnBank.bank-to-win) #btnRoll{order:2;width:30%;aspect-ratio:1401/912}
 /* dice: bigger and raised toward the centre band */
 #screen-match .die{width:13cqw;height:13cqw}
-#screen-match .player-dice-row{gap:3cqw}
+/* the row measured 399.8 inside a 418 line - the 18px of slack goes into the
+   gaps, where it buys separation */
+#screen-match .player-dice-row{gap:3.8cqw}
 /* The rival's row is the player's row - same gap, and the die size comes from
    `#screen-match .die` for both. The old !important overrides existed only to
    beat the little row's hard-coded 48px, which is gone. */
-#screen-match .opp-dice-row{gap:3cqw}
+#screen-match .opp-dice-row{gap:3.8cqw}
 #screen-match .throw-line{min-height:13cqw}
 #screen-match .die.sm{width:8.7cqw;height:8.7cqw}
 /* 2.4 : 1, not 1.75 : 1.75. An even split centres the line in the FLOW area,
@@ -16883,10 +16885,12 @@ var D3X={
   slotYieldV:1.1, slotYieldY:0.75, slotYieldMax:0.34,
   /* thrown in from off the top of the frame. 4.6 was barely above the table at
      this camera, which is why they read as coming up off it. */
-  dropY:4.9, dropZ:1.9,
+  /* 3.2, not 4.9: at the old peak a die was close enough to the camera to be
+     drawn 1.24x, which is most of the overlap on its own. It still arcs. */
+  dropY:3.2, dropZ:1.9,
   /* how high a die has to be to be out of the candlelight, and how far the
      brown goes at the top of that */
-  airDarkFrom:1.4, airDarkTo:4.6, airDark:0.35,
+  airDarkFrom:1.1, airDarkTo:3.2, airDark:0.35,
     /* The collision box is WIDER THAN THE DIE in the plane of the table, so
        two dice simply cannot end up closer than this - no force acting at a
        distance, no push after they have landed. Not taller: a uniformly
@@ -17777,40 +17781,28 @@ var D3X={
       for(var rp=0;rp<G.rimPasses;rp++)
         sel.forEach(function(h){trace(gx,h,0);gx.fill();});
     }else{
-      /* No ctx.filter (iOS Safari < 18). Stack EXPANDED copies of the hull
-         instead - trace() already grows the outline on a negative shrink -
-         from the outside in, each one a little more opaque. That builds the
-         same outward falloff out of primitives every engine has, and it is
-         what the punch-out below expects to find: paint sitting outside the
-         die's edge. Widest ring first so the alpha accumulates toward the
-         rim rather than away from it. */
-      /* shadowBlur is a true gaussian and WebKit has always had it. The
-         catch is that it draws the SHAPE as well as its shadow, and we only
-         want the shadow - so lay the shape down a full canvas-height ABOVE
-         the top edge and push its shadow back down by the same amount. Note
-         shadowOffset is in device pixels and is NOT affected by the current
-         transform, while the path IS, so the offset carries the dpr.
-         Stacking expanded rings instead of this was tried and rejected:
-         radial vertex expansion grows edge midpoints by only ~0.7x, so the
-         halo reached 6px where the filter reaches 22. */
-      var OFF=sc.height+80;
-      var blob=function(col,blur,passes){
-        gx.shadowColor=col; gx.shadowBlur=blur;
-        /* measured, not assumed - see _shadowOffsetScaled. The old *dpr was
-           a no-op on every desktop and the only thing it could ever change
-           was the phone, where the glow did not show. */
-        gx.shadowOffsetX=0;
-        gx.shadowOffsetY=self._shadowOffsetScaled()?OFF:OFF*dpr;
-        gx.fillStyle=col;
-        for(var i=0;i<passes;i++)
-          sel.forEach(function(h){trace(gx,h,0,-OFF);gx.fill();});
-      };
-      /* 2x: canvas shadowBlur is a gaussian of sigma = blur/2, while
-         filter:blur(N) is sigma = N, so the same number reads half as wide.
-         Measured against the desktop path to match its reach. */
-      blob(SOFT,G.soft*2,(G.softPasses||1));
-      blob(COL ,G.rim*2 ,G.rimPasses);
-      gx.shadowColor='transparent';gx.shadowBlur=0;gx.shadowOffsetY=0;
+      /* NO ctx.filter (iOS Safari < 18). Build the halo out of STROKES.
+         A stroke of width W centred on a path reaches W/2 outward, uniformly,
+         on every engine there is. That is the thing an expanded FILL cannot
+         do - radial vertex expansion grows edge midpoints by only ~0.7x, so
+         the halo reached 6px where the filter reaches 22 - and unlike the
+         shadowBlur trick it replaces, there is nothing here to probe. That
+         trick laid the shape a canvas-height above the top edge and pushed
+         its shadow back down, which needs to know whether shadowOffset is
+         scaled by the current transform; get that wrong and the halo lands
+         off-canvas, which is three reports of no glow on iOS.
+         Widest and faintest first: the punch-out below throws away the inner
+         half of every ring, so the alpha has to accumulate toward the rim. */
+      var RINGS=10, widest=Math.max(6,G.soft*2);
+      gx.lineJoin='round'; gx.lineCap='round';
+      for(var ri=0;ri<RINGS;ri++){
+        var f=ri/(RINGS-1);/* 0 widest and softest, 1 tightest and brightest */
+        gx.strokeStyle=(f<0.55)?SOFT:COL;
+        gx.lineWidth=widest*(1-f)+2;
+        gx.globalAlpha=0.09+0.23*f;
+        sel.forEach(function(h){trace(gx,h,0);gx.stroke();});
+      }
+      gx.globalAlpha=1;
     }
     /* cut the die back out EXACTLY on its painted edge: everything left is
        outside the shape, which is the whole point */
@@ -18369,7 +18361,11 @@ var D3X={
     g.add(out);
     return g;
   },
-  focus:null,FOV:40,FOV_MATCH:54,RISE_MATCH:20,MSCALE:0.77,_matchOn:false,
+  /* MSCALE 0.70, not 0.77: at 0.77 a die DREW 74.2px against a slot pitch of
+     68.8, so it was wider than the space it had - neighbours overlapped at
+     rest and badly in the air. The sim never noticed, because PHYS.proxy
+     calls a die 1.06 units across while it draws 1.73. */
+  focus:null,FOV:40,FOV_MATCH:54,RISE_MATCH:20,MSCALE:0.70,_matchOn:false,
   /* built on first use, NOT in the literal: three.js is loaded on demand and
      `new THREE.Color` here would run at parse time, before it exists */
   _hotCol:function(){return this.__hc||(this.__hc=new THREE.Color(0xffd98a));},
@@ -22055,10 +22051,9 @@ function _renderOppTags(rollPts){
   var oEdge=_diceEdge(row);
   var oTagBottom=(la.bottom-(oEdge?oEdge.top:lr.top))+_STACK_GAP;
   if(rollPts>0){
-    var planned=_ptSplit(kept,rollPts);
-    /* one tag that just repeats the total is noise - the total suffices */
-    if(!(planned.length===1&&planned[0][1]===rollPts)){
-      planned.forEach(function(t){
+    /* every die keeps its own number - see _renderSelTags */
+    {
+      _ptSplit(kept,rollPts).forEach(function(t){
         var e=document.createElement('div');e.className='oppTag';
         e.textContent='+'+t[1].toLocaleString();
         /* X from the die, Y from the row - see .selTag. Theirs matters more:
@@ -22113,10 +22108,12 @@ function _renderSelTags(selD,total,valid){
     area.appendChild(t);
   }
   if(valid&&total>0){
-    var planned=_ptSplit(selD,total);
-    /* one tag that just repeats the total is noise — the total suffices */
-    if(!(planned.length===1&&planned[0][1]===total))
-      planned.forEach(function(t2){_tag(t2[0],'+'+t2[1].toLocaleString());});
+    /* EVERY die keeps its own number. The old rule dropped a lone tag whose
+       value equalled the total, on the grounds that it was saying the same
+       thing twice - but with the total centred under the row, all that reads
+       as is the die's score having wandered off into the middle of the
+       table. The number belongs to the die. */
+    _ptSplit(selD,total).forEach(function(t2){_tag(t2[0],'+'+t2[1].toLocaleString());});
   }
   if(!tot){tot=document.createElement('div');tot.id='selTotal';area.appendChild(tot);}
   /* A branded face banks NOTHING and fires its effect instead - that is the
