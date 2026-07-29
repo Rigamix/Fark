@@ -2653,31 +2653,12 @@ html.fk3d #screen-match .die-wrap:has(.die.d3on.selected)::after{
   100%{background-position:-100% 0;opacity:0}
 }
 /* ── Vagabond drag-to-reorder visuals ── */
+/* only reaches the 2D fallback; the 3D die is lifted instead */
 .die.vg-drag-origin{opacity:.25;filter:grayscale(.4);transition:opacity .15s ease,filter .15s ease}
-.die.vg-drag-clone{
-  position:fixed!important;z-index:9500;pointer-events:none;
-  box-shadow:0 12px 22px 4px rgba(0,0,0,.65),0 0 18px 5px rgba(255,184,96,.4)!important;
-  /* Bigger lift so the clone clearly sits ABOVE the row — eliminates visual
-     overlap with neighbors as the cursor passes between them. */
-  transform:scale(1.18) translateY(-6px);
-  transition:transform .12s ease;
-  filter:brightness(1.12) drop-shadow(0 4px 6px rgba(0,0,0,.5));
-}
-/* Origin (ghosted) die during drag — fade more aggressively so the visible
-   "gap" where the dragged die was is unmistakable. */
-.die.vg-drag-origin{
-  opacity:.18!important;
-  filter:grayscale(.8) brightness(.6)!important;
-  transition:opacity .15s ease, filter .15s ease;
-}
-/* Dice currently shifting during a Vagabond drag — pause the idle breath
-   animation so the transition on transform actually interpolates. CSS animations
-   always win against transitions for the same property, which is why earlier
-   shifts looked like one-frame snaps. */
-.die.vg-shifting{
-  animation:none!important;
-  transition:transform 360ms cubic-bezier(.25,.46,.45,.94)!important;
-}
+/* No clone and no DOM shifting any more: a match die is drawn on the shared
+   canvas and its element is a slave to the mesh, so neither could ever be
+   seen. The die being carried is lifted off the table in 3D instead - see
+   _startVagabondDrag. */
 .die.committed{cursor:default}
 .die.committed:not(.d3on){opacity:.38}
 .die.committed:active{transform:none}
@@ -32006,136 +31987,131 @@ function setupDiceLongPress(){
    Uses passive:false on touchmove so page can't scroll out from under the
    gesture, and !important on transforms to beat the idle-breath animation. */
 var _vgDragState=null;
+/* Everything below works in SIM units on d.phys.x, never on DOM elements. The
+   DOM die is repositioned from the mesh every frame by _slaveHost, so moving
+   it is a no-op that looks like a bug. */
+function _vgRowInfo(){
+  if(!window.D3X||!D3X.dice)return null;
+  var mine=D3X.dice.filter(function(d){return d.match&&d.phys&&d.chip&&d.chip.isConnected;});
+  if(mine.length<2)return null;
+  var key=D3X._rowKey(mine[0]);
+  mine=mine.filter(function(d){return D3X._rowKey(d)===key;});
+  if(mine.length<2)return null;
+  var sz=mine[0].chip.getBoundingClientRect().width*D3X.MSCALE;
+  return {dice:mine,mid:D3X._rowMid(key),sz:sz,
+          mount:D3X.mount?D3X.mount.getBoundingClientRect():null};
+}
 function _startVagabondDrag(die){
   if(_vgDragState)return;
-  var row=document.getElementById('playerDiceRow');
-  if(!row)return;
-  var kids=Array.prototype.slice.call(row.children);
-  var startIndex=kids.indexOf(die);
-  if(startIndex<0)return;
-  /* Snapshot original slot centers (x coords of each die's center) — these
-     are used to figure out which slot the cursor is over at any moment. */
-  var slotCenters=kids.map(function(k){var r=k.getBoundingClientRect();return r.left+r.width/2;});
-  var slotWidth=(slotCenters[1]&&slotCenters[0])?(slotCenters[1]-slotCenters[0]):60;
-  /* Ghost the original AND mark all siblings as vg-shifting so their idle breath
-     animation pauses for the duration of the drag. Without this the transition
-     on transform never interpolates (animations always beat transitions). */
-  die.classList.add('vg-drag-origin');
-  kids.forEach(function(k){if(k!==die)k.classList.add('vg-shifting');});
-  /* Build the floating clone */
-  var clone=die.cloneNode(true);
-  clone.classList.add('vg-drag-clone');
-  clone.classList.remove('vg-drag-origin','selected','long-pressed');
-  /* Strip any inherited animations from the clone so it stays still under the cursor */
-  clone.style.animation='none';
-  var dieRect=die.getBoundingClientRect();
-  clone.style.width=dieRect.width+'px';
-  clone.style.height=dieRect.height+'px';
-  clone.style.left=dieRect.left+'px';
-  clone.style.top=dieRect.top+'px';
-  document.body.appendChild(clone);
+  var info=_vgRowInfo();if(!info)return;
+  var me=null;
+  info.dice.forEach(function(d){if(d.chip===die)me=d;});
+  if(!me)return;
+  /* order by where the dice actually SIT, which after the slot rework is also
+     their slot order - the two cannot disagree any more */
+  var order=info.dice.slice().sort(function(a,b){return a.phys.x-b.phys.x;});
+  var homes=order.map(function(d){return d.phys.x;});
+  var from=order.indexOf(me);
+  if(from<0)return;
   try{_haptic(25);}catch(e){}
   try{SFX.pop&&SFX.pop();}catch(e){}
-  _vgDragState={
-    die:die, clone:clone, kids:kids,
-    startIndex:startIndex, currentIdx:startIndex,
-    slotCenters:slotCenters, slotWidth:slotWidth,
-  };
-  function onMove(e){
+  die.classList.add('vg-drag-origin');
+  _vgDragState={me:me,die:die,order:order,homes:homes,from:from,to:from,
+                info:info,target:{},raf:0,y0:me.phys.y};
+  me.phys.y=me.phys.y+0.55;/* off the table, so it reads as carried */
+  order.forEach(function(d,i){if(d!==me)_vgDragState.target[i]=homes[i];});
+  var lerp=function(){
     if(!_vgDragState)return;
-    /* Block the page from scrolling under the drag — touchmove must be non-passive */
+    var st=_vgDragState,moving=false;
+    st.order.forEach(function(d,i){
+      if(d===st.me)return;
+      var t=st.target[i],x=d.phys.x;
+      if(Math.abs(t-x)>0.002){d.phys.x=x+(t-x)*0.28;moving=true;}
+      else d.phys.x=t;
+    });
+    st.raf=requestAnimationFrame(lerp);
+  };
+  _vgDragState.raf=requestAnimationFrame(lerp);
+  var onMove=function(e){
+    if(!_vgDragState)return;
     if(e.cancelable)e.preventDefault();
-    var x = e.clientX!=null?e.clientX:(e.touches&&e.touches[0]?e.touches[0].clientX:null);
-    var y = e.clientY!=null?e.clientY:(e.touches&&e.touches[0]?e.touches[0].clientY:null);
+    var x=e.clientX!=null?e.clientX:(e.touches&&e.touches[0]?e.touches[0].clientX:null);
     if(x==null)return;
-    /* Move the clone to the cursor */
-    var w=_vgDragState.clone.offsetWidth, h=_vgDragState.clone.offsetHeight;
-    _vgDragState.clone.style.left=(x-w/2)+'px';
-    _vgDragState.clone.style.top =(y-h/2)+'px';
-    /* Compute the slot under the cursor — nearest center wins */
-    var best=0, bestDist=Infinity;
-    for(var i=0;i<_vgDragState.slotCenters.length;i++){
-      var d=Math.abs(x-_vgDragState.slotCenters[i]);
-      if(d<bestDist){bestDist=d;best=i;}
+    var st=_vgDragState,I=st.info;
+    if(!I.mount)return;
+    /* screen -> sim: the table root sits at the row centre and scales by sz */
+    var sim=((x-I.mount.left)-I.mid)/I.sz;
+    var lo=st.homes[0],hi=st.homes[st.homes.length-1];
+    st.me.phys.x=Math.max(lo,Math.min(hi,sim));
+    /* which gap is it over? nearest home wins */
+    var best=0,bd=Infinity;
+    for(var i=0;i<st.homes.length;i++){
+      var dd=Math.abs(sim-st.homes[i]);
+      if(dd<bd){bd=dd;best=i;}
     }
-    if(best!==_vgDragState.currentIdx){
-      _vgDragState.currentIdx=best;
-      _updateSlotShift();
+    if(best!==st.to){
+      st.to=best;
+      /* everything between the old place and the new one shuffles one home
+         along, so the row opens a gap where the die is going */
+      var f=st.from,t=st.to;
+      st.order.forEach(function(d,i){
+        if(d===st.me)return;
+        var slot=i;
+        if(f<t&&i>f&&i<=t)slot=i-1;
+        else if(f>t&&i<f&&i>=t)slot=i+1;
+        st.target[i]=st.homes[slot];
+      });
       try{_haptic(6);}catch(e){}
     }
-  }
-  function onEnd(){
+  };
+  var onEnd=function(){
     if(!_vgDragState)return;
-    /* Stamp drag-end so any post-touchend synthesized click is gated out. */
     window._dragEndedAt=Date.now();
     _commitVagabondDrag();
-  }
-  _vgDragState.onMove=onMove;
-  _vgDragState.onEnd=onEnd;
-  /* IMPORTANT — passive:false so preventDefault works to block page scroll */
+  };
+  _vgDragState.onMove=onMove;_vgDragState.onEnd=onEnd;
   document.addEventListener('pointermove',onMove,{passive:false});
   document.addEventListener('pointerup',onEnd,{passive:true,once:true});
   document.addEventListener('pointercancel',onEnd,{passive:true,once:true});
   document.addEventListener('touchmove',onMove,{passive:false});
   document.addEventListener('touchend',onEnd,{passive:true,once:true});
   document.addEventListener('touchcancel',onEnd,{passive:true,once:true});
-  /* Initial render */
-  _updateSlotShift();
-}
-/* Live shift: slide other dice to make room for the dragged die — iPhone-style.
-   The breath animation is paused on these dice via the .vg-shifting class (set
-   in _startVagabondDrag), so the CSS transition on transform actually
-   interpolates smoothly instead of being clobbered by the animation each frame. */
-function _updateSlotShift(){
-  if(!_vgDragState)return;
-  var from=_vgDragState.startIndex, to=_vgDragState.currentIdx;
-  var slotW=_vgDragState.slotWidth;
-  _vgDragState.kids.forEach(function(k,i){
-    if(k===_vgDragState.die)return;
-    var shift=0;
-    if(from<to){if(i>from&&i<=to)shift=-1;}
-    else if(from>to){if(i<from&&i>=to)shift=1;}
-    if(shift){
-      k.style.transform='translateX('+(shift*slotW)+'px)';
-    }else{
-      k.style.transform='';
-    }
-  });
 }
 function _commitVagabondDrag(){
-  var st=_vgDragState; if(!st)return;
+  var st=_vgDragState;if(!st)return;
   _vgDragState=null;
-  /* Remove listeners first */
+  if(st.raf)cancelAnimationFrame(st.raf);
   document.removeEventListener('pointermove',st.onMove,{passive:false});
   document.removeEventListener('touchmove',st.onMove,{passive:false});
-  /* Restore clean state on all sibling dice — clear inline transform/transition
-     AND remove the vg-shifting class so the idle breath animation resumes. */
-  st.kids.forEach(function(k){
-    k.style.transition='';
-    k.style.removeProperty('transform');
-    k.classList.remove('vg-shifting');
-  });
-  /* Remove the floating clone */
-  if(st.clone&&st.clone.parentNode)st.clone.parentNode.removeChild(st.clone);
   st.die.classList.remove('vg-drag-origin');
-  /* Position unchanged → no-op (small haptic for "nothing happened") */
-  var from=st.startIndex, to=st.currentIdx;
+  if(st.y0!==undefined)st.me.phys.y=st.y0;/* back down onto the table */
+  var from=st.from,to=st.to;
+  /* the dice take the homes their NEW order entitles them to */
+  var seq=st.order.slice();
+  seq.splice(to,0,seq.splice(from,1)[0]);
+  seq.forEach(function(d,i){d.phys.x=st.homes[i];});
   if(from===to){try{_haptic(8);}catch(e){}return;}
-  /* Reorder G.pool AND the DOM to match the new arrangement */
-  var row=document.getElementById('playerDiceRow');
-  /* G is let-scoped (not on window) — check it directly, not window.G */
-  if(!row||typeof G==='undefined'||!G||!G.pool)return;
-  var poolIdx=G.pool.findIndex(function(d){return d.el===st.die;});
-  if(poolIdx<0)return;
-  var entry=G.pool.splice(poolIdx,1)[0];
-  G.pool.splice(to,0,entry);
-  /* Reorder DOM. After splicing the dragged die out, the row has N-1 children;
-     to insert it at index `to`, we reference children[to] (or null if at end). */
-  var refNode=null;
-  /* When moving rightward, the splice already shifted indices — adjust ref */
-  if(to>from){refNode=row.children[to+1]||null;}
-  else{refNode=row.children[to]||null;}
-  row.insertBefore(st.die,refNode);
+  /* and the pool follows, so scoring and the enchant slots agree with what is
+     now on the table */
+  try{
+    if(typeof G!=='undefined'&&G&&G.pool){
+      var poolSeq=seq.map(function(d){
+        for(var i=0;i<G.pool.length;i++)if(G.pool[i].el===d.chip)return G.pool[i];
+        return null;
+      }).filter(Boolean);
+      if(poolSeq.length===G.pool.length)G.pool=poolSeq;
+    }
+    /* the DOM row carries WRAPS, not dice - reordering bare dice is what
+       orphaned them from their wrap and hid them behind
+       .die-wrap:not(:has(.die)){display:none} */
+    var row=document.getElementById('playerDiceRow');
+    if(row){
+      seq.forEach(function(d){
+        var w=d.chip.closest?d.chip.closest('.die-wrap'):null;
+        if(w&&w.parentNode===row)row.appendChild(w);
+      });
+    }
+  }catch(e){}
   try{_haptic(20);}catch(e){}
   try{SFX.commit&&SFX.commit();}catch(e){}
   setStatusMsg('REARRANGED','active');
