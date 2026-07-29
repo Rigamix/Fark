@@ -1358,7 +1358,7 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 #screen-match .dlg-text{font-family:'JMH Beda',serif;font-size:3.4cqw;color:var(--patCol,#3a2812);line-height:1.3}
 /* NPC kept dice: die-shaped RIM only in the patron's colour — no
    blurred halo (it read as a tinted shadow under the dice) */
-.die.oppkeep .d3selg i{background:var(--patCol,#7a8a5c)}
+.die.oppkeep .d3selg i{background:#d94c3d}
 .die.oppkeep .d3selg2{display:none}
 /* the active-rule parchment note at the opponent edge (brief §5) */
 #screen-match #tellBadge{position:absolute;left:50%;right:auto;top:31.5cqw;bottom:auto;transform:translateX(-50%);
@@ -17685,11 +17685,10 @@ var D3X={
        instead, which is the same --patCol the portrait disc and the DOM
        fallback rim already use - so the three readings of a rival agree. */
     var SOFT=self.SEL_SOFT,COL=self.SEL_COL;
-    if(oppSel){
-      var _pc='';
-      try{_pc=(getComputedStyle(scEl).getPropertyValue('--patCol')||'').trim();}catch(e){}
-      COL=SOFT=(_pc||'#7a8a5c');
-    }
+    /* one red for the rival, every seat - see OPP_INK. This used to read
+       --patCol, so their keep glowed a different colour at every table and
+       no colour at all against a boss. */
+    if(oppSel)COL=SOFT=(window.OPP_INK||'#d94c3d');
     /* build the halo on its own surface: blur the silhouettes, then PUNCH
        THE DICE BACK OUT. Filling the silhouette and blurring it in place
        is what put the glow inside the die instead of around it. */
@@ -19673,6 +19672,8 @@ function clearRow(id){
      but the total hangs off .dice-area and would outlive the throw */
   if(id==='oppDiceRow'){
     const ot=document.getElementById('oppTotal');if(ot)ot.remove();
+    /* the held dice ARE row children - the wipe above already took them */
+    if(typeof G!=='undefined'&&G)G._oppHeld=[];
   }
   /* The kept line is part of the player's dice, not a separate widget. Bank,
      bust, hot dice and end-of-turn all clear the throwing row; every one of
@@ -21878,6 +21879,39 @@ function _oppAccent(){return OPP_INK;}
 /* The rival's roll, scored on the table instead of in a sentence. Mirrors
    _renderSelTags exactly - same split, same "+N" tags, same big total - but
    above the line and in their colour. */
+/* Every rival die on the table: the ones they just threw, plus the ones they
+   are sitting on. Used where the whole row has to react at once - the bust. */
+function _oppAllDice(){
+  if(typeof G==='undefined'||!G)return [];
+  return (G.oppDice||[]).concat(G._oppHeld||[]);
+}
+/* Between their rolls: the dice they KEPT stay exactly where they stopped and
+   turn translucent, and only the ones about to be rethrown leave the row.
+   The kept ones move to G._oppHeld rather than lingering in G.oppDice, which
+   every card effect reads as "this roll's commits" and nothing else. */
+function _oppHoldKept(){
+  if(typeof G==='undefined'||!G)return;
+  /* their hot dice: all six scored, so the table is swept and dealt again */
+  if(G._oppSweep){G._oppSweep=false;clearRow('oppDiceRow');G.oppDice=[];return;}
+  G._oppHeld=G._oppHeld||[];
+  (G.oppDice||[]).forEach(function(d){
+    if(!d.el)return;
+    if(d.kept){
+      if(!d.el.classList.contains('kept-still')){
+        d.el.classList.add('kept-still');
+        d.el.classList.remove('selected','oppkeep');
+        try{if(window.D3X&&D3X.dice)D3X.dice.forEach(function(q){
+          if(q.chip===d.el)D3X._keptLook(q,true);});}catch(e){}
+      }
+      G._oppHeld.push(d);
+    }else{
+      var w=d.el.parentElement;
+      if(w&&w.classList&&w.classList.contains('die-wrap'))w.remove();
+      else d.el.remove();
+    }
+  });
+  G.oppDice=[];
+}
 function _renderOppTags(rollPts){
   document.querySelectorAll('.oppTag').forEach(function(e){e.remove();});
   var tot=document.getElementById('oppTotal');
@@ -23746,7 +23780,7 @@ function runOppTurn(){
   function step(){
     if(G!==_matchG||!G||G._endMatchFired)return;/* ghost-timer guard */
     if(_ruleActive('drill_order','o')&&oppRollNum>=3){finOpp(oppBank);return;}
-    clearRow('oppDiceRow');G.oppDice=[];oppRollNum++;
+    _oppHoldKept();oppRollNum++;
     /* (In Arrears' pot retired with the rule) */
     if(_ruleActive('pickpocket','o')&&Math.random()<0.3&&left>1){left--;setStatusMsg('A DIE PALMED FROM THEIR HAND','gold');}
     const leakyActive=G.pCards.includes('leaky_cup')&&G.oppTurnCount%4===0&&G.oppTurnCount>0;
@@ -24173,10 +24207,10 @@ function runOppTurn(){
            they don't carry over to next turn (matches player startPTurn
            clear at line ~10960). */
         G._oVowArmed=false;G._oAllInArmed=false;
-        G.oppDice.forEach(d=>{if(d.el){d.el.classList.remove('die-blind');d.el.classList.add('opp-bust');}});
+        _oppAllDice().forEach(d=>{if(d.el){d.el.classList.remove('die-blind');d.el.classList.add('opp-bust');}});
         if(G._lanternActive)G._lanternActive=false;
         if(window.DLG)DLG.trigger('OPP_BUST');
-        setTimeout(function(){G.oppDice.forEach(d=>{if(d.el){d.el.classList.add('opp-scatter');if(d.el._d3)D3.draw(d.el._d3);}});},_oppDelay(120));
+        setTimeout(function(){_oppAllDice().forEach(d=>{if(d.el){d.el.classList.add('opp-scatter');if(d.el._d3)D3.draw(d.el._d3);}});},_oppDelay(120));
         setTimeout(function(){clearRow('oppDiceRow');finOpp(0);},_oppDelay(900));
       }
       /* NPC reckless die penalty (Brass): busts cost NPC extra from total */
@@ -24449,7 +24483,9 @@ function runOppTurn(){
         if(_otjV[5]&&_otjV[5]<3)G._oTurnComboTypes.single5=true;
       }
       left=G.oppDice.filter(d=>!d.kept).length;
-      if(left===0){G._oLastHotDice=true;left=6;setTimeout(step,_oppDelay(1500));return;}
+      /* all six scored: the next step deals a whole new row, so the held
+         dice go with the old one */
+      if(left===0){G._oLastHotDice=true;G._oppSweep=true;left=6;setTimeout(step,_oppDelay(1500));return;}
       /* DOUBLE DOWN NPC AI: when oppBank is solid (≥400) and reroll dice are
          scarce (≤2 left), double oppBank and force a fresh reroll of the
          opponent's whole hand. Mirrors player activateDoubleDown. */
