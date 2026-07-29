@@ -17333,6 +17333,31 @@ var D3X={
      in Safari 18 - before that the assignment is a silent no-op. See
      window._cfBlur, tested once and shared with the dice shadows. */
   _cf:_cfBlur(),
+  /* Is shadowOffsetY affected by the current transform on this engine? The
+     spec says no; WebKit has not always agreed, and the answer decides whether
+     the halo lands on the canvas or a whole canvas-height off the top of it.
+     Draw a 4px square at scale 2 with a 10px offset and see where the shadow
+     actually lands: at device y 28 if the offset was scaled, y 18 if not. */
+  _shadowOffsetScaled:function(){
+    if(this.__sos!==undefined)return this.__sos;
+    try{
+      var c=document.createElement('canvas');c.width=8;c.height=64;
+      var x=c.getContext('2d');
+      x.setTransform(2,0,0,2,0,0);
+      x.shadowColor='#ffffff';x.shadowBlur=0;x.shadowOffsetX=0;x.shadowOffsetY=10;
+      x.fillStyle='#ffffff';
+      x.fillRect(0,0,4,4);/* device rows 0-7; its shadow is the thing we want */
+      var d=x.getImageData(0,0,8,64).data,low=-1;
+      for(var y=63;y>=0;y--){
+        var hit=false;
+        for(var xx=0;xx<8;xx++)if(d[((y*8)+xx)*4+3]>10){hit=true;break;}
+        if(hit){low=y;break;}
+      }
+      /* shadow bottom is 8+10=18 unscaled, 8+20=28 scaled */
+      this.__sos=(low>=24);
+    }catch(e){this.__sos=false;}
+    return this.__sos;
+  },
   _glowCv:function(){
     var sc=document.getElementById('screen-match');
     if(!sc)return null;
@@ -17403,7 +17428,12 @@ var D3X={
   _drawGlow:function(){
     var cv=document.getElementById('dgCanvas');
     /* clear-and-leave: no selection, mid-roll, or no dice at all */
-    var skip=!this._matchOn||this._rolling();
+    /* not _matchOn: that is turned off whenever ANY sized .d3chip exists
+       anywhere in the document, which is a statement about the shop and the
+       loadout, not about whether there are match dice to draw around. */
+    var anyMatch=false;
+    for(var mi=0;mi<this.dice.length;mi++)if(this.dice[mi].match){anyMatch=true;break;}
+    var skip=!anyMatch||this._rolling();
     if(!skip){
       skip=true;
       for(var i=0;i<this.dice.length;i++){
@@ -17507,7 +17537,11 @@ var D3X={
       var OFF=sc.height+80;
       var blob=function(col,blur,passes){
         gx.shadowColor=col; gx.shadowBlur=blur;
-        gx.shadowOffsetX=0; gx.shadowOffsetY=OFF*dpr;
+        /* measured, not assumed - see _shadowOffsetScaled. The old *dpr was
+           a no-op on every desktop and the only thing it could ever change
+           was the phone, where the glow did not show. */
+        gx.shadowOffsetX=0;
+        gx.shadowOffsetY=self._shadowOffsetScaled()?OFF:OFF*dpr;
         gx.fillStyle=col;
         for(var i=0;i<passes;i++)
           sel.forEach(function(h){trace(gx,h,0,-OFF);gx.fill();});
@@ -18074,6 +18108,21 @@ var D3X={
     var row=document.getElementById('playerDiceRow');
     var n=row?row.getElementsByClassName('die').length:0;
     if(n!==this._rowN){this._rowN=n;if(this.dice.length)this._measureHomes();}
+    /* A tape is only ever retired inside _physPose, which only runs for a die
+       frame() decided to DRAW. A die hidden for any reason keeps d.roll for
+       good, _rolling() never goes false again, and the selection glow is
+       suppressed for the whole board with nothing to bring it back. Retire a
+       tape that has plainly finished, wherever the die is. */
+    var nowT=performance.now(),PD=this.PHYS.dt*1000;
+    this.dice.forEach(function(d){
+      if(!d.roll)return;
+      var R=d.roll,len=R.sol.frames.length;
+      if(nowT-R.t0<=(len+8)*PD)return;/* still inside its own tape */
+      var lf=R.sol.frames[len-1][R.i],rr=R.sol.rest[R.i];
+      d.phys={x:lf.x,y:lf.y,z:lf.z,
+        q:rr.flat.clone().multiply(new THREE.Quaternion(lf.qx,lf.qy,lf.qz,lf.qw)).multiply(rr.fix)};
+      d.roll=null;
+    });
     /* SYNC BEFORE STARTING A DEFERRED THROW. This was the other way round,
        so a throw waiting on its dice was retried against the list as it was
        BEFORE the dice were registered - it could only ever fail on the tick
