@@ -17716,19 +17716,6 @@ var D3X={
         b.r*(1-k)+0.129*k, b.g*(1-k)+0.078*k, b.b*(1-k)+0.039*k);
     });
   },
-  /* spent, but still on the table: see-through rather than moved away. The
-     outline goes with it or the die reads as a solid object wearing a ghost. */
-  _keptLook:function(d,on){
-    if(!d||!d.obj||d._keptLook===on)return;
-    d._keptLook=on;
-    d.obj.traverse(function(o){
-      if(!o.isMesh||!o.material)return;
-      o.material.transparent=!!on;
-      o.material.opacity=on?(o.userData.outline?0.42:0.5):1;
-      o.material.depthWrite=!on;
-      o.material.needsUpdate=true;
-    });
-  },
   _trayTint:function(d,k){
     var self=this,T=this.TRAY,c=function(v){return v<0?0:(v>1?1:v);};
     var shaded=k>=0.5;
@@ -19473,30 +19460,27 @@ function clearRow(id){
    Called on the reroll, which is when Denis wants to see them go: the row
    you are about to throw into is left holding only the dice being thrown -
    which is also what stops the sim landing a die on top of a kept one. */
-/* Kept dice STAY. They used to be flown to a tray under the table; a kept die
-   now holds the place and the angle it stopped at and turns translucent, which
-   is both what was asked for and what the slot system wants - a die on the
-   table is already an obstacle to the next throw, so its circle is taken and
-   the next roll goes to a free one. */
 function _dropKeptToTray(){
-  if(typeof G==='undefined'||!G||!G.pool)return;
-  var marked=0;
+  var tray=document.getElementById('keptRow');
+  /* G is a `let`, so it is NOT on window - `window.G` is undefined here and
+     the whole migration silently no-opped */
+  if(!tray||typeof G==='undefined'||!G||!G.pool)return;
+  var moved=0;
   G.pool.forEach(function(d){
     if(!d.committed||!d.el)return;
-    if(d.el.classList.contains('kept-still'))return;
-    /* the per-die "+100" tag has done its job; the running total under the
-       line is the number that matters once a die is spent */
+    var wrap=d.el.parentElement;
+    if(!wrap||wrap.parentElement===tray)return;
+    /* tell the 3D layer where the die is NOW - once the DOM node moves, the
+       slot it was sitting at is gone and there is nothing to animate from */
+    try{if(window.D3X&&D3X.toTray)D3X.toTray(d.el);}catch(e){}
+    /* the "+100" tags are children of the die, so they rode down with it.
+       Once a die is kept its individual score stops mattering - the running
+       total under the line is the number that does. */
     d.el.querySelectorAll('.selTag').forEach(function(t){t.remove();});
-    d.el.classList.add('kept-still');
-    d.el.classList.remove('selected');
-    try{
-      if(window.D3X&&D3X.dice){
-        D3X.dice.forEach(function(q){if(q.chip===d.el)D3X._keptLook(q,true);});
-      }
-    }catch(e){}
-    marked++;
+    d.el.classList.add('in-tray');
+    tray.appendChild(wrap);moved++;
   });
-  if(marked)_flySelTotal();
+  if(moved)_flySelTotal();
 }
 /* the selection total travels down with the dice it was counting and lands
    centred under them as the running turn total */
