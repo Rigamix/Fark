@@ -1455,7 +1455,9 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 /* centred in the diamond: the plate spans y 0-53.3% of the canvas, so its
    middle is 26.6% */
 #screen-match .hud-target{position:absolute;left:50.45%;top:26.63%;transform:translate(-50%,-50%);z-index:6;
-  font-family:'JMH Beda',serif;font-size:3.6cqw;color:#2e1c0b;background:none;border:none;padding:0;
+  /* 4.6cqw: the target is the number the whole match is measured against and
+     it was the smallest thing on the bar */
+  font-family:'JMH Beda',serif;font-size:4.6cqw;color:#2e1c0b;background:none;border:none;padding:0;
   letter-spacing:0;white-space:nowrap;line-height:1;text-shadow:none;box-shadow:none;filter:none}
 /* the wells, measured off ScoreBar_new_portraits: left centre 7.9%, right
    centre 92.0%, each ~9.2% of the bar wide. The portrait art draws its own
@@ -1495,7 +1497,8 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
    "score shifts to the side as it vibrates" bug. Centring the box instead
    leaves `transform` free for the effects, so it cannot recur: the widths
    below put each number's centre on the ribbon (o 7.9%, p 91.8%). */
-#screen-match .hud-score{position:absolute;top:73%;z-index:18;transform:none;
+/* 78%, not 73% - the numbers were riding high in their flags */
+#screen-match .hud-score{position:absolute;top:78%;z-index:18;transform:none;
   width:20%;height:0;display:flex;align-items:center;justify-content:center;
   font-family:'JMH Beda',serif;font-size:4.4cqw;line-height:1;color:#f6ecd4;
   text-shadow:0 2px 0 rgba(16,9,3,.75);background:none}
@@ -1580,7 +1583,12 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 #screen-match .opp-dice-row{gap:3cqw}
 #screen-match .throw-line{min-height:13cqw}
 #screen-match .die.sm{width:8.7cqw;height:8.7cqw}
-#screen-match #diceArea{--sp-before:1.75;--sp-after:1.75}
+/* 2.4 : 1, not 1.75 : 1.75. An even split centres the line in the FLOW area,
+   which starts under 62px of padding with the dialogue above it - so the dice
+   came out at 41% of the screen. This puts them at the middle, a shade below,
+   where a thumb can reach them. Both sides throw on this line, so the rival
+   moves with it. */
+#screen-match #diceArea{--sp-before:2.9;--sp-after:1}
 /* the kept line: smaller dice, close together, and the turn total under it */
 /* down and to the left, off the throwing line entirely - the reference has
    them tucked in the bottom corner with the turn total under them */
@@ -1592,7 +1600,10 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
    empty since kept dice started staying on the throwing line - so it sat at
    cx 49.8 while the dice, the selection total and the status line were all at
    215, reading as a stray number rather than the running total. */
-#screen-match .kept-zone{padding-top:23cqw;padding-left:0}
+/* 15, not 23: the 23 was clearing a bottom strip that lived at a fixed
+   offset. The strip is placed off the dice now, and with the line lower the
+   old padding walked the turn total into the controls. */
+#screen-match .kept-zone{padding-top:15cqw;padding-left:0}
 #screen-match .kept-zone{align-items:center}
 /* A flex gap cannot go negative, and it has to: the 3D die is drawn at 0.77
    of its DOM box, so touching boxes still leave a third of a die of air.
@@ -16865,7 +16876,7 @@ var D3X={
   /* looser: a wall that takes ALL the outward speed reads as jelly. It gives
      a third of it back now, sits wider, and only engages near the table so a
      die is free for most of its fall. */
-  slotRK:0.213, slotRMin:0.14, slotRMax:0.72, slotEngageY:1.5, slotRest:0.34,
+  slotRK:0.213, slotRMin:0.14, slotRMax:0.9, slotEngageY:1.5, slotRest:0.5,
   /* a die that has stopped and is still leaning on its wall gets the wall
      moved out to meet it, once. Without this the clamp re-projects it every
      frame and it creeps along the rim - the "very very slow laggy slide". */
@@ -16991,8 +17002,12 @@ var D3X={
        apart, so neither constraint has to push against the other. */
     /* the radius where the pen ceiling and the collision floor meet, opened
        up by a third: exactly meeting them leaves a die nothing to move in. */
+    /* 1.15, not 0.85. At the real row pitch that is 0.309 die-widths of room
+       instead of 0.229 - the difference between a die that can bounce and one
+       that is pinned. The circle is still what keeps the columns readable;
+       it just stops being the loudest thing in the throw. */
     var SLOT_R=_pitch?Math.max(this.PHYS.slotRMin,
-        Math.min(this.PHYS.slotRMax,(_pitch-this.PHYS.proxy)/2*0.85)):0.5;
+        Math.min(this.PHYS.slotRMax,(_pitch-this.PHYS.proxy)/2*1.15)):0.62;
     /* A slot holding a kept die is NOT free. Clamping a thrown die into an
        occupied circle is unwinnable - the clamp pushes it in, contact pushes it
        out - and it took 116 of 200 throws to the frame cap. Each die is moved
@@ -17060,7 +17075,7 @@ var D3X={
        dragging dice across it - with the spring gone a die has to be able to
        come to rest where it lands. The lower restitution takes the other half
        of "they bounce" out. */
-    world.addContactMaterial(new CANNON.ContactMaterial(mDesk,mDie,{friction:.42,restitution:.34}));
+    world.addContactMaterial(new CANNON.ContactMaterial(mDesk,mDie,{friction:.42,restitution:.46}));
     world.addContactMaterial(new CANNON.ContactMaterial(mDie,mDie,{friction:.12,restitution:.30}));
     world.addContactMaterial(new CANNON.ContactMaterial(mWall,mDie,{friction:0,restitution:.8}));
     var ground=new CANNON.Body({mass:0,material:mDesk,shape:new CANNON.Plane()});
@@ -17126,7 +17141,7 @@ var D3X={
          knocking around, but the knocking turned out to be the die landing on
          TOP of an invisible wall (P310) - so the tumble was paying for
          somebody else's crime. A thrown die should look thrown. */
-      b.angularVelocity.set(-(5+Math.random()*6),Math.random()*5-2.5,Math.random()*6-3);
+      b.angularVelocity.set(-(8+Math.random()*9),Math.random()*8-4,Math.random()*9-4.5);
       var q=new CANNON.Quaternion();
       q.setFromEuler(Math.random()*6.28,Math.random()*6.28,Math.random()*6.28);
       b.quaternion.copy(q);
@@ -19726,10 +19741,18 @@ function newG(rung,pCards,oCards,pStake,oStake){
 /* ═══════ UI HELPERS ═══════ */
 function clearRow(id){
   const el=document.getElementById(id);if(el)el.innerHTML='';
+  /* same for yours: the tags outlive the dice otherwise */
+  if(id==='playerDiceRow'){
+    document.querySelectorAll('.selTag').forEach(function(t){t.remove();});
+  }
   /* the rival's "+N" tags are children of their dice and leave with them,
      but the total hangs off .dice-area and would outlive the throw */
   if(id==='oppDiceRow'){
     const ot=document.getElementById('oppTotal');if(ot)ot.remove();
+    /* The rival's per-die numbers used to be children of their dice, so this
+       wipe took them. They hang off the dice area now (P328), which is how
+       they survived into the player's turn and sat there over an empty line. */
+    document.querySelectorAll('.oppTag').forEach(function(t){t.remove();});
     /* the held dice ARE row children - the wipe above already took them */
     if(typeof G!=='undefined'&&G)G._oppHeld=[];
   }
@@ -20078,9 +20101,22 @@ function _placeTurnText(){
   if(!zone)return;
   var rr=row.getBoundingClientRect(),zr=zone.getBoundingClientRect();
   if(rr.height<2)return;
-  top.style.bottom=(zr.bottom-rr.top+rr.height*1.25)+'px';
+  /* Each side's words sit beyond that side's numbers, and the numbers sit
+     beyond the dice. A fixed clearance off the row assumed the dice were at
+     rest inside it, which they never are - the mesh is drawn above its slot,
+     so the rival's line was written across dice still in the air. */
+  var edge=_diceEdge(document.getElementById('oppDiceRow'))
+        || _diceEdge(document.getElementById('playerDiceRow'));
+  var hiY=edge?edge.top:rr.top, loY=edge?edge.bottom:rr.bottom;
+  document.querySelectorAll('.oppTag,#oppTotal').forEach(function(e){
+    var t=e.getBoundingClientRect().top;if(t&&t<hiY)hiY=t;
+  });
+  document.querySelectorAll('.selTag,#selTotal').forEach(function(e){
+    var b=e.getBoundingClientRect().bottom;if(b>loY)loY=b;
+  });
+  top.style.bottom=(zr.bottom-hiY+_STACK_GAP)+'px';
   top.style.top='';
-  bot.style.top=(rr.bottom-zr.top+rr.height*1.25)+'px';
+  bot.style.top=(loY-zr.top+_STACK_GAP)+'px';
   bot.style.bottom='';
 }
 function setStatusMsg(m,c){
@@ -21908,6 +21944,36 @@ function _selPts(){
     return (r&&r.valid)?(r.total||0):0;
   }catch(e){return 0;}
 }
+/* WHERE THE DICE ACTUALLY ARE, in viewport coordinates. The row box is not
+   the answer: a die's mesh is drawn above its DOM slot, so anything placed
+   off the row lands on the dice. The chips are slaved to the meshes, so their
+   union is the real extent of the throw. Returns null when the row is empty,
+   and the caller falls back to the box. */
+function _diceEdge(row){
+  if(!row)return null;
+  var top=Infinity,bot=-Infinity;
+  row.querySelectorAll('.die').forEach(function(d){
+    /* the WRAP, plus the translate the 3D layer writes from the mesh.
+       Reading the die's own rect picks up die-tap-pop and die-sel-pop, and
+       these numbers are placed by the act of tapping a die - measured, tags
+       landing 26.9px inside the dice they label. CSS composes translate
+       before transform, and the keyframes only touch transform, so the mesh
+       offset and the tap bounce never mix. */
+    var w=d.parentElement;
+    var box=(w&&w.classList&&w.classList.contains('die-wrap'))?w:d;
+    var r=box.getBoundingClientRect();
+    if(r.height<2)return;
+    var ty=0;
+    try{
+      var tr=(d.style.translate||'').trim().split(/\s+/);
+      if(tr.length>1)ty=parseFloat(tr[1])||0;
+    }catch(e){}
+    if(r.top+ty<top)top=r.top+ty;
+    if(r.bottom+ty>bot)bot=r.bottom+ty;
+  });
+  return isFinite(top)?{top:top,bottom:bot}:null;
+}
+var _STACK_GAP=6;/* between any two layers of the score stack */
 /* Which die carries which number. A single 1 or 5 wears its own 100 or 50;
    whatever the combo made lands on the middle die of the group that made it.
    ONE owner, because both sides show it and the two readings must never
@@ -21986,6 +22052,8 @@ function _renderOppTags(rollPts){
   if(!kept.length||!row||!area||!row.querySelector('.die')){if(tot)tot.remove();return;}
   var lr=(document.getElementById('throwLine')||row).getBoundingClientRect();
   var la=area.getBoundingClientRect();
+  var oEdge=_diceEdge(row);
+  var oTagBottom=(la.bottom-(oEdge?oEdge.top:lr.top))+_STACK_GAP;
   if(rollPts>0){
     var planned=_ptSplit(kept,rollPts);
     /* one tag that just repeats the total is noise - the total suffices */
@@ -21998,7 +22066,7 @@ function _renderOppTags(rollPts){
            parented to a die could ride it clean off the screen. */
         var dr=t[0].getBoundingClientRect();
         e.style.left=Math.max(12,Math.min(la.width-12,(dr.left+dr.width/2)-la.left))+'px';
-        e.style.bottom=((la.bottom-lr.top)+lr.height*0.13)+'px';
+        e.style.bottom=oTagBottom+'px';
         area.appendChild(e);
       });
     }
@@ -22014,9 +22082,15 @@ function _renderOppTags(rollPts){
   }else{tot.style.color='';tot.style.textShadow='';}
   /* anchored to the TOP of the row, so it rides above the dice however tall
      the number itself turns out to be */
-  var rr=row.getBoundingClientRect(),ar=area.getBoundingClientRect();
+  /* above whatever the tags took, which is itself above the dice */
+  var highest=oTagBottom;
+  document.querySelectorAll('.oppTag').forEach(function(t){
+    var b=la.bottom-t.getBoundingClientRect().top;
+    if(b>highest)highest=b;
+  });
   tot.style.top='';
-  tot.style.bottom=(ar.bottom-rr.top+rr.height*0.55)+'px';
+  tot.style.bottom=(highest+_STACK_GAP)+'px';
+  try{_placeTurnText();}catch(e){}
 }
 function _renderSelTags(selD,total,valid){
   document.querySelectorAll('.selTag').forEach(function(e){e.remove();});
@@ -22026,13 +22100,16 @@ function _renderSelTags(selD,total,valid){
   var area=document.querySelector('#screen-match .dice-area');
   if(!row||!area)return;
   var rr=row.getBoundingClientRect(),ar=area.getBoundingClientRect();
-  /* X from the die it belongs to, Y from the ROW. One baseline for all of
-     them, and a fixed gap to the total underneath. */
+  var edge=_diceEdge(document.getElementById('playerDiceRow'));
+  var tagY=((edge?edge.bottom:rr.bottom)-ar.top)+_STACK_GAP;
+  /* X from the die it belongs to, Y from the LOWEST DIE ON THE LINE. One
+     baseline for all of them, and clear of the dice rather than clear of the
+     box the dice came out of. */
   function _tag(host,txt){
     var t=document.createElement('div');t.className='selTag';t.textContent=txt;
     var dr=host.getBoundingClientRect();
     t.style.left=((dr.left+dr.width/2)-ar.left)+'px';
-    t.style.top=((rr.bottom-ar.top)+rr.height*0.13)+'px';
+    t.style.top=tagY+'px';
     area.appendChild(t);
   }
   if(valid&&total>0){
@@ -22065,7 +22142,18 @@ function _renderSelTags(selD,total,valid){
       +(ex>0?',0 0 '+(40*ex).toFixed(0)+'px rgba(255,150,40,'+(0.75*ex).toFixed(2)+')':'')
       +',0 2px 0 rgba(58,32,8,.85)')
     :'';
-  tot.style.top=(rr.bottom-ar.top+rr.height*0.55)+'px';
+  /* and the total goes below whatever the tags ended up occupying */
+  var lowest=tagY;
+  document.querySelectorAll('.selTag').forEach(function(t){
+    var b=t.getBoundingClientRect().bottom-ar.top;
+    if(b>lowest)lowest=b;
+  });
+  tot.style.top=(lowest+_STACK_GAP)+'px';
+  /* and the words go under the total, which has only just moved. setStatusMsg
+     fires before _renderSelTags in refreshSelUI, so placing the strip from
+     there alone measured a total that was still where the last selection left
+     it - the two overlapped by 10px. */
+  try{_placeTurnText();}catch(e){}
 }
 function refreshSelUI(){
   /* Guard: don't update selection-status text outside the player's choosing/idle phases.
