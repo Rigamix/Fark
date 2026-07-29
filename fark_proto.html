@@ -16687,7 +16687,10 @@ var D3X={
      went to 6.4 die-widths and two dice ended up 0.02 apart. The ping-pong is
      cured by taking the sideways speed out of the throw and by not rebounding,
      not by letting go of the die earlier. */
-  slotRK:0.213, slotRMin:0.22, slotRMax:0.55, slotEngageY:2.2, slotRest:0.0,
+  /* looser: a wall that takes ALL the outward speed reads as jelly. It gives
+     a third of it back now, sits wider, and only engages near the table so a
+     die is free for most of its fall. */
+  slotRK:0.213, slotRMin:0.30, slotRMax:0.72, slotEngageY:1.5, slotRest:0.34,
   /* thrown in from off the top of the frame. 4.6 was barely above the table at
      this camera, which is why they read as coming up off it. */
   dropY:4.9, dropZ:1.9,
@@ -16788,8 +16791,10 @@ var D3X={
     /* the radius where the pen ceiling and the collision floor MEET: two
        square-on neighbours sitting on their facing rims are exactly a proxy
        apart, so neither constraint has to push against the other. */
+    /* the radius where the pen ceiling and the collision floor meet, opened
+       up by a third: exactly meeting them leaves a die nothing to move in. */
     var SLOT_R=_pitch?Math.max(this.PHYS.slotRMin,
-        Math.min(this.PHYS.slotRMax,(_pitch-this.PHYS.proxy)/2)):0.45;
+        Math.min(this.PHYS.slotRMax,(_pitch-this.PHYS.proxy)/2*1.35)):0.5;
     /* A slot holding a kept die is NOT free. Clamping a thrown die into an
        occupied circle is unwinnable - the clamp pushes it in, contact pushes it
        out - and it took 116 of 200 throws to the frame cap. Each die is moved
@@ -16846,29 +16851,19 @@ var D3X={
        dragging dice across it - with the spring gone a die has to be able to
        come to rest where it lands. The lower restitution takes the other half
        of "they bounce" out. */
-    world.addContactMaterial(new CANNON.ContactMaterial(mDesk,mDie,{friction:.42,restitution:.14}));
-    world.addContactMaterial(new CANNON.ContactMaterial(mDie,mDie,{friction:.12,restitution:.20}));
+    world.addContactMaterial(new CANNON.ContactMaterial(mDesk,mDie,{friction:.42,restitution:.34}));
+    world.addContactMaterial(new CANNON.ContactMaterial(mDie,mDie,{friction:.12,restitution:.30}));
     world.addContactMaterial(new CANNON.ContactMaterial(mWall,mDie,{friction:0,restitution:.8}));
     var ground=new CANNON.Body({mass:0,material:mDesk,shape:new CANNON.Plane()});
     ground.quaternion.setFromAxisAngle(new CANNON.Vec3(1,0,0),-Math.PI/2);
     world.add(ground);
-    /* the widest slot FROM THE CENTRE, not the right-most one. A die held
-       on the right of the row - a frozen die, or a batch thrown a tick after
-       its neighbours - makes every rerolled slot negative, and this went
-       negative with them: the side walls swapped sides and clearOf() below
-       degenerated into `return -halfW` for EVERY input, spawning the whole
-       batch in one column. Verified: slots [-3.1,-2.4] gave halfW -1.2 and
-       clearOf returned 1.2 for -3.1, -2.4, 0 and 2.5 alike. */
-    var halfW=Math.max.apply(null,slotX.map(Math.abs))+1.2;
-    var wall=function(x,z,sx,sz){
-      var b=new CANNON.Body({mass:0,material:mWall,
-        shape:new CANNON.Box(new CANNON.Vec3(sx,2.5,sz))});
-      b.position.set(x,2.5,z);world.add(b);
-    };
-    wall(0,-P.trayZ-P.wallPad,halfW+1,P.wallPad);
-    wall(0, P.trayZ+P.wallPad,halfW+1,P.wallPad);
-    wall(-halfW-P.wallPad,0,P.wallPad,P.trayZ+1);
-    wall( halfW+P.wallPad,0,P.wallPad,P.trayZ+1);
+    /* THE WALLS ARE GONE. Four static boxes spanning y 0 to 5, and the dice
+       now spawn at 5.4 to 6.3 - so they were landing ON TOP of them and had to
+       roll off before they could fall. That is exactly "they hang in the air
+       and drop as if an invisible floor disappeared from under them", and how
+       long it took depended on which bit of wall a die came down on.
+       They are also redundant: the slot circles bound x and z, and the ground
+       bounds y. Nothing else was holding a die in. */
     var HALF=.5,bodies=[];
     var PX=HALF*P.proxy,PY=HALF*P.tall;
     /* dice being kept are immovable furniture, not absent */
@@ -16882,6 +16877,7 @@ var D3X={
     /* A die aimed at a slot a kept die already occupies lands ON it and
        stays there - measured y=1.46 against a table at 0.48. Nudge the drop
        point clear of anything static before it is ever thrown. */
+    var halfW=Math.max.apply(null,slotX.map(Math.abs))+1.2;
     var clearOf=function(x){
       for(var t=0;t<6;t++){
         var worst=0,dir=0;
@@ -16926,7 +16922,10 @@ var D3X={
       /* the wall was being asked to absorb a tumble it should never have had:
          a cube landing on a corner turns spin into sideways travel, and every
          one of those became a knock. Damp it instead of catching it. */
-      b.linearDamping=.22;b.angularDamping=.30;
+      /* almost nothing in the air: damping here does not stop a die skating,
+         it stops it FALLING. Measured at .22 the die took 13 frames to start
+         moving and then dropped at half the rate gravity says it should. */
+      b.linearDamping=.02;b.angularDamping=.06;
       world.add(b);bodies.push(b);
     }
     var frames=[],it=0,over=0,boostFrom=-1,still=0;
@@ -16940,7 +16939,9 @@ var D3X={
       var hot=(boostFrom>=0&&it>=boostFrom);
       for(var k=0;k<N;k++){
         var b2=bodies[k];
-        b2.linearDamping=hot?.62:.22;b2.angularDamping=hot?.58:.30;
+        /* grip belongs to the CONTACT, not to the air: friction on the desk
+           is what stops a landed die, and it is 0.42. */
+        b2.linearDamping=hot?.55:.02;b2.angularDamping=hot?.5:.06;
         /* The lane spring is gone. It pulled every die toward its slot for the
            whole flight with a gain that ROSE from 1.0 to 2.2 as the die slowed -
            strongest exactly while it was being watched settle, which is what
