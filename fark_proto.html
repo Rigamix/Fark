@@ -12754,7 +12754,9 @@ CFX.sacrifice={
     var free=G.pool.filter(function(d){return !d.committed&&!d._shattered;});
     var d=free[free.length-1];
     d._shattered=true;
-    if(d.el){try{spawnShards(d.el,'#3a3a52');}catch(e){}d.el.classList.add('die-shatter');
+    if(d.el){try{spawnShards(d.el,'#3a3a52');}catch(e){}
+      try{if(window.D3X&&D3X.shatter)D3X.shatter(d.el);}catch(e){}
+      d.el.classList.add('die-shatter');
       (function(el){setTimeout(function(){if(el&&el.parentNode)el.remove();},360);})(d.el);}
     if(G.numDice>1)G.numDice--;
     if(Array.isArray(G.matchDice)){var mi=G.matchDice.indexOf(d.mat);if(mi>=0)G.matchDice.splice(mi,1);}
@@ -16248,8 +16250,11 @@ function _breakDie(d){
   var lane=_laneOf(d);
   /* gone for good, run save included - see _removeDieAt */
   _removeDieAt(lane,{permanent:true});
-  try{if(d.el){d.el.classList.add('die-shatter');var _w=d.el.parentElement;
-    setTimeout(function(){try{(_w||d.el).remove();}catch(e){}},400);}}catch(e){}
+  try{if(d.el){
+    /* the class alone animates a box nobody can see - see D3X.shatter */
+    try{if(window.D3X&&D3X.shatter)D3X.shatter(d.el);}catch(e2){}
+    d.el.classList.add('die-shatter');var _w=d.el.parentElement;
+    setTimeout(function(){try{(_w||d.el).remove();}catch(e){}},420);}}catch(e){}
   try{SFX.err&&SFX.err();}catch(e){}
   var trg=fam&&BREAK_TRIGGERS[fam];
   if(trg){try{famLog(trg.msg);}catch(e){}try{trg.fire();}catch(e){}}
@@ -16721,6 +16726,31 @@ var D3X={
     if(!xs.length)return {x:d.hx||0,y:d.hy||0};
     return {x:(Math.min.apply(null,xs)+Math.max.apply(null,xs))/2,
             y:ys.reduce(function(a,b){return a+b;},0)/ys.length};
+  },
+  /* A die coming apart. The CSS keyframes animate the host box, which is
+     invisible - this is the die itself. Swell, then collapse with a tumble;
+     the lift is what stops it reading as a die simply being deleted. */
+  BURST:{ms:300,swell:0.20,peak:1.32,lift:0.85,spin:11},
+  shatter:function(el){
+    var d=null;this.dice.forEach(function(q){if(q.chip===el)d=q;});
+    if(!d||d.burst||!window.THREE)return;
+    d.burst={t0:performance.now(),
+      ax:new THREE.Vector3(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5)
+           .normalize()};
+  },
+  _burstPose:function(d){
+    var B=this.BURST,t=(performance.now()-d.burst.t0)/B.ms;
+    if(t<0)t=0;
+    if(t>=1){d.obj.visible=false;return;}
+    /* up fast to the peak, then down the far side steeply - a break, not a
+       deflation */
+    var sc=(t<B.swell)?1+(B.peak-1)*(t/B.swell)
+                      :B.peak*Math.pow(1-((t-B.swell)/(1-B.swell)),2.2);
+    d.obj.scale.setScalar(Math.max(0.001,sc));
+    d.obj.position.y+=B.lift*Math.sin(Math.PI*t);
+    var q=(this._bq||(this._bq=new THREE.Quaternion()))
+      .setFromAxisAngle(d.burst.ax,B.spin*t*t);
+    d.obj.quaternion.multiply(q);
   },
   /* move the DOM box under the die so it stays clickable where it is drawn */
   _slaveHost:function(d,root){
@@ -18532,6 +18562,7 @@ var D3X={
           d.obj.quaternion.copy(pose.q);
           D3X._airTint(d,pose.y);
           D3X._weightOutline(d);
+          if(d.burst)D3X._burstPose(d);
           e._d3xOwned=true;
           D3X._slaveHost(d,root);
           return;
@@ -18549,6 +18580,7 @@ var D3X={
           d.obj.position.set(d.phys.x,d.phys.y,d.phys.z);
           d.obj.quaternion.copy(d.phys.q);
           D3X._weightOutline(d);
+          if(d.burst)D3X._burstPose(d);
           if(e)e._d3xOwned=true;
           D3X._slaveHost(d,root3);
           return;
@@ -20453,6 +20485,40 @@ function spawnShards(el,color){
     });
   }
 }
+/* Obsidian coming apart, as against the generic break: heavier, slower, and
+   in three readings of the same fracture - the glass in its own near-black,
+   the pale edge where it cleaves, and the ember at the core. The die is gone
+   for the rest of the match; it should land like it. */
+function spawnObsidianBurst(el){
+  if(!el)return;
+  var r=el.getBoundingClientRect();
+  if(!r.width)return;
+  var cx=r.left+r.width/2, cy=r.top+r.height/2;
+  var glass=['#1a1a28','#0a0a14'],edge='#7a7aa0',ember='#d4552f';
+  var i,a,sp;
+  /* chunks: few, big, and they fall */
+  for(i=0;i<7;i++){
+    a=Math.random()*Math.PI*2;sp=70+Math.random()*90;
+    FX.emit({x:cx,y:cy,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-70,g:820,
+      life:0.7+Math.random()*0.3,size:6+Math.floor(Math.random()*5),
+      color:glass[i%2],vr:Math.random()*10-5});
+  }
+  /* splinters: many, small, fast, pale */
+  for(i=0;i<16;i++){
+    a=Math.random()*Math.PI*2;sp=130+Math.random()*160;
+    FX.emit({x:cx,y:cy,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-50,g:640,
+      life:0.4+Math.random()*0.25,size:2+Math.floor(Math.random()*3),
+      color:edge,vr:Math.random()*16-8});
+  }
+  /* the ember: thrown upward and barely weighed down, so it hangs a moment
+     after the glass has hit the table */
+  for(i=0;i<9;i++){
+    a=Math.random()*Math.PI*2;sp=90+Math.random()*130;
+    FX.emit({x:cx,y:cy,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-110,g:180,
+      life:0.5+Math.random()*0.3,size:2+Math.floor(Math.random()*3),
+      color:ember,vr:0});
+  }
+}
 /* Sawdust burst — brown flecks that drift DOWN from a die dampened by the
    Sawdust card. Distinct from spawnPixelSparks (which radiates evenly) so
    it reads as dust falling, not an explosion. */
@@ -21356,12 +21422,19 @@ function _afterRollImpl(){
         d._shattered=true;
         G.pPts+=_ob;
         if(d.el){
-          /* Break it apart: shard burst + the die itself crumbles away
-             (no bust-scatter, no heart emoji). */
-          try{spawnShards(d.el,'#3a3a52');}catch(e){}
+          /* Break it apart. D3X.shatter is the one that is actually SEEN: the
+             class below animates the host box, and the host box is invisible
+             - the die is drawn on the WebGL canvas. Without it the die blinked
+             out and left its shards hanging in the air. The class stays for
+             the flat fallback. */
+          try{if(window.D3X&&D3X.shatter)D3X.shatter(d.el);}catch(e){}
+          try{spawnObsidianBurst(d.el);}catch(e){}
+          try{SFX.coinExplode&&SFX.coinExplode();}catch(e){}
           d.el.classList.add('die-shatter');
           var _shEl=d.el;
-          setTimeout(function(){if(_shEl&&_shEl.parentNode)_shEl.remove();},360);
+          /* 420, not 360: the chip is what keeps the mesh registered, so it
+             has to outlive the 300ms burst. */
+          setTimeout(function(){if(_shEl&&_shEl.parentNode)_shEl.remove();},420);
         }
         /* By SEAT, through the shared path. indexOf(d.mat) removed the first
            die of that material - not necessarily the one that shattered - and
