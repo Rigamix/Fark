@@ -81,7 +81,12 @@
 
     var bad = d.want.filter(function (v) { return !isFinite(v); }).length;
     if (bad) throw new Error('solver returned ' + bad + ' non-finite target x - that is a real defect, not a metric');
+    /* how many times a die was pushed back by its own slot wall. This is
+       "as if they bounce on invisible walls repeatedly" as a number. */
+    var hits = d.penHits || [];
     return {
+      penHitsMax: hits.length ? Math.max.apply(null, hits) : 0,
+      penHitsTotal: hits.reduce(function (a, b) { return a + b; }, 0),
       steps: sol.steps, frames: sol.frames.length,
       maxSlide: Math.max.apply(null, slide), meanSlide: mean(slide),
       reorder: reorder, offEdge: offEdge, minGap: minGap,
@@ -108,6 +113,9 @@
       minGap_p05: r2(pct(f('minGap'), 0.05)),
       drift_max: r2(Math.max.apply(null, f('maxDrift'))),
       drift_p95: r2(pct(f('maxDrift'), 0.95)),
+      penHits_worstDie: Math.max.apply(null, f('penHitsMax')),
+      penHits_perThrow_p50: pct(f('penHitsTotal'), 0.5),
+      penHits_perThrow_p95: pct(f('penHitsTotal'), 0.95),
       steps_max: Math.max.apply(null, f('steps')),
       steps_p95: pct(f('steps'), 0.95),
       hitCap: f('steps').filter(function (v) { return v >= 700; }).length
