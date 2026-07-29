@@ -1313,7 +1313,11 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 @keyframes keptWipe{to{opacity:0;transform:translateY(4px) scale(.8)}}
 /* concept scoring tags: medieval numbers under the selected dice */
 #screen-match .dice-area{position:relative}
-.selTag{position:absolute;top:calc(100% + 2.6cqw);left:50%;transform:translateX(-50%);z-index:6;
+/* Positioned against the DICE AREA, not parented to a die. Hanging off the
+   die meant the tag inherited the die's settled y, so the numbers sat at
+   different heights and could drop through the total below them. X still
+   comes from the die - that is the part that has to point at something. */
+.selTag{position:absolute;transform:translateX(-50%);z-index:6;
   font-family:'JMH Beda',serif;font-size:3.4cqw;color:#f6ecd4;white-space:nowrap;pointer-events:none;
   text-shadow:0 0 8px rgba(255,190,90,.6),0 2px 0 rgba(58,32,8,.85)}
 #selTotal{position:absolute;left:50%;transform:translateX(-50%);z-index:6;
@@ -1330,9 +1334,10 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
    on the opponent's total made every rival roll feel like your own. The
    accent colour is written from JS, out of the same --patCol the portrait
    disc and the keep-glow already read. */
-.oppTag{position:absolute;bottom:calc(100% + 2.6cqw);left:50%;transform:translateX(-50%);z-index:6;
+/* same as .selTag, mirrored: placed against the dice area, above the line */
+.oppTag{position:absolute;transform:translateX(-50%);z-index:6;
   font-family:'JMH Beda',serif;font-size:3.4cqw;color:#f0a89f;white-space:nowrap;pointer-events:none;
-  text-shadow:0 2px 0 rgba(16,10,4,.85)}
+  text-shadow:0 0 8px rgba(217,76,61,.55),0 2px 0 rgba(16,10,4,.85)}
 #oppTotal{position:absolute;left:50%;transform:translateX(-50%);z-index:6;
   font-family:'JMH Beda',serif;font-size:6.4cqw;color:#d94c3d;pointer-events:none;white-space:nowrap;
   text-shadow:0 2px 0 rgba(16,10,4,.85)}
@@ -19738,7 +19743,8 @@ function _dropKeptToTray(){
   var marked=0;
   G.pool.forEach(function(d){
     if(!d.committed||!d.el||d.el.classList.contains('kept-still'))return;
-    d.el.querySelectorAll('.selTag').forEach(function(t){t.remove();});
+    /* the tags hang off the dice area now, not off the die - see P328 */
+    document.querySelectorAll('.selTag').forEach(function(t){t.remove();});
     d.el.classList.add('kept-still');
     d.el.classList.remove('selected');
     try{if(window.D3X&&D3X.dice)D3X.dice.forEach(function(q){
@@ -19763,7 +19769,8 @@ function _dropKeptToTray_OLD(){
     /* the "+100" tags are children of the die, so they rode down with it.
        Once a die is kept its individual score stops mattering - the running
        total under the line is the number that does. */
-    d.el.querySelectorAll('.selTag').forEach(function(t){t.remove();});
+    /* the tags hang off the dice area now, not off the die - see P328 */
+    document.querySelectorAll('.selTag').forEach(function(t){t.remove();});
     d.el.classList.add('in-tray');
     tray.appendChild(wrap);moved++;
   });
@@ -21963,13 +21970,22 @@ function _renderOppTags(rollPts){
      full of dice that are no longer in the document - and the numbers went
      up over an empty line. */
   if(!kept.length||!row||!area||!row.querySelector('.die')){if(tot)tot.remove();return;}
+  var lr=(document.getElementById('throwLine')||row).getBoundingClientRect();
+  var la=area.getBoundingClientRect();
   if(rollPts>0){
     var planned=_ptSplit(kept,rollPts);
     /* one tag that just repeats the total is noise - the total suffices */
     if(!(planned.length===1&&planned[0][1]===rollPts)){
       planned.forEach(function(t){
         var e=document.createElement('div');e.className='oppTag';
-        e.textContent='+'+t[1].toLocaleString();t[0].appendChild(e);
+        e.textContent='+'+t[1].toLocaleString();
+        /* X from the die, Y from the row - see .selTag. Theirs matters more:
+           their numbers are drawn while the throw is still spread, so a tag
+           parented to a die could ride it clean off the screen. */
+        var dr=t[0].getBoundingClientRect();
+        e.style.left=Math.max(12,Math.min(la.width-12,(dr.left+dr.width/2)-la.left))+'px';
+        e.style.bottom=((la.bottom-lr.top)+lr.height*0.13)+'px';
+        area.appendChild(e);
       });
     }
   }
@@ -21992,16 +22008,25 @@ function _renderSelTags(selD,total,valid){
   document.querySelectorAll('.selTag').forEach(function(e){e.remove();});
   var tot=document.getElementById('selTotal');
   if(!selD.length){if(tot)tot.remove();return;}
-  function _tag(host,txt){var t=document.createElement('div');t.className='selTag';t.textContent=txt;host.appendChild(t);}
+  var row=document.getElementById('throwLine')||document.getElementById('playerDiceRow');
+  var area=document.querySelector('#screen-match .dice-area');
+  if(!row||!area)return;
+  var rr=row.getBoundingClientRect(),ar=area.getBoundingClientRect();
+  /* X from the die it belongs to, Y from the ROW. One baseline for all of
+     them, and a fixed gap to the total underneath. */
+  function _tag(host,txt){
+    var t=document.createElement('div');t.className='selTag';t.textContent=txt;
+    var dr=host.getBoundingClientRect();
+    t.style.left=((dr.left+dr.width/2)-ar.left)+'px';
+    t.style.top=((rr.bottom-ar.top)+rr.height*0.13)+'px';
+    area.appendChild(t);
+  }
   if(valid&&total>0){
     var planned=_ptSplit(selD,total);
     /* one tag that just repeats the total is noise — the total suffices */
     if(!(planned.length===1&&planned[0][1]===total))
       planned.forEach(function(t2){_tag(t2[0],'+'+t2[1].toLocaleString());});
   }
-  var row=document.getElementById('playerDiceRow');
-  var area=document.querySelector('#screen-match .dice-area');
-  if(!row||!area)return;
   if(!tot){tot=document.createElement('div');tot.id='selTotal';area.appendChild(tot);}
   /* A branded face banks NOTHING and fires its effect instead - that is the
      whole system. Saying so with a grey "0" reads as a mistake rather than a
@@ -22026,7 +22051,6 @@ function _renderSelTags(selD,total,valid){
       +(ex>0?',0 0 '+(40*ex).toFixed(0)+'px rgba(255,150,40,'+(0.75*ex).toFixed(2)+')':'')
       +',0 2px 0 rgba(58,32,8,.85)')
     :'';
-  var rr=row.getBoundingClientRect(),ar=area.getBoundingClientRect();
   tot.style.top=(rr.bottom-ar.top+rr.height*0.55)+'px';
 }
 function refreshSelUI(){
