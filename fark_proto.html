@@ -16731,6 +16731,13 @@ var D3X={
     trayZ:1.7, wallPad:.3, restY:.5
   },
   _cannon:false,
+  /* pulled in at boot rather than on the first throw: the fetch used to sit
+     between the ROLL tap and the dice moving, once per session */
+  _warmCannon:function(){
+    if(window.CANNON||this._cannonWarmed)return;
+    this._cannonWarmed=true;
+    try{this._loadCannon(function(){});}catch(e){}
+  },
   _loadCannon:function(cb){
     if(window.CANNON){cb();return;}
     if(this._cannonWait){this._cannonWait.push(cb);return;}
@@ -16837,8 +16844,12 @@ var D3X={
     world.broadphase=new CANNON.NaiveBroadphase();
     world.solver.iterations=16;
     var mDesk=new CANNON.Material('desk'),mDie=new CANNON.Material('die'),mWall=new CANNON.Material('wall');
-    world.addContactMaterial(new CANNON.ContactMaterial(mDesk,mDie,{friction:.01,restitution:.5}));
-    world.addContactMaterial(new CANNON.ContactMaterial(mDie,mDie,{friction:0,restitution:.5}));
+    /* 0.01 was an ice rink, and it made sense only while the lane spring was
+       dragging dice across it - with the spring gone a die has to be able to
+       come to rest where it lands. The lower restitution takes the other half
+       of "they bounce" out. */
+    world.addContactMaterial(new CANNON.ContactMaterial(mDesk,mDie,{friction:.42,restitution:.28}));
+    world.addContactMaterial(new CANNON.ContactMaterial(mDie,mDie,{friction:.12,restitution:.20}));
     world.addContactMaterial(new CANNON.ContactMaterial(mWall,mDie,{friction:0,restitution:.8}));
     var ground=new CANNON.Body({mass:0,material:mDesk,shape:new CANNON.Plane()});
     ground.quaternion.setFromAxisAngle(new CANNON.Vec3(1,0,0),-Math.PI/2);
@@ -17912,7 +17923,7 @@ var D3X={
     };
     add('assets/vendor/three.min.js',function(){
       add('assets/vendor/GLTFLoader.js',function(){
-        add('assets/models/die_glb.js',function(){self._init();});
+        add('assets/models/die_glb.js',function(){self._init();self._warmCannon();});
       });
     });
   },
