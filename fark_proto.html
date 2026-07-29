@@ -16764,7 +16764,11 @@ var D3X={
   /* looser: a wall that takes ALL the outward speed reads as jelly. It gives
      a third of it back now, sits wider, and only engages near the table so a
      die is free for most of its fall. */
-  slotRK:0.213, slotRMin:0.30, slotRMax:0.72, slotEngageY:1.5, slotRest:0.34,
+  slotRK:0.213, slotRMin:0.14, slotRMax:0.72, slotEngageY:1.5, slotRest:0.34,
+  /* a die that has stopped and is still leaning on its wall gets the wall
+     moved out to meet it, once. Without this the clamp re-projects it every
+     frame and it creeps along the rim - the "very very slow laggy slide". */
+  slotYieldV:1.1, slotYieldY:0.75, slotYieldMax:0.34,
   /* thrown in from off the top of the frame. 4.6 was barely above the table at
      this camera, which is why they read as coming up off it. */
   dropY:4.9, dropZ:1.9,
@@ -16878,7 +16882,7 @@ var D3X={
     /* the radius where the pen ceiling and the collision floor meet, opened
        up by a third: exactly meeting them leaves a die nothing to move in. */
     var SLOT_R=_pitch?Math.max(this.PHYS.slotRMin,
-        Math.min(this.PHYS.slotRMax,(_pitch-this.PHYS.proxy)/2*1.35)):0.5;
+        Math.min(this.PHYS.slotRMax,(_pitch-this.PHYS.proxy)/2*0.85)):0.5;
     /* A slot holding a kept die is NOT free. Clamping a thrown die into an
        occupied circle is unwinnable - the clamp pushes it in, contact pushes it
        out - and it took 116 of 200 throws to the frame cap. Each die is moved
@@ -17048,12 +17052,20 @@ var D3X={
           /* no free slot: a wide circle rather than none, so it can share
              space with a neighbour without being able to leave the table */
           var myR=taken[kc]?SLOT_R:Math.max(SLOT_R,_pitch*0.9||1.4);
+          if(bc._penR!==undefined&&bc._penR>myR)myR=bc._penR;
           var ddx=bc.position.x-slotC[kc], ddz=bc.position.z;
           var rr=Math.sqrt(ddx*ddx+ddz*ddz);
           if(rr<=myR||rr<1e-6)continue;
           var nx2=ddx/rr, nz2=ddz/rr;
           bc.position.x=slotC[kc]+nx2*myR;
           bc.position.z=nz2*myR;
+          /* it has come to rest against the wall: move the wall, not the die.
+             Re-projecting a stopped die every frame is what made it crawl. */
+          if(bc.velocity.norm()<P.slotYieldV&&bc.position.y<P.slotYieldY){
+            if(bc._penR===undefined)bc._penR=myR;
+            bc._penR=Math.min(P.slotYieldMax,Math.max(bc._penR,rr));
+            continue;
+          }
           var vn=bc.velocity.x*nx2+bc.velocity.z*nz2;
           if(vn>0){
             /* remove the outward component and no more. With any restitution
