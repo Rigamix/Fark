@@ -1549,14 +1549,11 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 /* dice: bigger and raised toward the centre band */
 #screen-match .die{width:13cqw;height:13cqw}
 #screen-match .player-dice-row{gap:3cqw}
-/* Same size as the player's. They were shrunk to 78% to read as "further
-   across the table", but the two rows are the same throw in the same band and
-   the mismatch read as a different game rather than as depth.
-   !important because `.opp-dice-row .die` sets a hard 48px !important (and a
-   41px one in the short-screen media query) - the id here out-specifies both,
-   but only once this is important too. */
+/* The rival's row is the player's row - same gap, and the die size comes from
+   `#screen-match .die` for both. The old !important overrides existed only to
+   beat the little row's hard-coded 48px, which is gone. */
 #screen-match .opp-dice-row{gap:3cqw}
-#screen-match .opp-dice-row .die{width:13cqw!important;height:13cqw!important}
+#screen-match .throw-line{min-height:13cqw}
 #screen-match .die.sm{width:8.7cqw;height:8.7cqw}
 #screen-match #diceArea{--sp-before:1.75;--sp-after:1.75}
 /* the kept line: smaller dice, close together, and the turn total under it */
@@ -2449,16 +2446,17 @@ html.fk3d #screen-match .die-wrap:has(.die.d3on.selected)::after{
   position:relative;overflow:hidden;
 }
 .dice-spacer{flex:1;min-height:0}
+/* Identical to .player-dice-row in every respect that matters - it is the
+   same line. The old fixed height and the hand-tuned 48px pip grid belonged
+   to the little row under the HUD and would now just make the rival's dice
+   the odd ones out. */
 .opp-dice-row{
-  display:flex;flex-wrap:nowrap;gap:4px;
+  display:flex;flex-wrap:nowrap;gap:clamp(4px,1.8vw,8px);
   justify-content:center;align-items:center;
-  flex-shrink:0;height:clamp(56px,13vw,66px);padding:4px 0;
+  flex-shrink:0;overflow:visible;
 }
-/* Lock opp dice to a clean 48px outer so the 7×7 pip grid divides into perfect 6px cells.
-   Without this, fractional cell widths produce visibly unequal pip squares. */
-.opp-dice-row .die{width:48px!important;height:48px!important;cursor:default;grid-template-columns:repeat(7,6px)!important;grid-template-rows:repeat(7,6px)!important}
-.opp-dice-row .die .dc{width:6px!important;height:6px!important;margin:0!important}
-.opp-dice-row .die .dc.dot{background:var(--dpip);width:4px!important;height:4px!important;margin:1px!important;border-radius:0}
+/* the one real difference: they are not yours to touch */
+.opp-dice-row .die{cursor:default}
 .opp-dice-row .die:active{transform:none}
 .dice-sep{
   width:88%;max-width:360px;height:2px;
@@ -2529,6 +2527,11 @@ html.fk3d #screen-match .die-wrap:has(.die.d3on.selected)::after{
   justify-content:center;align-items:center;
   flex-shrink:0;overflow:visible;
 }
+/* Both rows in ONE cell. min-height keeps the line at a die's height even
+   when it is empty - the zone used to collapse between turns, so the dice
+   arrived at a different height every time. */
+.throw-line{display:grid;width:100%;justify-items:center;align-items:center}
+.throw-line>*{grid-area:1/1}
 
 /* FIRST STRIKE — both hands, open on the table. */
 #fsReveal{position:absolute;left:50%;top:11%;transform:translateX(-50%);z-index:14;
@@ -5373,12 +5376,6 @@ body::before,body::after{display:none!important}
   .card-bar.bot .mcard{margin-left:-28px}
   .card-bar.top .mcard{margin-left:-28px;--base-ty-top:-70%}
   .card-bar.top{margin-top:14px}
-  /* ── Opp dice smaller, player dice stay full size ── */
-  .opp-dice-row{height:44px;padding:2px 0;margin-top:30px}
-  /* Small phones: keep clean 7×7 cell math (35 inner / 7 = 5px, border 3 → 41 outer) */
-  .opp-dice-row .die{width:41px!important;height:41px!important;grid-template-columns:repeat(7,5px)!important;grid-template-rows:repeat(7,5px)!important}
-  .opp-dice-row .die .dc{width:5px!important;height:5px!important}
-  .opp-dice-row .die .dc.dot{width:3px!important;height:3px!important;margin:1px!important}
   .dlg-inner{max-height:72px}
   .dlg-portrait{width:60px;height:60px}
   .dlg-scroll{max-width:calc(100vw - 80px);padding:8px 22px}
@@ -8532,8 +8529,8 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
 <!-- DICE AREA -->
 <div class="dice-area" id="diceArea">
   <div id="perfectGlow"><div class="perf-ring"></div><div class="perf-dither"></div></div>
-  <!-- Opponent dice row -->
-  <div class="opp-dice-row" id="oppDiceRow"></div>
+  <!-- The rival's dice used to sit here, in a 48px row of their own. They
+       throw on the player's line now - see #throwLine below. -->
 
   <div class="dice-sep"></div>
 
@@ -8566,8 +8563,13 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
         <div class="status-msg" id="statusBot"></div>
       </div>
     </div>
-    <!-- Player dice row -->
-    <div class="player-dice-row" id="playerDiceRow"></div>
+    <!-- ONE THROWING LINE. Both rows share this grid cell, so whoever is
+         rolling puts their dice in the same place, at the same size, through
+         the same solver. The turns alternate, so only one is ever full. -->
+    <div class="throw-line" id="throwLine">
+      <div class="opp-dice-row" id="oppDiceRow"></div>
+      <div class="player-dice-row" id="playerDiceRow"></div>
+    </div>
     <!-- Scored dice drop out of the row into this one, with the turn total
          under them. Fixed height so the throwing row never moves when the
          first die lands in it. -->
@@ -17710,6 +17712,11 @@ var D3X={
      on screen the last die iterated decided where both of them sat. */
   _tableRoot:function(key){
     key=key||'playerDiceRow';
+    /* The rival throws on the player's line, so it is literally the same
+       table - and it has to be, because only this one carries the shadow
+       catcher and the key light. A row of its own left rival dice floating
+       with no shadow under them. */
+    if(key==='oppDiceRow')key='playerDiceRow';
     this._tbls=this._tbls||{};
     if(this._tbls[key])return this._tbls[key];
     if(key!=='playerDiceRow'){
