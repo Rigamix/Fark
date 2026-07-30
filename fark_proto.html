@@ -1726,7 +1726,11 @@ html.fk3d #screen-match .die-wrap:has(.die.d3on.selected)::after{
   font-family:'JMH Beda',serif}
 #screen-gameover{background:#4a4a4a !important}
 #screen-gameover::before,#screen-gameover::after{display:none !important}
-#screen-gameover>*:not(#gbBarred){display:none !important}
+/* ...and the LAST ORDERS layer, which replaces the greybox for the death case.
+   The won case still renders into #gbBarred. */
+#screen-gameover>*:not(#gbBarred):not(#goLastOrders){display:none !important}
+#screen-gameover.go-lastorders{background:#0b0c10 !important}
+#screen-gameover.go-lastorders>#gbBarred{display:none !important}
 #gbBarred{position:absolute;inset:0;overflow:auto;color:#1c1c1c;
   font-family:'JMH Beda',serif}
 #screen-shop{background:#0e0e0e !important}
@@ -7575,6 +7579,42 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
   background:rgba(4,2,1,.55);
 }
 #screen-gameover .go-wrap{position:relative;z-index:1}
+/* ─── LAST ORDERS (game over, death) ───
+   cqh/cqw throughout so the whole thing scales with the viewport rather than
+   with a device guess. The screen is the container. */
+#screen-gameover{container-type:size}
+#goLastOrders{display:none;position:absolute;inset:0;overflow:hidden}
+#screen-gameover.go-lastorders #goLastOrders{display:block}
+.golo-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+  object-position:center top;z-index:0}
+/* The banner is a cut-out over a clean background - the background really is
+   clean, sampled where the banner sits and found only tavern browns - so its
+   place is set here. These are first estimates off the composite. */
+.golo-banner{position:absolute;left:50%;top:20cqh;width:88cqw;
+  transform:translateX(-50%);z-index:2;pointer-events:none}
+/* gap:0 - each flag PNG carries its own segment of the wooden rail, so any gap
+   between them breaks the rail into four floating pieces. Butted up, they read
+   as the single rail Denis drew. */
+.golo-flags{position:absolute;left:0;right:0;top:34cqh;z-index:2;
+  display:flex;justify-content:center;align-items:flex-start;gap:0}
+.golo-flag{position:relative;width:21cqw;max-width:104px;
+  display:flex;flex-direction:column;align-items:center}
+.golo-flag img{width:100%;display:block}
+/* the label sits ON the flag, so it is placed over the image rather than under.
+   Two lines have to fit: "PEAK GOLD" wraps, and at the first sizing that pushed
+   its value clean off the bottom of the flag onto the street. */
+.golo-flag .golo-lab{position:absolute;left:4%;right:4%;top:19%;
+  font-family:'JMH Beda',serif;text-align:center;
+  color:#3a2812;text-shadow:0 1px 0 rgba(255,248,224,.5)}
+.golo-flag .golo-name{font-size:1.55cqh;line-height:1.02;letter-spacing:.03em;
+  opacity:.85}
+.golo-flag .golo-val{font-size:2.9cqh;line-height:1;letter-spacing:.02em;
+  margin-top:.45cqh}
+.golo-btns{position:absolute;left:0;right:0;bottom:6cqh;z-index:3;
+  display:flex;flex-direction:column;align-items:center;gap:2cqh}
+/* the title screen's plaque, reused verbatim - .hsBtn is absolutely positioned
+   for the homescreen stage, so it is relaid out here and nothing else changes */
+.golo-btns .hsBtn{position:relative;left:auto;top:auto;width:62cqw}
 .go-wrap{
   display:flex;flex-direction:column;align-items:center;
   justify-content:space-between;
@@ -8821,6 +8861,14 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
 
 <!-- SCREEN: GAME OVER -->
 <div id="screen-gameover" class="screen">
+  <!-- LAST ORDERS. Built by _goLastOrders(); the markup is here so the art
+       starts downloading with the document rather than on death. -->
+  <div id="goLastOrders">
+    <img class="golo-bg" src="assets/GameOver_Art/gameover_bg.webp" alt="">
+    <img class="golo-banner" src="assets/GameOver_Art/gameover_banner.webp" alt="">
+    <div class="golo-flags" id="goloFlags"></div>
+    <div class="golo-btns" id="goloBtns"></div>
+  </div>
   <div class="go-wrap">
     <div class="go-title-area">
       <div class="go-title">
@@ -9128,7 +9176,13 @@ function _getS(){
   }
   return S;
 }
-function save(){try{localStorage.setItem('gambit4_proto',JSON.stringify(S));}catch(e){/* storage full or unavailable */}}
+function save(){
+  /* PEAK GOLD, the run's high-water mark. Here and not at the dozen sites that
+     add gold: every one of them already calls save(), and any that does not is
+     caught by the next call. A list of gold sites would rot; this cannot. */
+  try{if(S&&S.run){var _g=S.run.gold||0;
+    if(_g>(S.run._peakGold||0))S.run._peakGold=_g;}}catch(e){}
+  try{localStorage.setItem('gambit4_proto',JSON.stringify(S));}catch(e){/* storage full or unavailable */}}
 function startNewRun(){
   S.run=_freshRun();
   S.run._famFirstDraft=true;/* brief §4: draft 1 of 3 before the first seat */
@@ -12476,6 +12530,10 @@ function _famFeats(win){
   function grant(id,msg,amt){
     if(S.featsDone[id])return;
     S.featsDone[id]=1;S.renown=(S.renown||0)+amt;
+    /* and how many were earned THIS RUN. S.featsDone is lifetime and lives on S,
+       so the game-over screen was about to tell a player who died on night two
+       that they had earned every feat they had ever earned. */
+    try{if(S.run)S.run._featsThisRun=(S.run._featsThisRun||0)+1;}catch(e){}
     famLog('FEAT — '+msg);try{save();}catch(e){}
   }
   if(!win||!G)return;
@@ -25546,6 +25604,9 @@ function endMatch(win){
      "Victory screen audio repeats several times". */
   if(G&&G._endMatchFired)return;
   if(G)G._endMatchFired=true;
+  /* MATCHES PLAYED this run, win or lose. This is the funnel every match end
+     passes through, which is why the flag above lives here too. */
+  try{if(S&&S.run)S.run._matchesThisRun=(S.run._matchesThisRun||0)+1;}catch(e){}
   /* addendum copy: the continue button reads per outcome (reset every match) */
   try{var _cbs=document.querySelector('#btnContinue span');if(_cbs)_cbs.textContent='CONTINUE';}catch(e){}
   /* Clear mid-match save */
@@ -32754,7 +32815,49 @@ var _goQuotes=[
   '"A fine attempt! The tavern will remember ye."',
   '"Rest up. The dice will be kinder next time."',
 ];
+/* LAST ORDERS: the death screen, on Denis's art. Four flags, four numbers.
+   Not used for the final-boss VICTORY - that shows "LAST ORDERS RUNG" and a TO
+   THE SHELF button, which is a different screen with art of its own, so it
+   keeps the greybox panel until that art exists. _died tells them apart. */
+function _goLastOrders(){
+  _getS();
+  var scr=document.getElementById('screen-gameover');
+  var host=document.getElementById('goloFlags');
+  var btns=document.getElementById('goloBtns');
+  if(!scr||!host||!btns)return false;
+  scr.classList.add('go-lastorders');
+  /* Nights is the tier reached, counting the one they died on. The other three
+     are counters added in P350 - before that none of them existed, and the
+     feats number on the old panel was the LIFETIME total. */
+  var r=(S&&S.run)||{};
+  var stats=[
+    ['NIGHTS', (r.tier||0)+1],
+    ['MATCHES', r._matchesThisRun||0],
+    ['PEAK GOLD', Math.max(r._peakGold||0,r.gold||0)],
+    ['FEATS', r._featsThisRun||0]
+  ];
+  var h='';
+  stats.forEach(function(st,i){
+    h+='<div class="golo-flag">'
+      +'<img src="assets/GameOver_Art/gameover_flag'+(i+1)+'.webp" alt="">'
+      +'<div class="golo-lab"><div class="golo-name">'+st[0]+'</div>'
+      +'<div class="golo-val">'+Number(st[1]).toLocaleString()+'</div></div>'
+      +'</div>';
+  });
+  host.innerHTML=h;
+  var BTP='Art/Assets/Buttons/';
+  btns.innerHTML=
+     '<div class="hsBtn" onclick="SFX.nav();startNewRun();showScreen(\'gauntlet\')">'
+    +'<img class="plq" src="'+BTP+'Button_new_01.png" alt=""><span>NEW RUN</span></div>'
+    +'<div class="hsBtn cream" onclick="SFX.nav();showScreen(\'menu\')">'
+    +'<img class="plq" src="'+BTP+'Button_new_02.png" alt=""><span>MENU</span></div>';
+  return true;
+}
 function initGameOverScreen(){
+  /* death gets the new screen; the final-boss win still gets the greybox panel */
+  if(S&&S.run&&S.run._died){ if(_goLastOrders())return; }
+  var _scr0=document.getElementById('screen-gameover');
+  if(_scr0)_scr0.classList.remove('go-lastorders');
   try{_gbBarred();return;}catch(e){}
   _getS();
   /* Run-death summary: only when the run ended out of coins (S.run._died).
