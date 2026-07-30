@@ -92,17 +92,23 @@ Branded dice stop leaking textures. Bosses use the patron table.
 6. **No UI offers the resume path.** `S.pendingMatch` is written correctly and
    `resumeMatch()` restores a match perfectly when invoked — nothing calls it
    after a force-close.
-7. **`G.isBoss` is never assigned** — the field the match sets is `G._isBoss`,
-   so two boss-only behaviours are dead code.
+7. ~~**`G.isBoss` is never assigned**~~ — fixed P345. `'isBoss' in G` measured
+   `false`, `'_isBoss' in G` `true`. Both readers were dead: the tell badge
+   never got `.bossbind`, so a boss's tell was painted in patron colours
+   instead of the red seal the CSS carries for it; and `_bossFirstEnc` stayed
+   `undefined`, so the fast-rival speedup applied to a first boss encounter —
+   the one turn it exists to leave at full length.
 8. **Hot dice +250 goes straight to the banked score**, so busting on the next
    roll cannot take it back. The rules card says a bust loses all turn points.
 9. **Rival speech balloon paints over the tell badge** and cuts it in half on
    every seat that has a tell. `ugly`, but the badge is how the rule is read.
-10. **`handleRoll` has no `_endMatchFired` guard** and `G.phase` is left at
-    `'choosing'` after a match ends, so a queued auto-roll (Double Down's
-    ~450ms, the bust-save's ~1.7s) can deal six dice into a finished match.
-    Not reachable by finger — the button is `pointer-events:none` and the end
-    overlay covers it — but the game schedules those timers itself.
+10. ~~**`handleRoll` has no `_endMatchFired` guard**~~ — fixed P345, one line in
+    each of `handleRoll` and `handleBank`. Verified by calling both directly
+    after `endMatch(true)` (which is what a leftover timer does): phase, pool
+    and the dice row all unchanged. `G.phase` is deliberately left alone —
+    `_endMatchFired` is the flag every scheduled callback in the file already
+    checks, and inventing a terminal phase value would put every
+    `phase==='choosing'` test in the game in play for no gain.
 
 Explicitly out of scope per Denis: end-of-match screens (he is redoing them),
 and the first-night 2D dice (never replaced, known).

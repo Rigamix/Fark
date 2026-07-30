@@ -10710,7 +10710,9 @@ function _initTellHUD(){
   badge.innerHTML='<span class="tb-icon">'+t.icon+'</span>'+
     '<span class="tb-name">'+_tellNameHtml+_stedInlineVal+_arInlineVal+_drillInlineVal+'</span>'+
     '<span class="tb-desc">'+t.desc+'</span>';
-  if(G.isBoss)badge.classList.add('bossbind');
+  /* _isBoss, not isBoss - nothing has ever assigned the latter, so the red
+     boss seal this class carries (see #tellBadge.bossbind) never appeared. */
+  if(G._isBoss)badge.classList.add('bossbind');
   badge.onclick=function(){try{_gbInspect((t.name+' — '+t.desc).replace(/"/g,'&quot;'));}catch(e){}};
   /* Mount as a DIRECT child of #screen-match (not inside #diceArea).
      The badge is position:fixed and pinned to the viewport, but a CSS
@@ -21263,6 +21265,11 @@ function handleRoll(){
      (phase==='rolling') so a second tap can't queue up a re-roll
      before the first settles. */
   if(!G||G.phase==='opp'||G.phase==='rolling'||G.phase==='yielding')return;
+  /* The match is over. Every scheduled caller already checks this (the
+     bust-save's 1.7s timer, Double Down's 450ms) but neither handler did, and
+     endMatch leaves G.phase alone - _endMatchFired is the flag the rest of the
+     file agrees on. */
+  if(G._endMatchFired)return;
   /* Auto-roll lock: a bust-save (_runSave) and Double Down set phase='idle'
      then schedule handleRoll after a delay. 'idle' is normally rollable, so
      without this flag a manual ROLL tap during that 0.6–1.7s window fires a
@@ -23012,6 +23019,11 @@ function handleBank(){
      turn could corrupt the turn machine. _rollLocked covers those scheduled
      windows explicitly. */
   if(!G||G.phase==='opp'||G.phase==='rolling'||G.phase==='yielding')return;
+  /* The match is over. Every scheduled caller already checks this (the
+     bust-save's 1.7s timer, Double Down's 450ms) but neither handler did, and
+     endMatch leaves G.phase alone - _endMatchFired is the flag the rest of the
+     file agrees on. */
+  if(G._endMatchFired)return;
   if(G._rollLocked)return;
   /* Same defense as handleRoll: don't bank while a die-mutating active
      is mid-animation (Finnick's Palm). Banking commits selected dice
@@ -23955,7 +23967,10 @@ function runOppTurn(){
   /* pacing state: fresh multiplier per turn; flag lets the global tap-FF
      listener know a rival turn is in progress */
   G._oppTurnActive=true;G._ffMult=1;
-  if(G.isBoss&&G._bossFirstEnc===undefined){
+  /* _isBoss, not isBoss: this never ran, so _bossFirstEnc stayed undefined and
+     the fast-rival speedup applied to a first boss encounter - the one turn it
+     is meant to leave at full length. */
+  if(G._isBoss&&G._bossFirstEnc===undefined){
     S.run._bossSeen=S.run._bossSeen||{};
     var _bk=G.rung&&G.rung.key;
     G._bossFirstEnc=_bk?!S.run._bossSeen[_bk]:false;
