@@ -17381,7 +17381,9 @@ var D3X={
   },
   /* solve one throw. slots = target x per die in die-widths, values = the
      faces the game rolled. Returns {steps, frames:[[{p,q}]], rest:[{p,q}]} */
-  _physSolve:function(slotX,values,obstacles,limitX,rowPitch){
+  /* fromFar: the throw leaves the FAR edge and carries toward the player,
+     instead of the near edge carrying away. The rival's side of the table. */
+  _physSolve:function(slotX,values,obstacles,limitX,rowPitch,fromFar){
     /* pitch from the slots themselves, so this follows the row rather than
        assuming it. One die on its own has no pitch: fall back to the middle
        of the allowed range rather than pinning it to a point. */
@@ -17521,9 +17523,13 @@ var D3X={
          leave the player's near edge (+z) high and moving UP now, and gravity
          does the rest: a real toss that rises, crests, and lands away from
          the player. The stagger keeps the six from moving as one slab. */
+      /* +z is the near edge, the one closest to the camera. The rival's dice
+         leave the FAR edge instead - the same toss, mirrored about the table's
+         centre line, so it reads as thrown from the other side. */
+      var _zSide=fromFar?-1:1;
       b.position.set(clearOf(slotC[i])+(Math.random()*.2-.1),
                      P.restY+P.dropY+(i%3)*.45,
-                     P.dropZ+Math.random()*.4);
+                     _zSide*(P.dropZ+Math.random()*.4));
       /* barely any vertical kick: gravity here is -50, so even a 2.0 toss
          buys 0.04 of rise - it read as nothing while adding half a second of
          hang. The height IS the arc; the throw just carries it across the
@@ -17532,9 +17538,13 @@ var D3X={
          the die still has to arrive over its own slot, not past it */
       /* almost no sideways speed: the die should come down INTO its slot,
          not travel across it. The z carry is sized to the shorter fall. */
+      /* and it travels the other way. Mirroring only the start would leave the
+         rival's dice on the far edge still heading away from the player, off the
+         back of the table - the direction of travel is half of "which side it
+         was thrown from". */
       b.velocity.set(Math.random()*.24-.12,
                      0.15+Math.random()*0.25,
-                     -(2.2+Math.random()*0.6));
+                     _zSide*-(2.2+Math.random()*0.6));
       /* Roughly double what P307 left. That cut was made to stop the die
          knocking around, but the knocking turned out to be the die landing on
          TOP of an invisible wall (P310) - so the tumble was paying for
@@ -18518,7 +18528,9 @@ var D3X={
        different numbers here is how a die ends up penned to a radius that does
        not match the spacing it was given */
     var rowPitch=lanePitch;
-    var sol=this._physSolve(slots,b.vals,obst,limitX,rowPitch);
+    /* whose side of the table this throw comes from - the only thing that
+       distinguishes the rival's throw from the player's */
+    var sol=this._physSolve(slots,b.vals,obst,limitX,rowPitch,key==='oppDiceRow');
     /* one playback per die: two throws can be in the air at once without
        either being dropped */
     var t0=performance.now();

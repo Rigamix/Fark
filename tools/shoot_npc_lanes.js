@@ -58,7 +58,15 @@ D3X._physSolve = function (slotX, values, obstacles, limitX, rowPitch) {
     guessedRow: key, oppRowDice: n, limitX: +(+limitX).toFixed(3),
     dieWpl: szP, dieWopp: szO, rowMid: mid, mountW: mrw, MSCALE: D3X.MSCALE,
     aimedAt: slotX.map(v => +v.toFixed(3)), pitch: +(+rowPitch).toFixed(3), n: values.length });
-  return origSolve(slotX, values, obstacles, limitX, rowPitch);
+  const _sol = origSolve(slotX, values, obstacles, limitX, rowPitch, arguments[5]);
+  try {
+    const f0 = _sol.frames[0], fN = _sol.frames[_sol.frames.length - 1];
+    const rec = solves[solves.length - 1];
+    rec.fromFar = !!arguments[5];
+    rec.startZ = f0.map(f => +f.z.toFixed(2));
+    rec.endZ = fN.map(f => +f.z.toFixed(2));
+  } catch (e) {}
+  return _sol;
 };
 
 /* is the rival's row even going through the 3D layer? */
