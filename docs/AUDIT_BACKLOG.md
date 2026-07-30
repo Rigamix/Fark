@@ -184,6 +184,45 @@ path above and can be re-invoked with `Workflow({scriptPath})`. Treat every
 proposed patch as unverified until its `oldString` is confirmed present and
 unique with Read, not Grep (Grep renders `/*` as `\*`).
 
+## Decided by the creative director — one still to build
+
+All five design questions in `DESIGN_QUESTIONS.md` were answered. Four are done
+and in the build (Zero Hour kept as-is with its reasoning now in the code, Tar
+Pit retired, camera flattened instead of shrinking the dice, Game Over placement
+anchored to the art). **One remains:**
+
+### PRESERVE must be a visible die, not points
+
+The call was A, and it was not a fresh 50/50 — it was already locked in the match
+brief: *"A PRESERVED die SURVIVES turn end: it stays on the table in its casing
+through the pile reset and is excluded from the wipe"* and *"players track curses
+and Preserve choices by looking at them."* The workflow's proposed patch delivers
+a number in the tally, which is exactly the invisible-effect failure mode this
+project has repeatedly hunted down — on Amber's own signature card.
+
+What the card promises: *"Trap one scoring die in amber at the end of your turn.
+It is still there next turn, already kept and scored."* Tier 3 adds +100 when it
+cracks free.
+
+To build:
+1. **The die survives the turn reset.** The underlying bug is an ordering one —
+   the effect currently lands ABOVE the per-turn reset in `startPTurn`, which
+   does `G.turnPts=0;G.kept=[];G.numDice=...` and deletes it. Relocating it must
+   also land *below* the Stakes Rising branch, which **assigns** `G.turnPts`
+   rather than adding to it.
+2. **It is on the table, in its casing.** Not just a kept-tray entry: a die the
+   player can look at, visibly held, excluded from the pile wipe.
+3. **It cannot be re-rolled or re-selected** — it is already scored. That needs
+   its own visual state, distinct from both live and spent dice. The budget for
+   this was accepted when the brief line was written.
+4. `G.numDice` should drop by one, not be hardcoded to 5 — a hand already cut by
+   Confiscate/Seize would otherwise get the amber die for free.
+
+Sibling bug, same cause, worth fixing in the same pass: the rival Tar Pit
+consumption block had the identical ordering fault. Tar Pit is now retired so it
+no longer matters, but if anything else is ever consumed at the top of
+`startPTurn`, check it against that reset.
+
 ## Still open, found after the audit
 
 - **Painted width is not modelled properly, and a sweep built on the bad model
