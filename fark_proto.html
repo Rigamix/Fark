@@ -1571,9 +1571,12 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
   opacity:1;filter:drop-shadow(0 0.7cqw 0 rgba(26,15,7,.28)) grayscale(.55) brightness(.72)}
 /* the winning bank wears the big plate, so it takes the big plate's SIDE too
    - otherwise the wide button would swap hands on the deciding press */
-#btnBank.bank-to-win{order:1;width:62%;aspect-ratio:2392/1020;background:url('Art/Assets/Match/optimized/ROLL_new_opt.webp') center/contain no-repeat}
-#btnBank.bank-to-win #bankVerb{font-size:5.2cqw}
-#screen-match .controls:has(#btnBank.bank-to-win) #btnRoll{order:2;width:30%;aspect-ratio:1401/912}
+/* BANK STAYS WHERE BANK IS. This used to hand BANK the ROLL plate and
+   ROLL's place in the row (order:1 vs order:2) to give the winning tap
+   primary weight - but two buttons trading artwork and position mid-match
+   reads as the labels having swapped, not as emphasis. The emphasis is the
+   scale and glow in .match-btn-bank.bank-to-win, which needs neither. */
+#btnBank.bank-to-win #bankVerb{font-size:4.4cqw}
 /* dice: bigger and raised toward the centre band */
 #screen-match .die{width:13cqw;height:13cqw}
 /* the row measured 399.8 inside a 418 line - the 18px of slack goes into the
@@ -15100,10 +15103,15 @@ function _matchDress(isBoss){
   var pl=document.getElementById('matchPlate');
   var pr=document.getElementById('matchProps');
   if(!pl||!pr)return;
-  pl.style.display=isBoss?'none':'';
+  /* THE SAME TABLE FOR EVERYONE. Bosses used to hide the plate, the light and
+     the shadows and fall back to a CSS ::before carrying per-boss art - which
+     is the art that was stale, and the reason a boss table rendered as a flat
+     void for months. Until the boss tables are redrawn they play on the
+     patron table, props and lighting like everybody else. */
+  pl.style.display='';
   var lit=document.getElementById('matchDark'),shw=document.getElementById('matchShadows');
-  if(lit)lit.style.display=isBoss?'none':'';
-  if(shw)shw.style.display=isBoss?'none':'';
+  if(lit)lit.style.display='';
+  if(shw)shw.style.display='';
   pr.innerHTML='';
   var tok=document.getElementById('tokOImg');
   if(tok){
@@ -16878,11 +16886,12 @@ var D3X={
   /* looser: a wall that takes ALL the outward speed reads as jelly. It gives
      a third of it back now, sits wider, and only engages near the table so a
      die is free for most of its fall. */
-  slotRK:0.213, slotRMin:0.14, slotRMax:0.9, slotEngageY:1.5, slotRest:0.5,
+  /* slotRK / slotRMin / slotRMax / slotYieldV / slotYieldY / slotYieldMax are
+     gone: the radius is derived from the row's pitch and nothing tunes it. */
+  slotEngageY:1.5, slotRest:0.5,
   /* a die that has stopped and is still leaning on its wall gets the wall
      moved out to meet it, once. Without this the clamp re-projects it every
      frame and it creeps along the rim - the "very very slow laggy slide". */
-  slotYieldV:1.1, slotYieldY:0.75, slotYieldMax:0.34,
   /* thrown in from off the top of the frame. 4.6 was barely above the table at
      this camera, which is why they read as coming up off it. */
   /* 3.2, not 4.9: at the old peak a die was close enough to the camera to be
@@ -16995,78 +17004,33 @@ var D3X={
        7.992 and a die that cannot claim a free slot is penned at 7.19, which
        is no pen at all. Smallest-gap (P313) saves a CONTIGUOUS subset; a
        subset with holes in it carries no pitch to find. */
-    var _sp=slotX.slice().sort(function(a,b){return a-b;}),_pitch=0;
-    if(rowPitch>1e-4)_pitch=rowPitch;
-    else for(var _i9=1;_i9<_sp.length;_i9++){
-      var _g9=_sp[_i9]-_sp[_i9-1];
-      if(_g9>1e-4&&(!_pitch||_g9<_pitch))_pitch=_g9;
-    }
-    /* the radius where the pen ceiling and the collision floor MEET: two
-       square-on neighbours sitting on their facing rims are exactly a proxy
-       apart, so neither constraint has to push against the other. */
-    /* the radius where the pen ceiling and the collision floor meet, opened
-       up by a third: exactly meeting them leaves a die nothing to move in. */
-    /* 1.15, not 0.85. At the real row pitch that is 0.309 die-widths of room
-       instead of 0.229 - the difference between a die that can bounce and one
-       that is pinned. The circle is still what keeps the columns readable;
-       it just stops being the loudest thing in the throw. */
-    var SLOT_R=_pitch?Math.max(this.PHYS.slotRMin,
-        Math.min(this.PHYS.slotRMax,(_pitch-this.PHYS.proxy)/2*1.15)):0.62;
-    /* A slot holding a kept die is NOT free. Clamping a thrown die into an
-       occupied circle is unwinnable - the clamp pushes it in, contact pushes it
-       out - and it took 116 of 200 throws to the frame cap. Each die is moved
-       to the nearest circle nothing is standing in; anything left over rolls
-       unclamped, because a loose die is better than a throw that never ends. */
-    var slotC=slotX.slice(), taken=[];
-    (function(){
-      var occ=(obstacles||[]).map(function(o){return o.x;});
-      if(!occ.length)return;
-      var isFree=function(x){
-        return !occ.some(function(ox){return Math.abs(ox-x)<SLOT_R+0.5;});
-      };
-      /* KEEP YOUR OWN SLOT if nothing is standing in it. Only the dice whose
-         slot is actually taken go looking, and they take the nearest empty
-         one. Running every die through a greedy nearest-free pass instead can
-         shunt the entire row one place along when the occupied slot is at an
-         end - which is how a second roll ended up bunched to one side. */
-      var free=slotX.filter(isFree).sort(function(a,b){return a-b;});
-      var needy=[];
-      slotX.forEach(function(x,i){
-        if(isFree(x)){
-          var k=free.indexOf(x);
-          if(k>=0){free.splice(k,1);slotC[i]=x;taken[i]=true;return;}
-        }
-        needy.push(i);
-      });
-      var order=needy.sort(function(a,b){return slotX[a]-slotX[b];});
-      order.forEach(function(i){
-        if(!free.length){taken[i]=false;return;}
-        var bi=0,bd=Infinity;
-        for(var f=0;f<free.length;f++){
-          var dd=Math.abs(free[f]-slotX[i]);
-          if(dd<bd){bd=dd;bi=f;}
-        }
-        slotC[i]=free.splice(bi,1)[0];taken[i]=true;
-      });
-    })();
-    for(var _t9=0;_t9<slotX.length;_t9++)if(taken[_t9]===undefined)taken[_t9]=true;
-    /* A die may sit up to SLOT_R from its centre, so the centre itself has to
-       keep that much back from the edge. The old on-screen rescue slid the
-       whole row in after the fact, which is one of the tidies that had to go -
-       this does the same job before a die is ever thrown, and moves nothing. */
-    if(limitX){
-      /* only when the row actually FITS. Squeezing slots that need more width
-         than the screen has just stacks them on top of each other, which is
-         how a clamp meant to keep dice on screen took 66 of 200 throws to the
-         frame cap. If it cannot fit, a little overhang is the lesser evil -
-         and in practice it cannot happen, because the slots are measured off
-         the DOM row, which is itself sized to the screen. */
-      var _need=0;
-      for(var _n9=0;_n9<slotC.length;_n9++)_need=Math.max(_need,Math.abs(slotC[_n9]));
-      if(_need+SLOT_R<=limitX+1e-6){
-        for(var _e9=0;_e9<slotC.length;_e9++)
-          slotC[_e9]=Math.max(-(limitX-SLOT_R),Math.min(limitX-SLOT_R,slotC[_e9]));
+    /* THE PITCH IS THE ROW'S. The caller measures it off the DOM, where every
+       die has a place whether or not it is being thrown. Deriving it from the
+       dice in THIS throw reads a multiple of the truth the moment the throw is
+       a subset with a hole in it. */
+    var _pitch=rowPitch>1e-4?rowPitch:0;
+    if(!_pitch){
+      var _sp=slotX.slice().sort(function(a,b){return a-b;});
+      for(var _i9=1;_i9<_sp.length;_i9++){
+        var _g9=_sp[_i9]-_sp[_i9-1];
+        if(_g9>1e-4&&(!_pitch||_g9<_pitch))_pitch=_g9;
       }
+    }
+    /* How far a die may stray and still not reach its neighbour: the gap left
+       once you take a die's own width out of the pitch, halved because both
+       dice can move. One number, no bounds, no fudge factor. */
+    var SLOT_R=_pitch?Math.max(0.12,(_pitch-this.PHYS.proxy)/2):0.4;
+    /* A DIE'S SLOT IS ITS SLOT. No reassignment: order cannot change, two dice
+       can never be sent to the same place, and a kept die's slot is simply
+       never handed out - which is why the kept case needs no special case.
+       The obstacle boxes stop a thrown die landing on a kept one. */
+    var slotC=slotX.slice();
+    /* keep the centre back from the edge by the radius, so a die at the far
+       side of its circle is still on screen */
+    if(limitX>SLOT_R){
+      var _lim=limitX-SLOT_R;
+      for(var _e9=0;_e9<slotC.length;_e9++)
+        slotC[_e9]=Math.max(-_lim,Math.min(_lim,slotC[_e9]));
     }
     var P=Object.create(this.PHYS),N=values.length;
     P.limitX=limitX||0;
@@ -17191,35 +17155,20 @@ var D3X={
         for(var kc=0;kc<N;kc++){
           var bc=bodies[kc];
           if(bc.position.y>P.slotEngageY)continue;/* still in the air: free */
-          /* no free slot: a wide circle rather than none, so it can share
-             space with a neighbour without being able to leave the table */
-          var myR=taken[kc]?SLOT_R:Math.max(SLOT_R,_pitch*0.9||1.4);
-          if(bc._penR!==undefined&&bc._penR>myR)myR=bc._penR;
+          /* ONE radius, the same for every die, every frame. The wall used to
+             move itself outward for a die that had stopped, which needed three
+             more constants and let a die creep out of its column. */
           var ddx=bc.position.x-slotC[kc], ddz=bc.position.z;
           var rr=Math.sqrt(ddx*ddx+ddz*ddz);
-          if(rr<=myR||rr<1e-6)continue;
+          if(rr<=SLOT_R||rr<1e-6)continue;
           var nx2=ddx/rr, nz2=ddz/rr;
-          bc.position.x=slotC[kc]+nx2*myR;
-          bc.position.z=nz2*myR;
-          /* it has come to rest against the wall: move the wall, not the die.
-             Re-projecting a stopped die every frame is what made it crawl. */
-          if(bc.velocity.norm()<P.slotYieldV&&bc.position.y<P.slotYieldY){
-            if(bc._penR===undefined)bc._penR=myR;
-            bc._penR=Math.min(P.slotYieldMax,Math.max(bc._penR,rr));
-            continue;
-          }
+          bc.position.x=slotC[kc]+nx2*SLOT_R;
+          bc.position.z=nz2*SLOT_R;
           var vn=bc.velocity.x*nx2+bc.velocity.z*nz2;
           if(vn>0){
-            /* remove the outward component and no more. With any restitution
-               at all the die is thrown back across the circle and arrives at
-               the far wall still moving, which is the repeated knocking. */
             bc.velocity.x-=(1+P.slotRest)*vn*nx2;
             bc.velocity.z-=(1+P.slotRest)*vn*nz2;
             bc.angularVelocity.scale(0.7,bc.angularVelocity);
-            /* only count a real knock. A die that has come to rest against
-               its wall is re-projected every frame with a hair of inward
-               speed, and counting those said 116 knocks a throw when the die
-               had touched the wall once and stayed there. */
             if(vn>0.35){if(bc._penHits===undefined)bc._penHits=0;bc._penHits++;}
           }
         }
@@ -18085,7 +18034,12 @@ var D3X={
        `mrw/2 - mid` was ~0 and clamped to 1, which capped the spacing at
        2/(N-1) and pulled the dice into a pile. */
     var mrw=this.mount.getBoundingClientRect().width;
-    var limitX=Math.max(1.2,(Math.min(mid,mrw-mid)-sz*0.75)/sz);
+    /* 0.95, not 0.75. The margin has to cover HALF THE DRAWN DIE, and the
+       mesh draws 0.82 of sz to each side, and the slot's own slop adds more -
+       so 0.75 left the outer die's
+       painted edge 3px past the screen and the slot's own slop took it
+       further. Measured: drawn half-width 32px against sz 39.1. */
+    var limitX=Math.max(1.2,(Math.min(mid,mrw-mid)-sz*1.08)/sz);
     /* The row's own pitch, from EVERY die standing in it - kept ones included.
        d.hx is the layout home (the wrapper's centre), which is the flex slot
        and does not move when the solver puts a die somewhere inside it, so
