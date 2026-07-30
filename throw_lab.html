@@ -1,0 +1,636 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Fark — throw lab</title>
+<!--
+  THE THROW LAB.  Local only, gitignored, never shipped.
+
+  The constraint is fixed: LANES ARE SACRED.  A die ends in its own lane, every
+  throw.  So the question is not whether the landing is controlled - it is - but
+  whether the player can SEE it being controlled.  Everything that reads as bad
+  is the control leaking into view:
+
+      jitter            the pen nudging a die that has already stopped
+      snap              a correction big enough to see, applied in one frame
+      late correction   anything moving after the die has visibly landed
+      dead stop         the sim called it asleep while it was still turning
+
+  The game corrects.  It runs the sim, then pens each die toward its lane every
+  frame near the table, then relaxes the resting positions apart, then blends
+  that back into the last frames.  Three separate corrections, the last two
+  arriving after the eye has decided the die has landed.
+
+  But the solve is OFFLINE.  The whole flight is computed before a single frame
+  is drawn, so a throw that lands wrong can simply be thrown again, invisibly,
+  until one lands right.  That is strategy AIM below: no pen, no relax, no
+  blend - search the launch instead of correcting the landing.  Every frame the
+  player sees is then honest physics, and the die is in its lane because it was
+  aimed there, not because it was pushed there.
+
+  Open this file directly.  Compare strategies on the same seed.
+-->
+<script src="assets/vendor/three.min.js"></script>
+<script src="assets/vendor/cannon.min.js"></script>
+<style>
+  :root{--ink:#e8dcc0;--dim:#9a8f7a;--gold:#ffd98a;--bad:#e0606a;--ok:#7fd18f}
+  *{box-sizing:border-box}
+  html,body{overscroll-behavior:none}
+  body{margin:0;background:#14100c;color:var(--ink);
+    font:13px/1.45 ui-monospace,Menlo,Consolas,monospace;
+    -webkit-text-size-adjust:100%;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right)
+            env(safe-area-inset-bottom) env(safe-area-inset-left)}
+  header{padding:9px 12px;border-bottom:1px solid #2a2118;display:flex;
+    gap:10px;align-items:baseline;flex-wrap:wrap}
+  h1{font-size:13px;margin:0;letter-spacing:.08em;color:var(--gold)}
+  .sub{color:var(--dim);font-size:11px}
+  .wrap{display:flex;gap:12px;padding:12px;align-items:flex-start;flex-wrap:wrap}
+  /* the stage IS the tool on a phone: full width, match-screen proportions */
+  #stage{background:#2b1d12;border:1px solid #3a2b1c;border-radius:4px;
+    width:min(430px,100%);aspect-ratio:430/620;overflow:hidden;
+    touch-action:manipulation;flex:0 0 auto}
+  #stage canvas{display:block;width:100%!important;height:100%!important}
+  .panel{flex:1 1 320px;min-width:0}
+  .row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px}
+  /* 44px targets - this gets used with a thumb */
+  button{font:inherit;min-height:44px;padding:9px 13px;background:#241a12;
+    color:var(--ink);border:1px solid #4a3722;border-radius:4px;cursor:pointer;
+    touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+  button:active{background:#2f2217}
+  button.on{background:#4a3a1a;border-color:var(--gold);color:var(--gold)}
+  table{border-collapse:collapse;width:100%;margin-top:4px}
+  th,td{text-align:right;padding:5px 6px;border-bottom:1px solid #241a12;
+    font-variant-numeric:tabular-nums}
+  th:first-child,td:first-child{text-align:left}
+  th{color:var(--dim);font-weight:400}
+  .good{color:var(--ok)} .bad{color:var(--bad)} .note{color:var(--dim);margin:8px 0}
+  label{color:var(--dim);display:flex;gap:9px;align-items:center;margin:0 0 9px;width:100%}
+  label .v{margin-left:auto;color:var(--ink);white-space:nowrap}
+  input[type=range]{flex:1;min-width:110px;height:34px;accent-color:#ffd98a}
+  @media (max-width:720px){
+    .sub{display:none}          /* strapline is desk furniture */
+    .wrap{padding:10px;gap:10px}
+    button{flex:1 1 44%}        /* two per row under a thumb */
+    #bench{flex:1 1 100%}
+    table{font-size:12px}
+  }
+</style>
+
+<header>
+  <h1>FARK · THROW LAB</h1>
+  <span class="sub">lanes are sacred — the question is whether you can see them being kept</span>
+</header>
+
+<div class="wrap">
+  <div id="stage"></div>
+  <div class="panel">
+    <div class="row" id="strat"></div>
+    <div class="row">
+      <button id="roll">throw</button>
+      <button id="same">same seed</button>
+      <button id="slow">½ speed</button>
+      <button id="bench">bench ×120</button>
+    </div>
+    <div class="row" style="flex-direction:column">
+      <label>dice <input type="range" id="nDice" min="1" max="6" value="6"><span class="v" id="nDiceV">6</span></label>
+      <label>kept <input type="range" id="nKept" min="0" max="3" value="0"><span class="v" id="nKeptV">0</span></label>
+      <label>lane <input type="range" id="laneR" min="5" max="60" value="45"><span class="v" id="laneRV">0.45 pitch · 32px</span></label>
+    </div>
+    <div id="live"></div>
+    <div id="out"></div>
+    <div class="note" id="verdict"></div>
+  </div>
+</div>
+
+<script>
+/* ─────────────────────────────────────────────────────────────────────────
+   The physics, matched to the game: same gravity, same step, same box, same
+   rest thresholds.  Anything the lab concludes has to be true of the real
+   solver, so the shared numbers are copied, not invented.
+   ───────────────────────────────────────────────────────────────────────── */
+const P = {
+  gravity: -50, dt: 1/60, cap: 700,
+  stopV: 0.09, stopW: 0.14,          /* rest test (game: P349) */
+  proxy: 1.06, tall: 0.96,           /* collision box, in die-widths */
+  drawn: 1.82,                       /* what a die PAINTS at the row ends */
+  dropY: 5.4, dropZ: 1.9,            /* launch height and depth (game: P349) */
+  restitution: 0.28, friction: 0.42,
+  slotEngageY: 1.5, slotRest: 0.5, slotEase: 0.34,   /* the pen (game) */
+  pitch: 1.988, limitX: 5.0,
+};
+
+/* deterministic RNG so two strategies can be judged on the SAME throw */
+function mulberry(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);
+  t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+
+/* ── the sim.  Returns the frame tape plus a record of every correction that
+      was applied to it, which is the thing being judged. ── */
+function simulate(opts){
+  const {lanes, seed, strategy, launchJitter} = opts;
+  const rnd = mulberry(seed);
+  const N = lanes.length;
+  const world = new CANNON.World();
+  world.gravity.set(0, P.gravity, 0);
+  world.broadphase = new CANNON.NaiveBroadphase();
+  world.solver.iterations = 12;
+  const mat = new CANNON.Material('d');
+  world.addContactMaterial(new CANNON.ContactMaterial(mat, mat,
+    {friction: P.friction, restitution: P.restitution}));
+  const ground = new CANNON.Body({mass: 0, shape: new CANNON.Plane(), material: mat});
+  ground.quaternion.setFromAxisAngle(new CANNON.Vec3(1,0,0), -Math.PI/2);
+  world.addBody(ground);
+
+  const bodies = [];
+  for (let i = 0; i < N; i++) {
+    const b = new CANNON.Body({mass: 1, material: mat,
+      shape: new CANNON.Box(new CANNON.Vec3(P.proxy/2, P.tall/2, P.proxy/2))});
+    const j = launchJitter || {};
+    const jx = (j.x !== undefined ? j.x : (rnd()-0.5)*0.55);
+    const jz = (j.z !== undefined ? j.z : (rnd()-0.5)*0.35);
+    const vx = (j.vx !== undefined ? j.vx : (rnd()-0.5)*1.6);
+    const vz = (j.vz !== undefined ? j.vz : -1.2 - rnd()*0.8);
+    b.position.set(lanes[i] + jx, P.dropY + rnd()*0.5, P.dropZ + jz);
+    b.velocity.set(vx, -1.5 - rnd(), vz);
+    b.angularVelocity.set((rnd()-0.5)*14, (rnd()-0.5)*14, (rnd()-0.5)*14);
+    b.quaternion.setFromEuler(rnd()*6.3, rnd()*6.3, rnd()*6.3);
+    b.linearDamping = 0.02; b.angularDamping = 0.06;
+    world.addBody(b); bodies.push(b);
+  }
+
+  const frames = [];
+  const corr = {applied: 0, max: 0, late: 0, framesTouched: 0};
+  const landedAt = new Array(N).fill(-1);
+  let step = 0;
+  for (; step < P.cap; step++) {
+    world.step(P.dt);
+    /* has each die touched down yet?  Used to tell an early correction (fine,
+       nobody can see it) from a late one (the thing that reads as a glitch). */
+    for (let i = 0; i < N; i++)
+      if (landedAt[i] < 0 && bodies[i].position.y < P.tall*0.62) landedAt[i] = step;
+
+    if (strategy === 'pen' || strategy === 'aimnet') {
+      /* THE PEN, as the game runs it: ease each die toward its lane every frame
+         once it is low enough.  For 'aimnet' it only ever fires as a safety net,
+         because the launch was already aimed. */
+      for (let i = 0; i < N; i++) {
+        const b = bodies[i];
+        if (b.position.y > P.slotEngageY) continue;
+        const r = LANE_R;
+        const dx = b.position.x - lanes[i], dz = b.position.z;
+        const d = Math.hypot(dx, dz);
+        if (d <= r || d < 1e-6) continue;
+        const nx = dx/d, nz = dz/d;
+        const tx = lanes[i] + nx*r, tz = nz*r;
+        const mvx = (tx - b.position.x)*P.slotEase, mvz = (tz - b.position.z)*P.slotEase;
+        b.position.x += mvx; b.position.z += mvz;
+        const mag = Math.hypot(mvx, mvz);
+        corr.applied += mag; corr.framesTouched++;
+        if (mag > corr.max) corr.max = mag;
+        if (landedAt[i] >= 0 && step > landedAt[i] + 2) corr.late += mag;
+        const vn = b.velocity.x*nx + b.velocity.z*nz;
+        if (vn > 0) {
+          b.velocity.x -= (1+P.slotRest)*vn*nx*P.slotEase;
+          b.velocity.z -= (1+P.slotRest)*vn*nz*P.slotEase;
+        }
+      }
+    }
+    frames.push(bodies.map(b => ({x:b.position.x, y:b.position.y, z:b.position.z,
+      qx:b.quaternion.x, qy:b.quaternion.y, qz:b.quaternion.z, qw:b.quaternion.w})));
+    /* asleep? */
+    let moving = false;
+    for (const b of bodies) {
+      if (b.velocity.length() > P.stopV || b.angularVelocity.length() > P.stopW) {moving = true; break;}
+    }
+    if (!moving && step > 20) break;
+  }
+  const rest = bodies.map(b => b.position.x);
+  const err = rest.map((x,i) => Math.abs(x - lanes[i]));
+  return {frames, rest, err, corr, steps: frames.length, landedAt};
+}
+
+/* AIM: throw each die again, invisibly, until it lands where it belongs.
+
+   The first version searched all six launches TOGETHER and never converged -
+   100% out of lane over 120 throws. Two reasons, both worth keeping written
+   down because they are not obvious.
+
+   One: a tumbling die's resting x is a CHAOTIC function of its launch. It
+   bounces, catches a corner, and a hair's difference at release moves the rest
+   by a die-width. Nudging the launch by the last miss - which works for
+   anything smooth - does not converge here at all.
+
+   Two, and worse: asking six dice to land in their lanes SIMULTANEOUSLY is
+   asking for six low-probability events at once. Even a good per-die hit rate
+   is hopeless raised to the sixth power.
+
+   But the dice sit a whole pitch apart and hardly ever touch, so they are very
+   nearly independent - which turns one impossible six-dimensional search into
+   six easy one-dimensional ones. Each die is solved ALONE against an empty
+   table, retried until its own rest lands in its own lane, and the winning
+   flights are composed afterwards. Nothing is corrected: the dice are thrown
+   over and over until they land right, and the player sees the throw that did. */
+function simOne(lane, seed, launch){
+  const world = new CANNON.World();
+  world.gravity.set(0, P.gravity, 0);
+  world.broadphase = new CANNON.NaiveBroadphase();
+  world.solver.iterations = 12;
+  const mat = new CANNON.Material('d');
+  world.addContactMaterial(new CANNON.ContactMaterial(mat, mat,
+    {friction:P.friction, restitution:P.restitution}));
+  const g = new CANNON.Body({mass:0, shape:new CANNON.Plane(), material:mat});
+  g.quaternion.setFromAxisAngle(new CANNON.Vec3(1,0,0), -Math.PI/2);
+  world.addBody(g);
+  const rnd = mulberry(seed);
+  const b = new CANNON.Body({mass:1, material:mat,
+    shape:new CANNON.Box(new CANNON.Vec3(P.proxy/2, P.tall/2, P.proxy/2))});
+  b.position.set(lane + launch.x, P.dropY + launch.hy, P.dropZ + launch.z);
+  b.velocity.set(launch.vx, -1.5 - launch.vy, launch.vz);
+  b.angularVelocity.set(launch.wx, launch.wy, launch.wz);
+  b.quaternion.setFromEuler(rnd()*6.3, rnd()*6.3, rnd()*6.3);
+  b.linearDamping = 0.02; b.angularDamping = 0.06;
+  world.addBody(b);
+  const frames = []; let landedAt = -1;
+  for (let s = 0; s < P.cap; s++) {
+    world.step(P.dt);
+    if (landedAt < 0 && b.position.y < P.tall*0.62) landedAt = s;
+    frames.push({x:b.position.x,y:b.position.y,z:b.position.z,
+      qx:b.quaternion.x,qy:b.quaternion.y,qz:b.quaternion.z,qw:b.quaternion.w});
+    if (b.velocity.length() <= P.stopV && b.angularVelocity.length() <= P.stopW && s > 20) break;
+  }
+  return {frames, restX:b.position.x, landedAt};
+}
+function aim(lanes, seed, tol, maxTries){
+  const per = [], tries = [];
+  for (let i = 0; i < lanes.length; i++) {
+    const rnd = mulberry(seed + i*7919);
+    let best = null;
+    for (let t = 0; t < maxTries; t++) {
+      const launch = {x:(rnd()-0.5)*0.55, z:(rnd()-0.5)*0.35, hy:rnd()*0.5,
+        vx:(rnd()-0.5)*1.6, vy:rnd(), vz:-1.2-rnd()*0.8,
+        wx:(rnd()-0.5)*14, wy:(rnd()-0.5)*14, wz:(rnd()-0.5)*14};
+      const r = simOne(lanes[i], seed + i*7919 + t*104729, launch);
+      const err = Math.abs(r.restX - lanes[i]);
+      if (!best || err < best.err) best = {r, err, t:t+1};
+      if (err <= tol) break;
+    }
+    per.push(best); tries.push(best.t);
+  }
+  const len = Math.max.apply(null, per.map(p => p.r.frames.length));
+  const frames = [];
+  for (let f = 0; f < len; f++)
+    frames.push(per.map(p => p.r.frames[Math.min(f, p.r.frames.length-1)]));
+  return {frames, rest: per.map(p => p.r.restX),
+    err: per.map((p,i) => Math.abs(p.r.restX - lanes[i])),
+    corr:{applied:0,max:0,late:0,framesTouched:0},
+    steps: len, landedAt: per.map(p => p.r.landedAt), tries};
+}
+
+/* ── jitter: how much a die moves AFTER it has visibly landed.  This is the
+      number that maps onto "it looks twitchy". ── */
+function jitterOf(r){
+  let j = 0;
+  for (let i = 0; i < r.rest.length; i++) {
+    const from = r.landedAt[i] < 0 ? r.frames.length-1 : r.landedAt[i]+3;
+    for (let f = from+1; f < r.frames.length; f++)
+      j += Math.abs(r.frames[f][i].x - r.frames[f-1][i].x)
+         + Math.abs(r.frames[f][i].z - r.frames[f-1][i].z);
+  }
+  return j / r.rest.length;
+}
+
+/* ── strategies ── */
+const STRATS = {
+  pen:    {name:'PEN (current)',  run:(lanes,seed)=>simulate({lanes,seed,strategy:'pen'})},
+  free:   {name:'FREE (no lanes)',run:(lanes,seed)=>simulate({lanes,seed,strategy:'free'})},
+  aim:    {name:'AIM (retry)',    run:(lanes,seed)=>aim(lanes,seed,LANE_R,40)},
+  aimnet: {name:'AIM ×80',        run:(lanes,seed)=>aim(lanes,seed,LANE_R,80)},
+};
+let strat = 'pen', seed = 12345, slow = false;
+
+/* ── THE PICTURE, in 3D, with the game's own camera. ──
+   A flat top-down sketch cannot answer a question about FEEL, so this is the
+   real thing: cube meshes, a grey table, a grid for perspective, and the match
+   camera reproduced rather than approximated.
+
+   The camera is the part worth copying exactly. The game does not simply tilt
+   down - it LIFTS the lens and shears the frustum with setViewOffset so the
+   film plane stays upright, which is why dice in Fark do not keystone toward
+   the top of the screen the way a tilted camera makes them. Reproducing that is
+   the difference between judging this throw and judging a different one.
+
+   World units are CSS pixels, as in the game: x across, y up (the row sits at
+   negative y), z toward the viewer. One die-width is `sz` pixels. */
+/* THE STAGE SIZES ITSELF. On a phone the reference 430x620 is not what you get,
+   so the stage measures its own box and everything scales off that: SZ (pixels
+   per die-width) keeps the same proportion it has in-game at 430 wide, so a row
+   of six still fills the table the same way on any screen. */
+const REF_W = 430, REF_H = 620;
+let STAGE_W = REF_W, STAGE_H = REF_H;
+let SZ = 36.4;                   /* px per die-width, measured in-game at 430 wide */
+let ROW_Y = -REF_H*0.46;         /* where the throw line sits */
+const FOV_MATCH = 54, RISE_MATCH = 20;
+
+const host = document.getElementById('stage');
+const ren = new THREE.WebGLRenderer({antialias:true});
+ren.setPixelRatio(Math.min(2, window.devicePixelRatio||1));
+host.appendChild(ren.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x14100c);
+
+const cam = new THREE.PerspectiveCamera(FOV_MATCH, REF_W/REF_H, 1, 20000);
+function layout(){
+  const r = host.getBoundingClientRect();
+  STAGE_W = Math.max(200, Math.round(r.width));
+  STAGE_H = Math.max(260, Math.round(r.height));
+  SZ = 36.4 * (STAGE_W/REF_W);      /* the row keeps its proportion at any width */
+  ROW_Y = -STAGE_H*0.46;
+  ren.setSize(STAGE_W, STAGE_H);
+  /* The camera is the game's, reproduced: the lens LIFTS and the frustum is
+     sheared with setViewOffset so the film plane stays upright - which is why
+     dice in Fark do not keystone toward the top of the screen. A plain tilt
+     would be judging a throw the game does not have. */
+  const dist = (STAGE_H/2)/Math.tan(THREE.MathUtils.degToRad(FOV_MATCH)/2);
+  cam.near = Math.max(1, dist*0.5); cam.far = dist*3;
+  cam.rotation.set(0,0,0);
+  cam.clearViewOffset();
+  const rise = dist*Math.tan(THREE.MathUtils.degToRad(RISE_MATCH));
+  const fh = STAGE_H + 2*rise;
+  cam.fov = 2*Math.atan((fh/2)/dist)*180/Math.PI;
+  cam.aspect = STAGE_W/fh;
+  cam.setViewOffset(STAGE_W, fh, 0, fh/2 + rise - STAGE_H/2, STAGE_W, STAGE_H);
+  cam.position.set(0, ROW_Y + rise, dist);
+  cam.updateProjectionMatrix();
+  if (typeof rebuildTable === 'function') rebuildTable();
+}
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.62));
+const key = new THREE.DirectionalLight(0xfff2dc, 0.95);
+key.position.set(-0.4, 1, 0.75); scene.add(key);
+
+let laneMarks, tableTop, tableGrid;
+/* the table: a grey solid, with a grid so the perspective is readable.
+   Rebuilt on layout, because both its size and the grid's spacing are in
+   pixels and pixels change when the stage does. */
+function rebuildTable(){
+  [tableTop, tableGrid].forEach(o => { if (o) { scene.remove(o);
+    if (o.geometry) o.geometry.dispose(); } });
+  /* A FLOOR, NOT A BACKDROP. The first version left the plane in its default
+     orientation - facing the camera - which made the table a vertical wall at
+     z=0. Dice travelling away from the viewer went BEHIND it and vanished, and
+     nothing read as a surface they were resting on. The sim's table is the
+     y=0 plane spanning x and z, so the mesh has to lie flat to match it. */
+  tableTop = new THREE.Mesh(
+    new THREE.PlaneGeometry(STAGE_W*3, STAGE_W*3),
+    new THREE.MeshLambertMaterial({color:0x54514c}));
+  tableTop.rotation.x = -Math.PI/2;            /* lie flat */
+  tableTop.position.set(0, ROW_Y, 0);
+  scene.add(tableTop);
+  /* GridHelper is ALREADY in the XZ plane - rotating it was what stood it up */
+  tableGrid = new THREE.GridHelper(STAGE_W*3, Math.round(STAGE_W*3/SZ), 0x8d8880, 0x6d6862);
+  tableGrid.position.set(0, ROW_Y + 0.5, 0);
+  scene.add(tableGrid);
+  if (!laneMarks) { laneMarks = new THREE.Group(); scene.add(laneMarks); }
+  laneMarks.position.set(0, ROW_Y + 1.0, 0);
+  laneMarks.rotation.x = -Math.PI/2;    /* the lane discs lie on the table too */
+}
+rebuildTable();
+
+/* a die: pips drawn to a canvas so the tumble is legible - a plain cube tells
+   you nothing about how it is spinning */
+function pipTexture(n){
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const x = c.getContext('2d');
+  x.fillStyle = '#efe6d2'; x.fillRect(0,0,128,128);
+  x.strokeStyle = '#c8bda4'; x.lineWidth = 6; x.strokeRect(3,3,122,122);
+  const P3 = [30,64,98], put = (a,b)=>{x.beginPath();x.arc(a,b,11,0,7);x.fill();};
+  x.fillStyle = '#2e2418';
+  const L = {1:[[64,64]], 2:[[30,30],[98,98]], 3:[[30,30],[64,64],[98,98]],
+    4:[[30,30],[98,30],[30,98],[98,98]],
+    5:[[30,30],[98,30],[64,64],[30,98],[98,98]],
+    6:[[30,30],[98,30],[30,64],[98,64],[30,98],[98,98]]}[n];
+  L.forEach(p=>put(p[0],p[1]));
+  const t = new THREE.CanvasTexture(c); t.anisotropy = 4; return t;
+}
+const PIPS = [1,2,3,4,5,6].map(pipTexture);
+/* the geometry is in pixels, so it is rebuilt whenever the stage resizes -
+   a die that kept its desktop size on a phone would be the whole table */
+let DIE_GEO = null, DIE_GEO_SZ = 0;
+function dieGeo(){
+  if (!DIE_GEO || DIE_GEO_SZ !== SZ) {
+    if (DIE_GEO) DIE_GEO.dispose();
+    DIE_GEO = new THREE.BoxGeometry(SZ*0.98, SZ*0.94, SZ*0.98);
+    DIE_GEO_SZ = SZ;
+    meshes.forEach(m => { m.geometry = DIE_GEO; });
+  }
+  return DIE_GEO;
+}
+function makeDie(){
+  const mats = [2,5,3,4,1,6].map(n => new THREE.MeshLambertMaterial({map:PIPS[n-1]}));
+  return new THREE.Mesh(dieGeo(), mats);
+}
+let meshes = [];
+function ensureDice(n){
+  dieGeo();
+  while (meshes.length < n) { const m = makeDie(); scene.add(m); meshes.push(m); }
+  meshes.forEach((m,i) => m.visible = i < n);
+}
+/* A LANE IS A DISC, NOT A LINE. The first version drew a vertical line at each
+   lane's x, which says "land anywhere along this, so long as x is right". That
+   is not the rule: the pen holds a die inside a radius of (lane_x, z=0), so
+   DEPTH is constrained by exactly the same amount. Drawing the line would have
+   had us judging a looser constraint than the game actually applies - and the
+   whole point of the lab is that what it shows is what the game does.
+   The ring is that radius, to scale; the tick marks the centre. */
+/* THE LANE IS AN AREA, NOT A TARGET.
+   The first version derived this from (pitch - painted width)/2, which sizes
+   the radius so two dice can NEVER visually overlap - and comes out at 0.084
+   die-widths, about 3px. That is a point, not a lane, and it is why the pen
+   fought every die on every frame: at 3px every die is permanently at its own
+   boundary, so the correction never stops. The jitter and the snap were the
+   radius, not the solver.
+   The brief asks for "one loose horizontal spread with generous spacing" and
+   "horizontal jitter small" - a lane is a permanent SPOT the die lives in. So
+   the radius is a fraction of the PITCH, and dice are free inside it. Below
+   half a pitch two dice can still never swap or pass each other, which is the
+   property that actually has to hold. */
+let LANE_R = 0.45 * P.pitch;
+function showLanes(lanes){
+  while (laneMarks.children.length) laneMarks.remove(laneMarks.children[0]);
+  lanes.forEach(L => {
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(LANE_R*SZ*0.92, LANE_R*SZ, 40),
+      new THREE.MeshBasicMaterial({color:0xffd98a, transparent:true, opacity:0.55,
+        side:THREE.DoubleSide}));
+    ring.position.set(L*SZ, 0, 0);
+    laneMarks.add(ring);
+    const dot = new THREE.Mesh(new THREE.CircleGeometry(1.6, 12),
+      new THREE.MeshBasicMaterial({color:0xffd98a, transparent:true, opacity:0.75}));
+    dot.position.set(L*SZ, 0, 0.3);
+    laneMarks.add(dot);
+    /* The ring above is TRUE SIZE, and true size turns out to be about 3px -
+       which is the honest shock of this whole exercise: the tolerance a die is
+       held to is smaller than the ink on its own edge. It is too small to aim
+       the eye at, so this faint stem marks where the lane IS, while the ring
+       keeps saying how tight it is. Locator, not constraint. */
+    /* no stem now that the ring lies on the table at a real size - the disc
+       reads as the area it is, which is the whole point of drawing it */
+  });
+}
+
+/* frame -> meshes. Sim space is die-widths with the table at y=0 and +z toward
+   the player; the stage puts the table at ROW_Y in the screen plane. */
+function draw(frame, lanes){
+  if (!frame) { ren.render(scene, cam); return; }
+  ensureDice(frame.length);
+  frame.forEach((d,i) => {
+    const m = meshes[i];
+    m.position.set(d.x*SZ, ROW_Y + d.y*SZ, d.z*SZ);
+    m.quaternion.set(d.qx, d.qy, d.qz, d.qw);
+    /* a die outside its lane goes red, so a miss is visible without reading */
+    const off = Math.abs(d.x - lanes[i]) > LANE_R;
+    m.material.forEach(mm => mm.color.setHex(off ? 0xd08a7a : 0xffffff));
+  });
+  ren.render(scene, cam);
+}
+
+function lanesFor(n, kept){
+  /* the row's ladder, exactly as the game builds it: index × pitch, centred */
+  const total = n + kept;
+  const all = [];
+  for (let i = 0; i < total; i++) all.push((i - (total-1)/2) * P.pitch);
+  return all.slice(kept);   /* the kept ones hold the left-hand lanes */
+}
+
+let playing = null;
+function playback(r, lanes){
+  showLanes(lanes);
+  if (playing) cancelAnimationFrame(playing);
+  const t0 = performance.now();
+  const rate = slow ? 0.5 : 1;
+  (function tick(){
+    const f = Math.floor((performance.now()-t0)/(1000*P.dt)*rate);
+    if (f >= r.frames.length) { draw(r.frames[r.frames.length-1], lanes); playing = null; return; }
+    draw(r.frames[f], lanes);
+    playing = requestAnimationFrame(tick);
+  })();
+}
+
+function report(r, lanes, extra){
+  const secs = (r.steps*P.dt);
+  const worst = Math.max.apply(null, r.err);
+  const jit = jitterOf(r);
+  document.getElementById('live').innerHTML =
+    '<table><tr><th>throw</th><th>value</th><th>reads as</th></tr>'
+    + row('time to rest', secs.toFixed(2)+'s', secs < 1.1 ? 'snappy' : secs < 1.8 ? 'unhurried' : 'slow')
+    + row('worst lane error', worst.toFixed(3), worst <= LANE_R ? 'in lane' : 'OUT OF LANE', worst > LANE_R)
+    + row('correction applied', r.corr.applied.toFixed(3), r.corr.applied === 0 ? 'none — pure physics' : 'pushed')
+    + row('biggest single nudge', r.corr.max.toFixed(3), r.corr.max > 0.05 ? 'visible snap' : r.corr.max ? 'sub-pixel' : '—', r.corr.max > 0.05)
+    + row('correction AFTER landing', r.corr.late.toFixed(3), r.corr.late > 0.01 ? 'late correction' : 'none', r.corr.late > 0.01)
+    + row('post-landing movement', jit.toFixed(3), jit > 0.25 ? 'jittery' : 'settled', jit > 0.25)
+    + (extra||'')
+    + '</table>';
+}
+function row(k,v,note,bad){
+  return '<tr><td>'+k+'</td><td>'+v+'</td><td class="'+(bad?'bad':'good')+'">'+note+'</td></tr>';
+}
+
+function throwOnce(newSeed){
+  if (newSeed) seed = (Math.random()*1e9)|0;
+  const n = +document.getElementById('nDice').value;
+  const kept = +document.getElementById('nKept').value;
+  const lanes = lanesFor(n, kept);
+  const t0 = performance.now();
+  const r = STRATS[strat].run(lanes, seed);
+  const solveMs = performance.now()-t0;
+  report(r, lanes, row('solve cost', solveMs.toFixed(1)+'ms', solveMs < 60 ? 'free' : 'noticeable', solveMs > 120));
+  playback(r, lanes);
+}
+
+function bench(){
+  const n = +document.getElementById('nDice').value;
+  const kept = +document.getElementById('nKept').value;
+  const lanes = lanesFor(n, kept);
+  let html = '<table><tr><th>strategy</th><th>rest</th><th>lane err</th>'
+           + '<th>out of lane</th><th>late corr</th><th>jitter</th><th>solve</th></tr>';
+  for (const k of Object.keys(STRATS)) {
+    let secs=0, err=0, out=0, late=0, jit=0, ms=0;
+    const RUNS = 120;
+    for (let i = 0; i < RUNS; i++) {
+      const s = 1000 + i*13;
+      const t0 = performance.now();
+      const r = STRATS[k].run(lanes, s);
+      ms += performance.now()-t0;
+      secs += r.steps*P.dt;
+      const w = Math.max.apply(null, r.err);
+      err += w; if (w > LANE_R) out++;
+      late += r.corr.late; jit += jitterOf(r);
+    }
+    const bad = c => c ? ' class="bad"' : '';
+    html += '<tr><td>'+STRATS[k].name+'</td>'
+      + '<td>'+(secs/RUNS).toFixed(2)+'s</td>'
+      + '<td'+bad(err/RUNS>LANE_R)+'>'+(err/RUNS).toFixed(3)+'</td>'
+      + '<td'+bad(out>0)+'>'+Math.round(100*out/RUNS)+'%</td>'
+      + '<td'+bad(late/RUNS>0.01)+'>'+(late/RUNS).toFixed(3)+'</td>'
+      + '<td'+bad(jit/RUNS>0.25)+'>'+(jit/RUNS).toFixed(3)+'</td>'
+      + '<td>'+(ms/RUNS).toFixed(1)+'ms</td></tr>';
+  }
+  html += '</table>';
+  document.getElementById('out').innerHTML = html;
+  document.getElementById('verdict').textContent =
+    'lane err is in die-widths; 0.084 ≈ 3px, the pen radius itself (pitch minus painted width, halved). "out of lane" is the share of throws '
+    + 'that missed by more than that — with lanes sacred it must be 0%. '
+    + 'late corr and jitter are what the eye actually objects to.';
+}
+
+/* ── wiring ── */
+const sd = document.getElementById('strat');
+Object.keys(STRATS).forEach(k => {
+  const b = document.createElement('button');
+  b.textContent = STRATS[k].name; b.dataset.k = k;
+  if (k === strat) b.className = 'on';
+  b.onclick = () => { strat = k;
+    [...sd.children].forEach(c => c.className = c.dataset.k === k ? 'on' : '');
+    throwOnce(false); };
+  sd.appendChild(b);
+});
+document.getElementById('roll').onclick = () => throwOnce(true);
+document.getElementById('same').onclick = () => throwOnce(false);
+document.getElementById('bench').onclick = bench;
+document.getElementById('slow').onclick = e => { slow = !slow;
+  e.target.className = slow ? 'on' : ''; throwOnce(false); };
+document.getElementById('laneR').oninput = e => {
+  LANE_R = (+e.target.value/100) * P.pitch;
+  document.getElementById('laneRV').textContent =
+    (LANE_R/P.pitch).toFixed(2) + ' pitch · ' + Math.round(LANE_R*SZ) + 'px';
+  throwOnce(false);
+};
+/* size to the stage now, and again when the phone turns or its bars slide */
+layout();
+let _rz;
+addEventListener('resize', () => { clearTimeout(_rz);
+  _rz = setTimeout(() => { layout(); throwOnce(false); }, 160); });
+addEventListener('orientationchange', () =>
+  setTimeout(() => { layout(); throwOnce(false); }, 260));
+['nDice','nKept'].forEach(id => {
+  const el = document.getElementById(id);
+  el.oninput = () => { document.getElementById(id+'V').textContent = el.value; throwOnce(false); };
+});
+/* the lab has to be measurable from outside, like the game is */
+window.LAB = {get cam(){return cam;}, get meshes(){return meshes;},
+  get ren(){return ren;}, SZ, STAGE_W, STAGE_H, ROW_Y,
+  projectedWidth(){
+    const cv = ren.domElement, cr = cv.getBoundingClientRect();
+    const px = v => cr.left + (v.x+1)/2*cr.width;
+    return meshes.filter(m=>m.visible).map(m=>{
+      const bb = new THREE.Box3().setFromObject(m);
+      let lo=Infinity, hi=-Infinity;
+      for (const X of [bb.min.x,bb.max.x]) for (const Y of [bb.min.y,bb.max.y])
+        for (const Z of [bb.min.z,bb.max.z]) {
+          const sx = px(new THREE.Vector3(X,Y,Z).project(cam));
+          if(sx<lo)lo=sx; if(sx>hi)hi=sx;
+        }
+      return {l:Math.round(lo), r:Math.round(hi), w:Math.round(hi-lo)};
+    });
+  }};
+throwOnce(true);
+</script>
