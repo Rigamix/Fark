@@ -89,9 +89,15 @@ Branded dice stop leaking textures. Bosses use the patron table.
    keeps the first borrowed die (one `G._fairTrade` record, overwritten).
    STEADY HAND spends its charge on ARM, not on the reroll, and re-arming
    silently burns another.
-6. **No UI offers the resume path.** `S.pendingMatch` is written correctly and
-   `resumeMatch()` restores a match perfectly when invoked — nothing calls it
-   after a force-close.
+6. ~~**No UI offers the resume path**~~ — **the finding was wrong.** There is a
+   resume section in Settings, gated on the snapshot, and it works end to end.
+   Played and measured: the snapshot is written and persisted to localStorage,
+   survives leaving the match, the section shows with a correct label
+   ("MATCH IN PROGRESS — PATRON · YOU 100 / 2,800 (TURN 2)"), and the button
+   restores pPts, oPts, turn and phase identically. Its placement is deliberate
+   — the markup says so: "Resume lives here in Settings (no on-screen banner)."
+   Nothing to fix. If it should be easier to find, that is a design change to
+   ask for, not a bug.
 7. ~~**`G.isBoss` is never assigned**~~ — fixed P345. `'isBoss' in G` measured
    `false`, `'_isBoss' in G` `true`. Both readers were dead: the tell badge
    never got `.bossbind`, so a boss's tell was painted in patron colours
@@ -106,8 +112,13 @@ Branded dice stop leaking textures. Bosses use the patron table.
    is not only Stakes Rising and has not been since Flintlock joined it. A
    rename across ~35 sites is mechanical but would have buried the scoring
    change in this commit.
-9. **Rival speech balloon paints over the tell badge** and cuts it in half on
-   every seat that has a tell. `ugly`, but the badge is how the rule is read.
+9. ~~**Rival speech balloon paints over the tell badge**~~ — fixed P348.
+   Measured at 430x900: badge 150..280 x 135..184 (z 20), balloon scroll
+   76..354 x 163..216 (z 90), overlap 130x21px = 43% of the badge, including the
+   half that carries the roll counter. Neither can move without landing on
+   something else (55px of clearance to the HUD above, 4px to the dice area
+   below), so the badge yields for the few seconds the rival speaks and comes
+   straight back — verified opacity 1 → 0 → 1 with its box unchanged.
 10. ~~**`handleRoll` has no `_endMatchFired` guard**~~ — fixed P345, one line in
     each of `handleRoll` and `handleBank`. Verified by calling both directly
     after `endMatch(true)` (which is what a leftover timer does): phase, pool

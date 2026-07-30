@@ -1369,7 +1369,14 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 #screen-match #tellBadge{position:absolute;left:50%;right:auto;top:31.5cqw;bottom:auto;transform:translateX(-50%);
   width:max-content;max-width:46%;display:flex;align-items:center;gap:1.2cqw;cursor:pointer;
   background:#e8dcc0;border:1px solid #8a734d;border-radius:1.6cqw;padding:1.4cqw 2.4cqw 1.4cqw 3.4cqw;
-  font-family:'JMH Beda',serif;z-index:20;animation:none}
+  font-family:'JMH Beda',serif;z-index:20;animation:none;
+  transition:opacity .18s ease}
+/* The balloon lands on the badge's bottom half - measured 130x21px, 43% of it,
+   painted over at z-index 90 against the badge's 20 - and that half carries the
+   roll counter. Neither can move without landing on something else (55px of
+   clearance to the HUD above, 4px to the dice area below), so the badge yields
+   for the few seconds the rival is speaking. */
+body.dlg-speaking #screen-match #tellBadge{opacity:0;pointer-events:none}
 #screen-match #tellBadge::before{content:'';position:absolute;left:-2.4cqw;top:50%;transform:translateY(-50%);
   width:5cqw;height:5cqw;border-radius:50%;background:radial-gradient(circle at 35% 32%,#e8c14f,#a5772c 70%);
   border:1px solid #6a4c14}
@@ -27036,6 +27043,9 @@ const LEDGER_LINES={
       const full='\u201c'+text+'\u201d';
       textEl.innerHTML=jitterText(full);
       box.classList.remove('hiding');box.classList.add('show');this.active=true;
+      /* on <body>: the badge is mounted inside #screen-match and this box is
+         fixed, outside it, so there is no closer common ancestor */
+      try{document.body.classList.add('dlg-speaking');}catch(e){}
       // Redraw scroll canvas on show
       requestAnimationFrame(()=>requestAnimationFrame(()=>{const cv=document.getElementById('dlgCanvas');if(cv)drawPixelScroll(cv);}));
       const dur=Math.max(5000,Math.min(9000,text.length*100));
@@ -27043,7 +27053,8 @@ const LEDGER_LINES={
          no-overlap + post-line buffer rule. */
       this.busyUntil=Date.now()+dur;
       if(this.hideTimer)clearTimeout(this.hideTimer);this.hideTimer=setTimeout(()=>this.hide(),dur);},
-    hide(){const box=document.getElementById('dlgBox');if(!box)return;box.classList.remove('show');box.classList.add('hiding');this.active=false;}
+    hide(){const box=document.getElementById('dlgBox');if(!box)return;box.classList.remove('show');box.classList.add('hiding');this.active=false;
+      try{document.body.classList.remove('dlg-speaking');}catch(e){}}
   };
   window.DLG=DLG;
 })();
