@@ -95,6 +95,7 @@
       <label>dice <input type="range" id="nDice" min="1" max="6" value="6"><span class="v" id="nDiceV">6</span></label>
       <label>kept <input type="range" id="nKept" min="0" max="3" value="0"><span class="v" id="nKeptV">0</span></label>
       <label>lane <input type="range" id="laneR" min="5" max="60" value="45"><span class="v" id="laneRV">0.45 pitch · 32px</span></label>
+      <label>in-lane <input type="range" id="cover" min="20" max="100" value="70"><span class="v" id="coverV">70% of the die</span></label>
     </div>
     <div id="live"></div>
     <div id="out"></div>
@@ -269,9 +270,11 @@ function aim(lanes, seed, tol, maxTries){
         vx:(rnd()-0.5)*1.6, vy:rnd(), vz:-1.2-rnd()*0.8,
         wx:(rnd()-0.5)*14, wy:(rnd()-0.5)*14, wz:(rnd()-0.5)*14};
       const r = simOne(lanes[i], seed + i*7919 + t*104729, launch);
-      const err = Math.abs(r.restX - lanes[i]);
-      if (!best || err < best.err) best = {r, err, t:t+1};
-      if (err <= tol) break;
+      /* accept on COVERAGE, not on centre distance - aiming at the looser test
+         would leave dice half out of their lane and call it a hit */
+      const cov = coverOf(r.frames[r.frames.length-1], lanes[i]);
+      if (!best || cov > best.cov) best = {r, cov, err:Math.abs(r.restX-lanes[i]), t:t+1};
+      if (cov >= COVER_MIN) break;
     }
     per.push(best); tries.push(best.t);
   }
@@ -283,6 +286,37 @@ function aim(lanes, seed, tol, maxTries){
     err: per.map((p,i) => Math.abs(p.r.restX - lanes[i])),
     corr:{applied:0,max:0,late:0,framesTouched:0},
     steps: len, landedAt: per.map(p => p.r.landedAt), tries};
+}
+
+/* IN LANE MEANS MOST OF THE DIE IS IN THE LANE.
+   The first test was |restX - laneX| <= radius, i.e. the die's CENTRE inside the
+   disc - which passes a die sitting exactly on the boundary with half its body
+   outside. Denis: "the dice need to have most of their volume - most of the
+   bottom face, which is what is touching the surface - be in the radius."
+
+   So the footprint is measured directly: the square the die actually rests on,
+   turned by the yaw it landed on, sampled on a grid against the disc. Sampling
+   rather than solving square-circle intersection in closed form because the
+   square is rotated and the closed form is a pile of cases for no more accuracy
+   than an 11x11 grid gives (about 1%). */
+const COVER_N = 11;
+function coverOf(f, laneX){
+  const h = P.proxy/2;
+  const e = new THREE.Euler().setFromQuaternion(
+    new THREE.Quaternion(f.qx, f.qy, f.qz, f.qw), 'YXZ');
+  const c = Math.cos(e.y), sn = Math.sin(e.y);
+  let inside = 0, total = 0;
+  for (let i = 0; i < COVER_N; i++) for (let j = 0; j < COVER_N; j++) {
+    const u = -h + 2*h*(i+0.5)/COVER_N, v = -h + 2*h*(j+0.5)/COVER_N;
+    const px = f.x + u*c - v*sn, pz = f.z + u*sn + v*c;
+    total++;
+    if (Math.hypot(px - laneX, pz) <= LANE_R) inside++;
+  }
+  return inside/total;
+}
+function coversOf(r, lanes){
+  const last = r.frames[r.frames.length-1];
+  return lanes.map((L,i) => coverOf(last[i], L));
 }
 
 /* ── jitter: how much a die moves AFTER it has visibly landed.  This is the
@@ -454,6 +488,9 @@ function ensureDice(n){
    half a pitch two dice can still never swap or pass each other, which is the
    property that actually has to hold. */
 let LANE_R = 0.45 * P.pitch;
+/* how much of that footprint has to be inside the disc to count as in lane.
+   0.5 is "more in than out"; higher is stricter. */
+let COVER_MIN = 0.70;
 function showLanes(lanes){
   while (laneMarks.children.length) laneMarks.remove(laneMarks.children[0]);
   lanes.forEach(L => {
@@ -487,7 +524,9 @@ function draw(frame, lanes){
     m.position.set(d.x*SZ, ROW_Y + d.y*SZ, d.z*SZ);
     m.quaternion.set(d.qx, d.qy, d.qz, d.qw);
     /* a die outside its lane goes red, so a miss is visible without reading */
-    const off = Math.abs(d.x - lanes[i]) > LANE_R;
+    /* red when less than COVER_MIN of the resting footprint is in the lane -
+       the same test the numbers use, so the eye and the table agree */
+    const off = coverOf(d, lanes[i]) < COVER_MIN;
     m.material.forEach(mm => mm.color.setHex(off ? 0xd08a7a : 0xffffff));
   });
   ren.render(scene, cam);
@@ -517,12 +556,15 @@ function playback(r, lanes){
 
 function report(r, lanes, extra){
   const secs = (r.steps*P.dt);
-  const worst = Math.max.apply(null, r.err);
+  const covers = coversOf(r, lanes);
+  const worstCover = Math.min.apply(null, covers);
+  const outCount = covers.filter(c => c < COVER_MIN).length;
   const jit = jitterOf(r);
   document.getElementById('live').innerHTML =
     '<table><tr><th>throw</th><th>value</th><th>reads as</th></tr>'
     + row('time to rest', secs.toFixed(2)+'s', secs < 1.1 ? 'snappy' : secs < 1.8 ? 'unhurried' : 'slow')
-    + row('worst lane error', worst.toFixed(3), worst <= LANE_R ? 'in lane' : 'OUT OF LANE', worst > LANE_R)
+    + row('least-covered die', Math.round(worstCover*100)+'% inside',
+        outCount ? outCount+' OUT OF LANE' : 'all in lane', outCount > 0)
     + row('correction applied', r.corr.applied.toFixed(3), r.corr.applied === 0 ? 'none — pure physics' : 'pushed')
     + row('biggest single nudge', r.corr.max.toFixed(3), r.corr.max > 0.05 ? 'visible snap' : r.corr.max ? 'sub-pixel' : '—', r.corr.max > 0.05)
     + row('correction AFTER landing', r.corr.late.toFixed(3), r.corr.late > 0.01 ? 'late correction' : 'none', r.corr.late > 0.01)
@@ -550,10 +592,10 @@ function bench(){
   const n = +document.getElementById('nDice').value;
   const kept = +document.getElementById('nKept').value;
   const lanes = lanesFor(n, kept);
-  let html = '<table><tr><th>strategy</th><th>rest</th><th>lane err</th>'
+  let html = '<table><tr><th>strategy</th><th>rest</th><th>worst cover</th>'
            + '<th>out of lane</th><th>late corr</th><th>jitter</th><th>solve</th></tr>';
   for (const k of Object.keys(STRATS)) {
-    let secs=0, err=0, out=0, late=0, jit=0, ms=0;
+    let secs=0, cov=0, out=0, late=0, jit=0, ms=0;
     const RUNS = 120;
     for (let i = 0; i < RUNS; i++) {
       const s = 1000 + i*13;
@@ -561,14 +603,15 @@ function bench(){
       const r = STRATS[k].run(lanes, s);
       ms += performance.now()-t0;
       secs += r.steps*P.dt;
-      const w = Math.max.apply(null, r.err);
-      err += w; if (w > LANE_R) out++;
+      const cs = coversOf(r, lanes);
+      const worstC = Math.min.apply(null, cs);
+      cov += worstC; if (cs.some(c => c < COVER_MIN)) out++;
       late += r.corr.late; jit += jitterOf(r);
     }
     const bad = c => c ? ' class="bad"' : '';
     html += '<tr><td>'+STRATS[k].name+'</td>'
       + '<td>'+(secs/RUNS).toFixed(2)+'s</td>'
-      + '<td'+bad(err/RUNS>LANE_R)+'>'+(err/RUNS).toFixed(3)+'</td>'
+      + '<td'+bad(cov/RUNS<COVER_MIN)+'>'+Math.round(100*cov/RUNS)+'%</td>'
       + '<td'+bad(out>0)+'>'+Math.round(100*out/RUNS)+'%</td>'
       + '<td'+bad(late/RUNS>0.01)+'>'+(late/RUNS).toFixed(3)+'</td>'
       + '<td'+bad(jit/RUNS>0.25)+'>'+(jit/RUNS).toFixed(3)+'</td>'
@@ -577,9 +620,11 @@ function bench(){
   html += '</table>';
   document.getElementById('out').innerHTML = html;
   document.getElementById('verdict').textContent =
-    'lane err is in die-widths; 0.084 ≈ 3px, the pen radius itself (pitch minus painted width, halved). "out of lane" is the share of throws '
-    + 'that missed by more than that — with lanes sacred it must be 0%. '
-    + 'late corr and jitter are what the eye actually objects to.';
+    'A die is IN LANE when at least ' + Math.round(COVER_MIN*100) + '% of the face it '
+    + 'is resting on sits inside the lane disc — not merely its centre, which passes '
+    + 'a die half outside. "out of lane" is the share of throws where any die failed '
+    + 'that. With lanes sacred it must be 0%. late corr and jitter are what the eye '
+    + 'actually objects to.';
 }
 
 /* ── wiring ── */
@@ -611,6 +656,11 @@ addEventListener('resize', () => { clearTimeout(_rz);
   _rz = setTimeout(() => { layout(); throwOnce(false); }, 160); });
 addEventListener('orientationchange', () =>
   setTimeout(() => { layout(); throwOnce(false); }, 260));
+document.getElementById('cover').oninput = e => {
+  COVER_MIN = +e.target.value/100;
+  document.getElementById('coverV').textContent = e.target.value + '% of the die';
+  throwOnce(false);
+};
 ['nDice','nKept'].forEach(id => {
   const el = document.getElementById(id);
   el.oninput = () => { document.getElementById(id+'V').textContent = el.value; throwOnce(false); };
