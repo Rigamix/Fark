@@ -10744,7 +10744,13 @@ function _updateTellHUD(){
   }
   if(t.id==='drill_order'){
     var d=document.getElementById('drillVal');
-    if(d){var rc=G.turnRollCount||0;d.textContent=rc+'/'+t.maxRolls;
+    /* clamped: a hot-dice roll taken AT the cap is free (see _drillCap) but
+       still counts - it goes through afterRoll, which is where the counter
+       actually lives - so the raw number can read 4/3, which looks like the
+       rule breaking. The count stays honest for everything that reads it;
+       only the label stops at the cap, where it says the one thing the player
+       needs: no allowance left. */
+    if(d){var rc=Math.min(G.turnRollCount||0,t.maxRolls);d.textContent=rc+'/'+t.maxRolls;
       d.classList.toggle('tb-warn',rc>=t.maxRolls-1);
       d.classList.toggle('tb-danger',rc>=t.maxRolls);}
   }
@@ -12148,9 +12154,17 @@ function famRenderRow(){
   }
   if(G&&G._sleeve&&(!G._tell||G._tell.id!==G._sleeve)){
     var _st=_tellById(G._sleeve);
+    /* This chip is the ONLY surface a sleeved rule gets - the tell badge
+       belongs to the seat's own tell - so a sleeved Drill Order has to carry
+       its roll count here or the cap is enforced with nothing on screen
+       explaining the dead ROLL button. Clamped at the cap for the same reason
+       as the badge: a free hot roll taken at the cap still counts, and 4/3
+       reads as the rule breaking. */
+    var _slCap=(G._sleeve==='drill_order')?((_st&&_st.maxRolls)||3):0;
+    var _slVal=_slCap?(' '+Math.min(G.turnRollCount||0,_slCap)+'/'+_slCap):'';
     ha+='<div title="'+((_st?_st.name+' — '+_st.desc:G._sleeve)+' Binds both sides.').replace(/"/g,'&quot;')+'" onclick="_gbInspect(this.title)" '
       +'style="cursor:pointer;padding:2px 7px;background:#122;color:#6bc;border:1px dashed #365">SLEEVED: '
-      +(_st?_st.name:G._sleeve)+' (both) ⓘ</div>';
+      +(_st?_st.name:G._sleeve)+_slVal+' (both) ⓘ</div>';
   }
   hostA.innerHTML=ha;
 }
@@ -20149,15 +20163,38 @@ function setBtns(r,b){
      roll button that Drill Order should keep locked. */
   _updateDrillLock();
 }
-/* Drill Order tell: once the player hits the per-turn roll cap, the roll
-   button shows a locked/chain state (can't roll a 4th) — but Bank still
-   works, and Hot Dice still auto-rolls free (it bypasses handleRoll).
-   Replaces the old behaviour where a 4th roll force-busted the turn. */
+/* DRILL ORDER, asked once. Three sites wanted to know about the roll cap and
+   asked three different questions: handleRoll checked the RULE (_ruleActive, so
+   a sleeve or a sealed seat counts), while the button lock and the bust-save
+   checked only whether it was the seat's TELL. Arriving as the player's sleeve
+   on a seat that already had a tell, the cap was therefore enforced by
+   handleRoll while the button still looked live - an unexplained dead button,
+   with no counter anywhere to explain it.
+     `free` is the exception printed on the badge: hot dice rolls free. It
+   fires when a commit clears the row, and ROLL is the only button that commits
+   AND rolls on, so at the cap the promise was unreachable. When every
+   remaining die is selected, this press IS that commit - let it through, and
+   the commit path still rejects it if the selection does not score.
+     The free reroll does still spend an allowance slot. The old comment here
+   said it "bypasses this entirely (it auto-rolls without going through
+   handleRoll)", which is true and beside the point: the counter is incremented
+   by _afterRollImpl, which the hot branch calls. So the player gets the six
+   dice they earned and can commit and bank them, but not roll a fifth time -
+   and the badge clamps at 3/3 rather than reading 4/3. */
+function _drillCap(){
+  var off={active:false,cap:0,count:0,capped:false,free:false,blocked:false};
+  if(!G||!_ruleActive('drill_order','p'))return off;
+  var def=(G._tell&&G._tell.id==='drill_order')?G._tell:(_tellById('drill_order')||{});
+  var cap=def.maxRolls||3, count=G.turnRollCount||0, capped=count>=cap;
+  var live=(G.pool||[]).filter(function(d){return !d.committed;});
+  var free=live.length>0&&live.every(function(d){return d.sel;});
+  return {active:true,cap:cap,count:count,capped:capped,free:free,
+          blocked:capped&&!free};
+}
 function _updateDrillLock(){
   var rollBtn=document.getElementById('btnRoll');
   if(!rollBtn)return;
-  var locked=!!(G&&G._tell&&G._tell.id==='drill_order'&&(G.turnRollCount||0)>=(G._tell.maxRolls||3));
-  rollBtn.classList.toggle('roll-locked',locked);
+  rollBtn.classList.toggle('roll-locked',_drillCap().blocked);
 }
 /* Above the line is theirs, below it is yours - and each strip has to clear
    the scoring total on its own side. Off the dice: tags at 0.13 of a die,
@@ -21065,7 +21102,10 @@ function startPTurn(){
     /* Steeped: reset accumulated bonus each turn */
     if(G._tell.id==='steeped'&&G._tellState){G._tellState.bonus=0;_updateTellHUD();}
     /* Drill Order: refresh roll counter HUD */
-    if(_ruleActive('drill_order','p')&&G._tell&&G._tell.id==='drill_order'){_updateTellHUD();}
+    /* the RULE, not the tell: a sleeved Drill Order never refreshed, so its
+     count sat wherever the turn started. Each surface ignores the call when it
+     is not the one showing the rule. */
+  if(_ruleActive('drill_order','p')){try{_updateTellHUD();}catch(e){}try{famRenderRow();}catch(e){}}
     /* Reckoning: refresh floor display */
     if(G._tell.id==='reckoning'){_updateTellHUD();}
     /* Confession: pick a random equipped card to seal this turn */
@@ -21288,14 +21328,15 @@ function handleRoll(){
   }
   if(G.phase!=='idle'&&G.phase!=='choosing')return;
   /* ── TELL: Drill Order (Brutus) — roll cap per turn ──
-     REWORK: hitting the cap no longer force-busts the turn. The roll
-     button is locked (.roll-locked, see _updateDrillLock) so the player
-     simply can't roll a 4th time — but they keep whatever is on the
-     table and can still Bank. Hot Dice bypasses this entirely (it
-     auto-rolls without going through handleRoll). This block is just a
-     belt-and-braces refuse in case the locked button is somehow clicked. */
-  if(_ruleActive('drill_order','p')&&G.turnRollCount>=(((G._tell&&G._tell.id==='drill_order')?G._tell:_tellById('drill_order')||{}).maxRolls||3)){
-    setStatusMsg("DRILL ORDER — ROLL LOCKED. BANK YOUR SCORE.",'red');
+     Hitting the cap does not bust the turn: the player keeps what is on the
+     table and banks it. `blocked` and not `capped` is the whole of this fix —
+     a press that clears the row is the free hot-dice roll the badge promises,
+     and it used to be refused here. See _drillCap.
+     The message was 43 characters and ran off both edges of the screen, which
+     made the one explanation for a dead button unreadable. */
+  var _dc=_drillCap();
+  if(_dc.blocked){
+    setStatusMsg("ROLL LOCKED — BANK IT",'red');
     try{SFX.err&&SFX.err();}catch(e){}
     _updateDrillLock();
     return;
@@ -21629,7 +21670,10 @@ function _afterRollImpl(){
       try{save();}catch(e){}
     }
     /* Drill Order: update HUD counter */
-    if(_ruleActive('drill_order','p')&&G._tell&&G._tell.id==='drill_order'){_updateTellHUD();}
+    /* the RULE, not the tell: a sleeved Drill Order never refreshed, so its
+     count sat wherever the turn started. Each surface ignores the call when it
+     is not the one showing the rule. */
+  if(_ruleActive('drill_order','p')){try{_updateTellHUD();}catch(e){}try{famRenderRow();}catch(e){}}
     /* Counterfeit: re-mark cursed dice after each roll (pool re-rendered) */
     if(_ruleActive('counterfeit','p')){setTimeout(_markCounterfeitDice,500);}
     /* Cutpurse: maybe palm a die after the roll settles */
@@ -22335,7 +22379,11 @@ function _tryBustSave(free){
   /* Drill Order cap + empty tray: a save here would leave NO legal action —
      the scheduled roll gets refused by the drill guard and there's nothing to
      bank — a hard softlock. Let the bust proceed instead of burning the save. */
-  var _drillCapped=G._tell&&G._tell.id==='drill_order'&&G.turnRollCount>=(G._tell.maxRolls||3);
+  /* `capped`, not `blocked`: a bust means no selection scores, so the
+     hot-dice exception cannot apply here. Routed through _drillCap so a sleeve
+     drill counts - it did not, and the softlock this guards against was
+     reachable exactly then. */
+  var _drillCapped=_drillCap().capped;
   var _bankable=G.kept.length>0||(G._stakesRisingBonus||0)>0;
   if(_drillCapped&&!_bankable)return false;
   function _runSave(label,text){

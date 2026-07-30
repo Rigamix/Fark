@@ -70,12 +70,17 @@ Branded dice stop leaking textures. Bosses use the patron table.
    carries the turn on, the `+0` tag is cleared, and the empty `{vals:[],pts:0}`
    kept entry is no longer pushed. The effect's own status line stays — that
    is the feedback that the cast happened.
-4. **Drill Order**: the badge promises "Hot Dice rolls free" and it is
-   unreachable (the ROLL plate is `pointer-events:none` at the cap AND
-   `handleRoll` returns at the drill guard). Its status line — the only thing
-   explaining why ROLL is dead — runs off both screen edges. When Drill Order
-   arrives as the player's SLEEVE on an already-sealed seat the cap is
-   enforced with no counter shown at all.
+4. ~~**Drill Order**~~ — fixed P343 / P343b / P344, all three parts. One
+   `_drillCap()` now answers for the guard, the button lock and the bust-save
+   (they asked three different questions, which is why a sleeved drill was
+   enforced by `handleRoll` while the button still looked live). It knows about
+   the free roll: when every remaining die is selected, that press IS the
+   hot-dice commit the badge promises, so ROLL unlocks for exactly that press.
+   Message shortened to "ROLL LOCKED — BANK IT" (224px in a 430px screen; the
+   old one ran off both edges). The sleeve chip carries the count, since a
+   sleeved rule gets no badge. Counter display clamps at the cap — the free
+   roll does spend a slot (it goes through `afterRoll`, not `handleRoll`, which
+   is where the counter actually lives), so the raw number could read 4/3.
 5. **Family cards largely inert.** PRESERVE takes its charge and does nothing.
    The rival's TAR PIT announces itself then gets wiped by `startPTurn` six
    lines later. Nearly every rival family card never fires: the CFX hooks
