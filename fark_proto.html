@@ -16188,6 +16188,38 @@ function _iconFire(d,side){
   try{if(G&&G._tell&&G._tell.id==='last_call')G._zeroHourEnds=true;}catch(e){}
   return 0;/* ALWAYS zero */
 }
+/* GROG - ZERO HOUR: a branded keep ends the turn on the spot, whichever
+   button committed it. Returns true once it has taken the turn over, so the
+   caller stops where it is.
+   BOTH exits matter. With points on the table the turn banks them, which is
+   all this used to do - by calling handleBank and trusting it. But handleBank
+   will not bank nothing (`total<=0` returns), so a brand that was the turn's
+   only keep announced NO MORE ROLLS and then left the turn running with ROLL
+   still live. There is nothing to bank in that case: the table is handed over
+   the way any scoreless turn hands it over. */
+function _zeroHourClose(){
+  if(!G||!G._zeroHourEnds)return false;
+  G._zeroHourEnds=false;
+  /* dead the buttons for the beat. _rollLocked is the flag BOTH handleRoll and
+     handleBank check first, so nothing can be tapped into the gap - the 700ms
+     used to be wide open. */
+  try{setBtns(false,false);}catch(e){}
+  G._rollLocked=true;
+  try{setStatusMsg('ZERO HOUR — THE TURN ENDS','red');famLog('ZERO HOUR — NO MORE ROLLS');}catch(e){}
+  var _g=G;
+  setTimeout(function(){
+    if(G!==_g||!G||G._endMatchFired)return;
+    G._rollLocked=false;
+    /* the same total handleBank computes, for the same reason */
+    var _tp=(G.kept||[]).reduce(function(a,k){return a+(k.pts||0);},0)+(G._stakesRisingBonus||0);
+    if(_tp>0){try{handleBank();}catch(e){}return;}
+    try{clearRow('playerDiceRow');}catch(e){}
+    G.pool=[];
+    try{setBtns(false,false);}catch(e){}
+    try{endPTurn();}catch(e){}
+  },700);
+  return true;
+}
 /* Split a selection into the dice the scoring engine should see and the
    icon dice it must not. An icon die withheld here can never be scored and
    can never be reported as "unused", which is what makes a zero-point keep
@@ -21393,6 +21425,11 @@ function handleRoll(){
     var _bp=G._breakPending;G._breakPending=null;
     if(_breakBegin(_bp.src))return;
   }
+  /* Checked BEFORE the hot-dice branch below, which returns early: a brand
+     that completed the row skipped Zero Hour entirely and then cut a later,
+     unrelated roll instead. It sat after that branch until P341, under a
+     comment claiming it sat before it. */
+  if(_zeroHourClose())return;
   // Hot dice check
   if(G.pool.filter(d=>!d.committed).length===0&&G.pool.length>0){
     /* hot dice: a whole new set of six, so the kept line starts empty again.
@@ -21432,19 +21469,6 @@ function handleRoll(){
       SFX.roll(hotN);
       setTimeout(()=>{G.pool.forEach(d=>{if(!d.committed)settleDie(d.el);});afterRoll();},480);
     },700);
-    return;
-  }
-  /* NB checked BEFORE the hot-dice branch below, which returns early - an
-     icon keep that cleared the row used to skip Zero Hour entirely and then
-     cut a later, unrelated roll instead.
-     GROG — ZERO HOUR: keeping a branded face ends the turn on the spot.
-     Same theme as Last Call (time running out) but aimed at a system that
-     exists; Last Call tested neutral-to-negative. ~14% turn-bank tax on a
-     two-enchant hand, firing on ~32% of icon keeps. */
-  if(G._zeroHourEnds){
-    G._zeroHourEnds=false;
-    try{setStatusMsg('ZERO HOUR — THE TURN ENDS','red');famLog('ZERO HOUR — NO MORE ROLLS');}catch(e){}
-    setTimeout(function(){try{handleBank();}catch(e){}},700);
     return;
   }
   G.phase='rolling';setBtns(false,false);setStatusMsg('ROLLING...','active');
@@ -22947,6 +22971,9 @@ function handleBank(){
      state where the swap was visually mid-flight when the turn ended. */
   if(G&&G._palmAnimating)return;
   const selD=G.pool.filter(d=>d.sel&&!d.committed);
+  /* this press fired brands and banked nothing - the CAST case. Read below,
+     after the total is known, because nothing else distinguishes it. */
+  var _bkCast=false;
   if(selD.length){
     /* Withhold icons from scoring exactly as the roll commit does. A brand
        only sits on a natural 1 or 5, so an icon reaching the engine here
@@ -22982,6 +23009,7 @@ function handleBank(){
     if(_bkScore.length===0&&_bkIcons.length)pts=0;
     if(pts>0||_bkIcons.length){
       _bkIcons.forEach(function(d){_iconFire(d,'p');});
+      if(!_bkScore.length)_bkCast=true;
       /* A Break kept on the BANK press has to resolve BEFORE the bank lands.
          Only handleRoll read _breakPending, so banking a skull armed it and
          then startPTurn wiped it - 300g for nothing - or worse left it live
@@ -23009,8 +23037,13 @@ function handleBank(){
       var _cfBank=false;
       if(false&&selD.some(function(d){return d.cursed;})){_cfBank=true;pts=Math.floor(pts/2);spawnPop('💀 −HALF');try{SFX.err&&SFX.err();}catch(e){}}
       selD.forEach(d=>{d.committed=true;d._frozen=false;if(d.el){d.el.classList.remove('selected','die-frozen');d.el.classList.add('committed');d.el.onclick=null;if(d.el._d3)D3.draw(d.el._d3);}});
-      G.kept.push({vals:selV,mat:selD[0].mat,pts,cursed:_cfBank,
-        dice:selD.map(function(dd){return{val:dd.val,mat:dd.mat};})});
+      /* An icon-only keep has no scoring dice and no points, so this entry was
+         `{vals:[],pts:0}` - an empty group in the kept tray that also counted
+         as zero dice in the committed count Half Measure reads. The die itself
+         is marked committed above, which is the feedback that matters. */
+      if(pts>0||_bkScore.length)
+        G.kept.push({vals:selV,mat:selD[0].mat,pts,cursed:_cfBank,
+          dice:selD.map(function(dd){return{val:dd.val,mat:dd.mat};})});
     }}
   let total=G.kept.reduce((a,k)=>a+k.pts,0);
   /* Stakes Rising: fold the +300 turn-start bonus into the bank total. The
@@ -23018,7 +23051,23 @@ function handleBank(){
      already on the table" — those points need to be banked, not just
      displayed. Cleared at line ~11943 (bust) and the next startPTurn. */
   if(G._stakesRisingBonus){total+=G._stakesRisingBonus;}
-  if(total<=0)return;
+  if(total<=0){
+    /* Nothing to bank. Either a brand was just cast for its effect and the
+       turn carries on, or Zero Hour has just ended it - and Zero Hour has to
+       be asked HERE, because this is the press that armed it. Left to the next
+       ROLL it read as the roll being eaten by a message about the turn. */
+    if(_zeroHourClose())return;
+    if(_bkCast){
+      /* THE CAST FINISHES. It used to just return, so the button stayed lit
+         reading CAST for a selection that no longer existed, with the +0 tag
+         still under the spent die. Nothing is bankable now - a brand banks
+         nothing by definition - so BANK goes dark and ROLL carries the turn
+         on. The effect's own status line stays: it is the feedback. */
+      try{_renderSelTags([],0,true);}catch(e){}
+      setBtns(true,false);
+    }
+    return;
+  }
   /* If this bank wins the match, skip the bank ding — the victory
      fanfare (SFX.win in endMatch) fires ~700ms later and the two
      together read as "two sounds on top of each other." Let the win

@@ -44,15 +44,26 @@ Branded dice stop leaking textures. Bosses use the patron table.
 
 ## Open, in the order I would take it
 
-1. **Zero Hour does not end the turn** when a branded keep is the turn's only
-   keep. Status says "ZERO HOUR — NO MORE ROLLS" and ROLL stays live. `wrong`.
+1. ~~**Zero Hour does not end the turn**~~ — fixed P341. Both commit paths now
+   call one `_zeroHourClose()`: it banks when there is something to bank and
+   hands the table over when there is not. Also moved ahead of the hot-dice
+   branch, which returned early and let a brand that completed the row skip
+   the tell and cut a later roll. Verified by play in
+   `tools/shoot_zero_hour.js`. **Design call left for Denis:** a brand that
+   completes the row now ends the turn *instead of* awarding hot dice — no
+   +250, no fresh six. The alternative is to award the bonus and then end the
+   turn; one message and one outcome read cleaner, so that is what it does.
 2. **Three Grog card arts 404** every match: `assets/Card_ART/grogs_bump.png`,
    `one_more_round.png`, `her_lucky_coin.png`. All three ids are real
    `npcOnly` cards in rung 0's `cardPool`; the files do not exist. Needs the
    art, or a graceful fallback in the card renderer (they draw as blank
    rectangles today). `ugly`, trivial once decided.
-3. **CAST stays enabled after casting**, with the enchant name left on the
-   table; pressing again does nothing. Also leaves a zero-point kept entry.
+3. ~~**CAST stays enabled after casting**~~ — fixed P341. `handleBank` returned
+   at `total<=0` without touching the UI, so the button stayed lit reading
+   CAST for a selection that no longer existed. BANK now goes dark, ROLL
+   carries the turn on, the `+0` tag is cleared, and the empty `{vals:[],pts:0}`
+   kept entry is no longer pushed. The effect's own status line stays — that
+   is the feedback that the cast happened.
 4. **Drill Order**: the badge promises "Hot Dice rolls free" and it is
    unreachable (the ROLL plate is `pointer-events:none` at the cap AND
    `handleRoll` returns at the drill guard). Its status line — the only thing
