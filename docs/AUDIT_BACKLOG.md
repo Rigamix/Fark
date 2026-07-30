@@ -98,8 +98,14 @@ Branded dice stop leaking textures. Bosses use the patron table.
    instead of the red seal the CSS carries for it; and `_bossFirstEnc` stayed
    `undefined`, so the fast-rival speedup applied to a first boss encounter —
    the one turn it exists to leave at full length.
-8. **Hot dice +250 goes straight to the banked score**, so busting on the next
-   roll cannot take it back. The rules card says a bust loses all turn points.
+8. ~~**Hot dice +250 goes straight to the banked score**~~ — fixed P346. Both
+   hot bonuses (the +250 and Iron Crown's) join `_stakesRisingBonus`, the shared
+   turn-bonus pot Flintlock's +200 already uses, and inherit every path written
+   for it. Measured: hot dice leaves `pot 250 / turnPts 2750 / pPts 0`, and a
+   bust takes all of it. **Tidy-up left over:** that field's name is a lie — it
+   is not only Stakes Rising and has not been since Flintlock joined it. A
+   rename across ~35 sites is mechanical but would have buried the scoring
+   change in this commit.
 9. **Rival speech balloon paints over the tell badge** and cuts it in half on
    every seat that has a tell. `ugly`, but the badge is how the rule is read.
 10. ~~**`handleRoll` has no `_endMatchFired` guard**~~ — fixed P345, one line in
@@ -121,6 +127,19 @@ and the first-night 2D dice (never replaced, known).
 - Some reported "score drift" and a "stale SIT DOWN" were rig artefacts the
   agents themselves identified and discarded. Trust the disclosed caveats in
   `AUDIT_FINDINGS_RAW.md`.
+
+## Still open, found after the audit
+
+- **The outermost die paints ~3px past the screen edge**, every roll, on a
+  430px viewport. Not drift — a layout asymmetry. Perspective makes an
+  off-centre die's silhouette wider on its OUTBOARD side than its inboard side,
+  so a symmetric `drawn/2` margin understates it by about that much, and the
+  slot centre is where the flex layout put it (P347 deliberately stopped moving
+  slot centres — moving them is what used to squeeze the ends into their
+  neighbours by 23px). Cheapest fix if it matters: trim the row gap by ~1.2px
+  (`3.8cqw` → `3.5cqw`), which pulls each end centre in ~3px at a cost of ~1px
+  off every inter-die gap. Left alone because it also tightens `SLOT_BASE`,
+  which is already only ~3px.
 
 ## Numbers worth not re-deriving
 

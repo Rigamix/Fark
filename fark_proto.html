@@ -17046,6 +17046,16 @@ var D3X={
      shoves them back - a standing fight, measured at 67 wall knocks a throw.
      1.06 still leaves a hair of table between two ink outlines. */
   proxy:1.06, tall:0.96,
+    /* WHAT A DIE ACTUALLY PAINTS, in the same units as proxy, measured off the
+       screen: 1.53 on average and 1.74 at the row ends, where a die sits
+       off-axis and its near and far faces project to different x, widening the
+       silhouette. This is NOT the collider and must not be: `proxy` is the
+       spacing the contact solver can actually hold (see the note above - 1.28
+       fought the pen and lost), while this is the space the player SEES a die
+       occupy. The pen is sized from this one, because overlap is a fact about
+       pixels. The end-of-row figure is the one used: it is the worst case, and
+       the ends are exactly where the overlap was. */
+  drawn:1.82,
     /* a die turned 45 degrees needs 1.41 between centres just to not
        overlap, so settle is followed by a bounded spread phase that keeps
        stepping until there is a real gap. Recorded like any other frame,
@@ -17151,21 +17161,34 @@ var D3X={
         if(_g9>1e-4&&(!_pitch||_g9<_pitch))_pitch=_g9;
       }
     }
-    /* How far a die may stray and still not reach its neighbour: the gap left
-       once you take a die's own width out of the pitch, halved because both
-       dice can move. One number, no bounds, no fudge factor. */
-    var SLOT_R=_pitch?Math.max(0.12,(_pitch-this.PHYS.proxy)/2):0.4;
-    /* A DIE'S SLOT IS ITS SLOT. No reassignment: order cannot change, two dice
-       can never be sent to the same place, and a kept die's slot is simply
-       never handed out - which is why the kept case needs no special case.
-       The obstacle boxes stop a thrown die landing on a kept one. */
-    var slotC=slotX.slice();
-    /* keep the centre back from the edge by the radius, so a die at the far
-       side of its circle is still on screen */
-    if(limitX>SLOT_R){
-      var _lim=limitX-SLOT_R;
-      for(var _e9=0;_e9<slotC.length;_e9++)
-        slotC[_e9]=Math.max(-_lim,Math.min(_lim,slotC[_e9]));
+    /* How far a die may stray and still not touch its neighbour: the pitch
+       less the width of a die, halved because both of them can move. The width
+       that matters is the one that gets PAINTED, not the collider - a die is
+       44% wider than its collision box, so taking `proxy` here handed out
+       15.4px of licence where the painted dice could afford 6.2px, and the
+       measured result was two of six overlapping by 13 and 16px. */
+    var SLOT_BASE=_pitch?Math.max(0.04,(_pitch-this.PHYS.drawn)/2):0.4;
+    /* A DIE'S SLOT IS ITS SLOT. No reassignment and no clamping: order cannot
+       change, two dice can never be sent to the same place, and a kept die's
+       slot is simply never handed out - which is why the kept case needs no
+       special case. The obstacle boxes stop a thrown die landing on a kept one.
+         The edge used to be handled by pulling the outer slots inward, which
+       moved them 0.593 units - 23px - straight at their neighbours, and both
+       overlaps were at the ends because of it. The layout's homes are on screen
+       by construction (the row measures 417px inside a 418px line), so a clamp
+       that moves them can only manufacture overlap. Instead the RADIUS shrinks
+       where there is no room: same guarantee, nobody's slot touched. */
+    var slotC=slotX.slice(),slotR=[],SLOT_R=0;
+    for(var _e9=0;_e9<slotC.length;_e9++){
+      /* PER SLOT. One radius capped by the tightest slot held all six dice to
+         the tightness of the two on the ends - measured 2.3px of room there,
+         against 20px in the middle. The ends have no screen to spare and should
+         be rigid; the middle four should not be, and the pen was fighting the
+         sim to no purpose. */
+      var _room=(limitX>0)?(limitX-Math.abs(slotC[_e9])):SLOT_BASE;
+      var _r9=Math.max(0,Math.min(SLOT_BASE,_room));
+      slotR.push(_r9);
+      if(_r9>SLOT_R)SLOT_R=_r9;/* the widest any die gets: is the pen live? */
     }
     var P=Object.create(this.PHYS),N=values.length;
     P.limitX=limitX||0;
@@ -17295,10 +17318,11 @@ var D3X={
              more constants and let a die creep out of its column. */
           var ddx=bc.position.x-slotC[kc], ddz=bc.position.z;
           var rr=Math.sqrt(ddx*ddx+ddz*ddz);
-          if(rr<=SLOT_R||rr<1e-6)continue;
+          var _sr=slotR[kc];
+          if(rr<=_sr||rr<1e-6)continue;
           var nx2=ddx/rr, nz2=ddz/rr;
-          bc.position.x=slotC[kc]+nx2*SLOT_R;
-          bc.position.z=nz2*SLOT_R;
+          bc.position.x=slotC[kc]+nx2*_sr;
+          bc.position.z=nz2*_sr;
           var vn=bc.velocity.x*nx2+bc.velocity.z*nz2;
           if(vn>0){
             bc.velocity.x-=(1+P.slotRest)*vn*nx2;
@@ -18169,12 +18193,11 @@ var D3X={
        `mrw/2 - mid` was ~0 and clamped to 1, which capped the spacing at
        2/(N-1) and pulled the dice into a pile. */
     var mrw=this.mount.getBoundingClientRect().width;
-    /* 0.95, not 0.75. The margin has to cover HALF THE DRAWN DIE, and the
-       mesh draws 0.82 of sz to each side, and the slot's own slop adds more -
-       so 0.75 left the outer die's
-       painted edge 3px past the screen and the slot's own slop took it
-       further. Measured: drawn half-width 32px against sz 39.1. */
-    var limitX=Math.max(1.2,(Math.min(mid,mrw-mid)-sz*1.08)/sz);
+    /* The margin is HALF A PAINTED DIE, which is what the guesses that lived
+       here (0.75, then 0.95, then 1.08) were all reaching for. PHYS.drawn is
+       that width, measured rather than tuned, so this stops being a magic
+       number: half of 1.74 is 0.87 of sz. */
+    var limitX=Math.max(1.2,(Math.min(mid,mrw-mid)-sz*(D3X.PHYS.drawn/2))/sz);
     /* The row's own pitch, from EVERY die standing in it - kept ones included.
        d.hx is the layout home (the wrapper's centre), which is the flex slot
        and does not move when the solver puts a die somewhere inside it, so
@@ -18455,11 +18478,21 @@ var D3X={
     g.add(out);
     return g;
   },
-  /* MSCALE 0.70, not 0.77: at 0.77 a die DREW 74.2px against a slot pitch of
-     68.8, so it was wider than the space it had - neighbours overlapped at
-     rest and badly in the air. The sim never noticed, because PHYS.proxy
-     calls a die 1.06 units across while it draws 1.73. */
-  focus:null,FOV:40,FOV_MATCH:54,RISE_MATCH:20,MSCALE:0.70,_matchOn:false,
+  /* MSCALE 0.65. The row's slots are laid out around the 56px DOM box, but the
+     mesh paints 1.74 sim units - 70 to 72px at the ends, where a die sits
+     off-axis and its near and far faces project apart. At 0.70 the end die's
+     painted edge therefore landed 4 to 6px off the screen on a 430px viewport
+     ("dice get cropped"), which no pen can fix: the slot centre is where the
+     LAYOUT put it, and moving it inward is what used to squeeze the ends into
+     their neighbours (see _physSolve).
+     So the die is sized to fit instead. The end centre sits 181px from the row
+     centre and the half-screen is 215, leaving 34px for half a painted die: at
+     0.70 that half was 36, at 0.65 it is 33.5. The six painted widths also drop
+     from 386px of a 430px screen to ~358, which is where the breathing room
+     between them comes from - measured min gap 4px before, 10px after.
+     0.77 -> 0.70 came first, for the same family of reasons: at 0.77 a die drew
+     74.2px against a 68.8px pitch. */
+  focus:null,FOV:40,FOV_MATCH:54,RISE_MATCH:20,MSCALE:0.65,_matchOn:false,
   /* built on first use, NOT in the literal: three.js is loaded on demand and
      `new THREE.Color` here would run at parse time, before it exists */
   _hotCol:function(){return this.__hc||(this.__hc=new THREE.Color(0xffd98a));},
@@ -21496,15 +21529,32 @@ function handleRoll(){
     setBtns(false,false);setStatusMsg('🔥 HOT DICE','gold');
     if(!(G&&G._bustSavedThisTurn))SFX.hotDice();
     showHot();
+    /* ON THE TABLE, not in the bank. Both of these used to go straight to
+       G.pPts, so a bust on the fresh six could not take them back - against the
+       rules card ("you lose all unbanked turn points") and against the point of
+       the mechanic: hot dice is the moment the player is most tempted to keep
+       rolling, and it was the moment they had nothing left to lose.
+       _stakesRisingBonus is the shared turn-bonus pot - Flintlock's +200 is
+       already in it, and its card spells out the contract: "Lost if you bust."
+       Joining it inherits every path already written: doBust clears it, Ward
+       halves it, Iron Stomach / Aegis / Last Stand count it as part of what was
+       at stake, and handleBank folds it into the total. */
     var _hotBonus=250;
     /* Synergy: High Roller — Hot Dice bonus doubled */
     if(G.activeSynergies&&G.activeSynergies.includes('score_mates'))_hotBonus*=2;
-    G.pPts+=_hotBonus;spawnPop('+'+_hotBonus+' 🔥');updHUD();
+    G._stakesRisingBonus=(G._stakesRisingBonus||0)+_hotBonus;
+    spawnPop('+'+_hotBonus+' 🔥');
     if(G.pCards.includes('iron_crown')){
       G._ironCrownHits=(G._ironCrownHits||0)+1;
       var _icBonus=500+(G._ironCrownHits-1)*250;
-      G.pPts+=_icBonus;triggerCard('iron_crown','+'+_icBonus+' IRON CROWN',true);updHUD();
+      G._stakesRisingBonus=(G._stakesRisingBonus||0)+_icBonus;
+      triggerCard('iron_crown','+'+_icBonus+' IRON CROWN',true);
     }
+    /* the kept total was written above, before either bonus existed */
+    G.turnPts=G.kept.reduce(function(a,k){return a+k.pts;},0)+(G._stakesRisingBonus||0);
+    (function(){var kt2=document.getElementById('keptTotal');
+      if(kt2)kt2.textContent=(G.turnPts||0)?G.turnPts.toLocaleString():'';})();
+    updHUD();
     const hotSpur=!!G.spurActive;if(typeof G.spurActive==='number'&&G.spurActive>0)G.spurActive--;else G.spurActive=0;
     setTimeout(()=>{
       setStatusMsg('ROLLING...','active');const row=document.getElementById('playerDiceRow');
