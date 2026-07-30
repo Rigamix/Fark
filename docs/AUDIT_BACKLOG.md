@@ -285,6 +285,45 @@ which die is trapped rather than the card taking the first.
 and paint as broken-image glyphs; `famCardArt` has no fallback (unlike
 `_cardArtImg`, which removes itself on error).
 
+## The revised rework brief — what it answered, what is left
+
+`docs/briefs/FARK_ENCHANT_BADGE_REWORK.md` was updated after the code audit and
+now settles three things it previously deferred:
+
+- **Fair Trade, borrowed die destroyed** → REVERSED. The die is permanently
+  gone. The old "loan voids" ruling was a live exploit: borrow your own Obsidian,
+  Break it for the guaranteed +1000, and Fair Trade erased the loss — section 4's
+  whole timing trade for free. **Done in P365.**
+- **Brutus's relic** → becomes a die that permanently carries the Ward enchant,
+  pre-applied, counted against the one-Ward-per-loadout cap. **Not done.** This
+  also deletes the last guaranteed full bust-save, which §1 calls a structural
+  break — the audit found §1's claim that it "doesn't exist anywhere" was false.
+- **Kindred** → rescoped to the PLAYER's loadout only, because the engine has no
+  opponent-side enchants. The code already checks only the player, so this now
+  **matches** without work. Its "double strength" for non-numeric effects is
+  still open item 1 — do not guess a per-enchant default.
+- **First Strike** → redesigned to "first time the PLAYER fires a lane icon,
+  reveal the opponent's layout". **Not done**, and the brief itself asks for a
+  decision on whether the reduced form is worth keeping at all rather than
+  shipping a downgrade nobody signed off on.
+
+Still to build, in the order I would take it:
+
+1. **Brutus's relic → permanent Ward**, and delete the full-save shield path with
+   it (die def, `dieShieldsPlayer`/`dieShieldsOpp`, both doBust branches, the
+   save snapshot, the CSS/SFX). `_wardOwned` must count the relic so the cap
+   holds. Note the shield bloom is already broken: it queries
+   `.die-wrap[data-mat="silver"]`, which matches nothing when the holder is
+   `brutus_shield`.
+2. **Fair Trade tiers** — tier I is one ROLL, tier II the whole turn. Today both
+   unwind in `startPTurn`, which is per-turn, so tier I is a free upgrade.
+3. **Still Waters vs Obsidian's shatter** — the one case §7 names as validated.
+4. **The 1-or-5 face restriction** and the shop's face-picker step. The brief
+   reaffirms it; the code ships a different system deliberately and documents
+   why. Biggest single divergence, and it closes two other holes on its own — a
+   branded face can then never be a 6, which is what breaks Anchor and Jade's
+   wild today.
+
 ## Still open, found after the audit
 
 - **Painted width is not modelled properly, and a sweep built on the bad model

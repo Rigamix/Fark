@@ -61,23 +61,37 @@ fill the retired slots:
   TIER II extends the loan for the rest of the turn — the two must
   behave differently, tier I is the deliberately weaker version.
   Build-flexibility, no overlap with any other system.
-  **If the borrowed die is destroyed mid-loan** (Obsidian's natural
-  shatter, Break, or any future death effect): the loan simply voids.
-  Nothing is returned, nothing is lost from the player's real pool —
-  their own die resumes that lane next turn as if the trade never
-  happened. Deliberately NOT a stake: Fair Trade was designed as the
-  quiet, low-drama half of Silver's two replacement cards (opposite
-  Steady Hand), sitting apart from the game's actual wager-bearing
-  systems (Break, Ward, badges). Punishing a passive, uncontrolled
-  event (a 6%/roll shatter check the player isn't actively gambling
-  on) with permanent loss of a built-up die would make this card
-  carry more risk than Break itself, on a card never meant to carry
-  any.
+  **REVISED — if the borrowed die is destroyed mid-loan** (Obsidian's
+  natural shatter, Break, or any future death effect): **the player
+  loses the die they lent, permanently, exactly as if it had died in
+  its own home lane.** No exception for cause. This reverses an
+  earlier ruling (void the loan, nothing lost) that turned out to be
+  a live exploit: it let a player borrow their own Obsidian die,
+  Break it for the guaranteed +1000, and have Fair Trade erase the
+  loss entirely — bypassing the whole point of section 4's timing
+  finding with zero cost. The corrected reasoning: natural shatter
+  and Break are EQUALLY permanent (confirmed against the Break sim
+  work — shatter is a one-time, whole-match event, not "gone for a
+  turn, comes back"), so there was never a real "soft cause" to
+  protect against. A die's death belongs to the die, not to whichever
+  lane it's temporarily visiting. This does not make Fair Trade a
+  stake — the card's actual value (repositioning a die into a
+  different lane) is untouched; what's removed is an accidental
+  bonus immunity the card was never designed to grant. If the loan's
+  duration simply expires without the die dying, nothing changes:
+  the player's own die returns to its home lane as normal.
 
-Brutus's relic ("2 bust saves," from the old spoils system) needs a
-matching rewrite now that guaranteed bust-save doesn't exist anywhere in
-the game — flagged, not resolved here; likely becomes a stronger,
-permanent Ward charge once the relic-vs-badge architecture question
+**RESOLVED** (was an open item; a code audit found it still contradicting
+section 1's "doesn't exist anywhere" claim, since it was never actually
+closed out): Brutus's relic ("2 bust saves," from the old spoils system)
+becomes a die that PERMANENTLY carries the Ward enchant, pre-applied —
+no branding needed, no separate mechanic invented. It counts against
+the one-Ward-per-loadout hard cap exactly like a player-branded Ward
+die; the cap exists specifically to stop stacked safety nets, and a
+relic that bypassed it through a side door would quietly undo the
+reason the cap exists. Fits Brutus's character as a bonus: a soldier
+who is simply always prepared needs no flashy new rule. Old text
+superseded by the relic-vs-badge architecture question
 (open item, section 5) is settled.
 
 ## 2. ENCHANTS — FULL REWORK
@@ -241,17 +255,25 @@ changes. Do not commission new badge paintings for this rework.
   as Last Call (urgency, time running out) but now interacts with a
   system that exists.
 - **Whisper: Counterfeit → Kindred.** (Badge stays The Serpent.)
-  Counterfeit was never validated in prior sim passes. Kindred: while
-  worn, if EITHER side has 2+ enchanted dice in their loadout, icon
-  effects trigger at DOUBLE STRENGTH for both sides all match. Sim
-  (Tithe only, the clean case): gold income 5.9 → 11.9/turn, an exact
-  2x, confirmed no leakage. **OPEN ITEM:** "double strength" is only
-  cleanly defined for additive-numeric effects (Tithe's gold). Ward's
-  halved-consolation, and Snare/Break/Trade/Snuff/Fog's structural
-  effects, do NOT have an obvious "2x" — doubling a die-destruction or a
-  one-time swap doesn't mean anything as written. THIS NEEDS A DESIGN
-  DECISION before Code implements Kindred for anything but Tithe. Do
-  not guess a default per-enchant; ask.
+  Counterfeit was never validated in prior sim passes. **RESCOPED —
+  a code audit found the engine has no opponent-side enchants at all,
+  making the original "either side" wording structurally unreachable**
+  (the opponent-side half of the check can never be true). Kindred
+  now reads: while worn, if the PLAYER has 2+ enchanted dice in their
+  loadout, icon effects trigger at DOUBLE STRENGTH for the match. This
+  loses the mutual "read whether you're more enchanted than them"
+  tension the original wording implied, but survives intact as a
+  build-commitment reward (Whisper rewards a player who's leaned into
+  enchants) — still a good badge, just honestly scoped to what the
+  engine can evaluate. Sim (Tithe only, the clean case): gold income
+  5.9 → 11.9/turn, an exact 2x, confirmed no leakage. **OPEN ITEM:**
+  "double strength" is only cleanly defined for additive-numeric
+  effects (Tithe's gold). Ward's halved-consolation, and Snare/Break/
+  Trade/Snuff/Fog's structural effects, do NOT have an obvious "2x" —
+  doubling a die-destruction or a one-time swap doesn't mean anything
+  as written. THIS NEEDS A DESIGN DECISION before Code implements
+  Kindred for anything but Tithe. Do not guess a default per-enchant;
+  ask.
 - **Aldric: Confession → Still Waters.** (Badge stays The Antler Crown.)
   Confession was never validated. Still Waters: while worn, an
   enchanted die's underlying FAMILY TRAIT is suppressed for the match
@@ -263,17 +285,25 @@ changes. Do not commission new badge paintings for this rework.
   bank bonus, or Silver's odds-skew under this badge is inferred, not
   validated — re-test each before trusting the number in a live build.
 - **Corvus: In Arrears → First Strike.** (Badge stays The Tipped
-  Scales.) In Arrears was untested. First Strike: while worn, whichever
-  side FIRST triggers a lane-targeting icon (Snare, Trade, Snuff, or
-  Fog) reveals BOTH sides' full six-lane material layout to each other
-  for the rest of the match. **NOT numerically sim-tested** — it's a
-  pure information effect with no clean scoring-math signature to
-  measure; validated qualitatively only (fits Corvus's
-  counting-house-sees-all identity). **REAL COST, flag this plainly:**
-  Corvus's In Arrears was the ONLY pure-economy tell (gold-drain) in the
-  entire eight-badge roster. Removing it means no badge taxes gold
-  anymore. If that flavor is missed in playtest, it needs a new home —
-  not solved by this rework.
+  Scales.) In Arrears was untested. **REDESIGNED, not just rescoped —
+  a code audit found no opponent-side enchants exist, and unlike
+  Kindred this one can't survive a simple rescope:** the original
+  "whichever side triggers first" was a RACE, and with the opponent
+  structurally unable to ever trigger, the player always wins it
+  trivially — the race collapses into a guaranteed freebie, which was
+  never the design. New wording: while worn, the FIRST TIME the player
+  fires a lane-targeting icon (Snare, Trade, Snuff, or Fog) this match,
+  reveal the opponent's full six-lane material layout. **Flag this
+  plainly:** this is weaker and less interesting than the original
+  race concept — worth a real decision on whether it's still worth
+  keeping in this reduced form or should retire back toward something
+  else, rather than quietly shipping a downgrade nobody signed off on.
+  **NOT numerically sim-tested** either version — pure information
+  effect, no scoring-math signature to measure; validated qualitatively
+  only. **REAL COST, still stands:** Corvus's In Arrears was the ONLY
+  pure-economy tell (gold-drain) in the entire eight-badge roster.
+  Removing it means no badge taxes gold anymore. If missed in
+  playtest, needs a new home — not solved by this rework.
 
 **UNCHANGED:** Mabel (Steeped), Finnick (Pickpocket), Brutus (Drill
 Order), Ambrose (Reckoning) — the last one stays specifically because
@@ -323,13 +353,23 @@ numbers change.
    harness pass before their power level is trusted in a live build.
 5. Corvus's lost economy-tax flavor (In Arrears) — needs a new home if
    missed in playtest.
-6. Brutus's relic ("2 bust saves") is now referencing a mechanic that
-   doesn't exist anywhere in the game — needs a rewrite, blocked on the
-   broader relic-vs-badge architecture question that was raised but
-   never resolved earlier in this project (should relics be physical
-   dice competing for loadout slots, or fold into some other delivery —
-   this document takes no position, it only flags that Brutus's text
-   is now stale).
+6. RESOLVED — see the Silver section above (Brutus's relic now carries
+   a permanent Ward enchant, counted against the loadout cap). The
+   broader relic-vs-badge architecture question (should relics be
+   physical dice competing for loadout slots, or fold into some other
+   delivery) remains open independent of this specific fix.
+8. NO OPPONENT-SIDE ENCHANTS EXIST IN THE ENGINE. This was found to be
+   the root cause of THREE structurally-unreachable clauses in this
+   document, all now resolved: Kindred (rescoped to player-only, above),
+   First Strike (redesigned, above), and the "occasional enchanted
+   patron/boss die" flavor idea floated in earlier design discussion —
+   that one is DEFERRED outright, not fixed, since it was always a
+   stretch-goal riding on infrastructure that doesn't exist and nothing
+   else in this document depends on it. Building real opponent-side
+   enchant support (NPCs owning and triggering enchanted dice, an AI
+   keep-policy for icon faces) would let Kindred and First Strike
+   recover their original, richer designs — a real future option, not
+   attempted here.
 7. Snuff and Fog's real power level against an ADAPTING opponent (this
    document's sim used static hands; re-run once opponent AI logic for
    these two exists).

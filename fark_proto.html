@@ -21391,11 +21391,42 @@ function startPTurn(){
      and clear themselves when they fire. */
   G._wardArmed=false;G._bustImmuneTurn=false;G._zeroHourEnds=false;G._breakArmed=false;
   G._breakPending=null;
-  /* Fair Trade was for one roll - put the borrowed die back */
+  /* FAIR TRADE: the loan ends. Two ways it can end, and they are not the same.
+
+     This used to write `was` back into the lane UNCONDITIONALLY, without
+     checking the borrowed die was still standing in it. If the borrowed die
+     died mid-loan - Obsidian's shatter, or Break - the lane held something else
+     by now, and this overwrote it: a die the player actually owns, destroyed
+     for the rest of the match, by a card that is not supposed to be a stake.
+
+     And the death itself used to be erased, which the brief flags as a live
+     exploit: borrow your own Obsidian die, Break it for the guaranteed +1000,
+     and get the die back anyway - section 4's whole timing trade for free.
+     A die's death belongs to the die, not to whichever lane it is visiting. So
+     a borrowed die that dies is permanently gone from the stash, and the
+     player's own die comes home either way, because it never died. */
   if(G._fairTrade){
-    if(G.matchDice&&G._fairTrade.lane<G.matchDice.length)
-      G.matchDice[G._fairTrade.lane]=G._fairTrade.was;
-    G._fairTrade=null;
+    var _ft=G._fairTrade;G._fairTrade=null;
+    var _lane=_ft.lane, _stillThere=!!(G.matchDice&&_lane<G.matchDice.length&&
+      G.matchDice[_lane]===_ft.borrowed);
+    if(_stillThere){
+      G.matchDice[_lane]=_ft.was;/* loan simply expired */
+    }else{
+      /* the borrowed die is not in its seat any more: it died there. Take it
+         out of the stash for good, and DO NOT touch the lane - whatever holds
+         it now is not ours to overwrite. */
+      try{
+        _getS();
+        var _inv=S.run.diceInv||[], _at=_inv.indexOf(_ft.borrowed);
+        if(_at>=0){
+          _inv.splice(_at,1);
+          var _ei=S.run.dieEnchInv;
+          if(Array.isArray(_ei)&&_at<_ei.length)_ei.splice(_at,1);
+          save();
+          famLog('FAIR TRADE — THE BORROWED '+((getDie(_ft.borrowed)||{}).name||'DIE')+' DIED ON LOAN');
+        }
+      }catch(e){}
+    }
   }
   /* THE TAB: release any bank the rival escrowed last turn. It was held for
      one turn; credit it now and check the win it may complete (the rival
