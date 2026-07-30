@@ -81,14 +81,37 @@ Branded dice stop leaking textures. Bosses use the patron table.
    sleeved rule gets no badge. Counter display clamps at the cap — the free
    roll does spend a slot (it goes through `afterRoll`, not `handleRoll`, which
    is where the counter actually lives), so the raw number could read 4/3.
-5. **Family cards largely inert.** PRESERVE takes its charge and does nothing.
-   The rival's TAR PIT announces itself then gets wiped by `startPTurn` six
-   lines later. Nearly every rival family card never fires: the CFX hooks
-   return immediately unless `owner==='p'`, and the AI only ever arms
-   `tar_pit` / `sleight`. FAIR TRADE III used twice in one turn permanently
-   keeps the first borrowed die (one `G._fairTrade` record, overwritten).
-   STEADY HAND spends its charge on ARM, not on the reroll, and re-arming
-   silently burns another.
+5. **Family cards** — diagnosed by an 11-agent workflow, each proposed patch put
+   past two independent verifiers. Split five ways:
+   - ~~**STEADY HAND**~~ — fixed. 2/2. `use()` now returns false so `famUse`'s
+     `if(fx.use(inst)){inst.charges--}` leaves the counter alone; the die tap
+     bills instead. Re-arming is free, an abandoned arm costs nothing, and
+     `handleRoll` drops the flag and the red outline since the roll rebinds the
+     dice the arm belonged to.
+   - ~~**FAIR TRADE III**~~ — fixed. 2/2. `canUse` requires `!G._fairTrade`, one
+     loan at a time; the record clears each `startPTurn`, so the second charge is
+     spendable next turn. **Correction to the original finding:** "permanently"
+     overstated it — `use()` writes only `G.matchDice`, which is rebuilt at match
+     start, so the damage was match-scoped.
+   - ~~**"Rival cards never fire because CFX hooks check `owner==='p'`"**~~ —
+     **THE FINDING WAS WRONG.** The rival was never meant to run through CFX: it
+     has a parallel hand-written path (`_npcFamCard`, plus inline blocks in
+     `_npcArmActives` / `runOppTurn` / `finOpp`). Nothing to fix here.
+   - **PRESERVE** — real, an ordering bug in `startPTurn`: the effect lands
+     ABOVE the per-turn reset, so `G.kept=[]` deletes the amber die six lines
+     after it is written and the charge buys a log line. The fix is a relocation
+     (below the reset AND below Stakes Rising, which *assigns* `G.turnPts`).
+     **NOT APPLIED — 1/2 verifiers.** The dissent is worth reading: the card says
+     "already kept and scored", i.e. a visible DIE, and the patch delivers a
+     number in the tray. Denis's call.
+   - **RIVAL TAR PIT** — real, 2/2, same ordering bug (the `G.numDice` cut sits
+     above the reset that rebuilds it). **NOT APPLIED** on a verifier's explicit
+     advice: fixing it makes the *rival's* Tar Pit real while the *player's* stays
+     cosmetic — same card text, one-way weapon. Ship both sides together or
+     neither. Denis's call.
+
+   Full findings, evidence and patch text: the workflow output at
+   `tasks/weys6qm7r.output` (see the in-flight note above for the script path).
 6. ~~**No UI offers the resume path**~~ — **the finding was wrong.** There is a
    resume section in Settings, gated on the snapshot, and it works end to end.
    Played and measured: the snapshot is written and persisted to localStorage,

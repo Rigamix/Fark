@@ -12065,6 +12065,13 @@ CFX.slow_cook={
 CFX.steady_hand={
   canUse:function(inst){return !!(G&&G.phase==='choosing'&&
     (G.pool||[]).some(function(d){return !d.committed&&!d._frozen;}));},
+  /* THE REROLL PAYS, NOT THE ARM. use() only paints the targets, so it returns
+     FALSE and famUse's `if(fx.use(inst)){inst.charges--;}` leaves the counter
+     alone; the die tap below is what spends the charge. Two consequences, both
+     wanted: playing the card again while already armed is free — it just
+     re-paints whichever dice are free NOW, which is also how an arm stranded by
+     a ROLL gets picked up again — and an arm the player walks away from costs
+     nothing, because it was never billed. */
   use:function(inst){
     var free=(G.pool||[]).filter(function(d){return !d.committed&&!d._frozen;});
     if(!free.length)return false;
@@ -12077,6 +12084,10 @@ CFX.steady_hand={
         if(!G._steadyArmed)return;
         G._steadyArmed=false;
         free.forEach(function(q){if(q.el){q.el.classList.remove('break-target');q.el.onclick=function(){toggleDie(q);};}});
+        /* disarm first, THEN bill: a card with nothing left must hand the dice
+           back rather than eat the tap and leave them outlined */
+        if(inst.charges<=0)return;
+        inst.charges--;try{famRenderRow();}catch(e){}
         d.val=_rollD(d);d.sel=false;try{reDrawDieFace(d);}catch(e){}
         try{famLog('STEADY HAND — '+d.val);}catch(e){}
         var fv=free.map(function(x){return x.val;}),fm=free.map(function(x){return x.mat;});
@@ -12084,7 +12095,7 @@ CFX.steady_hand={
         try{refreshSelUI();}catch(e){}try{famRenderRow();}catch(e){}
       };
     });
-    return true;
+    return false;/* armed only — the tap pays */
   }
 };
 /* FAIR TRADE — build flexibility, before the dice are thrown. Swaps a seat
@@ -12092,7 +12103,14 @@ CFX.steady_hand={
 CFX.fair_trade={
   canUse:function(inst){
     _getS();
-    return !!(G&&(G.phase==='idle'||G.turnRollCount===0)&&(S.run.diceInv||[]).length);},
+    /* ONE LOAN AT A TIME. Tier III has two charges; spending both before the
+       first roll overwrote the single G._fairTrade record, so the first
+       borrowed die stayed in its seat for the rest of the match and the
+       player's own die from that seat was dropped from the hand (the same
+       stash die also sat in two seats at once, since use() never takes it out
+       of the stash). The record is cleared at the top of every startPTurn, so
+       the second charge is still spendable - next turn. */
+    return !!(G&&!G._fairTrade&&(G.phase==='idle'||G.turnRollCount===0)&&(S.run.diceInv||[]).length);},
   use:function(inst){
     _getS();
     var inv=(S.run.diceInv||[]);
@@ -21699,7 +21717,13 @@ function handleRoll(){
      reworked Frozen Die (hold-within-turn), a frozen die stays in the pool
      and must SURVIVE rerolls keeping its face. Only clear transient anim
      state on non-frozen dice. */
-  row.querySelectorAll('.die').forEach(el=>{if(el.classList.contains('die-frozen'))return;el.getAnimations().forEach(a=>a.cancel());el.style.transform='';el.style.opacity='';el.style.animation='';el.classList.remove('scatter','bust');});
+  /* A Steady Hand arm belongs to the dice on the table RIGHT NOW: this roll
+     replaces their faces and rebinds their clicks (see the onclick=null below
+     and the toggleDie rebind in the settle timeout), so the arm dies with them.
+     Drop the flag and the red target outline too, or the player is left staring
+     at outlined dice that no longer reroll. Nothing to refund — the tap pays. */
+  G._steadyArmed=false;
+  row.querySelectorAll('.die').forEach(el=>{if(el.classList.contains('die-frozen'))return;el.getAnimations().forEach(a=>a.cancel());el.style.transform='';el.style.opacity='';el.style.animation='';el.classList.remove('scatter','bust','break-target');});
   /* the scored dice leave the throwing row before anything is thrown into
      it - see _dropKeptToTray */
   _dropKeptToTray();
