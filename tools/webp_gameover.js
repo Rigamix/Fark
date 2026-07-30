@@ -5,20 +5,22 @@
  * and ask for image/webp. Returns data URLs; the caller decodes them to disk, so
  * the bytes never travel any further than the pipe.
  *
- * Art/ is the author's source folder and is never touched - these are derived
- * copies for the game to load.
+ * Output goes to Art/Assets/GameOver/optimized/ as <Name>_opt.webp, which is
+ * this project's established art pipeline - every other art folder has one and
+ * the game loads from them directly. The masters beside it are never touched.
+ * Re-run this whenever the source art changes.
  *
  *   node tools/shoot.js --eval-file tools/webp_gameover.js --out /dev/null \
  *     | python <decode the setup: line>
  */
-const SRC = 'Art/Assets/LastOrders/';
+const SRC = 'Art/Assets/GameOver/';
 const FILES = [
-  { in: 'LastOrders_bg.png',     out: 'gameover_bg.webp',     q: 0.82 },
-  { in: 'LastOrders_banner.png', out: 'gameover_banner.webp', q: 0.90 },
-  { in: 'LastOrders_stat01.png', out: 'gameover_flag1.webp',  q: 0.92 },
-  { in: 'LastOrders_stat02.png', out: 'gameover_flag2.webp',  q: 0.92 },
-  { in: 'LastOrders_stat03.png', out: 'gameover_flag3.webp',  q: 0.92 },
-  { in: 'LastOrders_stat04.png', out: 'gameover_flag4.webp',  q: 0.92 },
+  { in: 'GameOver_bg.png',     out: 'GameOver_bg_opt.webp',     q: 0.82 },
+  { in: 'GameOver_banner.png', out: 'GameOver_banner_opt.webp', q: 0.90 },
+  { in: 'GameOver_stat01.png', out: 'GameOver_stat01_opt.webp',  q: 0.92 },
+  { in: 'GameOver_stat02.png', out: 'GameOver_stat02_opt.webp',  q: 0.92 },
+  { in: 'GameOver_stat03.png', out: 'GameOver_stat03_opt.webp',  q: 0.92 },
+  { in: 'GameOver_stat04.png', out: 'GameOver_stat04_opt.webp',  q: 0.92 },
 ];
 
 const load = src => new Promise((res, rej) => {
