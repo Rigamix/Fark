@@ -139,6 +139,28 @@ and the first-night 2D dice (never replaced, known).
   agents themselves identified and discarded. Trust the disclosed caveats in
   `AUDIT_FINDINGS_RAW.md`.
 
+## In flight — a diagnosis workflow whose findings were never read
+
+A 11-agent workflow was launched to diagnose backlog item 5 (the five inert
+family-card defects) and to scout the Game Over screen. The Game Over half was
+overtaken by hand — P350 is built and deployed. The **five card diagnoses were
+never read**: the run was still in its Verify phase when the session ran out of
+context.
+
+Each defect got one investigator (returning an exact old/new patch pair) and two
+adversarial verifiers — one checking correctness and old-string uniqueness, one
+checking the patch delivers what the card's own description text promises.
+
+    run id     wf_cc266d46-aa3
+    journal    .claude/projects/<project>/<session>/subagents/workflows/wf_cc266d46-aa3/journal.jsonl
+    script     .claude/projects/<project>/<session>/workflows/scripts/fark-family-cards-and-gameover-wf_cc266d46-aa3.js
+
+Read the journal for the returned findings. It is session-scoped and will not
+survive cleanup, so if it is gone, re-run the script — it is checked in at the
+path above and can be re-invoked with `Workflow({scriptPath})`. Treat every
+proposed patch as unverified until its `oldString` is confirmed present and
+unique with Read, not Grep (Grep renders `/*` as `\*`).
+
 ## Still open, found after the audit
 
 - **Painted width is not modelled properly, and a sweep built on the bad model
