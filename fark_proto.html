@@ -1505,6 +1505,8 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 #screen-match .hud-score.o{left:-2.1%}
 #screen-match .hud-score.p{left:81.8%}
 #screen-match .hud-lbl{display:none}
+/* over the card bar (z-index 5), whose cards overflow onto the buttons */
+#screen-match .controls{position:relative;z-index:20}
 #screen-match .hud-mid{position:absolute;left:50%;top:calc(var(--bar-top) + 17.3cqw);transform:translateX(-50%);
   text-align:center;z-index:16}
 /* the plaque is art now; the text sits on it. padding-bottom lifts the line
@@ -1891,6 +1893,10 @@ html.fk3d #screen-match .die-wrap:has(.die.d3on.selected)::after{
 .edict-bar.show{display:block}
 
 /* ─── CARD BARS ─── */
+/* The controls are ABOVE this - see #screen-match .controls. The bar is
+   height:0 and lets its cards overflow visually, so on a short screen they
+   spill across the ROLL plate and, at z-index 5, swallowed its taps:
+   elementFromPoint inside ROLL returned the card bar. */
 .card-bar{
   display:flex;justify-content:center;
   flex-shrink:0;position:relative;z-index:5;overflow:visible;
@@ -13122,7 +13128,24 @@ function famLoadoutShow(){
 /* FEAT CEREMONY: one or several trinkets huge over a scrim, particles,
    flavour, and a PIN that flies them all onto the wall together (or
    off toward the shelf). Takes a feat or an array of feats. */
+/* THE CEREMONY IS GONE. Feats are charms now - collectibles that show up as
+   visual flair on the shelf, with no gameplay weight - so they no longer
+   deserve a full-screen glowing interruption between the match and the next
+   seat. They are still EARNED here: the award is what the old overlay's PIN
+   button used to do, so the shelf fills up exactly as before, silently.
+   Everything below this early return is the retired overlay, left in place
+   only because the pin-flight animation is the reference for how a charm
+   travels to the shelf if that is ever wanted again. */
 function _featCeremony(list){
+  if(!Array.isArray(list))list=[list];
+  try{
+    _getS();S.featsPinned=S.featsPinned||{};
+    (list||[]).forEach(function(f){if(f&&f.id)S.featsPinned[f.id]=1;});
+    save();
+  }catch(e){}
+  return Promise.resolve();
+}
+function _featCeremony_RETIRED(list){
   if(!Array.isArray(list))list=[list];
   return new Promise(function(resolve){
     var ov=null;
@@ -16212,7 +16235,20 @@ var BREAK_TRIGGERS={
   jade:{msg:'JADE SCATTERS — EVERYTHING ROLLS AGAIN',fire:function(){
     var free=G.pool.filter(function(d){return !d.committed;});
     free.forEach(function(d){d.val=_rollD(d);d.sel=false;try{reDrawDieFace(d);}catch(e){}});
-    try{refreshSelUI();}catch(e){}}},
+    try{refreshSelUI();}catch(e){}
+    /* THE SCATTER CAN LAND DEAD. It re-rolls every free die and then handed
+       control back regardless - so a scatter into a row with nothing scoring
+       left both buttons dead and no bust coming: a hard lock with no way out.
+       Same test afterRoll uses on any other roll. */
+    try{
+      var _jc=effectiveCards();
+      var _jv=free.map(function(d){return d.val;});
+      var _jm=free.map(function(d){return d.mat;});
+      if(!anyScoring(_jv,_jc,_jm,free)&&
+         !(typeof _anchorRescues==='function'&&_anchorRescues(_jc))){
+        setTimeout(function(){try{_delayedDoBust(free);}catch(e){}},280);
+      }
+    }catch(e){}}},
   vagabond:{msg:'VAGABOND TAKES WHAT THEY HELD',fire:function(){
     var steal=Math.max(0,G._oUnbanked||0);
     if(steal>0){G.turnPts=(G.turnPts||0)+steal;
@@ -23511,7 +23547,18 @@ function _handBackOrCap(){
       setTimeout(function(){endMatch(false);},_oppDelay(900));
       return;
     }
-    setStatusMsg('DEAD EVEN AT THE CAP — ONE MORE ROUND','gold');
+    /* OVERTIME TERMINATES. This printed the line and started another round
+       with no limit, no tiebreak and no escalation - measured, 18 straight
+       OVERTIME rounds at 0-0 with no exit but the tester's own loop guard.
+       Three extra rounds, then the higher tally takes it and a dead-level
+       board goes to the challenger. */
+    G._otRounds=(G._otRounds||0)+1;
+    if(G._otRounds>3){
+      setStatusMsg('THE CAP HOLDS — IT IS DECIDED','gold');
+      setTimeout(function(){endMatch((G.pPts||0)>=(G.oPts||0));},_oppDelay(900));
+      return;
+    }
+    setStatusMsg('DEAD EVEN AT THE CAP — ONE MORE ROUND ('+G._otRounds+'/3)','gold');
   }
   flashYourTurn();setTimeout(()=>{setTurnMode(false);startPTurn();},_oppDelay(800));
 }
