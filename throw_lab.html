@@ -96,6 +96,7 @@
       <label>kept <input type="range" id="nKept" min="0" max="3" value="0"><span class="v" id="nKeptV">0</span></label>
       <label>lane <input type="range" id="laneR" min="5" max="60" value="45"><span class="v" id="laneRV">0.45 pitch · 32px</span></label>
       <label>in-lane <input type="range" id="cover" min="20" max="100" value="70"><span class="v" id="coverV">70% of the die</span></label>
+      <label>pull <input type="range" id="pull" min="0" max="40" value="8"><span class="v" id="pullV">8 · while moving only</span></label>
     </div>
     <div id="live"></div>
     <div id="out"></div>
@@ -169,6 +170,14 @@ function simulate(opts){
     for (let i = 0; i < N; i++)
       if (landedAt[i] < 0 && bodies[i].position.y < P.tall*0.62) landedAt[i] = step;
 
+    if (PULL > 0) {
+      for (let i = 0; i < N; i++) {
+        const b = bodies[i];
+        /* the whole point: once it has settled, the pull is over */
+        if (b.velocity.length() <= P.stopV && b.angularVelocity.length() <= P.stopW) continue;
+        laneForce(b, lanes[i]);
+      }
+    }
     if (strategy === 'pen' || strategy === 'aimnet') {
       /* THE PEN, as the game runs it: ease each die toward its lane every frame
          once it is low enough.  For 'aimnet' it only ever fires as a safety net,
@@ -252,6 +261,8 @@ function simOne(lane, seed, launch){
   world.addBody(b);
   const frames = []; let landedAt = -1;
   for (let s = 0; s < P.cap; s++) {
+    if (PULL > 0 && !(b.velocity.length() <= P.stopV && b.angularVelocity.length() <= P.stopW))
+      laneForce(b, lane);
     world.step(P.dt);
     if (landedAt < 0 && b.position.y < P.tall*0.62) landedAt = s;
     frames.push({x:b.position.x,y:b.position.y,z:b.position.z,
@@ -336,6 +347,7 @@ function jitterOf(r){
 const STRATS = {
   pen:    {name:'PEN (current)',  run:(lanes,seed)=>simulate({lanes,seed,strategy:'pen'})},
   free:   {name:'FREE (no lanes)',run:(lanes,seed)=>simulate({lanes,seed,strategy:'free'})},
+  pull:   {name:'PULL only',      run:(lanes,seed)=>simulate({lanes,seed,strategy:'free'})},
   aim:    {name:'AIM (retry)',    run:(lanes,seed)=>aim(lanes,seed,LANE_R,40)},
   aimnet: {name:'AIM ×80',        run:(lanes,seed)=>aim(lanes,seed,LANE_R,80)},
 };
@@ -491,6 +503,28 @@ let LANE_R = 0.45 * P.pitch;
 /* how much of that footprint has to be inside the disc to count as in lane.
    0.5 is "more in than out"; higher is stricter. */
 let COVER_MIN = 0.70;
+/* LANE PULL. A gentle acceleration toward the lane centre, applied to a die
+   only WHILE IT IS STILL MOVING, and switched off the instant it settles.
+   This is a different thing from the pen. The pen waits until a die has landed
+   and then pushes it - which is a correction, and corrections after landing are
+   what read as snap, jitter and magnetism. A pull acts during the tumble, where
+   the die is moving anyway and nothing looks pushed, and it has stopped
+   entirely by the time the die comes to rest. Same destination, no correction:
+   the die is not put in its lane, it FALLS there.
+   CRITICALLY DAMPED, which is the whole difference between magnetism and
+   wobble. The first version was a bare spring - acceleration toward the lane
+   proportional to offset, nothing opposing it - so a die overshot, came back,
+   overshot again, and measured jitter ROSE with pull strength (1.5 at pull 0,
+   3.0 at pull 32) while coverage barely improved. A spring with no damping does
+   not settle, it rings.
+   So the lateral velocity is damped alongside the pull, at 2*sqrt(K), which is
+   the critical value: the fastest approach that never overshoots. */
+let PULL = 8;
+function laneForce(b, laneX){
+  const K = PULL, C = 2*Math.sqrt(K);
+  b.velocity.x += ((laneX - b.position.x)*K - b.velocity.x*C) * P.dt;
+  b.velocity.z += ((0      - b.position.z)*K - b.velocity.z*C) * P.dt;
+}
 function showLanes(lanes){
   while (laneMarks.children.length) laneMarks.remove(laneMarks.children[0]);
   lanes.forEach(L => {
@@ -569,6 +603,8 @@ function report(r, lanes, extra){
     + row('biggest single nudge', r.corr.max.toFixed(3), r.corr.max > 0.05 ? 'visible snap' : r.corr.max ? 'sub-pixel' : '—', r.corr.max > 0.05)
     + row('correction AFTER landing', r.corr.late.toFixed(3), r.corr.late > 0.01 ? 'late correction' : 'none', r.corr.late > 0.01)
     + row('post-landing movement', jit.toFixed(3), jit > 0.25 ? 'jittery' : 'settled', jit > 0.25)
+    + row('lane pull', PULL ? PULL + ' (stops at rest)' : 'off',
+        PULL ? 'during flight only' : 'none')
     + (extra||'')
     + '</table>';
 }
@@ -656,6 +692,12 @@ addEventListener('resize', () => { clearTimeout(_rz);
   _rz = setTimeout(() => { layout(); throwOnce(false); }, 160); });
 addEventListener('orientationchange', () =>
   setTimeout(() => { layout(); throwOnce(false); }, 260));
+document.getElementById('pull').oninput = e => {
+  PULL = +e.target.value;
+  document.getElementById('pullV').textContent =
+    PULL + (PULL ? ' · while moving only' : ' · off');
+  throwOnce(false);
+};
 document.getElementById('cover').oninput = e => {
   COVER_MIN = +e.target.value/100;
   document.getElementById('coverV').textContent = e.target.value + '% of the die';
