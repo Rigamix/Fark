@@ -243,6 +243,48 @@ consumption block had the identical ordering fault. Tar Pit is now retired so it
 no longer matters, but if anything else is ever consumed at the top of
 `startPTurn`, check it against that reset.
 
+## From the play-test workflow (wf_9aa2dedc-0e6) — read before touching these cards
+
+The two fixes that had gone in on review alone were PLAYED. **Both charge
+economies are correct** — Steady Hand bills exactly one on the tap and nothing on
+the arm; Fair Trade allows one loan at a time. But playing them found things
+review could not:
+
+**STEADY HAND — two fixed in P363, three left.**
+- ~~stale gold ring after a reroll~~ and ~~the arm stranded by other cards~~ are
+  fixed. The second is the recurring lesson: `handleRoll` was taught to disarm and
+  *four other sites that rebind the free dice were not* — Powder Keg, Encore,
+  Fool's Gold and the card-reroll block. One `_steadyDisarm()` now, called by all
+  of them.
+- **Still open:** the reroll gives no feedback of its own (`famLog` is wiped in
+  the same tick by `refreshSelUI`'s `setStatusMsg('','')`), so a reroll landing on
+  the same face looks like a dead tap. An already-selected die shows no red target
+  ring (`.selected` paint wins). `G._steadyArmed` is never cleared at turn end —
+  latent, not live, since `handleRoll` clears it before the new dice bind.
+
+**FAIR TRADE — one `wrong`, not yet fixed.**
+- **A shattered borrowed die leaves a stale `G._fairTrade` whose lane now points
+  at somebody else's die, and the next turn's restore destroys that die for the
+  match.** That is the one to fix first.
+- `canUse` approves a trade `use()` then refuses, silently — the card is tapped,
+  PLAY pressed, nothing happens, no message. While a loan is outstanding the card
+  still reads as live ("uses left: 1").
+- Tier I and tier II are mechanically identical: tier I's "for this roll only"
+  lasts the whole turn.
+
+**PRESERVE — built, 15/16 routes pass, NOT APPLIED.** The diff is in the workflow
+output. 1/2 verifiers, and the dissent is concrete and confirmed: the patch
+*creates* a regression — the preserved kept entry re-qualifies for Preserve, so a
+charge can be spent on a die already in amber without rolling — and RESUME
+refunds the spent charge while keeping the amber die, because `G.pF` is not in the
+snapshot. Both need closing before it lands. Its own open design questions are
+worth Denis's eye too: should a bust crack the amber, and should the player choose
+which die is trapped rather than the card taking the first.
+
+**Missing card art:** `assets/cards/steady_hand.webp` and `fair_trade.webp` 404
+and paint as broken-image glyphs; `famCardArt` has no fallback (unlike
+`_cardArtImg`, which removes itself on error).
+
 ## Still open, found after the audit
 
 - **Painted width is not modelled properly, and a sweep built on the bad model

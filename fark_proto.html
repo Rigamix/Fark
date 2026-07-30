@@ -12131,6 +12131,23 @@ CFX.slow_cook={
    with it, so it does not touch bust odds: it can just as easily make the
    hand worse. Must run the bust check itself, exactly as famQuicksilver
    does, or a reroll into a dead hand softlocks the turn. */
+/* DISARM STEADY HAND, from anywhere. The arm is a promise about the dice on the
+   table right now: tap one and it rerolls. Anything that rebinds those dice to
+   toggleDie breaks that promise, so it has to drop the flag AND the red target
+   ring, or the player is left staring at outlined dice that no longer reroll.
+   handleRoll was taught this and nothing else was, so POWDER KEG, ENCORE and
+   FOOL'S GOLD stranded the arm exactly the way ROLL used to - found by playing
+   it, three attempts out of three leaving six dice outlined and inert. One
+   function now, called by all of them, because four copies of a two-line
+   cleanup is how the fifth site gets forgotten. */
+function _steadyDisarm(){
+  try{
+    if(typeof G==='undefined'||!G)return;
+    G._steadyArmed=false;
+    document.querySelectorAll('#playerDiceRow .die.break-target')
+      .forEach(function(el){el.classList.remove('break-target');});
+  }catch(e){}
+}
 CFX.steady_hand={
   canUse:function(inst){return !!(G&&G.phase==='choosing'&&
     (G.pool||[]).some(function(d){return !d.committed&&!d._frozen;}));},
@@ -12157,7 +12174,12 @@ CFX.steady_hand={
            back rather than eat the tap and leave them outlined */
         if(inst.charges<=0)return;
         inst.charges--;try{famRenderRow();}catch(e){}
-        d.val=_rollD(d);d.sel=false;try{reDrawDieFace(d);}catch(e){}
+        /* .selected is what the glow is DRAWN from, so clearing d.sel alone left
+           the die wearing a gold ring while the model and the preview had it
+           unselected - the table claiming a die scores when it does not. */
+        d.val=_rollD(d);d.sel=false;
+        if(d.el)d.el.classList.remove('selected');
+        try{reDrawDieFace(d);}catch(e){}
         try{famLog('STEADY HAND — '+d.val);}catch(e){}
         var fv=free.map(function(x){return x.val;}),fm=free.map(function(x){return x.mat;});
         if(!anyScoring(fv,effectiveCards(),fm,free)){if(!_tryBustSave(free))_delayedDoBust(free);return;}
@@ -12237,6 +12259,7 @@ CFX.encore={
     try{SFX.roll();}catch(e){}
     G.turnRollCount++;
     famLog('ENCORE — ROLL IT AGAIN');
+    _steadyDisarm();/* these dice are new - the arm was about the old ones */
     /* held across the resolve window, and cleared on every way out of it */
     G._encorePending=true;
     G.phase='rolling';
@@ -12925,6 +12948,7 @@ function famFoolsGold(free){
   free.forEach(function(d){d.val=_rollD(d);try{reDrawDieFace(d);}catch(e){}});
   var fv=free.map(function(d){return d.val;}),fm=free.map(function(d){return d.mat;});
   if(anyScoring(fv,effectiveCards(),fm,free)){
+    _steadyDisarm();/* these dice are new - the arm was about the old ones */
     free.forEach(function(d){if(d.el)d.el.onclick=function(){toggleDie(d);};});
     G.phase='choosing';try{refreshSelUI();}catch(e){}
     return true;
@@ -12967,6 +12991,7 @@ CFX.powder_keg={
     G.turnRollCount++;
     try{SFX.roll();}catch(e){}
     famLog('POWDER KEG — THE WHOLE TABLE BLOWS');
+    _steadyDisarm();/* these dice are new - the arm was about the old ones */
     var free=G.pool.slice();
     setTimeout(function(){
       var fv=free.map(function(d){return d.val;}),fm=free.map(function(d){return d.mat;});
@@ -21615,6 +21640,7 @@ function handleRoll(){
     setTimeout(function(){
       var free2=G.pool.filter(function(d){return !d.committed;});var fv=free2.map(function(d){return d.val;});var fm=free2.map(function(d){return d.mat;});var cards=effectiveCards();
       if(!anyScoring(fv,cards,fm,free2)&&!_anchorRescues(cards)){if(_tryBustSave(free2))return;_delayedDoBust(free2);return;}
+      _steadyDisarm();/* these dice are new - the arm was about the old ones */
       free2.forEach(function(d){d.el.onclick=function(){toggleDie(d);};});
       G.phase='choosing';refreshSelUI();
     },600);
@@ -21849,8 +21875,10 @@ function handleRoll(){
      replaces their faces and rebinds their clicks (see the onclick=null below
      and the toggleDie rebind in the settle timeout), so the arm dies with them.
      Drop the flag and the red target outline too, or the player is left staring
-     at outlined dice that no longer reroll. Nothing to refund — the tap pays. */
-  G._steadyArmed=false;
+     at outlined dice that no longer reroll. Nothing to refund — the tap pays.
+     Shared with every other site that rebinds the free dice - see
+     _steadyDisarm, which exists because this was the only one that knew. */
+  _steadyDisarm();
   row.querySelectorAll('.die').forEach(el=>{if(el.classList.contains('die-frozen'))return;el.getAnimations().forEach(a=>a.cancel());el.style.transform='';el.style.opacity='';el.style.animation='';el.classList.remove('scatter','bust','break-target');});
   /* the scored dice leave the throwing row before anything is thrown into
      it - see _dropKeptToTray */
