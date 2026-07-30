@@ -11911,13 +11911,23 @@ var FAM_LIVE={slow_cook:1,steady_hand:1,fair_trade:1,retort:1,reprisal:1,pickpoc
               encore:1,double_or_nothing:1};
 var BOSS_FAM={grog:'obsidian',mabel:'amber',finnick:'vagabond',corvus:'starstone',
   brutus:'silver',aldric:'jade',whisper:'vagabond',ambrose:'amber'};
+/* ONE owner for "which boss is this". BOSS_FAM and the relic table are keyed
+   by the boss's NAME lowercased - which is what initMatchScreen uses to pick
+   the boss-{name} class - while rung.key holds a legacy id, so both lookups
+   missed on every boss: every boss fought CARDLESS and every boss relic came
+   out empty. */
+function _bossKey(rung){
+  var k=((rung&&rung.name)||'').toLowerCase().replace(/[^a-z0-9-]/g,'');
+  return BOSS_FAM[k]?k:'';
+}
 function _famInitOpp(rung){
   try{
     if(!rung)return [];
     var list=[];
-    var isBoss=!!(rung.key&&BOSS_FAM[rung.key]);
+    var _bk=_bossKey(rung);
+    var isBoss=!!_bk;
     if(isBoss){
-      var fam=BOSS_FAM[rung.key]||'obsidian';
+      var fam=BOSS_FAM[_bk]||'obsidian';
       var night=((S&&S.run&&S.run.tier)||0)+1;
       var n=1+(night>=4?1:0)+(night>=7?1:0);
       var pool=FAM_CARDS.filter(function(d){return FAM_LIVE[d.id]&&!d.unique&&d.fam===fam;});
@@ -15448,7 +15458,14 @@ function scoreRoll(vals,cards,locked,context,dieMats,dieEnchs){
   for(let i=0;i<n;i++){
     const eff=dieEff(i);
     if(!eff||vals[i]!==6)continue;
-    if(eff.mechanic==='wild_triple'){eVals[i]=-1;wildLevel[i]=1;}
+    /* _noWild: score this pass with the die as the face it SHOWS. A wild was
+       substituted unconditionally, so a Jade 6 could only ever be spent as a
+       wild and never as a 6 - four Jade 6s scored 600 where four Bone 6s
+       score 1200, and a 1-2-3-4-5-6 straight could not complete because its
+       6 had been replaced. scoreSelection now runs both ways and keeps the
+       better, so the wild is an OPTION rather than a replacement. */
+    if(context&&context._noWild){/* natural face: leave eVals[i] alone */}
+    else if(eff.mechanic==='wild_triple'){eVals[i]=-1;wildLevel[i]=1;}
     else if(eff.mechanic==='wild_quad'){eVals[i]=-1;wildLevel[i]=2;}
     else if(eff.mechanic==='wild_straight'){eVals[i]=-1;wildLevel[i]=3;}
   }
@@ -15930,6 +15947,23 @@ function scoreSelection(selVals,cards,locked,context,dieMats,dieEnchs){
      get pushed to commit useless extras they should reroll. */
   let _r1Valid=!_r1.used.some(u=>!u)||(_r1._bonusFired&&_r1.total>0);
   if(_r1Valid)_bestValid=_r1.total;
+  /* A WILD IS AN OPTION, NOT A REPLACEMENT. Score again with every wild as
+     the face it shows and keep whichever is worth more - otherwise a Jade 6
+     can never be a 6. Only costs a second pass when a wild is actually in
+     the selection. */
+  var _hasWild=false;
+  try{
+    (dieMats||[]).forEach(function(m){
+      var dt=getDie(m);
+      if(dt&&dt.effect&&/^wild_/.test(dt.effect.mechanic||''))_hasWild=true;
+    });
+  }catch(e){}
+  if(_hasWild){
+    var _ctxN=Object.assign({},context||{},{_noWild:true});
+    var _rN=scoreRoll(selVals,cards,locked,_ctxN,dieMats,dieEnchs);
+    var _rNValid=!_rN.used.some(function(u){return !u;})||(_rN._bonusFired&&_rN.total>0);
+    if(_rNValid&&_rN.total>_bestValid)_bestValid=_rN.total;
+  }
   const _orderSensitive=cards.includes('the_ladder')||cards.includes('ascending');
   if(_orderSensitive){
     const _ctx2=Object.assign({},context||{},{_triplesFirst:true});
@@ -16801,6 +16835,13 @@ var D3X={
       m.map=sk.map;
       m.color=new THREE.Color(0xffffff);/* as painted */
     }else{
+      /* BACK TO THE BASE TEXTURE, exactly as the painted branch does. This
+         branch used to tint and nothing else, so an unskinned material kept
+         whatever map the previous pass left on it - and the brand is
+         re-applied straight after, deriving from the last pass's output. That
+         is why every branded silver/amber/jade/obsidian/starstone die leaked
+         brand textures across rolls. */
+      if(m.userData&&m.userData.baseMap)m.map=m.userData.baseMap;
       m.color=new THREE.Color(this.MATCOL[mat]||this.MATCOL.bone);
     }
     m.needsUpdate=true;
@@ -18326,6 +18367,11 @@ var D3X={
            3D ones were reading as too CG. */
         o.material=new THREE.MeshLambertMaterial({
           map:src.map||null,color:new THREE.Color(col)});
+        /* the pristine texture this mesh started from, so _dress can put an
+           unskinned material back to a clean base before the brand and the
+           wild ring are drawn on again. Material.userData is safe - it was
+           TEXTURE.userData that does not exist in this three.js build. */
+        o.material.userData.baseMap=src.map||null;
         self._dress(o.material,mat,sk);
         if(ench&&ench.face&&o.material.map){
           o.material.map=self._brandedMap(o.material.map,ench,col);
@@ -21879,8 +21925,12 @@ function _markLoneCast(){
   var lone=false;
   if(free.length&&!free.some(function(d){return d.sel;})){
     try{
-      lone=scoreRoll(free.map(function(d){return d.val;}),effectiveCards(),0,{},
-                     free.map(function(d){return d.mat;})).total<=0;
+      /* WITHOUT the branded dice. A brand banks zero, so counting its own 1 or
+         5 as a score made the row look alive and the pulse never fired on the
+         very rows it exists for. */
+      var _plain=free.filter(function(d){return !_dieIsIcon(d);});
+      lone=scoreRoll(_plain.map(function(d){return d.val;}),effectiveCards(),0,{},
+                     _plain.map(function(d){return d.mat;})).total<=0;
     }catch(e){lone=false;}
   }
   free.forEach(function(d){
@@ -25798,7 +25848,11 @@ function endMatch(win){
     if(endBtns)endBtns.style.display='';_endScreenPhase='ready';
   }
   else if(win&&isBoss){
-    var _spKey=(G.rung&&G.rung.key)||'';
+    /* the boss's NAME, not rung.key - see _bossKey. This read rung.key and
+       always missed, so "HIS DIE" was an empty card that paid gold instead. */
+    var _spKey=_bossKey(G&&G.rung);
+    /* keyed by boss name - see _bossKey; this read rung.key and always missed,
+       so "HIS DIE" was an empty card that silently paid gold instead */
     var _spRelic={grog:'grogs_tooth',mabel:'mabels_thimble',finnick:'finnicks_palm',corvus:'corvus_ledger_d',
       brutus:'brutus_shield',aldric:'aldrics_square',whisper:'whispers_fang',ambrose:'ambrose_weight'}[_spKey];
     var _spTell=G.rung&&G.rung.tell;
