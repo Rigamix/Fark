@@ -12452,7 +12452,12 @@ function famOffer(forceTier1){
   return offer;
 }
 var _RELIC_FAM={grogs_tooth:'obsidian',mabels_thimble:'amber',finnicks_palm:'vagabond',
-  corvus_ledger:'starstone',brutus_shield:'silver',aldrics_square:'jade',
+  /* corvus_ledger_d, with the _d: the DIE is corvus_ledger_d (there is a CARD
+     called corvus_ledger, which is what this key was matching - nothing). So
+     _matFam returned null for the relic and Break fired the MUNDANE no-op
+     instead of Starstone's extra turn. Brief section 7 asks for seven cases,
+     no cross-contamination; this was the eighth, failing silently. */
+  corvus_ledger_d:'starstone',brutus_shield:'silver',aldrics_square:'jade',
   whispers_fang:'vagabond',ambrose_weight:'amber'};
 /* Which family a MATERIAL belongs to. DICE_TYPES entries carry no `fam`
    field - only CARDS do - so anything that wanted this had to re-derive it
@@ -12896,8 +12901,8 @@ function famCommitBonus(selD,pts){
     if(grown>0){pts+=grown;_famPop('+'+grown+' CULTIVATE');}
     else _famPop('CULTIVATE GROWS');
   }
-  var _tempered=[];/* tempering was cut - a flat scoring adjustment, not a verb */
-  if(_tempered.length){var _tb=_tempered.length*100;pts+=_tb;_famPop('+'+_tb+' TEMPERED');}
+  /* the Tempering remnant is gone too - it built an always-empty array and then
+     tested it, every commit, forever */
   var first=G.pool[0],last=G.pool[G.pool.length-1];
   var hitFirst=first&&selD.indexOf(first)>=0,hitLast=last&&selD.indexOf(last)>=0;
   if((inst=famInst('vanguard_f'))){
@@ -16298,7 +16303,12 @@ var ENCH_ICONS={
       /* stamped with the opponent turn it is FOR. "Until it fires" tested at
          97.7% inside six turns - not a bet at all - so the window has to be
          one turn whether it bites or not. */
-      G._snare={lane:c.lane,live:true,turn:(G.oppTurnCount||0)};
+      /* +1: the mark is stamped with the opponent turn it is FOR, not the one that
+         has already happened. G.oppTurnCount increments at the TOP of the rival's
+         turn, before this is read, so stamping the current count meant the test
+         `mark.turn === G.oppTurnCount` compared N against N+1 and these three
+         enchants never fired once. */
+      G._snare={lane:c.lane,live:true,turn:(G.oppTurnCount||0)+1};
       _firstStrike(c.side);
       try{famLog('SNARE SET — LANE '+(c.lane+1));}catch(e){}
     }},
@@ -16346,7 +16356,7 @@ var ENCH_ICONS={
   snuff:{name:'Snuff',price:300,glyph:'\u2716',ink:'#b09470',
     desc:'Brand a snuffed candle on one face. Keep it: it banks nothing and takes the rival\u2019s die in this seat away for one turn.',
     fire:function(c){
-      G._snuff={lane:c.lane,live:true,turn:(G.oppTurnCount||0)};
+      G._snuff={lane:c.lane,live:true,turn:(G.oppTurnCount||0)+1};/* see the note on _snare */
       _firstStrike(c.side);
       try{famLog('SNUFFED — THEY PLAY A DIE SHORT');}catch(e){}
     }},
@@ -16357,7 +16367,7 @@ var ENCH_ICONS={
   fog:{name:'Fog',price:250,glyph:'\u2601',ink:'#a8b0b8',
     desc:'Brand a cloud on one face. Keep it: it banks nothing and hides this seat from the rival\u2019s reckoning next turn.',
     fire:function(c){
-      G._fog={lane:c.lane,live:true,turn:(G.oppTurnCount||0)};
+      G._fog={lane:c.lane,live:true,turn:(G.oppTurnCount||0)+1};/* see the note on _snare */
       _firstStrike(c.side);
       try{famLog('FOG — THEY WILL NOT SEE THAT SEAT');}catch(e){}
     }}
@@ -25205,15 +25215,17 @@ function runOppTurn(){
         var _stB=(oppRollNum-1)*100;pts+=_stB;
         setStatusMsg('STEEPED — THEIR BANK BREWS +'+_stB,'gold');
       }
-      if(_ruleActive('last_call','o')&&pts<500){
-        setStatusMsg('LAST CALL — THEIR BANK UNDER 500 DOES NOT COUNT','gold');pts=0;
-      }
       if(pts>0&&_ruleActive('reckoning','o')&&(G._lastBankAmount||0)>0&&pts<G._lastBankAmount){
         setStatusMsg('THE RECKONING — THEY FALL SHORT OF YOUR '+G._lastBankAmount,'gold');pts=0;
       }
-      if(pts>0&&_ruleActive('counterfeit','o')&&Math.random()<0.3){
-        pts=Math.floor(pts/2);setStatusMsg('COUNTERFEIT — THEIR CURSED BANK HALVES','gold');
-      }
+      /* LAST CALL and COUNTERFEIT used to be applied to the rival's bank here.
+         Both were RETIRED by the badge rework - Grog carries Zero Hour now and
+         Whisper carries Kindred - but only the player-side sites were cleaned,
+         so a sealed or sleeved seat still ran the old rules against the rival.
+         The Counterfeit one was the worse of the two because it was random:
+         30% of rival banks silently halved, under a status line naming a rule
+         that no longer exists. _RETIRED_RULES guards the player side and does
+         not reach here. */
     }
     /* ── NPC family cards fire on their own turns (P5) ── */
     (function(){
