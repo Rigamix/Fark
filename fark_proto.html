@@ -12063,7 +12063,13 @@ CFX.falling_star={
     if(ev.amt>=ev.P&&!G._fExtraTurn){G._fExtraTurn=true;famLog('FALLING STAR — ANOTHER TURN COMES');}}
 };
 CFX.encore={
-  canUse:function(inst){return G&&G.phase==='choosing'&&G.pool&&G.pool.some(function(d){return !d.committed;});},
+  /* NOT WHILE ITS OWN REROLL IS RESOLVING. use() schedules the scoring check
+     500ms out and used to leave the phase at 'choosing' the whole time, so
+     canUse said yes again and a second play queued a SECOND check against the
+     same dice: doBust ran twice, famFire('bust') twice, two of the player's
+     eight turns burned in one go, and Retort fired twice off the one bust. */
+  canUse:function(inst){return G&&G.phase==='choosing'&&!G._encorePending
+    &&G.pool&&G.pool.some(function(d){return !d.committed;});},
   use:function(inst){
     var free=G.pool.filter(function(d){return !d.committed&&!d._frozen;});
     if(!free.length)return false;
@@ -12075,7 +12081,11 @@ CFX.encore={
     try{SFX.roll();}catch(e){}
     G.turnRollCount++;
     famLog('ENCORE — ROLL IT AGAIN');
+    /* held across the resolve window, and cleared on every way out of it */
+    G._encorePending=true;
+    G.phase='rolling';
     setTimeout(function(){
+      G._encorePending=false;
       var fv=free.map(function(d){return d.val;}),fm=free.map(function(d){return d.mat;});
       var cards=effectiveCards();
       if(!anyScoring(fv,cards,fm,free)){if(_tryBustSave(free))return;_delayedDoBust(free);return;}
@@ -20981,7 +20991,7 @@ function startPTurn(){
      endMatch deleted it, resurrecting a RESUME for a match already lost). */
   if(!G||G._endMatchFired)return;
   if(typeof _checkDeadAir==='function')_checkDeadAir();
-  G.phase='idle';G.turnPts=0;G.kept=[];G.numDice=G.matchDice?G.matchDice.length:6;G.pool=[];G.turnRollCount=0;G._slowHandUsedThisTurn=false;G._warmHandsActive=false;G._lastHotDice=false;G._firstRollCommitted=0;G._bustSavedThisTurn=false;
+  G.phase='idle';G.turnPts=0;G.kept=[];G.numDice=G.matchDice?G.matchDice.length:6;G.pool=[];G.turnRollCount=0;G._encorePending=false;G._slowHandUsedThisTurn=false;G._warmHandsActive=false;G._lastHotDice=false;G._firstRollCommitted=0;G._bustSavedThisTurn=false;
   /* per-turn icon state. Ward and Amber's immunity last one turn by
      definition; Zero Hour re-arms each turn. Snare/Snuff/Fog are NOT reset
      here - they are armed on the player's turn to resolve on the rival's,
