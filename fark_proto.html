@@ -18325,7 +18325,36 @@ var D3X={
     var sz=mine[0].chip.getBoundingClientRect().width*this.MSCALE;
     var key=this._rowKey(mine[0]);
     var mid=this._rowMid(key);
-    var slots=mine.map(function(d){return (d.hx-mid)/sz;});
+    /* ── THE LANE IS AN INDEX ──
+       Every die standing in this row, kept ones included, sorted into lane
+       order. A die's lane is its POSITION in that order, not where it was last
+       measured - so it is the same lane on every throw of the match, and a kept
+       die's lane is never handed to anybody because it belongs to its own index.
+       Measurement is still trusted for the two things it is reliable at: the
+       ORDER (dice sit ~70px apart, so a sort cannot slip) and the PITCH. It is
+       no longer trusted for the lane itself, which is what kept moving. */
+    var rowAll=[];
+    this.dice.forEach(function(d){
+      if(!d.match||d.hx===undefined)return;
+      if(self._rowKey(d)!==key)return;
+      rowAll.push(d);
+    });
+    rowAll.sort(function(a,b){return a.hx-b.hx;});
+    var NL=rowAll.length;
+    var lanePitch=0;
+    for(var _lp=1;_lp<NL;_lp++){
+      var _lg=(rowAll[_lp].hx-rowAll[_lp-1].hx)/sz;
+      if(_lg>1e-4&&(!lanePitch||_lg<lanePitch))lanePitch=_lg;
+    }
+    /* one die in the row has no pitch to measure; it sits in the middle */
+    if(!lanePitch)lanePitch=1.6;
+    var slots=mine.map(function(d){
+      var idx=rowAll.indexOf(d);
+      /* a die the row does not know about cannot have a lane - fall back to
+         where it is, rather than inventing an index for it */
+      if(idx<0)return (d.hx-mid)/sz;
+      return (idx-(NL-1)/2)*lanePitch;
+    });
     /* whatever is staying on THIS table is an obstacle, not empty space.
        The kept tray is a different table with its own centre, so its dice
        must never be handed to this sim. */
@@ -18357,22 +18386,10 @@ var D3X={
        that width, measured rather than tuned, so this stops being a magic
        number: half of 1.74 is 0.87 of sz. */
     var limitX=Math.max(1.2,(Math.min(mid,mrw-mid)-sz*(D3X.PHYS.drawn/2))/sz);
-    /* The row's own pitch, from EVERY die standing in it - kept ones included.
-       d.hx is the layout home (the wrapper's centre), which is the flex slot
-       and does not move when the solver puts a die somewhere inside it, so
-       this is the true spacing whatever is being thrown. */
-    var rowXs=[];
-    this.dice.forEach(function(d){
-      if(!d.match||d.hx===undefined)return;
-      if(self._rowKey(d)!==key)return;
-      rowXs.push((d.hx-mid)/sz);
-    });
-    rowXs.sort(function(a,b){return a-b;});
-    var rowPitch=0;
-    for(var _rp=1;_rp<rowXs.length;_rp++){
-      var _rg=rowXs[_rp]-rowXs[_rp-1];
-      if(_rg>1e-4&&(!rowPitch||_rg<rowPitch))rowPitch=_rg;
-    }
+    /* the pen is sized off the same pitch the lanes are laid out on - two
+       different numbers here is how a die ends up penned to a radius that does
+       not match the spacing it was given */
+    var rowPitch=lanePitch;
     var sol=this._physSolve(slots,b.vals,obst,limitX,rowPitch);
     /* one playback per die: two throws can be in the air at once without
        either being dropped */
