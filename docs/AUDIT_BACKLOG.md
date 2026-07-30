@@ -239,23 +239,42 @@ no longer matters, but if anything else is ever consumed at the top of
   truth, and fix or delete the sweep before using it again.** A correct model
   needs the projected silhouette as a function of (x, yaw), which only the live
   mesh can give.
-- **Six dice at this camera angle are near the geometric limit.** At MSCALE 0.65
-  on a 430px viewport the six painted silhouettes total ~350px of a 430px row,
-  so the margin is real but thin, and the outermost die still paints up to 4px
-  past the edge. If overlap comes back, the levers are die size (MSCALE), camera
-  pitch (a more top-down view narrows every silhouette toward its true 0.98-unit
-  footprint), or row width — all three are look decisions for Denis, not bugs.
+- ~~**Six dice near the geometric limit**~~ and ~~**the outermost die paints
+  ~3px past the edge**~~ — both closed by P352's camera. The creative director
+  chose the lens over die size (floored by the 44px touch minimum and by enchant
+  icon legibility). FOV_MATCH 54→34 with RISE_MATCH 20→34: measured on a real
+  throw, widest die 59px, gaps 20–25px where they were 6–34, and the row sits
+  9px inside both screen edges instead of 1px over.
 
-- **The outermost die paints ~3px past the screen edge**, every roll, on a
-  430px viewport. Not drift — a layout asymmetry. Perspective makes an
-  off-centre die's silhouette wider on its OUTBOARD side than its inboard side,
-  so a symmetric `drawn/2` margin understates it by about that much, and the
-  slot centre is where the flex layout put it (P347 deliberately stopped moving
-  slot centres — moving them is what used to squeeze the ends into their
-  neighbours by 23px). Cheapest fix if it matters: trim the row gap by ~1.2px
-  (`3.8cqw` → `3.5cqw`), which pulls each end centre in ~3px at a cost of ~1px
-  off every inter-die gap. Left alone because it also tightens `SLOT_BASE`,
-  which is already only ~3px.
+
+### Verification debt
+
+- **STEADY HAND and FAIR TRADE were never played.** They went in on the diff plus
+  two independent reviewers each and a parse gate — the weakest verification in
+  the session, and worth an actual play-test. Everything else was measured in a
+  running match.
+
+### Cleanup, none of it urgent
+
+- **Tar Pit's consumption blocks are dead code.** `G._oTarPit` and `G._famTarPit`
+  have no writer since the card was retired, so the blocks that read them at the
+  top of `startPTurn` and in the rival's turn are unreachable. Left deliberately:
+  removing them means edits inside the rival's turn machine for no behavioural
+  gain.
+- **`_stakesRisingBonus` is a misleading name.** It is the shared turn-bonus pot
+  and holds Flintlock's +200 and both hot-dice bonuses too. ~35 sites, purely
+  mechanical.
+- **`tools/shoot_throw_sweep.js` reports nonsense.** Its width model multiplies
+  the end-of-row painted width by the yaw term, double-counting the projection
+  spread — it claimed 98% of throws overlap while ground truth said zero. Fix the
+  model or delete the tool; do not trust its numbers meanwhile.
+
+### Copy and art, the author's
+
+- The victory headline still reads **"LAST ORDERS RUNG"**, which is wrong under
+  either meaning of the phrase now that Last Orders is the night-end beat.
+- The victory ending still lands on the greybox placeholder and wants art of its
+  own — the creative director ruled it must not share the loss screen.
 
 ## Numbers worth not re-deriving
 
