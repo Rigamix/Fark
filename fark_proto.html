@@ -7589,6 +7589,50 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
   background:rgba(4,2,1,.55);
 }
 #screen-gameover .go-wrap{position:relative;z-index:1}
+/* ─── LAST ORDERS (a night ends) ───
+   The sign HANGS, so it is built as one hanging thing: .lo-sign carries the
+   board art and all three readings, and rotates about its own top centre - the
+   point the ropes are tied to. Rotating the assembly rather than the picture is
+   what keeps the numbers on the wood: change --lo-tilt and the whole sign swings
+   together instead of the readings sliding off it. */
+.lo-screen{position:fixed;inset:0;z-index:60;overflow:hidden;
+  display:block;background:#0a0806}
+.lo-screen .lo-bg{position:absolute;inset:0;width:100%;height:100%;
+  object-fit:cover;object-position:center top;z-index:0}
+.lo-screen .lo-sign{--lo-tilt:-1.6deg;
+  position:absolute;left:50%;top:1.5%;width:82%;
+  transform:translateX(-50%) rotate(var(--lo-tilt));
+  transform-origin:top center;z-index:1}
+.lo-screen .lo-sign-art{width:100%;display:block}
+/* the board is the lower part of the art - the rope and beam are above it, so
+   the readings sit on the wood and not on the rope */
+.lo-screen .lo-cells{position:absolute;left:6%;right:6%;top:47%;bottom:9%;
+  display:flex;align-items:center}
+/* every cell gives its icon the SAME height, so the three labels underneath sit
+   on one line. Left to their own sizes the mug, the moon and the heart row are
+   all different heights and each cell centres its own content, which reads as
+   three readings at three levels rather than one row. */
+.lo-screen .lo-cell{flex:1 1 0;display:flex;flex-direction:column;
+  align-items:center;justify-content:flex-start;gap:0.7cqh;min-width:0}
+.lo-screen .lo-ico,.lo-screen .lo-hearts{height:5.2cqh;flex:0 0 auto}
+.lo-screen .lo-ico{width:auto;max-width:70%;object-fit:contain;display:block}
+.lo-screen .lo-ico-txt{font-size:5.2cqw;line-height:5.2cqh;
+  display:flex;align-items:center;justify-content:center}
+.lo-screen .lo-val{font-family:'JMH Beda',serif;font-size:5.2cqw;
+  color:#3a2812;letter-spacing:.02em;line-height:1;text-align:center}
+.lo-screen .lo-hearts{display:flex;gap:5%;align-items:center;justify-content:center;width:100%}
+.lo-screen .lo-heart{height:78%;width:auto;object-fit:contain;display:block}
+/* a spent heart is still THERE - the row has to read as three, or "two left"
+   looks like "you only ever had two" */
+.lo-screen .lo-heart.spent{opacity:.55;filter:grayscale(.5)}
+/* the roster is the thing worth tapping next, so it is the thing that glows */
+.lo-screen .lo-roster{font-size:3.4cqw;animation:loRoster 1.9s ease-in-out infinite}
+@keyframes loRoster{
+  0%,100%{text-shadow:0 0 0 rgba(255,214,130,0);color:#3a2812}
+  50%{text-shadow:0 0 0.9cqw rgba(255,206,110,.95),0 0 2.2cqw rgba(255,178,60,.6);color:#5a3c14}}
+.lo-screen .lo-btns{position:absolute;left:0;right:0;bottom:7%;z-index:2;
+  display:flex;justify-content:center}
+.lo-screen .lo-btns .hsBtn{position:relative;left:auto;top:auto;width:66%}
 /* ─── GAME OVER (the run ends) ───
    cqh/cqw throughout so the whole thing scales with the viewport rather than
    with a device guess. The screen is the container. */
@@ -32061,23 +32105,40 @@ function _showLastOrders(){
      was one tap behind an overlay that contradicted it. On the death path it
      steps aside and the painted screen is the ending. */
   if(S&&S.run&&S.run._died){showScreen('gameover');return;}
-  var c=S.run.coins||0;/* after the heart was taken */
+  var LO='Art/Assets/LastOrders/optimized/',HRT='Art/Assets/Hearts/optimized/';
+  var c=Math.max(0,S.run.coins||0);/* after the heart was taken */
+  var night=(S.run.tier||0)+1;
+  /* three hearts, from the art rather than from emoji - full while they last,
+     empty once spent. The one just lost is the first empty. */
   var hearts='';
   for(var i=0;i<3;i++){
-    if(i<c)hearts+='<span style="font-size:27px">\u2764\ufe0f</span>';
-    else if(i===c)hearts+='<span style="font-size:27px;display:inline-block;animation:heartShatter .8s ease-in .7s forwards">\ud83d\udc94</span>';
-    else hearts+='<span style="font-size:27px;opacity:.4;filter:grayscale(.8)">\ud83e\udd0d</span>';
+    hearts+='<img class="lo-heart'+(i>=c?' spent':'')+'" src="'+HRT
+      +(i<c?'heart_full_opt.webp':'heart_empty_opt.webp')+'" alt="">';
   }
   var ov=document.createElement('div');
-  ov.className='handicap-splash';ov.style.pointerEvents='auto';
-  ov.style.setProperty('--hs-color','#c05050');
-  ov.innerHTML='<div class="hs-bg"></div>'
-    +'<div class="hs-name">LAST ORDERS</div>'
-    +'<div style="display:flex;gap:9px;margin:16px 0 6px">'+hearts+'</div>'
-    +'<div class="hs-desc">The room empties. A new crowd tomorrow.</div>'
-    +'<button id="loNext" style="margin-top:24px;font-family:var(--font-px);font-size:15px;letter-spacing:2px;padding:13px 46px;background:rgba(50,40,22,.9);border:1px solid rgba(200,160,80,.5);border-radius:4px;color:var(--gold);cursor:pointer;pointer-events:auto">NEXT NIGHT</button>';
+  ov.className='handicap-splash lo-screen';ov.style.pointerEvents='auto';
+  ov.innerHTML=
+     '<img class="lo-bg" src="'+LO+'LastOrders_opt.webp" alt="">'
+    /* the board and its readings are ONE rotated thing, pivoting where the
+       ropes are tied - see the CSS */
+    +'<div class="lo-sign">'
+      +'<img class="lo-sign-art" src="'+LO+'LastOrders_panel_opt.webp" alt="">'
+      +'<div class="lo-cells">'
+        /* PLACEHOLDER: no moon art exists yet. The tell badges already use
+           emoji for icons without art, so this follows that until one is drawn. */
+        +'<div class="lo-cell"><div class="lo-ico lo-ico-txt" data-placeholder="moon">\uD83C\uDF19</div>'
+          +'<div class="lo-val">'+night+'</div></div>'
+        +'<div class="lo-cell"><div class="lo-hearts">'+hearts+'</div></div>'
+        +'<div class="lo-cell"><img class="lo-ico" src="Art/Assets/Icons/optimized/ale_opt.webp" alt="">'
+          +'<div class="lo-val lo-roster">NEW ROSTER</div></div>'
+      +'</div>'
+    +'</div>'
+    +'<div class="lo-btns"><div class="hsBtn" id="loNext">'
+      +'<img class="plq" src="Art/Assets/Buttons/Button_new_01.png" alt="">'
+      +'<span>BACK TO THE ROOM</span></div></div>';
   document.body.appendChild(ov);
   document.getElementById('loNext').onclick=function(){
+    try{SFX.nav();}catch(e){}
     ov.classList.add('hs-out');
     setTimeout(function(){ov.remove();if(S.run._died)showScreen('gameover');else showScreen('gauntlet');},450);
   };
