@@ -17003,12 +17003,25 @@ var D3X={
     return out;
   },
 
+  /* Painted width of a die whose centre is `x` die-widths off the row centre,
+     against a row half-span of `limit`. Linear between the measured middle and
+     end figures - the projection is not linear, but over this range the error
+     is under 3% and a curve here would be false precision. */
+  _drawnAt:function(x,limit){
+    var P=this.PHYS,t=(limit>1e-4)?Math.min(1,Math.abs(x)/limit):0;
+    return P.drawnMid+(P.drawn-P.drawnMid)*t;
+  },
+
   /* ═══ physics roll (ported from die3d_lab) ═══════════════════════════
      World units are die-widths. All randomness is made up front, the sim
      runs hidden to rest, the up-face is read and relabelled to the value
      the game rolled, then the recorded trajectory replays visibly. */
   PHYS:{
-    on:true, gravity:-50, dt:1/60, cap:700, stopV:.15, stopW:.25,
+    /* stopV/stopW were .15/.25, which called a die finished while it was still
+       visibly turning - "they stop a bit too fast, it doesn't feel natural".
+       Lower thresholds let the tail of the motion play out; `cap` bounds how
+       long that can take, so a stubborn die still ends. */
+    on:true, gravity:-50, dt:1/60, cap:700, stopV:.09, stopW:.14,
     /* the depth lane is much stiffer than the lab's: the table is seen from
        58 degrees here, so wander in z reads as vertical jumble rather than
        as depth. x stays loose - that is where the rough line lives. */
@@ -17031,6 +17044,10 @@ var D3X={
   /* slotRK / slotRMin / slotRMax / slotYieldV / slotYieldY / slotYieldMax are
      gone: the radius is derived from the row's pitch and nothing tunes it. */
   slotEngageY:1.5, slotRest:0.5,
+  /* eased, not teleported: a die outside its circle is moved this fraction of
+     the way back per frame. 1.0 is the old hard clamp, which read as a magnet
+     the moment the radius got small enough to actually engage. */
+  slotEase:0.34,
   /* a die that has stopped and is still leaning on its wall gets the wall
      moved out to meet it, once. Without this the clamp re-projects it every
      frame and it creeps along the rim - the "very very slow laggy slide". */
@@ -17038,10 +17055,16 @@ var D3X={
      this camera, which is why they read as coming up off it. */
   /* 3.2, not 4.9: at the old peak a die was close enough to the camera to be
      drawn 1.24x, which is most of the overlap on its own. It still arcs. */
-  dropY:3.2, dropZ:1.9,
+  /* 5.4, not 3.2. P334 cut it to 3.2 because at 4.9 a die came close enough to
+     the camera to draw 1.24x and overlap its neighbours in the air - but that
+     was at MSCALE 0.77, and 0.65 gives the headroom back. There is far more
+     room vertically here than horizontally, and a taller arc is a longer
+     flight, more air to tumble in, and a steeper arrival - which leaves less
+     sideways speed at the table for the pen to have to correct. */
+  dropY:5.4, dropZ:1.9,
   /* how high a die has to be to be out of the candlelight, and how far the
      brown goes at the top of that */
-  airDarkFrom:1.1, airDarkTo:3.2, airDark:0.35,
+  airDarkFrom:1.4, airDarkTo:5.4, airDark:0.35,
     /* The collision box is WIDER THAN THE DIE in the plane of the table, so
        two dice simply cannot end up closer than this - no force acting at a
        distance, no push after they have landed. Not taller: a uniformly
@@ -17063,6 +17086,12 @@ var D3X={
        pixels. The end-of-row figure is the one used: it is the worst case, and
        the ends are exactly where the overlap was. */
   drawn:1.82,
+    /* Painted width is NOT one number: measured 1.25 at the middle of the row
+       and 1.82 at the ends, because an off-axis die shows its near and far
+       faces at different x. `drawn` is the end-of-row figure, used where the
+       worst case is what matters (the pen's radius, the screen margin);
+       drawnAt() is for anything reasoning about a die at a known position. */
+  drawnMid:1.25,
     /* a die turned 45 degrees needs 1.41 between centres just to not
        overlap, so settle is followed by a bounded spread phase that keeps
        stepping until there is a real gap. Recorded like any other frame,
@@ -17312,10 +17341,16 @@ var D3X={
          gap of bare table, and it went on pushing after they had landed.
          The oversized collision box does the same job by contact, during the
          tumble, where it reads as dice knocking into each other. */
-      /* THE SLOT WALL. A hard clamp, not a spring: a spring is what the lane
-         force was, and a spring that has to be strong enough to hold a die is
-         strong enough to be seen pulling it. This cannot be overshot and costs
-         nothing when the die is inside, which is almost always. */
+      /* THE SLOT WALL. Still not a spring - a spring strong enough to hold a
+         die is strong enough to be seen pulling it, which is what the old lane
+         force was - but no longer a teleport either. It EASES the die back over
+         a few frames and never touches its spin.
+         That distinction did not matter while the radius was 15px, because the
+         wall almost never engaged. At the honest 2-3px it engages on the
+         landing frame and the ones after, and setting position outright while
+         multiplying angular velocity by 0.7 is a die being yanked into place
+         with its tumble taken away: "a weird snap, like there is a magnet, and
+         they shift rotation in a frame or so." */
       if(SLOT_R>0){
         for(var kc=0;kc<N;kc++){
           var bc=bodies[kc];
@@ -17328,13 +17363,19 @@ var D3X={
           var _sr=slotR[kc];
           if(rr<=_sr||rr<1e-6)continue;
           var nx2=ddx/rr, nz2=ddz/rr;
-          bc.position.x=slotC[kc]+nx2*_sr;
-          bc.position.z=nz2*_sr;
+          /* eased: a third of the way home per frame, so a die arrives over
+             about four frames rather than being placed */
+          var _tx=slotC[kc]+nx2*_sr, _tz=nz2*_sr, _ez=P.slotEase;
+          bc.position.x+=(_tx-bc.position.x)*_ez;
+          bc.position.z+=(_tz-bc.position.z)*_ez;
           var vn=bc.velocity.x*nx2+bc.velocity.z*nz2;
           if(vn>0){
-            bc.velocity.x-=(1+P.slotRest)*vn*nx2;
-            bc.velocity.z-=(1+P.slotRest)*vn*nz2;
-            bc.angularVelocity.scale(0.7,bc.angularVelocity);
+            /* take out the OUTWARD speed only, and leave the spin alone - it
+               was being multiplied by 0.7 every frame the wall was touched,
+               which is the visible half of the snap and was never needed to
+               correct a position */
+            bc.velocity.x-=(1+P.slotRest)*vn*nx2*_ez;
+            bc.velocity.z-=(1+P.slotRest)*vn*nz2*_ez;
             if(vn>0.35){if(bc._penHits===undefined)bc._penHits=0;bc._penHits++;}
           }
         }
@@ -17435,7 +17476,18 @@ var D3X={
           frames[frames.length-1][e1].qy,frames[frames.length-1][e1].qz,
           frames[frames.length-1][e1].qw));
       var ey=new THREE.Euler().setFromQuaternion(rq,'YXZ').y;
-      ext[e1]=(Math.abs(Math.cos(ey))+Math.abs(Math.sin(ey)))/2;
+      /* IN PAINTED UNITS, to first order. This was the half-width of a UNIT
+         square turned by its yaw - 0.5 square-on - and a die paints about 1.25
+         units wide, so the relax was asking for a finger of table between
+         footprints 80% smaller than the real ones.
+         drawnMid and NOT _drawnAt: the end-of-row figure (1.82) already
+         contains the projection spread of a square-on die sitting off-axis, so
+         multiplying it by the yaw term counts that spread twice - it predicts a
+         93px die where the widest ever measured is 78px. The yaw term and the
+         projection term are not independent and this expression does not model
+         them properly; 1.25 is the honest first-order scale. See the note in
+         AUDIT_BACKLOG.md on what is still unsolved here. */
+      ext[e1]=P.drawnMid*(Math.abs(Math.cos(ey))+Math.abs(Math.sin(ey)))/2;
     }
     /* The dice that are STAYING on this table are part of the row, not
        empty space. The relax used to run over the thrown dice alone, so it
@@ -17450,7 +17502,9 @@ var D3X={
         oyw=new THREE.Euler().setFromQuaternion(
           new THREE.Quaternion(o.q.x,o.q.y,o.q.z,o.q.w),'YXZ').y;
       }
-      node.push({x:o.x,i:-1,e:(Math.abs(Math.cos(oyw))+Math.abs(Math.sin(oyw)))/2,fix:1});
+      node.push({x:o.x,i:-1,
+        e:P.drawnMid*(Math.abs(Math.cos(oyw))+Math.abs(Math.sin(oyw)))/2,
+        fix:1});
     });
     /* shrink the gap if the row genuinely cannot hold it. The ends are the
        ends OF THE SORTED ROW - reading ext[0]/ext[N-1] took whichever dice

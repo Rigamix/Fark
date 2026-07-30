@@ -141,6 +141,27 @@ and the first-night 2D dice (never replaced, known).
 
 ## Still open, found after the audit
 
+- **Painted width is not modelled properly, and a sweep built on the bad model
+  lied.** `_physSolve`'s spread pass measures each die's footprint as a unit
+  square turned by its yaw. A die paints ~1.25 die-widths in the middle of the
+  row and ~1.82 at the ends, where it sits off-axis and its near and far faces
+  project apart — so the unit-square model understates footprints by ~80%, and
+  P349 scales it by `drawnMid` (1.25) as a first-order correction. What is NOT
+  solved: the yaw term and the projection term are not independent. Multiplying
+  the end-of-row figure by the yaw term double-counts the spread and predicts a
+  93px die where the widest ever measured is 78px. `tools/shoot_throw_sweep.js`
+  is built on that bad model and reported "98% of throws overlap" while the
+  projected-mesh ground truth over 23 rolls reported zero — **trust the ground
+  truth, and fix or delete the sweep before using it again.** A correct model
+  needs the projected silhouette as a function of (x, yaw), which only the live
+  mesh can give.
+- **Six dice at this camera angle are near the geometric limit.** At MSCALE 0.65
+  on a 430px viewport the six painted silhouettes total ~350px of a 430px row,
+  so the margin is real but thin, and the outermost die still paints up to 4px
+  past the edge. If overlap comes back, the levers are die size (MSCALE), camera
+  pitch (a more top-down view narrows every silhouette toward its true 0.98-unit
+  footprint), or row width — all three are look decisions for Denis, not bugs.
+
 - **The outermost die paints ~3px past the screen edge**, every roll, on a
   430px viewport. Not drift — a layout asymmetry. Perspective makes an
   off-centre die's silhouette wider on its OUTBOARD side than its inboard side,
