@@ -10371,7 +10371,7 @@ const RUNGS=[
        no scoring signature to measure, validated qualitatively only.
        REAL COST: In Arrears was the only economy tell in the roster, so no
        badge taxes gold any more. Needs a new home if it is missed. */
-    tell:{id:'in_arrears',name:'FIRST STRIKE',desc:"“Reach across the table and we both see everything.”",icon:'📒'}},
+    tell:{id:'in_arrears',name:'FIRST STRIKE',desc:"“Reach across the table and I read both sides of the book.”",icon:'📒'}},
   {id:4,name:'BRUTUS',key:'soldier',icon:'⚔️',tier:'respected',target:9500,gold:500,buyIn:70,
     boss:null,bossDesc:null,
     agg:.75,cardRarity:'silver',wager:true,wagerCount:1,wagerMode:'best',minBank:550,diceStop:2,chaotic:false,adaptive:true,
@@ -10719,7 +10719,12 @@ function _tellById(id){
 /* the four rules the rework replaced. Their ids still exist (the badge
    objects kept them) but the OLD behaviour is gone, so nothing may switch it
    back on through a sleeve or a sealed seat. */
-var _RETIRED_RULES={last_call:1,counterfeit:1,confession:1,in_arrears:1};
+/* in_arrears is NOT here: First Strike fully replaced In Arrears (the gold
+   drain is switched off at its only site), so the id is free and the guard
+   below would only stop the NEW rule reaching a sleeve or a sealed seat.
+   confession and counterfeit must stay - Still Waters and Kindred are not
+   built yet, so their old behaviour is still the live code under those ids. */
+var _RETIRED_RULES={last_call:1,counterfeit:1,confession:1};
 function _ruleActive(id,side){
   if(!G)return false;
   if(_RETIRED_RULES[id]&&!(G._tell&&G._tell.id===id))return false;
@@ -10832,7 +10837,9 @@ function _initTellHUD(){
   /* IN ARREARS: show running gold cost inline next to the tell name so the
      player sees how much the tell has drained from their purse. Updated
      per-roll in afterRoll alongside the actual gold deduction. */
-  var _arInlineVal=(t.id==='in_arrears')?' <span class="tb-val tb-val-inline tb-val-debt" id="arrearsVal">−0g</span>':'';
+  /* In Arrears' running-debt chip. First Strike took the id but not the
+     economy, so this rendered a permanent "-0g" beside the name. */
+  var _arInlineVal='';
   /* DRILL ORDER: roll counter inline next to the name (was appended as a
      separate row below the desc, which overlapped the player score row).
      Player feedback: "Put the 1/3 number next to DRILL ORDER". */
@@ -16457,11 +16464,19 @@ function _iconRescuesRow(){
    Pure information - no scoring signature to sim, validated qualitatively
    only, and it fits Corvus's counting-house-sees-all identity. */
 function _firstStrike(side){
-  if(!G||!G._tell||G._tell.id!=='in_arrears')return;
+  /* _ruleActive, not G._tell.id - the id also arrives by sleeve and by sealed
+     seat, and reading the tell directly made the badge silently do nothing in
+     exactly the boss matches it was written for. */
+  if(!_ruleActive('in_arrears','p'))return;
+  /* the player's reveal. It used to be a race - either side firing a lane icon
+     opened both books - and the downgrade makes it one-way. Nothing on the
+     rival's side fires a lane icon today, so this is a guard against the
+     future rather than a change to what happens now. */
+  if(side&&side!=='p')return;
   if(G._firstStrikeOpen)return;
   G._firstStrikeOpen=true;
   try{famLog('FIRST STRIKE — THE BOOKS ARE OPEN');}catch(e){}
-  try{setStatusMsg('FIRST STRIKE — BOTH HANDS SHOWING','gold');}catch(e){}
+  try{setStatusMsg('FIRST STRIKE — BOTH HANDS SHOWING TO YOU','gold');}catch(e){}
   try{document.documentElement.classList.add('fkFirstStrike');}catch(e){}
   try{_firstStrikeRender();}catch(e){}
 }
@@ -18445,15 +18460,14 @@ var D3X={
       rowAll.push(d);
     });
     rowAll.sort(function(a,b){return a.hx-b.hx;});
-    var NL=rowAll.length;
-    var lanePitch=0;
-    for(var _lp=1;_lp<NL;_lp++){
-      var _lg=(rowAll[_lp].hx-rowAll[_lp-1].hx)/sz;
-      if(_lg>1e-4&&(!lanePitch||_lg<lanePitch))lanePitch=_lg;
-    }
-    /* one die in the row has no pitch to measure; it sits in the middle */
-    if(!lanePitch)lanePitch=1.6;
+    /* the grid is held, not re-measured - see _laneGrid */
+    var _g=this._laneGrid(key,rowAll,sz);
+    var NL=_g.n,lanePitch=_g.pitch;
     var slots=mine.map(function(d){
+      /* the INDEX is still read from order every throw. That is what lets a die
+         dragged to another lane actually take it, and order is the one thing
+         measurement cannot get wrong at ~70px of separation. What no longer
+         moves is the grid the index is multiplied by. */
       var idx=rowAll.indexOf(d);
       /* a die the row does not know about cannot have a lane - fall back to
          where it is, rather than inventing an index for it */
@@ -18540,6 +18554,46 @@ var D3X={
   },
   /* the player line, the kept tray and the opponent line are separate
      tables; their dice must never be mixed into one sim */
+  /* THE LANE GRID - how many lanes this row has and how far apart they sit.
+     Measured once and then held, because a lane is a fixture of the match: the
+     same six spots for the whole of it, whoever is standing in them and
+     whichever ones are empty. Re-deriving it per throw is what let an
+     unmeasured die recentre the row and a tight pair shrink it.
+
+     Keyed on the row and its DOM die count, so it survives every throw of a
+     turn and every turn of a match, and is rebuilt only when the row itself is
+     rebuilt with a different number of dice in it. */
+  _grid:null,
+  _laneGrid:function(key,rowAll,sz){
+    /* the DOM row is the authority on how many lanes there are - the tracked
+       list can be short of a die whose home has not been measured yet, and
+       that must not be allowed to move anybody's lane */
+    var dom=document.getElementById(key),n=0;
+    if(dom)n=dom.querySelectorAll('.die').length;
+    if(!n)n=rowAll.length;
+    var g=this._grid;
+    /* sz is in the key because the grid is in die-widths: the same pitch means
+       a different row once the dice are laid out at another scale, which is
+       what a rotation does. 1% tolerance so sub-pixel drift does not churn it. */
+    if(g&&g.key===key&&g.n===n&&sz>0&&Math.abs(g.sz-sz)<=sz*0.01)return g;
+    /* MEAN spacing across the row, not the smallest gap in it. Both read the
+       same on an evenly laid out row; where they differ, the smallest gap is a
+       fact about one pair and the mean is a fact about the row. */
+    var pitch=0;
+    if(rowAll.length>1&&sz>0){
+      var lo=rowAll[0].hx,hi=rowAll[rowAll.length-1].hx;
+      pitch=((hi-lo)/(rowAll.length-1))/sz;
+    }
+    if(!(pitch>1e-4))pitch=(g&&g.pitch)||1.6;
+    /* COMMIT ONLY A COMPLETE READING. The row on screen has n dice; if fewer
+       than that have been measured, this pitch describes a row that is not the
+       one being thrown into. Good enough to aim this throw with, not good
+       enough to hold for the rest of the match - so hand it back without
+       caching and measure again next throw, when the row is whole. */
+    if(rowAll.length<n)return {key:key,n:n,pitch:pitch,sz:sz};
+    g=this._grid={key:key,n:n,pitch:pitch,sz:sz};
+    return g;
+  },
   _rowKey:function(d){
     var el=d.chip.closest&&d.chip.closest('#playerDiceRow,#keptRow,#keptTray,#oppDiceRow');
     return el?el.id:'loose';
