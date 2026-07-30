@@ -17232,6 +17232,17 @@ var D3X={
      die is free for most of its fall. */
   /* slotRK / slotRMin / slotRMax / slotYieldV / slotYieldY / slotYieldMax are
      gone: the radius is derived from the row's pitch and nothing tunes it. */
+  /* LANE PULL, critically damped, applied only while a die is still moving and
+     switched off the instant it settles. K is the spring; the damping is
+     2*sqrt(K), the fastest approach that never overshoots. Chosen on a phone in
+     throw_lab.html against a lane of 0.54 pitch and a 61%-of-the-die coverage
+     rule, where it read 82% inside, all six in lane. */
+  lanePull:37,
+  /* the lane as an AREA, a fraction of the row's pitch - used to lay the lanes
+     out and to judge them, no longer to push anything. It was
+     (pitch - painted width)/2, which is 3px: a point, not a lane, and the reason
+     the old pen corrected on every single frame and never stopped. */
+  laneRadius:0.54,
   slotEngageY:1.5, slotRest:0.5,
   /* eased, not teleported: a die outside its circle is moved this fraction of
      the way back per frame. 1.0 is the old hard clamp, which read as a magnet
@@ -17392,7 +17403,7 @@ var D3X={
        44% wider than its collision box, so taking `proxy` here handed out
        15.4px of licence where the painted dice could afford 6.2px, and the
        measured result was two of six overlapping by 13 and 16px. */
-    var SLOT_BASE=_pitch?Math.max(0.04,(_pitch-this.PHYS.drawn)/2):0.4;
+    var SLOT_BASE=_pitch?Math.max(0.04,_pitch*this.PHYS.laneRadius):0.4;
     /* A DIE'S SLOT IS ITS SLOT. No reassignment and no clamping: order cannot
        change, two dice can never be sent to the same place, and a kept die's
        slot is simply never handed out - which is why the kept case needs no
@@ -17432,7 +17443,28 @@ var D3X={
     var ground=new CANNON.Body({mass:0,material:mDesk,shape:new CANNON.Plane()});
     ground.quaternion.setFromAxisAngle(new CANNON.Vec3(1,0,0),-Math.PI/2);
     world.add(ground);
-    /* THE WALLS ARE GONE. Four static boxes spanning y 0 to 5, and the dice
+    /* THE TABLE HAS EDGES AGAIN - as two infinite PLANES, which is the whole
+       difference from the boxes that were removed (see the note below): a plane
+       has no top, so a die cannot land on one and roll off it.
+       They are back because the slot pen is gone. The pen's radius was capped
+       by limitX, and that cap was quietly the only thing keeping a die on
+       screen; without it, measured over seven rolls, dice landed up to 14px
+       past the frame. A wall is not a correction - the die hits it and bounces,
+       in front of the player, like a die reaching the edge of a table. */
+    if(limitX>0){
+      [[-1,Math.PI/2],[1,-Math.PI/2]].forEach(function(w){
+        var wall=new CANNON.Body({mass:0,material:mDesk,shape:new CANNON.Plane()});
+        wall.quaternion.setFromAxisAngle(new CANNON.Vec3(0,1,0),w[1]);
+        /* limitX is already the furthest a die CENTRE may sit - it has half a
+           painted die subtracted out of it. So the wall goes half a COLLISION
+           box further out, or it stops the die's body short of its own
+           outermost lane and squeezes the whole row inward: measured -11 to
+           -14px of overlap with the wall sitting exactly on limitX. */
+        wall.position.set(w[0]*(limitX+P.proxy/2),0,0);
+        world.add(wall);
+      });
+    }
+    /* THE OLD BOX WALLS ARE GONE. Four static boxes spanning y 0 to 5, and the dice
        now spawn at 5.4 to 6.3 - so they were landing ON TOP of them and had to
        roll off before they could fall. That is exactly "they hang in the air
        and drop as if an invisible floor disappeared from under them", and how
@@ -17530,43 +17562,25 @@ var D3X={
          gap of bare table, and it went on pushing after they had landed.
          The oversized collision box does the same job by contact, during the
          tumble, where it reads as dice knocking into each other. */
-      /* THE SLOT WALL. Still not a spring - a spring strong enough to hold a
-         die is strong enough to be seen pulling it, which is what the old lane
-         force was - but no longer a teleport either. It EASES the die back over
-         a few frames and never touches its spin.
-         That distinction did not matter while the radius was 15px, because the
-         wall almost never engaged. At the honest 2-3px it engages on the
-         landing frame and the ones after, and setting position outright while
-         multiplying angular velocity by 0.7 is a die being yanked into place
-         with its tumble taken away: "a weird snap, like there is a magnet, and
-         they shift rotation in a frame or so." */
-      if(SLOT_R>0){
-        for(var kc=0;kc<N;kc++){
-          var bc=bodies[kc];
-          if(bc.position.y>P.slotEngageY)continue;/* still in the air: free */
-          /* ONE radius, the same for every die, every frame. The wall used to
-             move itself outward for a die that had stopped, which needed three
-             more constants and let a die creep out of its column. */
-          var ddx=bc.position.x-slotC[kc], ddz=bc.position.z;
-          var rr=Math.sqrt(ddx*ddx+ddz*ddz);
-          var _sr=slotR[kc];
-          if(rr<=_sr||rr<1e-6)continue;
-          var nx2=ddx/rr, nz2=ddz/rr;
-          /* eased: a third of the way home per frame, so a die arrives over
-             about four frames rather than being placed */
-          var _tx=slotC[kc]+nx2*_sr, _tz=nz2*_sr, _ez=P.slotEase;
-          bc.position.x+=(_tx-bc.position.x)*_ez;
-          bc.position.z+=(_tz-bc.position.z)*_ez;
-          var vn=bc.velocity.x*nx2+bc.velocity.z*nz2;
-          if(vn>0){
-            /* take out the OUTWARD speed only, and leave the spin alone - it
-               was being multiplied by 0.7 every frame the wall was touched,
-               which is the visible half of the snap and was never needed to
-               correct a position */
-            bc.velocity.x-=(1+P.slotRest)*vn*nx2*_ez;
-            bc.velocity.z-=(1+P.slotRest)*vn*nz2*_ez;
-            if(vn>0.35){if(bc._penHits===undefined)bc._penHits=0;bc._penHits++;}
-          }
+      /* THE PEN IS GONE. It waited until a die had LANDED and then pushed it
+         toward its lane, every frame, and a correction after the die has
+         visibly stopped is exactly what reads as snap and magnetism. The lane
+         pull below replaces it: it acts during the tumble, where the die is
+         moving anyway and nothing looks pushed, and switches off the instant
+         the die settles. The die is not put in its lane, it falls there.
+         Nothing corrects a die after it comes to rest any more. */
+      /* THE LANE PULL, critically damped. Each die is drawn toward its own lane
+         centre while it is still moving; once it is at rest it is left alone.
+         Damping at 2*sqrt(K) is the fastest approach that never overshoots - a
+         bare spring RINGS, and measured jitter rose with strength until this
+         term was added. */
+      if(P.lanePull>0){
+        var _K=P.lanePull,_C=2*Math.sqrt(_K);
+        for(var kp=0;kp<N;kp++){
+          var bp=bodies[kp];
+          if(bp.velocity.norm()<=P.stopV&&bp.angularVelocity.norm()<=P.stopW)continue;
+          bp.velocity.x+=((slotC[kp]-bp.position.x)*_K-bp.velocity.x*_C)*P.dt;
+          bp.velocity.z+=((0-bp.position.z)*_K-bp.velocity.z*_C)*P.dt;
         }
       }
       world.step(P.dt);
