@@ -53,11 +53,17 @@ Branded dice stop leaking textures. Bosses use the patron table.
    completes the row now ends the turn *instead of* awarding hot dice — no
    +250, no fresh six. The alternative is to award the bonus and then end the
    turn; one message and one outcome read cleaner, so that is what it does.
-2. **Three Grog card arts 404** every match: `assets/Card_ART/grogs_bump.png`,
-   `one_more_round.png`, `her_lucky_coin.png`. All three ids are real
-   `npcOnly` cards in rung 0's `cardPool`; the files do not exist. Needs the
-   art, or a graceful fallback in the card renderer (they draw as blank
-   rectangles today). `ugly`, trivial once decided.
+2. ~~**Three Grog card arts 404** every match~~ — fixed P342, and it needed
+   neither art nor a fallback. The fallback already worked (the `<img>` removes
+   itself on error and the emoji on its colour swatch shows), and the cards
+   were not on screen at all: ROOM V2 hid the whole legacy panel with
+   `#screen-gauntlet .tier-boss-loadout{display:none !important}` and kept the
+   node, and `_renderBossLoadout` kept writing into it — two card previews,
+   their tooltips, six `mkDie` calls and a saved pick list per gauntlet render.
+   It now leaves if that rule is in force, and resumes if the rule is deleted
+   (verified both ways). **Still true:** those three PNGs do not exist, so if
+   that panel is ever unhidden the cards read as emoji-on-swatch until Denis
+   draws them. Nothing else in the game asks for them.
 3. ~~**CAST stays enabled after casting**~~ — fixed P341. `handleBank` returned
    at `total<=0` without touching the UI, so the button stayed lit reading
    CAST for a selection that no longer existed. BANK now goes dark, ROLL
