@@ -18505,6 +18505,15 @@ var D3X={
        that width, measured rather than tuned, so this stops being a magic
        number: half of 1.74 is 0.87 of sz. */
     var limitX=Math.max(1.2,(Math.min(mid,mrw-mid)-sz*(D3X.PHYS.drawn/2))/sz);
+    /* THE WALLS MAKE ROOM FOR THE LANES. limitX is where P366 stands the table's
+       edge planes; the lanes are a fixture of the match. Aiming a die at a lane
+       outside its own wall asks the solver for something impossible - the die is
+       pinned there for the whole flight while the lane pull hauls it outward, and
+       it settles wherever the wall lets it, which is on top of its neighbour.
+       Measured before this guard: a single reroll aimed at -4.97 against a wall
+       at 1.2, finishing 54.7px inside the next die. */
+    var _outerLane=((NL-1)/2)*lanePitch;
+    if(limitX<_outerLane+0.1)limitX=_outerLane+0.1;
     /* the pen is sized off the same pitch the lanes are laid out on - two
        different numbers here is how a die ends up penned to a radius that does
        not match the spacing it was given */
@@ -18603,8 +18612,21 @@ var D3X={
     this.dice.forEach(function(d){
       if(d.match&&d.hx!==undefined&&(!key||self._rowKey(d)===key))xs.push(d.hx);
     });
-    if(!xs.length)return 0;
-    return (Math.min.apply(null,xs)+Math.max.apply(null,xs))/2;
+    if(xs.length>1)return (Math.min.apply(null,xs)+Math.max.apply(null,xs))/2;
+    /* ONE tracked die cannot tell you where its row is - the midpoint comes back
+       as that die's own position, at whichever end of the table it happens to
+       sit. limitX is derived from this, so it then collapsed to its floor and the
+       table's edge walls ended up INSIDE the lane the die was aimed at. The rival
+       meets this constantly because it rerolls a die at a time. The row element
+       always knows where it is, so ask it rather than guessing from one die. */
+    try{
+      var el=document.getElementById(key||'playerDiceRow');
+      if(el&&this.mount){
+        var r=el.getBoundingClientRect(),m=this.mount.getBoundingClientRect();
+        if(r.width>0)return (r.left+r.width/2)-m.left;
+      }
+    }catch(e){}
+    return xs.length?xs[0]:0;
   },
   /* where a physics die sits/points right now, in table-local space */
   _physPose:function(d){
@@ -20338,6 +20360,24 @@ function _wrapDie(die){
   return wrap;
 }
 function _appendDie(row,die){if(row&&die)row.appendChild(_wrapDie(die));}
+/* Put a die in the row AT ITS SEAT. The rival's row is torn down and rebuilt
+   between rolls, so appending puts every fresh die on the right-hand end and the
+   kept ones bunch at the left - the row stops being six seats and becomes a
+   queue. The seat is stamped on the wrapper so a die kept across rolls still
+   announces where it belongs when the next throw is laid out around it.
+   The player's row never needed this: its dice are never removed, so DOM order
+   is seat order for free. */
+function _seatDie(row,die,seat){
+  if(!row||!die)return;
+  var w=_wrapDie(die);
+  w.dataset.seat=seat;
+  var before=null,kids=row.children;
+  for(var i=0;i<kids.length;i++){
+    var s=parseInt(kids[i].dataset&&kids[i].dataset.seat,10);
+    if(!isNaN(s)&&s>seat){before=kids[i];break;}
+  }
+  if(before)row.insertBefore(w,before);else row.appendChild(w);
+}
 /* ONE TAP, ONE DIE.
    The die is drawn at 0.77 of its DOM box and the solver puts it anywhere
    inside its slot, so two boxes overlap long before the dice do - and every
@@ -24608,8 +24648,27 @@ function runOppTurn(){
       _rungMats.splice(_snuffLane,1);rungLanes.splice(_snuffLane,1);
     }
     const rungDice=_rungMats;
+    /* WHICH SEATS ARE ACTUALLY FREE. Everything the rival is still holding sits
+       in a seat, and the snuffed seat is empty for the turn - so the dice about
+       to be thrown go into what is left, in seat order. This is the whole fix:
+       the loop below used to index materials and lanes by ITS OWN counter, which
+       is the position of a die within this roll and has nothing to do with the
+       seat it lives in. */
+    var _heldSeats={};
+    (G._oppHeld||[]).forEach(function(d){if(d&&d.lane!==undefined)_heldSeats[d.lane]=1;});
+    var _freeSeats=[];
+    for(var _fs=0;_fs<_rungAll.length;_fs++){
+      if(_heldSeats[_fs])continue;
+      if(_fs===_snuffLane)continue;
+      _freeSeats.push(_fs);
+    }
     var _sawdustCount=0;
-    for(let i=0;i<rollDice;i++){const dieMat=rungDice[i]||'bone';let val=rollFace(dieMat);var _wasDampened=false;
+    for(let i=0;i<rollDice;i++){
+      /* the seat this die is going into, and therefore WHICH DIE IT IS - the
+         material comes from the seat too. Indexing the material by `i` let a
+         rival's die change what it was made of between two rolls of one turn. */
+      const _seat=(_freeSeats[i]!==undefined)?_freeSeats[i]:i;
+      const dieMat=_rungAll[_seat]||rungDice[i]||'bone';let val=rollFace(dieMat);var _wasDampened=false;
       if(sootyActive){while(val===1)val=rollFace(dieMat);}
       /* Sawdust: on opponent's first roll, dampen 2 dice (can't be 1 or 5) */
       var _sawdustMax=G._fenceActive?3:2;
@@ -24617,11 +24676,16 @@ function runOppTurn(){
         var _sdGuard=20;while((val===1||val===5)&&_sdGuard-->0)val=rollFace(dieMat);
         _sawdustCount++;_wasDampened=true;
       }
-      const el=mkDie(val,dieMat);el.classList.add('rolling');_appendDie(row,el);
+      const el=mkDie(val,dieMat);el.classList.add('rolling');_seatDie(row,el,_seat);
+      /* commit it to layout NOW, the same way the player's roll does. The throw
+         is laid out from measured homes - the lane pitch from their span, limitX
+         from the row's midpoint - so measuring before the browser has placed the
+         new dice reads a row that does not exist yet. */
+      el.offsetWidth;
       if(_wasDampened){el.classList.add('die-dampened','die-dampened-fresh');setTimeout(function(){el.classList.remove('die-dampened-fresh');},_oppDelay(600));}
       /* Broken Lantern: hide dice faces */
       if(G._lanternActive)el.classList.add('die-blind');
-      G.oppDice.push({val,el,kept:false,mat:dieMat,lane:(rungLanes[i]!==undefined?rungLanes[i]:i)});}
+      G.oppDice.push({val,el,kept:false,mat:dieMat,lane:_seat});}
     sootyActive=false;
     /* Say whose turn it is, at the moment the dice land. setStatusMsg routes
        to the TOP strip while G.phase==='opp', which is where the player is
