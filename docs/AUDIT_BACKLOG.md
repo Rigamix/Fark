@@ -162,6 +162,26 @@ and the first-night 2D dice (never replaced, known).
   agents themselves identified and discarded. Trust the disclosed caveats in
   `AUDIT_FINDINGS_RAW.md`.
 
+## In flight — play-test + Preserve build
+
+Launched at the end of the 2026-07-30 session, when the orchestrator was nearly
+out of context. Results land as a task notification and in the journal; **read
+them before starting any of this by hand.**
+
+    run id     wf_9aa2dedc-0e6
+    journal    .claude/projects/<project>/<session>/subagents/workflows/wf_9aa2dedc-0e6/journal.jsonl
+    script     .claude/projects/<project>/<session>/workflows/scripts/fark-playtest-and-preserve-wf_9aa2dedc-0e6.js
+
+Three things in it: play-tests of STEADY HAND and FAIR TRADE (the two fixes that
+went in on review alone), and a build of PRESERVE as a visible die in an isolated
+worktree, checked by two adversarial verifiers — one on correctness, one asking
+whether a player can *look* at the table and see the preserved die, which is the
+whole reason the points version was rejected.
+
+The Preserve build returns a diff rather than landing on this branch — it needs
+applying and re-verifying here. If the journal is gone, the script is checked in
+and can be re-invoked with `Workflow({scriptPath})`.
+
 ## In flight — a diagnosis workflow whose findings were never read
 
 A 11-agent workflow was launched to diagnose backlog item 5 (the five inert
