@@ -172,3 +172,52 @@ balance change nobody signed off on.
 - Break's half of the same ruling — "the destroyed die returns fully restored at the start of the player's NEXT match" — is NOT addressed here. `_breakDie` -> `_removeDieAt(lane,{permanent:true})` (16612) still splices S.run.dice and S.run.dieEnch for good. That is a separate item and needs its own return-at-next-match hook; flagging it so it is not assumed covered by this patch.
 
 _14 further questions. Nothing here blocks work in progress._
+
+---
+
+## Round 3 — raised while building, 2026-07-31
+
+Everything below was decided-in-passing or flagged inline during the dice,
+patron and lore work. None of it blocked anything: the work shipped under the
+stated assumption, and each entry says what it would cost to reverse.
+
+### Vagabond's Break row
+
+- **Does "steals" take FROM the rival, or only give TO the player?** Today it
+  only adds to the player's turn — `G.oPts` is untouched. The brief's single
+  word "steals" does not settle it, and a deduction is a much bigger swing than
+  the value fix. Left as a gain. Cheap to change (one line), so it is worth an
+  answer before the harness pass rather than after.
+- **The magnitude is still unvalidated.** P382 made the row mean something
+  measurable — what the rival banked on their last turn, 0 if they busted — but
+  the brief marks every row but Obsidian's a proposal and open item 5.4 asks for
+  a harness pass. Do not read "it works now" as "the number is right".
+
+### The lore system
+
+- **The seed six cannot be seated.** Odo, Hollis, Peck, Ferrand, Fenn and Tam
+  have no portraits, and a seat's name IS its portrait's filename. Their lines
+  are written and in the table, inert. Three ways out: draw them portraits, let
+  a named patron use a portrait that is not their own (breaks the name/file
+  link, and the same face would carry two names on different nights), or leave
+  them as authored-but-unused. Currently the third. Ferrand matters most of the
+  six — his pair is the brief's own worked example of the condition system.
+- **Scale target for the named cast.** The lore doc proposes 20-30 for launch
+  and 24 have art. Do the seed six get art to reach 30, or is 24 the cast?
+- **Full multi-stage ladders for all 24** are flagged in the doc as a separate
+  pass. Patrons with no personal line currently fall through to the ambient
+  pools, which reads fine — so this is a "when", not a "must".
+- **The Tankard badge as tavern folklore** ("some say it's why nobody's robbed
+  the till in forty years") is a proposal in the doc, not written. It would drop
+  straight into the gossip pool as data if wanted.
+
+### Residual tension in the rework brief
+
+- **Section 2 still says a die killed on loan is lost "permanently"**, while 4b
+  says the player's own die returns at once and they stay at 6. Both are
+  satisfiable if "permanently" is read as match-scoped (which is how the whole
+  Break/Trade correction reads it, and how P376/P377 implement it) — but the
+  word is now the odd one out and will mislead the next reader.
+- **4b's closing line says Break's next-match return "still needs building"**.
+  It was built in P375, before 4b was written. Stale rather than wrong; worth
+  striking so it is not treated as outstanding.
