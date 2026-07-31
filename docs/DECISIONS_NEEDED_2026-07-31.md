@@ -1,5 +1,18 @@
 # Decisions needed — the sim's leftovers
 
+> **SUPERSEDED in part by `FEEL_2026-07-31.md`**, which reorders these by what
+> a player actually runs into and adds the one this list MISSED — see below.
+> The options and recommendations here still stand; read that document first.
+
+**A CORRECTION.** This list said six. It should have said seven: **Starstone's
+unconditional +500 per die on every bank** is blocker #3 of five in the sim
+report and it is in none of the six items below. No commit closes it either, so
+it fell out of the fix list and the decision list at the same time. It is the
+single strongest thing in the game — two Starstone plus four bone wins 77.5% for
+a completely RANDOM player against an all-bone baseline of 3.0% — and it makes
+banking small and often the optimal line, which is the inverse of a
+push-your-luck game. Written up as exhibit C of section 2 in FEEL_2026-07-31.md.
+
 Six questions. Each one is a case where **the code does exactly what the spec
 says and the spec is the problem**, so I can't fix them by reading harder — they
 need your call. Recommendation given for each; say "your rec" and I'll take it.
