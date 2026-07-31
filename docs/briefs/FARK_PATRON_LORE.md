@@ -38,7 +38,7 @@ Every speakable line, whatever it belongs to, is the same small record:
 
 ```
 {
-  speaker_pool: "patron:hollis" | "gossip:town" | ...
+  speaker_pool: "patron:ollis" | "gossip:town" | ...
   min_stage: <int>       // floor, not exact match — see resolution below
   conditions: [ <predicate>, ... ]   // optional, all must hold (AND)
   text: "..."
@@ -237,8 +237,8 @@ thinner and lower-frequency than a patron's own personal content.
 The cast is all anthropomorphic animals, and that can flavor the
 DIALECT the way real English borrows animal behavior into idiom —
 *"stubborn as a badger in a hedge," "keeps his coin like a squirrel
-keeps its nuts."* That second one fits Hollis's established coin-
-anxiety without needing to know or ever state what species Hollis
+keeps its nuts."* That second one fits Ollis's established coin-
+anxiety without needing to know or ever state what species Ollis
 actually is — it works as ambient vernacular anyone might use, not a
 joke ABOUT a specific character's own species. Hard rule: never let an
 idiom become a running gag pattern, never make species itself the
@@ -422,7 +422,10 @@ but he's no longer down to exactly one line of his own.
   obvious."*
 Works standalone either order; pays off best if the player's heard both.
 
-**HOLLIS** — anxious, careful with coin, clerk-adjacent. GOAL: saving
+**OLLIS** — anxious, careful with coin, clerk-adjacent. (Named HOLLIS in the
+first two passes of this doc; the painting arrived as Ollis.png and a seat's
+name is its portrait's filename, so OLLIS is the name. Renamed throughout
+rather than left disagreeing with the build.) GOAL: saving
 toward a Ward enchant — "the shield," in his own words, never the game's
 exact term. QUIRK: counts and recounts his coin visibly. EXTENDED one
 stage further, since his arc is a genuine, earned progression rather
@@ -487,7 +490,7 @@ worth the losing. Don't tell her I said the losing part."*
 
 ---
 
-Connection density check on this seed batch: Odo, Hollis, and Ferrand
+Connection density check on this seed batch: Odo, Ollis, and Ferrand
 touch something beyond themselves (a debt pair plus a goal-condition) —
 3 of 6 for PATRON-to-patron/mechanic connections specifically, closer
 to 50% than the original 60% target, with Peck now carrying ambient
@@ -748,7 +751,7 @@ with the tavern.
 
 **Seed six, deepened to the same standard where their design allows
 it:** Odo goes from one line of his own to three (interchangeable).
-Hollis gains a genuine stage 2 — his coin-saving arc actually pays
+Ollis gains a genuine stage 2 — his coin-saving arc actually pays
 off now, which is exactly what stage-gating was built for. Ferrand
 was already at comparable depth (two conditional variants plus a
 personal King-override) and needed no further work. Fenn and Tam

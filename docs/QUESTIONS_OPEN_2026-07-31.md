@@ -236,7 +236,7 @@ first is what the question is about.
 
 ## Added when the seed-six portraits arrived (P403)
 
-**59. OLLIS or HOLLIS?** The lore doc names him HOLLIS and his three lines were
+**59. OLLIS or HOLLIS? — ANSWERED: Ollis.** The lore doc names him HOLLIS and his three lines were
 keyed `patron:hollis`; the painting is `Ollis.png`. A seat's name IS its
 portrait's filename — the rule the whole roster runs on — so the character on
 screen is OLLIS, and his lines are re-keyed to match. Left as `hollis` they
@@ -244,3 +244,8 @@ would simply never have fired, and his is the only three-stage arc in the cast,
 so the silence would have been conspicuous. If HOLLIS was the intent the fix is
 renaming the file, which is your folder and your call. Cheap either way: one
 filename, one webp, three pool keys.
+
+> **Answered: "just call him Ollis."** No code change needed — the build was
+> already keyed that way. `FARK_PATRON_LORE.md` renamed throughout to match,
+> with a note at his entry recording that he was HOLLIS in its first two
+> passes, so a later writing pass does not reintroduce the old name.
