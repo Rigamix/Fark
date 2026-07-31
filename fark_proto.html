@@ -25169,15 +25169,30 @@ function handleBank(){
         var _bkBp=G._breakPending;G._breakPending=null;
         selD.forEach(function(d){d.committed=true;d.sel=false;
           if(d.el){d.el.classList.remove('selected');d.el.classList.add('committed');d.el.onclick=null;}});
-        if(pts>0){
-          G.kept.push({vals:selV,mat:(_bkScore[0]||selD[0]).mat,pts:pts,
-            dice:_bkScore.map(function(dd){return{val:dd.val,mat:dd.mat};})});
-          G.turnPts=G.kept.reduce(function(a,k){return a+k.pts;},0)+(G._turnBonusPot||0);
-          try{updHUD();refreshKeptTray();}catch(e){}
-        }
         G._breakThenBank=true;/* _breakDie finishes the bank once a die is tapped */
-        if(_breakBegin(_bkBp.src))return;
-        G._breakThenBank=false;/* nothing to break - fall through and bank */
+        /* THE KEEP IS BANKED ONLY ON THE PATH THAT RETURNS. This push used to
+           sit ABOVE the _breakBegin call, so when _breakBegin found no legal
+           target and the code fell through, the bottom of this same branch
+           pushed THE SAME SELECTION AGAIN - two rows in G.kept for one keep,
+           points counted twice. It exists so the points are already in hand
+           when _breakDie completes the bank on the far side of the tap; on the
+           fall-through path the bottom push is the correct and only one.
+           P410 made this reachable far more often, because excluding borrowed
+           dice from the target list is precisely what makes "nothing left to
+           break" a common outcome rather than a corner case.
+           selD is still marked committed ABOVE this, deliberately: _breakBegin
+           filters on !d.committed and the dice just selected must not be
+           offered as targets for their own Break. */
+        if(_breakBegin(_bkBp.src)){
+          if(pts>0){
+            G.kept.push({vals:selV,mat:(_bkScore[0]||selD[0]).mat,pts:pts,
+              dice:_bkScore.map(function(dd){return{val:dd.val,mat:dd.mat};})});
+            G.turnPts=G.kept.reduce(function(a,k){return a+k.pts;},0)+(G._turnBonusPot||0);
+            try{updHUD();refreshKeptTray();}catch(e){}
+          }
+          return;
+        }
+        G._breakThenBank=false;/* nothing to break - fall through and bank once */
       }
       if(pts<0)pts=0;
       _pCrowsCommit(_cw);/* banked straight downgraded by NPC's Crow's Luck → spend a charge */
