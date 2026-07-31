@@ -9812,6 +9812,21 @@ function saveMatchState(){
     pPts:G.pPts,oPts:G.oPts,target:G.target,turnNum:G.turnNum,numDice:G.numDice,
     pTurns:G.pTurns||0,oTurns:G.oTurns||0,
     matchDice:[...G.matchDice],matchOppDice:[...G.matchOppDice],
+    /* THE LIVE ENCHANT ARRAY, not the run's. A die removed mid-match (Break,
+       Obsidian's shatter) is spliced out of matchDice and _enchArr and NOT
+       out of S.run.dieEnch - removal is match-scoped now, and the run loadout
+       is what the next match restores from. Rebuilding _enchArr from the run
+       on resume therefore handed a six-entry brand list to a five-die loadout
+       and every lane past the gap wore its neighbour's brand. This snapshot
+       is the only record of the live array. */
+    _enchArr:[...(G._enchArr||[])],
+    /* THE LIVE FAIR TRADE LOAN. Always null HERE - this snapshot is only ever
+       taken at a turn boundary, and startPTurn expires the loan long before
+       its last line calls this. It is in the shape anyway because
+       _removeDieAt writes these same dice fields MID-turn, where a loan can
+       be live, and the resume side has to be able to trust the field instead
+       of guessing which of the two writers produced the snapshot. */
+    _fairTrade:G._fairTrade?{...G._fairTrade}:null,
     originalPlayerDice:[...G.originalPlayerDice],
     thriftyBonus:G.thriftyBonus||0,spurActive:G.spurActive||0,
     martyrUsed:G.martyrUsed||false,
@@ -16559,11 +16574,34 @@ var BREAK_TRIGGERS={
       try{updHUD();refreshKeptTray();}catch(e){}}
     try{famLog(steal>0?('STOLE '+steal+' FROM THEIR HAND'):'THEY HELD NOTHING TO TAKE');}catch(e){}}}
 };
+/* A PRESERVED die is explicitly INERT and is therefore never a legal Break
+   target (docs/AUDIT_RESOLUTIONS.md, "Corrections issued AFTER the first
+   answer pass").
+   THIS GUARD IS A NO-OP TODAY, DELIBERATELY LEFT ARMED. Preserve as a die
+   that STAYS ON THE TABLE in its amber casing is not built: CFX.preserve
+   only stashes a VALUE (G._famPreserve = {val,pts,crack}) and startPTurn
+   spends it straight into G.kept, so nothing in G.pool can answer true here
+   yet - measured, no pool die carries a preserved flag. It is written
+   against both shapes the built version can take, a per-die flag or a
+   G._famPreserve that names the die or its lane, so it starts protecting
+   the casing the day the casing ships without anyone having to remember
+   that Break needs telling. */
+function _breakPreserved(d){
+  if(!d)return false;
+  if(d._preserved)return true;
+  try{
+    var p=G&&G._famPreserve;
+    if(!p)return false;
+    if(p.die&&p.die===d)return true;
+    if(p.lane!==undefined&&p.lane!==null&&p.lane===_laneOf(d))return true;
+  }catch(e){}
+  return false;
+}
 /* Enter targeting: the next die tapped is the one that breaks. Mundane dice
    (bone, iron, flint, lead) have no trigger - confirmed the worst target,
    matching mundane dice being baseline-weak everywhere else. */
 function _breakBegin(src){
-  var live=G.pool.filter(function(d){return !d.committed&&d!==src;});
+  var live=G.pool.filter(function(d){return !d.committed&&d!==src&&!_breakPreserved(d);});
   /* false = nothing to break, so the caller must carry on rather than wait
      for a tap that can never come */
   if(!live.length){try{famLog('NOTHING LEFT TO BREAK');}catch(e){}return false;}
@@ -16580,10 +16618,29 @@ function _breakBegin(src){
   return true;
 }
 /* Take the die in SEAT `lane` off the table, keeping every array that is
-   indexed by seat in step: the match loadout, the enchant array, the pool's
-   own seat stamps, and - when the loss is permanent - the run save.
-   `permanent:false` is a match-only loss (Obsidian's shatter); the die comes
-   back next match. */
+   indexed by seat in step: the match loadout, the enchant array and the
+   pool's own seat stamps.
+
+   EVERY removal here is MATCH-SCOPED. There is no permanent one any more.
+   The ruling (docs/AUDIT_RESOLUTIONS.md, "Corrections issued AFTER the first
+   answer pass"): a die destroyed by Break "returns fully restored at the
+   start of the player's NEXT match, not gone for the rest of the run" - "for
+   the rest of the match" was always a bound, not a permanence claim. So
+   nothing below touches S.run.dice / dieEnch / diceInv: the run loadout is
+   exactly what the next match is rebuilt from (newG reads it into matchDice),
+   so leaving it alone IS the restore. `opts.permanent` is now VESTIGIAL -
+   both callers still pass it, it is deliberately ignored, and it must not be
+   wired back up to a splice.
+
+   The die still cannot come back INSIDE this match. matchDice is spliced
+   here and every path that rebuilds the row reads it: startPTurn's numDice,
+   the hot-dice loop, doRoll's top-up, Second Wind's three, Stitch's fresh
+   six. The last hole was the mid-match snapshot, closed at the bottom.
+   ONE EXCEPTION, pre-existing and deliberately left alone: a resumed
+   mirror_match re-seeds matchDice from rung._mirrorOppDice AFTER the snapshot
+   is restored, so the die walks back in there. That path never respected the
+   snapshot's loadout in the first place and belongs to whoever owns mirror
+   matches. */
 function _removeDieAt(lane,opts){
   opts=opts||{};
   if(!G||lane===undefined||lane===null||lane<0)return false;
@@ -16594,28 +16651,59 @@ function _removeDieAt(lane,opts){
   G.numDice=Math.max(1,(G.numDice||6)-1);
   G.pool=(G.pool||[]).filter(function(q){return q.lane!==lane;});
   G.pool.forEach(function(q){if(q.lane>lane)q.lane--;});
-  if(opts.permanent){
-    try{
-      _getS();_enchInit();
-      var ft=G._fairTrade;
-      if(ft&&ft.lane===lane){
-        /* this seat holds a BORROWED die. Destroying it must take the stash
-           die, not the player's own - splicing S.run.dice by lane here would
-           delete a die they never targeted and then startPTurn would write
-           the deleted one back over its neighbour. */
-        var bi=(S.run.diceInv||[]).indexOf(ft.borrowed);
-        if(bi>=0){
-          S.run.diceInv.splice(bi,1);
-          if(S.run.dieEnchInv)S.run.dieEnchInv.splice(bi,1);
-        }
-        G._fairTrade=null;/* nothing left to give back */
-      }else if(S.run.dice&&lane<S.run.dice.length){
-        S.run.dice.splice(lane,1);
-        if(S.run.dieEnch)S.run.dieEnch.splice(lane,1);
-      }
+  /* FAIR TRADE. If the destroyed seat held the BORROWED die the loan dies
+     with it - but nothing leaves the stash. The card's rule is that a die
+     killed on loan is lost "exactly as if it had died in its own home lane",
+     and under the correction a die that dies in its home lane is back next
+     match, so this one is too. The exploit that rule closed stays closed:
+     the die is off the table for the rest of THIS match either way, which
+     was always the real cost. Clearing the record is load-bearing -
+     startPTurn's loan-expiry block would otherwise find the borrowed die
+     missing from its seat, read that as a death, and splice the stash for
+     good. And a seat destroyed BELOW a live loan shifts it down, or that
+     same expiry check reads the wrong lane. Runs BEFORE the snapshot below,
+     which records whatever this leaves behind. */
+  try{
+    var ft=G._fairTrade;
+    if(ft){
+      if(ft.lane===lane)G._fairTrade=null;/* nothing left to give back */
+      else if(ft.lane>lane)ft.lane--;
+    }
+  }catch(e){}
+  /* RE-SNAPSHOT THE DICE, AND ONLY THE DICE. The mid-match snapshot was
+     written at turn boundaries only, so a quit between a Break and the next
+     turn resumed from one that still held six dice, and the destroyed die
+     walked straight back into the same match. Measured, not reasoned: after
+     a live Break the snapshot's matchDice was six entries while the live
+     loadout was five.
+     DO NOT call saveMatchState() here. That snapshot means "the state at the
+     START of a player turn" - startPTurn's last line is its only other
+     writer - and a resume replays the turn from the top. Rewriting all of it
+     mid-turn re-timestamps what the replayed turn is meant to hand back:
+     measured, a Break landing after a shatter bonus and a spent active card
+     moved the snapshot's pPts 0 -> 500 and recorded second_wind as used, so
+     the resumed turn charged the player for a card use on a turn that never
+     happened, and banked points it then let them earn again.
+     _fairTrade IS in the list, and has to be: a LOAN is live mid-turn and
+     already expired by the turn-boundary snapshot, so it is the one field a
+     mid-turn write can catch that the boundary write never sees. Without it
+     a resume found the borrowed die sitting in matchDice with no loan left
+     to expire, and startPTurn's expiry block - gated on G._fairTrade - never
+     ran: the borrowed die kept that seat for the REST OF THE MATCH while
+     still sitting in the stash, and the player's own die never came home.
+     The card only fires when the stash die BEATS the seat, so that was a
+     free strict upgrade bought by force-quitting.
+     No snapshot exists in a practice match, and none survives endMatch -
+     both correct, and the guard is what makes them no-ops. */
+  try{
+    if(S&&S.pendingMatch){
+      S.pendingMatch.matchDice=[...G.matchDice];
+      S.pendingMatch._enchArr=[...(G._enchArr||[])];
+      S.pendingMatch.numDice=G.numDice;
+      S.pendingMatch._fairTrade=G._fairTrade?{...G._fairTrade}:null;
       save();
-    }catch(e){}
-  }
+    }
+  }catch(e){}
   return true;
 }
 function _breakClear(){
@@ -16625,11 +16713,19 @@ function _breakClear(){
 }
 function _breakDie(d){
   if(!G._breakArmed)return;
+  /* The same rule _breakBegin filters on, gated again at the point of no
+     return: a PRESERVED die is inert and never breaks, however the tap got
+     here. Returning while still armed is deliberate - the other outlined
+     dice keep their handlers, so the player is not stranded behind dead
+     buttons. */
+  if(_breakPreserved(d)){try{famLog('THE AMBER HOLDS - THAT DIE CANNOT BREAK');}catch(e){}return;}
   _breakClear();
   G.pool.forEach(function(q){if(q.el)q.el.onclick=null;});
   var fam=_matFam(d.mat);
   var lane=_laneOf(d);
-  /* gone for good, run save included - see _removeDieAt */
+  /* off the table for the rest of the MATCH, not the run: the die is back,
+     fully restored, at the start of the next one. The flag is vestigial -
+     see _removeDieAt. */
   _removeDieAt(lane,{permanent:true});
   try{if(d.el){
     /* the class alone animates a box nobody can see - see D3X.shatter */
@@ -29025,7 +29121,29 @@ function initMatchScreen(data){
     }
   }
 
-  G._enchArr=(S&&S.run&&S.run.dieEnch)?S.run.dieEnch.slice():[];
+  /* A RESUME prefers the SNAPSHOT's array - see saveMatchState. S.run.dieEnch
+     is the right source for a fresh match and the wrong one for a resumed
+     one, because a mid-match removal no longer touches the run. The LENGTH
+     test is the real gate, because the only thing that matters here is that
+     the brand list is lane-aligned with the loadout it is about to dress: a
+     mirror_match resume has just re-seeded matchDice from rung._mirrorOppDice
+     a few lines above and thrown the snapshot's loadout away, so it falls
+     back to the run and stays aligned. So do snapshots written before this
+     field existed. */
+  var _rdEnch=params&&params._resumeData&&params._resumeData._enchArr;
+  G._enchArr=(Array.isArray(_rdEnch)&&_rdEnch.length===(G.matchDice?G.matchDice.length:0))
+    ?_rdEnch.slice()
+    :((S&&S.run&&S.run.dieEnch)?S.run.dieEnch.slice():[]);
+  /* And the live LOAN, for the same reason - see saveMatchState. Restored
+     BEFORE startPTurn runs (it is called on a timer at the end of this
+     function), so the expiry block finds the borrowed die in its seat, hands
+     it back and returns the player's own die. Without this a resumed match
+     kept the borrowed die for the rest of the match - and it was still in
+     the stash too. */
+  if(params&&params._resumeData){
+    var _rdFt=params._resumeData._fairTrade;
+    G._fairTrade=(_rdFt&&typeof _rdFt.lane==='number')?{lane:_rdFt.lane,was:_rdFt.was,borrowed:_rdFt.borrowed}:null;
+  }
   /* ── Apply patron Tell (signature passive rule) ── */
   _applyTellAndSleeve();
   if(typeof playerTitle==='function'&&playerTitle()!=='nobody'){
