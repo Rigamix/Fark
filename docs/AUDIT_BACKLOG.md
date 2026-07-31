@@ -390,3 +390,60 @@ arrangement (full row, kept left/right/both ends, every-other, ends-only,
 middle gap, single die), minGap ≥1.15, zero off-edge, zero frame-cap, zero
 reorders. `tools/dice_harness.js` reproduces this headlessly in seconds — pass
 `pitch` or it guesses wrong on any subset with a hole in it.
+
+---
+
+## The brief sweep (wf_e505c7ff-bdc) — area A landed, six to go
+
+28 agents, 0 errors, seven disjoint areas each audited, double-verified and
+reconciled into applyable patch text. All seven came back `applyable:true`,
+67 patches total. **Area A is in (P383). The other six are not.**
+
+Apply them with the staged applier, ONE AT A TIME:
+
+```bash
+python <scratch>/apply_area.py B   # stages to fark_proto.html.stage
+```
+
+It absorbs the two artefacts that have broken anchors on this project before —
+CRLF where the file has LF, and a `\uXXXX` source escape transcribed as the
+literal glyph — and refuses anything that still will not match rather than
+guessing. Parse-gate the `.stage` file, promote it, verify by playing, commit,
+then cut the next area against the new file.
+
+**Why one at a time.** The areas overlap on six functions, so applying them in
+sequence double-patches the same regions — the failure that wasted a round on
+the match-scoping sweep. Measured overlaps:
+
+| function | claimed by |
+|---|---|
+| `_enchInit` | A + B + F |
+| `saveMatchState` | A + D + F |
+| `doBust` | A + C |
+| `_breakDie` | C + E |
+| `endMatch` | D + E |
+| `initMatchScreen` | D + F |
+
+**G is the only area touching none of the others** — it can go next with no
+re-cutting. After that, expect misses and re-anchor.
+
+Remaining, with what each carries:
+
+- **B** (7 patches) — the 1-or-5 brand restriction, the shop's random draw
+  narrowed to {1,5}, and refund-and-clear for brands already on an illegal face.
+- **C** (3) — the seven Break death-trigger rows.
+- **D** (9) — the Trade enchant's match-end restore. **Its audit found Trade
+  writing through to the RUN** (`S.run.dice[L]=theirs;save();` with a comment
+  saying "for the rest of the RUN, not just the match"), which contradicts the
+  match-scoped ruling outright. Highest-value of the six.
+- **E** (19) — Kindred (Tithe only, per the brief's do-not-guess) and Still
+  Waters, including retiring the old card-sealing code still live under the
+  `confession` id.
+- **F** (10) — legacy-save refunds (Break ~450g, Trade 350g) and missing-die
+  visibility in the loadout/peek UI.
+- **G** (4) — confirming the cut enchants are gone and routing the universal
+  icon rule through one shared helper.
+
+Cross-area findings the agents were told to report rather than patch are in
+each area's `crossArea` field in the journal. The D one above is the important
+one.
