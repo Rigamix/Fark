@@ -61,25 +61,47 @@ fill the retired slots:
   TIER II extends the loan for the rest of the turn — the two must
   behave differently, tier I is the deliberately weaker version.
   Build-flexibility, no overlap with any other system.
-  **REVISED — if the borrowed die is destroyed mid-loan** (Obsidian's
-  natural shatter, Break, or any future death effect): **the player
-  loses the die they lent, permanently, exactly as if it had died in
-  its own home lane.** No exception for cause. This reverses an
-  earlier ruling (void the loan, nothing lost) that turned out to be
-  a live exploit: it let a player borrow their own Obsidian die,
-  Break it for the guaranteed +1000, and have Fair Trade erase the
-  loss entirely — bypassing the whole point of section 4's timing
-  finding with zero cost. The corrected reasoning: natural shatter
-  and Break are EQUALLY permanent (confirmed against the Break sim
-  work — shatter is a one-time, whole-match event, not "gone for a
-  turn, comes back"), so there was never a real "soft cause" to
-  protect against. A die's death belongs to the die, not to whichever
-  lane it's temporarily visiting. This does not make Fair Trade a
-  stake — the card's actual value (repositioning a die into a
+  **REVISED, then re-aligned to match-scoping** — if the borrowed die
+  is destroyed mid-loan (Obsidian's natural shatter, Break, or any
+  future death effect): **the player loses the die they lent, GONE
+  UNTIL THEIR NEXT MATCH, exactly as if it had died in its own home
+  lane.** No exception for cause. (Correcting a stale word here: this
+  section previously said "permanently" and described shatter as
+  never coming back — that was accurate under the old, pre-match-
+  scoping understanding, but everything since, including Break's own
+  final ruling, treats a die's death as bounded to the current match,
+  restored at the start of the player's next one. A borrowed die that
+  dies follows the exact same rule; "permanently" was the odd word
+  out and has been struck.) This reverses an EARLIER ruling still
+  (void the loan, nothing lost) that turned out to be a live exploit:
+  it let a player borrow their own Obsidian die, Break it for the
+  guaranteed +1000, and have Fair Trade erase the loss entirely —
+  bypassing the whole point of section 4's timing finding with zero
+  cost. The corrected reasoning holds regardless of match-scoping:
+  natural shatter and Break are EQUALLY severe (both remove the die
+  for the rest of the current match), so there was never a real "soft
+  cause" to protect against. A die's death belongs to the die, not to
+  whichever lane it's temporarily visiting. This does not make Fair
+  Trade a stake — the card's actual value (repositioning a die into a
   different lane) is untouched; what's removed is an accidental
   bonus immunity the card was never designed to grant. If the loan's
-  duration simply expires without the die dying, nothing changes:
-  the player's own die returns to its home lane as normal.
+  duration simply expires without the die dying, nothing changes: the
+  player's own die returns to its home lane as normal.
+  **REVERSED — Break cannot target a borrowed die at all, full stop.**
+  The "lane persists, benched die returns immediately, stay at 6"
+  resolution below is STRUCK — under scrutiny it doesn't actually
+  resolve to anything non-arbitrary once Fair Trade's swap is
+  involved (there's no principled answer for which die goes where
+  afterward), and the shipped code found the same gap and landed on
+  "costs nothing" instead: borrow a die, break it, keep the family
+  payout, still have 6 real dice — measured at 48.6% win rate versus
+  15.2% for an honest self-break. Cleaner fix: a borrowed die is
+  simply an ILLEGAL BREAK TARGET, same shape as a Preserved die being
+  illegal (§2, Break's own entry). This is specifically about
+  DELIBERATE Break targeting — passive/natural death on a borrowed
+  die (Obsidian's own shatter) is UNCHANGED, still follows the
+  existing ruling above (the player loses the die they lent, gone
+  until next match, exactly as if it died at home).
   **CLARIFIED — a brand belongs to the die, never the seat/lane.** A
   code audit found the shipped game leaves a die's enchant behind when
   Fair Trade swaps it, so a borrowed die wears whatever brand its
@@ -202,7 +224,10 @@ resolved; see open items.
   clarification, it was never testing the harsher reading.
   (A PRESERVED die, per the match brief, is explicitly INERT and is
   therefore never a legal Break target — stated outright here so it
-  never has to be inferred from the two words being opposites.)
+  never has to be inferred from the two words being opposites. A
+  BORROWED die, currently on loan via Fair Trade, is ALSO an illegal
+  Break target — see Fair Trade's entry above for the full reasoning;
+  this closed a real, measured exploit, not a theoretical one.)
   WIDENED (supersedes the earlier "Obsidian-only" decision): every
   family now has its own
   death-trigger, so Break has a real partner in every build, not one
@@ -211,12 +236,28 @@ resolved; see open items.
   | Family    | Death-trigger, fires guaranteed when Break-destroyed |
   |-----------|--------------------------------------------------------|
   | Obsidian  | +1000 flat to the current turn's bank (this is the ONLY sim-validated row — section 4) |
-  | Amber     | The current turn becomes bust-immune for its remainder — you may keep pushing without risk until you choose to bank |
+  | Amber     | **CORRECTED, was unbounded, now matches every other row's shape:** saves the turn from the NEXT bust only — one bust, not the rest of the turn. Original "immune for its remainder" wording measured at 98.5% of turns never ending naturally, hitting a 60-roll safety guard instead — an unbounded row in a table of otherwise single, bounded, one-time effects, which is structurally why it broke this badly. Now a one-shot like its five siblings. |
   | Starstone | Grants one immediate extra turn, right after this one ends |
   | Silver    | Immediately banks the current turn's total as-is, ending the turn, guaranteed (a safe cash-out) |
   | Jade      | Immediately grants one free full reroll of every currently-live die, no cost |
-  | Vagabond  | Steals an amount equal to the OPPONENT's current unbanked turn total (0 if they haven't banked anything yet this turn) |
+  | Vagabond  | **SYNCED to the real ruling below (§4c) — this row previously still showed the pre-fix wording.** Steals the opponent's MOST RECENTLY COMPLETED turn's bank (0 if they busted it), subtracted from their running total, added to the player's. Never "current unbanked" — that number is structurally unreadable at the one moment Break can fire, see §4c for the full derivation. |
   | Bone / mundane (iron, flint, lead, plain bone) | No trigger. Banks 0, die gone, nothing else — confirmed worst Break target, matching mundane dice being baseline-weak everywhere else in this game. |
+
+  **Starstone's OWN base family trait (separate from its Break row above)
+  is ALSO corrected here, found by the same sim pass:** the +500-per-bank
+  bonus was gated on nothing but banking ANY amount while owning a
+  Starstone die — not on that die being kept or scored that turn at all.
+  Measured: 77.5% win rate for a fully RANDOM player at two Starstone
+  dice, versus 3.0% for an all-bone baseline; roster spread across eight
+  agents collapsed from 34.8 points to 4.3. This is the single most
+  severe finding across the whole sim pass — it stopped mattering who
+  was playing. FIX: gate the +500 on the Starstone die itself being part
+  of the KEPT AND SCORED selection that bank, not on the player banking
+  anything at all while merely owning one. This brings Starstone in line
+  with how every other family trait already works (tied to genuine
+  participation, not passive ownership) and, as a side effect, makes it
+  properly suppressible by Still Waters for the first time — it wasn't
+  before, for the same structural reason the old wording broke it.
 
   Each row is a distinct VERB (flat value / temporary invincibility /
   extra turn / safe lock-in / free reroll / opponent theft), chosen to
@@ -369,6 +410,24 @@ changes. Do not commission new badge paintings for this rework.
   meaningfully different number to strip than plain Obsidian's
   (6%/+1000), so it needs its OWN measurement, not an extrapolation
   from the Obsidian figure above.
+  **RESOLVED — a genuine document conflict, closed here, not left for
+  a third document to re-open.** The sim pass found Still Waters
+  implemented as `!!(d && d.ench && _stillWaters())` — it only hushes
+  a die that's ALSO been branded, meaning a plain, unenchanted
+  Obsidian die sails through completely untouched while a die the
+  player paid to enchant gets punished for having been enchanted.
+  That's backwards from this section's own stated intent (suppress
+  the FAMILY trait, brand status irrelevant) and measured at −23.6
+  on a branded build for exactly that reason — the cheapest possible
+  counter-build (Break on one die, plain Obsidian everywhere else)
+  walked through it entirely, badge worn or not, 1000/1000 both ways
+  in 200 driven breaks. `DECISIONS_NEEDED_2026-07-31.md` separately
+  re-opened this as an unmade choice — it isn't one: FAMILY-based
+  suppression is the ruling, reasoned through above against Section
+  0's law, and stands. FIX: hush by material family, not by whether
+  `d.ench` is set — a die's family trait is suppressed by wearing
+  this badge regardless of whether that same die also happens to
+  carry a brand.
 - **Corvus: In Arrears → First Strike.** (Badge stays The Tipped
   Scales.) In Arrears was untested. **REDESIGNED, not just rescoped —
   a code audit found no opponent-side enchants exist, and unlike
@@ -494,11 +553,147 @@ the die object — consistent with how curse marks and other per-die
 state already travel with the persistent die object elsewhere in this
 system.
 
-**NOT ADDRESSED HERE, confirmed as a separate outstanding task:**
+**STALE, STRUCK — was "still needs building," is actually done.**
 Break's own "returns fully restored at the start of the player's next
-match" mechanism still needs building — `_removeDieAt(lane,
-{permanent:true})` still splices permanently as of this patch. Real,
-separate, still needed; not assumed covered by the Trade-scoping work.
+match" mechanism was built in P375, BEFORE this section was even
+written — this note was already out of date the moment it was typed.
+Left here as a record of the mistake rather than silently deleted:
+when writing a status note, check the actual implementation state
+first, don't assume "I specified it" means "it isn't built yet."
+
+## 4c. ROUND 4 RULINGS (7-area brief sweep, 2026-07-31)
+
+**VAGABOND'S BREAK ROW, REDEFINED.** The shipped `G._oUnbanked` read is
+structurally broken — turn alternation means it's always 0 at the one
+moment Break can actually fire, so the row was paying out a stale,
+lagging number from the wrong instant, not what the brief described.
+New definition: **steals an amount equal to the opponent's MOST
+RECENTLY COMPLETED turn's banked total (0 if they busted it) — added
+to the player's current turn bank AND subtracted from the opponent's
+running match total.** This also settles a separate ambiguity in the
+original wording ("steals" was previously gain-only, touching nothing
+on the opponent's side): a real deduction is what the word means, and
+keeps this the one genuinely opponent-facing row in the table rather
+than a self-buff sized by a number that happens to reference them.
+Needs a new field (something like `G._oLastBank`, written the instant
+the opponent's turn resolves, by bank OR bust) and its OWN harness
+pass before the number is trusted — this is a bigger effect than the
+old vague wording implied, deliberately: every other Break row already
+bends a normal rule as its whole identity, this one should too.
+
+**STARSTONE'S BREAK ROW, TURN-ORDERING FIX.** Currently fires before
+the turn-cap/turnNum increments Falling Star's own extra-turn already
+runs through, so it silently bypasses the turn cap and breaks
+Quicksilver's once-per-turn gate. FIX: align it to Falling Star's
+existing, established ordering — the extra turn counts normally,
+advances turnNum, refreshes Quicksilver. A cap-bypassing "extra turn"
+is exactly the shape of hole this whole review exists to close; align
+to the pattern already proven safe rather than let a second, newer
+one quietly disagree with it.
+
+**RETIRED MATERIALS (Brass, Crystal, Ruby, jade3) FALL THROUGH TO THE
+MUNDANE BREAK ROW — CONFIRMED, not overlooked.** No forward path back
+into circulation for any of them; no new design effort owed. "Lucky"
+is a naming flag, not a family, and should never need its own row.
+
+**JADE'S BREAK ROW STAYS AS SHIPPED** (claims/replaces the interrupted
+roll, does not add a genuine second roll after resolution). The
+alternate reading would create an unintended second Ward, recreating
+exactly the redundant-systems problem this design has repeatedly
+closed elsewhere. Confirmed, not reversed.
+
+**ONE ENCHANT PER DIE EVER COVERS BORN ENCHANTS, NOT JUST PURCHASED
+ONES.** Brutus's relic (permanently carries Ward) can never also be
+branded with anything else, Quicksilver included. This is intended,
+not a gap: letting it stack a second enchant on top of its free born
+one would make it strictly better than any player-built die, breaking
+the one-enchant economy every other die in the game runs on. If a
+player already owns a purchased Ward and then wins the relic, the
+PURCHASE gives way (refund the gold) — the relic's Ward is what the
+die intrinsically IS, the purchase was always the reversible half.
+
+**KINDRED'S "DOUBLE STRENGTH," FINALLY DEFINED** (was open item 1,
+previously fully unresolved):
+- Tithe: 2x gold (already shipped, sim-confirmed, unchanged).
+- Ward: a two-thirds save instead of a half (NOT two arms per turn —
+  that would reopen the stacking problem the one-Ward loadout cap
+  exists to prevent).
+- Snare: halves twice on the SAME next-turn shot (NOT an extended
+  window — extending it risks recreating the 97.7%-fires-anyway
+  problem that the shortened "next turn only" window was built to
+  fix in the first place).
+- Snuff / Fog: extends to two turns (NOT two lanes — two lanes is a
+  much bigger power spike than "double" should mean, given Snuff's
+  single-lane baseline already measured strong on its own).
+- Break / Trade: NEVER double. Explicitly excluded from the Kindred
+  whitelist, not left ambiguous — nothing coherent exists for either
+  (destroy two dice / swap two lanes are both disproportionate jumps,
+  not modest doublings), so they simply keep their normal effect even
+  under Kindred.
+
+**MIXED ICON+ILLEGAL-DIE KEEP STAYS REJECTED — CONFIRMED, narrow
+reading.** An icon die contributes 0 and must never POISON an
+otherwise-legal keep, but it does not RESCUE a selection with no other
+legal scoring basis. The wide reading (icon rescues everything) would
+hand every icon-holder a free, unconditional discard mechanism — the
+exact "unconditional free option" shape this document has closed
+everywhere else it's appeared (Silver's old bust-save, the 2/3/4/6
+branding exploit). Not reversed.
+
+**TWO SMALL VISIBILITY REQUIREMENTS, same principle, two places:**
+- A "hushed" (Still-Waters-suppressed) die must be marked BEFORE the
+  player targets it with Break, not discovered after the die is
+  already gone — a Break spent on a silenced payout must be a choice
+  made knowingly, never a surprise.
+- A MIXED keep (scorers + one icon die) should name the firing enchant
+  in the preview ("+500 · TITHE"), not just show a bare total — the
+  icons-only preview already does this; the mixed case is the one
+  place left where the universal icon rule is invisible at the moment
+  of commitment.
+
+**naked_run FEAT should read the OWNED loadout (`S.run.dice`), not the
+live mid-match one (`G.matchDice`).** It's a statement about the build
+the player chose, not about whatever survived a fight after Break or
+natural shatter mutated it mid-match. This fix also makes the entire
+class of accidental-trigger edge cases (family dice stripped away by
+an unrelated mechanic) disappear for free.
+
+**LEGACY MIGRATION SPECIFICS:**
+- Trade: refund all brands uniformly, fired or not — the save cannot
+  distinguish the two, and building new tracking solely for this
+  narrow, one-time population isn't worth the cost.
+- Break: refund PER MISSING DIE (450g each), not a single flat amount
+  regardless of how many are gone — a save down two dice should be
+  compensated for two.
+- Migration timing: hoist to RUN-LOAD, don't wait for the player to
+  incidentally open shop or loadout — a known, ready fix shouldn't sit
+  unapplied because of which screen they happen to visit first.
+- Missing-die label stays cause-neutral ("OUT" / "BACK NEXT MATCH") —
+  the player already has context (their own choice, or having watched
+  the shatter happen), not worth threading a cause through two call
+  sites for a distinction context likely already covers.
+- Peeks never needed a player-side gap — they scout the opponent, that
+  was never the right venue regardless of this feature. The
+  badge-gated "YOU" row is a real but low-priority gap; if ever built,
+  original lane position, not appended at the end, consistent with
+  lane-position-as-truth everywhere else in this system.
+
+**SILVER'S REGRESSION TARGET SHOULD BE STATED AS A RATIO, not an
+absolute.** "~26%" depends on an unstated bank policy and produced
+three different honest measurements (23.5% / 26% / 28.2%) from three
+reasonable policies. The ratio (Silver busts ~0.55x as often as bone)
+held stable (0.54-0.58) across every policy tested — that's the actual
+invariant, and the test checklist should check THAT, not a brittle
+absolute that depends on an assumption nobody wrote down.
+
+**CURSED-SEAT POOL: leaning NO on adding `confession` (Still Waters)
+to the random draw, not a full ruling.** Still Waters is uniquely
+build-neutering next to the other seven tells, which tax gold, tempo,
+or lane value but don't switch off something the player actually
+built. That severity reads as earned when the player knows they're
+walking into Aldric specifically; less so as an unpredictable patron
+encounter with no warning beyond the smoke effect. Closer to a feel
+call than a correctness one — flip it if playtesting says otherwise.
 
 ## 5. OPEN ITEMS — NOT RESOLVED, DO NOT GUESS DEFAULTS
 
