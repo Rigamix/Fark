@@ -1,0 +1,32 @@
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const until=async(fn,ms)=>{const t0=Date.now();while(Date.now()-t0<ms){try{if(fn())return true;}catch(e){}await sleep(60);}return false;};
+const vis=el=>{if(!el||!el.isConnected)return false;const s=getComputedStyle(el),r=el.getBoundingClientRect();
+ return s.display!=='none'&&s.visibility!=='hidden'&&+s.opacity>0.05&&r.width>1&&r.height>1;};
+const tap=el=>{if(!vis(el))return false;const r=el.getBoundingClientRect();
+ const o={bubbles:true,cancelable:true,clientX:r.left+r.width/2,clientY:r.top+r.height/2};
+ el.dispatchEvent(new PointerEvent('pointerdown',o));el.dispatchEvent(new PointerEvent('pointerup',o));
+ el.dispatchEvent(new MouseEvent('click',o));return true;};
+tap(document.getElementById('hsBtnBottom'));await sleep(1800);
+await until(()=>{const d=document.querySelector('.nrdie');return d&&d._floatDone;},9000);
+tap(document.querySelector('.nrdie'));await sleep(1300);
+tap(document.getElementById('nrTakeBtn'));await sleep(2500);
+_getS();
+const card=document.querySelector('.ptcard');
+const w=card.offsetWidth;
+const stg=document.getElementById('ptStage');
+const u=(stg?stg.offsetHeight:innerHeight)/100;
+const cv=document.createElement('canvas');const x=cv.getContext('2d');
+const fam='"JMH Beda",serif';
+const ALL=['Corbin','Dunstan','Eira','Golgoth','Krox','Mudge','Nebb','Nell','Nix','Osgood','Pell','Poll','Rask','Regis','Remny','Rilla','Roan','Sil','Sparr','Squib','Thorne','Tuck','Twill','Vess'];
+const rows=ALL.map(n=>{
+  let size=u*2.4; const max=w*0.60;
+  x.font=size+'px '+fam;
+  const raw=x.measureText(n).width;
+  let shrunk=false;
+  if(raw>max&&raw>0){size=Math.max(u*1.5,size*(max/raw));shrunk=true;}
+  x.font=size+'px '+fam;
+  const fin=x.measureText(n).width;
+  return {name:n,rawFrac:+(raw/w).toFixed(3),finalFrac:+(fin/w).toFixed(3),shrunk};
+});
+rows.sort((a,b)=>b.rawFrac-a.rawFrac);
+return {cardW:w, budgetFrac:0.60, widest:rows.slice(0,8), anyOver:rows.some(r=>r.finalFrac>0.605)};

@@ -407,7 +407,17 @@ body{letter-spacing:.045em}
 @keyframes ptCardOut{from{transform:translate3d(0,0,0) rotate(var(--rot,0deg))}
   to{transform:translate3d(0,260%,0) rotate(var(--rot,0deg))}}
 .ptcard .ly{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none;will-change:transform}
-.ptcard .lwho.win{inset:auto;left:-11.9%;top:-3.4%;width:119.8%;height:73.6%;object-fit:fill}
+/* THE BUSTS ARE CUT-OUTS NOW, not full-card images. `.ly` above stretches a
+   layer over the whole card and contains it, which was exactly right when every
+   bust was a 443x802 painting matching the frame. These are trimmed to their
+   own content at twenty-four different sizes, so contain would float each one
+   in the middle of a tall card at whatever scale its aspect happened to give.
+   Anchor them to the bottom of the frame's window instead and let height run
+   free: a taller character stands taller, which is what the art intends. */
+.ptcard .lwho{inset:auto;left:50%;bottom:26%;width:92%;height:auto;
+  transform:translateX(-50%);object-fit:contain}
+.ptcard .lwho.win{inset:auto;left:-11.9%;top:-3.4%;width:119.8%;height:73.6%;
+  bottom:auto;transform:none;object-fit:fill}
 .ptcard .lfront{position:absolute;inset:0;pointer-events:none;will-change:transform}
 .ptcard .lfront .lffg{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
 .ptcard .ctext{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
@@ -14274,7 +14284,14 @@ function _gbBarred(){
 /* ═══ PAINTED ROOM (P22) — main-screen mockup wired to live state ═══ */
 var PT_A='assets/_mockups/new_main/';
 var PT_P='Art/Assets/Frames/Patrons/';
-var PT_ART_POOL=['Krox','Eira','Nebb','Regis'];
+/* the busts live in Characters/ and are served from the optimized copies, the
+   same way every other picture in this game is - the masters are 7.2MB of PNG
+   against 0.9MB of webp, and the phone downloads whichever this points at. */
+var PT_CHAR='Art/Assets/Frames/Patrons/Characters/optimized/';
+var PT_CHAR_EXT='_opt.webp';
+/* ALL of them. This was four names while twenty-four busts sat on disk, so
+   twenty patrons could never appear however long anyone played. */
+var PT_ART_POOL=['Corbin','Dunstan','Eira','Golgoth','Krox','Mudge','Nebb','Nell','Nix','Osgood','Pell','Poll','Rask','Regis','Remny','Rilla','Roan','Sil','Sparr','Squib','Thorne','Tuck','Twill','Vess'];
 var PT_TRAIT={ones:'steady',hoard:'greedy',aggro:'reckless',triples:'strong',straights:'orderly',combo:'cunning'};
 var PT_TRAITDIR='Art/Assets/traits/';
 var PT_COLORS=['green','purple','blue','red'];
@@ -14433,7 +14450,7 @@ function _ptRenderCards(){
       '<div class="cwrap">'
       +'<img class="ly lbg" src="'+PT_P+'bg_'+st.color+'.png?v=2" alt="">'
       +'<img class="ly lback" src="'+PT_P+'frame_bg_'+st.color+'.png?v=2" alt="">'
-      +(st.gone?'':'<img class="ly lwho" src="'+PT_P+st.art+'.png?v=2" alt="">')
+      +(st.gone?'':'<img class="ly lwho" src="'+PT_CHAR+st.art+PT_CHAR_EXT+'" alt="">')
       +'<div class="lfront">'
         +'<img class="lffg" src="'+PT_P+'frame_fg_'+st.color+'.png?v=2" alt="">'
         +'<canvas class="ctext"></canvas>'
@@ -14476,11 +14493,32 @@ function _ptDrawText(card){
     if(st.won)x.fillText('won',w/2,h*.672);
     return;
   }
+  /* SHRINK TO FIT THE SCROLL. The name is whatever the bust's file is called
+     (see the seat mapping above), so it is not a fixed-width label: the pool
+     runs from Sil to Dunstan. Measure, and step the size down only when the
+     name would run past the ends of the banner - anything inside the budget is
+     drawn at exactly the size it always was. 0.60 is the SCROLL, not the card:
+     measured against the frame art, seven-letter names cleared 0.70 and still
+     hung off both ends of the paper. */
   x.fillStyle='#3a2712';x.textAlign='center';x.textBaseline='middle';
-  x.font=(u*2.4)+'px '+fam;
+  var _nmSize=u*2.4, _nmMax=w*0.60;
+  x.font=_nmSize+'px '+fam;
+  var _nmW=x.measureText(st.name||'').width;
+  if(_nmW>_nmMax&&_nmW>0){
+    _nmSize=Math.max(u*1.5,_nmSize*(_nmMax/_nmW));
+    x.font=_nmSize+'px '+fam;
+  }
   x.fillText(st.name,w/2,h*.672);
+  /* the price is drawn left-aligned from 45% across, so it has 55% of the card
+     to live in and a four-figure seat price would run off the edge */
   x.fillStyle='#2e1c0b';x.textAlign='left';
-  x.font=(u*2.5)+'px '+fam;
+  var _pxSize=u*2.5, _pxMax=w*0.42, _pxTxt=String(st.price===undefined?'':st.price);
+  x.font=_pxSize+'px '+fam;
+  var _pxW=x.measureText(_pxTxt).width;
+  if(_pxW>_pxMax&&_pxW>0){
+    _pxSize=Math.max(u*1.6,_pxSize*(_pxMax/_pxW));
+    x.font=_pxSize+'px '+fam;
+  }
   x.fillText(st.price,w*.45,h*.802);
 }
 function _ptRedrawText(){document.querySelectorAll('.ptcard').forEach(_ptDrawText);}
@@ -14512,7 +14550,7 @@ function _ptOpenPanel(st){
   var _pc=PT_BGCOL[st.color]||PT_BGCOL.green;
   var port=document.getElementById('ptPort');
   port.style.background=_pc;
-  port.innerHTML=(st.art?'<img class="pwho" src="'+PT_P+st.art+'.png?v=2" onerror="this.remove()" alt="">':'');
+  port.innerHTML=(st.art?'<img class="pwho" src="'+PT_CHAR+st.art+PT_CHAR_EXT+'" onerror="this.remove()" alt="">':'');
   /* panel-only family name: the given name alone leaves the parchment
      empty. Deterministic per patron (hash of the given name). */
   var _FAMN=['Thistledown','Bramblewick','Copperpot','Underbough','Fernwhistle','Mosscreek',

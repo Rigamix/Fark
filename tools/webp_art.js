@@ -5,7 +5,7 @@
  * and ask for image/webp. Returns data URLs; the caller decodes them to disk, so
  * the bytes never travel any further than the pipe.
  *
- * Output goes to Art/Assets/GameOver/optimized/ as <Name>_opt.webp, which is
+ * Output goes to <that folder>/optimized/ as <Name>_opt.webp, which is
  * this project's established art pipeline - every other art folder has one and
  * the game loads from them directly. The masters beside it are never touched.
  * Re-run this whenever the source art changes.
@@ -14,14 +14,44 @@
  *     | python <decode the setup: line>
  */
 const JOBS = [
-  { dir: 'Art/Assets/GameOver/', files: [
-    ['GameOver_bg.png', 0.82], ['GameOver_banner.png', 0.90],
-    ['GameOver_stat01.png', 0.92], ['GameOver_stat02.png', 0.92],
-    ['GameOver_stat03.png', 0.92], ['GameOver_stat04.png', 0.92] ] },
-  { dir: 'Art/Assets/LastOrders/', files: [
-    ['LastOrders.png', 0.82], ['LastOrders_panel.png', 0.90] ] },
-  { dir: 'Art/Assets/Hearts/', files: [
-    ['heart_full.png', 0.92], ['heart_half.png', 0.92], ['heart_empty.png', 0.92] ] },
+  /* the eight enchant icons: small, high-contrast plaques that get scaled DOWN
+     hard, so quality stays high - artefacts on a 40px icon are very visible. */
+  { dir: 'Art/Assets/Enchants/', files: [
+    ['break.png', 0.92],
+    ['fog.png', 0.92],
+    ['quicksilver.png', 0.92],
+    ['snare.png', 0.92],
+    ['snuff.png', 0.92],
+    ['tithe.png', 0.92],
+    ['trade.png', 0.92],
+    ['ward.png', 0.92] ] },
+  /* the patron busts: large cut-outs behind a frame, the biggest art on the
+     night screen and the most worth shrinking. */
+  { dir: 'Art/Assets/Frames/Patrons/Characters/', files: [
+    ['Corbin.png', 0.86],
+    ['Dunstan.png', 0.86],
+    ['Eira.png', 0.86],
+    ['Golgoth.png', 0.86],
+    ['Krox.png', 0.86],
+    ['Mudge.png', 0.86],
+    ['Nebb.png', 0.86],
+    ['Nell.png', 0.86],
+    ['Nix.png', 0.86],
+    ['Osgood.png', 0.86],
+    ['Pell.png', 0.86],
+    ['Poll.png', 0.86],
+    ['Rask.png', 0.86],
+    ['Regis.png', 0.86],
+    ['Remny.png', 0.86],
+    ['Rilla.png', 0.86],
+    ['Roan.png', 0.86],
+    ['Sil.png', 0.86],
+    ['Sparr.png', 0.86],
+    ['Squib.png', 0.86],
+    ['Thorne.png', 0.86],
+    ['Tuck.png', 0.86],
+    ['Twill.png', 0.86],
+    ['Vess.png', 0.86] ] },
 ];
 
 const load = src => new Promise((res, rej) => {
