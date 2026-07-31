@@ -492,6 +492,13 @@ body{letter-spacing:.045em}
   font-family:'JMH Beda',serif;color:#4b5527;line-height:1.05;white-space:nowrap}
 #ptvName .t1{display:block;font-size:2.6cqh;color:#26170a;position:relative;top:.5cqh}
 #ptvName .t2{display:block;font-size:7cqh;letter-spacing:.02em}
+/* what this patron has to say, under their name. Sized to sit in the gap above
+   the card fan rather than push anything down - the sheet's layout is fixed
+   art, so this has to fit the space that is already there. */
+#ptvSay{position:absolute;left:9%;right:9%;top:42.2%;z-index:2;text-align:center;
+  font-family:var(--bodyFont);color:#5a4326;line-height:1.22;
+  font-style:italic;pointer-events:none;overflow:hidden}
+#ptvSay:empty{display:none}
 #ptvTrait{position:absolute;left:60.5%;top:23.2%;width:15.5%;z-index:3;cursor:pointer}
 #ptvTrait img{width:100%;transition:transform .15s}
 #ptvTrait:active img{transform:scale(1.12)}
@@ -14295,6 +14302,143 @@ var PT_ART_POOL=['Corbin','Dunstan','Eira','Golgoth','Krox','Mudge','Nebb','Nell
 var PT_TRAIT={ones:'steady',hoard:'greedy',aggro:'reckless',triples:'strong',straights:'orderly',combo:'cunning'};
 var PT_TRAITDIR='Art/Assets/traits/';
 var PT_COLORS=['green','purple','blue','red'];
+/* ══ PATRON LORE ═══════════════════════════════════════════════════════════
+   FARK_PATRON_LORE.md, implemented as its own brief demands: ONE resolver,
+   fed different pools. A new patron or a new line is a ROW OF DATA below,
+   never a new code path - that is the answer to "how does this stay clean at
+   thirty patrons instead of six".
+
+   A row is {p:pool, s:minStage, c:[conditions], t:text}.
+     p  'patron:<id>' personal | 'gossip:town' ambient | 'reaction:king' topic
+     s  a FLOOR, not an exact match - a stage-0 line stays eligible forever,
+        which is what lets a deliberately thin patron be complete with one line
+     c  optional, ALL must hold. Only ever a query against state the game
+        already keeps for other reasons; see _DLG_COND.
+     t  the line */
+var _DLG_COND={
+  /* night is the tier plus one, the same arithmetic the rest of the file uses */
+  night_gte:function(a){return ((S&&S.run&&S.run.tier)||0)+1>=+a;},
+  night_lte:function(a){return ((S&&S.run&&S.run.tier)||0)+1<=+a;},
+  boss_beaten:function(a){try{return (S.run.bossesBeaten||[]).indexOf(a)>=0;}catch(e){return false;}},
+  enchant_owned:function(a){try{
+    return (S.run.dieEnch||[]).concat(S.run.dieEnchInv||[])
+      .some(function(e){return e&&e.t===a;});}catch(e){return false;}}
+};
+function _dlgCondOk(row){
+  var cs=row.c;if(!cs||!cs.length)return true;
+  for(var i=0;i<cs.length;i++){
+    var bits=String(cs[i]).split(':'),fn=_DLG_COND[bits[0]];
+    if(!fn||!fn(bits[1]))return false;
+  }
+  return true;
+}
+/* THE RESOLVER. Everything speaks through this.
+   1 gather the pool  2 keep what clears the stage floor and its conditions
+   3 most conditions wins (a conditional override outranks the default beside
+     it)  4 then the highest floor (prefer the most advanced applicable line)
+   5 still tied - pick at random, which the brief asks for by name: "a little
+     variance in what a familiar named patron says on repeat encounters is a
+     small, free improvement, not a gap to close with more ordering rules". */
+function _dlgPick(pool,stage,skip){
+  var live=PATRON_LINES.filter(function(r){
+    if(r.p!==pool)return false;
+    if(stage<(r.s||0))return false;
+    if(skip&&skip[r.t])return false;
+    return _dlgCondOk(r);
+  });
+  if(!live.length)return null;
+  var spec=Math.max.apply(null,live.map(function(r){return (r.c||[]).length;}));
+  live=live.filter(function(r){return (r.c||[]).length===spec;});
+  var flo=Math.max.apply(null,live.map(function(r){return r.s||0;}));
+  live=live.filter(function(r){return (r.s||0)===flo;});
+  return live[Math.floor(Math.random()*live.length)];
+}
+/* What this patron says right now, and the bookkeeping that follows.
+   PERSONAL FIRST, ambient only once a patron's own pool is spent - the brief:
+   "keeps an arc from getting crowded out by ambient texture, while still giving
+   an exhausted patron something live to say instead of repeating themselves".
+   The King pool additionally never repeats a line within a run. */
+function _dlgSay(id){
+  if(!id)return null;
+  try{_getS();}catch(e){return null;}
+  var run=S&&S.run;if(!run)return null;
+  run._dlgStage=run._dlgStage||{};run._dlgHeard=run._dlgHeard||{};
+  var key=String(id).toLowerCase(),stage=run._dlgStage[key]||0;
+  var row=_dlgPick('patron:'+key,stage,null);
+  if(!row)row=_dlgPick('reaction:king',stage,run._dlgHeard);
+  if(!row)row=_dlgPick('gossip:town',stage,null);
+  if(!row)return null;
+  /* one operation, no branching, whichever line fired - per the brief */
+  run._dlgStage[key]=stage+1;
+  if(row.p.indexOf('reaction:')===0)run._dlgHeard[row.t]=1;
+  try{save();}catch(e){}
+  return row.t;
+}
+/* ── THE LINES. Data only. ──
+   Written content is from FARK_PATRON_LORE.md; nothing here is invented. The
+   doc flags full multi-stage ladders for all 24 as a separate later pass, so
+   patrons it gives no personal line to simply fall through to the ambient
+   pools, which is the system working as designed rather than a gap. */
+var PATRON_LINES=[
+  /* Grog's regulars - they have sat his table before, canonically */
+  {p:'patron:nebb',s:0,t:"Not her. Never her. Ask again and I'll charge you for the insult."},
+  /* the hoofed thread - Rilla names Osgood by RELATION only, never by look:
+     the vague-reference rule keeps the lore safe to write ahead of the art */
+  {p:'patron:rilla',s:0,t:"He'll tell you he was a soldier. Ask him which war and watch him change the subject."},
+  /* the feline four, deliberately not a friend group */
+  {p:'patron:sil',s:0,t:"No curse. Bad luck and worse ale. I can't fix either, but I can charge you for trying."},
+  /* rodents */
+  {p:'patron:squib',s:0,t:"She taught me everything I know and still cleans me out. Tell me that's fair."},
+  {p:'patron:tuck',s:0,t:"Tell whoever's been talking up her stew that the bread's the real work. Always has been."},
+  /* aquatic - Mudge contradicts the town gossip pool on purpose, two
+     unverifiable sources rubbing against each other */
+  {p:'patron:mudge',s:0,t:"Whatever they're saying about the bridge in here, downriver says different. Believe whichever suits you."},
+  {p:'patron:nix',s:0,t:"Don't sit near me on a cold streak. I only carry the one kind of luck and it's not the Roller's."},
+  {p:'patron:poll',s:0,t:"Heard the bridge is fixed. Or burned. One of the two, m' sure."},
+  /* standalones. Golgoth is the most imposing design in the set and is given
+     almost nothing to say on purpose - the same subversion as the curse joke */
+  {p:'patron:golgoth',s:0,t:"...No, go on. I was only sitting."},
+  {p:'patron:remny',s:0,t:"You were here Tuesday too. Don't tell me you weren't, I remember faces."},
+
+  /* ── AUTHORED, NOT YET SEATABLE ──
+     The seed six have no portrait, and a seat's name is its portrait's
+     filename, so none of these can be drawn today. Kept because the content is
+     written and because Ferrand's pair IS the brief's worked example of the
+     specificity rule: with Grog alive only the first survives; once he is
+     beaten both do, and the one carrying a condition wins on specificity - the
+     right line, from data alone, with no code that knows who Ferrand is. */
+  {p:'patron:ferrand',s:0,t:"Boot's mine. Bruiser owes me that much and worse besides."},
+  {p:'patron:ferrand',s:0,c:['boss_beaten:grog'],t:"Someone beat me to it. Fark."},
+  {p:'patron:ferrand',s:0,t:"A King wants a game, he can find me. I don't run from crowns any more than blades."},
+  {p:'patron:odo',s:0,t:"Aye, cursed. Cursed by geography, mate. No bath house on the traplines. Sit if you dare."},
+  {p:'patron:hollis',s:0,t:"Every coin twice bought, twice spent, twice worried over. I'll have my shield yet."},
+  {p:'patron:hollis',s:1,t:"Owe the trapper a little still. He's not one to forget it, either."},
+  {p:'patron:fenn',s:0,t:"Careful with the bone ones. Mine chip if you look at them wrong."},
+  {p:'patron:tam',s:0,t:"Her stew alone's worth the losing. Don't tell her I said the losing part."},
+
+  /* ── THE TOWN: THISTLEFORD. Thin on purpose - the tavern is the stage. ── */
+  {p:'gossip:town',s:0,t:"Green Fair's near enough you can smell it. If the frost lets the orchards be."},
+  {p:'gossip:town',s:0,t:"Millstone Bridge still out. Third year the council's sworn it'll be fixed by spring."},
+  {p:'gossip:town',s:0,t:"Frost took the early plantings. Good thing about a bad frost - cheap talk, that's all it costs you."},
+
+  /* ── THE KING. An ensemble of reactions, not a thread with a status.
+     The brief killed the escalating-thread version outright: one voice
+     reporting fixed status on a fixed schedule becomes recognised noise by a
+     player's tenth run. Many independent voices on one topic does not, because
+     the replay value is WHICH patron is drawn and how they take it. No order,
+     no escalation, mostly no resolution. ── */
+  {p:'reaction:king',s:0,t:"If he so much as brushes past me, I'm never washing this sleeve again."},
+  {p:'reaction:king',s:0,t:"Kings don't travel light, they say. Question is whether any of it's meant for spending in here."},
+  {p:'reaction:king',s:0,t:"A King, in Thistleford. Next you'll tell me the Roller pays her tabs."},
+  {p:'reaction:king',s:0,t:"If he does come, someone'll have to sweep. Won't be me, and it won't be you either, so who's left, then?"},
+  {p:'reaction:king',s:0,t:"A King's guard's purse is still a purse. Just saying."},
+  {p:'reaction:king',s:0,t:"Kings drink same as anyone once they're three cups in. Seen it before, don't much care to see it again."},
+  {p:'reaction:king',s:0,t:"Can't say what I'd even do. Bow, I s'pose. Never bowed to anyone in my life."},
+  {p:'reaction:king',s:0,t:"Bet the whole house on it being true. Bust-handed fool that I am."},
+  /* the one temporal note, and still just another opinion rather than a status
+     update superseding the others */
+  {p:'reaction:king',s:0,c:['night_gte:6'],t:"Season's near out and still no King. Told you lot. Told you."}
+];
 var _ptOpen=false,_ptSeats=[];
 function _ptLayout(n){
   /* card fan: width + left/top/rot per seat count (mockup tuned for 4) */
@@ -14382,6 +14526,7 @@ function _ptRoom(host,tier,bossReady){
       +'<img class="bgimg" src="Art/Assets/Panels/optimized/SitDown_panel_bg_opt.webp" alt="">'
       +'<div id="ptvWins"></div>'
       +'<div id="ptvName"></div>'
+      +'<div id="ptvSay"></div>'
       +'<div id="ptvDice"></div>'
       +'<div id="ptvTrait"></div>'
       +'<div id="ptvXtra"></div>'
@@ -14565,6 +14710,27 @@ function _ptOpenPanel(st){
   document.getElementById('ptvName').innerHTML=
     '<span class="t2" style="color:#241505;font-size:'+_nfs+'cqh">'+_gn
     +' <span style="color:'+_pc+'">'+_sn+'</span></span>';
+  /* one call, and it does not care who the patron is */
+  (function(){
+    var sayEl=document.getElementById('ptvSay');if(!sayEl)return;
+    var line=null;try{line=_dlgSay(st.art);}catch(e){line=null;}
+    sayEl.textContent=line?('\u201c'+line+'\u201d'):'';
+    /* FIT THE GAP. The sheet is fixed art - the name ends around 42% and the
+       card fan starts just under 47%, so a line has that band and no more.
+       Lines are authored prose of any length, so measure and step down rather
+       than pick a size that suits whichever line is longest today. */
+    if(line){
+      var sheet=document.getElementById('ptPanelSheet');
+      var H=(sheet?sheet.getBoundingClientRect().height:0)||0;
+      if(H>0){
+        var band=H*0.049, px=H*0.0205, floor=H*0.0125, guard=14;
+        sayEl.style.fontSize=px+'px';
+        while(sayEl.scrollHeight>band&&px>floor&&guard-->0){
+          px-=H*0.0012;sayEl.style.fontSize=px+'px';
+        }
+      }
+    }
+  })();
   var trt=document.getElementById('ptvTrait');
   trt.classList.remove('show');
   var _wl='';
