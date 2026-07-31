@@ -16780,8 +16780,14 @@ var BREAK_TRIGGERS={
         setTimeout(function(){try{_delayedDoBust(free);}catch(e){}},280);
       }
     }catch(e){}}},
+  /* Takes what the rival BANKED on their last turn - nothing if they busted
+     it away. Break only ever fires on the player's turn, so there is no live
+     rival total to read; see G._oLastBank in finOpp. The MAGNITUDE is still
+     unvalidated (brief section 2 calls every row but Obsidian's a proposal,
+     open item 5.4 asks for the harness pass) - this makes the row mean
+     something measurable, it does not show the number is right. */
   vagabond:{msg:'VAGABOND TAKES WHAT THEY HELD',fire:function(){
-    var steal=Math.max(0,G._oUnbanked||0);
+    var steal=Math.max(0,G._oLastBank||0);
     if(steal>0){G.turnPts=(G.turnPts||0)+steal;
       G.kept.push({vals:[],mat:'vagabond',pts:steal,dice:[]});
       try{updHUD();refreshKeptTray();}catch(e){}}
@@ -25158,7 +25164,6 @@ function runOppTurn(){
       crowsCtx.crowsLuckFiredThisRoll=false;
       var{total,used,context:newCtx}=scoreRoll(_fogV,G.oCards,oppBank,crowsCtx,_fogM);crowsCtx=newCtx||crowsCtx;
       if(crowsCtx.crowsLuckFiredThisRoll)triggerCard('crows_luck',"CROW'S LUCK — STRAIGHT DOWNGRADED",true);
-      G._oUnbanked=oppBank;/* what Vagabond's break-trigger steals */
       /* SNARE: their die in the marked seat is halved once if it scores
          during this turn. The mark then clears whether it fired or not -
          "until it fires" tested at 97.7% inside six turns, which is not a
@@ -26205,6 +26210,16 @@ function runOppTurn(){
       else if(G.pCards.includes('thieves_luck')&&pts>0&&pts<250){G.pPts+=pts;triggerCard('thieves_luck','STOLE '+pts.toLocaleString(),true);}
       else{G.oPts+=pts;_npcActuallyBanked=true;setStatusMsg((G.rung?G.rung.name:'RIVAL')+' BANKED '+pts.toLocaleString(),'active');if(window.DLG&&pts>=600)DLG.trigger('OPP_BIG_BANK');}
       famFire('bank',{actor:'o',amt:pts});
+      /* WHAT THE RIVAL KEPT, for Vagabond's Break row to take off them. Every
+         badge and card adjustment to `pts` has landed by here, so this is the
+         real figure rather than a running total mid-turn. Zero when they
+         busted, and zero when the bank was escrowed rather than credited -
+         they held nothing either way, which is what the row's own message
+         says. Recorded on the same flag and at the same moment Reckoning
+         records its own last-bank two lines below; the old field was written
+         inside the roll loop, a roll early, and never cleared, so it paid out
+         after a bust for points the rival had already lost. */
+      G._oLastBank=(_npcActuallyBanked&&pts>0)?pts:0;
       /* TELL: Reckoning (Ambrose) — record his last bank only if he actually scored it */
       if(_npcActuallyBanked&&_ruleActive('reckoning','p')&&pts>0){
         G._tellState.lastNpcBank=pts;
