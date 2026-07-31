@@ -5575,6 +5575,33 @@ body::before,body::after{display:none!important}
 .lo-die .dc.dot{border-radius:0;background:var(--dpip);width:70%;height:70%;margin:15%}
 /* ── Die tooltip wrapper ── */
 .lo-dw{position:relative;display:inline-block}
+/* A DIE THAT IS OUT FOR THE REST OF THIS MATCH KEEPS ITS SEAT. Break,
+   Obsidian's shatter, an NPC seizure and Sacrifice all splice matchDice, and
+   this row used to render whatever survived - five dice, no gap, nothing to
+   say a sixth ever stood there. A hand that is quietly one die short is the
+   state lying to the player (brief 4b, missing-die visibility), so the seat
+   stays behind as an empty socket, tagged OUT, answered by the note under the
+   row.
+   AN EMPTY SOCKET, NOT A GREYED DIE, and that is measured rather than taste.
+   A loadout-panel die is a `.die.d3on` inside #screen-match, so D3X.syncMatch
+   hoists it onto the WebGL mesh and sets its own DOM slot to visibility:hidden
+   (probe: slotComputedVisibility "hidden", _d3xOwned true, one D3X entry per
+   panel die). A CSS filter or opacity on that element therefore greys
+   something nobody can see. The socket is plain DOM, so it is the one thing in
+   this row certain to draw, and it borrows the lost die's own --dborder2
+   through the dtype- class on the wrapper, so the seat still reads as THAT
+   die's seat. 41px is the size .lo-dice-row .die is locked to with
+   !important, so the socket sits exactly where a die would. */
+.lo-out-seat{width:41px;height:41px;border-radius:3px;
+  border:2px dashed var(--dborder2,#5a4a34);background:rgba(0,0,0,.30);
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.5);opacity:.75}
+.lo-out-tag{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  font-size:8px;letter-spacing:1px;color:#e0705a;background:rgba(10,7,5,.88);
+  border:1px solid #5a2e26;padding:1px 3px;pointer-events:none;z-index:3;white-space:nowrap}
+/* spans all three columns of .lo-dice-row's grid, so it centres under the row
+   rather than taking a die's cell */
+.lo-out-note{grid-column:1/-1;text-align:center;font-size:9px;letter-spacing:1px;
+  color:#e0705a;opacity:.9;margin-top:3px}
 .lo-dw.peeked{z-index:9999}
 /* ── Die tooltip (inline 3D preview) ── */
 .die-tooltip{
@@ -9185,7 +9212,31 @@ function _famDiceMigrate(){
   /* the law: exactly six dice, always — heal short arrays from older
      builds (and keep the enchant array in step) */
   if(Array.isArray(S.run.dice)&&S.run.dice.length<6){
+    /* A SHORT LOADOUT IS A LEGACY BREAK, AND IT MUST NOT HEAL IN SILENCE.
+       Break used to splice S.run.dice for good (removal is match-scoped now)
+       and it recorded nothing: material, brand and lane all went with the die,
+       and every seat after the gap slid down one. Measured: such a save plays
+       five-die matches until the shop or the loadout opens, at which point the
+       line below pushed a plain 'bone' onto the END and the loss vanished
+       without a trace - gold 100 before, 100 after, no log line, the pad
+       landing at the tail rather than at the seat that emptied.
+       Exact restoration is impossible, so this does what the _enchV pass
+       already does for a retired mechanic and REFUNDS - brief 4b's flat 450g
+       per missing die, which approximates the average family-die cost, no
+       exact price being recoverable. The bone still goes in, because six dice
+       is the law; what changes is that it is now a bone the player was PAID
+       for rather than a silent substitute for whatever they actually owned.
+       Only a legacy save can reach this: a fresh run is built from _boneDice,
+       six of them, and every live path that splices S.run.dice re-pads it in
+       the same statement. The save() two lines below persists the gold. */
+    var _lostDice=6-S.run.dice.length;
     while(S.run.dice.length<6)S.run.dice.push('bone');
+    if(_lostDice>0){
+      var _lostG=450*_lostDice;
+      S.run.gold=(S.run.gold||0)+_lostG;
+      try{famLog('THE INNKEEP MAKES GOOD ON '+_lostDice+' BROKEN '
+        +(_lostDice>1?'DICE':'DIE')+' — +'+_lostG+'g');}catch(e){}
+    }
     if(Array.isArray(S.run.dieEnch))while(S.run.dieEnch.length<6)S.run.dieEnch.push(null);
     try{save();}catch(e){}
   }
@@ -9873,6 +9924,11 @@ function saveMatchState(){
        and every lane past the gap wore its neighbour's brand. This snapshot
        is the only record of the live array. */
     _enchArr:[...(G._enchArr||[])],
+    /* THE OUT-DICE RECORD, for the same reason as _enchArr above. This
+       function rebuilds S.pendingMatch whole, so without this line the next
+       turn boundary would quietly drop what _removeDieAt wrote mid-turn and
+       the resumed match would show a five-die loadout with no gap in it. */
+    _diceOut:(G._diceOut||[]).map(function(o){return{lane:o.lane,mat:o.mat,ench:o.ench};}),
     /* THE LIVE FAIR TRADE LOAN. Always null HERE - this snapshot is only ever
        taken at a turn boundary, and startPTurn expires the loan long before
        its last line calls this. It is in the shape anyway because
@@ -13107,6 +13163,20 @@ CFX.sacrifice={
       d.el.classList.add('die-shatter');
       (function(el){setTimeout(function(){if(el&&el.parentNode)el.remove();},360);})(d.el);}
     if(G.numDice>1)G.numDice--;
+    /* THE SAME RECORD A BREAK LEAVES - this splice is match-scoped too
+       (S.run.dice is untouched and newG rebuilds matchDice from the run), so
+       the sacrificed die is back at the next match and the loadout panel must
+       show its seat rather than quietly rendering five. Written before the
+       splice. The seat is found by indexOf(d.mat), so it is the first die of
+       that material and not necessarily the one that shattered - pre-existing,
+       and not this record's to fix; the material is right either way, which is
+       all the seat and the note draw. */
+    try{
+      var _sacL=Array.isArray(G.matchDice)?G.matchDice.indexOf(d.mat):-1;
+      if(_sacL>=0)G._diceOut=(G._diceOut||[]).concat([{
+        lane:_sacL,mat:d.mat,
+        ench:(G._enchArr&&_sacL<G._enchArr.length)?(G._enchArr[_sacL]||null):null}]);
+    }catch(e){}
     if(Array.isArray(G.matchDice)){var mi=G.matchDice.indexOf(d.mat);if(mi>=0)G.matchDice.splice(mi,1);}
     G.pool=G.pool.filter(function(x){return x!==d;});
     var P=famDef('sacrifice').p[inst.tier-1];
@@ -17452,19 +17522,35 @@ var BREAK_TRIGGERS={
     var free=G.pool.filter(function(d){return !d.committed;});
     free.forEach(function(d){d.val=_rollD(d);d.sel=false;try{reDrawDieFace(d);}catch(e){}});
     try{refreshSelUI();}catch(e){}
-    /* THE SCATTER CAN LAND DEAD. It re-rolls every free die and then handed
-       control back regardless - so a scatter into a row with nothing scoring
-       left both buttons dead and no bust coming: a hard lock with no way out.
-       Same test afterRoll uses on any other roll. */
-    try{
-      var _jc=effectiveCards();
-      var _jv=free.map(function(d){return d.val;});
-      var _jm=free.map(function(d){return d.mat;});
-      if(!anyScoring(_jv,_jc,_jm,free)&&
-         !(typeof _anchorRescues==='function'&&_anchorRescues(_jc))){
-        setTimeout(function(){try{_delayedDoBust(free);}catch(e){}},280);
-      }
-    }catch(e){}}},
+    /* NO DEAD-HAND CHECK HERE, AND THE REMOVAL IS THE FIX. _breakDie's tail
+       resumes the roll Break interrupted, and handleRoll re-rolls every free
+       die on top of this scatter - measured on the real path, the free dice
+       went [2,1,4,3] -> [3,1,2,4] here and then [2,3,6,5] 320ms later. So the
+       hand this row used to test was already gone by the time the test paid
+       out. Measured again on the live build: the check fired _delayedDoBust
+       BEFORE the resumed roll reached afterRoll, in both cases tried -
+       including the case where the broken die was the LAST free one, where
+       there is nothing to scatter at all and it still claimed a bust against
+       the fresh six the resumed roll was about to award as hot dice.
+       afterRoll is the ONE authoritative bust check and the only one that
+       runs the full save chain - famFoolsGold, then _tryBustSave, then
+       doBust - so duplicating it here skipped both, and a player holding Iron
+       Stomach, Martyr or Fool's Gold lost a save they owned. The resumed roll
+       ALWAYS gets there: _breakBegin returns out of handleRoll above the
+       `G.phase='rolling'` line, so the tail's `phase==='choosing'` gate is
+       still true and _rollLocked is still false - measured, both cases.
+       THE ROW IS STILL WORTH NOTHING, and that is a DESIGN question, not a
+       code one. A scatter immediately overwritten by the roll it interrupted
+       is statistically one roll, so brief section 2's "one free full reroll,
+       no cost" has nothing to show for itself yet. Both ways of paying it out
+       were costed and rejected here rather than guessed at. Claiming the
+       resumed roll drops turnRollCount and the whole of afterRoll with it -
+       Drill Order's allowance, Steeped, Pickpocket, every Obsidian die's
+       per-roll shatter check - which is a tax, not a free reroll. Throwing a
+       SECOND scatter once the paid roll settles is the other reading, and it
+       is a real power increase on a row the brief itself files as an
+       unvalidated proposal. Either one needs the harness pass brief open item
+       5.4 asks for before this verb changes. */}},
   /* Takes what the rival BANKED on their last turn - nothing if they busted
      it away. Break only ever fires on the player's turn, so there is no live
      rival total to read; see G._oLastBank in finOpp. The MAGNITUDE is still
@@ -17576,6 +17662,28 @@ function _removeDieAt(lane,opts){
       return true;
     }
   }catch(e){}
+  /* THE RECORD OF WHAT LEFT, because the splice below is the only moment
+     anything knows a die went. After it the loadout is simply one shorter,
+     with nothing to say which seat emptied or what stood in it - measured, the
+     mid-match loadout panel rendered five dice and no gap of any kind. The run
+     array cannot answer it either: removal is match-scoped now, so S.run.dice
+     still holds six, and a bare length difference carries no material, which
+     is the one thing the panel needs to name the die. So it is written HERE,
+     the choke point Break and Obsidian's natural shatter both pass through,
+     and it lives on G and dies with the match, exactly like _ftDead. Brief 4b:
+     a die gone until the player's next match must be shown as such, never
+     silently absent.
+     Gated on the same test as the splice, so the record and the gap can never
+     disagree. The Fair-Trade branch above needs nothing - it returns early,
+     the lane keeps its own die and the player stays at six.
+     `lane` is the seat AS IT STOOD AT REMOVAL. The splice renumbers every seat
+     after it, so that number is a note of where the die was, not a live index
+     - which is why the panel names the die and never the seat. */
+  try{
+    if(G.matchDice&&lane<G.matchDice.length)G._diceOut=(G._diceOut||[]).concat([{
+      lane:lane,mat:G.matchDice[lane],
+      ench:(G._enchArr&&lane<G._enchArr.length)?(G._enchArr[lane]||null):null}]);
+  }catch(e){}
   if(G.matchDice&&lane<G.matchDice.length)G.matchDice.splice(lane,1);
   if(G._enchArr&&lane<G._enchArr.length)G._enchArr.splice(lane,1);
   /* DECREMENT. Assigning matchDice.length here refunded every per-turn dice
@@ -17633,6 +17741,11 @@ function _removeDieAt(lane,opts){
       S.pendingMatch._enchArr=[...(G._enchArr||[])];
       S.pendingMatch.numDice=G.numDice;
       S.pendingMatch._fairTrade=G._fairTrade?{...G._fairTrade}:null;
+      /* and the out-dice record with them, for the same reason the dice fields
+         are here: a resume that lost it would show a five-die loadout with
+         nothing missing, which is the exact lie the record exists to stop.
+         Copied entry by entry so the snapshot never aliases live G. */
+      S.pendingMatch._diceOut=(G._diceOut||[]).map(function(o){return{lane:o.lane,mat:o.mat,ench:o.ench};});
       save();
     }
   }catch(e){}
@@ -17693,7 +17806,30 @@ function _breakDie(d){
      gone or the bank would count a die that no longer exists. */
   var _bankNow=G._breakBankNow||G._breakThenBank;
   G._breakBankNow=false;G._breakThenBank=false;
-  if(_bankNow){setTimeout(function(){try{handleBank();}catch(e){}},260);return;}
+  if(_bankNow){var _bkG=G;setTimeout(function(){try{
+    /* A CASH-OUT OF NOTHING IS STILL AN END. handleBank refuses a total of 0
+       and returns without ending anything, so breaking a Silver die before
+       this turn had banked a point left the turn running with BOTH buttons
+       dark. Measured, not reasoned: phase 'choosing', ROLL dead, BANK dead,
+       four dice still on the table with no scorer among them - no legal move
+       and no way out of the match. The identical lock sits on _breakThenBank,
+       the BANK press that cast the brand: it re-enters handleBank with
+       nothing selected, so _bkCast is false on that second call and even
+       handleBank's own carry-on branch is out of reach.
+       Silver's row promises "banks the current turn's total as-is, ending the
+       turn, guaranteed", so when there is nothing to bank the table is handed
+       over the way any scoreless turn hands it over - the same two exits
+       _zeroHourClose already reasons about, for the same reason, and they
+       take the same ghost-timer guard: G is reassigned on a new match, so a
+       260ms timer can otherwise land inside one. */
+    if(!G||G!==_bkG||G._endMatchFired)return;
+    var _tp=(G.kept||[]).reduce(function(a,k){return a+(k.pts||0);},0)+(G._stakesRisingBonus||0);
+    if(_tp>0){handleBank();return;}
+    try{clearRow('playerDiceRow');}catch(e){}
+    G.pool=[];
+    try{setBtns(false,false);}catch(e){}
+    try{endPTurn();}catch(e){}
+  }catch(e){}},260);return;}
   setTimeout(function(){try{if(G&&G.phase==='choosing')handleRoll();}catch(e){}},320);
 }
 /* A die's LANE: its left-to-right seat in the loadout, which is the order
@@ -17769,6 +17905,39 @@ function _enchInit(){
     var _pm=S.pendingMatch;
     if(_pm)_scrub(_pm._enchArr,_pm.matchDice,false);
     S.run._enchV=3;try{save();}catch(e){}
+  }
+  /* LEGACY TRADE, ON ITS OWN VERSION KEY. The old run-scoped Trade wrote the
+     rival's material straight into S.run.dice[lane] and deliberately left the
+     brand behind on the seat, so a save from it carries a die the player never
+     owned and no record at all of the one it replaced - exact restoration is
+     impossible, the same as Break's case above. Nothing distinguishes a trade
+     brand that FIRED from one that never did: measured, no marker key exists
+     anywhere in S.run, and the rival's materials come from the same catalogue
+     as the player's. So every trade brand is cleared and refunded at its own
+     known price, 350g (brief 4b - more precise than Break's, because here the
+     data allows it). That is the honest reading of an ambiguous save in both
+     directions: a brand that never fired loses nothing by being bought again,
+     and one that did fire is at least paid for.
+     ITS OWN KEY, not a bump of _enchV, and deliberately so: _enchV=2 is the
+     cut-enchant pass above and the illegal-face brand refund is due to land on
+     that same block. Two migrations sharing one integer means whichever ships
+     second silently never runs, on every save the first one already stamped.
+     A separate guard makes the two independent in either order. */
+  if(S.run._enchTradeV!==1){
+    var _tradeBack=0;
+    ['dieEnch','dieEnchInv'].forEach(function(key){
+      (S.run[key]||[]).forEach(function(e,i){
+        if(e&&e.t==='trade'){_tradeBack+=350;S.run[key][i]=null;}
+      });
+    });
+    if(_tradeBack>0){
+      S.run.gold=(S.run.gold||0)+_tradeBack;
+      /* its own line, not folded into the refund above: that one says the work
+         is no longer done, which is true of a cut enchant and false of Trade -
+         Trade still exists, it is this SAVE's record of it that cannot stand */
+      try{famLog('THE INNKEEP RETURNS '+_tradeBack+'g — THAT TRADE WAS STRUCK UNDER THE OLD BOOK');}catch(e){}
+    }
+    S.run._enchTradeV=1;try{save();}catch(e){}
   }
   while(S.run.dieEnch.length<(S.run.dice||[]).length)S.run.dieEnch.push(null);
   S.run.dieEnch.length=(S.run.dice||[]).length;
@@ -22836,6 +23005,21 @@ function startPTurn(){
       var dieRank2=dieRank;
       var pBestIdx3=0;G.matchDice.forEach(function(d,i){if(dieRank2(d)>dieRank2(G.matchDice[pBestIdx3]))pBestIdx3=i;});
       var stolen=G.matchDice[pBestIdx3];
+      /* THE SAME RECORD A BREAK LEAVES. Both modes below splice matchDice and
+         neither touches S.run.dice, so a seized die is back at the next match
+         exactly like a Broken one - newG rebuilds matchDice from the run.
+         Without this the mid-match loadout panel renders five dice and no gap,
+         which is the silent absence brief 4b forbids, and by the time the
+         player thinks to look the SEIZED pop has long faded. Written BEFORE
+         the splice, which is what destroys the evidence, and guarded on
+         `stolen` so an empty loadout cannot invent a seat that never held
+         anything. One write covers both modes: take_best and take_and_use are
+         the only two the card data defines and both splice this same seat. */
+      try{
+        if(stolen)G._diceOut=(G._diceOut||[]).concat([{
+          lane:pBestIdx3,mat:stolen,
+          ench:(G._enchArr&&pBestIdx3<G._enchArr.length)?(G._enchArr[pBestIdx3]||null):null}]);
+      }catch(e){}
       if(eff.mode==='take_best'){
         /* Remove die — player plays with 5 */
         G.matchDice.splice(pBestIdx3,1);
@@ -24160,9 +24344,13 @@ function doBust(){
      the only dispatch would have disappeared with it, and the brief KEEPS
      Retort and Reprisal. */
   var _bustLost=(G.kept||[]).reduce(function(a,k){return a+(k.pts||0);},0);
-  try{famFire('bust',{actor:'p',lost:_bustLost});}catch(e){}
   /* AMBER's break-trigger: this turn simply cannot bust. Checked before
-     anything is cleared, so the turn continues untouched. */
+     anything is cleared, so the turn continues untouched - and BEFORE the bust
+     EVENT below, which is the half that was wrong. famFire('bust') is what pays
+     Retort, Reprisal, slow_cook and fools_gold; firing it two lines above this
+     check meant every one of them collected on a bust that never happened,
+     while the player kept the turn AND its points. A turn Amber says cannot
+     bust has to look that way to the cards listening for one. */
   if(G._bustImmuneTurn){
     try{setStatusMsg('AMBER HOLDS — NO BUST','gold');famLog('AMBER — THE TURN SURVIVES');}catch(e){}
     var _amFree=G.pool.filter(function(d){return !d.committed;});
@@ -24189,6 +24377,9 @@ function doBust(){
     try{refreshSelUI();}catch(e){}
     return;
   }
+  /* THE bust event, on the path where a bust actually happened. Everything
+     above either returned or continued the turn. */
+  try{famFire('bust',{actor:'p',lost:_bustLost});}catch(e){}
   /* THE BUST TOLLS. Ill Omen and Whisper's Fang, hoisted out of the
      Silver-shield branch that used to be their only home. That branch ran
      ONLY when a shield BLOCKED the bust, so on every real bust the rival's
@@ -28467,6 +28658,44 @@ function toggleLoadoutPanel(){
     attachDieTooltipTap(wrap,mat);
     pd.appendChild(wrap);
   });
+  /* THE GAP, SHOWN (brief 4b: a die gone until the player's next match must
+     never be silently absent). matchDice is spliced whenever a die leaves for
+     the match, so this row simply rendered whatever was left - measured, five
+     dice and no gap of any kind, indistinguishable from a six-die hand the
+     player misremembered. G._diceOut is the record every match-scoped removal
+     now leaves behind; each die that is out keeps its seat here as an empty
+     socket, and the note under the row names the clock and the die.
+     Deliberately NOT derived from an S.run.dice-vs-matchDice length
+     difference: the run still holds six (removal is match-scoped), so the
+     difference is a bare count with no material - and the note needs a
+     material to name the die. Every producer writes the record instead:
+     _removeDieAt for Break and Obsidian's shatter, steal_die and Sacrifice
+     for theirs.
+     The wording is cause-neutral on purpose. All four leave the player one die
+     short for this match and whole for the next - none of them touches
+     S.run.dice, and newG rebuilds matchDice from it - so all four mean the
+     same thing to the player looking at this row. */
+  var _diceOutNow=(G&&G._diceOut)||[];
+  _diceOutNow.forEach(function(o){
+    var w=document.createElement('div');
+    w.className='lo-dw lo-dw-out dtype-'+(o.mat||'bone');w.dataset.mat=o.mat||'bone';
+    var seat=document.createElement('div');seat.className='lo-out-seat';
+    w.appendChild(seat);
+    var tg=document.createElement('span');tg.className='lo-out-tag';tg.textContent='OUT';
+    w.appendChild(tg);
+    /* the tooltip is built from the material id, not from any die inside the
+       wrapper, so tapping an empty seat still names the die missing from it */
+    attachDieTooltipTap(w,o.mat||'bone');
+    pd.appendChild(w);
+  });
+  if(_diceOutNow.length){
+    var _outWho=(_diceOutNow.length===1)
+      ?(((getDie(_diceOutNow[0].mat)||{}).name)||'ONE DIE')
+      :(_diceOutNow.length+' DICE');
+    var _outNote=document.createElement('div');_outNote.className='lo-out-note';
+    _outNote.textContent=_outWho+' OUT — BACK NEXT MATCH';
+    pd.appendChild(_outNote);
+  }
   // Player cards
   const pc=document.getElementById('mLoPCards');pc.innerHTML='';
   pc.classList.toggle('many-slots',G&&G.pCards&&G.pCards.length>3);
@@ -29801,6 +30030,18 @@ function initMatchScreen(data){
   G._enchArr=(Array.isArray(_rdEnch)&&_rdEnch.length===(G.matchDice?G.matchDice.length:0))
     ?_rdEnch.slice()
     :((S&&S.run&&S.run.dieEnch)?S.run.dieEnch.slice():[]);
+  /* THE OUT-DICE RECORD, restored behind the SAME length test, because it is
+     only true of the snapshot's own loadout. A mirror_match resume re-seeds
+     matchDice from rung._mirrorOppDice a few lines above and throws the
+     snapshot's shorter loadout away; restoring the record anyway would then
+     draw six live dice AND the out die's empty seat - seven seats, the same
+     lie in the opposite direction. Failing the test means the snapshot's
+     loadout is not the one in force, so there is no gap left to explain.
+     Snapshots written before this field existed resume with an empty record
+     and simply show no gap, which is the pre-patch behaviour, not a crash. */
+  var _rdOut=params&&params._resumeData&&params._resumeData._diceOut;
+  G._diceOut=(Array.isArray(_rdOut)&&Array.isArray(_rdEnch)
+    &&_rdEnch.length===(G.matchDice?G.matchDice.length:0))?_rdOut.slice():[];
   /* And the live LOAN, for the same reason - see saveMatchState. Restored
      BEFORE startPTurn runs (it is called on a timer at the end of this
      function), so the expiry block finds the borrowed die in its seat, hands
