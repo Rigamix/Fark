@@ -17581,6 +17581,12 @@ var BREAK_TRIGGERS={
          points, and it roughly doubles the row's swing, which is why #7 raises
          the priority of its harness pass rather than treating this as settled. */
       G.oPts=Math.max(0,(G.oPts||0)-steal);
+      /* SPENT. The row takes "the opponent's most recently completed turn's
+         bank" - one bank, once. G._oLastBank is written when their turn
+         resolves and was never cleared when it was taken, so two Break dice in
+         a turn both stole the same money, each crediting the player and
+         debiting the rival again. */
+      G._oLastBank=0;
       try{updHUD();refreshKeptTray();}catch(e){}}
     try{famLog(steal>0?('STOLE '+steal+' FROM THEIR HAND'):'THEY HELD NOTHING TO TAKE');}catch(e){}}}
 };
@@ -23239,18 +23245,24 @@ function handleRoll(){
        anchor firing - unless the selection carries an icon, which is a legal
        keep worth nothing by design. */
     if(_scoreDice.length===0&&_iconSel.length)pts=0;
-    /* A BRAND NEVER POISONS THE KEEP. pts<0 here is the engine refusing the
-       NON-icon half of the selection - a die it cannot use on its own. This
-       path answered NO SCORE for that keep while the preview lit both buttons
-       and handleBank went ahead and committed it, so the roll commit was the
-       one surface of three telling a different story. The direction is ruled,
-       not inferred: AUDIT_RESOLUTIONS item 18 answers "commit accepts and
-       scores the non-icon part" - zero is the CORRECT value for an icon
-       component, not an error state, so a brand dragged into a dead selection
-       contributes nothing rather than invalidating the whole keep. Pinning to
-       0 here is what lets the reject line below accept it; a selection with no
-       icon in it is untouched and still refused exactly as before. */
-    if(pts<0&&_iconSel.length)pts=0;
+    /* THE SWEEP LIVED HERE: `if(pts<0&&_iconSel.length)pts=0;`, removed.
+       _selVals is built from _splitIcons(selDice).rest, so it is ALREADY the
+       non-icon half - which means pts<0 says THAT half is illegal on its own,
+       and forgiving it accepted the whole selection. One branded die therefore
+       legalised committing every other die on the table for nothing, emptying
+       the pool and triggering hot dice: +250 and a fresh six.
+       Measured by the run-level sim at +80.5 win-rate points [77.95, 82.69] on
+       a 900g loadout, and worth the same to a fully RANDOM agent - a dominant
+       solved strategy rather than a skill.
+       It cited AUDIT_RESOLUTIONS #18, "commit accepts and scores the non-icon
+       part", but #18 is already satisfied by the line above: an icon-ONLY
+       selection is pinned to zero and accepted, which is the legal zero keep
+       that rule is about. #18 says SCORE the non-icon part, not forgive it when
+       it does not score. #42 rules the wider reading out by name - "the wide
+       reading hands every icon-holder a free, unconditional discard", the same
+       shape as old Silver and the 2/3/4/6 branding exploit.
+       An icon-only keep is still legal and still banks zero. A brand dragged
+       into a dead selection no longer drags six dice through with it. */
     if(pts<0||(pts===0&&!_anchorDie&&!_iconSel.length)){SFX.err();setStatusMsg('NO SCORE — TRY AGAIN','red');return;}
     pts+=_anchorPts;
     _pCrowsCommit(_cw);/* selection accepted → spend the NPC's Crow's Luck charge if a straight was downgraded */
