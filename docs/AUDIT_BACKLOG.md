@@ -1,7 +1,7 @@
 # Audit backlog — pick up here
 
 Written 2026-07-30 so a fresh session loses nothing. Companion to
-`AUDIT_FINDINGS_RAW.md` (all 72 soak findings verbatim, with repro lines).
+`archive/AUDIT_FINDINGS_RAW.md` (all 72 soak findings verbatim, with repro lines).
 
 ## Read this first
 
@@ -160,7 +160,7 @@ and the first-night 2D dice (never replaced, known).
   drift, zero stuck buttons. Busts and hot dice held up under everything.
 - Some reported "score drift" and a "stale SIT DOWN" were rig artefacts the
   agents themselves identified and discarded. Trust the disclosed caveats in
-  `AUDIT_FINDINGS_RAW.md`.
+  `archive/AUDIT_FINDINGS_RAW.md`.
 
 ## In flight — play-test + Preserve build
 

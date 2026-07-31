@@ -1,7 +1,7 @@
 # Fark — open questions
 
 **Raised 2026-07-31. All UNANSWERED.** Grouped by subject, not by which
-audit produced them — the round numbering in `DESIGN_QUESTIONS_3.md` got
+audit produced them — the round numbering in `archive/DESIGN_QUESTIONS_3.md` got
 confusing, so that file is now an archive and this is the live list.
 
 Nothing here blocks work. Everything shipped under a stated assumption, and
