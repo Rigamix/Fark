@@ -14463,6 +14463,29 @@ function _dlgAmbient(){
     return row.t;
   }catch(e){return null;}
 }
+/* WHAT THE OPPONENT SAYS ABOUT THE RESULT. `won` is the PLAYER winning, so the
+   speaker's own outcome is the opposite of it.
+   A boss remembers across the run, and remembers the two directions separately:
+   how many times they have beaten you is not how many times you have beaten
+   them, and each advances only its own pool. The counters live on the SAVE, not
+   on G - G is rebuilt every match and would forget between them. */
+function _dlgOutcome(won){
+  try{
+    _getS();var run=S&&S.run;if(!run)return null;
+    var mine=won?'loss':'win';/* the speaker lost when the player won */
+    var boss=(G&&G._isBoss&&G.rung)?String(_bossKey(G.rung)||'').toLowerCase():'';
+    if(boss){
+      run._dlgWL=run._dlgWL||{};
+      var key=boss+':'+mine,stage=run._dlgWL[key]||0;
+      var row=_dlgPick('boss:'+key,stage,null);
+      if(row){run._dlgWL[key]=Math.min(stage+1,1);try{save();}catch(e){}return row.t;}
+      return null;
+    }
+    var art=window._lastSeatArt;if(!art)return null;
+    var r2=_dlgPick('patron:'+String(art).toLowerCase()+':'+mine,0,null);
+    return r2?r2.t:null;
+  }catch(e){return null;}
+}
 /* the four DLG events these answer, and which side each belongs to */
 var _DLG_MOMENT={OPP_BUST:'bust',PLAYER_BUST:'yourBust',
                  OPP_BIG_BANK:'bank',BIG_BANK:'yourBank'};
@@ -14473,8 +14496,11 @@ var _DLG_PERSONAL={MATCH_START:1,REMATCH_START:1};
    and these are the events whose own barks carry the least weight. */
 var _DLG_AMBIENT={EARLY_BANK:1,MATCH_CLOSE:1,OPP_TAKES_LEAD:1,
                   PLAYER_TAKES_LEAD:1,LOSING_BADLY:1,WINNING_BADLY:1};
-/* this layer COLOURS a match, it does not take it over - the patron's own
-   barks still lead on these beats most of the time */
+/* ONCE A MATCH. The doc is explicit that this is ambient texture and not a
+   firehose - "firing at every available pause point would turn flavor into
+   noise" - so a match gets one ambient line at most. The chance below no longer
+   controls how OFTEN it fires, only WHICH of the available pauses gets it, so
+   the moment does not land on the same beat every match. */
 var _DLG_AMBIENT_CHANCE=0.35;
 /* ── THE LINES. Data only. ──
    Written content is from FARK_PATRON_LORE.md; nothing here is invented. The
@@ -14724,7 +14750,172 @@ var PATRON_LINES=[
   /* two bespoke overrides, proving the pattern rather than attempting 24 -
      a named patron's own line outranks their trait bucket on specificity */
   {p:'patron:sil:bust',s:0,t:"No curse did that. Just bad dice."},
-  {p:'patron:regis:bank',s:0,t:"As I predicted. I predict many things."}
+  {p:'patron:regis:bank',s:0,t:"As I predicted. I predict many things."},
+
+  /* ── WIN AND LOSS. Outcome only - "you beat me" / "I beat you" - never
+     backstory redirected onto this beat. OUTCOME IS THE SPEAKER'S: `win` is
+     the opponent winning, which is the player's loss screen.
+     Bosses carry TWO INDEPENDENT counters, times they beat you and times you
+     beat them, so stage 0 is the first result OF THAT TYPE and stage 1 every
+     one after. Patrons are flat, two per outcome. ── */
+  {p:'boss:grog:win',s:0,t:"Hmph. Luck, that's all you had. Try again if you've got the coin for it."},
+  {p:'boss:grog:win',s:0,t:"That's the boot, then. Don't say I didn't warn you."},
+  {p:'boss:grog:win',s:1,t:"Back again? Some folk never learn the shape of a losing streak."},
+  {p:'boss:grog:win',s:1,t:"You're getting predictable to beat. That's not a compliment."},
+  {p:'boss:grog:loss',s:0,t:"Hmph. Lucky toss. I'll get you next round."},
+  {p:'boss:grog:loss',s:0,t:"Fine. FINE. Take it. Doesn't mean you'll manage it twice."},
+  {p:'boss:grog:loss',s:1,t:"You again. Starting to think that first win wasn't luck after all."},
+  {p:'boss:grog:loss',s:1,t:"Alright. You've earned the right to stop gloating about it now."},
+  {p:'boss:mabel:win',s:0,t:"There now. Everyone loses a hand now and then, dear. Sit a while, have something warm."},
+  {p:'boss:mabel:win',s:0,t:"Oh, don't look so glum. You'll have better luck with a full stomach next time."},
+  {p:'boss:mabel:win',s:1,t:"Back so soon? I do worry about you, you know, even when you keep losing to me."},
+  {p:'boss:mabel:win',s:1,t:"You're persistent, I'll give you that. Persistent and hungry, probably."},
+  {p:'boss:mabel:loss',s:0,t:"Well! Aren't you clever. Don't let it go to your head, now."},
+  {p:'boss:mabel:loss',s:0,t:"Beaten by a bit of luck and a full house, was I? Fine, fine. Sit down, I'll get you something anyway."},
+  {p:'boss:mabel:loss',s:1,t:"Twice now. I'm almost proud, in a motherly sort of way."},
+  {p:'boss:mabel:loss',s:1,t:"You keep this up and I'll have to start taking you seriously."},
+  {p:'boss:finnick:win',s:0,t:"Heh. Didn't even feel me take it, did you? That's the trick of it."},
+  {p:'boss:finnick:win',s:0,t:"Better luck next time. Or don't. Suits me either way."},
+  {p:'boss:finnick:win',s:1,t:"You keep coming back for the same trick. I keep obliging."},
+  {p:'boss:finnick:win',s:1,t:"At this point I almost feel bad. Almost."},
+  {p:'boss:finnick:loss',s:0,t:"Clever. I don't like clever. Clever costs me coin."},
+  {p:'boss:finnick:loss',s:0,t:"Alright, alright. You got the better of me this once. Don't let it go to your head."},
+  {p:'boss:finnick:loss',s:1,t:"Twice you've had my measure now. I'll need a new trick."},
+  {p:'boss:finnick:loss',s:1,t:"You're becoming a genuine problem for my business, you know that?"},
+  {p:'boss:corvus:win',s:0,t:"The numbers favored me tonight. They usually do."},
+  {p:'boss:corvus:win',s:0,t:"A loss recorded, filed, and forgotten by morning. Yours to remember, not mine."},
+  {p:'boss:corvus:win',s:1,t:"Another entry in the ledger. You're becoming a reliable line item."},
+  {p:'boss:corvus:win',s:1,t:"I could set my books by how often you lose to me. Comforting, in its way."},
+  {p:'boss:corvus:loss',s:0,t:"Unexpected. I don't care for unexpected. I'll adjust my figures."},
+  {p:'boss:corvus:loss',s:0,t:"You've cost me tonight. I intend to recover it, one way or another."},
+  {p:'boss:corvus:loss',s:1,t:"Twice against the numbers now. I'm revising my estimate of you."},
+  {p:'boss:corvus:loss',s:1,t:"You're an anomaly I haven't priced in yet. Uncomfortable, that."},
+  {p:'boss:brutus:win',s:0,t:"Discipline wins. Every time. Take that lesson home with you."},
+  {p:'boss:brutus:win',s:0,t:"Three rolls, soldier. That's all you get at my table. Learn it."},
+  {p:'boss:brutus:win',s:1,t:"Back for more drilling? Good. Some of you need it repeated."},
+  {p:'boss:brutus:win',s:1,t:"Still haven't learned the count. We'll keep at it till you do."},
+  {p:'boss:brutus:loss',s:0,t:"...Hm. Discipline noted. Yours, this time."},
+  {p:'boss:brutus:loss',s:0,t:"A fair beating, soldier. Don't expect it to become a habit."},
+  {p:'boss:brutus:loss',s:1,t:"Twice you've held the line against me. I'm reassessing your training."},
+  {p:'boss:brutus:loss',s:1,t:"You're drilling well. I'll allow it, this once more."},
+  {p:'boss:aldric:win',s:0,t:"Thy cleverness forgets its breeding at mine table. Confess it, and go in peace."},
+  {p:'boss:aldric:win',s:0,t:"A quiet lesson, freely given. Take it as such."},
+  {p:'boss:aldric:win',s:1,t:"Thou returnest, still unconfessed. Persistence is its own small virtue, I suppose."},
+  {p:'boss:aldric:win',s:1,t:"The same lesson, again. I begin to wonder if it's landing at all."},
+  {p:'boss:aldric:loss',s:0,t:"Well struck. I confess it plainly, as I'd ask of thee."},
+  {p:'boss:aldric:loss',s:0,t:"Mine own table, mine own lesson, turned back on me. Fair enough."},
+  {p:'boss:aldric:loss',s:1,t:"Twice bested. I begin to suspect thy cleverness needs no quieting at all."},
+  {p:'boss:aldric:loss',s:1,t:"A worthy return match. I'll not pretend otherwise."},
+  {p:'boss:whisper:win',s:0,t:"Mm. Predictable, in the end. I do so enjoy being right."},
+  {p:'boss:whisper:win',s:0,t:"Marked dice sing loudest right before they lose. Didn't you notice?"},
+  {p:'boss:whisper:win',s:1,t:"Back again. I do love a repeat performance."},
+  {p:'boss:whisper:win',s:1,t:"Same result, different night. I'm not complaining."},
+  {p:'boss:whisper:loss',s:0,t:"Oh. Well played. I'll remember that."},
+  {p:'boss:whisper:loss',s:0,t:"Unexpected. I do enjoy being surprised, on the rare occasion it happens."},
+  {p:'boss:whisper:loss',s:1,t:"Twice now. You're becoming genuinely interesting to me."},
+  {p:'boss:whisper:loss',s:1,t:"I'm starting to take you seriously. Dangerous, for both of us."},
+  {p:'boss:ambrose:win',s:0,t:"The house remembers your name. Tonight, not fondly."},
+  {p:'boss:ambrose:win',s:0,t:"A reckoning delivered. Come back when you're ready for another."},
+  {p:'boss:ambrose:win',s:1,t:"You keep returning to be reckoned with. I respect the persistence, if nothing else."},
+  {p:'boss:ambrose:win',s:1,t:"The house remembers every name that's tried and failed. Yours is in good company."},
+  {p:'boss:ambrose:loss',s:0,t:"The house remembers your name. Tonight, rightly so."},
+  {p:'boss:ambrose:loss',s:0,t:"A reckoning, and I'm on the losing end of it. Rare. Noted."},
+  {p:'boss:ambrose:loss',s:1,t:"Twice you've bested my table. The house is taking notice of you now."},
+  {p:'boss:ambrose:loss',s:1,t:"You're no longer a name I'll forget by morning."},
+  {p:'patron:krox:win',s:0,t:"Figured as much."},
+  {p:'patron:krox:win',s:0,t:"No surprise there."},
+  {p:'patron:krox:loss',s:0,t:"Huh. Wasn't expecting that."},
+  {p:'patron:krox:loss',s:0,t:"Fair enough. Didn't see it coming."},
+  {p:'patron:eira:win',s:0,t:"Predictable. I could've written that outcome down before we started."},
+  {p:'patron:eira:win',s:0,t:"Noted, and filed away."},
+  {p:'patron:eira:loss',s:0,t:"Well. I'll need to revise my notes on you."},
+  {p:'patron:eira:loss',s:0,t:"Unexpected. I don't often say that."},
+  {p:'patron:nebb:win',s:0,t:"Course I did. Sat still long enough to prove it."},
+  {p:'patron:nebb:win',s:0,t:"There we go. Told you I could focus when it mattered."},
+  {p:'patron:nebb:loss',s:0,t:"Fark. Didn't see that coming."},
+  {p:'patron:nebb:loss',s:0,t:"Well, that's embarrassing. Won't happen twice."},
+  {p:'patron:regis:win',s:0,t:"As I predicted. I predict many things."},
+  {p:'patron:regis:win',s:0,t:"Order restored to this table, as it should be."},
+  {p:'patron:regis:loss',s:0,t:"An aberration. I shall permit it, this once."},
+  {p:'patron:regis:loss',s:0,t:"Well played. I suppose even I can be surprised."},
+  {p:'patron:corbin:win',s:0,t:"The numbers favored me. They usually do."},
+  {p:'patron:corbin:win',s:0,t:"Balanced, as expected."},
+  {p:'patron:corbin:loss',s:0,t:"An error in my calculation somewhere. I'll find it."},
+  {p:'patron:corbin:loss',s:0,t:"Unaccounted for. I don't care for that."},
+  {p:'patron:sparr:win',s:0,t:"Ha, quick as ever."},
+  {p:'patron:sparr:win',s:0,t:"Told you I don't slow down for anyone."},
+  {p:'patron:sparr:loss',s:0,t:"Didn't see that one coming, and I see most things coming."},
+  {p:'patron:sparr:loss',s:0,t:"Huh. You're faster than you look."},
+  {p:'patron:pell:win',s:0,t:"Flew true. Same as always."},
+  {p:'patron:pell:win',s:0,t:"No surprises from an honest hand."},
+  {p:'patron:pell:loss',s:0,t:"Well. Even a good arrow misses sometimes."},
+  {p:'patron:pell:loss',s:0,t:"Fair shot. I'll allow it."},
+  {p:'patron:osgood:win',s:0,t:"Told you. Old hands still know a few tricks."},
+  {p:'patron:osgood:win',s:0,t:"Experience wins out. Usually does."},
+  {p:'patron:osgood:loss',s:0,t:"Hmph. Fair fight, that. Rilla'll be pleased, at least."},
+  {p:'patron:osgood:loss',s:0,t:"Well struck. Don't let it go to your head, mind."},
+  {p:'patron:rilla:win',s:0,t:"There, that's settled then."},
+  {p:'patron:rilla:win',s:0,t:"No hard feelings, I hope."},
+  {p:'patron:rilla:loss',s:0,t:"Oh! Well done, truly."},
+  {p:'patron:rilla:loss',s:0,t:"That's a good win, that is. Don't be modest about it."},
+  {p:'patron:dunstan:win',s:0,t:"Solid work. Same as my forge."},
+  {p:'patron:dunstan:win',s:0,t:"No cracks in that outcome."},
+  {p:'patron:dunstan:loss',s:0,t:"Hm. Didn't see the weak point till it was too late."},
+  {p:'patron:dunstan:loss',s:0,t:"Fair beating. I'll take the lesson."},
+  {p:'patron:rask:win',s:0,t:"That's the job done, then."},
+  {p:'patron:rask:win',s:0,t:"Nothing personal. Just work."},
+  {p:'patron:rask:loss',s:0,t:"Huh. Didn't expect that from you."},
+  {p:'patron:rask:loss',s:0,t:"Fine. You earned that one."},
+  {p:'patron:sil:win',s:0,t:"No curse did that. Just good dice."},
+  {p:'patron:sil:win',s:0,t:"Nothing to fix here. You'll live."},
+  {p:'patron:sil:loss',s:0,t:"Well. Bad luck and worse dice, this time mine."},
+  {p:'patron:sil:loss',s:0,t:"Fair enough. I've had worse nights."},
+  {p:'patron:thorne:win',s:0,t:"Quiet win. Prefer it that way."},
+  {p:'patron:thorne:win',s:0,t:"Didn't need to say much. The result speaks."},
+  {p:'patron:thorne:loss',s:0,t:"Hm. Missed that one."},
+  {p:'patron:thorne:loss',s:0,t:"Fair. Even a good hunter misses sometimes."},
+  {p:'patron:vess:win',s:0,t:"Good outcome for me. Better for my ledger."},
+  {p:'patron:vess:win',s:0,t:"Everything has a price. Tonight, yours was steep."},
+  {p:'patron:vess:loss',s:0,t:"Well, that's a loss I'll have to absorb."},
+  {p:'patron:vess:loss',s:0,t:"Fine deal, that. For you, anyway."},
+  {p:'patron:nell:win',s:0,t:"Told you. Cards don't lie, and neither do I about my odds."},
+  {p:'patron:nell:win',s:0,t:"That's how it's done."},
+  {p:'patron:nell:loss',s:0,t:"Huh. Didn't see that coming, and I usually do."},
+  {p:'patron:nell:loss',s:0,t:"Well played. Genuinely."},
+  {p:'patron:squib:win',s:0,t:"HA! Finally! Someone besides Nell!"},
+  {p:'patron:squib:win',s:0,t:"See, I'm not completely hopeless."},
+  {p:'patron:squib:loss',s:0,t:"Aw, come on. So close."},
+  {p:'patron:squib:loss',s:0,t:"Fine. FINE. You got me."},
+  {p:'patron:tuck:win',s:0,t:"That's the bread rising, same as always."},
+  {p:'patron:tuck:win',s:0,t:"Good result. Good enough to celebrate with pie, maybe."},
+  {p:'patron:tuck:loss',s:0,t:"Well, even good bread falls flat sometimes."},
+  {p:'patron:tuck:loss',s:0,t:"Fair enough. Feed you extra next time, maybe."},
+  {p:'patron:twill:win',s:0,t:"Even seams. Every time."},
+  {p:'patron:twill:win',s:0,t:"No mistakes in that outcome."},
+  {p:'patron:twill:loss',s:0,t:"A dropped stitch, that was."},
+  {p:'patron:twill:loss',s:0,t:"Fair enough. I'll unpick it and learn."},
+  {p:'patron:mudge:win',s:0,t:"Smooth crossing, that."},
+  {p:'patron:mudge:win',s:0,t:"No surprises on the water tonight."},
+  {p:'patron:mudge:loss',s:0,t:"Huh. Rough water, that."},
+  {p:'patron:mudge:loss',s:0,t:"Fair enough. Even the river surprises me sometimes."},
+  {p:'patron:nix:win',s:0,t:"Told you. My luck, not yours."},
+  {p:'patron:nix:win',s:0,t:"The Roller favored me, this time."},
+  {p:'patron:nix:loss',s:0,t:"Ha! My own luck turned on me. Fitting, really."},
+  {p:'patron:nix:loss',s:0,t:"Well, that's a first. Don't get used to it."},
+  {p:'patron:poll:win',s:0,t:"Knew it'd go that way. Or something close to it."},
+  {p:'patron:poll:win',s:0,t:"Told everyone I'd win. Or I will, now."},
+  {p:'patron:poll:loss',s:0,t:"Huh, didn't see that coming. Or maybe I did. Hard to say."},
+  {p:'patron:poll:loss',s:0,t:"Well, that's one story I'll tell straight, for once."},
+  {p:'patron:roan:win',s:0,t:"Job's done."},
+  {p:'patron:roan:win',s:0,t:"Simple as that."},
+  {p:'patron:roan:loss',s:0,t:"Huh. Didn't expect that."},
+  {p:'patron:roan:loss',s:0,t:"Fair enough. Back to my errands."},
+  {p:'patron:remny:win',s:0,t:"Knew I'd win. I remember it happening before, even."},
+  {p:'patron:remny:win',s:0,t:"Course I won. I always do. Mostly."},
+  {p:'patron:remny:loss',s:0,t:"Well, that's new. Don't remember losing before."},
+  {p:'patron:remny:loss',s:0,t:"Huh. I'll remember this one, probably wrong, but I'll remember it."},
+  {p:'patron:golgoth:win',s:0,t:"...Yeah."},
+  {p:'patron:golgoth:loss',s:0,t:"...Huh."}
 ];
 var _ptOpen=false,_ptSeats=[];
 function _ptLayout(n){
@@ -27026,20 +27217,28 @@ function endMatch(win){
      fact still owned — a flat lie that could drive bad decisions. Only the
      boss's gloat dialogue remains. */
   var _bossLossData=null;
-  if(!win&&isBoss){
+  /* EVERY OUTCOME SPEAKS NOW, not only a boss beating you. This block used to
+     be gated on `!win&&isBoss`, which reached one of the four cases while the
+     lore doc supplies all four - both outcomes, bosses and patrons. The line
+     itself comes from _dlgOutcome, which knows that a boss remembers the two
+     directions separately and that outcome is stated from the SPEAKER's side. */
+  {
     var _bKey=G.rung?G.rung.key:'';
     var _bName=G.rung?G.rung.name:'';
     var _bUpper=_bName.toUpperCase();
-    var _portrait=PORTRAITS[_bKey]||GAUNTLET_PORTRAITS[_bKey]||'';
-    var _dlgPool=OPP_DIALOGUE[_bUpper]&&OPP_DIALOGUE[_bUpper].OPP_WINS?OPP_DIALOGUE[_bUpper].OPP_WINS:['You lose.'];
-    var _dlgText=_dlgPool[Math.floor(Math.random()*_dlgPool.length)];
+    /* the portrait follows whoever is speaking */
+    var _portrait=isBoss?(PORTRAITS[_bKey]||GAUNTLET_PORTRAITS[_bKey]||'')
+      :((window._lastSeatArt&&typeof PT_CHAR!=='undefined')
+        ?(PT_CHAR+window._lastSeatArt+PT_CHAR_EXT):'');
+    var _dlgText='';
+    try{_dlgText=_dlgOutcome(!!win)||'';}catch(e){_dlgText='';}
     var _dlgHTML='';
     if(_portrait||_dlgText){
       _dlgHTML='<div class="dlg-portrait">';
       if(_portrait)_dlgHTML+='<img src="'+_portrait+'" style="width:100%;height:100%;object-fit:cover;image-rendering:pixelated">';
       _dlgHTML+='</div><div class="dlg-scroll"><canvas class="res-dlg-canvas"></canvas><div class="dlg-text">'+_dlgText+'</div></div>';
     }
-    _bossLossData={cardHTML:'',dlgHTML:_dlgHTML};
+    if(_dlgHTML)_bossLossData={cardHTML:'',dlgHTML:_dlgHTML};
   }
 
   /* Show draft (wins) or CONTINUE button (losses) after animation */
@@ -27122,7 +27321,9 @@ function endMatch(win){
   /* Boss loss: show card greying + dialogue inside end screen.
      No feats panel on loss, so pull the lost card UP closer to the
      scores instead of leaving it at the default 44% top. */
-  if(!win&&isBoss&&_bossLossData){
+  /* was `!win&&isBoss` - now anything that actually produced a line. The data
+     is only built when there is something to say, so this is the same test. */
+  if(_bossLossData){
     if(resCard&&_bossLossData.cardHTML){
       resCard.innerHTML=_bossLossData.cardHTML;
       resCard.classList.add('show','lost');
@@ -27836,8 +28037,10 @@ const LEDGER_LINES={
           var pl=_dlgSay(window._lastSeatArt);if(pl)return pl;
         }
         else if(typeof _DLG_AMBIENT!=='undefined'&&_DLG_AMBIENT[cat]
+                &&!(typeof G!=='undefined'&&G&&G._dlgAmbientDone)
                 &&Math.random()<_DLG_AMBIENT_CHANCE){
-          var al=_dlgAmbient();if(al)return al;
+          var al=_dlgAmbient();
+          if(al){try{G._dlgAmbientDone=true;}catch(e){}return al;}
         }
       }catch(e){}
       /* nothing lore has to say, so the line that would have shown still does -

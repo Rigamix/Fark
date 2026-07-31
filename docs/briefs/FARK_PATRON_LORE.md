@@ -939,3 +939,277 @@ everything simultaneously at genuine depth in one pass risked
 shallow, repetitive-feeling filler across 24 characters rather than
 real variety. Named-patron bespoke in-match overrides (currently just
 Sil and Regis) are the same kind of deferred-not-forgotten item.
+
+## Win/loss reactions — patrons and bosses, NEW major addition
+
+**Scope correction first, since it changes what belongs here:** win/loss
+content must be about the OUTCOME specifically — "you beat me" / "I beat
+you" — never general identity flavor redirected onto this screen. The
+general backstory pools (the 138 patron lines, the King/gossip pools)
+stay where they are; none of that content belongs here, and none of it
+is duplicated below. This also means the earlier recommendation that
+general backstory content renders on the win/loss screen was wrong in
+scope — win/loss needed its OWN dedicated content, not a redirect. Where
+the general backstory pool actually renders is a REOPENED, still-open
+question — best current guess is the match-START moment (sitting down,
+before the first roll), additive to the same in-match hooks the trait
+reactions already use, but this is a guess flagged for confirmation, not
+a ruling made here.
+
+**Architecture: no new mechanism.** At match end the engine already knows
+win or loss — that's how it picks which end screen to show. Filtering a
+patron or boss's pool to only `outcome:win` or only `outcome:loss` lines
+is one more condition, resolved the same way everything else in this
+system resolves.
+
+### Bosses — deeper than patrons, per "more personalised"
+
+Two independent stage counters per boss (times lost to them, times beaten
+them — NOT the same number, tracked separately), giving real
+progression: stage 0 is the first-ever result of that type, stage 1 is
+every subsequent one. Two interchangeable lines per stage, same random
+tie-break as everywhere else in this system.
+
+**GROG** — WIN (Grog beats you), stage 0: *"Hmph. Luck, that's all you
+had. Try again if you've got the coin for it."* / *"That's the boot,
+then. Don't say I didn't warn you."* stage 1: *"Back again? Some folk
+never learn the shape of a losing streak."* / *"You're getting
+predictable to beat. That's not a compliment."*
+LOSS (you beat Grog), stage 0: *"Hmph. Lucky toss. I'll get you next
+round."* / *"Fine. FINE. Take it. Doesn't mean you'll manage it twice."*
+stage 1: *"You again. Starting to think that first win wasn't luck after
+all."* / *"Alright. You've earned the right to stop gloating about it
+now."*
+
+**MABEL** — WIN, stage 0: *"There now. Everyone loses a hand now and
+then, dear. Sit a while, have something warm."* / *"Oh, don't look so
+glum. You'll have better luck with a full stomach next time."* stage 1:
+*"Back so soon? I do worry about you, you know, even when you keep
+losing to me."* / *"You're persistent, I'll give you that. Persistent
+and hungry, probably."*
+LOSS, stage 0: *"Well! Aren't you clever. Don't let it go to your head,
+now."* / *"Beaten by a bit of luck and a full house, was I? Fine, fine.
+Sit down, I'll get you something anyway."* stage 1: *"Twice now. I'm
+almost proud, in a motherly sort of way."* / *"You keep this up and I'll
+have to start taking you seriously."*
+
+**FINNICK** — WIN, stage 0: *"Heh. Didn't even feel me take it, did you?
+That's the trick of it."* / *"Better luck next time. Or don't. Suits me
+either way."* stage 1: *"You keep coming back for the same trick. I keep
+obliging."* / *"At this point I almost feel bad. Almost."*
+LOSS, stage 0: *"Clever. I don't like clever. Clever costs me coin."* /
+*"Alright, alright. You got the better of me this once. Don't let it go
+to your head."* stage 1: *"Twice you've had my measure now. I'll need a
+new trick."* / *"You're becoming a genuine problem for my business, you
+know that?"*
+
+**CORVUS** — WIN, stage 0: *"The numbers favored me tonight. They
+usually do."* / *"A loss recorded, filed, and forgotten by morning.
+Yours to remember, not mine."* stage 1: *"Another entry in the ledger.
+You're becoming a reliable line item."* / *"I could set my books by how
+often you lose to me. Comforting, in its way."*
+LOSS, stage 0: *"Unexpected. I don't care for unexpected. I'll adjust my
+figures."* / *"You've cost me tonight. I intend to recover it, one way
+or another."* stage 1: *"Twice against the numbers now. I'm revising my
+estimate of you."* / *"You're an anomaly I haven't priced in yet.
+Uncomfortable, that."*
+
+**BRUTUS** — WIN, stage 0: *"Discipline wins. Every time. Take that
+lesson home with you."* / *"Three rolls, soldier. That's all you get at
+my table. Learn it."* stage 1: *"Back for more drilling? Good. Some of
+you need it repeated."* / *"Still haven't learned the count. We'll keep
+at it till you do."*
+LOSS, stage 0: *"...Hm. Discipline noted. Yours, this time."* / *"A fair
+beating, soldier. Don't expect it to become a habit."* stage 1: *"Twice
+you've held the line against me. I'm reassessing your training."* /
+*"You're drilling well. I'll allow it, this once more."*
+
+**ALDRIC** — WIN, stage 0: *"Thy cleverness forgets its breeding at
+mine table. Confess it, and go in peace."* / *"A quiet lesson, freely
+given. Take it as such."* stage 1: *"Thou returnest, still unconfessed.
+Persistence is its own small virtue, I suppose."* / *"The same lesson,
+again. I begin to wonder if it's landing at all."*
+LOSS, stage 0: *"Well struck. I confess it plainly, as I'd ask of
+thee."* / *"Mine own table, mine own lesson, turned back on me. Fair
+enough."* stage 1: *"Twice bested. I begin to suspect thy cleverness
+needs no quieting at all."* / *"A worthy return match. I'll not pretend
+otherwise."*
+
+**WHISPER** — WIN, stage 0: *"Mm. Predictable, in the end. I do so
+enjoy being right."* / *"Marked dice sing loudest right before they
+lose. Didn't you notice?"* stage 1: *"Back again. I do love a repeat
+performance."* / *"Same result, different night. I'm not complaining."*
+LOSS, stage 0: *"Oh. Well played. I'll remember that."* (echoes her
+established CUNNING-trait line — she's the cunning boss, kept
+deliberately consistent) / *"Unexpected. I do enjoy being surprised, on
+the rare occasion it happens."* stage 1: *"Twice now. You're becoming
+genuinely interesting to me."* / *"I'm starting to take you seriously.
+Dangerous, for both of us."*
+
+**AMBROSE** — WIN, stage 0: *"The house remembers your name. Tonight,
+not fondly."* / *"A reckoning delivered. Come back when you're ready for
+another."* stage 1: *"You keep returning to be reckoned with. I respect
+the persistence, if nothing else."* / *"The house remembers every name
+that's tried and failed. Yours is in good company."*
+LOSS, stage 0: *"The house remembers your name. Tonight, rightly so."*
+(the established line from the Ambrose victory card, reused deliberately
+— not reinvented) / *"A reckoning, and I'm on the losing end of it.
+Rare. Noted."* stage 1: *"Twice you've bested my table. The house is
+taking notice of you now."* / *"You're no longer a name I'll forget by
+morning."*
+
+### Named patrons — flat, two lines per outcome, matching the volume
+### standard, not the deeper boss treatment
+
+**KROX** — win: *"Figured as much."* / *"No surprise there."* loss:
+*"Huh. Wasn't expecting that."* / *"Fair enough. Didn't see it coming."*
+
+**EIRA** — win: *"Predictable. I could've written that outcome down
+before we started."* / *"Noted, and filed away."* loss: *"Well. I'll
+need to revise my notes on you."* / *"Unexpected. I don't often say
+that."*
+
+**NEBB** — win: *"Course I did. Sat still long enough to prove it."* /
+*"There we go. Told you I could focus when it mattered."* loss: *"Fark.
+Didn't see that coming."* / *"Well, that's embarrassing. Won't happen
+twice."*
+
+**REGIS** — win: *"As I predicted. I predict many things."* / *"Order
+restored to this table, as it should be."* loss: *"An aberration. I
+shall permit it, this once."* / *"Well played. I suppose even I can be
+surprised."*
+
+**CORBIN** — win: *"The numbers favored me. They usually do."* /
+*"Balanced, as expected."* loss: *"An error in my calculation
+somewhere. I'll find it."* / *"Unaccounted for. I don't care for that."*
+
+**SPARR** — win: *"Ha, quick as ever."* / *"Told you I don't slow down
+for anyone."* loss: *"Didn't see that one coming, and I see most things
+coming."* / *"Huh. You're faster than you look."*
+
+**PELL** — win: *"Flew true. Same as always."* / *"No surprises from an
+honest hand."* loss: *"Well. Even a good arrow misses sometimes."* /
+*"Fair shot. I'll allow it."*
+
+**OSGOOD** — win: *"Told you. Old hands still know a few tricks."* /
+*"Experience wins out. Usually does."* loss: *"Hmph. Fair fight, that.
+Rilla'll be pleased, at least."* / *"Well struck. Don't let it go to
+your head, mind."*
+
+**RILLA** — win: *"There, that's settled then."* / *"No hard feelings,
+I hope."* loss: *"Oh! Well done, truly."* / *"That's a good win, that
+is. Don't be modest about it."*
+
+**DUNSTAN** — win: *"Solid work. Same as my forge."* / *"No cracks in
+that outcome."* loss: *"Hm. Didn't see the weak point till it was too
+late."* / *"Fair beating. I'll take the lesson."*
+
+**RASK** — win: *"That's the job done, then."* / *"Nothing personal.
+Just work."* loss: *"Huh. Didn't expect that from you."* / *"Fine. You
+earned that one."*
+
+**SIL** — win: *"No curse did that. Just good dice."* (mirrors her
+established bust line exactly, deliberately) / *"Nothing to fix here.
+You'll live."* loss: *"Well. Bad luck and worse dice, this time mine."*
+/ *"Fair enough. I've had worse nights."*
+
+**THORNE** — win: *"Quiet win. Prefer it that way."* / *"Didn't need to
+say much. The result speaks."* loss: *"Hm. Missed that one."* / *"Fair.
+Even a good hunter misses sometimes."*
+
+**VESS** — win: *"Good outcome for me. Better for my ledger."* /
+*"Everything has a price. Tonight, yours was steep."* loss: *"Well,
+that's a loss I'll have to absorb."* / *"Fine deal, that. For you,
+anyway."*
+
+**NELL** — win: *"Told you. Cards don't lie, and neither do I about my
+odds."* / *"That's how it's done."* loss: *"Huh. Didn't see that coming,
+and I usually do."* / *"Well played. Genuinely."*
+
+**SQUIB** — win: *"HA! Finally! Someone besides Nell!"* / *"See, I'm not
+completely hopeless."* loss: *"Aw, come on. So close."* / *"Fine. FINE.
+You got me."*
+
+**TUCK** — win: *"That's the bread rising, same as always."* / *"Good
+result. Good enough to celebrate with pie, maybe."* loss: *"Well, even
+good bread falls flat sometimes."* / *"Fair enough. Feed you extra next
+time, maybe."*
+
+**TWILL** — win: *"Even seams. Every time."* / *"No mistakes in that
+outcome."* loss: *"A dropped stitch, that was."* / *"Fair enough. I'll
+unpick it and learn."*
+
+**MUDGE** — win: *"Smooth crossing, that."* / *"No surprises on the
+water tonight."* loss: *"Huh. Rough water, that."* / *"Fair enough. Even
+the river surprises me sometimes."*
+
+**NIX** — win: *"Told you. My luck, not yours."* / *"The Roller favored
+me, this time."* loss: *"Ha! My own luck turned on me. Fitting,
+really."* / *"Well, that's a first. Don't get used to it."*
+
+**POLL** — win: *"Knew it'd go that way. Or something close to it."* /
+*"Told everyone I'd win. Or I will, now."* loss: *"Huh, didn't see that
+coming. Or maybe I did. Hard to say."* / *"Well, that's one story I'll
+tell straight, for once."*
+
+**ROAN** — win: *"Job's done."* / *"Simple as that."* loss: *"Huh.
+Didn't expect that."* / *"Fair enough. Back to my errands."*
+
+**REMNY** — win: *"Knew I'd win. I remember it happening before,
+even."* / *"Course I won. I always do. Mostly."* loss: *"Well, that's
+new. Don't remember losing before."* / *"Huh. I'll remember this one,
+probably wrong, but I'll remember it."*
+
+**GOLGOTH** — win: *"...Yeah."* loss: *"...Huh."* (deliberately just one
+line each, no exception this time either — same reasoning as everywhere
+else his entry appears in this doc)
+
+### Volume tally, this addition
+
+64 boss lines (8 bosses x 2 outcomes x 2 stages x 2 lines) + 94 patron
+lines (23 x 2 outcomes x 2 lines, + Golgoth's 2) = 158 new lines.
+
+### RESOLVED — the placement question above, and the earlier room-
+### screen guess a few messages back. Both superseded by this, final.
+
+Everything ambient — King ensemble, town gossip, the 138-line named-
+patron backstory pool — lives INSIDE matches, at natural pauses,
+spoken by whoever the player is currently facing. Not the room screen
+(that guess is retracted), not a separate external screen at all.
+"They don't have to live anywhere else" — the correct, simpler answer
+this whole placement question was overcomplicating.
+
+**Trigger: pause-based, not event-based — this is what distinguishes it
+from the trait-reaction layer above.** The trait pool fires off SPECIFIC
+mechanical events (a bust happened, a big bank happened). This pool
+fires during NATURAL LULLS in a match's rhythm, unrelated to any
+specific event — candidates: match start (sitting down, before the
+first roll), right after a bank resolves and before the next roll,
+during/just after the opponent's turn while the player is otherwise
+idle. Pick RANDOMLY among whichever candidates are available each match,
+rather than always firing at the same fixed beat — keeps the exact
+moment from becoming predictable/expected.
+
+**Rate: light-touch, proposed once per match as the starting default.**
+This is ambient texture, not a firehose — firing at every available
+pause point would turn flavor into noise. Tunable, same as the ambient
+draw-rate knob proposed earlier in this document; adjust by feel once
+it's actually playable.
+
+**Speaker and priority: the CURRENT OPPONENT, same specificity rule as
+everywhere else in this system.** If the player is facing a named
+patron, that patron's own 6-line backstory pool is eligible and takes
+priority. King and town gossip (widely eligible, per their own sections
+above) fill in as the fallback — for a generic (unnamed) opponent, or
+whenever the named opponent's own pool doesn't have anything eligible.
+Personal beats ambient whenever both are eligible, the same rule
+governing every other pool in this document.
+
+**Additive to, not competing with, the trait-reaction layer.** A single
+match can fire BOTH: a trait-based reaction when the opponent busts, AND
+(independently, at a different pause point) one ambient/backstory line.
+Two different layers, two different trigger types, same resolver, same
+underlying architecture — this was always designed to support multiple
+pool types running alongside each other, this is just the second one
+actually specified with a real trigger mechanism rather than left as an
+open guess.
