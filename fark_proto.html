@@ -9848,7 +9848,6 @@ function saveMatchState(){
     thriftyBonus:G.thriftyBonus||0,spurActive:G.spurActive||0,
     martyrUsed:G.martyrUsed||false,
     flintlockFired:G.flintlockFired||false,safeTurnStreak:G.safeTurnStreak||0,
-    dieShieldsPlayer:G.dieShieldsPlayer,dieShieldsOpp:G.dieShieldsOpp,
     activeCardState:JSON.parse(JSON.stringify(G.activeCardState||{})),
     crowsLuckCtx:{...G.crowsLuckCtx},
     _pCrowsCtx:{...G._pCrowsCtx},
@@ -11687,8 +11686,20 @@ const DICE_TYPES=[
    faces:[1,2,3,4,5,6],effect:{type:'scoring_boost',mechanic:'starstone_bonus',amount:300},
    desc:'Every bank +300, and +5g besides.'},
   {id:'brutus_shield',name:"BRUTUS'S SHIELD",icon:'🛡',cost:0,hidden:true,relic:'brutus',
-   faces:[1,2,3,4,5,6],effect:{type:'defense',mechanic:'shield',shieldCount:2},
-   desc:'Two bust saves per match.'},
+   /* BRUTUS'S RELIC. The old "two bust saves" is gone with the rest of the
+      full-save path; the relic is a die that carries the Ward brand
+      PERMANENTLY instead - pre-applied, no branding step, no separate
+      mechanic invented for one die. FACE 5, not 1: "brand the most expensive
+      face" is there to stop a PLAYER picking the cheap option, and nobody is
+      choosing here - a 100-point toll to arm a half-save would leave the
+      relic's signature ability unused in practice. And it is tagged Silver
+      family, so it rolls Silver's weighted table; a fair 1-6 was an
+      oversight, not a design choice, and the two fixes are independent. */
+   faces:[1,2,3,4,5,6],
+   rollTable:[1,5,1,5,2,3,4,6],
+   bornEnch:{t:'ward',face:5},
+   effect:null,
+   desc:'Weighted to 1s and 5s, and born warded on its 5. Keep that face and a bust only takes half.'},
   {id:'aldrics_square',name:"ALDRIC'S SQUARE",icon:'⬜',cost:0,hidden:true,relic:'aldric',
    faces:[1,2,3,4,5,6],effect:{type:'rule_changer',mechanic:'wild_triple'},
    desc:'Its 6s go wild — for triples only.'},
@@ -11803,8 +11814,6 @@ function _dieEffectLabel(eff){
     case'single5_bonus':return'5s score '+(SCORING_BASE.single5+(eff.amount||25));
     case'wild_triple':return'6s are wild for triples';
     case'reckless':return'Busts cost −'+Math.round((eff.penaltyPct||0.04)*100)+'% of total';
-    /* Brutus's relic still uses this; Silver no longer does. */
-    case'shield':return'Saves one bust per match';
     default:return eff.mechanic.replace(/_/g,' ');
   }
 }
@@ -16523,6 +16532,11 @@ var ENCH_ICONS={
     fire:function(c){
       if(G._wardArmed){try{famLog('ALREADY WARDED THIS TURN');}catch(e){}return;}
       G._wardArmed=true;
+      /* SFX.shield, re-homed rather than deleted. It was written for the
+         Silver full-save this rework removes, and Ward - the mechanic that
+         inherited that job - was arming in total silence. Its only other
+         caller is gone. */
+      try{SFX.shield&&SFX.shield();}catch(e){}
       try{famLog('WARD — A BUST WILL ONLY TAKE HALF');}catch(e){}
       try{setStatusMsg('WARDED — A BUST COSTS HALF','gold');}catch(e){}
     }},
@@ -17032,6 +17046,73 @@ function _enchInit(){
   S.run.dieEnch.length=(S.run.dice||[]).length;
   while(S.run.dieEnchInv.length<(S.run.diceInv||[]).length)S.run.dieEnchInv.push(null);
   S.run.dieEnchInv.length=(S.run.diceInv||[]).length;
+  /* BORN BRANDS. Brutus's relic carries Ward permanently, pre-applied - no
+     branding step, no separate mechanic invented for it. Stamping it HERE, on
+     the run's own brand arrays, is what makes every downstream reader agree
+     without being told: the loadout paints the icon, a fresh match copies
+     S.run.dieEnch straight into G._enchArr, the counter already refuses a
+     second brand on a worked die, and _wardOwned counts it against the cap.
+     The pass is self-healing in both directions - it re-stamps a relic whose
+     slot was cleared, and clears a born brand left on a slot the relic has
+     since left - so no caller has to remember to run it in any order. */
+  var _bwRefund=0,_bwDirty=false;
+  [['dice','dieEnch'],['diceInv','dieEnchInv']].forEach(function(p){
+    var mats=S.run[p[0]]||[],arr=S.run[p[1]];
+    for(var i=0;i<mats.length;i++){
+      var bw=_bornEnch(mats[i]),cur=arr[i];
+      if(!bw){if(cur&&cur.born){arr[i]=null;_bwDirty=true;}continue;}
+      if(cur&&cur.born&&cur.t===bw.t&&cur.face===bw.face)continue;
+      /* a save from before the relic was born warded may have a PAID brand
+         sitting on it. The born one wins - it is what the die IS, not a
+         purchase - so the purchase is refunded rather than silently
+         deleted, matching the _enchV=2 precedent above. */
+      if(cur&&!cur.born){var pd=_enchDef(cur.t);if(pd&&pd.price)_bwRefund+=pd.price;}
+      arr[i]={t:bw.t,face:bw.face,born:true};_bwDirty=true;
+    }
+  });
+  /* THE ONE-WARD CAP, held against acquisition order and not just the shop.
+     The counter refuses to sell a second Ward, but the relic arrives from a
+     boss win rather than a counter, so a player who bought a Ward first would
+     otherwise walk out with two - the stacked safety net the cap exists to
+     prevent, through a side door. The bought one is the one that gives way,
+     and it is refunded. */
+  var _bwBorn=false;
+  ['dieEnch','dieEnchInv'].forEach(function(k){
+    (S.run[k]||[]).forEach(function(e){if(e&&e.t==='ward'&&e.born)_bwBorn=true;});
+  });
+  if(_bwBorn){
+    ['dieEnch','dieEnchInv'].forEach(function(k){
+      (S.run[k]||[]).forEach(function(e,i){
+        if(e&&e.t==='ward'&&!e.born){
+          _bwRefund+=((typeof ENCH_ICONS!=='undefined'&&ENCH_ICONS.ward)||{}).price||0;
+          S.run[k][i]=null;_bwDirty=true;
+        }
+      });
+    });
+  }
+  if(_bwRefund>0){
+    S.run.gold=(S.run.gold||0)+_bwRefund;
+    try{famLog('THE INNKEEP REFUNDS '+_bwRefund+'g - THAT DIE CAME ALREADY WARDED');}catch(e){}
+  }
+  /* PERSIST THE STAMP, not just the refund. The brand only exists in the save
+     once this pass has written it, and nothing on the way into a match used
+     to run it - measured zero _enchInit calls between a page load and
+     initMatchScreen building G._enchArr. Left in memory only, the relic's
+     Ward survived or vanished depending on whether some unrelated caller
+     happened to save afterwards. The dirty flag is what keeps a converged
+     pass from writing the save on every call. */
+  if(_bwDirty){try{save();}catch(e){}}
+}
+/* A brand the DIE IS BORN WITH, not one the innkeep put there. Read off the
+   die type so exactly one place says which dice have one, and so adding a
+   second such die later is a data change rather than a code change. */
+function _bornEnch(mat){
+  /* getDie falls back to DICE_TYPES[0] for an id it does not know, so the id
+     has to be confirmed too or an unknown material would inherit whatever
+     brand the first die in the table happens to carry. */
+  var dt=getDie(mat);
+  if(!mat||!dt||dt.id!==mat||!dt.bornEnch)return null;
+  return dt.bornEnch;
 }
 /* What a die actually ROLLS, which is not always what it shows. A family may
    weight its outcomes (Silver) without gaining or losing physical faces, so
@@ -20533,18 +20614,22 @@ function _commitActivation(mcardEl,cardId,savedState){
 /* ═══════ GAME STATE ═══════ */
 let G=null,LO=null;
 function newG(rung,pCards,oCards,pStake,oStake){
-  /* Count shield dice in player loadout */
+  /* THE BORN BRANDS, stamped before the loadout is read. Measured: nothing on
+     the way into a match called _enchInit - not the seat launch, not the boss
+     launch, not initMatchScreen - so a run that already had Brutus's relic
+     equipped went to the table with an empty brand slot and no Ward, and the
+     relic's signature ability was simply absent unless the player happened to
+     open the shop first. This is the last point before initMatchScreen copies
+     S.run.dieEnch into G._enchArr, and it is on EVERY way in: seat, boss,
+     mirror, resume. */
+  try{_enchInit();}catch(e){}
   var _playerDice=(S.run&&S.run.dice)||S.dice||_boneDice;
-  const _pShields=(function(){let c=0;_playerDice.forEach(function(m){var dt=getDie(m);if(dt&&dt.effect&&dt.effect.mechanic==='shield')c+=(dt.effect.shieldCount||1);});return c;})();
-  /* Count shield dice in NPC loadout */
-  const _oShields=(function(){let c=0;((rung&&rung.dice)||[]).forEach(function(m){var dt=getDie(m);if(dt&&dt.effect&&dt.effect.mechanic==='shield')c+=(dt.effect.shieldCount||1);});return c;})();
   return{rung,pCards,oCards,pStake,oStake,pPts:0,oPts:0,target:rung.target,
     turnPts:0,numDice:6,phase:'waiting',turnNum:1,pTurns:0,oTurns:0,pool:[],kept:[],oppDice:[],
     martyrUsed:false,flintlockFired:false,safeTurnStreak:0,turnRollCount:0,oppTurnCount:0,
     /* Strategic-path tracking (opener cards): counts dice committed on
        roll 1 of each turn for player/NPC, reset in startPTurn/runOppTurn. */
     _firstRollCommitted:0,_oFirstRollKept:0,_oTurnDiceCommitted:0,
-    dieShieldsPlayer:_pShields,dieShieldsOpp:_oShields,
     /* WARDED (gold): one-charge shield against opp disruptions. */
     _wardCharges:pCards.includes('warded')?1:0,
     matchDice:[..._playerDice],
@@ -23373,6 +23458,51 @@ function doBust(){
     try{refreshSelUI();}catch(e){}
     return;
   }
+  /* THE BUST TOLLS. Ill Omen and Whisper's Fang, hoisted out of the
+     Silver-shield branch that used to be their only home. That branch ran
+     ONLY when a shield BLOCKED the bust, so on every real bust the rival's
+     called omen was never paid and the Fang never bit - two effects that are
+     core identity for the card and for the die, silently one-sided since
+     they were written. Worse for the omen: leaving G._oIllOmen set meant
+     endPTurn later read it as a MISS and PAID THE PLAYER for busting.
+     A FUNCTION, not a straight-line block, because both tolls are drawn
+     from G.pPts and both are clamped against it - the omen takes
+     min(its tier, pPts), the Fang cannot push pPts below zero. A warded
+     bust is still a bust, but the ward pays half the turn INTO that same
+     pot, so reading pPts before the ward has paid would cap the rival's
+     take at the pre-ward bank and let the Fang's 200 land on a floor it
+     should never have reached. So the ward branch calls this itself, the
+     moment after it pays and while G.kept is still intact; every other bust
+     path calls it below. Amber, above, reaches neither - immunity means no
+     bust happened at all. */
+  function _bustTolls(){
+    if(G._oIllOmen){/* they called your bust: pay them */
+      /* famDef returns null for an id it does not carry. That could never
+         bite while this sat in a branch nothing could reach; it is on the
+         live bust path now, and a throw here would leave the turn with no
+         route to endPTurn. */
+      var _ioD=famDef('ill_omen');
+      if(_ioD&&_ioD.p){
+        var _ioP3=_ioD.p[(G._oIllOmen.tier||1)-1]||[0,0];
+        var _ioTake=Math.min(_ioP3[0]||0,G.pPts||0);
+        G.pPts=(G.pPts||0)-_ioTake;G.oPts=(G.oPts||0)+_ioTake;
+        try{famLog('THEIR OMEN LANDS - THEY TAKE '+_ioTake);}catch(e){}
+      }
+      G._oIllOmen=null;try{updHUD();}catch(e){}
+    }
+    /* k.dice, not just k.mat: a kept group stores only its FIRST die's
+       material on k.mat, so a Fang kept second in a selection was invisible
+       to the old test. The pool half still matters on its own - it catches a
+       die committed this roll - but hot dice rebuilds the pool while the tray
+       keeps the history, so both halves are needed to mean "it sits kept". */
+    if((G.kept||[]).some(function(k){
+         return k.mat==='whispers_fang'||
+           (k.dice||[]).some(function(dd){return dd&&dd.mat==='whispers_fang';});})||
+       (G.pool||[]).some(function(d){return d.committed&&d.mat==='whispers_fang';})){
+      G.pPts=Math.max(0,(G.pPts||0)-200);
+      try{famLog('THE FANG BITES - 200 MORE GONE');updHUD();}catch(e){}
+    }
+  }
   /* WARD: never a full save - the bank is HALVED, not kept. One ward per
      turn, armed by the first branded face kept. */
   if(G._wardArmed){
@@ -23383,6 +23513,10 @@ function doBust(){
     var _half=Math.floor(_wardTotal/2);
     try{setStatusMsg('WARD HOLDS — HALF SURVIVES: '+_half,'gold');famLog('WARD — HALF THE TURN SURVIVES ('+_half+')');}catch(e){}
     G.pPts=(G.pPts||0)+_half;
+    /* AFTER the half lands and BEFORE G.kept is emptied. Both tolls read
+       G.pPts and one of them reads G.kept, so this is the only point in the
+       branch where either can be paid honestly. */
+    _bustTolls();
     G.turnPts=0;G.kept=[];G._stakesRisingBonus=0;
     try{updHUD();refreshKeptTray();}catch(e){}
     G.safeTurnStreak=0;
@@ -23399,75 +23533,16 @@ function doBust(){
     },900);
     return;
   }
+  /* Ward returned above having paid these itself. Everything from here down
+     is a bust with no half-bank to wait for, so they are paid now, while
+     G.kept still holds the turn. */
+  _bustTolls();
   /* Feat tracking: count player busts for "Untouchable" feat */
   G._featBusts=(G._featBusts||0)+1;
   /* Rusty Spur: bias was earned by banking — a bust resets it so the bias doesn't carry past failure */
   if(G.spurActive){G.spurActive=0;}
   /* Hot Hand chain reset on bust — losing the chain is the real cost. */
   G._hotHandChain=0;
-  /* Silver die shield: cancel bust once per shield die in loadout.
-     Defensive recount: if dieShieldsPlayer is undefined (init missed) or
-     0 but matchDice still contains shield dice that haven't been used,
-     re-derive the count. Player feedback "Die that saves you from busting
-     didn't work" — most likely cause is state drift between matches. */
-  if(G.dieShieldsPlayer===undefined&&G.matchDice){
-    G.dieShieldsPlayer=G.matchDice.reduce(function(a,m){
-      var dt=getDie(m);return a+((dt&&dt.effect&&dt.effect.mechanic==='shield')?(dt.effect.shieldCount||1):0);
-    },0);
-    G._shieldUses=G._shieldUses||0;
-    G.dieShieldsPlayer=Math.max(0,G.dieShieldsPlayer-G._shieldUses);
-  }
-  if(G.dieShieldsPlayer>0){
-    G._shieldUses=(G._shieldUses||0)+1;
-    G.dieShieldsPlayer--;
-    /* D1: Pick the silver die that's "consuming" its charge this bust.
-       Find one silver die-wrap in the row that hasn't already been spent
-       (no .shield-spent class yet). Apply the bloom animation to it now,
-       then permanently mark it spent so the player can SEE which charges
-       remain across the rest of the match. Fall back to any silver wrap
-       if none are pristine. */
-    var _sdRow=document.getElementById('playerDiceRow');
-    if(_sdRow){
-      var _sdAllSilver=_sdRow.querySelectorAll('.die-wrap[data-mat="silver"]');
-      var _sdTarget=null;
-      for(var _sdi=0;_sdi<_sdAllSilver.length;_sdi++){
-        if(!_sdAllSilver[_sdi].classList.contains('shield-spent')){_sdTarget=_sdAllSilver[_sdi];break;}
-      }
-      if(!_sdTarget&&_sdAllSilver.length)_sdTarget=_sdAllSilver[0];
-      if(_sdTarget){
-        _sdTarget.classList.remove('shield-fired');void _sdTarget.offsetWidth;
-        _sdTarget.classList.add('shield-fired');
-        /* After the bloom finishes, permanently dim the die so the spent
-           shield reads at a glance for the rest of the match. */
-        setTimeout(function(){if(_sdTarget)_sdTarget.classList.add('shield-spent');},900);
-      }
-      /* Apply bust class to ALL OTHER visible dice (the silver one keeps its
-         shield treatment instead of busting). */
-      Array.prototype.forEach.call(_sdRow.querySelectorAll('.die'),function(el){
-        var _w=el.parentElement;
-        if(_w===_sdTarget)return;
-        el.style.opacity='';el.style.filter='';el.classList.add('bust');if(el._d3)D3.draw(el._d3);
-      });
-    }
-    try{SFX.shield&&SFX.shield();}catch(e){}
-    try{Haptic.commit&&Haptic.commit();}catch(e){}
-    setStatusMsg('SILVER SHIELD — BUST BLOCKED!','silver');
-    spawnPop('🛡️ SHIELD');
-    G.safeTurnStreak=0;G.turnPts=0;G.kept=[];updHUD();refreshKeptTray();setBtns(false,false);
-    /* (the bust event now fires once at the top of doBust, before the
-       total is cleared - see there) */
-    if(G._oIllOmen){/* they called your bust: pay them */
-      var _ioP3=famDef('ill_omen').p[(G._oIllOmen.tier||1)-1];
-      var takeO=Math.min(_ioP3[0],G.pPts);
-      G.pPts-=takeO;G.oPts+=takeO;famLog('THEIR OMEN LANDS — THEY TAKE '+takeO);
-      G._oIllOmen=null;
-    }
-    if(G.kept.some(function(k){return k.mat==='whispers_fang';})||G.pool.some(function(d){return d.committed&&d.mat==='whispers_fang';})){
-      G.pPts=Math.max(0,G.pPts-200);famLog('THE FANG BITES — 200 MORE GONE');
-    }
-    setTimeout(()=>{clearRow('playerDiceRow');G.pool=[];endPTurn();},1400);
-    return;
-  }
   /* Second Wind: bust → roll 3 rescue dice ONCE, whatever scores is
      auto-banked, then the turn ends. REWORK: the old version handed the
      player a free 3-dice mini-turn (roll/score/bank freely) which didn't
@@ -25297,15 +25372,6 @@ function runOppTurn(){
         }
       }
       if(total===0){
-        /* NPC silver die shield: cancel bust */
-        if(G.dieShieldsOpp>0){
-          G.dieShieldsOpp--;
-          setStatusMsg('🛡️ SILVER SHIELD — '+G.rung.name+" DIDN'T BUST",'red');
-          spawnPop('🛡️ SHIELD');
-          /* Flash the silver dice in the opp's pool so the effect is visually clear */
-          if(G.oppDice){G.oppDice.forEach(function(d){if(d.mat==='silver'&&d.el){d.el.classList.add('eff-glow-blue');setTimeout(function(){if(d.el)d.el.classList.remove('eff-glow-blue');},_oppDelay(900));}});}
-          setTimeout(function(){clearRow('oppDiceRow');G.oppDice=[];step();},_oppDelay(900));return;
-        }
         /* BRUTUS'S GRIT NPC mirror: only the FIRST bust under 500 oppBank is
            saved per match. NPC clears bust dice and re-rolls (mirrors player
            _runSave). */
@@ -29319,7 +29385,6 @@ function initMatchScreen(data){
     G.thriftyBonus=rd.thriftyBonus||0;G.spurActive=(typeof rd.spurActive==='number'?rd.spurActive:(rd.spurActive?1:0));
     G.martyrUsed=rd.martyrUsed||false;
     G.flintlockFired=rd.flintlockFired||false;G.safeTurnStreak=rd.safeTurnStreak||0;
-    G.dieShieldsPlayer=rd.dieShieldsPlayer;G.dieShieldsOpp=rd.dieShieldsOpp;
     if(rd.activeCardState)G.activeCardState=rd.activeCardState;
     if(rd.crowsLuckCtx)G.crowsLuckCtx=rd.crowsLuckCtx;
     if(rd._pCrowsCtx)G._pCrowsCtx=rd._pCrowsCtx;
@@ -30626,9 +30691,14 @@ function _iconFaceRoll(mat){
 }
 /* a loadout may hold at most ONE Ward-branded die. The single-save cap is
    not enough on its own: a second Ward die is a second CHANCE TO ARM, which
-   sim measured at a 28% save rate against 17% for one. */
+   sim measured at a 28% save rate against 17% for one.
+   _enchInit, not just _getS: Brutus's relic carries Ward without anybody
+   buying it, and that brand only exists in these arrays once _enchInit has
+   stamped it. Read raw, this returned FALSE with the relic in the loadout
+   and the counter cheerfully sold a second Ward - the exact side door the
+   cap was written to close. */
 function _wardOwned(skipIdx){
-  _getS();
+  _getS();_enchInit();
   var hit=false;
   ['dieEnch','dieEnchInv'].forEach(function(key){
     (S.run[key]||[]).forEach(function(e,i){
