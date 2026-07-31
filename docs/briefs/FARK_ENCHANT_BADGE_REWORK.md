@@ -191,19 +191,20 @@ resolved; see open items.
   turns, i.e. not a real bet. The shortened window is what makes it an
   actual wager.
 - **Break** (~300g) — skull icon. Kept: banks 0. Destroys ONE OTHER
-  LIVE die of the player's choice for the REST OF THIS MATCH ONLY —
-  the die returns, fully restored, at the start of the player's next
-  match. Same bound as Trade above, stated explicitly here because the
-  earlier "permanently... for the rest of the match" phrasing reads
-  ambiguously between match-scoped and run-scoped, and the section 4
-  timing finding was always about turns remaining WITHIN a match, not
-  matches remaining in the run — that finding holds unchanged under
-  this clarification, it was never testing the harsher reading.
+  LIVE die of the player's choice for the REST OF THIS MATCH ONLY
+  (loadout drops to 5 dice for the remaining turns) — the die returns,
+  fully restored, at the start of the player's next match. Same bound
+  as Trade above, stated explicitly here because the earlier
+  "permanently... for the rest of the match" phrasing reads ambiguously
+  between match-scoped and run-scoped, and the section 4 timing finding
+  was always about turns remaining WITHIN a match, not matches
+  remaining in the run — that finding holds unchanged under this
+  clarification, it was never testing the harsher reading.
   (A PRESERVED die, per the match brief, is explicitly INERT and is
   therefore never a legal Break target — stated outright here so it
   never has to be inferred from the two words being opposites.)
-  (loadout drops to 5 dice for all remaining turns). WIDENED (supersedes
-  the earlier "Obsidian-only" decision): every family now has its own
+  WIDENED (supersedes the earlier "Obsidian-only" decision): every
+  family now has its own
   death-trigger, so Break has a real partner in every build, not one
   solved answer:
 
@@ -227,26 +228,25 @@ resolved; see open items.
   nuance that applies to ALL SEVEN rows equally, not just Obsidian's,
   and must not be smoothed away in implementation.
 - **Trade** (~350g) — crossed-arrows icon. Kept: banks 0, POST-ROLL.
-  PERMANENTLY swaps the MATERIAL occupying the player's lane with the
-  opponent's material in that same fixed lane, for the rest of the
-  match (the lane position itself never moves — only what's in it
-  changes). Not a hidden-information gamble — landing order is
-  loadout order and the peek already shows the opponent's dice before
-  the match starts, so this is a commitment risk (you know exactly
-  what you're trading for) not a blind one. Visible on the table: the
-  swap animates at both lane positions when it fires.
-  **CLARIFIED, then corrected — MATCH-SCOPED, reverts fully after.**
-  "For the rest of the match" is a bound, not a permanence claim — an
-  earlier pass here over-read it as crossing between matches and
-  invented an "enchants never cross" carve-out to guard against that.
-  Wrong scope: nothing here ever persists past the match it's used
-  in, so there is nothing to guard. The WHOLE die swaps — material
-  AND whatever enchant it carries — for the duration of THIS match
-  only; the instant the match ends (win or lose), both sides' true
-  owned loadouts are fully restored, no exceptions, no residue. This
-  is simpler than the earlier ruling, needs no special case, and is
-  the more exciting version besides — you're borrowing the opponent's
-  whole capability for one fight, not just their base material.
+  The WHOLE die swaps — material AND whatever enchant it carries —
+  with the opponent's die in that same fixed lane, for the CURRENT
+  MATCH ONLY (the lane position itself never moves — only what
+  occupies it changes). The instant the match ends, win or lose, both
+  sides' true owned loadouts are fully restored, no exceptions, no
+  residue. Not a hidden-information gamble — landing order is loadout
+  order and the peek already shows the opponent's dice before the
+  match starts, so this is a commitment risk (you know exactly what
+  you're trading for), not a blind one. Visible on the table: the swap
+  animates at both lane positions when it fires. You're borrowing the
+  opponent's whole capability for one fight, not just their base
+  material — that's the point of the card.
+  (Revision note, kept short on purpose: an earlier pass here
+  restricted this to material-only and invented an "enchants never
+  cross" carve-out, worried about permanent cross-table ownership.
+  Wrong — match-scoping already makes everything revert cleanly at
+  match end, so no carve-out was ever needed. The description above is
+  final; nothing else in this document should be read as overriding
+  it.)
 - **Snuff** (~300g) — banks 0, POST-ROLL. A candle-snuffer marker
   appears at the OPPONENT's same fixed lane; their die there is
   removed from their pool for their NEXT TURN ONLY, then returns
@@ -504,8 +504,13 @@ separate, still needed; not assumed covered by the Trade-scoping work.
 
 1. Kindred's "double strength" definition for Ward/Snare/Break/Trade/
    Snuff/Fog (section 3) — needs a design decision, not an assumption.
-2. Per-face pricing for the residual 1-vs-5 enchant cheese (section 2)
-   — exact multiplier untested.
+2. RESOLVED, matches section 2's own text exactly — per-face pricing
+   for the 1-vs-5 gap is MOOT now that the shop ships a random draw
+   with no player choice between faces (section 2). Left in this list
+   with its resolution stated, rather than deleted outright, so a
+   reader scanning only section 5 doesn't independently re-open a
+   question section 2 already closed — that mismatch is exactly the
+   bug this sweep found and fixed twice already; not repeating it here.
 3. All seven new enchant gold prices are placeholders, need a dedicated
    pricing pass.
 4. RESOLVED — Break is widened to all six families (section 2 table).
@@ -519,6 +524,9 @@ separate, still needed; not assumed covered by the Trade-scoping work.
    broader relic-vs-badge architecture question (should relics be
    physical dice competing for loadout slots, or fold into some other
    delivery) remains open independent of this specific fix.
+7. Snuff and Fog's real power level against an ADAPTING opponent (this
+   document's sim used static hands; re-run once opponent AI logic for
+   these two exists).
 8. NO OPPONENT-SIDE ENCHANTS EXIST IN THE ENGINE. This was found to be
    the root cause of THREE structurally-unreachable clauses in this
    document, all now resolved: Kindred (rescoped to player-only, above),
@@ -531,9 +539,6 @@ separate, still needed; not assumed covered by the Trade-scoping work.
    keep-policy for icon faces) would let Kindred and First Strike
    recover their original, richer designs — a real future option, not
    attempted here.
-7. Snuff and Fog's real power level against an ADAPTING opponent (this
-   document's sim used static hands; re-run once opponent AI logic for
-   these two exists).
 
 ## 6. MIGRATION CHECKLIST FOR CODE
 
@@ -560,8 +565,11 @@ ADD:
   Obsidian alone, since the whole point of widening was to avoid a
   single dominant partner.
 - Steady Hand, Fair Trade (Silver's two new cards).
-- Face-restriction validation (1/5 only) in the enchant shop flow, plus
-  the new face-picker UI step.
+- Face-restriction validation (1/5 only) on the random-draw shop flow
+  — NO face-picker screen, per section 2's explicit "no picker, ever"
+  ruling. Struck per Code's flag: this line previously referenced a
+  picker step that section 2 already superseded; left uncorrected here
+  it would have been read as a checklist item to build.
 - The universal icon-resolution rule (banks 0, fires effect, never
   both) as shared logic all seven icon enchants call into — implement
   once, not seven times, so the section-0 law stays enforced by
@@ -576,9 +584,10 @@ outside Silver's suite.
 
 - An icon-face keep NEVER also banks its natural number — verify across
   all seven icon enchants, zero exceptions.
-- Enchant face-picker rejects any face except 1 or 5; rejects Jade
-  wild-6 and any relic-altered face even if that die shows on 1 or 5
-  naturally elsewhere.
+- Enchant random-face-draw NEVER produces a face outside {1, 5} —
+  verify across many draws, no picker screen involved. The draw pool
+  excludes Jade wild-6 and any relic-altered face even if that die
+  shows 1 or 5 naturally elsewhere.
 - A loadout with 2 Ward-branded dice is impossible to construct (hard
   cap enforced at the shop/loadout level, not just at resolution time).
 - A Snare mark clears after exactly one opposing turn, hit or miss —
