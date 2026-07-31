@@ -1,4 +1,10 @@
-# Design questions — for the creative director
+# Design questions — ARCHIVE
+
+> **This file is closed.** The live list of unanswered questions is
+> `QUESTIONS_OPEN_2026-07-31.md` — one clean doc, grouped by subject and
+> numbered for replies. This one is kept for the record: it holds round 1
+> (answered in `AUDIT_RESOLUTIONS.md`) and the raw form of rounds 2-4 as they
+> were raised. Do not append to it; each new batch gets its own dated file.
 
 ## Status — read this first
 
