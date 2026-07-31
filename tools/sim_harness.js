@@ -246,7 +246,16 @@ F.buildLoadout=function(spec){
   S.run.dice=dice.slice();
   S.run.dieEnch=[null,null,null,null,null,null];
   S.run.dieEnchInv=[];
-  S.run._enchV=3;S.run._enchTradeV=2;
+  /* THE SHIPPED MIGRATIONS' TARGET VERSIONS, and they are NOT the same number.
+     _enchInit guards on `_enchV!==3` and `_enchTradeV!==1` - two independent
+     keys on purpose (fark_proto.html:17947 explains why). This line used to
+     write 2 for the Trade key, which does not satisfy that guard, it trips it:
+     the legacy-Trade pass then nulled every {t:'trade'} brand and refunded 350g
+     before a single match was played. newG calls _enchInit() unconditionally
+     right after this function, so EVERY Trade measurement made with this
+     harness measured an empty lane, with an inflated gold curve on top.
+     If either guard changes in the game, these two numbers must follow. */
+  S.run._enchV=3;S.run._enchTradeV=1;
   var refused=[];
   (spec.ench||[]).forEach(function(t,i){
     if(!t||i>5)return;
@@ -278,12 +287,31 @@ F.setupMatch=function(o){
   var oCards=(rung.cards||[]).slice();
   var g=newG(rung,[],oCards,0,0);
   setG(g);
+  /* DID THE BUILD SURVIVE newG? newG runs _enchInit(), which is where the save
+     migrations live, and a migration can legally delete a brand. This used to
+     copy S.run.dieEnch straight into _enchArr - AFTER that had happened - so
+     the harness's own record agreed with the damage and nothing ever compared
+     what was ASKED FOR against what was STANDING. That is how a wrong
+     _enchTradeV silently emptied every Trade lane in the whole sim: the numbers
+     looked fine.
+     `refused` is buildLoadout declining to fit a brand. `lost` is a brand that
+     WAS fitted and then removed by something downstream. They are different
+     failures and they are reported separately. */
+  var _lost=[];
+  (lo.ench||[]).forEach(function(e,i){
+    if(e&&!(S.run.dieEnch||[])[i])_lost.push({lane:i,t:e.t,why:'removed by _enchInit'});
+  });
+  if(_lost.length)lo.lost=_lost;
   g._enchArr=(S.run.dieEnch||[]).slice();
   g.turnCap=o.boss?TURN_CAP_BOSS:TURN_CAP_PATRON;
   g.phase='idle';
   try{_applyTellAndSleeve();}catch(e){}
   _elPool.length=0;
   return{g:g,rung:rung,loadout:lo,target:g.target,
+         /* surfaced at the top level too - a caller reading only the summary
+            still cannot miss that the build it asked for is not the build that
+            was measured. */
+         lostEnch:lo.lost||null,
          badgeLive:o.badge?_ruleActive(o.badge,'p'):false};
 };
 
