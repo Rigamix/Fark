@@ -16211,10 +16211,34 @@ function _matchDress(isBoss){
   var SIZE={singleCoin:11,coins:15,spoon:18,bread:21,cheese:21,olives:19,
     pouch:18,pouch02:19,package:22,bottle:18,jug:23,mug01:20,mug_empty:20,
     candle:26,towel:28};
-  var ASPECT={bottle:[349,483],bread:[440,312],candle:[379,400],cheese:[432,344],
-    coins:[359,277],jug:[329,413],mug01:[365,368],mug_empty:[396,357],
-    olives:[388,361],package:[446,368],pouch:[302,381],pouch02:[447,384],
-    singleCoin:[247,206],spoon:[431,283],towel:[491,372]};
+  /* EVERY PROP, MEASURED, not typed. This is load-bearing twice over: it sets
+     the prop's own layout height AND the shadow silhouette's height in
+     _drawPropShadows (h0=w0*a[1]/a[0]). A prop missing from here falls back to
+     [1,1], which draws its shadow as a SQUARE and then centres that square at
+     y+h0/2 - so the shadow ends up the wrong shape AND pushed off the prop.
+     bowl_dirty (525x391) came out 34% too tall and sat below the bowl instead
+     of up-and-left; fork (138x309) came out less than half its height and sat
+     above the fork.
+     It had fifteen entries for thirty-eight props and nobody noticed, because
+     template 001 happens to use only props that were in the fifteen. The first
+     dressing built from the wider set broke immediately.
+     Read off naturalWidth/naturalHeight of the actual files by
+     tools/apv_prop_aspect.js; the original fifteen came back identical, which
+     is what says the measurement is trustworthy. Re-run it when art changes. */
+  var ASPECT={bag:[521,409],bottle:[349,483],bottle01:[274,654],bottle02:[169,402],
+    bowl_dirty:[525,391],bowl_full:[541,441],bread:[440,312],candle:[379,400],
+    cauldron:[456,488],cheese:[432,344],coins:[359,277],cork:[172,165],
+    fork:[138,309],grapes:[223,199],jug:[329,413],key:[159,174],knife:[186,356],
+    lantern:[197,457],loaf:[332,280],mug01:[365,368],mug_empty:[396,357],
+    olives:[388,361],package:[446,368],plank:[422,399],plateMetal:[356,307],
+    plateWood:[360,313],pouch:[302,381],pouch02:[447,384],pouch03:[296,434],
+    sausages:[337,499],singleCoin:[247,206],singleCoin_02:[106,86],
+    spoon:[431,283],towel:[491,372],towel01:[324,384],towel02:[325,386],
+    ustensils:[240,445],wine:[458,503]};
+  /* a numbered variant falls back to its base rather than to [1,1] - towel03
+     should read as a towel, not as a cube. */
+  function _propBase(n){return String(n||'').replace(/_?\d+$/,'');}
+  function _propAspect(n){return ASPECT[n]||ASPECT[_propBase(n)]||[1,1];}
   var PP='Art/Assets/Match/Commoner/Props/';
   var TOP={TL:[-4,15],TR:[78,15]};
   var COIN=['coins','singleCoin'],CUP=['mug01','mug_empty','jug','bottle'];
@@ -16309,7 +16333,7 @@ function _matchDress(isBoss){
   /* painter's order: what is further (higher on the table) sits BELOW
      what is closer (lower) — sort by visual base line, then append */
   placed.sort(function(A,B){
-    var aa=ASPECT[A.n]||[1,1],ab=ASPECT[B.n]||[1,1];
+    var aa=_propAspect(A.n),ab=_propAspect(B.n);
     return (A.y+A.w*(aa[1]/aa[0])*0.52)-(B.y+B.w*(ab[1]/ab[0])*0.52);
   });
   /* a hand-made template wins over the procedural dressing, used exactly
@@ -16334,9 +16358,36 @@ function _matchDress(isBoss){
       return {n:q.n,x:+q.x,y:+q.y,w:+q.w,rot:+(q.rot||0),
               fx:+(q.fx||1),fy:+(q.fy||1)};});
   }
-  /* how far a prop's shadow is allowed to travel, as a fraction of normal.
-     1 = a tall object, 0.2 = something lying flat on the wood. */
-  var FLAT_PROPS={coins:0.22,singleCoin:0.18,towel:0.25,spoon:0.28};
+  /* How far a prop's shadow is allowed to travel, as a fraction of normal.
+     1 = a tall object, 0.2 = something lying flat on the wood. The gap between
+     a thing and its shadow is what makes it read as HOVERING, so anything
+     lying on the table keeps its shadow tucked underneath.
+     THIS USED TO BE AN EXACT LOOKUP over four names, which meant `towel` was
+     flat and `towel01`/`towel02` were not, and `singleCoin` was flat while
+     `singleCoin_02` was not. Measured on the live table: of twelve props, ONE
+     resolved to a flat value and eleven threw a tall object's shadow.
+     _flatOf strips a trailing number so a future towel03 inherits instead of
+     silently becoming a tower. */
+  var FLAT_PROPS={
+    /* thinnest - a coin, a key: the shadow is a rim, not an offset */
+    singleCoin:0.18, key:0.18,
+    /* cutlery lying flat */
+    fork:0.20, knife:0.20,
+    /* flat boards and plates, and a scatter of coins */
+    coins:0.22, plank:0.22, plateMetal:0.22, plateWood:0.22,
+    /* cloth, with a little loft */
+    towel:0.25,
+    spoon:0.28,
+    /* small, rounded, still resting on the wood */
+    cork:0.30, sausages:0.30,
+    /* a slumped sack has real volume, but nothing like a bottle */
+    bag:0.35
+  };
+  function _flatOf(n){
+    if(FLAT_PROPS[n]!==undefined)return FLAT_PROPS[n];
+    var b=_propBase(n);
+    return FLAT_PROPS[b]!==undefined?FLAT_PROPS[b]:1;
+  }
   var _jobs=window._shJobs=[];
   placed.forEach(function(q){
     var w=q.w;
@@ -16347,7 +16398,7 @@ function _matchDress(isBoss){
     pr.appendChild(img);
     /* silhouette shadow job: offset radially away from the overhead
        light centre (50%/44%); drawn on the shadow canvas */
-    var a=ASPECT[q.n]||[1,1];
+    var a=_propAspect(q.n);
     var cx=q.x+w/2,cy=q.y+w*(a[1]/a[0])*0.26;   /* prop centre, approx (h% ~ w%*ratio/1.9) */
     img._pcx=cx/100;img._pcy=cy/100;
     /* away from the candle. 44 was left behind when the pool moved to 52. */
@@ -16356,7 +16407,7 @@ function _matchDress(isBoss){
     /* A flat thing lying ON the table cannot throw its shadow out to one
        side - the gap is what makes it read as hovering. Coins, the towel and
        the spoon keep theirs tucked underneath. */
-    var flat=FLAT_PROPS[q.n]?FLAT_PROPS[q.n]:1;
+    var flat=_flatOf(q.n);
     var mag=Math.max(0.7,len*0.045)*flat;
     var ox=dx/len*mag,oy=(dy/len*mag)/1.9;
     _jobs.push({src:PP+q.n+'.png?v=2',x:+(q.x+ox).toFixed(2),y:+(q.y+oy).toFixed(2),
