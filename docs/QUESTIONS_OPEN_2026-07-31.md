@@ -1,3 +1,7 @@
+> **SUPERSEDED by `QUESTIONS_2026-07-31b.md`.** That is the live list.
+> This one is the pre-sim, pre-rulings set and is kept only as the record
+> of what was asked before the briefs were revised.
+
 # Fark — open questions
 
 > **Answered 2026-07-31** in `ANSWERS_2026-07-31.md` (1-53), and questions
