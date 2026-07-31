@@ -10568,9 +10568,11 @@ const RUNGS=[
     /* WHISPER — KINDRED (was Counterfeit, never validated). RESCOPED to the
        player alone: the engine has no opponent-side enchants, so the original
        "either side" wording could never be true on their half of the table.
-       2+ worked dice in YOUR loadout double icon effects for the match. Only
-       cleanly defined for additive-numeric effects, so only Tithe doubles;
-       the rest are an open design decision, not a default to guess. The bark
+       2+ worked dice in YOUR loadout double icon effects for the match.
+       RULING E DEFINES "DOUBLE" SEPARATELY FOR EACH ENCHANT that carries it
+       - 2x gold, a two-thirds save, a second halving on the one shot, a
+       second opponent turn - because one multiplier cannot express a change
+       of shape, only a change of size. Break and Trade never double. The bark
        lost "for both of us" with the rescope - it was describing a rule the
        engine has no way to run. */
     tell:{id:'counterfeit',name:'KINDRED',desc:"“Marked dice sing louder at my table.”",icon:'💀'}},
@@ -17128,9 +17130,18 @@ var ENCHANTS={
    law holds by construction rather than by seven people remembering it.
 
    `doubles` marks an effect Whisper's Kindred badge can meaningfully
-   double. Only Tithe qualifies: "twice as much gold" is obvious, "twice a
-   die-destruction" is not. See the brief's open items - the others are a
-   design decision, not a default to guess. */
+   double, and RULING E HAS NOW DEFINED WHAT "DOUBLE" MEANS FOR EACH OF THE
+   FIVE THAT CARRY IT, so this is no longer an open question anyone needs to
+   re-open: Tithe pays 2x gold, Ward saves two-thirds instead of a half,
+   Snare halves TWICE on the same next-turn shot rather than watching a
+   longer window, and Snuff and Fog each hold their seat for TWO opponent
+   turns rather than two lanes. Every one of those meanings is written where
+   the effect RESOLVES, not here - the fire handlers below only stamp what
+   `c.mult` told them, because Ward pays out at a bust and the three seat
+   marks pay out on the rival's turn, both long after the brand was kept.
+   BREAK AND TRADE ARE EXCLUDED ON PURPOSE and must stay excluded: there is
+   no coherent 2x of a die-destruction or of a one-time swap, and their
+   absence from this whitelist IS the ruling, not an omission to tidy up. */
 var ENCH_ICONS={
   tithe:{name:'Tithe',price:150,glyph:'\u25C9',ink:'#d8b054',doubles:true,
     desc:'Brand a coin on one face. Keep it: it banks nothing and pays you 15 gold.',
@@ -17231,14 +17242,20 @@ var ENCH_ICONS={
       var myEn=G._enchArr[L]||null;
       G.matchDice[L]=theirs;G.matchOppDice[L]=mine;
       /* The brand leaves with the die - that is what makes Trade
-         self-consuming, and it also moves a number that is NOT this area's to
-         move: _kindredActive counts (G._enchArr||[]).filter(Boolean).length, so
-         a player holding exactly two branded dice loses the doubling the moment
-         they Trade. It follows from the brand physically leaving the table, but
-         the badge brief words Kindred as doubling "for the match" and its own
-         open item says not to assume Kindred's behaviour. Flagged at the line
-         that causes it, so whoever owns Kindred signs it off rather than
-         discovering it. */
+         self-consuming. THIS NO LONGER COSTS THE PLAYER KINDRED, and the
+         warning that used to stand here is discharged. It was written when
+         _kindredActive counted (G._enchArr||[]).filter(Boolean).length, which
+         meant a player holding exactly two branded dice lost the doubling the
+         instant they Traded - the brand physically leaves the table, so the
+         live array is one shorter. That count now reads S.run.dieEnch, the
+         LOADOUT, which nothing inside a match writes: Trade touches only
+         G._enchArr and the two match arrays, so Kindred survives the swap and
+         the brief's wording of doubling "for the match" holds. Signed off
+         under ruling E, which owns Kindred. The live-array fallback inside
+         _kindredActive is the one place the old behaviour can still occur, on
+         a table with no S.run behind it, and it is left as it is rather than
+         papered over - a runless table has no shop to have bought the second
+         brand from. */
       G._enchArr[L]=null;
       /* THE LEDGER. It makes the restore an act rather than an absence, and
          something downstream really does read the live loadout before G is
@@ -17415,8 +17432,16 @@ function _dieIsIcon(d){return !!(d&&_isIcon(d.ench)&&d.val===d.ench.face);}
    side" wording could never be true on their half of the table (brief
    section 3, open item 8). Sim, Tithe only: gold 5.9 -> 11.9 a turn, an exact
    2x with no leakage.
-   ONLY the additive-numeric effects double, and Tithe is the only one there
-   is - see ENCH_ICONS.doubles, which is the single place that list lives. */
+   EVERY ENCHANT ON THE `doubles` WHITELIST NOW HAS A DEFINED DOUBLING, per
+   ruling E: Tithe 2x gold, Ward two-thirds surviving instead of a half,
+   Snare halved twice on one shot, Snuff and Fog two opponent turns each.
+   The sim above measured Tithe alone because Tithe is the only one whose
+   doubling is a NUMBER rather than a SHAPE - the other four change what the
+   effect does, not how much of it there is, so there is nothing for a gold-
+   per-turn harness to read. Do not take the missing four as unshipped; each
+   is implemented where its effect resolves, not where it is armed. See
+   ENCH_ICONS.doubles, the single place that list lives, which leaves Break
+   and Trade off deliberately. */
 function _kindredActive(){
   try{
     /* _ruleActive, not G._tell.id - the id also arrives by sleeve and by a
@@ -17611,9 +17636,15 @@ var BREAK_TRIGGERS={
     G.turnPts=(G.turnPts||0)+1000;
     G.kept.push({vals:[],mat:'obsidian',pts:1000,dice:[]});
     try{updHUD();refreshKeptTray();}catch(e){}}},
-  amber:{msg:'AMBER SETS — NO BUST THIS TURN',fire:function(){
+  amber:{msg:'AMBER SETS — YOUR NEXT BUST IS EATEN',fire:function(){
+    /* ONE BUST, NOT THE REST OF THE TURN - brief section 2, Amber row,
+       CORRECTED. The old promise was the whole turn and doBust never spent
+       the flag, so 98.5% of measured turns never ended naturally and ran into
+       the 60-roll safety guard instead. Every other row in this table is a
+       single bounded one-time effect; this one is one too now. doBust clears
+       the flag on the bust it eats. */
     G._bustImmuneTurn=true;
-    try{setStatusMsg('AMBER — YOU CANNOT BUST THIS TURN','gold');}catch(e){}}},
+    try{setStatusMsg('AMBER — YOUR NEXT BUST IS EATEN','gold');}catch(e){}}},
   starstone:{msg:'STARSTONE FALLS — ONE MORE TURN',fire:function(){
     G._extraTurn=(G._extraTurn||0)+1;}},
   silver:{msg:'SILVER CLOSES — BANKED',fire:function(){
@@ -22943,8 +22974,11 @@ function startPTurn(){
   if(!G||G._endMatchFired)return;
   if(typeof _checkDeadAir==='function')_checkDeadAir();
   G.phase='idle';G.turnPts=0;G.kept=[];G.numDice=G.matchDice?G.matchDice.length:6;G.pool=[];G.turnRollCount=0;G._encorePending=false;G._slowHandUsedThisTurn=false;G._warmHandsActive=false;G._lastHotDice=false;G._firstRollCommitted=0;G._bustSavedThisTurn=false;
-  /* per-turn icon state. Ward and Amber's immunity last one turn by
-     definition; Zero Hour re-arms each turn. Snare/Snuff/Fog are NOT reset
+  /* per-turn icon state. Ward lasts one turn by definition. AMBER IS A
+     ONE-SHOT NOW, not a turn-long immunity - doBust spends it on the single
+     bust it eats, so this line only reaches a save that was never called on,
+     and an unspent save does NOT carry into the next turn.
+     Zero Hour re-arms each turn. Snare/Snuff/Fog are NOT reset
      here - they are armed on the player's turn to resolve on the rival's,
      and clear themselves when they fire. */
   G._wardArmed=false;G._bustImmuneTurn=false;G._zeroHourEnds=false;G._breakArmed=false;
@@ -24469,15 +24503,27 @@ function doBust(){
      the only dispatch would have disappeared with it, and the brief KEEPS
      Retort and Reprisal. */
   var _bustLost=(G.kept||[]).reduce(function(a,k){return a+(k.pts||0);},0);
-  /* AMBER's break-trigger: this turn simply cannot bust. Checked before
+  /* AMBER's break-trigger eats ONE BUST, then it is gone. Checked before
      anything is cleared, so the turn continues untouched - and BEFORE the bust
      EVENT below, which is the half that was wrong. famFire('bust') is what pays
      Retort, Reprisal, slow_cook and fools_gold; firing it two lines above this
      check meant every one of them collected on a bust that never happened,
-     while the player kept the turn AND its points. A turn Amber says cannot
-     bust has to look that way to the cards listening for one. */
+     while the player kept the turn AND its points. A bust Amber eats has to
+     look that way to the cards listening for one.
+     ONE BUST, NOT THE REST OF THE TURN - brief section 2, Amber row,
+     CORRECTED. The flag used to survive this branch, so a turn that had eaten
+     one bust could not end at all: 98.5% of measured turns never ended
+     naturally and hit the 60-roll safety guard instead. It was the only
+     unbounded row in a table of otherwise single, bounded, one-time effects,
+     which is structurally why it broke this badly. Spending the flag on entry
+     is the whole fix - every later bust in the same turn falls straight
+     through to the real bust path below. */
   if(G._bustImmuneTurn){
-    try{setStatusMsg('AMBER HOLDS — NO BUST','gold');famLog('AMBER — THE TURN SURVIVES');}catch(e){}
+    /* SPENT ON ENTRY, BEFORE ANY PATH CAN RETURN. Both exits from this branch
+       - the play-on path at the bottom, and the !_amOK bank-out - leave the
+       save used, so no route out of here still owes the player one. */
+    G._bustImmuneTurn=false;
+    try{setStatusMsg('AMBER HOLDS — THAT SAVE IS SPENT','gold');famLog('AMBER HOLDS — ONE BUST EATEN, THE NEXT ONE LANDS');}catch(e){}
     var _amFree=G.pool.filter(function(d){return !d.committed;});
     /* Keep rerolling until the hand can actually be played. Without this the
        reroll could land dead and leave the player with no legal move and no
@@ -24491,9 +24537,10 @@ function doBust(){
     _amFree.forEach(function(d){try{reDrawDieFace(d);}catch(e){}});
     if(!_amOK){
       /* astronomically unlikely, but never leave the turn unplayable: bank
-         what is there rather than hang. */
-      G._bustImmuneTurn=false;
-      try{famLog('AMBER GIVES OUT');}catch(e){}
+         what is there rather than hang. NOTHING TO CLEAR HERE ANY MORE - the
+         save is spent at the top of the branch, and clearing it a second time
+         would tell a future reader it survives this far. It does not. */
+      try{famLog('AMBER GIVES OUT — AND IT IS SPENT EITHER WAY');}catch(e){}
       setTimeout(function(){try{handleBank();}catch(e){}},400);
       return;
     }
