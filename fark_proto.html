@@ -25636,15 +25636,6 @@ function _handBackOrCap(){
 function endPTurn(){
   /* Ghost-timer guard (see startPTurn) */
   if(!G||G._endMatchFired)return;
-  /* STARSTONE's break-trigger: one immediate extra turn, taken right after
-     this one instead of yielding the table. */
-  if(G._extraTurn>0){
-    G._extraTurn--;
-    try{setStatusMsg('STARSTONE — THE TABLE IS STILL YOURS','gold');famLog('AN EXTRA TURN');}catch(e){}
-    restoreRollButton();
-    setTimeout(function(){try{startPTurn();}catch(e){}},700);
-    return;
-  }
   restoreRollButton();
   try{_renderSelTags([],0,true);}catch(e){}
   G.phase='opp';G.turnPts=0;G.kept=[];G.numDice=6;G.turnNum++;
@@ -25693,6 +25684,26 @@ function endPTurn(){
   if(G._fExtraTurn&&G.pPts<G.target&&G.oPts<G.target){
     G._fExtraTurn=false;
     setStatusMsg('FALLING STAR — YOU GO AGAIN','gold');
+    flashYourTurn();setTimeout(()=>{setTurnMode(false);startPTurn();},900);
+    return;
+  }
+  /* STARSTONE's break-trigger: one immediate extra turn, taken right after
+     this one instead of yielding the table.
+     IT SITS HERE, NOT AT THE TOP OF THIS FUNCTION, and the position IS the
+     mechanic (ruling #9 - "align to Falling Star's existing ordering, counts
+     normally, advances turnNum, refreshes Quicksilver"). Returning early, as
+     this used to, skipped G.pTurns++ so the turn was free against the cap;
+     skipped G.turnNum++, and Quicksilver's "already used" test is
+     G._qsTurn===G.turnNum, so the bonus turn was the one turn of the match
+     where Quicksilver could NOT be used; and skipped the per-turn flag resets,
+     so Flintlock could not fire on it either. A reward that quietly disabled
+     two other things.
+     What both rows actually buy is TEMPO - two turns back to back with no
+     reply - not turns off the books. Same decided-match guard as Falling Star:
+     no bonus turn once the match is already over. */
+  if(G._extraTurn>0&&G.pPts<G.target&&G.oPts<G.target){
+    G._extraTurn--;
+    try{setStatusMsg('STARSTONE — THE TABLE IS STILL YOURS','gold');famLog('AN EXTRA TURN');}catch(e){}
     flashYourTurn();setTimeout(()=>{setTurnMode(false);startPTurn();},900);
     return;
   }
