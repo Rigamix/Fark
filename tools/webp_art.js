@@ -14,44 +14,14 @@
  *     | python <decode the setup: line>
  */
 const JOBS = [
-  /* the eight enchant icons: small, high-contrast plaques that get scaled DOWN
-     hard, so quality stays high - artefacts on a 40px icon are very visible. */
-  { dir: 'Art/Assets/Enchants/', files: [
-    ['break.png', 0.92],
-    ['fog.png', 0.92],
-    ['quicksilver.png', 0.92],
-    ['snare.png', 0.92],
-    ['snuff.png', 0.92],
-    ['tithe.png', 0.92],
-    ['trade.png', 0.92],
-    ['ward.png', 0.92] ] },
-  /* the patron busts: large cut-outs behind a frame, the biggest art on the
-     night screen and the most worth shrinking. */
+  /* the six seed-cast busts, added after the first 24 */
   { dir: 'Art/Assets/Frames/Patrons/Characters/', files: [
-    ['Corbin.png', 0.86],
-    ['Dunstan.png', 0.86],
-    ['Eira.png', 0.86],
-    ['Golgoth.png', 0.86],
-    ['Krox.png', 0.86],
-    ['Mudge.png', 0.86],
-    ['Nebb.png', 0.86],
-    ['Nell.png', 0.86],
-    ['Nix.png', 0.86],
-    ['Osgood.png', 0.86],
-    ['Pell.png', 0.86],
-    ['Poll.png', 0.86],
-    ['Rask.png', 0.86],
-    ['Regis.png', 0.86],
-    ['Remny.png', 0.86],
-    ['Rilla.png', 0.86],
-    ['Roan.png', 0.86],
-    ['Sil.png', 0.86],
-    ['Sparr.png', 0.86],
-    ['Squib.png', 0.86],
-    ['Thorne.png', 0.86],
-    ['Tuck.png', 0.86],
-    ['Twill.png', 0.86],
-    ['Vess.png', 0.86] ] },
+    ['Odo.png', 0.86],
+    ['Ollis.png', 0.86],
+    ['Peck.png', 0.86],
+    ['Ferrand.png', 0.86],
+    ['Fenn.png', 0.86],
+    ['Tam.png', 0.86] ] },
 ];
 
 const load = src => new Promise((res, rej) => {
