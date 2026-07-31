@@ -17731,11 +17731,45 @@ function _breakPreserved(d){
   }catch(e){}
   return false;
 }
+/* A BORROWED die - one standing in a lane it only occupies because of a live
+   Fair Trade loan - is never a legal Break target either (brief section 1,
+   Fair Trade's entry: "Break cannot target a borrowed die at all, full
+   stop"). Deliberately built to the SAME SHAPE as _breakPreserved above,
+   because that is exactly what the ruling asks for: one predicate, filtered
+   in _breakBegin and gated again at the tap in _breakDie.
+   WHAT IT CLOSES WAS MEASURED, NOT THEORETICAL. Borrow a die, break it, keep
+   the family payout and still have six real dice - 48.6% win rate against
+   15.2% for an honest self-break. The alternative that used to sit here,
+   brief 4b's "the lane persists, benched die returns immediately, stay at 6",
+   tried to PRICE the break instead of forbidding it and is now STRUCK: once
+   Fair Trade's swap is involved there is no non-arbitrary answer for which
+   die ends up standing where.
+   THE SEAT TEST IS THE ONE startPTurn'S LOAN-EXPIRY BLOCK ALREADY USES -
+   matchDice[lane] still holding ft.borrowed - so the two can never disagree
+   about whether the loan is still standing in its lane. If some other effect
+   has taken that seat since (steal_die, a mirror swap) the die there is not
+   borrowed and Break may have it. If matchDice cannot be read at all the die
+   is treated as borrowed: refusing a legal target costs the player one Break,
+   allowing an illegal one costs the exploit above.
+   DELIBERATE TARGETING ONLY. Passive death on a borrowed die - Obsidian's own
+   shatter - is UNCHANGED by this and still resolves through the Fair-Trade
+   branch at the top of _removeDieAt. */
+function _breakBorrowed(d){
+  if(!d||!G)return false;
+  try{
+    var ft=G._fairTrade;
+    if(!ft||ft.lane===undefined||ft.lane===null)return false;
+    if(_laneOf(d)!==ft.lane)return false;
+    if(!G.matchDice||ft.lane>=G.matchDice.length)return true;
+    return G.matchDice[ft.lane]===ft.borrowed;
+  }catch(e){}
+  return false;
+}
 /* Enter targeting: the next die tapped is the one that breaks. Mundane dice
    (bone, iron, flint, lead) have no trigger - confirmed the worst target,
    matching mundane dice being baseline-weak everywhere else. */
 function _breakBegin(src){
-  var live=G.pool.filter(function(d){return !d.committed&&d!==src&&!_breakPreserved(d);});
+  var live=G.pool.filter(function(d){return !d.committed&&d!==src&&!_breakPreserved(d)&&!_breakBorrowed(d);});
   /* false = nothing to break, so the caller must carry on rather than wait
      for a tap that can never come */
   if(!live.length){try{famLog('NOTHING LEFT TO BREAK');}catch(e){}return false;}
@@ -17778,13 +17812,26 @@ function _breakBegin(src){
 function _removeDieAt(lane,opts){
   opts=opts||{};
   if(!G||lane===undefined||lane===null||lane<0)return false;
-  /* THE LANE SURVIVES, ONLY THE DIE DIES (brief 4b). A lane holding a BORROWED
-     die is not an ordinary seat: the player's own die is standing just behind
-     it, benched by the loan and never itself destroyed. Killing the borrower
-     hands the lane straight back to its owner - the player keeps six dice, and
-     breaking a borrowed die costs exactly what breaking an owned one costs,
-     one die for the match, rather than a whole seat because of which die
-     happened to be visiting.
+  /* THE LANE SURVIVES, ONLY THE DIE DIES - AND NATURAL DEATH IS THE ONLY WAY
+     IN HERE NOW. The single caller that still reaches this branch is the
+     Obsidian shatter sweep in afterRoll, which removes each shattered die by
+     seat. Break cannot: brief section 1 makes a borrowed die an ILLEGAL BREAK
+     TARGET, so _breakBegin never offers it and _breakDie refuses the tap, and
+     the lane the deliberate break used to arrive with can no longer be one
+     that holds a loan.
+     THE 4b RULING THIS BRANCH WAS WRITTEN TO IS STRUCK FOR BREAK ONLY. "The
+     lane persists, benched die returns immediately, stay at 6" was the price
+     put on breaking a borrowed die; measured, it priced it at nothing (48.6%
+     win rate against 15.2% for an honest self-break) and the brief replaced it
+     with a ban rather than a bigger price. It survives here because the same
+     brief says passive death on a borrowed die is UNCHANGED, and this is the
+     only path that still carries it. DO NOT delete it, and do not re-open it
+     to Break.
+     A lane holding a BORROWED die is not an ordinary seat: the player's own
+     die is standing just behind it, benched by the loan and never itself
+     destroyed, so killing the borrower hands the lane straight back to its
+     owner. The lent die is still lost until the next match - _ftDead just
+     below - which is the cost brief section 2 actually asks for.
      P375 cleared the loan and let the seat go with it. That read the loan as
      part of the seat; it is not - the lane is a fixed position on the table and
      the die is only what is standing in it, which is the same distinction the
@@ -17902,12 +17949,20 @@ function _breakClear(){
 }
 function _breakDie(d){
   if(!G._breakArmed)return;
-  /* The same rule _breakBegin filters on, gated again at the point of no
-     return: a PRESERVED die is inert and never breaks, however the tap got
-     here. Returning while still armed is deliberate - the other outlined
-     dice keep their handlers, so the player is not stranded behind dead
-     buttons. */
+  /* The same two rules _breakBegin filters on, gated again at the point of no
+     return: a PRESERVED die is inert and never breaks, and a BORROWED die is
+     an illegal target full stop, however the tap got here. Returning while
+     still armed is deliberate - the other outlined dice keep their handlers,
+     so the player is not stranded behind dead buttons.
+     BOTH GATES ARE BELT AND BRACES AND THAT IS THE POINT. _breakBegin only
+     binds _breakDie to the dice it offered, so neither famLog below should
+     ever be reachable through the UI; they exist because this is the point of
+     no return and any future caller that reaches _breakDie by another route
+     must not be the one that discovers the rule.
+     They are named separately because the reason differs for the player: the
+     amber die cannot die, the borrowed die is not theirs to destroy. */
   if(_breakPreserved(d)){try{famLog('THE AMBER HOLDS - THAT DIE CANNOT BREAK');}catch(e){}return;}
+  if(_breakBorrowed(d)){try{famLog('THAT DIE IS ON LOAN - BREAK CANNOT TAKE IT');}catch(e){}return;}
   _breakClear();
   G.pool.forEach(function(q){if(q.el)q.el.onclick=null;});
   var fam=_matFam(d.mat);
