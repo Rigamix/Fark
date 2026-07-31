@@ -11913,7 +11913,11 @@ const DICE_TYPES=[
   {id:'starstone',name:'STARSTONE',icon:'⭐',cost:700,
    faces:[1,2,3,4,5,6],
    effect:{type:'scoring_boost',mechanic:'starstone_bonus',amount:500},
-   desc:'Each Starstone in your loadout adds +500 to every bank you make. Stacks per die.'},
+   /* Text follows ruling B: the bonus is paid for the die's participation, so
+      the old "in your loadout" wording now describes a rule the code does not
+      run. An icon-face keep scores nothing and pays nothing, which is why this
+      says keep AND score. */
+   desc:'Each Starstone you keep and score adds +500 to that bank. Stacks per die.'},
   {id:'vagabond',name:'VAGABOND',icon:'🦊',cost:700,
    faces:[1,2,3,4,5,6],
    effect:{type:'movement',mechanic:'drag_reorder'},
@@ -16519,13 +16523,27 @@ function scoreRoll(vals,cards,locked,context,dieMats,dieEnchs){
   const _tavernTalesPartial=_ttColCount===2;
 
   /* Helper: get die effect for index i */
-  /* Still Waters (Aldric): a WORKED die forgets what it was made of. The
-     engine used to read the family effect raw, so the badge suppressed only
-     Silver's weighting and nothing else - Amber's triple bonus, Starstone's
-     bank bonus and the rest all still fired. */
+  /* Still Waters (Aldric): a die of a hushed FAMILY forgets what it was made
+     of. The engine used to read the family effect raw, so the badge
+     suppressed only Silver's weighting and nothing else - Amber's triple
+     bonus, Starstone's bank bonus and the rest all still fired.
+     BY FAMILY, NOT BY BRAND, matching _famHushed - dieEnchs[i] is no longer
+     read. Gating on the brand meant a plain Amber die kept its triple bonus
+     while an enchanted one lost it, the same backwards rule the
+     ENCHANT_BADGE_REWORK ruling closes for _dieEffect, _rollTable and Break.
+     THE ARRAY IS STILL TESTED, AND THAT IS NOT LEFTOVER - it is the only
+     signal this function has for WHOSE dice these are. dieEnchs reaches
+     scoreRoll from scoreSelection alone, and scoreSelection is only ever
+     called from the player's own selection paths; runOppTurn scores with the
+     NPC's mats and no enchs array at all. Drop the test and a boss tell that
+     binds the PLAYER only would start hushing the opponent's Jade and Amber
+     dice, which is not a power this badge has. A sleeved or a sealed Still
+     Waters does bind both sides and would want them hushed - that is a real
+     gap, and closing it needs a side argument threaded through scoreRoll
+     rather than a guess made from the shape of the arguments here. */
   const dieEff=i=>{
     if(!dieMats||!dieMats[i])return null;
-    if(typeof _stillWaters==='function'&&_stillWaters()&&dieEnchs&&dieEnchs[i])return null;
+    if(typeof _stillWaters==='function'&&_stillWaters()&&dieEnchs&&typeof _matFam==='function'&&_matFam(dieMats[i]))return null;
     const dt=getDie(dieMats[i]);return dt&&dt.effect?dt.effect:null;};
 
   /* ── Wild prep (Jade variants): 6s on wild_* dice become -1 (wild marker).
@@ -17604,8 +17622,25 @@ function _stillWaters(){
      nothing in every match except Aldric's own. */
   try{return !!_ruleActive('confession','p');}catch(e){return false;}
 }
-/* Is THIS die's family hushed? Only a WORKED die goes quiet - a plain die
-   keeps its family, which is the whole shape of the rule.
+/* Is THIS die's family hushed? BY MATERIAL FAMILY, NOT BY BRAND - d.ench is
+   not consulted here and must not be. It used to read
+   d && d.ench && _stillWaters(), which hushed only a die the player had PAID
+   to enchant and let a plain die of the same material sail through
+   untouched. That is backwards from the rule's own stated intent: the badge
+   suppresses the FAMILY trait, and brand status has nothing to do with it.
+   Measured, not reasoned - the cheapest possible counter-build (Break on one
+   die, plain Obsidian everywhere else) walked the badge entirely, 1000/1000
+   both ways in 200 driven breaks, and the badge scored -23.6 on a branded
+   build for exactly that reason: it only ever charged the player for having
+   spent gold. ENCHANT_BADGE_REWORK section 3, Aldric: "hush by material
+   family, not by whether d.ench is set". The die behaves as a plain die
+   EXCEPT for its enchant, which still fires normally - no icon path asks
+   this predicate, and none should be made to.
+   _matFam, NOT a bare true. A die with no family has no family trait to
+   lose, and answering yes for BONE would make _breakDie's log blame Aldric
+   for a trigger mundane materials never had. _matFam also resolves relics
+   through _RELIC_FAM, so Grog's Tooth goes quiet with the rest of Obsidian -
+   relics are NOT badge-proof, and that is the ruling rather than a slip.
    WHAT ASKS IT, AND WHAT STILL DOES NOT. This predicate covers _dieEffect,
    the passive shatter, _rollTable and Break. scoreRoll's own dieEff asks the
    same question inline - it holds mats+enchs arrays, not die objects - so the
@@ -17614,13 +17649,48 @@ function _stillWaters(){
    ids with no die object to ask about: Brass's reckless bust penalty, and
    the shield bust-save recount. That is a known GAP, not a ruling - the brief
    validated Obsidian only, and AUDIT_RESOLUTIONS #7 puts the rest behind its
-   own harness pass. Do not read this helper as proof of full coverage. */
-function _famHushed(d){return !!(d&&d.ench&&_stillWaters());}
+   own harness pass. Do not read this helper as proof of full coverage.
+   NEITHER IS rollFace(mat), which passes no die at all, so the NPC's rolls
+   and the player's spurred rolls still read the weighted table. Same gap,
+   same reason - it has no die object - and widening this predicate does not
+   close it.
+   EVERY NUMBER QUOTED AROUND THIS HELPER WAS MEASURED AT THE OLD, NARROWER
+   WIDTH - the ~644 points and ~14.5% above included. Re-run the harness
+   before treating any of them as the badge's current value. */
+function _famHushed(d){return !!(d&&_stillWaters()&&_matFam(d.mat));}
 /* a die's family effect, or null when Still Waters has hushed it */
 function _dieEffect(d){
   var dt=getDie(d&&d.mat)||{};
   if(_famHushed(d))return null;
   return dt.effect||null;
+}
+/* WHAT A STARSTONE IS PAID FOR IS BEING KEPT AND SCORED, NOT BEING OWNED.
+   Ruling B. Returns the bank bonus owed by ONE committed selection; handleBank
+   stamps it onto the kept row and sums the rows at bank time.
+   HAND IT THE SCORED HALF OF THE SELECTION, i.e. _splitIcons(sel).rest, never
+   the raw selection. selDice still holds the icon-face dice the keep is
+   spending, and an icon keep banks zero by design - an icon-face Starstone
+   must not pay. .rest is also exactly the set _applyCommitBonuses already
+   treats as "the dice that scored" for Vanguard, Hot Hand and the rest, so
+   Starstone is now paid on the same participation every other per-commit
+   bonus is paid on rather than on a definition invented for it.
+   _dieEffect, NOT getDie(d.mat).effect. Routing through _dieEffect is what
+   finally puts this trait behind Still Waters: _famHushed is true for a WORKED
+   die while confession is live, _dieEffect then returns null, and the die pays
+   nothing. Suppression comes for free with the routing - no separate check.
+   The old loadout count could never be hushed for the structural reason
+   _famHushed's own comment gives for Brass and the shield: it walked
+   G.matchDice as bare material ids, with no die object to ask.
+   Driven off the MECHANIC rather than the material id, so the one other die
+   carrying starstone_bonus - Corvus's Ledger, amount 300 - pays through the
+   same path and honours the same gate. */
+function _starstonePay(dice){
+  var n=0;
+  (dice||[]).forEach(function(d){
+    var e=_dieEffect(d);
+    if(e&&e.mechanic==='starstone_bonus')n+=(e.amount||0);
+  });
+  return n;
 }
 /* ═══ BREAK ═══
    Destroys one OTHER live die of the player's choice, permanently, and fires
@@ -18226,7 +18296,14 @@ function _enchFaces(mat,ench){
      That is the line between an enchant and a family trait (brief section 0),
      and the three enchants that crossed it (amber_cast, tempering, loaded)
      are exactly the three that were cut. */
-  var f=_rollTable(mat,ench?{mat:mat,ench:ench}:null).slice();
+  /* ALWAYS a die-shaped object, even with no brand on it. This passed null
+     whenever ench was falsy, and the only thing _rollTable does with the
+     argument is hand it to _famHushed - so the widened family hush would
+     have been DEAD ON EXACTLY THE DICE IT WAS WIDENED TO REACH: a plain
+     Silver die would have kept its weighted rollTable under Still Waters
+     while a branded one lost it, which is the same brand-gated shape the
+     ruling just removed from _famHushed, one call further down. */
+  var f=_rollTable(mat,{mat:mat,ench:ench||null}).slice();
   return f.length?f:[1];
 }
 function _enchRollM(mat,ench){var f=_enchFaces(mat,ench);return f[Math.floor(Math.random()*f.length)];}
@@ -23468,7 +23545,14 @@ function handleRoll(){
        pressed. The die is marked committed just above; that is the feedback that
        matters. A mixed keep still records, at 0 if that is what it scored, which
        is the row handleBank writes for the same selection. */
+    /* ss: the Starstone bank bonus this keep earned (ruling B). STAMPED HERE
+       BECAUSE THIS IS THE LAST PLACE THE DIE OBJECTS EXIST - the row below
+       records {val,mat} pairs and drops the ench, so handleBank can neither
+       call _dieEffect nor see Still Waters. _scoreDice, not selDice: selDice
+       still carries the icon-face dice this keep is spending, and an icon keep
+       banks zero. */
     if(pts>0||_scoreDice.length)G.kept.push({vals:selVals,mat:selDice[0].mat,pts,cursed:_cfHit,
+      ss:_starstonePay(_scoreDice),
       dice:selDice.map(function(dd){return{val:dd.val,mat:dd.mat};})});
     G.turnPts=G.kept.reduce((a,k)=>a+k.pts,0)+(G._turnBonusPot||0);refreshKeptTray();
     /* OPENING SHOT (opener): track scoring dice committed on roll 1 only.
@@ -25185,7 +25269,14 @@ function handleBank(){
            offered as targets for their own Break. */
         if(_breakBegin(_bkBp.src)){
           if(pts>0){
+            /* ss: the Break-then-bank row needs the stamp too. Since P411 this
+               push happens ONLY on the path where _breakBegin found a target and
+               returned, so it is unambiguously its own row rather than a
+               duplicate of the one below - leaving it unstamped would lose the
+               Starstone bonus on exactly the presses where a skull was kept
+               alongside the scorers. */
             G.kept.push({vals:selV,mat:(_bkScore[0]||selD[0]).mat,pts:pts,
+              ss:_starstonePay(_bkScore),
               dice:_bkScore.map(function(dd){return{val:dd.val,mat:dd.mat};})});
             G.turnPts=G.kept.reduce(function(a,k){return a+k.pts;},0)+(G._turnBonusPot||0);
             try{updHUD();refreshKeptTray();}catch(e){}
@@ -25207,8 +25298,13 @@ function handleBank(){
          `{vals:[],pts:0}` - an empty group in the kept tray that also counted
          as zero dice in the committed count Half Measure reads. The die itself
          is marked committed above, which is the feedback that matters. */
+      /* ss: same stamp the ROLL commit writes, for the same reason - see the
+       G.kept.push in handleRoll. Missing it here would silently drop the
+       Starstone bonus on every turn whose last keep was made on the BANK
+       press, which is the commonest way a turn ends. */
       if(pts>0||_bkScore.length)
         G.kept.push({vals:selV,mat:selD[0].mat,pts,cursed:_cfBank,
+          ss:_starstonePay(_bkScore),
           dice:selD.map(function(dd){return{val:dd.val,mat:dd.mat};})});
     }}
   let total=G.kept.reduce((a,k)=>a+k.pts,0);
@@ -25650,18 +25746,33 @@ function handleBank(){
   }
   /* Hot Hand chain resets at end of turn (banking) — chain is per-turn. */
   G._hotHandChain=0;
-  /* ── Starstone bonus — +500 per Starstone die in your loadout, applied to every bank.
-     triggerCard('starstone', ...) used to silently no-op (starstone is a die,
-     not a card — there's no card element to anchor a label to). Now uses
-     spawnPop for a visible floating bonus so the player knows it fired. */
-  if(G.matchDice){
-    var _ssCount=G.matchDice.filter(function(m){return m==='starstone';}).length;
-    if(_ssCount>0){
-      var _ssBonus=_ssCount*500;
-      total+=_ssBonus;
-      bonusMsg+=' +'+_ssBonus+' ⭐';
-      try{spawnPop('+'+_ssBonus+' ⭐ STARSTONE');}catch(e){}
-    }
+  /* -- Starstone bonus - +500 for each Starstone die that was KEPT AND SCORED
+     this bank, summed off the kept rows instead of off the loadout.
+     THE OLD GATE WAS OWNERSHIP, NOT PARTICIPATION. It counted
+     G.matchDice.filter(m === 'starstone') and paid 500 per die on any bank of
+     any size, whether or not a Starstone was ever rolled, kept or scored.
+     Measured by the sim pass: 77.5% win rate for a fully RANDOM player holding
+     two Starstone dice against 3.0% for an all-bone baseline, and the roster
+     spread across eight agents collapsed from 34.8 points to 4.3 - it stopped
+     mattering who was playing. That is the single most severe finding in the
+     whole pass (ruling B, FARK_ENCHANT_BADGE_REWORK section 2).
+     Each kept row now carries the bonus its own SCORED dice earned, stamped at
+     commit time by _starstonePay - see the three G.kept.push sites. Stamping
+     at commit is not a convenience: the row records {val,mat} pairs and drops
+     the ench, so by the time handleBank runs there is no die object left to
+     ask _dieEffect about, and therefore no way to see Still Waters.
+     Reading G.kept also makes the lifetime free. G.kept is already cleared at
+     turn start and on every bust path, so a busted turn pays nothing with no
+     new flag to reset, and the synthetic rows BREAK_TRIGGERS pushes carry
+     dice:[] and no stamp, so a shatter bonus cannot conjure a Starstone payout.
+     spawnPop, not triggerCard: starstone is a die and not a card, so
+     triggerCard('starstone', ...) had no element to anchor a label to and
+     silently no-opped. */
+  var _ssBonus=(G.kept||[]).reduce(function(a,k){return a+(k.ss||0);},0);
+  if(_ssBonus>0){
+    total+=_ssBonus;
+    bonusMsg+=' +'+_ssBonus+' ⭐';
+    try{spawnPop('+'+_ssBonus+' ⭐ STARSTONE');}catch(e){}
   }
   /* ── TELL HOOKS (applied after all card bonuses, before celebration) ── */
   if(G._tell){
@@ -27449,8 +27560,18 @@ function runOppTurn(){
           dice:(G.oppDice||[]).filter(function(d){return d.kept;}).map(function(d){return {vals:[d.val],mat:d.mat||'bone',pts:0};})});
       }
       var _npcActuallyBanked=false;
-      /* Starstone parity (audit P2): an NPC rolling starstone gets the same
-         +500-per-bank the player does — late bosses carry it. */
+      /* Starstone parity (audit P2): an NPC rolling starstone gets
+         +500-per-bank, and the late bosses carry it.
+         THIS IS NO LONGER THE RULE THE PLAYER PLAYS. Ruling B gated the
+         player's Starstone on the die being KEPT AND SCORED; this side still
+         pays on ownership alone, for two reasons. It reads G.matchOppDice as
+         bare material ids with no die object behind them, the same structural
+         gap _famHushed lists for Brass and the shield; and the ladder's boss
+         difficulty was tuned with this flat adder already in place, so cutting
+         it would move every late rung on no measurement at all. The measured
+         77.5%-for-a-random-player finding was about the PLAYER's copy.
+         Deliberate asymmetry, not an oversight - it needs its own sim pass
+         before it moves. */
       if(pts>0&&Array.isArray(G.matchOppDice)){
         var _oSS=G.matchOppDice.filter(function(m){return m==='starstone';}).length;
         if(_oSS>0){pts+=_oSS*500;setStatusMsg('⭐ THEIR STARSTONE — +'+(_oSS*500),'red');}
