@@ -12,7 +12,7 @@ await until(()=>{const d=document.querySelector('.nrdie');return d&&d._floatDone
 tap(document.querySelector('.nrdie'));await sleep(1300);
 tap(document.getElementById('nrTakeBtn'));await sleep(2500);
 _getS();
-const LONG=['Dunstan','Golgoth','Osgood','Thorne'];
+const LONG=['Nix','Dunstan','Osgood','Twill'];
 (S.run.night.roster||[]).forEach((p,i)=>{if(LONG[i])p._art=LONG[i];});
 save();
 showScreen('gauntlet');
