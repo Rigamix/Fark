@@ -14367,7 +14367,14 @@ var _DLG_COND={
   boss_beaten:function(a){try{return (S.run.bossesBeaten||[]).indexOf(a)>=0;}catch(e){return false;}},
   enchant_owned:function(a){try{
     return (S.run.dieEnch||[]).concat(S.run.dieEnchInv||[])
-      .some(function(e){return e&&e.t===a;});}catch(e){return false;}}
+      .some(function(e){return e&&e.t===a;});}catch(e){return false;}},
+  /* HAS THIS RUN ALREADY HEARD A LINE TAGGED `a`? Reads the same per-run set
+     the resolver already keeps to stop a reaction pool repeating itself, so
+     this is a new USE of state that exists rather than new state invented for
+     dialogue - which is the brief's own test for what a condition may be.
+     It is what lets the King's speculation lines require his introduction to
+     have happened first: a reaction with nothing to react to was the bug. */
+  heard:function(a){try{return !!(S.run._dlgHeard&&S.run._dlgHeard[a]);}catch(e){return false;}}
 };
 function _dlgCondOk(row){
   var cs=row.c;if(!cs||!cs.length)return true;
@@ -14416,73 +14423,278 @@ function _dlgSay(id){
   /* one operation, no branching, whichever line fired - per the brief */
   run._dlgStage[key]=stage+1;
   if(row.p.indexOf('reaction:')===0)run._dlgHeard[row.t]=1;
+  /* a TAG marks that a whole category has been established, which is what a
+     later line's heard() condition asks about - separate from the per-line
+     de-dup above, which is keyed on the text itself */
+  if(row.tag)run._dlgHeard[row.tag]=1;
   try{save();}catch(e){}
   return row.t;
 }
+/* WHAT THIS OPPONENT SAYS WHEN SOMETHING HAPPENS AT THE TABLE.
+   Four moments, keyed on the trait seal the patron already wears, with a
+   bespoke per-patron override taking precedence where one is worth writing.
+   Returns null when neither has anything, and the caller then falls through to
+   the generic bark it would have shown anyway - the event is never silent. */
+function _dlgEvent(moment){
+  try{
+    var art=window._lastSeatArt,trait=window._lastSeatTrait,r=null;
+    if(art)r=_dlgPick('patron:'+String(art).toLowerCase()+':'+moment,0,null);
+    if(!r&&trait)r=_dlgPick('trait:'+trait+':'+moment,0,null);
+    return r?r.t:null;
+  }catch(e){return null;}
+}
+/* the four DLG events these answer, and which side each belongs to */
+var _DLG_MOMENT={OPP_BUST:'bust',PLAYER_BUST:'yourBust',
+                 OPP_BIG_BANK:'bank',BIG_BANK:'yourBank'};
 /* ── THE LINES. Data only. ──
    Written content is from FARK_PATRON_LORE.md; nothing here is invented. The
    doc flags full multi-stage ladders for all 24 as a separate later pass, so
    patrons it gives no personal line to simply fall through to the ambient
    pools, which is the system working as designed rather than a gap. */
 var PATRON_LINES=[
-  /* Grog's regulars - they have sat his table before, canonically */
+  /* ── THE 24 WITH ART. Three interchangeable lines each; the resolver's
+     tie-break picks between them, which is why variety here costs no code.
+     GOLGOTH KEEPS EXACTLY ONE, on purpose - he is the most imposing design
+     in the set and the joke is that he has nothing to say. More lines would
+     undo it rather than deepen it. ── */
+  {p:'patron:krox',s:0,t:"Still water and all that. I've heard every story this room tells twice over. Doesn't mean I need to say much back."},
+  {p:'patron:krox',s:0,t:"Leather doesn't rush. Neither do I. Works out."},
+  {p:'patron:krox',s:0,t:"You want noise, go bother Regis. I'll be here being unremarkable."},
+  {p:'patron:eira',s:0,t:"Mistake me for Nebb again and I'll start signing letters in their name. See how they like that."},
+  {p:'patron:eira',s:0,t:"Half this room can't write their own name. I make a living off that, not that I'd say it to their face."},
+  {p:'patron:eira',s:0,t:"Watching costs nothing. Ask me what I've seen and it'll cost you plenty."},
   {p:'patron:nebb',s:0,t:"Not her. Never her. Ask again and I'll charge you for the insult."},
-  /* the hoofed thread - Rilla names Osgood by RELATION only, never by look:
-     the vague-reference rule keeps the lore safe to write ahead of the art */
+  {p:'patron:nebb',s:0,t:"Can't sit still at a table where nothing's moving. Suppose that's my whole problem."},
+  {p:'patron:nebb',s:0,t:"I hear things. Doesn't mean I say them. Mostly."},
+  {p:'patron:regis',s:0,t:"Someone has to keep order at this table. Grog certainly won't, and the rest of you are worse."},
+  {p:'patron:regis',s:0,t:"Someone at this table ought to have standards. Evidently it falls to me."},
+  {p:'patron:regis',s:0,t:"I've won here. I've lost here. Only one of those improved my posture."},
+  {p:'patron:corbin',s:0,t:"Every figure balanced twice before I sleep on it. Corvus doesn't abide a ledger that argues with itself."},
+  {p:'patron:corbin',s:0,t:"A crooked column is worse than an honest loss. At least the loss tells you the truth."},
+  {p:'patron:corbin',s:0,t:"I don't gamble. I audit people who do."},
+  {p:'patron:sparr',s:0,t:"No time to sit proper. If I'm here, I'm between two places already."},
+  {p:'patron:sparr',s:0,t:"Sit long enough in one place and you forget how fast the road actually is."},
+  {p:'patron:sparr',s:0,t:"Ask me the news. I probably haven't caught up to it myself yet."},
+  {p:'patron:pell',s:0,t:"Feathers are feathers to most. Mine fly true, which is more than I'll say for half this town's arrows."},
+  {p:'patron:pell',s:0,t:"Everyone wants the cheap shaft and the good feather. Can't have both, same as anything."},
+  {p:'patron:pell',s:0,t:"I don't play. I just like watching people lose to bad luck they could've bought better."},
+  {p:'patron:osgood',s:0,t:"Ask me what I was before and you'll get a different answer each night. Pick the one you like."},
+  {p:'patron:osgood',s:0,t:"Rilla worries too much. Somebody in the family has to, I suppose, and it isn't me."},
+  {p:'patron:osgood',s:0,t:"Every scar's got a story. Mine have gotten better with age. The stories, not the scars."},
   {p:'patron:rilla',s:0,t:"He'll tell you he was a soldier. Ask him which war and watch him change the subject."},
-  /* the feline four, deliberately not a friend group */
+  {p:'patron:rilla',s:0,t:"Stall doesn't run itself. Neither does he, most days."},
+  {p:'patron:rilla',s:0,t:"I'm told I smile too easy for this town. I've decided that's their problem."},
+  {p:'patron:dunstan',s:0,t:"Iron doesn't lie to you. Can't say the same for half what walks through that door."},
+  {p:'patron:dunstan',s:0,t:"Everything worth having gets hammered first. Applies to more than iron."},
+  {p:'patron:dunstan',s:0,t:"I fix what breaks. I don't ask why it broke. Keeps the work simple."},
+  {p:'patron:rask',s:0,t:"Work's work. Don't ask whose idea it was, ask if it paid — and don't ask the Roller either, she's never once answered me."},
+  {p:'patron:rask',s:0,t:"Don't ask what I did before this town. Ask what I'm doing tomorrow, that's the useful part."},
+  {p:'patron:rask',s:0,t:"Trouble finds the ones who go looking. I just happen to be standing where it lands."},
   {p:'patron:sil',s:0,t:"No curse. Bad luck and worse ale. I can't fix either, but I can charge you for trying."},
-  /* rodents */
+  {p:'patron:sil',s:0,t:"Half my custom thinks I'm cursing them. The other half thinks I'm curing them. Neither's quite right."},
+  {p:'patron:sil',s:0,t:"Bring me your aches, not your theories. I've no patience for the second kind."},
+  {p:'patron:thorne',s:0,t:"Quieter out there than in here. That's the whole reason I go."},
+  {p:'patron:thorne',s:0,t:"Town's got too many voices for my taste. Woods only ever say one thing at a time."},
+  {p:'patron:thorne',s:0,t:"I don't miss much. Comes from years of not talking while others do."},
+  {p:'patron:vess',s:0,t:"Everything's got a price. Even the ones born rolling ones pay eventually — just later, and worse."},
+  {p:'patron:vess',s:0,t:"Everyone thinks they're the exception. Funny how the ledger never agrees."},
+  {p:'patron:vess',s:0,t:"I'll take your coin happily. I'll take your excuses less happily, and not for long."},
+  {p:'patron:nell',s:0,t:"Squib thinks I taught him everything. I taught him enough to lose interesting."},
+  {p:'patron:nell',s:0,t:"Cards don't lie. People do, constantly, and usually badly."},
+  {p:'patron:nell',s:0,t:"I could teach anyone to win. Wouldn't be half as fun watching them lose, though."},
   {p:'patron:squib',s:0,t:"She taught me everything I know and still cleans me out. Tell me that's fair."},
+  {p:'patron:squib',s:0,t:"One day I'll beat her clean. Today's not that day. Yesterday wasn't either."},
+  {p:'patron:squib',s:0,t:"Everyone's got a big sister who ruined gambling for them. Mine just did it with more style."},
   {p:'patron:tuck',s:0,t:"Tell whoever's been talking up her stew that the bread's the real work. Always has been."},
-  /* aquatic - Mudge contradicts the town gossip pool on purpose, two
-     unverifiable sources rubbing against each other */
+  {p:'patron:tuck',s:0,t:"Bread rises whether you believe in it or not. Faith's got nothing to do with baking."},
+  {p:'patron:tuck',s:0,t:"Feed a table well and they forgive you almost anything. Almost."},
+  {p:'patron:twill',s:0,t:"Every thread counted before it's cut. Rush it once and you're the bust-hand who ruined the whole bolt."},
+  {p:'patron:twill',s:0,t:"A crooked seam shows eventually. So does a crooked hand. I've an eye for both."},
+  {p:'patron:twill',s:0,t:"Patience isn't a virtue in my trade. It's the whole trade."},
   {p:'patron:mudge',s:0,t:"Whatever they're saying about the bridge in here, downriver says different. Believe whichever suits you."},
+  {p:'patron:mudge',s:0,t:"River doesn't care what the town thinks it heard. Neither do I, most days."},
+  {p:'patron:mudge',s:0,t:"Longest job in this town is being the one who actually saw something."},
   {p:'patron:nix',s:0,t:"Don't sit near me on a cold streak. I only carry the one kind of luck and it's not the Roller's."},
+  {p:'patron:nix',s:0,t:"Don't thank me if you win big near me. Don't blame me either. I only carry it, I don't hand it out."},
+  {p:'patron:nix',s:0,t:"Everyone wants my luck till they remember it comes with the rest of me."},
   {p:'patron:poll',s:0,t:"Heard the bridge is fixed. Or burned. One of the two, m' sure."},
-  /* standalones. Golgoth is the most imposing design in the set and is given
-     almost nothing to say on purpose - the same subversion as the curse joke */
-  {p:'patron:golgoth',s:0,t:"...No, go on. I was only sitting."},
+  {p:'patron:poll',s:0,t:"Heard it from someone who heard it from someone. Good enough for me."},
+  {p:'patron:poll',s:0,t:"I don't remember things wrong on purpose. It just comes out more interesting that way."},
+  {p:'patron:roan',s:0,t:"She asks, I go. Don't need a better reason than that."},
+  {p:'patron:roan',s:0,t:"Ask me to fetch something and it's already halfway done. Ask me why and I've got nothing."},
+  {p:'patron:roan',s:0,t:"Loyalty's simple. Everyone else seems to make it complicated."},
   {p:'patron:remny',s:0,t:"You were here Tuesday too. Don't tell me you weren't, I remember faces."},
+  {p:'patron:remny',s:0,t:"You had the amber die last time. Don't tell me you didn't, I remember these things."},
+  {p:'patron:remny',s:0,t:"We spoke of the King's visit already, you and I. Or someone did. Might've been you."},
+  {p:'patron:golgoth',s:0,t:"...No, go on. I was only sitting."},
 
-  /* ── AUTHORED, NOT YET SEATABLE ──
-     The seed six have no portrait, and a seat's name is its portrait's
-     filename, so none of these can be drawn today. Kept because the content is
-     written and because Ferrand's pair IS the brief's worked example of the
-     specificity rule: with Grog alive only the first survives; once he is
-     beaten both do, and the one carrying a condition wins on specificity - the
-     right line, from data alone, with no code that knows who Ferrand is. */
+  /* ── AUTHORED, NOT YET SEATABLE. No portraits, and a seat's name IS its
+     portrait's filename, so none of these can be drawn. Ferrand's pair is
+     the brief's own worked example of the specificity rule. ── */
+  {p:'patron:odo',s:0,t:"Aye, cursed. Cursed by geography, mate. No bath house on the traplines. Sit if you dare."},
+  {p:'patron:odo',s:0,t:"Traplines don't care how you smell. Neither do the traps. We've an understanding."},
+  {p:'patron:odo',s:0,t:"You get used to your own company out there. Talking's a skill I'm a bit rusty at, if it's not obvious."},
+  {p:'patron:hollis',s:0,t:"Every coin twice bought, twice spent, twice worried over. I'll have my shield yet."},
+  {p:'patron:hollis',s:1,t:"Owe the trapper a little still. He's not one to forget it, either."},
+  {p:'patron:hollis',s:2,t:"Almost there now. Just a little more, and I'll have my shield after all. Don't tell me the odds, I don't want to hear them."},
+  {p:'patron:fenn',s:0,t:"Careful with the bone ones. Mine chip if you look at them wrong."},
+  {p:'patron:tam',s:0,t:"Her stew alone's worth the losing. Don't tell her I said the losing part."},
   {p:'patron:ferrand',s:0,t:"Boot's mine. Bruiser owes me that much and worse besides."},
   {p:'patron:ferrand',s:0,c:['boss_beaten:grog'],t:"Someone beat me to it. Fark."},
   {p:'patron:ferrand',s:0,t:"A King wants a game, he can find me. I don't run from crowns any more than blades."},
-  {p:'patron:odo',s:0,t:"Aye, cursed. Cursed by geography, mate. No bath house on the traplines. Sit if you dare."},
-  {p:'patron:hollis',s:0,t:"Every coin twice bought, twice spent, twice worried over. I'll have my shield yet."},
-  {p:'patron:hollis',s:1,t:"Owe the trapper a little still. He's not one to forget it, either."},
-  {p:'patron:fenn',s:0,t:"Careful with the bone ones. Mine chip if you look at them wrong."},
-  {p:'patron:tam',s:0,t:"Her stew alone's worth the losing. Don't tell her I said the losing part."},
 
-  /* ── THE TOWN: THISTLEFORD. Thin on purpose - the tavern is the stage. ── */
+  /* ── THISTLEFORD. Thin on purpose - the tavern is the stage. ── */
   {p:'gossip:town',s:0,t:"Green Fair's near enough you can smell it. If the frost lets the orchards be."},
   {p:'gossip:town',s:0,t:"Millstone Bridge still out. Third year the council's sworn it'll be fixed by spring."},
-  {p:'gossip:town',s:0,t:"Frost took the early plantings. Good thing about a bad frost - cheap talk, that's all it costs you."},
+  {p:'gossip:town',s:0,t:"Frost took the early plantings. Good thing about a bad frost — cheap talk, that's all it costs you."},
+  {p:'gossip:town',s:0,t:"Miller's raised his prices again. Third time this season. Might as well grind my own."},
+  {p:'gossip:town',s:0,t:"Someone's chickens keep turning up two streets over. Nobody's owned up to owning either the chickens or the trouble."},
+  {p:'gossip:town',s:0,t:"Roads are worse than the bridge, if you ask me, and nobody talks about the roads."},
+  {p:'gossip:town',s:0,t:"Heard there's a wedding coming before the Fair. Whole street's already arguing about whose garden gets used."},
+  {p:'gossip:town',s:0,t:"Someone's been at the grain stores again. Second time this month. Innkeep says it's rats. I've my doubts about the rats."},
+  {p:'gossip:town',s:0,t:"First proper sun we've had in a week. Won't last, but I'll take it while it does."},
+  {p:'gossip:town',s:0,t:"Cooper's apprentice ran off with a traveling show, they're saying. Or he just went to visit family. Depends who's telling it."},
 
-  /* ── THE KING. An ensemble of reactions, not a thread with a status.
-     The brief killed the escalating-thread version outright: one voice
-     reporting fixed status on a fixed schedule becomes recognised noise by a
-     player's tenth run. Many independent voices on one topic does not, because
-     the replay value is WHICH patron is drawn and how they take it. No order,
-     no escalation, mostly no resolution. ── */
-  {p:'reaction:king',s:0,t:"If he so much as brushes past me, I'm never washing this sleeve again."},
-  {p:'reaction:king',s:0,t:"Kings don't travel light, they say. Question is whether any of it's meant for spending in here."},
-  {p:'reaction:king',s:0,t:"A King, in Thistleford. Next you'll tell me the Roller pays her tabs."},
-  {p:'reaction:king',s:0,t:"If he does come, someone'll have to sweep. Won't be me, and it won't be you either, so who's left, then?"},
-  {p:'reaction:king',s:0,t:"A King's guard's purse is still a purse. Just saying."},
-  {p:'reaction:king',s:0,t:"Kings drink same as anyone once they're three cups in. Seen it before, don't much care to see it again."},
-  {p:'reaction:king',s:0,t:"Can't say what I'd even do. Bow, I s'pose. Never bowed to anyone in my life."},
-  {p:'reaction:king',s:0,t:"Bet the whole house on it being true. Bust-handed fool that I am."},
-  /* the one temporal note, and still just another opinion rather than a status
-     update superseding the others */
-  {p:'reaction:king',s:0,c:['night_gte:6'],t:"Season's near out and still no King. Told you lot. Told you."}
+  /* ── THE KING, in three gated tiers. Tiering says WHEN a category may
+     fire, never who delivers it or in what order - so dozens of patrons
+     across dozens of runs each give a DIFFERENT tier-2 line, which is the
+     ensemble the flat version was already trying to be. What it fixes is a
+     real bug: a speculation line firing before anyone had established the
+     rumour, i.e. a character answering something the player never heard. ── */
+  {p:'reaction:king',s:0,tag:'king_intro',t:"Word from the Hall — someone's coming down this way before season's out. Might be, well. I don't rightly know who. Big, though."},
+  {p:'reaction:king',s:0,tag:'king_intro',t:"Heard something odd today. Someone important, coming through. Nobody's said a name yet."},
+  {p:'reaction:king',s:0,tag:'king_intro',t:"There's talk starting up. A visit, they're saying. Haven't heard the half of it myself."},
+  {p:'reaction:king',s:0,tag:'king_intro',t:"First I'm hearing of it, but apparently there's a King thinking of coming this way."},
+  {p:'reaction:king',s:0,tag:'king_intro',t:"Something's stirring beyond the usual gossip. A royal visit, if you believe it."},
+  {p:'reaction:king',s:0,tag:'king_intro',t:"Innkeep's been extra particular about the place this week. Word is that's why."},
+  {p:'reaction:king',s:0,tag:'king_intro',t:"Somebody mentioned a King might grace us with his presence. I laughed. They didn't."},
+  {p:'reaction:king',s:0,c:['heard:king_intro'],t:"If he so much as brushes past me, I'm never washing this sleeve again."},
+  {p:'reaction:king',s:0,c:['heard:king_intro'],t:"Kings don't travel light, they say. Question is whether any of it's meant for spending in here."},
+  {p:'reaction:king',s:0,c:['heard:king_intro'],t:"A King, in Thistleford. Next you'll tell me the Roller pays her tabs."},
+  {p:'reaction:king',s:0,c:['heard:king_intro'],t:"If he does come, someone'll have to sweep. Won't be me, and it won't be you either, so who's left, then?"},
+  {p:'reaction:king',s:0,c:['heard:king_intro'],t:"A King's guard's purse is still a purse. Just saying."},
+  {p:'reaction:king',s:0,c:['heard:king_intro'],t:"Kings drink same as anyone once they're three cups in. Seen it before, don't much care to see it again."},
+  {p:'reaction:king',s:0,c:['heard:king_intro'],t:"Can't say what I'd even do. Bow, I s'pose. Never bowed to anyone in my life."},
+  {p:'reaction:king',s:0,c:['heard:king_intro'],t:"Bet the whole house on it being true. Bust-handed fool that I am."},
+  {p:'reaction:king',s:0,c:['heard:king_intro'],t:"Word is he'll want a wife by the time he leaves. I've told my daughter to stay home that week."},
+  {p:'reaction:king',s:0,c:['heard:king_intro'],t:"Been hearing this exact rumor for three years running. Roller's own luck if it's ever true."},
+  {p:'reaction:king',s:0,c:['heard:king_intro'],t:"I'll take bets on it, actually. Even odds he shows, worse odds he sits down to play."},
+  {p:'reaction:king',s:0,c:['heard:king_intro'],t:"Not planning to be here that week, myself. Some of us have debts we'd rather a King not overhear about."},
+  {p:'reaction:king',s:0,c:['heard:king_intro'],t:"Nobody's told me how you're meant to address one. I'll just call him 'you' and hope for the best."},
+  {p:'reaction:king',s:0,c:['heard:king_intro'],t:"Won't change a thing about how I sit or how I drink. A King's still just a fellow with better tailors."},
+  {p:'reaction:king',s:0,c:['heard:king_intro'],t:"It's never the King himself worth watching. It's who he brings. That's where the real money walks in."},
+  {p:'reaction:king',s:0,c:['heard:king_intro'],t:"I've got a proposition ready, should he actually walk through that door. Every merchant in three towns has one, probably."},
+  {p:'reaction:king',s:0,c:['heard:king_intro'],t:"He'll owe somebody something by the time he leaves this place. Might as well be me."},
+  {p:'reaction:king',s:0,c:['heard:king_intro'],t:"Suspicious, if you ask me. Nobody just visits a place like this for no reason — and any bust-hand who tells you otherwise is selling something."},
+  {p:'reaction:king',s:0,c:['heard:king_intro'],t:"If he wants a game, I'm the one he should sit across from. Not being modest, just accurate."},
+  {p:'reaction:king',s:0,c:['heard:king_intro'],t:"I'll wager the whole thing's an excuse for the innkeep to charge double that week. Wouldn't blame her."},
+  {p:'reaction:king',s:0,c:['heard:king_intro'],t:"Half of me hopes he comes. Other half remembers what happened last time someone important visited anywhere I was standing."},
+  {p:'reaction:king',s:0,c:['heard:king_intro'],t:"Some say he plays dice himself. If that's true, Fark, I might actually be excited."},
+  {p:'reaction:king',s:0,c:['heard:king_intro'],t:"If it's true, I want to be the first to shake his hand. Or bow. Whichever's proper."},
+  {p:'reaction:king',s:0,c:['heard:king_intro'],t:"I've started practicing my best table manners, just in case. Feels foolish, doing it alone."},
+  {p:'reaction:king',s:0,c:['heard:king_intro'],t:"Wonder if he knows how to play. Real dice, not the polished kind they use up at the Hall."},
+  {p:'reaction:king',s:0,c:['heard:king_intro'],t:"My mother always said royalty smells like everyone else after a long ride. I intend to test that theory."},
+  {p:'reaction:king',s:0,c:['heard:king_intro'],t:"If he shows, I'm asking him straight out why. Politely. But straight out."},
+  {p:'reaction:king',s:0,c:['heard:king_intro'],t:"Half this town's already decided what they'll wear. I've decided not to decide."},
+  {p:'reaction:king',s:0,c:['heard:king_intro'],t:"A King in Thistleford would be the best story this town's told in years. True or not."},
+  {p:'reaction:king',s:0,c:['heard:king_intro'],t:"I keep picturing it wrong. Different crown every time I imagine it."},
+  {p:'reaction:king',s:0,c:['heard:king_intro'],t:"They say a King doesn't travel without at least a dozen watching him breathe. Can't imagine the noise."},
+  {p:'reaction:king',s:0,c:['heard:king_intro'],t:"If it happens, I want a seat with a view of the door. Best seat in the house, for once."},
+  {p:'reaction:king',s:0,c:['heard:king_intro'],t:"I've set aside my best coin, just in case there's a game to be had."},
+  {p:'reaction:king',s:0,c:['heard:king_intro'],t:"Told the family we might be entertaining royalty. They didn't believe me either."},
+  {p:'reaction:king',s:0,c:['heard:king_intro'],t:"Been saving a good bottle for the occasion. Might drink it myself if he never shows."},
+  {p:'reaction:king',s:0,c:['heard:king_intro'],t:"I've rehearsed what I'd say. Sounds a lot less impressive out loud than it did in my head."},
+  {p:'reaction:king',s:0,c:['heard:king_intro'],t:"If he plays, I'm sitting across from him myself. Somebody's got to."},
+  {p:'reaction:king',s:0,c:['heard:king_intro'],t:"Cleaned my best coat for the first time in a year. Feels like tempting fate."},
+  {p:'reaction:king',s:0,c:['heard:king_intro','night_gte:6'],t:"Season's near out and still no King. Told you lot. Told you."},
+  {p:'reaction:king',s:0,c:['heard:king_intro','night_gte:6'],t:"Starting to think the whole thing was somebody's idea of a joke. A slow one."},
+  {p:'reaction:king',s:0,c:['heard:king_intro','night_gte:6'],t:"No King. No visit. Just a very long rumor that outstayed its welcome."},
+
+  /* ── IN-MATCH REACTIONS, keyed on the trait seal a patron already wears.
+     Six traits x four moments x three lines. Written per TRAIT rather than
+     per patron because that covers EVERY match instead of the rare named
+     ones, at a fraction of the writing.
+     NOTE ON `strong`: the brief calls this trait BULLISH, but PT_TRAIT ships
+     steady/greedy/reckless/strong/orderly/cunning. Five names match exactly
+     and one slot is left on each side, so BULLISH is `strong` - the
+     aggressive one either way, and its lines fit unchanged. ── */
+  {p:'trait:steady:bust',s:0,t:"Well. That's that, then. Nothing for it but the next roll."},
+  {p:'trait:steady:bust',s:0,t:"No sense chasing what's gone. Next roll's the only one that matters."},
+  {p:'trait:steady:bust',s:0,t:"Didn't need that turn anyway. Plenty more coming."},
+  {p:'trait:steady:yourBust',s:0,t:"Happens to the steadiest hand eventually. Don't take it personal."},
+  {p:'trait:steady:yourBust',s:0,t:"Even the patient ones go too far sometimes. You'll learn the line eventually."},
+  {p:'trait:steady:yourBust',s:0,t:"That's the game correcting itself. Happens to everyone, given time."},
+  {p:'trait:steady:bank',s:0,t:"Slow and it adds up. Told you it would."},
+  {p:'trait:steady:bank',s:0,t:"Didn't rush it. Didn't need to."},
+  {p:'trait:steady:bank',s:0,t:"That's what waiting gets you. Every time, eventually."},
+  {p:'trait:steady:yourBank',s:0,t:"Lucky spread. Enjoy it, they don't come twice in a row."},
+  {p:'trait:steady:yourBank',s:0,t:"Fine bank. Won't be your last good one, I'd wager, but it won't be every time either."},
+  {p:'trait:steady:yourBank',s:0,t:"Steady hands make those too, now and then. Yours included, apparently."},
+  {p:'trait:strong:bust',s:0,t:"Fark it. Should've stopped a roll back."},
+  {p:'trait:strong:bust',s:0,t:"Should've quit while I was ahead. Never do, though."},
+  {p:'trait:strong:bust',s:0,t:"That one's on me. Won't happen twice tonight."},
+  {p:'trait:strong:yourBust',s:0,t:"There it is. Knew you'd push too far."},
+  {p:'trait:strong:yourBust',s:0,t:"Greed'll do that. Every single time."},
+  {p:'trait:strong:yourBust',s:0,t:"Ha! Knew that turn had too much hope in it."},
+  {p:'trait:strong:bank',s:0,t:"That's how it's done. Watch and learn."},
+  {p:'trait:strong:bank',s:0,t:"THAT'S a bank. Try and match it."},
+  {p:'trait:strong:bank',s:0,t:"Told you I don't play small."},
+  {p:'trait:strong:yourBank',s:0,t:"Fine roll. Won't happen again, mind."},
+  {p:'trait:strong:yourBank',s:0,t:"Not bad. Not better than mine, but not bad."},
+  {p:'trait:strong:yourBank',s:0,t:"Alright, that one earned a nod. Just the one."},
+  {p:'trait:orderly:bust',s:0,t:"Miscounted my odds, clearly. Won't happen twice."},
+  {p:'trait:orderly:bust',s:0,t:"An error in my calculation. I'll adjust."},
+  {p:'trait:orderly:bust',s:0,t:"Should have banked two rolls prior. Noted for next time."},
+  {p:'trait:orderly:yourBust',s:0,t:"Predictable, really. The dice favor patience, not greed."},
+  {p:'trait:orderly:yourBust',s:0,t:"The odds always catch up. Every single time, without fail."},
+  {p:'trait:orderly:yourBust',s:0,t:"Greed rarely survives contact with real numbers."},
+  {p:'trait:orderly:bank',s:0,t:"Exactly as planned. Every roll accounted for."},
+  {p:'trait:orderly:bank',s:0,t:"Precisely the outcome I projected."},
+  {p:'trait:orderly:bank',s:0,t:"Discipline, not fortune. There's a difference."},
+  {p:'trait:orderly:yourBank',s:0,t:"An anomaly. The numbers will even out."},
+  {p:'trait:orderly:yourBank',s:0,t:"A statistical outlier. Nothing more."},
+  {p:'trait:orderly:yourBank',s:0,t:"Enjoy it. Regression is coming for us both eventually."},
+  {p:'trait:reckless:bust',s:0,t:"HA — worth it. Absolutely worth it."},
+  {p:'trait:reckless:bust',s:0,t:"Worth every bit of that risk. Do it again in a heartbeat."},
+  {p:'trait:reckless:bust',s:0,t:"Went down swinging. Only way I know how."},
+  {p:'trait:reckless:yourBust',s:0,t:"Told you! Told you to keep going!"},
+  {p:'trait:reckless:yourBust',s:0,t:"SEE?! I love this game."},
+  {p:'trait:reckless:yourBust',s:0,t:"You almost had me scared there. Almost."},
+  {p:'trait:reckless:bank',s:0,t:"See, THAT'S how you play this game."},
+  {p:'trait:reckless:bank',s:0,t:"That's what happens when you actually COMMIT."},
+  {p:'trait:reckless:bank',s:0,t:"Big or nothing. Just proved it."},
+  {p:'trait:reckless:yourBank',s:0,t:"Now THAT'S a roll. Do it again, I dare you."},
+  {p:'trait:reckless:yourBank',s:0,t:"Now we're talking! Do that again!"},
+  {p:'trait:reckless:yourBank',s:0,t:"I respect that. Genuinely. Do it again so I can respect it more."},
+  {p:'trait:greedy:bust',s:0,t:"There goes good coin. Every last piece of it."},
+  {p:'trait:greedy:bust',s:0,t:"That hurts more than it should. Every coin, gone."},
+  {p:'trait:greedy:bust',s:0,t:"Should've banked when I had the chance. Lesson learned, expensively."},
+  {p:'trait:greedy:yourBust',s:0,t:"Shame. All that could've been mine by now."},
+  {p:'trait:greedy:yourBust',s:0,t:"Pity. I was already counting that in my head."},
+  {p:'trait:greedy:yourBust',s:0,t:"Should've quit sooner. Their loss, my satisfaction."},
+  {p:'trait:greedy:bank',s:0,t:"Now THAT'S worth the seat price."},
+  {p:'trait:greedy:bank',s:0,t:"Now THAT'S a night's work."},
+  {p:'trait:greedy:bank',s:0,t:"Worth every coin I put on the table for this seat."},
+  {p:'trait:greedy:yourBank',s:0,t:"That's my coin you're counting, near enough."},
+  {p:'trait:greedy:yourBank',s:0,t:"Fine bank. I'll remember it, and I'll want it back eventually."},
+  {p:'trait:greedy:yourBank',s:0,t:"That's a lot of coin walking away from me right now."},
+  {p:'trait:cunning:bust',s:0,t:"Didn't want that turn anyway."},
+  {p:'trait:cunning:bust',s:0,t:"That was intentional. Believe what you like."},
+  {p:'trait:cunning:bust',s:0,t:"A necessary sacrifice. For reasons I won't explain."},
+  {p:'trait:cunning:yourBust',s:0,t:"Mm. Almost thought you had something there."},
+  {p:'trait:cunning:yourBust',s:0,t:"Oh, unfortunate. Truly."},
+  {p:'trait:cunning:yourBust',s:0,t:"I saw that coming. I always see it coming."},
+  {p:'trait:cunning:bank',s:0,t:"Exactly as I intended. Mostly."},
+  {p:'trait:cunning:bank',s:0,t:"Everything's going precisely to plan. Whatever the plan is."},
+  {p:'trait:cunning:bank',s:0,t:"Careful. I'm just getting started."},
+  {p:'trait:cunning:yourBank',s:0,t:"Interesting. I'll remember that."},
+  {p:'trait:cunning:yourBank',s:0,t:"Noted. Filed away for later."},
+  {p:'trait:cunning:yourBank',s:0,t:"You'll regret showing me that, eventually."},
+
+  /* two bespoke overrides, proving the pattern rather than attempting 24 -
+     a named patron's own line outranks their trait bucket on specificity */
+  {p:'patron:sil:bust',s:0,t:"No curse did that. Just bad dice."},
+  {p:'patron:regis:bank',s:0,t:"As I predicted. I predict many things."}
 ];
 var _ptOpen=false,_ptSeats=[];
 function _ptLayout(n){
@@ -28006,6 +28218,22 @@ const LEDGER_LINES={
     hide(){const box=document.getElementById('dlgBox');if(!box)return;box.classList.remove('show');box.classList.add('hiding');this.active=false;
       try{document.body.classList.remove('dlg-speaking');}catch(e){}}
   };
+  /* ONE HOOK FOR ALL FOUR EVENTS. getLine is the single place a bark is
+     chosen, so wrapping it reaches every call site at once and leaves the
+     probability gate, the cooldown, the priority rule and show() untouched.
+     The lore line wins when there is one; otherwise the boss's own bark fires
+     exactly as before. The big-bank threshold is not redefined here - this
+     runs inside whatever trigger already decided the event happened. */
+  (function(){
+    var _orig=DLG.getLine.bind(DLG);
+    DLG.getLine=function(cat){
+      try{
+        var m=(typeof _DLG_MOMENT!=='undefined')&&_DLG_MOMENT[cat];
+        if(m){var line=_dlgEvent(m);if(line)return line;}
+      }catch(e){}
+      return _orig(cat);
+    };
+  })();
   window.DLG=DLG;
 })();
 
@@ -32982,6 +33210,9 @@ function launchSeat(seatIdx){
   /* clone — handicap target mutations must never touch the persisted roster */
   var patron=JSON.parse(JSON.stringify(night.roster[seatIdx]));
   window._lastSeatArt=patron._art||null;
+  /* the trait seal, for the in-match reaction pool. Same field the peek sheet
+     already draws its seal from, so nothing new is being tracked. */
+  window._lastSeatTrait=(typeof PT_TRAIT!=='undefined'&&PT_TRAIT[patron.persona])||'steady';
   var isSealed=(seatIdx===night.handicapSeat)&&!!night.sealTell;
   window._lastSeatColor=isSealed?'purple'
     :['green','blue','red'][(seatIdx-((typeof night.handicapSeat==='number'&&night.sealTell&&seatIdx>night.handicapSeat)?1:0))%3];

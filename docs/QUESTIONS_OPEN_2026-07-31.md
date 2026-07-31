@@ -162,3 +162,37 @@ Places the brief now contradicts itself or the code. Not gameplay calls.
 **52.** **Section 2 still says a die killed on loan is lost "permanently"**, while 4b says the player's own die returns at once and they stay at 6. Both are satisfiable if "permanently" is read as match-scoped (which is how the whole Break/Trade correction reads it, and how P376/P377 implement it) — but the word is now the odd one out and will mislead the next reader.
 
 **53.** **4b's closing line says Break's next-match return "still needs building"**. It was built in P375, before 4b was written. Stale rather than wrong; worth striking so it is not treated as outstanding.
+
+---
+
+## Added 2026-07-31, from building the expanded lore doc
+
+**54.** **The ambient pools are now unreachable through a patron.** The priority
+rule says personal content wins and ambient is the fallback "only if the
+patron's own pool is fully exhausted". But every one of the 24 now has three
+stage-0 lines, and a stage-0 line is a FLOOR — it stays eligible forever — so no
+pool ever exhausts. Measured: 30 consecutive draws from Krox returned only his
+own lines, never a King or gossip line. So the King's 48 lines and the town's 10
+can only ever fire from a surface that asks for them DIRECTLY, not from sitting
+with somebody. That surface does not exist yet, which is the same open question
+as placement (below). Options: give the ambient pools their own trigger
+independent of patrons, or let a patron fall through on a chance roll rather
+than only on exhaustion.
+
+**55.** **Where does the character/King/gossip content render?** The doc
+corrected it off the peek sheet and recommends the win/loss screen "pending
+confirmation". Nothing calls those pools today — the data and resolver are built
+and tested, but deliberately not wired, because putting it in a second wrong
+place would repeat the first mistake. The in-match trait layer IS wired, since
+its home was unambiguous.
+
+**56.** **The doc's sixth trait is BULLISH; the code's is `strong`.** PT_TRAIT
+ships steady / greedy / reckless / strong / orderly / cunning. Five names match
+the doc exactly, one slot is left on each side, and the BULLISH lines fit
+`strong` unchanged — so they are wired to `strong`. Confirm that is the intended
+pairing, or rename one side. (`lucky.png` exists in the trait art but appears in
+no PT_TRAIT row, so nothing maps to it at all.)
+
+**57.** **The ambient draw-rate ask is moot for now.** The doc asks to halve the
+rate "if it is anywhere near half of all matches". It is currently zero — see 54
+and 55. Worth revisiting once those pools have a home.
