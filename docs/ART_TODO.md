@@ -9,12 +9,22 @@ Checked by listing `Art/Assets/**` against the ids the game actually defines.
 
 ---
 
-## Family cards — 2 missing
+## Family cards — DONE (was 2 missing)
 
 `Art/Assets/Cards/<Family>/card_face_<id>.png`
 
-- [ ] **steady_hand** (Silver)
-- [ ] **fair_trade** (Silver)
+- [x] **steady_hand** (Silver) — added 2026-07-31
+- [x] **fair_trade** (Silver) — added 2026-07-31
+
+**Every live family card now has art.** Verified against the game's own path
+(`assets/cards/<id>.webp`) across all 31 FAM_LIVE ids; the only two without a
+file are `anchor_f` and `bookends_f`, which are aliases onto `vanguard_f` and
+need none.
+
+Note the masters arrived camelCase (`card_face_steadyHand.png`,
+`card_face_FairTrade.png`) where every other card is snake_case
+(`card_face_ward.png`). Harmless, but any future script deriving a card id from
+a filename will trip on those two.
 
 Both are Silver, and the gap has an obvious cause: the rework RETIRED
 Ward-the-card and Insurance-the-card and replaced them with these two.
@@ -32,6 +42,15 @@ aren't mistaken for current work: `tar_pit` (Amber), `cultivate` (Jade),
 `insurance` + `ward` (Silver), `tamper` (Vagabond).
 
 ---
+
+## Still on old art — flagged 2026-07-31
+
+**The game's match table is the previous version's.** `fark_proto.html` renders
+`assets/Environment_ART/match.png` — 1064x1920, dated 07-11 — while the current
+master is `Art/Assets/Match/Commoner/Table_new.png` at 1080x2011 (07-27). The
+props lab was pointed at `TableLit.png` (07-20) and is now on `Table_new.png`;
+the game itself was not touched, because repointing it changes the look of every
+match and that is a call rather than a fix.
 
 ## Everything else is complete
 

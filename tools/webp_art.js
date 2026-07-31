@@ -14,14 +14,13 @@
  *     | python <decode the setup: line>
  */
 const JOBS = [
-  /* the six seed-cast busts, added after the first 24 */
-  { dir: 'Art/Assets/Frames/Patrons/Characters/', files: [
-    ['Odo.png', 0.86],
-    ['Ollis.png', 0.86],
-    ['Peck.png', 0.86],
-    ['Ferrand.png', 0.86],
-    ['Fenn.png', 0.86],
-    ['Tam.png', 0.86] ] },
+  /* the two family cards that had no art. The masters are camelCase
+     (card_face_steadyHand.png) where every other card is snake_case, so the
+     output name is stated explicitly rather than derived - the GAME loads
+     assets/cards/<card id>.webp, and the ids are steady_hand and fair_trade. */
+  { dir: 'Art/Assets/Cards/Silver/', files: [
+    ['card_face_steadyHand.png', 0.88],
+    ['card_face_FairTrade.png', 0.88] ] },
 ];
 
 const load = src => new Promise((res, rej) => {
