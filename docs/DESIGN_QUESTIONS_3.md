@@ -1,16 +1,29 @@
 # Design questions — for the creative director
 
-Raised by a 25-agent sweep of the whole open backlog (2026-07-30), plus what came
-up while fixing the dice this session. **None of these block code.** Everything
-answerable from the brief or from the code has already been decided and built;
-what is left here is the set where two defensible answers exist and the choice is
-yours. Where an agent picked one to keep moving, its pick is named — treat it as a
-default to overrule, not a decision taken.
+## Status — read this first
+
+| Round | Raised | What it came from | Q | Status |
+|---|---|---|---|---|
+| 1 | 2026-07-30 | 25-agent backlog sweep + the dice work | 44 | **ANSWERED** — see `AUDIT_RESOLUTIONS.md` |
+| 2 | 2026-07-31 | building the match-scoping ruling | 14 | **OPEN** |
+| 3 | 2026-07-31 | Vagabond, the lore system, brief tensions | 8 | **OPEN** |
+| 4 | 2026-07-31 | the 7-area brief sweep | 28 | **OPEN** |
+
+Round 1 is kept for the record only — every one of them was answered in
+`AUDIT_RESOLUTIONS.md` and most are now built. **Rounds 2, 3 and 4 are the live
+ones.** Nothing in any round blocks work: everything shipped under a stated
+assumption, and each entry says what reversing it would cost.
+
+Where an agent or I picked a default to keep moving, the pick is named — treat
+it as a default to overrule, not a decision already taken. Anything the brief
+itself marks unvalidated is flagged, so a ruling is not mistaken for evidence.
 
 Companion docs: `DESIGN_QUESTIONS.md` (all five answered),
-`DESIGN_QUESTIONS_2.md`, `AUDIT_BACKLOG.md`.
+`DESIGN_QUESTIONS_2.md`, `AUDIT_RESOLUTIONS.md`, `AUDIT_BACKLOG.md`.
 
 ---
+
+## Round 1 — 2026-07-30 · ANSWERED in AUDIT_RESOLUTIONS.md · kept for the record
 
 ## From the dice work, this session
 
@@ -141,7 +154,7 @@ _44 questions across 9 areas. Nothing here blocks work in progress._
 
 ---
 
-## Round 2 — from the match-scoping work (Break / Trade / Fair Trade)
+## Round 2 — 2026-07-31 · OPEN · from the match-scoping work (Break / Trade / Fair Trade)
 
 Raised while implementing the AUDIT_RESOLUTIONS ruling. **None block anything** —
 Break shipped in P375 and the other two are re-cutting against it. These are the
@@ -175,7 +188,7 @@ _14 further questions. Nothing here blocks work in progress._
 
 ---
 
-## Round 3 — raised while building, 2026-07-31
+## Round 3 — 2026-07-31 · OPEN · raised while building
 
 Everything below was decided-in-passing or flagged inline during the dice,
 patron and lore work. None of it blocked anything: the work shipped under the
@@ -221,3 +234,63 @@ stated assumption, and each entry says what it would cost to reverse.
 - **4b's closing line says Break's next-match return "still needs building"**.
   It was built in P375, before 4b was written. Stale rather than wrong; worth
   striking so it is not treated as outstanding.
+
+---
+
+## Round 4 — 2026-07-31 · OPEN · from the 7-area brief sweep
+
+The sweep audited the whole enchant/Silver/badge brief against the code in
+seven disjoint areas. Area A (Brutus's relic, Silver's table, the Ward cap) is
+built and shipped; the other six are queued. These are what its agents could not
+decide for themselves.
+
+### Area A — Silver family table + Brutus's relic + the one-Ward loadout cap (brief section 1)
+
+- Silver's bust-rate regression target has no policy attached. I measured 23.5% (max-keep, bank at 500), the in-file comment claims 28.2% at 'a 500-point banking policy', and the brief says ~26%. All three describe the same shipped table - the spread is entirely the keep policy. Should a canonical harness policy be written into the test checklist so the ~26% line is actually falsifiable, or should the checklist state the ratio (silver busts ~0.55x as often as bone, which held at 0.54-0.58 across every policy I tried) instead of an absolute?
+- Can Brutus's relic ever carry Quicksilver as well as its born Ward? The game's own rule is 'one enchant per die, ever', so the relic is now permanently unbrandable. That reads correct to me, but it is the one ability the relic can never have, and Quicksilver is architecturally a whole-die passive rather than a face brand - so 'one per die' may not have been written with a die that arrives pre-branded in mind.
+- If a player buys a Ward and THEN wins Brutus's relic, which one gives way? I refund the purchase (350g) and keep the relic's, on the reasoning that the born brand is what the die IS and the purchase is the reversible half. The alternative - the relic simply arrives unwarded - is defensible too and needs no refund. This case is not covered by the brief, which only says the relic 'counts against' the cap.
+- Kindred x Ward (brief open item 1) now also governs the relic: if 'double strength' is ever defined for Ward, Brutus's relic inherits it for free, and a Kindred build holding the relic gets the doubled version without ever buying a brand. Worth naming explicitly whenever that decision is made.
+- AUDIT_RESOLUTIONS #2 asks for a sim-check on Whisper's Fang now that it actually bites: it went from never paying its cost to paying -200 on every bust where it sits kept, and my patch widens the 'sits kept' test to catch Fangs kept second in a group (previously invisible), so the real-world rate is higher than a naive reading of the old code would suggest. That harness pass is not something I can do from inside this area.
+
+### Area B — the 1-or-5 brand restriction (brief §2 "Shop flow", §7; AUDIT_RESOLUTIONS #13/#14/#16/#22)
+
+- Refund amount for an illegal-face brand: the patch pays the enchant's own current ENCH_ICONS price (tithe 150 / ward 350 / snare 400 / break 300 / trade 350 / snuff 300 / fog 250), which is the most precise figure available — the same reasoning §4b uses to give Trade an exact 350g against Break's estimated ~450g. Confirm that is wanted rather than a flat per-brand figure, since §5 open item 3 says all seven prices are still placeholders and a later pricing pass would silently change what old saves get back.
+- A refunded Ward frees the one-Ward-per-loadout cap, so a player whose only Ward sat on a 2 gets 350g back AND may immediately re-brand a Ward. That reads as correct (they never legally held one), but it is a state change the cap's owner (Area A) should sign off on.
+- The refund is announced only through famLog, which scrolls. Section 4b's "state must never lie" principle got missing dice a persistent visual; an illegal-face refund arriving as one scrolling line on next load may want the same treatment — a shop-visit notice or a loadout marker. Out of scope here, flagged rather than guessed.
+
+### Area C — the seven Break death-triggers (brief section 2 table)
+
+- Vagabond's row reads G._oUnbanked, which is written in exactly one place - `G._oUnbanked=oppBank;` inside runOppTurn's roll loop - and is never cleared when the rival banks or busts. Because turns strictly alternate, Break can only fire on the PLAYER's turn, when the rival's genuinely-unbanked total is 0 by construction, so the brief's literal wording would make this row always pay nothing. What ships instead is the rival's running total from their PREVIOUS turn, lagging one roll behind (oppBank is read before that roll's points are added) and paid even when the rival already banked those points safely or busted them away. I did not change it: making it literal makes the row vacuous, and the brief calls this row an unvalidated proposal (open item 5.4). Needs a ruling on what the number should be, and then a field written at the right moment to hold it. I have flagged this as a spawnable follow-up task.
+- Starstone's row returns from the top of endPTurn, before G.pTurns++, G.turnNum++, G._pLastRolls, G.flintlockFired's reset and the turn-cap / final-answer checks. Falling Star's extra turn (G._fExtraTurn) sits AFTER all of that and is additionally gated on neither side having crossed the target. So a Starstone extra turn does not count against the patron turn cap and does not advance turnNum, which among other things means Quicksilver's once-per-turn allowance does not refresh on it (famQuicksilver gates on G._qsTurn===G.turnNum). Both readings of 'one immediate extra turn' are defensible and the win check is safe either way (handleBank calls endMatch before endPTurn is ever reached), so I left it alone - but the two extra-turn mechanics in the file disagree with each other and one of them is wrong.
+- Brass and Crystal are priced, effect-carrying dice that _matFam resolves to null, so they take the mundane no-op row. The brief's mundane row names only 'iron, flint, lead, plain bone'. Ruby (retired), jade3 (retired, resolves to jade) and lucky are the same shape. If Brass and Crystal are meant to be mundane for Break purposes that is fine and already true; if they were overlooked when the table was written, they need rows.
+- Jade's row now claims the roll Break interrupted, which is what makes it non-vacuous, but it means the row's value is 'a fresh hand that costs no roll' rather than 'an extra roll on top of the one you were making'. The brief says 'immediately grants one free full reroll of every currently-live die, no cost', which is what I implemented; a reading where the scatter lands AFTER the pending roll resolves (a genuine second chance, and a bust escape) would be more powerful and would collide with Ward/Amber's verb. Worth confirming before the harness pass open item 5.4 asks for.
+
+### Area D — the Trade enchant (brief §2 "Trade" + §4b)
+
+- VISIBLE SWAP-BACK, the one part of 4b I could not deliver literally. The swap is fully visible when it fires — the die is rebuilt at its lane and I verified the change down to the D3X mesh material. But endMatch clears both dice rows eight lines after the restore runs and drops the end overlay over the table, so there is no lane on screen to animate the revert at. It currently ships as corrected state plus a log line, with the post-match loadout screens showing the truth. Is that enough, or does the revert want a real beat — hold the rows for ~600ms after a match that had a live Trade and play the swap backwards at both lanes before the overlay? That is a UI change with a cost, and I would rather it were signed off than assumed.
+- TRADE'S PRICE. 4b already flags that ~350g should be revisited once self-consumption is real, and after this patch it genuinely is one use per match. It is also now strictly weaker than the shipped behaviour in a way the price never accounted for: you rent the rival's die for one fight instead of keeping it for the run. Worth naming in the pricing pass rather than left to be noticed later.
+- THE `naked_run` FEAT READS THE LIVE MATCH LOADOUT, not the owned one (`G.matchDice`, falling back to `S.run.dice`). My restore makes it honest for Trade, but Break and Obsidian's shatter also mutate `G.matchDice` mid-match, so the feat is evaluated against whatever survived the fight rather than against the six the player actually built. Is 'win using only plain dice' a statement about the build or about the match as played? If it is the build, the check should read `S.run.dice` and the whole class of interaction goes away.
+
+### Area E — Kindred (Whisper) and Still Waters (Aldric), brief section 3
+
+- Kindred's 'double strength' for Ward / Snare / Break / Trade / Snuff / Fog is still undefined and is left deliberately unimplemented (`doubles` is now documented at the call site as an opt-in whitelist). This is the ask the brief instructed me to make rather than guess: what does a doubled Ward, Snare, Break, Trade, Snuff or Fog mean, if anything? Candidate shapes, not proposals: Ward -> two arms per turn, or a two-thirds save instead of a half; Snare -> the mark survives two opposing turns, or halves twice; Snuff/Fog -> two lanes, or two turns; Break/Trade -> nothing is coherent, so they may simply never double.
+- Should `'confession'` join `_SEAL_POOL` (line 10726)? It is the only one of the four rework badge ids not in it, so after this patch Still Waters can be sleeved but never sealed, while Kindred can be both. Adding it changes the sealed-seat difficulty distribution, so I did not do it unasked.
+- Kindred's bark. I changed "Marked dice sing louder here — for both of us." to "Marked dice sing louder at my table." because the old line promises the mutual rule the rescope removed and the engine cannot run. Confirm the replacement copy, or supply a better line — happy to take a different one.
+- Still Waters + Break is now a SILENT death: the player spends a Break on a worked die and gets nothing but a status line after the die is already gone. AUDIT_RESOLUTIONS #29 already extended the targeting-ring work to Break — should the ring also mark worked dice as hushed BEFORE the tap, so the cost is visible at the decision rather than after it? That is a UI change in Area C/F territory, so I have not built it.
+- Three sim passes this patch newly requires, all flagged UNVALIDATED in the code comments: (a) Still Waters vs Break, all seven rows, not just Obsidian's; (b) Still Waters vs the PASSIVE shatter — the ~644-point figure the brief quotes was never actually being paid, so it is a projection, not a measurement of the shipped build; (c) Grog's Tooth's own 10%/+1500 under the badge, which AUDIT_RESOLUTIONS #6 explicitly says must not be extrapolated from plain Obsidian's 6%/+1000.
+
+### Area F — legacy save migration + missing-die visibility (brief 4b)
+
+- Trade refund breadth: the save cannot distinguish a trade brand that FIRED under the old run-scoped rule from one bought and never used, so patch 3 clears and refunds all of them at 350g. Confirm that is the intended reading of brief 4b's 'refund exactly 350g', or should an unfired brand be left alone at the cost of leaving genuinely spoiled runs unrepaired?
+- Break refund arithmetic: brief 4b says 'a flat ~450g'. A legacy save can be short by more than one die (two Breaks in one run under the old rule). Patch 2 pays 450g PER missing die. Confirm that, versus a single flat 450g however many are gone.
+- Migration timing: _famDiceMigrate only runs from famLoadoutShow and _gbShop, so a legacy save still plays five-die matches until the player opens one of those screens. Should it be hoisted to run-load so the repair lands before the next match, or is the existing (unchanged) timing acceptable?
+- Placeholder label wording: Break and Obsidian's natural shatter share _removeDieAt, so the tag is cause-neutral ('OUT' / 'BACK NEXT MATCH'). If the CD wants them distinguished ('BROKEN' vs 'SHATTERED'), that needs an explicit cause threaded from both call sites (16766 and 22374) — I did not invent one, and specifically did not repurpose the vestigial opts.permanent flag for it, since brief 4b says that flag must not be wired back up.
+- Peek scope: openPeek/openBossPeek scout the OPPONENT's dice, so there is no player-side gap to show there. The only other renderer of the player's own live loadout mid-match is _firstStrikeRender's 'YOU' row (16524), which is gated on the Corvus badge and was not active in my probe. Should the out-dice appear there too, and if so at their original lane position (which reopens crossArea #2's renumbering problem) or appended at the end?
+
+### Area G — cut enchants (Amber Cast / Tempering / Loaded, Ward-the-card, Insurance-the-card) + the universal ico
+
+- Patch 2/3 rule an icon+illegal-die keep as REJECTED, on the reading that the brief's clarification ("a branded die must never invalidate an otherwise-legal selection") runs one way only, and that handleRoll's existing NO SCORE is the correct half of the pre-existing disagreement. The other reading — a brand rescues the whole selection, letting a player dump unscoring dice — would instead mean patching handleRoll to accept. I took the narrow reading because the wide one hands every branded die a free discard, which is the same unconditional-safe-option shape section 1 deleted Silver's identity to remove. Worth a confirm.
+- When a mixed keep commits, the icon die is excluded from `vals` but included in `dice`, so it shows in the kept tray while contributing 0 to Half Measure's `totalCommitted` (which counts `k.vals.length`). Both commit paths already agree on this and I did not change it — but "does a cast die count as one of your three committed dice" is a real design question nobody appears to have answered.
+- Zero is the correct value for an icon component, and the preview says so by printing the enchant's NAME instead of a grey 0 — but only when the selection is icons-only (`selD.every(_dieIsIcon)` at :22926). A mixed keep prints just "+500" with no sign that a brand is about to fire. Should a mixed selection also name the enchant (e.g. "+500 · TITHE")? Out of scope for a correctness patch, but it is the one place the universal rule is invisible at the moment the player commits to it.
+
+_28 questions this round. None block work in progress._
