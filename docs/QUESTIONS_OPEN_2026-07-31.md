@@ -200,3 +200,34 @@ no PT_TRAIT row, so nothing maps to it at all.)
 **57.** **The ambient draw-rate ask is moot for now.** The doc asks to halve the
 rate "if it is anywhere near half of all matches". It is currently zero — see 54
 and 55. Worth revisiting once those pools have a home.
+
+---
+
+## Added after removing the previous version's dialogue (P393)
+
+**58. WIN AND LOSS NOW HAVE NO LINES — the one real gap, and it needs writing,
+not inventing.** `OPP_WINS` was the only win/loss category and every line it had
+was in the deleted block. `FARK_PATRON_LORE.md` writes four in-match moments,
+the King, the town and per-patron voice — it writes no win or loss line
+anywhere. Measured after the removal: 300 draws on `OPP_WINS` returned nothing.
+There is a hardcoded `'You lose.'` at the boss-defeat site so nothing shows
+blank, but that is a placeholder. Given "the win/loss screens should only show
+dialogue about winning or losing the match", this is the content that layer now
+needs. Shape suggestion only: it would sit naturally as two more trait moments
+(`win` / `loss`), six traits x three lines = 36, matching the existing buckets —
+but the lines themselves are yours.
+
+**43 — ANSWERED, and the two cards were being conflated.** There are two:
+`half_measure` is a live PLAYER card ("+400 if you bank 3 dice this turn"),
+`measure_twice` is Mabel's NPC-only card (doubles her first bank). Only the
+first is what the question is about.
+- Is it obtainable? YES. Measured against the game's own draft filter: rarity
+  `tin`, `npcOnly:false`, `npc:false`, `dep:false`, and `tin` appears in the
+  draft pool of all four tiers. Retired cards in this file carry `dep:true`
+  (`fools_gold` does); `half_measure` does not. So 43(b) is closed — it is live,
+  and 43(a) therefore stands rather than being moot.
+- Does an icon die count toward its three? It already does, with no change
+  needed: the counter is `G.kept.reduce((a,k)=>a+k.vals.length,0)`, which counts
+  DICE COMMITTED, not points scored. An icon face banks zero but still occupies
+  a `vals` slot. So the shipped behaviour already matches the ruling that the
+  counter's purpose is commitment.
