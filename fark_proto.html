@@ -9880,6 +9880,12 @@ function saveMatchState(){
        be live, and the resume side has to be able to trust the field instead
        of guessing which of the two writers produced the snapshot. */
     _fairTrade:G._fairTrade?{...G._fairTrade}:null,
+    /* THE LIVE TRADE LEDGER, for the same reason as the loan above. A Trade
+       fires MID-turn and this snapshot is rewritten whole at every turn
+       boundary, so without the field a resumed match held a rival's die in a
+       lane with no record it had ever been borrowed - and the restore at that
+       match's end had nothing left to undo. */
+    _tradeSwaps:G._tradeSwaps?JSON.parse(JSON.stringify(G._tradeSwaps)):null,
     originalPlayerDice:[...G.originalPlayerDice],
     thriftyBonus:G.thriftyBonus||0,spurActive:G.spurActive||0,
     martyrUsed:G.martyrUsed||false,
@@ -17030,27 +17036,65 @@ var ENCH_ICONS={
        has settled. */
     fire:function(c){G._breakPending={src:c.die};}},
 
-  /* PERMANENTLY swaps the player's die in this lane with the opponent's.
+  /* MATCH-SCOPED, and the WHOLE die crosses: material AND the brand it wears.
+     The lane never moves - only what stands in it - so this writes the two
+     match arrays and nothing else. It used to write S.run.dice and save(),
+     which is what "for good" meant: measured, the rival's LUCKY die landed in
+     the player's owned loadout, on disk, and was still sitting there after the
+     match had been LOST. The next match rebuilds its loadout from S.run.dice,
+     so leaving that array alone IS the restore - the same shape the
+     match-scoped Break correction landed on.
+     THE BRAND LEAVES WITH THE DIE, which is what makes Trade self-consuming:
+     nothing is left in the lane that can fire it again this match. One use per
+     match by construction, confirmed wanted (brief 4b) - not a nerf to patch
+     around. ONE-WAY too, also per 4b: the brand crosses over and only material
+     comes back, because there is no opponent-side enchant array to hold it.
+     Deferred, not a bug - do not invent one here.
      Not a blind gamble - landing order is loadout order and the peek shows
      their dice before the match - so it is a commitment risk, not a
      hidden-information one. */
   trade:{name:'Trade',price:350,glyph:'\u21C4',ink:'#8cb28c',
-    desc:'Brand crossed arrows on one face. Keep it: it banks nothing and trades this die for the rival\u2019s, in the same seat, for good.',
+    desc:'Brand crossed arrows on one face. Keep it: it banks nothing and trades this die for the rival\u2019s, in the same seat, for the rest of the match.',
     fire:function(c){
       var L=c.lane;
       if(L<0||!G.matchDice||!G.matchOppDice||L>=G.matchDice.length||L>=G.matchOppDice.length)return;
       _firstStrike(c.side);
       var mine=G.matchDice[L],theirs=G.matchOppDice[L];
+      G._enchArr=G._enchArr||[];
+      var myEn=G._enchArr[L]||null;
       G.matchDice[L]=theirs;G.matchOppDice[L]=mine;
-      /* and for the rest of the RUN, not just the match. The brand stays on
-         the seat, which is the point - you traded the die, not the work. */
-      try{
-        _getS();_enchInit();
-        if(S.run.dice&&L<S.run.dice.length){S.run.dice[L]=theirs;save();}
-      }catch(e){}
-      /* the die on the table becomes what was traded for, from now on */
-      try{c.die.mat=theirs;reDrawDieFace(c.die);}catch(e){}
-      try{famLog('TRADE — '+(getDie(mine)||{}).name+' FOR '+(getDie(theirs)||{}).name);}catch(e){}
+      /* The brand leaves with the die - that is what makes Trade
+         self-consuming, and it also moves a number that is NOT this area's to
+         move: _kindredActive counts (G._enchArr||[]).filter(Boolean).length, so
+         a player holding exactly two branded dice loses the doubling the moment
+         they Trade. It follows from the brand physically leaving the table, but
+         the badge brief words Kindred as doubling "for the match" and its own
+         open item says not to assume Kindred's behaviour. Flagged at the line
+         that causes it, so whoever owns Kindred signs it off rather than
+         discovering it. */
+      G._enchArr[L]=null;
+      /* THE LEDGER. It makes the restore an act rather than an absence, and
+         something downstream really does read the live loadout before G is
+         dropped: endMatch's feat pass runs after the restore point and
+         naked_run tests G.matchDice, so a rival's worked die parked in a lane
+         used to decide a feat the player's real six had earned.
+         cnt is how many dice of the borrowed material stand in the loadout
+         immediately after the swap. _tradeRestore needs it to tell "a Break
+         shifted the lane index under me" from "the borrowed die is gone" - the
+         two want opposite handling, and the array holds only materials, so
+         nothing else in the ledger can distinguish them. */
+      var _tc=0;for(var _i=0;_i<G.matchDice.length;_i++)if(G.matchDice[_i]===theirs)_tc++;
+      (G._tradeSwaps=G._tradeSwaps||[]).push({lane:L,mine:mine,theirs:theirs,myEn:myEn,cnt:_tc});
+      /* THE SWAP HAS TO SHOW. This used to reassign c.die.mat and leave the
+         element alone - reDrawDieFace only redraws pips - so the dtype- class,
+         the host's _trueMat and the 3D layer's mesh all still said bone while
+         the model said lucky, and the table went on claiming the player's own
+         die was standing there. Measured before this fix: mat 'lucky',
+         _trueMat 'bone', mesh 'bone'. */
+      _tradePaint(c.die,theirs,null);
+      try{famLog('TRADE — '+(getDie(mine)||{}).name+' FOR '+(getDie(theirs)||{}).name
+        +', LANE '+(L+1)+', THIS MATCH');}catch(e){}
+      _tradeSnap();
     }},
 
   /* Removes the opponent's die in this lane for their NEXT TURN ONLY, then
@@ -17075,6 +17119,117 @@ var ENCH_ICONS={
       try{famLog('FOG — THEY WILL NOT SEE THAT SEAT');}catch(e){}
     }}
 };
+/* TRADE'S MACHINERY. The swap is match-scoped, so it needs three things the
+   other six icons do not: a way to SHOW the die change, a way to survive a
+   force-quit taken mid-turn, and a way to hand both loadouts back the instant
+   the match ends. */
+/* A die's material is baked into three places the moment it is built - the
+   dtype- class, the host's _trueMat, and the mesh D3X registers against that
+   exact element - and none of them is ever re-read, so a die cannot be
+   repainted in place. It is rebuilt in the same seat instead, and the new one
+   tumbles in on its own: that IS the swap animating at that lane. Brief 4b's
+   visible-swap ruling - a die that reads as the other side's after the state
+   has changed is the state-lies-about-truth problem. */
+function _tradePaint(d,mat,ench){
+  try{
+    if(!d)return;
+    d.mat=mat;d.ench=ench||null;
+    var old=d.el;if(!old||!old.parentElement)return;
+    var wrapOld=(old.parentElement.classList&&old.parentElement.classList.contains('die-wrap'))?old.parentElement:old;
+    var nu=mkDie(d.val,mat,null,false,d.ench);
+    /* selection and commit state belong to the LANE, not to whichever die is
+       standing in it - the commit that fired this icon is still in flight */
+    ['selected','committed','sel'].forEach(function(k){if(old.classList.contains(k))nu.classList.add(k);});
+    var wrapNew=_wrapDie(nu);
+    if(wrapOld.dataset&&wrapOld.dataset.seat!==undefined&&wrapNew.dataset)wrapNew.dataset.seat=wrapOld.dataset.seat;
+    wrapOld.parentNode.replaceChild(wrapNew,wrapOld);
+    d.el=nu;
+    /* mkDie has two branches and only one of them draws a face. The 3D branch
+       ends in _d3InitHost, which lands the true value by itself - that IS the
+       swap tumbling in. The other branch (taken when window.D3_MATCH===false)
+       deliberately paints a RANDOM placeholder face and leaves settleDie or
+       reDrawDieFace to draw the real one, and nothing here ever would: a die
+       that already scored as a 1 would sit in the row showing a 4. The shipped
+       fire called reDrawDieFace unconditionally - do not drop it on the way
+       past. Gated on the same flag mkDie branches on, not on nu._d3, which is
+       still undefined at this instant either way. */
+    if(window.D3_MATCH===false)try{reDrawDieFace(d);}catch(e){}
+    if(!old.classList.contains('committed'))nu.onclick=function(){toggleDie(d);};
+    try{spawnPixelSparks(nu,8);}catch(e){}
+  }catch(e){}
+}
+/* A Trade fires MID-turn; the mid-match snapshot is only written at turn
+   boundaries. Force-quitting between the two resumed from a snapshot taken
+   before the swap - the rival still had their die and the brand was still in
+   the lane, so the same 350g enchant could be spent a second time. Only the
+   dice fields, never a whole saveMatchState: that snapshot means "the state at
+   the START of a player turn", and re-timestamping it mid-turn re-charges the
+   replayed turn for everything it has already spent. Exactly the shape
+   _removeDieAt uses, for exactly the same reason.
+   G._practice is in the guard because saveMatchState refuses a practice match
+   outright, and _removeDieAt's comment states the invariant both writers lean
+   on - no snapshot exists in a practice match. Two writers disagreeing about
+   whether this match has one is how a practice match ends up overwriting a
+   real match's. */
+function _tradeSnap(){
+  try{
+    if(!S||!S.pendingMatch||!G||G._practice)return;
+    S.pendingMatch.matchDice=[...G.matchDice];
+    S.pendingMatch.matchOppDice=[...G.matchOppDice];
+    S.pendingMatch._enchArr=[...(G._enchArr||[])];
+    S.pendingMatch._tradeSwaps=G._tradeSwaps?JSON.parse(JSON.stringify(G._tradeSwaps)):null;
+    save();
+  }catch(e){}
+}
+/* BOTH SIDES BACK THE INSTANT THE MATCH ENDS - win, loss, flee, or the end of
+   a resumed match - no exceptions, no residue. This is not what keeps
+   S.run.dice honest; fire never touches it any more, so the owned loadout is
+   intact by construction. This is what puts the LIVE arrays right before the
+   last things that read them do. Idempotent: the ledger is cleared as it is
+   spent, so a second call is a no-op.
+   THE RECORDED LANE CAN MOVE UNDER US. _removeDieAt splices G.matchDice and
+   shifts G.pool's lanes and G._fairTrade.lane, but it knows nothing about this
+   ledger, so a Break in a seat BELOW a traded one leaves the index pointing at
+   the wrong die - and endMatch's naked_run check reads G.matchDice a few
+   hundred lines after this runs, so a seat left un-restored quietly decides a
+   renown feat in either direction.
+   The index does not have to be right for the repair to be: matchDice holds
+   MATERIALS, so every entry reading t.theirs is interchangeable and writing
+   t.mine over any one of them yields the same loadout. What the fallback must
+   NOT do is fire when the borrowed die is GONE rather than merely moved - Break
+   the borrowed die itself and a blind indexOf would find the player's OWN die
+   of that material and erase it, which is worse than doing nothing. t.cnt, the
+   count of that material taken right after the swap, is what tells the two
+   apart: unchanged means nothing of that material died, so the borrowed one is
+   still among them; fewer means one died and which one is unknowable, so leave
+   it alone. Deliberately NOT a fix inside _removeDieAt - that function belongs
+   to the Break area and has been through two corrections already; nothing here
+   needs it to change. */
+function _tradeRestore(){
+  if(!G||!G._tradeSwaps||!G._tradeSwaps.length)return 0;
+  var sw=G._tradeSwaps;G._tradeSwaps=null;var n=0;
+  var md=G.matchDice||[];
+  /* newest first, so two swaps in one lane unwind in the order they were made */
+  for(var i=sw.length-1;i>=0;i--){
+    var t=sw[i],L=t.lane,k=-1;
+    if(L>=0&&L<md.length&&md[L]===t.theirs)k=L;
+    else if(typeof t.cnt==='number'){
+      var have=0;for(var j=0;j<md.length;j++)if(md[j]===t.theirs)have++;
+      if(have===t.cnt)k=md.indexOf(t.theirs);
+    }
+    if(k>=0){
+      md[k]=t.mine;
+      /* the brand only goes home to the seat it left. If the index moved, the
+         seat now at k belongs to some other die and its brand is not ours to
+         overwrite - the material repair above already stands on its own. */
+      if(G._enchArr&&k===L)G._enchArr[L]=t.myEn;
+      n++;
+    }
+    if(G.matchOppDice&&L>=0&&L<G.matchOppDice.length&&G.matchOppDice[L]===t.mine)G.matchOppDice[L]=t.theirs;
+  }
+  if(n){try{famLog('THE MATCH ENDS - EVERY TRADED DIE GOES HOME');}catch(e){}}
+  return n;
+}
 /* every service the innkeep sells, icons included */
 function _enchDef(k){return ENCHANTS[k]||ENCH_ICONS[k]||null;}
 function _isIcon(ench){return !!(ench&&ENCH_ICONS[ench.t]);}
@@ -26872,6 +27027,12 @@ function endMatch(win){
      "Victory screen audio repeats several times". */
   if(G&&G._endMatchFired)return;
   if(G)G._endMatchFired=true;
+  /* TRADE IS MATCH-SCOPED: the instant the match ends, win or lose, both
+     sides' true loadouts are whole again. Hung on the far side of the guard
+     above so it runs exactly once per match, and this early so it lands before
+     anything downstream reads the live loadout - evaluateFeats' naked_run check
+     tests G.matchDice a few hundred lines below. */
+  try{_tradeRestore();}catch(e){}
   /* MATCHES PLAYED this run, win or lose. This is the funnel every match end
      passes through, which is why the flag above lives here too. */
   try{if(S&&S.run)S.run._matchesThisRun=(S.run._matchesThisRun||0)+1;}catch(e){}
@@ -27564,6 +27725,11 @@ function doFlee(){
        pending NPC step()/finOpp/bust chains kept executing on the gauntlet
        screen and could roll ghost dice into the NEXT match. */
     G._endMatchFired=true;
+    /* the one match exit that never reaches endMatch, so Trade's restore is
+       hung here too. Nothing reads the arrays after this today - G is dropped
+       three lines down - but "restored at every exit, no exceptions" has to
+       hold by construction, not by which exit happens to have no reader. */
+    try{_tradeRestore();}catch(e){}
     if(S&&S.pendingMatch){delete S.pendingMatch;save();}
     G=null;
     showScreen('gauntlet');
@@ -29525,6 +29691,13 @@ function initMatchScreen(data){
   if(params&&params._resumeData){
     var _rdFt=params._resumeData._fairTrade;
     G._fairTrade=(_rdFt&&typeof _rdFt.lane==='number')?{lane:_rdFt.lane,was:_rdFt.was,borrowed:_rdFt.borrowed}:null;
+    /* and the Trade ledger. matchDice and _enchArr above already carry the swap
+       itself; this is the record of what to hand back, without which a match
+       resumed mid-swap would end with the two loadouts still crossed. */
+    var _rdTs=params._resumeData._tradeSwaps;
+    G._tradeSwaps=(Array.isArray(_rdTs)&&_rdTs.length)
+      ?_rdTs.map(function(t){return{lane:t.lane,mine:t.mine,theirs:t.theirs,myEn:t.myEn||null,cnt:t.cnt};})
+      :null;
   }
   /* ── Apply patron Tell (signature passive rule) ── */
   _applyTellAndSleeve();
