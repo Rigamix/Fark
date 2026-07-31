@@ -10466,11 +10466,15 @@ const RUNGS=[
     agg:.84,cardRarity:'gold',wager:true,wagerCount:2,wagerMode:'best',minBank:800,diceStop:1,chaotic:false,adaptive:true,
     dice:['amber','jade','jade','jade2','starstone','flint'],
     cardPool:['the_royal_purse','crown_authority','the_quiet_decree','sundays_rest','old_roads','royal_seizure'],cardCount:4,
-    /* WHISPER — KINDRED (was Counterfeit, never validated). Doubles icon
-       effects for BOTH sides when either holds 2+ enchanted dice. Only
+    /* WHISPER — KINDRED (was Counterfeit, never validated). RESCOPED to the
+       player alone: the engine has no opponent-side enchants, so the original
+       "either side" wording could never be true on their half of the table.
+       2+ worked dice in YOUR loadout double icon effects for the match. Only
        cleanly defined for additive-numeric effects, so only Tithe doubles;
-       the rest are an open design decision, not a default to guess. */
-    tell:{id:'counterfeit',name:'KINDRED',desc:"“Marked dice sing louder here — for both of us.”",icon:'💀'}},
+       the rest are an open design decision, not a default to guess. The bark
+       lost "for both of us" with the rescope - it was describing a rule the
+       engine has no way to run. */
+    tell:{id:'counterfeit',name:'KINDRED',desc:"“Marked dice sing louder at my table.”",icon:'💀'}},
   {id:7,name:'AMBROSE',key:'bishop',icon:'✝️',tier:'renowned',target:12500,gold:1300,buyIn:200,
     boss:null,bossDesc:null,
     agg:.88,cardRarity:'gold',wager:true,wagerCount:3,wagerMode:'all',minBank:900,diceStop:1,chaotic:false,adaptive:true,
@@ -10789,15 +10793,26 @@ function _tellById(id){
 }
 /* is a table rule live for this side? boss tell binds the player only;
    a sleeved tell binds BOTH sides (brief §7) */
-/* the four rules the rework replaced. Their ids still exist (the badge
-   objects kept them) but the OLD behaviour is gone, so nothing may switch it
-   back on through a sleeve or a sealed seat. */
-/* in_arrears is NOT here: First Strike fully replaced In Arrears (the gold
-   drain is switched off at its only site), so the id is free and the guard
-   below would only stop the NEW rule reaching a sleeve or a sealed seat.
-   confession and counterfeit must stay - Still Waters and Kindred are not
-   built yet, so their old behaviour is still the live code under those ids. */
-var _RETIRED_RULES={last_call:1,counterfeit:1,confession:1};
+/* the rules the rework replaced whose OLD behaviour is STILL LIVE CODE under
+   the same id. The guard is what stops a sleeve or a sealed seat switching
+   that dead rule back on. It is a blunt instrument: it cannot tell a retired
+   id from a LIVE rule wearing the same id, so anything listed here switches
+   its replacement off through a sleeve and a sealed seat too. Only list an id
+   whose replacement does not exist yet.
+   last_call is exactly that trap, still armed and NOT fixed here: Grog's
+   badge carries ZERO HOUR under this id now, _iconFire reads G._tell.id for
+   it directly rather than _ruleActive, and 'last_call' is in _SEAL_POOL - so
+   a sealed seat can roll a rule this very table calls retired. Reported to
+   whoever owns Zero Hour; the fix is the same shape as the two removals
+   below. */
+/* in_arrears left when First Strike replaced In Arrears (the gold drain is
+   switched off at its only site). confession and counterfeit leave now: the
+   old card-sealing and die-cursing they were guarding is DELETED below, so
+   the only things answering to those ids are Still Waters and Kindred. While
+   the ids sat here, a SLEEVED or SEALED Still Waters and a sleeved or sealed
+   Kindred did nothing whatever - and both are claimable as boss spoils, so
+   that was a rule the player had won and could not use. */
+var _RETIRED_RULES={last_call:1};
 function _ruleActive(id,side){
   if(!G)return false;
   if(_RETIRED_RULES[id]&&!(G._tell&&G._tell.id===id))return false;
@@ -10821,7 +10836,6 @@ function _applySleeve(){
     if(t){G._tell=t;G._tellState={};
       if(t.id==='steeped')G._tellState.bonus=0;
       if(t.id==='in_arrears')G._tellState.totalRollCost=0;
-      if(t.id==='counterfeit'){G._tellState.cursedDice=[];G._tellState.lastCurseTurn=0;}
       if(t.id==='reckoning')G._tellState.lastNpcBank=0;
     }
   }
@@ -10838,7 +10852,6 @@ function _applySeal(){
     var t=_tellById(G._sealRule);
     if(t){G._tell=t;
       if(t.id==='in_arrears')G._tellState.totalRollCost=0;
-      if(t.id==='counterfeit'){G._tellState.cursedDice=[];G._tellState.lastCurseTurn=0;}
     }
   }
   famLog('SEALED SEAT — '+G._sealRule.toUpperCase().replace(/_/g,' ')+' RULES THE TABLE, BOTH SIDES');
@@ -10856,8 +10869,12 @@ function _applyTell(){
     case 'pickpocket':/* per-roll RNG, no persistent state */ break;
     case 'in_arrears': G._tellState.totalRollCost=0; break;
     case 'drill_order':/* uses turnRollCount + maxRolls */ break;
-    case 'confession': G._tellState.sealedCard=null;G._tellState.lastSealed=null; break;
-    case 'counterfeit': G._tellState.cursedDice=[];G._tellState.lastCurseTurn=0; break;
+    /* Still Waters and Kindred are both stateless reads - of the die, and of
+       the loadout - so there is nothing to set up. The sealedCard and
+       cursedDice fields these two seeded belonged to Confession and
+       Counterfeit, and both of those are deleted. */
+    case 'confession':/* Still Waters: no per-match state */ break;
+    case 'counterfeit':/* Kindred: no per-match state */ break;
     case 'reckoning': G._tellState.lastNpcBank=0; break;
   }
 }
@@ -10991,44 +11008,12 @@ function _flashTellRule(){
   setTimeout(function(){b.classList.remove('tell-cancel-flash');},3000);
 }
 
-/* ── COUNTERFEIT (Whisper): cursed dice expand on schedule ── */
-/* RETIRED with Counterfeit. Kindred does not curse dice, it amplifies
-   marked ones - so nothing here has a job any more. Kept as a no-op rather
-   than deleted, because several turn-start paths call it unconditionally. */
-function _maybeAdvanceCounterfeit(){
-  return;
-  /* eslint-disable no-unreachable */
-  if(!G||!G._tell||G._tell.id!=='counterfeit')return;
-  if(!G._tellState)G._tellState={cursedDice:[],lastCurseTurn:0};
-  var t=G._tell;
-  var startCount=t.startCount||1;
-  var addEvery=t.addEvery||3;
-  var diceTotal=(G.matchDice&&G.matchDice.length)||6;
-  /* Determine target count of cursed dice for this turn */
-  var cursesNow=G._tellState.cursedDice.length;
-  var turn=G.turnNum||0;
-  var targetCount=startCount+Math.floor(turn/addEvery);
-  if(targetCount>diceTotal-1)targetCount=diceTotal-1;/* leave at least one clean */
-  while(cursesNow<targetCount){
-    /* Pick a random uncursed index */
-    var avail=[];for(var i=0;i<diceTotal;i++){if(G._tellState.cursedDice.indexOf(i)<0)avail.push(i);}
-    if(!avail.length)break;
-    G._tellState.cursedDice.push(avail[Math.floor(Math.random()*avail.length)]);
-    cursesNow++;
-    if(turn>0)setStatusMsg('COUNTERFEIT — DIE CURSED','red');
-  }
-}
-function _markCounterfeitDice(){
-  return;/* retired with Counterfeit - see _maybeAdvanceCounterfeit */
-  /* eslint-disable no-unreachable */
-  if(!G||!G._tell||G._tell.id!=='counterfeit'||!G._tellState||!G.pool)return;
-  var cursed=G._tellState.cursedDice||[];
-  G.pool.forEach(function(d,i){
-    var isC=cursed.indexOf(i)>=0;
-    d.cursed=isC;
-    if(d.el)d.el.classList.toggle('die-counterfeit',isC);
-  });
-}
+/* COUNTERFEIT's cursed dice are DELETED, not stubbed. Kindred curses nothing
+   - it amplifies dice the player chose to have worked - so these two no-op
+   functions had no job left and, once their two call sites went with them, no
+   caller either. They were also the reason `counterfeit` had to stay in
+   _RETIRED_RULES, and that entry was switching KINDRED off for every sleeve
+   and every sealed seat. */
 
 /* WARDED helper: returns true (and consumes a charge) if the player has
    the WARDED card and a charge remaining. Disruption hooks call this
@@ -12399,9 +12384,11 @@ function famRenderRow(){
   (G&&G.pF||[]).forEach(function(inst,i){
     var d=famDef(inst.id);if(!d)return;
     if(d.fam==='tavern')return;/* run-domain cards: nothing to track at the table (brief §3) */
-    var sealed=(typeof _ruleActive==='function'&&_ruleActive('confession','p')&&G._fSealIdx===i);
+    /* no sealed state any more: Confession's card-seal is retired, and Still
+       Waters hushes a die's FAMILY, never a card. G._fSealIdx was never
+       assigned by anything, so this only ever compared against undefined. */
     var spent=d.kind==='active'&&inst.charges<=0;
-    var cls=(spent?' spent':'')+(sealed?' sealed':'')+(inst.state.armed?' armed':'');
+    var cls=(spent?' spent':'')+(inst.state.armed?' armed':'');
     hp+=famCardArt(inst.id,inst.tier,{cls:cls.trim(),onclick:'famCardTap('+i+')'});
   });
   hostP.innerHTML=hp;
@@ -12444,10 +12431,11 @@ function famRenderRow(){
 function famCardTap(i){
   if(!G||!G.pF||!G.pF[i])return;
   var inst=G.pF[i],d=famDef(inst.id);if(!d)return;
-  var sealed=(typeof _ruleActive==='function'&&_ruleActive('confession','p')&&G._fSealIdx===i);
-  var usable=d.kind==='active'&&inst.charges>0&&CFX[inst.id]&&CFX[inst.id].use&&!sealed;
-  var sub=sealed?'SEALED SHUT THIS TURN (Confession)'
-    :(d.kind==='active'?(inst.charges>0?'uses left: '+inst.charges:'spent for this match'):'');
+  /* Confession's card-seal is retired - Still Waters hushes a die's family
+     and never touches cards - and G._fSealIdx was never assigned by anything,
+     so the seal branch here was unreachable as well as wrong. */
+  var usable=d.kind==='active'&&inst.charges>0&&CFX[inst.id]&&CFX[inst.id].use;
+  var sub=(d.kind==='active'?(inst.charges>0?'uses left: '+inst.charges:'spent for this match'):'');
   famCardSheet(inst.id,inst.tier,{sub:sub,
     btn:usable?'PLAY':null,cb:usable?('function(){famUse('+i+');}'):null});
 }
@@ -16989,9 +16977,15 @@ var ENCH_ICONS={
      alone does not restrict that. */
   ward:{name:'Ward',price:350,glyph:'\u25B2',ink:'#9ab0d0',
     desc:'Brand a shield on one face. Keep it: it banks nothing and arms this turn — a bust halves your bank instead of taking it all.',
+    doubles:true,
     fire:function(c){
       if(G._wardArmed){try{famLog('ALREADY WARDED THIS TURN');}catch(e){}return;}
       G._wardArmed=true;
+      /* KINDRED (#32): two-thirds survives instead of half. Deliberately NOT a
+         second arming - that reopens the stacking the one-Ward loadout cap
+         exists to prevent. Stamped here because the save pays out at the bust,
+         long after this. */
+      G._wardBoost=(c&&c.mult===2)||false;
       /* SFX.shield, re-homed rather than deleted. It was written for the
          Silver full-save this rework removes, and Ward - the mechanic that
          inherited that job - was arming in total silence. Its only other
@@ -17008,6 +17002,7 @@ var ENCH_ICONS={
      makes it a wager. */
   snare:{name:'Snare',price:400,glyph:'\u2442',ink:'#a888c0',
     desc:'Brand a snare on one face. Keep it: it banks nothing and sets a trap in this lane for the rival\u2019s next turn.',
+    doubles:true,
     fire:function(c){
       /* stamped with the opponent turn it is FOR. "Until it fires" tested at
          97.7% inside six turns - not a bet at all - so the window has to be
@@ -17017,7 +17012,9 @@ var ENCH_ICONS={
          turn, before this is read, so stamping the current count meant the test
          `mark.turn === G.oppTurnCount` compared N against N+1 and these three
          enchants never fired once. */
-      G._snare={lane:c.lane,live:true,turn:(G.oppTurnCount||0)+1};
+      /* KINDRED (#32): halves TWICE on the same next-turn shot - not a longer
+         window, which would risk the 97.7%-fires problem the short one fixed */
+      G._snare={lane:c.lane,live:true,turn:(G.oppTurnCount||0)+1,x2:(c&&c.mult===2)||false};
       _firstStrike(c.side);
       try{famLog('SNARE SET — LANE '+(c.lane+1));}catch(e){}
     }},
@@ -17102,8 +17099,12 @@ var ENCH_ICONS={
      average value ~36%. */
   snuff:{name:'Snuff',price:300,glyph:'\u2716',ink:'#b09470',
     desc:'Brand a snuffed candle on one face. Keep it: it banks nothing and takes the rival\u2019s die in this seat away for one turn.',
+    doubles:true,
     fire:function(c){
-      G._snuff={lane:c.lane,live:true,turn:(G.oppTurnCount||0)+1};/* see the note on _snare */
+      /* KINDRED (#32): two opponent turns, not two lanes - a second lane would
+         be a far bigger spike than "double" should mean */
+      G._snuff={lane:c.lane,live:true,turn:(G.oppTurnCount||0)+1,
+        turns:((c&&c.mult===2)?2:1)};/* see the note on _snare */
       _firstStrike(c.side);
       try{famLog('SNUFFED — THEY PLAY A DIE SHORT');}catch(e){}
     }},
@@ -17113,8 +17114,11 @@ var ENCH_ICONS={
      concept, was cut for needing an opponent smart enough to be fooled.) */
   fog:{name:'Fog',price:250,glyph:'\u2601',ink:'#a8b0b8',
     desc:'Brand a cloud on one face. Keep it: it banks nothing and hides this seat from the rival\u2019s reckoning next turn.',
+    doubles:true,
     fire:function(c){
-      G._fog={lane:c.lane,live:true,turn:(G.oppTurnCount||0)+1};/* see the note on _snare */
+      /* KINDRED (#32): two opponent turns, same reading as Snuff */
+      G._fog={lane:c.lane,live:true,turn:(G.oppTurnCount||0)+1,
+        turns:((c&&c.mult===2)?2:1)};/* see the note on _snare */
       _firstStrike(c.side);
       try{famLog('FOG — THEY WILL NOT SEE THAT SEAT');}catch(e){}
     }}
@@ -17235,13 +17239,36 @@ function _enchDef(k){return ENCHANTS[k]||ENCH_ICONS[k]||null;}
 function _isIcon(ench){return !!(ench&&ENCH_ICONS[ench.t]);}
 /* is this die SHOWING its branded face right now? */
 function _dieIsIcon(d){return !!(d&&_isIcon(d.ench)&&d.val===d.ench.face);}
-/* Whisper's Kindred: 2+ enchanted dice on EITHER side doubles icon effects
-   for both. Only the additive-numeric ones - see ENCH_ICONS.doubles. */
+/* WHISPER - KINDRED. While worn, 2+ enchanted dice in the PLAYER's loadout
+   make icon effects fire at double strength for the match. Player-only on
+   purpose: the engine has no opponent-side enchants, so the original "either
+   side" wording could never be true on their half of the table (brief
+   section 3, open item 8). Sim, Tithe only: gold 5.9 -> 11.9 a turn, an exact
+   2x with no leakage.
+   ONLY the additive-numeric effects double, and Tithe is the only one there
+   is - see ENCH_ICONS.doubles, which is the single place that list lives. */
 function _kindredActive(){
   try{
-    if(!G||!G._tell||G._tell.id!=='counterfeit')return false;
-    var mine=(G._enchArr||[]).filter(Boolean).length;
-    return mine>=2;
+    /* _ruleActive, not G._tell.id - the id also arrives by sleeve and by a
+       sealed seat, and reading the tell directly made the badge silently do
+       nothing in every match except Whisper's own. */
+    if(!_ruleActive('counterfeit','p'))return false;
+    /* THE LOADOUT, NOT THE LIVE ARRAY. The brief grants this on what the
+       player BROUGHT - "2+ enchanted dice in their loadout" - and grants it
+       "for the match". G._enchArr is neither: it is the live match array, and
+       _removeDieAt SPLICES it every time a die leaves the table, from Break
+       and from the Obsidian shatter sweep alike. Counting it meant a player
+       who brought exactly two worked dice lost Kindred mid-match, silently,
+       the moment one of them died - on a 6% roll they never chose.
+       S.run.dieEnch IS the loadout, and match-scoped removal is deliberately
+       forbidden from touching it (P375: the run loadout is what the next
+       match restores from), so it is stable for the whole match and survives
+       a resume. The live array is the fallback only for a table with no run
+       behind it. */
+    var mine=null;
+    try{if(S&&S.run&&Array.isArray(S.run.dieEnch))mine=S.run.dieEnch;}catch(e2){}
+    if(!mine)mine=G._enchArr||[];
+    return mine.filter(Boolean).length>=2;
   }catch(e){return false;}
 }
 /* ═══ THE UNIVERSAL RULE ═══
@@ -17251,6 +17278,20 @@ function _kindredActive(){
 function _iconFire(d,side){
   var def=ENCH_ICONS[d&&d.ench&&d.ench.t];
   if(!def)return 0;
+  /* KINDRED DOUBLES BY WHITELIST, ONE ENCHANT WIDE. `doubles` is opt-in and
+     never a default: "twice as much gold" is the only reading of double
+     strength the brief has settled, and it settled it against a sim. Ward's
+     halved consolation and Snare/Break/Trade/Snuff/Fog's structural effects
+     have no meaningful 2x - doubling a die-destruction or a one-time swap
+     says nothing - and the brief is explicit that Code must ASK rather than
+     pick a default per enchant (section 3, open item 1). Putting
+     `doubles:true` on an enchant is a design decision, and #32 has now made it
+     for all seven. Each one means something DIFFERENT by "double" - two-thirds
+     rather than a half, a second halving rather than a longer window, a second
+     turn rather than a second lane - which is exactly why one multiplier could
+     not have covered them and why the brief refused to let Code guess. BREAK
+     and TRADE stay off the list explicitly: nothing coherent exists for
+     doubling a die-destruction or a one-time swap. */
   var mult=(def.doubles&&_kindredActive())?2:1;
   try{def.fire({die:d,side:side||'p',lane:_laneOf(d),mult:mult});}
   catch(e){try{console.error('icon '+d.ench.t,e);}catch(e2){}}
@@ -17357,12 +17398,27 @@ function _firstStrikeRender(){
    Suppressing Jade's wilds, Amber's triple bonus, Starstone's bank bonus or
    Silver's odds-skew is INFERRED, not validated - retest before trusting. */
 function _stillWaters(){
-  try{return !!(G&&G._tell&&G._tell.id==='confession');}catch(e){return false;}
+  /* _ruleActive, not G._tell.id - the id also arrives by sleeve and by a
+     sealed seat, and reading the tell directly made the badge silently do
+     nothing in every match except Aldric's own. */
+  try{return !!_ruleActive('confession','p');}catch(e){return false;}
 }
+/* Is THIS die's family hushed? Only a WORKED die goes quiet - a plain die
+   keeps its family, which is the whole shape of the rule.
+   WHAT ASKS IT, AND WHAT STILL DOES NOT. This predicate covers _dieEffect,
+   the passive shatter, _rollTable and Break. scoreRoll's own dieEff asks the
+   same question inline - it holds mats+enchs arrays, not die objects - so the
+   scoring traits (Jade wilds, Amber triples, Starstone bank) are hushed too.
+   TWO family traits are NOT, because they walk G.matchDice as bare material
+   ids with no die object to ask about: Brass's reckless bust penalty, and
+   the shield bust-save recount. That is a known GAP, not a ruling - the brief
+   validated Obsidian only, and AUDIT_RESOLUTIONS #7 puts the rest behind its
+   own harness pass. Do not read this helper as proof of full coverage. */
+function _famHushed(d){return !!(d&&d.ench&&_stillWaters());}
 /* a die's family effect, or null when Still Waters has hushed it */
 function _dieEffect(d){
   var dt=getDie(d&&d.mat)||{};
-  if(d&&d.ench&&_stillWaters())return null;
+  if(_famHushed(d))return null;
   return dt.effect||null;
 }
 /* ═══ BREAK ═══
@@ -17592,6 +17648,17 @@ function _breakDie(d){
   _breakClear();
   G.pool.forEach(function(q){if(q.el)q.el.onclick=null;});
   var fam=_matFam(d.mat);
+  /* READ BEFORE THE DIE LEAVES THE TABLE. Still Waters hushes a worked die's
+     family, and a death-trigger IS a family trait by section 0's law: it
+     fires whichever face was showing. Break invents no new mechanism - its
+     own spec says it forces the SAME shatter, only guaranteed - so
+     suppressing the passive 6% roll while exempting the guaranteed one would
+     be a carve-out the law does not support. It makes Aldric a hard counter
+     to the best-validated Break partner, on purpose. Grog's Tooth goes quiet
+     on the same line; relics are not badge-proof. UNVALIDATED - this ruling
+     needs its own harness pass, and the Tooth's 10%/+1500 needs its OWN
+     measurement rather than an extrapolation from Obsidian's 6%/+1000. */
+  var _hushed=_famHushed(d);
   var lane=_laneOf(d);
   /* off the table for the rest of the MATCH, not the run: the die is back,
      fully restored, at the start of the next one. The flag is vestigial -
@@ -17603,8 +17670,12 @@ function _breakDie(d){
     d.el.classList.add('die-shatter');var _w=d.el.parentElement;
     setTimeout(function(){try{(_w||d.el).remove();}catch(e){}},420);}}catch(e){}
   try{SFX.err&&SFX.err();}catch(e){}
-  var trg=fam&&BREAK_TRIGGERS[fam];
+  var trg=!_hushed&&fam&&BREAK_TRIGGERS[fam];
   if(trg){try{famLog(trg.msg);}catch(e){}try{trg.fire();}catch(e){}}
+  /* only blame the badge when it actually silenced something: a worked BONE
+     die has no row to lose, and saying STILL WATERS there would charge Aldric
+     for a trigger mundane materials never had. */
+  else if(_hushed&&fam&&BREAK_TRIGGERS[fam]){try{famLog('STILL WATERS — IT DIES WITHOUT A SOUND');}catch(e){}}
   else{try{famLog('IT WAS ONLY BONE — NOTHING ANSWERS');}catch(e){}}
   /* whatever happens next, the table must be usable again: every route out
      of targeting rebinds the dice and restores the buttons */
@@ -17731,7 +17802,7 @@ function _rollTable(mat,d){
   var dt=getDie(mat)||{};
   /* Still Waters: a worked die rolls as plain geometry. Silver's weighting
      is a family trait, so it is exactly what this badge takes away. */
-  if(d&&d.ench&&typeof _stillWaters==='function'&&_stillWaters())return dt.faces||[1,2,3,4,5,6];
+  if(typeof _famHushed==='function'&&_famHushed(d))return dt.faces||[1,2,3,4,5,6];
   return (dt.rollTable||dt.faces||[1,2,3,4,5,6]);
 }
 function _enchFaces(mat,ench){
@@ -22617,34 +22688,11 @@ function startPTurn(){
   if(_ruleActive('drill_order','p')){try{_updateTellHUD();}catch(e){}try{famRenderRow();}catch(e){}}
     /* Reckoning: refresh floor display */
     if(G._tell.id==='reckoning'){_updateTellHUD();}
-    /* Confession: pick a random equipped card to seal this turn */
-    /* Confession's sealing is retired - Still Waters replaced it. This
-       block survived the first pass and was applying the OLD penalty on top
-       of the new rule every turn. */
-    if(false&&G.pCards&&G.pCards.length>0){
-      /* Avoid sealing the same card twice in a row */
-      var _confPool=G.pCards.filter(function(cid){return cid!==(G._tellState&&G._tellState.lastSealed);});
-      if(_confPool.length===0)_confPool=G.pCards.slice();
-      var _confPick=_confPool[Math.floor(Math.random()*_confPool.length)];
-      var _confIdx=G.pCards.indexOf(_confPick);
-      G._tellState.sealedCard=_confPick;G._tellState.lastSealed=_confPick;
-      G._tellState.sealedRemovedCard=_confPick;G._tellState.sealedRemovedAt=_confIdx;
-      /* Splice card OUT of G.pCards so all triggers (passive bonus, active use) skip it */
-      if(_confIdx>=0)G.pCards.splice(_confIdx,1);
-      /* Visual seal — apply class to player card row */
-      try{
-        document.querySelectorAll('#playerCards .mcard').forEach(function(el){
-          el.classList.remove('card-sealed');
-          if(el.dataset.cid===_confPick)el.classList.add('card-sealed');
-        });
-      }catch(e){}
-      var _sealedName='';try{var _cdSeal=CARDS.find(function(c){return c.id===_confPick;})||NPC_CARDS_MAP[_confPick];_sealedName=_cdSeal?_cdSeal.name:_confPick.toUpperCase();}catch(e){}
-      setStatusMsg('CONFESSION — '+_sealedName+' SEALED','red');
-    }
-    /* Counterfeit: roll cursed dice on schedule, then mark in pool when built */
-    if(G._tell.id==='counterfeit'){
-      _maybeAdvanceCounterfeit();
-    }
+    /* Confession's card-seal and Counterfeit's cursed dice are GONE, not
+       disabled: Aldric carries Still Waters and Whisper carries Kindred, and
+       both are stateless reads with nothing to do at turn start. The dead
+       blocks that stood here are what kept those two ids in _RETIRED_RULES,
+       which is in turn what stopped the NEW rules ever reaching a sleeve. */
   }
   /* Stakes Rising: previous turn banked 500+ → start with +300 turn pts
      (matches card description "your next turn starts with +300 turn points
@@ -23225,18 +23273,22 @@ function _afterRollImpl(){
      count sat wherever the turn started. Each surface ignores the call when it
      is not the one showing the rule. */
   if(_ruleActive('drill_order','p')){try{_updateTellHUD();}catch(e){}try{famRenderRow();}catch(e){}}
-    /* Counterfeit: re-mark cursed dice after each roll (pool re-rendered) */
-    if(_ruleActive('counterfeit','p')){setTimeout(_markCounterfeitDice,500);}
     /* Cutpurse: maybe palm a die after the roll settles */
     if(_ruleActive('pickpocket','p')){setTimeout(_maybeFireCutpurse,650);}
   }
   /* ── Obsidian shatter check — each rolled obsidian die has a small
      chance to shatter, granting bonus points and removing the die from
      the rest of the match. Fires once per roll per die. */
+  /* _dieEffect, NOT getDie().effect. Shattering is a FAMILY trait, so Aldric's
+     Still Waters hushes it on a worked die. Reading the material table raw
+     meant the badge took nothing whatever off an Obsidian build - shatter is
+     Obsidian's only effect - so the one case the sim actually measured (~644
+     points, ~14.5% of that build's match value) was never being paid. Grog's
+     Tooth goes quiet on the same line; relics are not badge-proof. */
   var _preFree=G.pool.filter(d=>!d.committed);
-  if(_preFree.some(function(d){var e=getDie(d.mat).effect;return e&&e.mechanic==='shatter_bonus';})){
+  if(_preFree.some(function(d){var e=_dieEffect(d);return e&&e.mechanic==='shatter_bonus';})){
     _preFree.forEach(function(d){
-      var _odt=getDie(d.mat);var _ofx=_odt&&_odt.effect;
+      var _odt=getDie(d.mat);var _ofx=_dieEffect(d);
       if(!_ofx||_ofx.mechanic!=='shatter_bonus'||d._shattered)return;
       var _oc=_ofx.chance||0.06;
       var _ob=_ofx.amount||500;
@@ -24119,8 +24171,11 @@ function doBust(){
     /* the whole turn, not just G.kept - the Stakes Rising seed lives outside
        it and was being dropped rather than halved */
     var _wardTotal=_bustLost+(G._stakesRisingBonus||0);
-    var _half=Math.floor(_wardTotal/2);
-    try{setStatusMsg('WARD HOLDS — HALF SURVIVES: '+_half,'gold');famLog('WARD — HALF THE TURN SURVIVES ('+_half+')');}catch(e){}
+    /* KINDRED doubles this to two-thirds (#32), stamped when the ward armed */
+    var _wardBoosted=!!G._wardBoost;G._wardBoost=false;
+    var _half=Math.floor(_wardTotal*(_wardBoosted?2/3:1/2));
+    try{setStatusMsg('WARD HOLDS — '+(_wardBoosted?'TWO-THIRDS':'HALF')+' SURVIVES: '+_half,'gold');
+      famLog('WARD — '+(_wardBoosted?'TWO-THIRDS':'HALF')+' THE TURN SURVIVES ('+_half+')');}catch(e){}
     G.pPts=(G.pPts||0)+_half;
     /* AFTER the half lands and BEFORE G.kept is emptied. Both tolls read
        G.pPts and one of them reads G.kept, so this is the only point in the
@@ -25279,15 +25334,6 @@ function endPTurn(){
   }
   restoreRollButton();
   try{_renderSelTags([],0,true);}catch(e){}
-  /* TELL: Confession — restore the sealed card to G.pCards now that turn ends */
-  if(G._tell&&G._tell.id==='confession'&&G._tellState&&G._tellState.sealedRemovedCard){
-    var _scid=G._tellState.sealedRemovedCard;var _sidx=G._tellState.sealedRemovedAt;
-    if(typeof _sidx==='number'&&_sidx>=0&&_sidx<=G.pCards.length){G.pCards.splice(_sidx,0,_scid);}
-    else{G.pCards.push(_scid);}
-    G._tellState.sealedRemovedCard=null;G._tellState.sealedRemovedAt=null;
-    /* Clear visual seal */
-    try{document.querySelectorAll('#playerCards .mcard').forEach(function(el){el.classList.remove('card-sealed');});}catch(e){}
-  }
   G.phase='opp';G.turnPts=0;G.kept=[];G.numDice=6;G.turnNum++;
   G.pTurns=(G.pTurns||0)+1;/* P3: a completed player turn (bank or bust) */
   G._pLastRolls=G.turnRollCount||0;
@@ -25667,7 +25713,12 @@ function runOppTurn(){
      36% of its average value. */
   var _snuffLane=-1;
   if(G._snuff&&G._snuff.live){
-    _snuffLane=G._snuff.lane;G._snuff.live=false;
+    _snuffLane=G._snuff.lane;
+    /* KINDRED holds it for a second turn: spend one, and re-arm for the next
+       opponent turn rather than clearing */
+    G._snuff.turns=(G._snuff.turns||1)-1;
+    if(G._snuff.turns>0)G._snuff.turn=(G.oppTurnCount||0)+1;
+    else G._snuff.live=false;
     if(_snuffLane>=0&&left>1){
       left--;/* the seat itself is dropped where rungDice is built, below */
       try{setStatusMsg('THEIR '+(_snuffLane+1)+(_snuffLane===0?'ST':(_snuffLane===1?'ND':(_snuffLane===2?'RD':'TH')))+' DIE IS SNUFFED','gold');}catch(e){}
@@ -25844,6 +25895,10 @@ function runOppTurn(){
           _fogV.splice(_fi,1);_fogM.splice(_fi,1);
           try{famLog('FOG — THEY MISREAD A SEAT');}catch(e){}
         }
+        /* KINDRED holds it for a second opponent turn (#32) */
+        G._fog.turns=(G._fog.turns||1)-1;
+        if(G._fog.turns>0)G._fog.turn=(G.oppTurnCount||0)+1;
+        else G._fog.live=false;
       }
       crowsCtx.crowsLuckFiredThisRoll=false;
       var{total,used,context:newCtx}=scoreRoll(_fogV,G.oCards,oppBank,crowsCtx,_fogM);crowsCtx=newCtx||crowsCtx;
@@ -25856,10 +25911,11 @@ function runOppTurn(){
         var _snIdx=-1;
         for(var _si=0;_si<_oFree.length;_si++)if(_oFree[_si].lane===G._snare.lane){_snIdx=_si;break;}
         if(total>0&&_snIdx>=0&&used&&used[_snIdx]){
-          total=Math.floor(total/2);
+          var _snX2=!!G._snare.x2;
+          total=Math.floor(total/(_snX2?4:2));/* Kindred halves it twice */
           G._snare.live=false;
-          try{famLog('THE SNARE BITES — HALVED');}catch(e){}
-          try{setStatusMsg('YOUR SNARE CATCHES THEM — HALF','gold');}catch(e){}
+          try{famLog('THE SNARE BITES — '+(_snX2?'HALVED TWICE':'HALVED'));}catch(e){}
+          try{setStatusMsg('YOUR SNARE CATCHES THEM — '+(_snX2?'A QUARTER':'HALF'),'gold');}catch(e){}
         }
       }
       /* Snake Oil: zero out this roll's score */
@@ -27042,13 +27098,6 @@ function endMatch(win){
   if(S&&S.pendingMatch){delete S.pendingMatch;save();}
   if(window.DLG)DLG.hide();clearRow('playerDiceRow');clearRow('oppDiceRow');
   _dragState=null;
-  /* TELL: restore Confession-sealed card to G.pCards if match ends mid-turn */
-  if(G&&G._tell&&G._tell.id==='confession'&&G._tellState&&G._tellState.sealedRemovedCard){
-    var _emScid=G._tellState.sealedRemovedCard,_emSidx=G._tellState.sealedRemovedAt;
-    if(typeof _emSidx==='number'&&_emSidx>=0&&_emSidx<=G.pCards.length){G.pCards.splice(_emSidx,0,_emScid);}
-    else{G.pCards.push(_emScid);}
-    G._tellState.sealedRemovedCard=null;G._tellState.sealedRemovedAt=null;
-  }
   /* TELL: cleanup persistent HUD + lingering visual classes */
   document.querySelectorAll('.tell-badge,.tell-cursed-overlay').forEach(function(e){e.remove();});
   document.querySelectorAll('.die-counterfeit,.die-palmed').forEach(function(e){e.classList.remove('die-counterfeit','die-palmed');});
