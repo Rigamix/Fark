@@ -24441,6 +24441,35 @@ function _oppDelay(ms){
   if(G&&G._ffMult&&G._ffMult<mult)mult=G._ffMult;
   return Math.max(40,Math.round(ms*mult));
 }
+/* THE RIVAL ACTS ONLY ONCE ITS DICE HAVE STOPPED.
+   Runs fn after every die in the rival's row has finished its playback, plus a
+   deliberate beat. `d.roll` is the tape a die is being played back from and is
+   cleared the moment it runs out, so it is the settle signal itself rather than
+   a guess at one - which is what the fixed delay this replaces was.
+
+   MIN first: a die does not carry `d.roll` until the 3D layer picks it up, a
+   frame or two after it is appended, so an immediate check would find nothing
+   moving and fire before the throw started.
+   CAP last: if the 3D layer is not running at all - 2D dice, a detached
+   renderer - no die ever carries `d.roll`, and the wait still has to end. */
+function _afterOppSettle(fn){
+  var MIN=_oppDelay(260), BEAT=_oppDelay(450), CAP=4200;
+  var t0=Date.now();
+  setTimeout(function poll(){
+    if(typeof G==='undefined'||!G||G._endMatchFired)return;/* ghost-timer guard */
+    var moving=false;
+    try{
+      if(typeof D3X!=='undefined'&&D3X.dice){
+        moving=D3X.dice.some(function(d){
+          if(!d.roll||!d.chip||!d.chip.closest)return false;
+          return !!d.chip.closest('#oppDiceRow');
+        });
+      }
+    }catch(e){moving=false;}
+    if(moving&&Date.now()-t0<CAP){setTimeout(poll,60);return;}
+    setTimeout(fn,BEAT);
+  },MIN);
+}
 function _npcFamCard(id){
   return (G&&G.oF||[]).filter(function(o){return o.id===id&&!o.broken&&o.charges>0;})[0]||null;
 }
@@ -24734,7 +24763,10 @@ function runOppTurn(){
         triggerCard('hot_streak','HOT STREAK!',false);
       }
     }
-    setTimeout(()=>{
+    /* was setTimeout(..., _oppDelay(1100)) - a fixed guess at the throw's
+       length that the physics tape routinely outlived, so the rival selected
+       and scored over dice that were still tumbling. See _afterOppSettle. */
+    _afterOppSettle(()=>{
       G.oppDice.forEach(d=>{if(d.el){
         settleDie(d.el);
         if(G._lanternActive)d.el.classList.add('die-blind');
@@ -25370,7 +25402,7 @@ function runOppTurn(){
       }
       const bank=oppShouldBank(G.rung,oppBank,left,G.oPts,G.pPts,G.target);
       setTimeout(()=>{if(bank)finOpp(oppBank);else step();},_oppDelay(1900));
-    },_oppDelay(1100));
+    });
   }
   G.npcCardState.oppTurnCount++;
   step();
