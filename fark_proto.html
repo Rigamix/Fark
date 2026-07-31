@@ -17272,8 +17272,14 @@ function _kindredActive(){
   }catch(e){return false;}
 }
 /* ═══ THE UNIVERSAL RULE ═══
-   Banks zero, fires the effect, never both. Three callers: the roll commit,
-   the bank commit, and the NPC keep loop. None of them may add points for an
+   Banks zero, fires the effect, never both. Two callers today: the roll commit
+   and the bank commit. There is no NPC one: the engine has no opponent-side
+   enchant array, so the rival never keeps a branded face of its own (brief
+   open item 8). That is today's count, NOT an invariant - brief 4b already
+   sends a player's brand across into an opponent's lane via Trade, and open
+   item 8 keeps real opponent-side enchants a live future option. Whatever
+   fires an icon next calls THIS function; a third copy of the rule is what
+   section 6 forbids. None of them may add points for an
    icon die, and none of them may implement an effect themselves. */
 function _iconFire(d,side){
   var def=ENCH_ICONS[d&&d.ench&&d.ench.t];
@@ -17705,22 +17711,64 @@ function _laneOf(d){
 function _enchInit(){
   _getS();
   S.run.dieEnch=S.run.dieEnch||[];S.run.dieEnchInv=S.run.dieEnchInv||[];
-  /* MIGRATION. A run in progress may carry amber_cast, tempering or loaded,
-     none of which exist any more. Strip them and refund what was paid, so a
-     save is never left pointing at a mechanic the code has forgotten. Runs
-     once per save, guarded by _enchV. */
-  if(S.run._enchV!==2){
+  /* MIGRATION. Two repairs, one gate, because they are the same repair twice.
+     v2 - a run in progress may carry amber_cast, tempering or loaded, none of
+     which exist any more. Strip them and refund what was paid, so a save is
+     never left pointing at a mechanic the code has forgotten.
+     v3 - a brand sitting on a face outside {1,5}. Every brand sold before the
+     draw was restricted could land on any of the six, and roughly two in three
+     did. Those are REFUNDED AND CLEARED, never quietly slid onto the die's 1:
+     silently rewriting a purchase to a face the player never chose is worse
+     than an honest refund. Same shape as the v2 strip, which is why it shares
+     v2's gate rather than inventing a second one - a v2 save falls through the
+     _gone table finding nothing, at the cost of one pass over seven slots. */
+  if(S.run._enchV!==3){
     var _refund=0,_gone={amber_cast:200,tempering:150,loaded:400};
-    ['dieEnch','dieEnchInv'].forEach(function(key){
-      (S.run[key]||[]).forEach(function(e,i){
-        if(e&&_gone[e.t]!==undefined){_refund+=_gone[e.t];S.run[key][i]=null;}
+    var _badG=0;
+    /* ONE brand list judged against the die list it is aligned with, so a face
+       is always tested against the material actually carrying it. `pay` is
+       false for the two match-scoped copies below: every entry in them was
+       copied from a run entry that has already been paid out. */
+    var _scrub=function(arr,mats,pay){
+      if(!Array.isArray(arr))return;
+      arr.forEach(function(e,i){
+        if(!e)return;
+        if(_gone[e.t]!==undefined){if(pay)_refund+=_gone[e.t];arr[i]=null;return;}
+        if(!ENCH_ICONS[e.t])return;/* quicksilver has no face to be wrong about */
+        if(_iconFaces((mats||[])[i]).indexOf(e.face)>=0)return;
+        if(pay)_badG+=(_enchDef(e.t)||{}).price||0;
+        arr[i]=null;
       });
-    });
+    };
+    _scrub(S.run.dieEnch,S.run.dice,true);
+    _scrub(S.run.dieEnchInv,S.run.diceInv,true);
     if(_refund>0){
       S.run.gold=(S.run.gold||0)+_refund;
       try{famLog('THE INNKEEP REFUNDS '+_refund+'g — THAT WORK IS NO LONGER DONE');}catch(e){}
     }
-    S.run._enchV=2;try{save();}catch(e){}
+    if(_badG>0){
+      S.run.gold=(S.run.gold||0)+_badG;
+      try{famLog('THE INNKEEP REFUNDS '+_badG+'g — THAT BRAND SAT ON A FACE THAT CANNOT HOLD ONE');}catch(e){}
+    }
+    /* THE LIVE MATCH ARRAY FIRST, because it is what the snapshot is rebuilt
+       FROM. _enchInit is reachable from inside a running match - the Trade
+       enchant's fire calls it - and G._enchArr is a shallow COPY of the run's
+       list taken at match start, so nulling the run entry does not null this
+       one. Scrubbing only the snapshot is undone by the very next
+       saveMatchState, which writes _enchArr straight back out of G: the
+       refunded brand would be back in the snapshot at the next turn boundary
+       and still firing, already paid for. A die ALREADY dealt into the pool
+       keeps the brand object it was handed for the rest of that one roll;
+       every roll after this one reads the array. try/catch because G is a
+       top-level let, not a window property. */
+    try{
+      if(G&&Array.isArray(G._enchArr))_scrub(G._enchArr,G.matchDice,false);
+    }catch(e){}
+    /* And the SNAPSHOT, because a resume PREFERS it over the run's list - left
+       alone it would re-seed the next resume from the brand just refunded. */
+    var _pm=S.pendingMatch;
+    if(_pm)_scrub(_pm._enchArr,_pm.matchDice,false);
+    S.run._enchV=3;try{save();}catch(e){}
   }
   while(S.run.dieEnch.length<(S.run.dice||[]).length)S.run.dieEnch.push(null);
   S.run.dieEnch.length=(S.run.dice||[]).length;
@@ -22987,6 +23035,18 @@ function handleRoll(){
        anchor firing - unless the selection carries an icon, which is a legal
        keep worth nothing by design. */
     if(_scoreDice.length===0&&_iconSel.length)pts=0;
+    /* A BRAND NEVER POISONS THE KEEP. pts<0 here is the engine refusing the
+       NON-icon half of the selection - a die it cannot use on its own. This
+       path answered NO SCORE for that keep while the preview lit both buttons
+       and handleBank went ahead and committed it, so the roll commit was the
+       one surface of three telling a different story. The direction is ruled,
+       not inferred: AUDIT_RESOLUTIONS item 18 answers "commit accepts and
+       scores the non-icon part" - zero is the CORRECT value for an icon
+       component, not an error state, so a brand dragged into a dead selection
+       contributes nothing rather than invalidating the whole keep. Pinning to
+       0 here is what lets the reject line below accept it; a selection with no
+       icon in it is untouched and still refused exactly as before. */
+    if(pts<0&&_iconSel.length)pts=0;
     if(pts<0||(pts===0&&!_anchorDie&&!_iconSel.length)){SFX.err();setStatusMsg('NO SCORE — TRY AGAIN','red');return;}
     pts+=_anchorPts;
     _pCrowsCommit(_cw);/* selection accepted → spend the NPC's Crow's Luck charge if a straight was downgraded */
@@ -23006,7 +23066,17 @@ function handleRoll(){
       try{SFX.err&&SFX.err();}catch(e){}
     }
     selDice.forEach(d=>{d.committed=true;d._frozen=false;d.el.classList.remove('selected','die-frozen');d.el.classList.add('committed');d.el.onclick=null;d.el.style.cursor='default';if(d.el._d3)D3.draw(d.el._d3);});
-    SFX.commit();Haptic.commit();G.kept.push({vals:selVals,mat:selDice[0].mat,pts,cursed:_cfHit,
+    SFX.commit();Haptic.commit();
+    /* AN ICON-ONLY KEEP LEAVES NO GROUP BEHIND. It has no scoring dice and no
+       points, so this pushed {vals:[],pts:0} - the empty row handleBank already
+       refuses to record, for exactly this reason, on its own path only. The row
+       is not free: G.kept.length is what lights BANK and what _tryBustSave reads
+       as "there is something to bank", so after a lone cast the player was
+       handed a lit BANK that banks nothing and does not even change phase when
+       pressed. The die is marked committed just above; that is the feedback that
+       matters. A mixed keep still records, at 0 if that is what it scored, which
+       is the row handleBank writes for the same selection. */
+    if(pts>0||_scoreDice.length)G.kept.push({vals:selVals,mat:selDice[0].mat,pts,cursed:_cfHit,
       dice:selDice.map(function(dd){return{val:dd.val,mat:dd.mat};})});
     G.turnPts=G.kept.reduce((a,k)=>a+k.pts,0)+(G._stakesRisingBonus||0);refreshKeptTray();
     /* OPENING SHOT (opener): track scoring dice committed on roll 1 only.
@@ -30953,27 +31023,60 @@ function _gbDieInspect(mat){
   else h+='<div class="gbx-btn disabled" style="height:60px;margin-top:10px">'+price+'g — not enough gold</div>';
   _gbSheetOpen(h);
 }
-/* enchant flow: service → pick YOUR die → (faces) → confirm, permanent */
-/* which faces may carry an icon on this die. ONE place decides. */
+/* enchant flow: service → pick YOUR die → confirm, permanent. No face step:
+   there was never a picker built, and there is not going to be one - below. */
+/* A face the die's own material has already rewritten, and which therefore
+   cannot carry a brand. Jade turns its 6 into a wild, and so does Aldric's
+   Square, the relic that shares that mechanic - the 6 those dice show is not
+   a natural 6 any more. SIX is not a number invented here: scoreRoll's wild
+   prep substitutes a wild only for a die showing 6 (`if(!eff||vals[i]!==6)
+   continue`), so 6 IS the wild face by construction and this test has to
+   agree with that one. Kept as its own named test so the two rules stay
+   separately readable - but read it honestly: it returns false for every face
+   except 6, so inside a filter that has already dropped 2/3/4/6 it can only
+   ever be a no-op. It does NOT generalise to a die that wilds a 1 or a 5;
+   nothing does yet, and nothing needs to.
+   DELIBERATELY NOT COVERED: the brief's other altered-face case, a relic whose
+   brand is pre-applied by the developer - Brutus's Shield carries a permanent
+   Ward on its FIVE. Whether that wants a clause here depends on where that
+   Ward is stored: if it lives in S.run.dieEnch, _gbEnchantApply's existing
+   `if(S.run.dieEnch[i])return` already refuses a second brand on that die and
+   this stays a no-op; if it lives anywhere else, the clause belongs here. That
+   is the relic work's call to make, not this one's to guess. */
+function _faceAltered(mat,f){
+  var eff=(getDie(mat)||{}).effect||null;
+  if(eff&&/^wild_/.test(eff.mechanic||'')&&f===6)return true;
+  return false;
+}
+/* which faces may carry an icon on this die. ONE place decides.
+   A NATURAL 1 or 5, never a 2/3/4/6. Branding a 2/3/4/6 is nearly free -
+   those faces almost never score on their own (~8% of rolls) where 1 and 5
+   carry ~66% - so a brand there hands a would-be-bust roll a guaranteed
+   non-bust alternative it would not otherwise have had: measured at a 25%
+   flat cut in single-roll bust rate, and no effect at all on 1/5. That is the
+   same unconditional safe keep Silver's original identity was deleted to
+   remove, walking back in through the innkeep's door.
+   Duplicates collapse, so a Brass or Crystal double-5 is not twice as likely
+   to catch the brand as its single 1. */
 function _iconFaces(mat){
   var base=((getDie(mat)||{}).faces||[1,2,3,4,5,6]);
   var out=[];
-  base.forEach(function(f){if((f===1||f===5)&&out.indexOf(f)<0)out.push(f);});
+  base.forEach(function(f){
+    if(f!==1&&f!==5)return;
+    if(_faceAltered(mat,f))return;
+    if(out.indexOf(f)<0)out.push(f);
+  });
   return out;
 }
-/* every face the brand could land on. The 1/5 restriction is replaced by a
-   random draw (see the note above), so this is the die's real face set with
-   duplicates collapsed - a Silver die's weighted table lists 1 and 5 twice
-   and must not be twice as likely to catch the brand. */
-function _iconFacesAny(mat){
-  var base=((getDie(mat)||{}).faces||[1,2,3,4,5,6]);
-  var out=[];
-  base.forEach(function(f){if(out.indexOf(f)<0)out.push(f);});
-  return out.length?out:[1,2,3,4,5,6];
-}
+/* The whole of the shop's face choice, and it is not the player's: the face is
+   drawn here. No picker screen, ever - every die in the game carries both a 1
+   and a 5, so a picker would offer the same two buttons forever, and the gap
+   between them (73 vs 125 EV forfeited) is a tuning knob, not a fork.
+   null rather than a fallback face when a die has no legal face left, so the
+   caller refuses the sale instead of quietly branding something illegal. */
 function _iconFaceRoll(mat){
-  var f=_iconFacesAny(mat);
-  return f[(Math.random()*f.length)|0];
+  var f=_iconFaces(mat);
+  return f.length?f[(Math.random()*f.length)|0]:null;
 }
 /* a loadout may hold at most ONE Ward-branded die. The single-save cap is
    not enough on its own: a second Ward die is a second CHANCE TO ARM, which
@@ -31105,7 +31208,7 @@ function _stEnchTap(k){
   document.getElementById('stEnchPickSub').textContent=e.desc||'';
   var _hint=document.getElementById('stEnchPickHint');
   if(_hint)_hint.textContent=ENCH_ICONS[k]
-    ? 'pick a die to apply the enchant \u2014 it takes whichever face it lands on'
+    ? 'pick a die to apply the enchant \u2014 the brand lands on its 1 or its 5'
     : 'pick a die to apply the enchant \u2014 this one works the whole die';
   var row=document.getElementById('stEnchPickTray');
   /* the same six painted bays the BUY tray drops into */
@@ -31172,13 +31275,17 @@ function _stEnchChoose(i){
   var k=_stEnchK; if(!k)return;
   _getS();
   var mat=S.run.dice[i]; if(!mat)return;
+  /* The draw happens BEFORE anything moves. A die with no legal face cannot
+     take a brand at all, and the player has to be told that instead of
+     watching a die spin for 1.3s and land nothing. */
+  var face=ENCH_ICONS[k]?_iconFaceRoll(mat):null;
+  if(ENCH_ICONS[k]&&face==null){try{famLog('THAT DIE HAS NO FACE THAT CAN TAKE A BRAND');}catch(x){}return;}
   var el=document.querySelector('#stEnchPickTray .stPickDie[data-i="'+i+'"]');
   /* a second tap must not land a second brand while the first is in the air */
   if(el){ if(el.classList.contains('spinning'))return; el.classList.add('spinning'); }
   document.querySelectorAll('#stEnchPickTray .trayLbl').forEach(function(l){
     if(l.getAttribute('data-i')!==String(i))l.classList.add('dim');
   });
-  var face=ENCH_ICONS[k]?_iconFaceRoll(mat):null;
   try{SFX.nav&&SFX.nav();}catch(x){}
   var chip=el&&el.querySelector('.d3chip');
   var findDie=function(){
@@ -31248,7 +31355,7 @@ function _gbEnchantPick(k){
     var col=(FAMILIES[_matFam(mt)]||{}).color||'#777';
     /* an icon needs a natural 1 or 5 to sit on; a die with neither cannot
        take one, and says so rather than silently offering an empty step */
-    var noFace=!!ENCH_ICONS[k]&&!_iconFacesAny(mt).length;/* random face: any die qualifies */
+    var noFace=!!ENCH_ICONS[k]&&!_iconFaces(mt).length;
     if(en||noFace)h+='<div class="gbx-box sub" style="width:78px;height:64px;font-size:11px;opacity:.5"><span class="d3chip" data-mat="'+mt+'" style="width:26px;height:26px"></span>'+getDie(mt).name+'<br><span class="gbx-label">'+(en?((_enchDef(en.t)||{}).name||'branded'):'no 1 or 5')+'</span></div>';
     else h+='<div class="gbx-box" style="width:78px;height:64px;font-size:11px;cursor:pointer;border-bottom:3px solid '+col+'" '
       +'onclick="_gbEnchantDie(\''+k+'\','+i+')"><span class="d3chip" data-mat="'+mt+'" style="width:26px;height:26px"></span>'+getDie(mt).name+'</div>';
@@ -31258,22 +31365,16 @@ function _gbEnchantPick(k){
 }
 function _gbEnchantDie(k,i){
   _getS();
-  if(ENCH_ICONS[k])return _gbEnchantFace(k,i,'icon',null);
+  /* The face screen this used to open is GONE and is not coming back: the
+     draw is random from {1,5}, so a picker would offer the same two buttons
+     on every die forever. The face is drawn here and the confirm step just
+     reports which one came up - the flow stays two taps. */
+  if(ENCH_ICONS[k]){
+    var f=_iconFaceRoll(S.run.dice[i]);
+    if(f==null){famLog('THAT DIE HAS NO FACE THAT CAN TAKE A BRAND');return;}
+    return _gbEnchantConfirm(k,i,f,null);
+  }
   _gbEnchantConfirm(k,i,null,null);/* quicksilver: no face to pick */
-}
-function _gbEnchantFace(k,i,step,fa){
-  _getS();var mat=S.run.dice[i];
-  var uniq=_iconFacesAny(mat);
-  var def=ENCH_ICONS[k]||{};
-  var h='<div class="gbx-box" style="min-height:56px;padding:8px"><b>'+getDie(mat).name+' — brand which face?</b>'
-    +'<div class="gbx-label">that face stops scoring: it pays the '+(def.name||k).toLowerCase()+' instead</div></div>'
-    +'<div style="display:flex;gap:12px;justify-content:center;padding:14px 0">';
-  uniq.forEach(function(f){
-    h+='<div class="gbx-box" style="width:64px;height:64px;font-size:22px;cursor:pointer" '
-      +'onclick="_gbEnchantConfirm(\''+k+'\','+i+','+f+',null)">'+f+'</div>';
-  });
-  h+='</div><div class="gbx-label" style="text-align:center">the brand takes whichever face it lands on</div>';
-  _gbSheetOpen(h);
 }
 function _gbEnchantConfirm(k,i,a,b){
   _gbSheetClose();
@@ -31288,13 +31389,13 @@ function _gbEnchantApply(k,i,a,b,quiet){
   _getS();_enchInit();
   var e=_enchDef(k);if(!e||S.run.dieEnch[i])return;
   if((S.run.gold||0)<e.price){famLog('NOT ENOUGH GOLD');return;}
-  /* the restriction re-asserted at the point of sale, not just in the UI
-     that offered it - the picker can be reached from a stale sheet.
-     _iconFacesAny, not _iconFaces: the face is drawn at random now, so any
-     of the die's own faces is legal. Left as _iconFaces this would have
-     rejected roughly two brands in three, silently, at the moment of sale. */
+  /* The 1/5 restriction re-asserted at the point of sale, not just wherever
+     the face was drawn - the confirm modal can be reached from a stale sheet
+     and carries the face in its onclick as a literal. The draw itself can no
+     longer produce an illegal face, so this can only fire on a stale or a
+     forged argument, which is exactly what it is here to catch. */
   if(ENCH_ICONS[k]){
-    if(_iconFacesAny(S.run.dice[i]).indexOf(a)<0){famLog('THAT FACE CANNOT TAKE A BRAND');return;}
+    if(_iconFaces(S.run.dice[i]).indexOf(a)<0){famLog('THAT FACE CANNOT TAKE A BRAND');return;}
     if(k==='ward'&&_wardOwned(i)){famLog('ONE WARDED DIE AT A TIME');return;}
   }
   var ench={t:k};
