@@ -9479,7 +9479,14 @@ const FEATS=[
          counts where it means something — and it stops the easy early
          matches from front-loading every feat at once. */
       if(!(typeof S!=='undefined'&&S&&S.run)||(S.run.tier||0)<2)return false;
-      var md=(G&&Array.isArray(G.matchDice))?G.matchDice:(Array.isArray(S.run.dice)?S.run.dice:null);
+      /* THE OWNED LOADOUT, NOT THE LIVE TABLE (#19). This read G.matchDice,
+         which is whatever survived the fight - so a Break, an Obsidian shatter
+         or a Trade could each award this feat for dice the player never built
+         with, or deny it for a build that qualified. "No special materials" is
+         a claim about the BUILD, and reading S.run.dice makes that whole
+         false-positive class disappear instead of patching its instances. */
+      var md=Array.isArray(S.run.dice)?S.run.dice
+        :((G&&Array.isArray(G.matchDice))?G.matchDice:null);
       if(!md||!md.length)return false;
       return md.every(function(m){var d=(typeof getDie==='function')?getDie(m):null;return !d||!d.effect;});
     }},
@@ -17398,7 +17405,7 @@ function _zeroHourClose(){
     if(G!==_g||!G||G._endMatchFired)return;
     G._rollLocked=false;
     /* the same total handleBank computes, for the same reason */
-    var _tp=(G.kept||[]).reduce(function(a,k){return a+(k.pts||0);},0)+(G._stakesRisingBonus||0);
+    var _tp=(G.kept||[]).reduce(function(a,k){return a+(k.pts||0);},0)+(G._turnBonusPot||0);
     if(_tp>0){try{handleBank();}catch(e){}return;}
     try{clearRow('playerDiceRow');}catch(e){}
     G.pool=[];
@@ -17559,8 +17566,15 @@ var BREAK_TRIGGERS={
      something measurable, it does not show the number is right. */
   vagabond:{msg:'VAGABOND TAKES WHAT THEY HELD',fire:function(){
     var steal=Math.max(0,G._oLastBank||0);
-    if(steal>0){G.turnPts=(G.turnPts||0)+steal;
+    if(steal>0){
+      G.turnPts=(G.turnPts||0)+steal;
       G.kept.push({vals:[],mat:'vagabond',pts:steal,dice:[]});
+      /* A STEAL, NOT A GAIN (#6/#8). It used to add to the player and leave the
+         rival's total untouched, which is not what the word means - the points
+         move across the table. Clamped at zero because a rival cannot be owed
+         points, and it roughly doubles the row's swing, which is why #7 raises
+         the priority of its harness pass rather than treating this as settled. */
+      G.oPts=Math.max(0,(G.oPts||0)-steal);
       try{updHUD();refreshKeptTray();}catch(e){}}
     try{famLog(steal>0?('STOLE '+steal+' FROM THEIR HAND'):'THEY HELD NOTHING TO TAKE');}catch(e){}}}
 };
@@ -17823,7 +17837,7 @@ function _breakDie(d){
        take the same ghost-timer guard: G is reassigned on a new match, so a
        260ms timer can otherwise land inside one. */
     if(!G||G!==_bkG||G._endMatchFired)return;
-    var _tp=(G.kept||[]).reduce(function(a,k){return a+(k.pts||0);},0)+(G._stakesRisingBonus||0);
+    var _tp=(G.kept||[]).reduce(function(a,k){return a+(k.pts||0);},0)+(G._turnBonusPot||0);
     if(_tp>0){handleBank();return;}
     try{clearRow('playerDiceRow');}catch(e){}
     G.pool=[];
@@ -22913,12 +22927,12 @@ function startPTurn(){
   }
   /* Stakes Rising: previous turn banked 500+ → start with +300 turn pts
      (matches card description "your next turn starts with +300 turn points
-     already on the table"). Tracked in G._stakesRisingBonus so it survives
+     already on the table"). Tracked in G._turnBonusPot so it survives
      commit overwrites of G.turnPts and gets folded into the bank total. */
-  G._stakesRisingBonus=0;
+  G._turnBonusPot=0;
   if(G._stakesRisingNext&&G.pCards.includes('stakes_rising')){
     G._stakesRisingNext=false;
-    G._stakesRisingBonus=300;
+    G._turnBonusPot=300;
     G.turnPts=300;
     triggerCard('stakes_rising','+300 START',true);
   }
@@ -23262,7 +23276,7 @@ function handleRoll(){
        is the row handleBank writes for the same selection. */
     if(pts>0||_scoreDice.length)G.kept.push({vals:selVals,mat:selDice[0].mat,pts,cursed:_cfHit,
       dice:selDice.map(function(dd){return{val:dd.val,mat:dd.mat};})});
-    G.turnPts=G.kept.reduce((a,k)=>a+k.pts,0)+(G._stakesRisingBonus||0);refreshKeptTray();
+    G.turnPts=G.kept.reduce((a,k)=>a+k.pts,0)+(G._turnBonusPot||0);refreshKeptTray();
     /* OPENING SHOT (opener): track scoring dice committed on roll 1 only.
        turnRollCount === 1 means this commit happened during the very first
        roll of the turn (before any rerolls). */
@@ -23322,7 +23336,7 @@ function handleRoll(){
        rules card ("you lose all unbanked turn points") and against the point of
        the mechanic: hot dice is the moment the player is most tempted to keep
        rolling, and it was the moment they had nothing left to lose.
-       _stakesRisingBonus is the shared turn-bonus pot - Flintlock's +200 is
+       _turnBonusPot is the shared turn-bonus pot - Flintlock's +200 is
        already in it, and its card spells out the contract: "Lost if you bust."
        Joining it inherits every path already written: doBust clears it, Ward
        halves it, Iron Stomach / Aegis / Last Stand count it as part of what was
@@ -23330,16 +23344,22 @@ function handleRoll(){
     var _hotBonus=250;
     /* Synergy: High Roller — Hot Dice bonus doubled */
     if(G.activeSynergies&&G.activeSynergies.includes('score_mates'))_hotBonus*=2;
-    G._stakesRisingBonus=(G._stakesRisingBonus||0)+_hotBonus;
+    /* THE SHARED TURN-BONUS POT. Was _stakesRisingBonus, which stopped being
+       true the moment Flintlock's +200 joined it and was plainly wrong once
+       both hot-dice bonuses did - this line is one of them. Renamed rather
+       than commented around: a field whose name contradicts three of its four
+       writers costs a reader more than it saves. Not persisted anywhere, so
+       no save migration is owed. */
+    G._turnBonusPot=(G._turnBonusPot||0)+_hotBonus;
     spawnPop('+'+_hotBonus+' 🔥');
     if(G.pCards.includes('iron_crown')){
       G._ironCrownHits=(G._ironCrownHits||0)+1;
       var _icBonus=500+(G._ironCrownHits-1)*250;
-      G._stakesRisingBonus=(G._stakesRisingBonus||0)+_icBonus;
+      G._turnBonusPot=(G._turnBonusPot||0)+_icBonus;
       triggerCard('iron_crown','+'+_icBonus+' IRON CROWN',true);
     }
     /* the kept total was written above, before either bonus existed */
-    G.turnPts=G.kept.reduce(function(a,k){return a+k.pts;},0)+(G._stakesRisingBonus||0);
+    G.turnPts=G.kept.reduce(function(a,k){return a+k.pts;},0)+(G._turnBonusPot||0);
     (function(){var kt2=document.getElementById('keptTotal');
       if(kt2)kt2.textContent=(G.turnPts||0)?G.turnPts.toLocaleString():'';})();
     updHUD();
@@ -23588,12 +23608,12 @@ function _afterRollImpl(){
   /* THE FLINTLOCK (nerfed): +200 into the TURN-bonus pool (was +300
      straight to total score, which survived busts and fired nearly
      every turn since a 1 almost always shows). Routing it through
-     _stakesRisingBonus — the shared "turn bonus that banks and is lost
+     _turnBonusPot — the shared "turn bonus that banks and is lost
      on bust" pool — means a bust now wipes it, adding real risk. */
   if(!G.flintlockFired&&G.pCards.includes('flintlock')&&freeV.includes(1)){
     G.flintlockFired=true;
-    G._stakesRisingBonus=(G._stakesRisingBonus||0)+200;
-    G.turnPts=G.kept.reduce(function(a,k){return a+k.pts;},0)+(G._stakesRisingBonus||0);
+    G._turnBonusPot=(G._turnBonusPot||0)+200;
+    G.turnPts=G.kept.reduce(function(a,k){return a+k.pts;},0)+(G._turnBonusPot||0);
     triggerCard('flintlock','+200 FLINTLOCK',true);updHUD();
   }
   /* Warm Hands: extend dice-manipulation effects to rolls 2 & 3 */
@@ -23712,8 +23732,8 @@ function _afterRollImpl(){
       setStatusMsg('VOW: 300+ ROLL! PICKS DOUBLED','green');triggerCard('aldrics_vow','DOUBLED!',true);
       if(typeof _updatePlayerCardVisuals==='function')_updatePlayerCardVisuals();
     }else{
-      const lost=G.kept.reduce((a,k)=>a+k.pts,0)+(G._stakesRisingBonus||0);
-      G.turnPts=0;G.kept=[];G._stakesRisingBonus=0;refreshKeptTray();updHUD();
+      const lost=G.kept.reduce((a,k)=>a+k.pts,0)+(G._turnBonusPot||0);
+      G.turnPts=0;G.kept=[];G._turnBonusPot=0;refreshKeptTray();updHUD();
       setStatusMsg('VOW FAILED — LOST '+lost+' TURN PTS','red');triggerCard('aldrics_vow','VOW FAILED',true);
     }
   }
@@ -23730,7 +23750,7 @@ function _afterRollImpl(){
      zero AND skipped its effect. */
   if(G.pCards.includes('last_stand')&&free.length===1&&(freeV[0]===1||freeV[0]===5)&&!_dieIsIcon(free[0])){
     const d=free[0];d.committed=true;if(d.el){d.el.classList.add('committed');d.el.onclick=null;if(d.el._d3)D3.draw(d.el._d3);}
-    G.kept.push({vals:[freeV[0]],mat:d.mat,pts:600,dice:[{val:freeV[0],mat:d.mat}]});G.turnPts=G.kept.reduce((a,k)=>a+k.pts,0)+(G._stakesRisingBonus||0);refreshKeptTray();updHUD();
+    G.kept.push({vals:[freeV[0]],mat:d.mat,pts:600,dice:[{val:freeV[0],mat:d.mat}]});G.turnPts=G.kept.reduce((a,k)=>a+k.pts,0)+(G._turnBonusPot||0);refreshKeptTray();updHUD();
     triggerCard('last_stand','LAST STAND! 600',true);if(window.DLG)setTimeout(function(){DLG.triggerCard('last_stand',true);},800);setBtns(false,true);return;
   }
   /* ── Boss edicts removed — patron "edict" system simplified away.
@@ -24139,7 +24159,7 @@ function refreshSelUI(){
      branded 1 previewed as +100 and then banked nothing. */
   const _pvSplit=_splitIcons(selD),_scoreD=_pvSplit.rest,_pvIcons=_pvSplit.icons;
   const selV=_scoreD.map(d=>d.val);const selMats=_scoreD.map(d=>d.mat);const _pvEnch=_scoreD.map(d=>d.ench||null);const locked=G.kept.reduce((a,k)=>a+k.pts,0);const cards=effectiveCards();
-  if(!selV.length&&!_pvIcons.length){G.turnPts=locked+(G._stakesRisingBonus||0);updHUD();setBtns(false,locked>0||(G._stakesRisingBonus||0)>0);setStatusMsg('','');_renderSelTags([],0,true);_clearDieEffects();G.pool.forEach(d=>{d.el.classList.remove('combo-glow');d.el.style.removeProperty('--gd');});G._comboGlow=false;return;}
+  if(!selV.length&&!_pvIcons.length){G.turnPts=locked+(G._turnBonusPot||0);updHUD();setBtns(false,locked>0||(G._turnBonusPot||0)>0);setStatusMsg('','');_renderSelTags([],0,true);_clearDieEffects();G.pool.forEach(d=>{d.el.classList.remove('combo-glow');d.el.style.removeProperty('--gd');});G._comboGlow=false;return;}
   /* Bookends row-eligibility stamp (see handleRoll) — preview must agree
      with the commit/bank paths. */
   var _beE=_bookendsEligible(selD);
@@ -24174,7 +24194,7 @@ function refreshSelUI(){
   /* an icon-only selection is legal and worth zero */
   const _selHasIcon=_pvIcons.length>0;
   if(!selV.length&&_selHasIcon)pts=0;
-  const ok=pts>0||_selHasIcon;G.turnPts=locked+(pts>0?pts:0)+(G._stakesRisingBonus||0);updHUD();
+  const ok=pts>0||_selHasIcon;G.turnPts=locked+(pts>0?pts:0)+(G._turnBonusPot||0);updHUD();
   /* Die effect visuals */
   _clearDieEffects();
   if(ok&&_sr.effects&&_sr.effects.length){_showDieEffects(selD,_sr.effects);}
@@ -24241,7 +24261,7 @@ function _tryBustSave(free){
      drill counts - it did not, and the softlock this guards against was
      reachable exactly then. */
   var _drillCapped=_drillCap().capped;
-  var _bankable=G.kept.length>0||(G._stakesRisingBonus||0)>0;
+  var _bankable=G.kept.length>0||(G._turnBonusPot||0)>0;
   if(_drillCapped&&!_bankable)return false;
   function _runSave(label,text){
     free.forEach(d=>{if(d.el){d.el.classList.add('bust');if(d.el._d3)D3.draw(d.el._d3);setTimeout(()=>{if(d.el)d.el.remove();},380);}});
@@ -24313,7 +24333,7 @@ function _tryBustSave(free){
     if(_omrC&&_omrC.effect&&_omrC.effect.mechanic==='bust_survive'&&!G.npcCardState.playerOnce[G.pCards[_omrI]]){
       G.npcCardState.playerOnce[G.pCards[_omrI]]=true;
       G.kept.forEach(function(k){k.pts=Math.floor(k.pts/2);});
-      G.turnPts=G.kept.reduce(function(a,k){return a+k.pts;},0)+(G._stakesRisingBonus||0);
+      G.turnPts=G.kept.reduce(function(a,k){return a+k.pts;},0)+(G._turnBonusPot||0);
       refreshKeptTray();updHUD();
       _runSave(G.pCards[_omrI],_omrC.name.toUpperCase()+' — SAVED (½ PTS)');
       return true;
@@ -24431,7 +24451,7 @@ function doBust(){
     G._wardArmed=false;
     /* the whole turn, not just G.kept - the Stakes Rising seed lives outside
        it and was being dropped rather than halved */
-    var _wardTotal=_bustLost+(G._stakesRisingBonus||0);
+    var _wardTotal=_bustLost+(G._turnBonusPot||0);
     /* KINDRED doubles this to two-thirds (#32), stamped when the ward armed */
     var _wardBoosted=!!G._wardBoost;G._wardBoost=false;
     var _half=Math.floor(_wardTotal*(_wardBoosted?2/3:1/2));
@@ -24442,7 +24462,7 @@ function doBust(){
        G.pPts and one of them reads G.kept, so this is the only point in the
        branch where either can be paid honestly. */
     _bustTolls();
-    G.turnPts=0;G.kept=[];G._stakesRisingBonus=0;
+    G.turnPts=0;G.kept=[];G._turnBonusPot=0;
     try{updHUD();refreshKeptTray();}catch(e){}
     G.safeTurnStreak=0;
     /* it is still a bust: the chain breaks and the feat counter ticks, which
@@ -24521,9 +24541,9 @@ function doBust(){
   if(!G._thickSkinUsed&&G.pCards.includes('thick_skin')){
     G._thickSkinUsed=true;
     /* Save half of all turn pts (kept dice + stakes-rising bonus). */
-    var _tsTurnPts=G.kept.reduce((a,k)=>a+k.pts,0)+(G._stakesRisingBonus||0);
+    var _tsTurnPts=G.kept.reduce((a,k)=>a+k.pts,0)+(G._turnBonusPot||0);
     var _tsSaved=Math.floor(_tsTurnPts/2);
-    G._stakesRisingBonus=0;
+    G._turnBonusPot=0;
     /* Apply bust class to all visible dice in the row */
     (function(){var _r=document.getElementById('playerDiceRow');if(_r)Array.prototype.forEach.call(_r.querySelectorAll('.die'),function(el){el.style.opacity='';el.style.filter='';el.classList.add('bust');if(el._d3)D3.draw(el._d3);});})();
     G.safeTurnStreak=0;G.turnPts=0;G.kept=[];updHUD();refreshKeptTray();setBtns(false,false);
@@ -24567,9 +24587,9 @@ function doBust(){
   if(_lsCid&&!(G.npcCardState.playerOnce&&G.npcCardState.playerOnce[_lsCid])){
     G.npcCardState.playerOnce=G.npcCardState.playerOnce||{};
     G.npcCardState.playerOnce[_lsCid]=true;
-    var _lsTurnPts=G.kept.reduce((a,k)=>a+k.pts,0)+(G._stakesRisingBonus||0);
+    var _lsTurnPts=G.kept.reduce((a,k)=>a+k.pts,0)+(G._turnBonusPot||0);
     var _lsSaved=Math.floor(_lsTurnPts/2);
-    G._stakesRisingBonus=0;
+    G._turnBonusPot=0;
     (function(){var _r=document.getElementById('playerDiceRow');if(_r)Array.prototype.forEach.call(_r.querySelectorAll('.die'),function(el){el.style.opacity='';el.style.filter='';el.classList.add('bust');if(el._d3)D3.draw(el._d3);});})();
     G.safeTurnStreak=0;G.turnPts=0;G.kept=[];updHUD();refreshKeptTray();setBtns(false,false);
     var _lsBov=document.getElementById('bust-ov');
@@ -24608,8 +24628,8 @@ function doBust(){
      decisive use of the one charge. */
   if(G.activeCardState&&G.activeCardState.stitchActive){
     G.activeCardState.stitchActive=false;clearCardLabel('mabels_stitch');
-    const saved=G.kept.reduce((a,k)=>a+k.pts,0)+(G._stakesRisingBonus||0);
-    G._stakesRisingBonus=0;
+    const saved=G.kept.reduce((a,k)=>a+k.pts,0)+(G._turnBonusPot||0);
+    G._turnBonusPot=0;
     /* Apply bust to all visible dice in the row */
     (function(){var _r=document.getElementById('playerDiceRow');if(_r)Array.prototype.forEach.call(_r.querySelectorAll('.die'),function(el){el.style.opacity='';el.style.filter='';el.classList.add('bust');if(el._d3)D3.draw(el._d3);});})();
     /* Bank the accumulated pts safely into G.pPts so they aren't at risk
@@ -24662,7 +24682,7 @@ function doBust(){
   /* IRON GATE (NPC-owned): once per match, when the player busts, the NPC
      seizes the turn points the player just lost. "steal_on_bust". */
   if(G.oCards&&G.oCards.indexOf('iron_gate_npc')>=0&&!(G.npcCardState&&G.npcCardState.usedOnce&&G.npcCardState.usedOnce['iron_gate_npc'])){
-    var _igLost=G.kept.reduce(function(a,k){return a+k.pts;},0)+(G._stakesRisingBonus||0);
+    var _igLost=G.kept.reduce(function(a,k){return a+k.pts;},0)+(G._turnBonusPot||0);
     if(_igLost>0){
       if(!G.npcCardState.usedOnce)G.npcCardState.usedOnce={};
       G.npcCardState.usedOnce['iron_gate_npc']=true;
@@ -24679,7 +24699,7 @@ function doBust(){
      on the regular bust path). Includes the Stakes Rising bonus in the
      saved-pool since the card description is "half turn pts". */
   if(G.pCards.includes('aegis')){
-    var _aegisPts=G.kept.reduce(function(a,k){return a+k.pts;},0)+(G._stakesRisingBonus||0);
+    var _aegisPts=G.kept.reduce(function(a,k){return a+k.pts;},0)+(G._turnBonusPot||0);
     if(_aegisPts>0){
       var _aegisSave=Math.floor(_aegisPts/2);
       G.pPts+=_aegisSave;
@@ -24726,7 +24746,7 @@ function doBust(){
   }
   G.safeTurnStreak=0;G.turnPts=0;G.kept=[];
   /* Stakes Rising bonus is also lost on bust (it was "on the table" turn pts) */
-  G._stakesRisingBonus=0;
+  G._turnBonusPot=0;
   /* TELL: Steeped — bust loses accumulated bonus, refresh HUD immediately */
   if(G._tell&&G._tell.id==='steeped'&&G._tellState){G._tellState.bonus=0;_updateTellHUD();}
   /* ── Handicap: Rising Stakes — reset streak on bust ── */
@@ -24918,6 +24938,20 @@ function handleBank(){
     var _bkIcons=_bkSplit.icons;
     if(_bkScore.length===0&&_bkIcons.length)pts=0;
     if(pts>0||_bkIcons.length){
+      /* NAME THE BRAND THAT FIRED (#44). A mixed keep banks its scorers AND
+         spends an icon; the pop showed only the number, so the brand went off
+         silently inside a total. Same "visible at the moment it happens" rule
+         as the targeting ring, and its cheaper half. */
+      if(pts>0&&_bkIcons.length){
+        try{
+          var _bkNames=[];
+          _bkIcons.forEach(function(d){
+            var _n=(ENCH_ICONS[d&&d.ench&&d.ench.t]||{}).name;
+            if(_n&&_bkNames.indexOf(_n)<0)_bkNames.push(_n);
+          });
+          if(_bkNames.length)famLog('+'+pts+' \u00b7 '+_bkNames.join(' \u00b7 ').toUpperCase());
+        }catch(e){}
+      }
       _bkIcons.forEach(function(d){_iconFire(d,'p');});
       if(!_bkScore.length)_bkCast=true;
       /* A Break kept on the BANK press has to resolve BEFORE the bank lands.
@@ -24931,7 +24965,7 @@ function handleBank(){
         if(pts>0){
           G.kept.push({vals:selV,mat:(_bkScore[0]||selD[0]).mat,pts:pts,
             dice:_bkScore.map(function(dd){return{val:dd.val,mat:dd.mat};})});
-          G.turnPts=G.kept.reduce(function(a,k){return a+k.pts;},0)+(G._stakesRisingBonus||0);
+          G.turnPts=G.kept.reduce(function(a,k){return a+k.pts;},0)+(G._turnBonusPot||0);
           try{updHUD();refreshKeptTray();}catch(e){}
         }
         G._breakThenBank=true;/* _breakDie finishes the bank once a die is tapped */
@@ -24960,7 +24994,7 @@ function handleBank(){
      card description says "your next turn starts with +300 turn points
      already on the table" — those points need to be banked, not just
      displayed. Cleared at line ~11943 (bust) and the next startPTurn. */
-  if(G._stakesRisingBonus){total+=G._stakesRisingBonus;}
+  if(G._turnBonusPot){total+=G._turnBonusPot;}
   if(total<=0){
     /* Nothing to bank. Either a brand was just cast for its effect and the
        turn carries on, or Zero Hour has just ended it - and Zero Hour has to
@@ -24993,16 +25027,16 @@ function handleBank(){
   /* Stakes Rising — was already added to `total` above; surface it in the
      bonus message so the player sees "+300 STAKES" in the bank pop and
      fire the trigger animation, then reset the carry-over flag. */
-  if(G._stakesRisingBonus){
+  if(G._turnBonusPot){
     /* The pool can also hold Flintlock's +200, which already showed its
        own label mid-turn. Only surface a STAKES label if the player
        actually runs Stakes Rising, so a Flintlock-only player doesn't
        see a phantom "STAKES" pop. The amount is banked either way. */
     if(G.pCards.includes('stakes_rising')){
-      bonusMsg+=' +'+G._stakesRisingBonus+' STAKES';
-      triggerCard('stakes_rising','+'+G._stakesRisingBonus,true);
+      bonusMsg+=' +'+G._turnBonusPot+' STAKES';
+      triggerCard('stakes_rising','+'+G._turnBonusPot,true);
     }
-    G._stakesRisingBonus=0;
+    G._turnBonusPot=0;
   }
   const totalCommitted=G.kept.reduce((a,k)=>a+k.vals.length,0);
   if(G.pCards.includes('half_measure')&&totalCommitted===3){total+=400;bonusMsg+=' +400 HALF MEASURE';triggerCard('half_measure','+400',true);}
@@ -29269,7 +29303,7 @@ function activateDoubleDown(){
   var _ddNewPts=G.kept.reduce(function(a,k){return a+k.pts;},0);
   /* Preserve the Stakes Rising bonus (it isn't a kept-dice score so the
      k.pts*=2 doubling above doesn't touch it). */
-  G.turnPts=_ddNewPts+(G._stakesRisingBonus||0);
+  G.turnPts=_ddNewPts+(G._turnBonusPot||0);
   /* Double Down visual juice: scatter + sparks on committed dice */
   G.pool.forEach(function(d){if(d.committed&&d.el){d.el.classList.add('scatter');spawnPixelSparks(d.el,3);}});
   refreshKeptTray();updHUD();
