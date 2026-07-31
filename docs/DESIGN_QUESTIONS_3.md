@@ -294,3 +294,23 @@ decide for themselves.
 - Zero is the correct value for an icon component, and the preview says so by printing the enchant's NAME instead of a grey 0 — but only when the selection is icons-only (`selD.every(_dieIsIcon)` at :22926). A mixed keep prints just "+500" with no sign that a brand is about to fire. Should a mixed selection also name the enchant (e.g. "+500 · TITHE")? Out of scope for a correctness patch, but it is the one place the universal rule is invisible at the moment the player commits to it.
 
 _28 questions this round. None block work in progress._
+
+### Round 4 addendum — where does patron dialogue belong?
+
+Removed from the character sheet on Denis's call: *"why is there dialogue on the
+character sheets? Especially this line which would refer to something else being
+said prior? No dialogue needed on character sheet."* The King line he caught
+makes the general point — those are written as one voice in an ensemble
+REACTING to a topic, so they presume something said before them, and a sheet is
+not a conversation.
+
+The resolver and the 30 authored lines are still in the build, correct and
+tested, but **nothing calls them now**. Where should they speak?
+- In-match, through the existing `DLG` system (64 call sites, currently rival
+  barks only) — a named patron would have a voice at the table they are playing
+  at, and a reaction line has something to react to.
+- Somewhere on the night screen that reads as overheard room chatter rather
+  than a character speaking to you.
+- Nowhere yet, until the full ladders are written.
+
+The engine takes any of these as another pool with no new mechanism.

@@ -414,8 +414,15 @@ body{letter-spacing:.045em}
    in the middle of a tall card at whatever scale its aspect happened to give.
    Anchor them to the bottom of the frame's window instead and let height run
    free: a taller character stands taller, which is what the art intends. */
-.ptcard .lwho{inset:auto;left:50%;bottom:26%;width:92%;height:auto;
-  transform:translateX(-50%);object-fit:contain}
+/* FILL THE FRAME'S WINDOW. Bottom-anchoring at a fixed WIDTH (P378) sizes a
+   bust by its width alone, so a wide character like Nix - 666x535 - came out
+   only ~0.74 of the card tall and floated small in a window twice that height.
+   Give the window its real box and contain inside it: a tall bust is bound by
+   the height, a wide one by the width, and either way it is as large as it can
+   be without cropping. Anchored low, so a taller character grows upward into
+   the frame rather than off the bottom of it. */
+.ptcard .lwho{inset:6% 8% 38% 8%;width:auto;height:auto;
+  transform:none;object-fit:contain;object-position:50% 100%}
 .ptcard .lwho.win{inset:auto;left:-11.9%;top:-3.4%;width:119.8%;height:73.6%;
   bottom:auto;transform:none;object-fit:fill}
 .ptcard .lfront{position:absolute;inset:0;pointer-events:none;will-change:transform}
@@ -474,7 +481,16 @@ body{letter-spacing:.045em}
 /* the shield window: room-frame patron over his frame colour, BOTH
    behind the panel plate (the rim overlaps them) */
 #ptPort{position:absolute;left:27.2%;top:1.9%;width:46%;height:27.9%;overflow:hidden;z-index:0}
-#ptPort .pwho{position:absolute;width:140%;left:50%;top:-16%;transform:translateX(-50%)}
+/* THE SHIELD SHOWS THE WHOLE BUST. width:140%/top:-16% was aimed at the old
+   443x802 plates, where every bust sat at the same spot on the same canvas.
+   Against a cut-out it is a 1.4x zoom into an image that is already cropped to
+   its subject, which is why Nix arrived with his head out of frame. CONTAIN
+   inside the shield's own box: the bust is scaled to fit, whole, whatever its
+   aspect - tall ones bound by height, wide ones by width, no per-character
+   numbers. Held slightly low so the head sits in the shield's upper half
+   rather than down at the point the shield tapers to. */
+#ptPort .pwho{position:absolute;inset:0;width:100%;height:100%;
+  object-fit:contain;object-position:50% 34%}
 #ptPanelSheet.sealed #ptPort .pwho{filter:drop-shadow(4px 0 0 #3d2f52) drop-shadow(-4px 0 0 #3d2f52)
   drop-shadow(0 4px 0 #3d2f52) drop-shadow(0 -4px 0 #3d2f52)}
 #ptPanel .pv{position:absolute;right:13%;font-family:var(--bodyFont);color:#802c10;
@@ -492,13 +508,6 @@ body{letter-spacing:.045em}
   font-family:'JMH Beda',serif;color:#4b5527;line-height:1.05;white-space:nowrap}
 #ptvName .t1{display:block;font-size:2.6cqh;color:#26170a;position:relative;top:.5cqh}
 #ptvName .t2{display:block;font-size:7cqh;letter-spacing:.02em}
-/* what this patron has to say, under their name. Sized to sit in the gap above
-   the card fan rather than push anything down - the sheet's layout is fixed
-   art, so this has to fit the space that is already there. */
-#ptvSay{position:absolute;left:9%;right:9%;top:42.2%;z-index:2;text-align:center;
-  font-family:var(--bodyFont);color:#5a4326;line-height:1.22;
-  font-style:italic;pointer-events:none;overflow:hidden}
-#ptvSay:empty{display:none}
 #ptvTrait{position:absolute;left:60.5%;top:23.2%;width:15.5%;z-index:3;cursor:pointer}
 #ptvTrait img{width:100%;transition:transform .15s}
 #ptvTrait:active img{transform:scale(1.12)}
@@ -14535,7 +14544,6 @@ function _ptRoom(host,tier,bossReady){
       +'<img class="bgimg" src="Art/Assets/Panels/optimized/SitDown_panel_bg_opt.webp" alt="">'
       +'<div id="ptvWins"></div>'
       +'<div id="ptvName"></div>'
-      +'<div id="ptvSay"></div>'
       +'<div id="ptvDice"></div>'
       +'<div id="ptvTrait"></div>'
       +'<div id="ptvXtra"></div>'
@@ -14719,27 +14727,6 @@ function _ptOpenPanel(st){
   document.getElementById('ptvName').innerHTML=
     '<span class="t2" style="color:#241505;font-size:'+_nfs+'cqh">'+_gn
     +' <span style="color:'+_pc+'">'+_sn+'</span></span>';
-  /* one call, and it does not care who the patron is */
-  (function(){
-    var sayEl=document.getElementById('ptvSay');if(!sayEl)return;
-    var line=null;try{line=_dlgSay(st.art);}catch(e){line=null;}
-    sayEl.textContent=line?('\u201c'+line+'\u201d'):'';
-    /* FIT THE GAP. The sheet is fixed art - the name ends around 42% and the
-       card fan starts just under 47%, so a line has that band and no more.
-       Lines are authored prose of any length, so measure and step down rather
-       than pick a size that suits whichever line is longest today. */
-    if(line){
-      var sheet=document.getElementById('ptPanelSheet');
-      var H=(sheet?sheet.getBoundingClientRect().height:0)||0;
-      if(H>0){
-        var band=H*0.049, px=H*0.0205, floor=H*0.0125, guard=14;
-        sayEl.style.fontSize=px+'px';
-        while(sayEl.scrollHeight>band&&px>floor&&guard-->0){
-          px-=H*0.0012;sayEl.style.fontSize=px+'px';
-        }
-      }
-    }
-  })();
   var trt=document.getElementById('ptvTrait');
   trt.classList.remove('show');
   var _wl='';
@@ -15610,14 +15597,21 @@ function _matchDress(isBoss){
   var tok=document.getElementById('tokOImg');
   if(tok){
     var art=window._lastSeatArt;
-    /* measured face crops: [bg-size%, pos-x%, pos-y%] per character.
-       Each source is 443x802 with the bust in the top half, so these frame
-       the head rather than the plate - see docs/PROTO_NOTES.md. */
-    var CROP={Krox:[104,100,17],Eira:[104,0,17],Nebb:[104,50,16],Regis:[104,100,8]};
-    var cr=CROP[art]||[104,50,15];
-    tok.style.backgroundImage=(!isBoss&&art)?'url("Art/Assets/Frames/Patrons/'+art+'.png?v=2")':'none';
-    tok.style.backgroundSize=cr[0]+'%';
-    tok.style.backgroundPosition=cr[1]+'% '+cr[2]+'%';
+    /* THE BUSTS MOVED, AND SO DID THEIR SHAPE. This asked for
+       Art/Assets/Frames/Patrons/<art>.png, which is gone - they live in
+       Characters/ now and are served from the optimized copies like every
+       other picture. It was missed when the other two portrait sites were
+       repointed because it builds a CSS background rather than an <img>.
+       The per-character crop table went with it. Its own comment said what it
+       was measured against - "Each source is 443x802 with the bust in the top
+       half" - and that plate no longer exists: the busts are trimmed to their
+       own content at 24 different sizes, so a percentage of a 443x802 canvas
+       frames nothing in particular. Since every source is now a bust and
+       nothing else, one rule covers all of them: cover the well and hold near
+       the top, which is where a head is. */
+    tok.style.backgroundImage=(!isBoss&&art)?'url("'+PT_CHAR+art+PT_CHAR_EXT+'")':'none';
+    tok.style.backgroundSize='cover';
+    tok.style.backgroundPosition='50% 14%';
     /* the disc behind the character takes the same colour the peek panel
        gives that patron, so the two readings of a rival match */
     var FRAME_COL={green:'#46503c',purple:'#503c46',blue:'#3c505a',red:'#6e463c'};

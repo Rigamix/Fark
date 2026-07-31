@@ -11,7 +11,7 @@ await until(()=>{const d=document.querySelector('.nrdie');return d&&d._floatDone
 tap(document.querySelector('.nrdie'));await sleep(1300);
 tap(document.getElementById('nrTakeBtn'));await sleep(2500);
 _getS();
-(S.run.night.roster||[]).forEach((p,i)=>{if(i===0)p._art='Sil';});
+(S.run.night.roster||[]).forEach((p,i)=>{if(i===0)p._art='Nix';});
 save();showScreen('gauntlet');await sleep(1500);
 const c=[...document.querySelectorAll('.ptcard')].filter(vis)[0];
 if(c)tap(c);
