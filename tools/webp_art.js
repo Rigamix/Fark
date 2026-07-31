@@ -14,6 +14,15 @@
  *     | python <decode the setup: line>
  */
 const JOBS = [
+  /* THE MATCH TABLE. The game has been rendering assets/Environment_ART/
+     match.png - 1064x1920, dated 07-11, from the previous version's asset
+     folder - while the current master is Table_new.png at 1080x2011 (07-27).
+     Quality is high (0.92) because this one is full-screen behind everything
+     and any banding in the wood grain is visible for the whole match, unlike a
+     card face at thumbnail size. It has no transparency, but webp is still the
+     right container - the alpha path costs nothing when there is none. */
+  { dir: 'Art/Assets/Match/Commoner/', files: [
+    ['Table_new.png', 0.92] ] },
   /* the two family cards that had no art. The masters are camelCase
      (card_face_steadyHand.png) where every other card is snake_case, so the
      output name is stated explicitly rather than derived - the GAME loads
