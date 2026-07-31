@@ -1,5 +1,9 @@
 # Fark — open questions
 
+> **Answered 2026-07-31** in `ANSWERS_2026-07-31.md` (1-53), and questions
+> 54, 55 and 57 were closed by wiring all dialogue into the match (P392).
+> Kept as the record of what was asked.
+
 **Raised 2026-07-31. All UNANSWERED.** Grouped by subject, not by which
 audit produced them — the round numbering in `archive/DESIGN_QUESTIONS_3.md` got
 confusing, so that file is now an archive and this is the live list.

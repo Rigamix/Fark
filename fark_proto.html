@@ -14443,9 +14443,39 @@ function _dlgEvent(moment){
     return r?r.t:null;
   }catch(e){return null;}
 }
+/* THE AMBIENT POOLS, ASKED FOR DIRECTLY. They cannot be reached through a
+   patron: personal content wins, and a stage-0 line is a FLOOR that stays
+   eligible forever, so the "fall back once their own pool is exhausted" rule
+   never fires. Measured - 30 consecutive draws from Krox returned only Krox.
+   So the room's talk gets its own door, and keeps everything _dlgSay does with
+   it: the King's tier gating, the per-run de-dup that stops a reaction
+   repeating, and the tag that marks the rumour as established. */
+function _dlgAmbient(){
+  try{
+    _getS();var run=S&&S.run;if(!run)return null;
+    run._dlgHeard=run._dlgHeard||{};
+    var row=_dlgPick('reaction:king',0,run._dlgHeard);
+    if(!row)row=_dlgPick('gossip:town',0,null);
+    if(!row)return null;
+    if(row.p.indexOf('reaction:')===0)run._dlgHeard[row.t]=1;
+    if(row.tag)run._dlgHeard[row.tag]=1;
+    try{save();}catch(e){}
+    return row.t;
+  }catch(e){return null;}
+}
 /* the four DLG events these answer, and which side each belongs to */
 var _DLG_MOMENT={OPP_BUST:'bust',PLAYER_BUST:'yourBust',
                  OPP_BIG_BANK:'bank',BIG_BANK:'yourBank'};
+/* sitting down opposite them is where a patron's OWN voice belongs, and it
+   routes through _dlgSay so their stage advances and the arc moves */
+var _DLG_PERSONAL={MATCH_START:1,REMATCH_START:1};
+/* the quiet beats. Overheard talk belongs where nothing sharp is happening,
+   and these are the events whose own barks carry the least weight. */
+var _DLG_AMBIENT={EARLY_BANK:1,MATCH_CLOSE:1,OPP_TAKES_LEAD:1,
+                  PLAYER_TAKES_LEAD:1,LOSING_BADLY:1,WINNING_BADLY:1};
+/* this layer COLOURS a match, it does not take it over - the patron's own
+   barks still lead on these beats most of the time */
+var _DLG_AMBIENT_CHANCE=0.35;
 /* ── THE LINES. Data only. ──
    Written content is from FARK_PATRON_LORE.md; nothing here is invented. The
    doc flags full multi-stage ladders for all 24 as a separate later pass, so
@@ -28228,9 +28258,23 @@ const LEDGER_LINES={
     var _orig=DLG.getLine.bind(DLG);
     DLG.getLine=function(cat){
       try{
+        /* BOSSES KEEP THEIR OWN VOICE ENTIRELY. They have hand-written pools
+           per boss, richer than any shared bucket, and they are not part of the
+           patron cast this system describes. */
+        if(typeof G!=='undefined'&&G&&G._isBoss)return _orig(cat);
         var m=(typeof _DLG_MOMENT!=='undefined')&&_DLG_MOMENT[cat];
         if(m){var line=_dlgEvent(m);if(line)return line;}
+        else if(typeof _DLG_PERSONAL!=='undefined'&&_DLG_PERSONAL[cat]){
+          var pl=_dlgSay(window._lastSeatArt);if(pl)return pl;
+        }
+        else if(typeof _DLG_AMBIENT!=='undefined'&&_DLG_AMBIENT[cat]
+                &&Math.random()<_DLG_AMBIENT_CHANCE){
+          var al=_dlgAmbient();if(al)return al;
+        }
       }catch(e){}
+      /* nothing lore has to say, so the line that would have shown still does -
+         and OPP_WINS is mapped nowhere above, so the win and loss beats keep
+         their bespoke lines and only those */
       return _orig(cat);
     };
   })();
