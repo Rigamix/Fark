@@ -80,6 +80,21 @@ fill the retired slots:
   bonus immunity the card was never designed to grant. If the loan's
   duration simply expires without the die dying, nothing changes:
   the player's own die returns to its home lane as normal.
+  **CLARIFIED — a brand belongs to the die, never the seat/lane.** A
+  code audit found the shipped game leaves a die's enchant behind when
+  Fair Trade swaps it, so a borrowed die wears whatever brand its
+  temporary lane happens to carry instead of its own. This contradicts
+  an already-locked rule (match brief: enchants live on the die, a
+  lane is just wherever that die currently sits, which is what makes
+  pre-match reordering meaningful at all) — not a fresh question, the
+  code needs to catch up to the existing spec. The brand travels with
+  the physical die wherever it goes, always.
+  **CLARIFIED — mixed selections never get poisoned by an icon.** The
+  universal rule (an icon face banks zero and fires its effect) means
+  zero is the CORRECT value for that component, not an error state. A
+  keep containing real scorers plus one icon-face die should commit
+  and score the non-icon part normally while the icon fires — a
+  branded die must never invalidate an otherwise-legal selection.
 
 **RESOLVED** (was an open item; a code audit found it still contradicting
 section 1's "doesn't exist anywhere" claim, since it was never actually
@@ -89,10 +104,21 @@ no branding needed, no separate mechanic invented. It counts against
 the one-Ward-per-loadout hard cap exactly like a player-branded Ward
 die; the cap exists specifically to stop stacked safety nets, and a
 relic that bypassed it through a side door would quietly undo the
-reason the cap exists. Fits Brutus's character as a bonus: a soldier
-who is simply always prepared needs no flashy new rule. Old text
-superseded by the relic-vs-badge architecture question
-(open item, section 5) is settled.
+reason the cap exists.
+**FACE: 5, not 1.** The "brand the most expensive face" logic that
+governs PLAYER-chosen brands (discourage picking the cheap option)
+doesn't apply to a single, fixed, developer-authored relic property —
+nobody is choosing here. A 100-point toll to arm a half-save risks the
+relic's signature ability going unused in practice; face 5's gentler
+cost is what makes it something a player actually reaches for.
+**INHERITS SILVER'S WEIGHTED TABLE** (`[1,5,1,5,2,3,4,6]`) — it is
+tagged Silver family and should behave like Silver family; rolling a
+fair 1-6 instead was an oversight, not a design choice, and this fix
+is unconditional regardless of the face-5 call above.
+Fits Brutus's character as a bonus: a soldier who is simply always
+prepared needs no flashy new rule. Old text superseded by the
+relic-vs-badge architecture question (open item, section 5) is
+settled.
 
 ## 2. ENCHANTS — FULL REWORK
 
@@ -164,8 +190,18 @@ resolved; see open items.
   the match ends," which sim showed fires 97.7% of the time within 6
   turns, i.e. not a real bet. The shortened window is what makes it an
   actual wager.
-- **Break** (~300g) — skull icon. Kept: banks 0. PERMANENTLY destroys
-  ONE OTHER live die of the player's choice, for the rest of the match
+- **Break** (~300g) — skull icon. Kept: banks 0. Destroys ONE OTHER
+  LIVE die of the player's choice for the REST OF THIS MATCH ONLY —
+  the die returns, fully restored, at the start of the player's next
+  match. Same bound as Trade above, stated explicitly here because the
+  earlier "permanently... for the rest of the match" phrasing reads
+  ambiguously between match-scoped and run-scoped, and the section 4
+  timing finding was always about turns remaining WITHIN a match, not
+  matches remaining in the run — that finding holds unchanged under
+  this clarification, it was never testing the harsher reading.
+  (A PRESERVED die, per the match brief, is explicitly INERT and is
+  therefore never a legal Break target — stated outright here so it
+  never has to be inferred from the two words being opposites.)
   (loadout drops to 5 dice for all remaining turns). WIDENED (supersedes
   the earlier "Obsidian-only" decision): every family now has its own
   death-trigger, so Break has a real partner in every build, not one
@@ -199,6 +235,18 @@ resolved; see open items.
   the match starts, so this is a commitment risk (you know exactly
   what you're trading for) not a blind one. Visible on the table: the
   swap animates at both lane positions when it fires.
+  **CLARIFIED, then corrected — MATCH-SCOPED, reverts fully after.**
+  "For the rest of the match" is a bound, not a permanence claim — an
+  earlier pass here over-read it as crossing between matches and
+  invented an "enchants never cross" carve-out to guard against that.
+  Wrong scope: nothing here ever persists past the match it's used
+  in, so there is nothing to guard. The WHOLE die swaps — material
+  AND whatever enchant it carries — for the duration of THIS match
+  only; the instant the match ends (win or lose), both sides' true
+  owned loadouts are fully restored, no exceptions, no residue. This
+  is simpler than the earlier ruling, needs no special case, and is
+  the more exciting version besides — you're borrowing the opponent's
+  whole capability for one fight, not just their base material.
 - **Snuff** (~300g) — banks 0, POST-ROLL. A candle-snuffer marker
   appears at the OPPONENT's same fixed lane; their die there is
   removed from their pool for their NEXT TURN ONLY, then returns
@@ -223,11 +271,29 @@ All seven gold prices above are PLACEHOLDERS ordered by estimated
 power/complexity, not yet run through a pricing-specific sim pass — flag
 this to whoever tunes the economy next.
 
-**Shop flow change:** enchanting now requires an extra step. OLD: pick
-service → pick your die → confirm. NEW: pick service → pick your die →
-**pick which face (1 or 5 only — Quicksilver skips this step entirely,
-it has no face)** → confirm. Three taps instead of two for the seven
-icon enchants.
+**Shop flow — SUPERSEDES the earlier "add a face-picker" plan below.**
+A code audit found the shipped game never built the picker at all — it
+ships a random draw across ALL SIX faces, which reopens the exact
+"free bust insurance" exploit the 1/5 restriction exists to close (a
+branded 2/3/4/6 face gives a would-be-bust roll a guaranteed non-bust
+alternative it otherwise wouldn't have; measured at a 25% flat cut in
+single-roll bust rate, zero effect on 1/5 — the same unconditional
+safe-keep shape section 1 deleted Silver's original identity to
+remove, walking back in through a different door). RULING, final:
+- Restrict the random draw to [1, 5] only. No picker screen, ever —
+  every die always has both a 1 and a 5, so a picker would only ever
+  offer the same two buttons, forever; not worth the extra tap or the
+  art for a choice that narrow (73 vs 125 EV forfeited, a minor tuning
+  knob, not a strategic fork).
+  Shop flow stays TWO taps: pick service → pick your die → confirm.
+  The face is assigned automatically, randomly, from {1, 5}.
+- Per-face pricing (was open item 2) is now MOOT — it only mattered if
+  players were choosing between faces. Consider that item closed.
+- Existing brands sitting on an illegal face (2/3/4/6) at the moment
+  this ships: REFUND AND CLEAR, not silently moved to the die's 1.
+  Matches the game's own existing precedent for retired mechanics;
+  silently rewriting a purchase to a face the player didn't choose is
+  worse than an honest refund.
 
 ## 3. BADGES — FOUR OF EIGHT BOSSES REMAPPED
 
@@ -284,6 +350,25 @@ changes. Do not commission new badge paintings for this rework.
   sim-tested; suppressing Jade wilds, Amber's triple bonus, Starstone's
   bank bonus, or Silver's odds-skew under this badge is inferred, not
   validated — re-test each before trusting the number in a live build.
+  **CLARIFIED — Break vs Still Waters:** a code audit found Break's
+  guaranteed Obsidian trigger (section 2/4) was surviving Still Waters
+  because it dispatches off material family, not the die's specific
+  effect. RULING: it should NOT survive. Section 0's law is explicit —
+  a family death-trigger fires regardless of which face shows, which
+  is the definition of a family trait; Break doesn't invent a new
+  mechanism, its own spec says it forces the SAME shatter, just
+  guaranteed. Suppressing the passive version but exempting the
+  guaranteed one is an inconsistent carve-out the law doesn't support.
+  This makes Still Waters a hard counter to the best-validated Break
+  partner — intentional, not a flaw; Snare/Trade/Fog already exist to
+  reward reading the table and countering a build, this is the same
+  shape. Applies identically to Grog's Tooth (the Obsidian relic
+  shares this mechanic) — relics are NOT badge-proof, no principled
+  reason to exempt them. UNVALIDATED, needs its own sim pass before
+  trusting it live — and Grog's Tooth's magnitude (10%/+1500) is a
+  meaningfully different number to strip than plain Obsidian's
+  (6%/+1000), so it needs its OWN measurement, not an extrapolation
+  from the Obsidian figure above.
 - **Corvus: In Arrears → First Strike.** (Badge stays The Tipped
   Scales.) In Arrears was untested. **REDESIGNED, not just rescoped —
   a code audit found no opponent-side enchants exist, and unlike
@@ -338,6 +423,82 @@ late-turn timing on their own, the fix is a UI/telegraph hint (e.g. the
 match brief's turn counter already pulses amber at 2 turns remaining —
 that's a natural moment to make Break's icon glow harder), not a
 numbers change.
+
+## 4b. MATCH-SCOPING IMPLEMENTATION RULINGS (Round 2 — closes gaps
+Code found while actually building the correction in section 4/above)
+
+**THE LANE PERSISTS, ONLY THE DIE IS DESTROYED — this is the one that
+actually matters.** When Break destroys a die that is currently
+occupying a lane via a Fair Trade loan, the player's OWN die (benched
+by the loan, never itself destroyed) returns to that lane IMMEDIATELY.
+The player stays at 6 dice for the rest of the match. The cost of
+breaking a borrowed die is exactly the cost of breaking any die — one
+die gone for the match — never inflated to a whole seat because of
+which physical die happened to be sitting there. Follows directly from
+the lane/die distinction already established ("the lane position
+itself never moves, only what's in it changes") — Code's conservative
+seat-loss implementation was a reasonable read of an under-specified
+ruling, not a wrong one; this closes the gap explicitly so it isn't
+inferred differently a third time.
+
+**LEGACY SAVE MIGRATION, both Break and Trade.** No record exists of
+what was destroyed/swapped under the old (run-scoped) behavior, so
+exact restoration is impossible for either — refund is the only honest
+repair, matching the existing `_enchV=2` precedent for retired
+enchants:
+- Break: refund a flat ~450g (no exact price recoverable; this
+  approximates the average family-die cost).
+- Trade: refund exactly 350g — the enchant's own known price, more
+  precise than Break's case since the data allows it.
+
+**MISSING-DIE VISIBILITY.** A die that's gone until the player's next
+match must be shown as such in the loadout/peek UI — never silently
+absent. Same "state must never lie" principle that already required
+the visible swap-back fix below; an invisible gap is the same failure
+in the opposite direction.
+
+**FAIR TRADE'S OWN LOAN CLOCK IS UNCHANGED BY MATCH-SCOPING.** The
+match-scoping correction resolved ambiguity specifically in Break's
+and Trade's "for the rest of the match" phrasing. Fair Trade the CARD
+was never worded that way — "this roll" (tier I) and "the turn"
+(tier II/III) stay exactly as designed, genuinely different durations,
+no text changes. Only the DEATH clock (what happens if the borrowed
+die is destroyed mid-loan) inherits match-scoped treatment, per the
+ruling above and the earlier reversed Fair Trade ruling (section 2).
+
+**TRADE'S SWAP STAYS ONE-WAY.** No opponent-side enchant array exists
+in the engine — the exact same structural gap already found and
+accepted for Kindred and First Strike. Same resolution for
+consistency: the player's material + enchant crosses to the opponent's
+lane; only material returns, since there was never an enchant on the
+other side to cross back. Deferred, not a bug — same status already
+given to the NPC-Preserve visibility gap (both wait on the same future
+"real opponent-side enchant support" work, not solved reactively here).
+
+**TRADE IS CORRECTLY SELF-CONSUMING — confirmed wanted, not a nerf to
+patch around.** Falls directly out of "the whole die swaps": once the
+enchant physically leaves with the die, nothing remains in that lane
+capable of firing Trade again this match. One use per match, by
+construction. Thematically right (commitment, no take-backs). Price
+(~350g) should be revisited whenever the full enchant pricing pass
+happens, factoring this in — not resolved now.
+
+**VISIBLE SWAP-BACK EXTENDS TO TRADE.** Same engineering the ruling
+already bought for Fair Trade (a die that visually reads stale after
+its material/brand has actually changed is the state-lies-about-truth
+problem) — applies identically to Trade's swapped dice. Not a new
+decision, precedent applied to its second occurrence.
+
+**PRESERVE GUARD FIELD NAME:** `d._preserved`, a boolean directly on
+the die object — consistent with how curse marks and other per-die
+state already travel with the persistent die object elsewhere in this
+system.
+
+**NOT ADDRESSED HERE, confirmed as a separate outstanding task:**
+Break's own "returns fully restored at the start of the player's next
+match" mechanism still needs building — `_removeDieAt(lane,
+{permanent:true})` still splices permanently as of this patch. Real,
+separate, still needed; not assumed covered by the Trade-scoping work.
 
 ## 5. OPEN ITEMS — NOT RESOLVED, DO NOT GUESS DEFAULTS
 

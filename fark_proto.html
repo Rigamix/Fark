@@ -12223,10 +12223,19 @@ CFX.fair_trade={
        stash die also sat in two seats at once, since use() never takes it out
        of the stash). The record is cleared at the top of every startPTurn, so
        the second charge is still spendable - next turn. */
-    return !!(G&&!G._fairTrade&&(G.phase==='idle'||G.turnRollCount===0)&&(S.run.diceInv||[]).length);},
+    /* a die that died on loan is spent for the match, so a stash holding only
+       dead dice cannot fund another trade */
+    return !!(G&&!G._fairTrade&&(G.phase==='idle'||G.turnRollCount===0)&&
+      (S.run.diceInv||[]).filter(function(_d){
+        return (G._ftDead||[]).indexOf(_d)<0;}).length);},
   use:function(inst){
     _getS();
-    var inv=(S.run.diceInv||[]);
+    /* only dice still ALIVE this match can be lent. One that died on loan is
+       spent until the next match (brief 4b), and it has to be invisible to the
+       picker as well as to canUse - this reaches for the highest-ranked die in
+       the stash, which is exactly the one a player just lost. */
+    var inv=(S.run.diceInv||[]).filter(function(_d){
+      return (G._ftDead||[]).indexOf(_d)<0;});
     if(!inv.length||!G.matchDice||!G.matchDice.length)return false;
     /* the weakest seat out, the best thing in the stash in */
     var worst=0;
@@ -16644,6 +16653,34 @@ function _breakBegin(src){
 function _removeDieAt(lane,opts){
   opts=opts||{};
   if(!G||lane===undefined||lane===null||lane<0)return false;
+  /* THE LANE SURVIVES, ONLY THE DIE DIES (brief 4b). A lane holding a BORROWED
+     die is not an ordinary seat: the player's own die is standing just behind
+     it, benched by the loan and never itself destroyed. Killing the borrower
+     hands the lane straight back to its owner - the player keeps six dice, and
+     breaking a borrowed die costs exactly what breaking an owned one costs,
+     one die for the match, rather than a whole seat because of which die
+     happened to be visiting.
+     P375 cleared the loan and let the seat go with it. That read the loan as
+     part of the seat; it is not - the lane is a fixed position on the table and
+     the die is only what is standing in it, which is the same distinction the
+     rest of this system runs on. */
+  try{
+    var _ftB=G._fairTrade;
+    if(_ftB&&_ftB.lane===lane){
+      G._fairTrade=null;
+      G.matchDice[lane]=_ftB.was;/* its owner walks back in */
+      /* the borrowed die is spent for THIS match and back for the next one -
+         match-scoped, so this record dies with G and nothing touches the run */
+      G._ftDead=(G._ftDead||[]).concat([_ftB.borrowed]);
+      /* it is off the table for this roll like any destroyed die, but the lane
+         it stood in keeps its number, so no other lane shifts */
+      G.pool=(G.pool||[]).filter(function(q){return q.lane!==lane;});
+      try{famLog('THE BORROWED '+((getDie(_ftB.borrowed)||{}).name||'DIE')
+        +' BREAKS - YOUR OWN RETURNS TO THE LANE');}catch(e){}
+      try{saveMatchState();}catch(e){}
+      return true;
+    }
+  }catch(e){}
   if(G.matchDice&&lane<G.matchDice.length)G.matchDice.splice(lane,1);
   if(G._enchArr&&lane<G._enchArr.length)G._enchArr.splice(lane,1);
   /* DECREMENT. Assigning matchDice.length here refunded every per-turn dice
@@ -16666,8 +16703,8 @@ function _removeDieAt(lane,opts){
   try{
     var ft=G._fairTrade;
     if(ft){
-      if(ft.lane===lane)G._fairTrade=null;/* nothing left to give back */
-      else if(ft.lane>lane)ft.lane--;
+      /* the ft.lane===lane case is handled above, where the lane is kept */
+      if(ft.lane>lane)ft.lane--;
     }
   }catch(e){}
   /* RE-SNAPSHOT THE DICE, AND ONLY THE DICE. The mid-match snapshot was
@@ -21628,20 +21665,17 @@ function startPTurn(){
     if(_stillThere){
       G.matchDice[_lane]=_ft.was;/* loan simply expired */
     }else{
-      /* the borrowed die is not in its seat any more: it died there. Take it
-         out of the stash for good, and DO NOT touch the lane - whatever holds
+      /* the borrowed die is not in its seat any more: it died there. It is
+         spent for the REST OF THIS MATCH and back for the next one - the same
+         bound Break and Trade now carry. P365 spliced it out of the stash for
+         good, under the run-scoped reading section 2 and 4b have since
+         reversed; the exploit that splice closed is closed anyway, because
+         Break's own cost is match-scoped for everyone and there is nothing
+         left for Fair Trade to erase. DO NOT touch the lane - whatever holds
          it now is not ours to overwrite. */
-      try{
-        _getS();
-        var _inv=S.run.diceInv||[], _at=_inv.indexOf(_ft.borrowed);
-        if(_at>=0){
-          _inv.splice(_at,1);
-          var _ei=S.run.dieEnchInv;
-          if(Array.isArray(_ei)&&_at<_ei.length)_ei.splice(_at,1);
-          save();
-          famLog('FAIR TRADE — THE BORROWED '+((getDie(_ft.borrowed)||{}).name||'DIE')+' DIED ON LOAN');
-        }
-      }catch(e){}
+      G._ftDead=(G._ftDead||[]).concat([_ft.borrowed]);
+      try{famLog('FAIR TRADE — THE BORROWED '+((getDie(_ft.borrowed)||{}).name||'DIE')
+        +' DIED ON LOAN, BACK NEXT MATCH');}catch(e){}
     }
   }
   /* THE TAB: release any bank the rival escrowed last turn. It was held for
