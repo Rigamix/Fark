@@ -138,3 +138,37 @@ is "you own the night". Your copy, so it wants your line.
 ---
 
 _44 questions across 9 areas. Nothing here blocks work in progress._
+
+---
+
+## Round 2 — from the match-scoping work (Break / Trade / Fair Trade)
+
+Raised while implementing the AUDIT_RESOLUTIONS ruling. **None block anything** —
+Break shipped in P375 and the other two are re-cutting against it. These are the
+places where the ruling admits two readings, or where implementing it forced a
+balance change nobody signed off on.
+
+### BREAK must become MATCH-SCOPED (plus the Fair Trade borrowed-die branch, plus the preserved-die Break guard)
+
+- LEGACY SAVES: is a retro-repair wanted? A run already spliced by the old Break plays five-die matches until the player opens the shop or loadout, which then appends a plain BONE in the wrong seat - material, brand and lane position all silently lost. There is no record of what was destroyed, so the only honest repairs are (a) leave it and let the bone stand, or (b) refund the die's gold value. Currently doing neither.
+- FAIR TRADE + BREAK: when the BORROWED die is broken, the player's own lent die (`_ft.was`) cannot come home this match - Break destroyed the seat it would return to, so the player finishes at five dice and the lent die reappears only at the next match. Is that the intent (Break costs a SEAT), or should `was` slot back in and Break instead cost the borrowed die only (player stays at six)? The current behaviour is the conservative reading of 'loadout drops to 5 dice for all remaining turns'.
+- PRESERVE: the guard ships armed but inert because Preserve-as-a-visible-die does not exist. Whoever builds the amber casing must set `d._preserved` on the pool die, or give `G._famPreserve` a `die` or `lane` field - `_breakPreserved` already answers to any of the three. If the built version picks a fourth shape, this guard silently stops working. Worth naming the field in the brief.
+- `opts.permanent` is now dead weight at both call sites. Delete the argument entirely (touching the Obsidian-shatter line at 22244, which may belong to another item), or leave it as documented-vestigial? Left as-is here to keep the blast radius small.
+- The startPTurn loan-death branch (21538-21548) still splices the stash permanently. Same ruling applies to it; it belongs to the Fair Trade / Trade-enchant items rather than this one. Who takes it?
+
+### Fair Trade card (`G._fairTrade`): revert P365's permanent deletion of a borrowed die that dies on loan, to a m
+
+- Does the ruling's 'both sides' true owned loadouts fully restore the instant the match ends' reach the FAIR TRADE CARD, or only the TRADE ENCHANT? I read it as the enchant only -- the brief frames it as the opponent-side swap, and the card's own printed text sells roll/turn duration, not match duration. So I left the loan clock alone (roll for tier I, turn for II/III) and applied the ruling only to the death clock. If the intent was that a Fair Trade loan also runs to the end of the match, tier I and tier II collapse into each other and both card texts need rewriting -- flag it rather than let me pick.
+- When a BORROWED die is broken, the player ends the match down one seat and holds their own benched die back in the stash-equivalent limbo until the next match. Should their own die instead return to a seat immediately, so the cost is 'you lose the borrowed die' rather than 'you lose a seat'? I implemented the seat loss, because that is what makes breaking a borrowed die cost exactly what breaking an owned one costs and is what stops Fair Trade erasing Break. But it does mean a passive, uncontrolled 6%/roll Obsidian shatter of a borrowed die costs the player a seat for the rest of the match -- which is the outcome the original brief's 'deliberately NOT a stake' language was written to avoid.
+- A die that died on loan is unlendable for the rest of that match (G._ftDead). Should the player be TOLD which stash die is out, and why? Right now the only signal is a famLog line at the moment of death and the card quietly reaching for a different die next time. If a die can be conspicuously missing from the stash for half a match, the peek/loadout UI probably needs to show it as broken-until-next-match rather than absent.
+- Resolution item 32 puts tier I's 'this roll' at the end of the CHOOSING phase. If a borrowed die is still on the table when its tier-I loan expires mid-turn, does the die vanish from the row it is sitting in, or does the loan hold until the row is committed? That decision belongs to the tier item, not this one, but whoever takes it should know the loan-end path is now in two places (startPTurn for expiry, _ftLendDied for death) and would want a third for the mid-turn case.
+
+### TRADE ENCHANT (lane icon, ENCH_GRID ~30274) — make the whole-die swap match-scoped per AUDIT_RESOLUTIONS "Corr
+
+- The rival's dice cannot carry brands — there is no opponent enchant array anywhere in the file. So the enchant half of the swap is one-way: the player's brand goes across and nothing comes back. Is that the intended reading of "the WHOLE die swaps", or should the rival get a brand slot so a rival-branded die can genuinely cross the other way? (Note resolution 43 already wants the NPC's Preserve to get a visible die — same asymmetry, same shape of answer.)
+- Trade is now self-consuming: the brand leaves with the die, so that seat has no brand for the rest of the match and cannot trade again. The old carve-out kept the brand on the seat and let it re-fire. One-shot-per-match follows from the ruling but is a real nerf — confirm it is wanted before it ships.
+- Should the visible swap-back get the same engineering the ruling bought for Fair Trade (resolution 31: "a die that visually still reads borrowed after it's mechanically the player's own again is exactly the state-lies-about-truth problem")? Today the traded die keeps its old material and brand in the kept tray until the next throw, because reDrawDieFace only does pips and the 3D mesh bakes the brand at creation.
+- Runs saved before this patch already have a Trade baked permanently into S.run.dice, with no record of what was swapped. Let those runs ride, or is a coarse migration (e.g. refund the enchant's 350g the way _enchInit's _enchV=2 migration refunds retired enchants) worth it?
+- Break's half of the same ruling — "the destroyed die returns fully restored at the start of the player's NEXT match" — is NOT addressed here. `_breakDie` -> `_removeDieAt(lane,{permanent:true})` (16612) still splices S.run.dice and S.run.dieEnch for good. That is a separate item and needs its own return-at-next-match hook; flagging it so it is not assumed covered by this patch.
+
+_14 further questions. Nothing here blocks work in progress._
