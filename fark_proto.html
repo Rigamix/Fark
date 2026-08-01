@@ -10554,7 +10554,12 @@ const RUNGS=[
     cardPool:['her_lucky_coin','one_more_round','grogs_bump'],cardCount:2,cardChance:1,
     /* GROG — ZERO HOUR (was Last Call, which tested weakest in the roster).
        Same theme, urgency, but aimed at a system that now exists. */
-    tell:{id:'last_call',name:'ZERO HOUR',desc:"“Take a marked face at my table and your turn is over.”",icon:'🍻'}},
+    /* "marked" -> "enchanted": a mark on a die is an enchant now, and this
+       rule was always about a branded face - G._zeroHourEnds is set from inside
+       the enchant-icon fire path. The old wording is also why the designer had
+       to ask what Zero Hour even was: its only explanation leaned on a word the
+       game never defines. */
+    tell:{id:'last_call',name:'ZERO HOUR',desc:"“Take an enchanted face at my table and your turn is over.”",icon:'🍻'}},
   {id:1,name:'MABEL',key:'peasant',icon:'👨‍🌾',tier:'regular',target:5600,gold:175,buyIn:20,
     boss:null,bossDesc:null,
     agg:.58,cardRarity:'tin',wager:true,wagerCount:1,wagerMode:'best',minBank:200,diceStop:2,chaotic:false,adaptive:false,
@@ -10600,7 +10605,14 @@ const RUNGS=[
        die loses its FAMILY trait for the match; its enchant still fires.
        Sim, Obsidian only: strips ~644 points, ~14.5% of that build's match
        value. The other families' suppression is inferred, not validated. */
-    tell:{id:'confession',name:'STILL WATERS',desc:"“A worked die forgets what it was made of.”",icon:'⛪'}},
+    tell:{id:'confession',name:'STILL WATERS',/* "A WORKED DIE" WAS TRUE UNTIL P412 AND IS NOW FALSE. Still Waters used
+       to hush only branded dice - that was the bug ruling D closed, because it
+       punished exactly the dice the player had paid to enchant while a plain
+       one of the same family sailed through. It now hushes by MATERIAL FAMILY,
+       brand irrelevant, so the copy has to say every die and not a worked one.
+       Caught by reading the eight tell descriptions back out of the live table
+       during the seal/mark sweep, not by the sweep itself. */
+    desc:"“Every die at my table forgets what it was made of.”",icon:'⛪'}},
   {id:6,name:'WHISPER',key:'noble',icon:'👑',tier:'renowned',target:11250,gold:950,buyIn:140,
     boss:null,bossDesc:null,
     agg:.84,cardRarity:'gold',wager:true,wagerCount:2,wagerMode:'best',minBank:800,diceStop:1,chaotic:false,adaptive:true,
@@ -10616,7 +10628,9 @@ const RUNGS=[
        of shape, only a change of size. Break and Trade never double. The bark
        lost "for both of us" with the rescope - it was describing a rule the
        engine has no way to run. */
-    tell:{id:'counterfeit',name:'KINDRED',desc:"“Marked dice sing louder at my table.”",icon:'💀'}},
+    /* Kindred was already describing enchants under the old word -
+       _kindredActive grants on 2+ ENCHANTED dice, counted from S.run.dieEnch. */
+    tell:{id:'counterfeit',name:'KINDRED',desc:"“Enchanted dice sing louder at my table.”",icon:'💀'}},
   {id:7,name:'AMBROSE',key:'bishop',icon:'✝️',tier:'renowned',target:12500,gold:1300,buyIn:200,
     boss:null,bossDesc:null,
     agg:.88,cardRarity:'gold',wager:true,wagerCount:3,wagerMode:'all',minBank:900,diceStop:1,chaotic:false,adaptive:true,
@@ -10996,7 +11010,10 @@ function _applySeal(){
       if(t.id==='in_arrears')G._tellState.totalRollCost=0;
     }
   }
-  famLog('SEALED SEAT — '+G._sealRule.toUpperCase().replace(/_/g,' ')+' RULES THE TABLE, BOTH SIDES');
+  /* THE CURSE, not SEALED SEAT - the word is retired for this meaning. Not
+     "CURSED TABLE" either: that is now the tavern card's name and the two would
+     collide in the log. */
+  famLog('THE CURSE — '+G._sealRule.toUpperCase().replace(/_/g,' ')+' RULES THIS TABLE, BOTH SIDES');
 }
 function _applyTellAndSleeve(){_applyTell();_applySeal();_applySleeve();}
 function _applyTell(){
@@ -12257,8 +12274,21 @@ var FAM_CARDS=[
   text:['Borrow 250 gold from the innkeep right now. Owe 400 by last orders, or it costs a chalk circle.','','']},
  {id:'hair_of_the_dog',fam:'tavern',kind:'passive',name:'Hair of the Dog',
   text:['Lose a match, and your first bank next match is doubled.','','']},
- {id:'marked_table',fam:'tavern',kind:'passive',name:'Marked Table',
-  text:['The sealed seat pays THREE circles instead of two.','','']},
+ /* CURSED TABLE, not Marked Table. Two renames land on this one card: the
+     cursed seat is no longer a seal, and a mark on a die now means an enchant -
+     so a card called Marked Table read like an enchant card. The brief already
+     ships it under this name. Only the DISPLAY name moves; the id marked_table
+     is load-bearing at three famOwnTier call sites and stays. */
+  {id:'marked_table',fam:'tavern',kind:'passive',name:'Cursed Table',
+  /* Rewritten because the old line named an object the game never shows. A
+     probe scraped the whole night screen and found no visible text saying
+     "seal" or "sealed seat" anywhere - the cursed patron announces itself with
+     smoke and a tell line, so "the sealed seat" pointed at nothing on screen.
+     The rule as measured: a normal patron win chalks ONE circle, the cursed
+     patron chalks two, three with this card - and losing to the cursed patron
+     rubs one out. This card only changes the WIN side, so the copy only claims
+     the win side. Names the smoke, which is what a player can point at. */
+  text:['Beat the patron the smoke clings to and the board chalks you THREE circles, not two.','','']},
  {id:'high_table',fam:'tavern',kind:'passive',name:'High Table',
   text:['When you sit down, raise the match target by 500 for both sides. Win: the pot pays half again more, and GREEDY or BULLISH patrons pay double.','','']}
 ];
@@ -13938,7 +13968,7 @@ function _gbSeatTile(pat,i,n,buy,compact){
   return '<div class="gbx-box" style="'+sz+';cursor:pointer;position:relative'
     +(sealed?';border:3px solid #222':'')+(pat.grudge?';border:3px solid #8a2d2d':'')+'" onclick="_gbPeek('+i+')">'
     +disp+'<br><span class="gbx-label">'+(compact?'':(_TRAIT_SYMBOL[pat.persona]||'')+' '+word+'<br>')
-    +buy+'g'+(sealed?' · SEALED':'')+(pat.grudge?' · GRUDGE':'')+'</span></div>';
+    +buy+'g'+(sealed?' · CURSED':'')+(pat.grudge?' · GRUDGE':'')+'</span></div>';
 }
 /* ── sheet / modal infra ── */
 function _gbSheetInfra(){
@@ -14012,13 +14042,13 @@ function _gbPeek(i){
     +'<div class="gbx-box sub" style="flex:1;height:40px">pot '+(reward+buy)+'g</div></div>';
   if(sealed&&tellD){
     var circ=(famOwnTier('marked_table')>0)?'THREE circles':'2 circles';
-    h+='<h2>the seal — one rule, both sides</h2>'
+    h+='<h2>the curse — one rule, both sides</h2>'
       +'<div class="gbx-box sub" style="min-height:44px;font-size:12px;padding:8px;border:2px solid #222">'
       +tellD.icon+' '+tellD.name+' — '+tellD.desc+'</div>';
   }
   if(S.run._fkArmed)h+='<div class="gbx-box sub" style="height:30px;font-size:12px;margin-top:8px;border:2px solid #8a2d2d">FOR KEEPS — this match is for dice</div>';
   h+='<div class="gbx-btn primary" style="height:60px;margin-top:12px" onclick="_gbSheetClose();launchSeat('+i+')">SIT DOWN — '+buy+'g'
-    +(sealed?' · sealed: win '+((famOwnTier('marked_table')>0)?'3':'2')+' circles / lose 1':'')+'</div>';
+    +(sealed?' · cursed: win '+((famOwnTier('marked_table')>0)?'3':'2')+' circles / lose 1':'')+'</div>';
   _gbSheetOpen(h);
 }
 /* ── boss peek sheet (flow spec 4) ── */
@@ -14967,7 +14997,7 @@ var PATRON_LINES=[
   {p:'boss:aldric:loss',s:1,t:"Twice bested. I begin to suspect thy cleverness needs no quieting at all."},
   {p:'boss:aldric:loss',s:1,t:"A worthy return match. I'll not pretend otherwise."},
   {p:'boss:whisper:win',s:0,t:"Mm. Predictable, in the end. I do so enjoy being right."},
-  {p:'boss:whisper:win',s:0,t:"Marked dice sing loudest right before they lose. Didn't you notice?"},
+  {p:'boss:whisper:win',s:0,t:"Enchanted dice sing loudest right before they lose. Didn't you notice?"},
   {p:'boss:whisper:win',s:1,t:"Back again. I do love a repeat performance."},
   {p:'boss:whisper:win',s:1,t:"Same result, different night. I'm not complaining."},
   {p:'boss:whisper:loss',s:0,t:"Oh. Well played. I'll remember that."},
@@ -15373,7 +15403,7 @@ function _ptOpenPanel(st){
   sheet.classList.toggle('sealed',!!st.sealed);
   var winsEl=document.getElementById('ptvWins');
   {/* every patron shows their win diamonds: 1 normally, 2 sealed
-      (3 with Marked Table), heat-tinted by how close they bring you */
+      (3 with Cursed Table), heat-tinted by how close they bring you */
     var circ=st.sealed?((typeof famOwnTier==='function'&&famOwnTier('marked_table')>0)?3:2):1;
     var _need=(TIERS[S.run.tier]&&TIERS[S.run.tier].pointsNeeded)||0;
     var _rem=_need-((S.run.points||0)+circ);
