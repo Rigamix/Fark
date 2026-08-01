@@ -7,6 +7,91 @@ Ordered by whether it's blocking me, not by size.
 
 ---
 
+## 0. FOR THE TEAM — Grog's badge, and opponent-side enchants
+
+*This one is written to be circulated. It is self-contained; you can paste this
+section on its own.*
+
+### The situation
+
+Grog is the **first boss** — rung 0, target 3,700, buy-in 10. His badge rule is
+**ZERO HOUR**: while worn, keeping any enchanted die's icon face immediately ends
+that side's turn. It replaced Last Call, which tested as the weakest tell in the
+roster.
+
+### Two problems, found in code, not in theory
+
+**1. The rule can only ever point one way.** `_iconFire` is called from exactly
+two places and both pass the player side. `_zeroHourClose` is called from
+`handleRoll` and `handleBank` — both player paths. There is no opponent enchant
+array anywhere; `G._enchArr` is the player's. So a badge whose governing law is
+*"a SYMMETRIC house rule for the whole match: binds both sides"* is in practice a
+one-way self-tax.
+
+This is the **fourth** casualty of the same missing system. The enchant brief's
+open item 8 already lists three clauses made unreachable by "no opponent-side
+enchants exist in the engine" — Kindred (rescoped), First Strike (redesigned),
+and enchanted patron dice (deferred). Zero Hour has the same defect and was not
+on that list.
+
+**2. It arrives before the system it points at.** Grog is night one. The player
+is on a starter die and has bought nothing. Grog's own loadout is
+`bone, bone, bone, iron, iron, iron` — all mundane. **Neither side has an enchant
+at that point, and neither side can.** So even after opponent-side enchants are
+built, Zero Hour remains a no-op at Grog's tier specifically.
+
+Those two are independent. Fixing the first does not fix the second.
+
+### Already decided
+
+**Opponent-side enchants get built.** Denis: *"opponents SHOULD have enchants
+anyway."* That closes problem 1 for the whole badge system and lets Kindred and
+First Strike recover their original, richer designs. It is a feature — NPCs
+owning brands, an AI keep-policy for icon faces — not a patch.
+
+### THE QUESTION FOR THE TEAM
+
+**What rule should Grog carry, given he is the first fight in the run?**
+
+The first boss is the game's teaching fight. Whatever he carries is the first
+house rule a player ever meets, and it has to bite with plain dice — which is
+exactly what Zero Hour cannot do.
+
+**Option A — Grog gets a rule that works on mundane dice; Zero Hour moves to a
+late boss.** *(recommended)*
+A badge's physical identity belongs to its boss and only the rule ID moves — the
+brief already establishes this, and says no new badge art is needed. Zero Hour
+lands somewhere the player actually owns brands. This also composes with two
+problems we already have: Corvus's First Strike is flagged in the brief as "a
+downgrade nobody signed off on", and Corvus's In Arrears was the only gold-tax in
+the roster and now has no home. So it is one three-way reshuffle instead of three
+separate fixes.
+*Open sub-question if we take A: what does Grog carry?* The original Last Call
+(banks under 500 don't count) worked and taught the right lesson — it just tested
+weak. A retuned Last Call is the low-risk answer.
+
+**Option B — Give Zero Hour a floor so it can never be a no-op.**
+It also ends the turn on the Nth roll, brands or not. Works at every tier and
+sharpens as the player brands up. Risk: it is close to Brutus's Drill Order
+(three rolls a turn), so two of eight badges would be roll-limiters.
+
+**Option C — Leave Zero Hour on Grog and accept it is inert until late.**
+Only defensible if we expect players to re-fight Grog wearing it, or to face him
+late. Worth stating out loud so it is a choice rather than an oversight.
+
+**Option D — Escalate the tier.** Give bosses brands as part of the
+opponent-enchant work, including Grog. Rejected as written: a night-1 boss with
+an enchanted die contradicts the progression curve everything else follows.
+
+### What I need back
+
+1. Which option for Grog — A, B, C or D.
+2. If A: what rule does Grog get, and which boss inherits Zero Hour?
+3. Is opponent-side enchant support scheduled now, or after the pricing pass? It
+   gates Kindred and First Strike recovering their real designs.
+
+---
+
 ## A. Ratify (or overturn) three calls I already shipped
 
 These are live in the build right now. I made them because the work couldn't
