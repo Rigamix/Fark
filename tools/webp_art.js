@@ -14,6 +14,15 @@
  *     | python <decode the setup: line>
  */
 const JOBS = [
+  /* THE WIN SCREEN, four layers. The background is 1536x2720 and 5.5 MB as a
+     PNG - far too heavy for a screen that appears after every won match, and
+     the alpha layers above it (banner, hands, panel) are cut-outs, so quality
+     is kept high on those and the background carries the compression. */
+  { dir: 'Art/Assets/Win/Standard/', files: [
+    ['win_standard_bg.png', 0.86],
+    ['win_standard_banner.png', 0.92],
+    ['win_standard_hands.png', 0.92],
+    ['win_standard_panel.png', 0.92] ] },
   /* THE MATCH TABLE. The game has been rendering assets/Environment_ART/
      match.png - 1064x1920, dated 07-11, from the previous version's asset
      folder - while the current master is Table_new.png at 1080x2011 (07-27).

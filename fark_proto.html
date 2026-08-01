@@ -3599,6 +3599,97 @@ body.crit-dilate{animation:critDilate .55s ease-out both}
 }
 
 /* ─── END MATCH OVERLAY ─── */
+/* ═══ THE PAINTED WIN SCREEN ═══════════════════════════════════════════
+   Layers sit at z-index 0 and everything already on this overlay is lifted
+   above them. The art only appears on a win (body gets .win-art-on from
+   showEnd); a loss keeps the plain dark screen it already had, because there
+   is no painting for it yet and half-dressing a defeat reads worse than not
+   dressing it.
+   COVER, NOT CONTAIN, on the background: the room is painted to bleed off the
+   edges and a letterboxed tavern would show the page behind it. The three
+   cut-out layers are positioned in per cent of the SCREEN so they hold their
+   relationship to each other on any aspect - they were painted as one
+   composite, so they move together or not at all. */
+/* #end-ov IS SELECTOR-QUALIFIED HERE ON PURPOSE. `#end-ov>*{position:relative}`
+   sits further down this sheet and catches every direct child, which collapsed
+   this layer to 0x0 - relative, with only absolute children, so no content to
+   size from. A bare .win-art loses that fight on specificity. The comment a few
+   rules below records the same rule catching something else out before. */
+#end-ov .win-art{position:absolute;inset:0;z-index:0;pointer-events:none;
+  opacity:0;transition:opacity .45s ease}
+#end-ov.win-art-on .win-art{opacity:1}
+.win-art img{position:absolute;left:50%;transform:translateX(-50%);
+  image-rendering:auto;/* the painting is not pixel art - let it resample */
+  -webkit-user-drag:none;user-select:none}
+.win-bg{top:0;width:100%;height:100%;object-fit:cover;object-position:50% 50%}
+.win-banner{top:2.5%;width:95%}
+.win-hands {top:16%;width:100%}
+.win-panel {top:38%;width:68%}
+/* the board is where the numbers live, so it must not be swallowed by the
+   scanline veil that sits over this overlay */
+#end-ov .res-title,#end-ov .res-scores,#end-ov .res-gold-wrap{z-index:3}
+
+/* ── THE BOARD ── the hanging panel is the only writable surface in the
+   painting, so the run's three numbers live on it: what you scored, what you
+   won, and how many chalk circles it was worth. Positioned inside the panel's
+   painted cream area (the panel image spans 38-58.7% of the screen; its board
+   face is inset from that). INK, NOT GOLD: the board is parchment and the
+   overlay's usual gold-on-dark is unreadable on it. */
+/* ON THE CREAM FACE, NOT ON THE IMAGE. The panel PNG spans 38-58.7% of the
+   screen but includes the ropes it hangs from, so its top is empty air - the
+   sign starts near 46% and its writing face runs about 49.5-58%. A ROW, not a
+   column: the sign is wide and short, and stacked the three numbers spilled
+   over its top rail into the shield. */
+#end-ov .win-board{position:absolute;z-index:3;left:19%;width:62%;top:50%;height:8%;
+  display:none;flex-direction:row;align-items:center;justify-content:space-around;
+  gap:.2em;pointer-events:none;text-align:center}
+#end-ov.win-art-on .win-board{display:flex}
+.win-board .wb-score{font-family:var(--font-px);font-size:clamp(26px,8vw,44px);
+  color:#3b2a16;line-height:1;text-shadow:0 1px 0 rgba(255,245,220,.5)}
+.win-board .wb-gold{display:flex;align-items:center;gap:.35em;
+  font-family:var(--font-px);font-size:clamp(15px,4.6vw,24px);color:#7a5a1e}
+.win-board .wb-coin{width:1em;height:1em;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%,#ffe9a8,#d8a83c 60%,#9a6f1c);
+  box-shadow:0 0 0 1px rgba(90,62,14,.7) inset}
+.win-board .wb-dmds{display:flex;gap:.3em;align-items:center;height:1.1em}
+.win-board .wb-dmds img{height:100%;width:auto;-webkit-user-drag:none}
+
+/* ── EVERYTHING THE PAINTING REPLACES ── the scores printed across the WON
+   scroll and the feat rows ran over the hands, because both are positioned for
+   a screen with no art behind them. On a win the board says it instead; on a
+   loss they are untouched. */
+/* the board says these instead on a win; on a loss they are untouched.
+   (.res-feats used to be listed here too - the element itself is gone now,
+   see the note where the builder was.) */
+#end-ov.win-art-on .res-scores,
+#end-ov.win-art-on .res-gold-wrap{display:none!important}
+
+/* ── BELOW THE BOARD ── the panel's lower edge is at 58.7%, so the draft
+   starts under it rather than on top of it, and the whole lower stack is
+   pulled tighter to fit the room the painting leaves. */
+/* THE ROOM THE PAINTING LEAVES is everything under the panel's lower edge -
+   58.7% to the bottom, 41% of the screen, and it has to hold the offer, the
+   deck and the button. At the old 94% width the three cards measured 40% tall
+   and ended at 101.9%, off the screen. 62% brings them to about 26%:
+     cards 60.5-86    deck 86.5-93    button 93.5-99 */
+#end-ov.win-art-on .res-card{top:60.5%!important;width:62%!important}
+
+/* ── YOUR DECK, AS A HAND ── three full-size dashed boxes in a row read as a
+   second offer competing with the real one. Overlapped and tilted they read as
+   what they are: the cards you already hold, shown so you can see what a new
+   one would replace. Still full drop targets - only the look changes, the
+   drag-and-drop and the tap-to-focus are untouched. */
+#end-ov.win-art-on .end-draft-slots{margin-top:4px;margin-bottom:2px;gap:0;
+  transform:scale(.62);transform-origin:50% 0}
+#end-ov.win-art-on .end-draft-slots .draft-slot{margin-left:-16px;
+  transition:transform .18s ease,margin .18s ease}
+#end-ov.win-art-on .end-draft-slots .draft-slot:first-child{margin-left:0;transform:rotate(-6deg)}
+#end-ov.win-art-on .end-draft-slots .draft-slot:nth-child(2){transform:translateY(-6px)}
+#end-ov.win-art-on .end-draft-slots .draft-slot:last-child{transform:rotate(6deg)}
+/* the spread opens up when a card is being dragged over it, so the overlap
+   never hides the slot you are aiming at */
+#end-ov.win-art-on .end-draft-slots .draft-slot.drop-hover{transform:translateY(-14px) scale(1.06);z-index:5}
+
 #end-ov{
   display:none;position:fixed;inset:0;z-index:9500;
   background:#0c0a06;
@@ -8926,6 +9017,25 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
 
 <!-- END MATCH OVERLAY -->
 <div id="end-ov">
+  <!-- THE PAINTED WIN SCREEN, four layers in painted order. They are separate
+       images because they overlap in depth rather than tile: the panel hangs
+       from ropes that pass behind the hands, and the hands meet in front of the
+       banner's lower edge. Everything the screen already had - score, gold,
+       cards, buttons - sits in front of all four. Only shown on a WIN; a loss
+       keeps the plain dark treatment, so the class is toggled in showEnd. -->
+  <div class="win-art" aria-hidden="true">
+    <img class="win-bg"     src="assets/win/bg.webp?v=1"     alt="">
+    <img class="win-banner" src="assets/win/banner.webp?v=1" alt="">
+    <img class="win-hands"  src="assets/win/hands.webp?v=1"  alt="">
+    <img class="win-panel"  src="assets/win/panel.webp?v=1"  alt="">
+  </div>
+  <!-- What the board says. Filled by showEnd on a win; hidden on a loss,
+       where the old .res-scores / .res-gold-wrap treatment still runs. -->
+  <div class="win-board" id="winBoard">
+    <div class="wb-score" id="wbScore">0</div>
+    <div class="wb-gold"  id="wbGold"><span class="wb-coin"></span><span id="wbGoldNum">0</span></div>
+    <div class="wb-dmds"  id="wbDmds"></div>
+  </div>
   <!-- Pouch button moved into the bottom action row next to SKIP/CONTINUE
        (see _endDraftActionsHtml). Floating top-right FAB removed per
        player feedback to consolidate UI. -->
@@ -8945,7 +9055,6 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
     <div class="res-coin-big" id="resCoinBig"><div class="res-coin-sheen"></div></div>
     <div class="res-gold-text" id="resGoldText"></div>
   </div>
-  <div class="res-feats" id="resFeats" style="display:none"></div>
   <div class="res-card" id="resCard"></div>
   <div id="resDlg"></div>
   <div id="end-btns">
@@ -27921,9 +28030,17 @@ function endMatch(win){
   var ov=document.getElementById('end-ov');
   /* (Pouch button now lives inline in the .end-draft-actions row — see
      _endDraftActionsHtml. Old top-right FAB removed.) */
+  /* THE PAINTING IS FOR WINS ONLY. There is no defeat art yet, and a
+     half-dressed loss screen - a celebration room with the wrong word on it -
+     reads worse than the plain dark one it already had. The banner itself says
+     WON, so it cannot be reused either way. */
+  ov.classList.toggle('win-art-on',!!win);
   var resTitle=document.getElementById('resTitle');
   resTitle.className='res-title '+(win?'win':'lose');
-  resTitle.textContent=win?'VICTORY':'DEFEAT';
+  /* the banner already says WON, so a VICTORY heading on top of it is the
+     same word twice - the title steps aside on a win and keeps its job on a
+     loss, where there is no art to say it */
+  resTitle.textContent=win?'':'DEFEAT';
   resTitle.style.animation='none';resTitle.style.opacity='0';
   /* Reset scores visibility and position for animation */
   var resScores=ov.querySelector('.res-scores');if(resScores){resScores.classList.remove('fade-in','lifted');resScores.style.opacity='0';}
@@ -27988,9 +28105,13 @@ function endMatch(win){
       var eased=1-Math.pow(1-t,2.4);
       var cur=Math.floor(eased*target);
       resGoldText.textContent='+'+cur+'g';
+      /* the board counts up with it - same source, so the two numbers cannot
+         drift apart the way a recomputed reward would */
+      var _wbG=document.getElementById('wbGoldNum');if(_wbG)_wbG.textContent=cur;
       if(t<1){requestAnimationFrame(step);}
       else{
         resGoldText.textContent='+'+target+'g';
+        var _wbG2=document.getElementById('wbGoldNum');if(_wbG2)_wbG2.textContent=target;
         /* Pop bounce on land */
         resGoldText.classList.remove('pop');void resGoldText.offsetWidth;
         resGoldText.classList.add('pop');
@@ -28006,6 +28127,30 @@ function endMatch(win){
       }
     }
     requestAnimationFrame(step);
+  }
+
+  /* ── FILL THE BOARD (win only) ── the three numbers Denis asked the panel to
+     carry: what you scored, what you won, and how many chalk circles it was
+     worth. The diamond is the same SitDown_diamond art the sit-down button and
+     the pin button already use, so the mark for "a point on the board" reads
+     the same everywhere it appears rather than being a new symbol here. */
+  if(win){
+    try{
+      var _wbS=document.getElementById('wbScore');
+      if(_wbS)_wbS.textContent=(G.pPts||0).toLocaleString();
+      var _wbD=document.getElementById('wbDmds');
+      if(_wbD){
+        _wbD.innerHTML='';
+        for(var _di=0;_di<pointsEarned;_di++){
+          var _im=document.createElement('img');
+          _im.src='Art/Assets/Panels/optimized/SitDown_diamond_opt.webp';
+          _im.alt='';_wbD.appendChild(_im);
+        }
+      }
+      /* the gold number is written by the coin animation further down, which
+         also drives .res-gold-text - read it from the same place rather than
+         recomputing the reward and risking the two disagreeing */
+    }catch(e){}
   }
 
   /* ── Animation sequence ── */
@@ -28246,71 +28391,17 @@ function endMatch(win){
   /* Fully remove the wrap after the fade so layout doesn't hold space */
   setTimeout(function(){if(resGoldWrap)resGoldWrap.style.display='none';},320);
 
-  /* Feats reveal — slot in where the coins just were. The fullscreen
-     splash for newly-earned feats already fired earlier (immediately when
-     endMatch ran, see the call right after evaluateFeats). Here we just
-     render the listed-out feat rows in the victory panel. */
-  if(win){
-    var rf=document.getElementById('resFeats');
-    if(rf){
-      var fhtml='';
-      if(_featsEarned && _featsEarned.length>0){
-        _featsEarned.forEach(function(f,i){
-          fhtml+='<div class="res-feat-row" style="animation-delay:'+(i*0.15)+'s">';
-          fhtml+='<span class="res-feat-star">⭐</span>';
-          fhtml+='<span class="res-feat-label">'+f.label+'</span>';
-          fhtml+='<span class="res-feat-desc">'+f.desc+'</span>';
-          fhtml+='<span class="res-feat-renown">+'+f.renown+'</span>';
-          fhtml+='</div>';
-        });
-      }else{
-        /* No feats earned — innkeeper-voice fallback so the panel
-           isn't an awkward empty space between scores and cards. Lines
-           mention feats/renown explicitly so it's clear what she means. */
-        var _noFeatLines=[
-          '"No feats tonight, love \u2014 but a win\u2019s a win."',
-          '"Clean win, no renown to show for it. Still counts."',
-          '"Plain victory \u2014 no feats written in the books this round."',
-          '"Took it clean. No feats, but the coin\u2019s yours all the same."',
-          '"A quiet win. No renown from the bards, just a good night."'
-        ];
-        var _line=_noFeatLines[Math.floor(Math.random()*_noFeatLines.length)];
-        fhtml='<div class="res-no-feat">'+_line+'</div>';
-      }
-      rf.innerHTML=fhtml;
-      rf.style.display='flex';
-      var _noFeats=!(_featsEarned&&_featsEarned.length>0);
-      requestAnimationFrame(function(){
-        rf.classList.add('show');
-        /* Position res-card. Big screens: keep the original 0.44 floor + 18px
-           gap (the layout was perfect there). Small phones: tighten the floor
-           and gap so the SKIP button isn't cropped, especially with the
-           reshuffle icon present. Very-short viewports (iPhone SE 1st gen)
-           get an even tighter floor since 5 slots + skip overflow otherwise. */
-        var rcEl=document.getElementById('resCard');
-        var isSmall=window.innerWidth<=380;
-        var isShort=window.innerHeight<=620;
-        var floorPct=(isSmall&&isShort)?0.30:(isSmall?0.36:0.44);
-        var defaultTopPct=floorPct*window.innerHeight;
-        /* No-feats mode: center the innkeeper line vertically between the
-           scores and the card (instead of leaving it hugging the scores
-           as if the panel were full of feat rows). */
-        if(_noFeats){
-          var scoresEl=document.querySelector('#end-ov .res-scores');
-          var scoresBottom=scoresEl?scoresEl.getBoundingClientRect().bottom:(0.15*window.innerHeight);
-          var midpoint=(scoresBottom+defaultTopPct)/2;
-          var rfH=rf.getBoundingClientRect().height;
-          rf.style.top=Math.max(scoresBottom+12,midpoint-rfH/2)+'px';
-        }
-        if(rcEl){
-          var rfRect=rf.getBoundingClientRect();
-          var gap=isSmall?6:18;
-          var minTopPx=rfRect.bottom+gap;
-          rcEl.style.top=Math.max(minTopPx,defaultTopPct)+'px';
-        }
-      });
-    }
-  }
+  /* THE FEATS LIST IS GONE. It printed five rows of name, description and
+     renown across the painted hands, and it is retired rather than merely
+     moved: feats stopped announcing themselves in P414 and the wall is the
+     surface for them now.
+     Deleted rather than left behind an `if(false)`, which is the house idiom
+     and would have been the easier edit - but P414's whole finding was that a
+     producer left wired is how the last "removed" overlay survived removal.
+     The innkeep's no-feats lines were real writing and are in git history.
+     It was also doing LAYOUT: it measured itself and then wrote an inline
+     rcEl.style.top to push the offered cards below it, which is why they
+     carried an inline position at all. The painting composes them now. */
 
   /* Boss loss: show card greying + dialogue inside end screen.
      No feats panel on loss, so pull the lost card UP closer to the
