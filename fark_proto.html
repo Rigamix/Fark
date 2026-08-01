@@ -9175,11 +9175,30 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
    it in Safari 18; before that the assignment silently does nothing, which
    quietly broke both the selection glow and the dice ground shadows on
    iPhones. Tested once, cached. */
+/* DRAW IT, DO NOT ASK IT. The old test assigned 'blur(2px)' and read it back.
+   On an engine that never implemented the attribute there is no accessor to
+   intercept the write, so the assignment merely creates an ordinary property on
+   the context object and reading it returns the same string - THE TEST ANSWERED
+   TRUE ON EXACTLY THE IPHONES IT WAS WRITTEN TO CATCH, and every no-filter
+   branch downstream of it was dead code there. That is three reports of no
+   selection glow on iOS, and two correct fixes that were never reachable.
+   Measured with the prototype accessor deleted to stand in for an older WebKit:
+   the old string test still said true while the sampled pixel held alpha 0,
+   against 13 with a blur that really ran. In that state the selection glow fell
+   from 22,321 lit pixels to 2,414 - the 2.8px stroke and nothing else, no halo
+   - while the stroke fallback this gate exists to select paints 25,394.
+   Behavioural test: lay a square, blur it hard, sample 12px clear of it. Only a
+   blur that really ran reaches there, and a phantom property cannot fake it. */
 function _cfBlur(){
   if(window.__cfBlur===undefined){
-    try{var c=document.createElement('canvas').getContext('2d');
-        c.filter='blur(2px)';window.__cfBlur=(c.filter==='blur(2px)');}
-    catch(e){window.__cfBlur=false;}
+    try{
+      var c=document.createElement('canvas');c.width=64;c.height=64;
+      var x=c.getContext('2d');
+      x.filter='blur(8px)';
+      x.fillStyle='#fff';x.fillRect(24,24,16,16);
+      x.filter='none';
+      window.__cfBlur=(x.getImageData(12,32,1,1).data[3]>2);
+    }catch(e){window.__cfBlur=false;}
   }
   return window.__cfBlur;
 }
