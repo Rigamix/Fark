@@ -24696,9 +24696,52 @@ function _tryBustSave(free){
    brief 1000ms experiment — player clarified the "dice invisible BEFORE
    busting" complaint isn't about the post-bust delay, so longer pause
    doesn't help and just slows down the bust feedback. */
+/* HAS THE ROW STOPPED? A die is finished only when the 3D layer has frozen its
+   landing pose into d.phys. d.roll alone cannot answer this: measured on the
+   rival's second throw, the old gate fired while D3X._waitQ still held that
+   very batch, unstarted, with only 2 of the 6 dice in the row carrying a pose.
+   "No tape" meant "not thrown yet" and the old test read it as "landed".
+   So count POSES against the dice actually standing in the row - then "not
+   started" and "still flying" both correctly read as unfinished.
+   Early-outs first: with the 3D layer absent, failed, still booting, or physics
+   off, no die will ever carry a pose and the honest answer is yes. */
+function _rowSettled(sel){
+  try{
+    if(typeof D3X==='undefined'||!D3X||!D3X.ready||D3X.fail)return true;
+    if(!D3X.PHYS||!D3X.PHYS.on||!D3X.dice||!D3X.dice.length)return true;
+    var row=document.querySelector(sel);if(!row)return true;
+    var n=row.getElementsByClassName('die').length;if(!n)return true;
+    var flying=0,landed=0;
+    D3X.dice.forEach(function(d){
+      if(!d.chip||!d.chip.closest||!d.chip.closest(sel))return;
+      if(d.roll)flying++;else if(d.phys)landed++;
+    });
+    return flying===0&&landed>=n;
+  }catch(e){return true;}
+}
+/* Run fn once the named row has stopped, then a beat. CAP is the escape for a
+   die that never gets a pose at all - a face swapped by a card with no throw, a
+   renderer that dies mid-match. 4200 is _afterOppSettle's existing cap. */
+function _afterRowSettle(sel,beat,fn){
+  var t0=Date.now(),CAP=4200;
+  (function poll(){
+    if(typeof G==='undefined'||!G||G._endMatchFired)return;/* ghost-timer guard */
+    if(!_rowSettled(sel)&&Date.now()-t0<CAP){setTimeout(poll,60);return;}
+    setTimeout(fn,beat);
+  })();
+}
 var BUST_PAUSE_MS=600;
 function _delayedDoBust(_freeArr){
-  setTimeout(doBust,BUST_PAUSE_MS);
+  /* THE PAUSE STARTS WHEN THE DICE STOP, not when the roll animation's fixed
+     budget runs out. Measured on a forced bust: the word BUST hit the screen
+     1119ms after the ROLL tap - _rollDur 480 plus BUST_PAUSE_MS 600 plus the
+     20ms hop inside doBust - while the dice were still tumbling until 2037ms.
+     The verdict landed 918ms BEFORE the throw it was judging. The tape is
+     data-dependent - 102 frames, 1700ms, with 120ms before playback even began,
+     and D3X.PHYS.cap allows 700 - so no fixed number covers it.
+     Only doBust moves. Every player bust route funnels through here, so this is
+     the one place that has to change and the state machine is untouched. */
+  _afterRowSettle('#playerDiceRow',BUST_PAUSE_MS,doBust);
 }
 function doBust(){
   /* Ghost-timer guard (see startPTurn) */
@@ -26237,15 +26280,17 @@ function _afterOppSettle(fn){
   var t0=Date.now();
   setTimeout(function poll(){
     if(typeof G==='undefined'||!G||G._endMatchFired)return;/* ghost-timer guard */
-    var moving=false;
-    try{
-      if(typeof D3X!=='undefined'&&D3X.dice){
-        moving=D3X.dice.some(function(d){
-          if(!d.roll||!d.chip||!d.chip.closest)return false;
-          return !!d.chip.closest('#oppDiceRow');
-        });
-      }
-    }catch(e){moving=false;}
+    /* MOVING IS NOT THE QUESTION - FINISHED IS. d.roll exists only once the
+       solve has STARTED, and the start is not prompt: measured 1019ms after the
+       dice were appended, on the rival's second throw of a match, with the batch
+       parked in D3X._waitQ the whole time. The single sample at MIN landed
+       inside that gap, found no tape, and called the throw over - the rival then
+       selected, scored and busted over four dice that had not been thrown yet.
+       The probe caught the gate firing with waitQ 1 and landed poses 2 of 6.
+       That is why this looked correct on the first throw of a match and failed
+       on every reroll after it. _rowSettled counts landed poses against the
+       dice in the row, which is the distinction d.roll cannot make. */
+    var moving=!_rowSettled('#oppDiceRow');
     if(moving&&Date.now()-t0<CAP){setTimeout(poll,60);return;}
     setTimeout(fn,BEAT);
   },MIN);
