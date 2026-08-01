@@ -92,6 +92,128 @@ an enchanted die contradicts the progression curve everything else follows.
 
 ---
 
+## 0-B. ROUND TWO — from the answers and the expanded lore brief
+
+### Q1. Please send the current `FARK_ENCHANT_BADGE_REWORK.md` — BLOCKING
+
+The answers doc says Corvus's two problems (First Strike's downgrade, In
+Arrears' orphaned gold-tax) *"were already resolved together in the prior round
+— one badge, both halves of his identity restored."*
+
+**The copy I hold does not contain that resolution.** It still reads *"Flag this
+plainly: this is weaker and less interesting than the original race concept —
+worth a real decision"* and *"Removing it means no badge taxes gold anymore. If
+missed in playtest, needs a new home — not solved by this rework."*
+
+So I am working from a version behind yours. Without the current one I will
+either re-open something you consider closed or implement against stale text.
+This is the only genuinely blocking item here.
+
+### Q2. Zero Hour lands on Whisper — so where does Kindred go?
+
+The ruling is position-based: *"whichever boss holds the LAST slot before
+Ambrose."* Measured against the shipped ladder:
+
+| slot | boss | tell today |
+|---|---|---|
+| 0 | GROG | ZERO HOUR |
+| 1 | MABEL | STEEPED |
+| 2 | FINNICK | PICKPOCKET |
+| 3 | CORVUS | FIRST STRIKE |
+| 4 | BRUTUS | DRILL ORDER |
+| 5 | ALDRIC | STILL WATERS |
+| **6** | **WHISPER** | **KINDRED** |
+| 7 | AMBROSE | THE RECKONING |
+
+Last-before-Ambrose is **Whisper**, who already carries Kindred. So this is not
+a two-way swap, it is three-cornered — Grog and Whisper trade, and **Kindred is
+displaced with nowhere to go.**
+
+Worth noting Kindred is a poor fit for Grog's slot for exactly the reason Zero
+Hour was: it rewards a player with 2+ enchanted dice, which a night-one player
+does not have. Moving it to slot 0 recreates the problem we just solved.
+
+- **Kindred takes Grog's vacated slot anyway** — no; same no-op failure.
+- **Kindred swaps with Aldric's Still Waters (slot 5)** and Grog gets Last Call
+  back — Kindred stays late, Still Waters moves one slot later. *Recommended if
+  the intent was "Zero Hour goes late", since it keeps all three enchant-facing
+  badges in the late half.*
+- **Kindred retires** and Whisper's Counterfeit returns — it was never
+  validated, so this loses little, but it is a fourth rule change.
+- Or name the boss you want rather than the slot, and I will take it.
+
+### Q3. Retuned Last Call — what are the numbers?
+
+The ruling restores Grog's Last Call *"with corrected numbers"* because it
+*"only tested weak on magnitude, not on the idea itself."* It is currently dead
+code in the file (an `if(false)` block from when Zero Hour replaced it), so
+reviving it is cheap — but the retune is a design number I should not invent.
+
+Original: banks under 500 score zero. Options:
+- **Raise the floor** (e.g. 800), so it bites more often against Grog's target
+  of 3,700.
+- **Scale the floor with the target**, so it stays meaningful if targets move.
+  *Recommended* — it is the version that survives the target-curve work in C3.
+- Keep 500 and accept it as a gentle first lesson.
+
+### Q4. Boss win/loss counters — per-run or across runs?
+
+The lore doc asks for *"two independent stage counters per boss (times lost to
+them, times beaten them)"*. Every other counter in this system is per-run and
+resets, and the doc's own patron-progression section explicitly **rejects**
+cross-run memory as contradicting that.
+
+But within a single run you fight a given boss once, twice if you lose and
+retry — so per-run these are almost always 0 or 1, and the stage-1 lines
+(*"Back again? Some folk never learn the shape of a losing streak."*) would
+almost never fire.
+
+- **Cross-run**, persisted like feats. The lines read as written, but it is the
+  first cross-run state in the dialogue system. *Recommended — the stage-1 copy
+  is plainly written for a returning player.*
+- **Per-run**, consistent with everything else; accept that stage-1 lines are
+  rare and only appear on a boss retry.
+
+### Q5. Does the `greeting` pool apply to generic patrons too?
+
+The new rule: greeting is *"mandatory and exclusive on a patron's first-ever
+encounter in a run"*, with personal content only from the second encounter.
+
+Named patrons have a stage counter, so "first encounter" is well-defined. Most
+seats are **generic** algorithmic patrons with no identity that persists — for
+them every encounter is a first encounter, so they would never say anything but
+a greeting.
+
+- **Named patrons only**; generics keep the ambient pools. *Recommended.*
+- **Everyone**, and generics simply never progress past greeting.
+
+### Q6. Sequencing — the lore build against the eight playtest bugs
+
+The lore work is now a substantial build: a new `greeting` pool, the density
+ramp, the draw-rate cut, 72 trait-reaction lines, 158 win/loss lines with new
+boss counters, and a placement move to in-match pauses. The table holds 371 rows
+today; this roughly doubles it.
+
+Alongside it sit your eight playtest notes — several of which are "nothing
+happens when I do X" bugs (cards, NPC cards, the missing relic).
+
+- **Bugs first, lore second.** *Recommended* — dialogue on top of a game where
+  Honeytrap may not fire is decorating a broken room.
+- **Lore first**, since it is specced and ready to write.
+- **Interleave** — the cheap lore items (draw rate, greeting pool) alongside the
+  bug work, the big content pass after.
+
+### A correction, not a question
+
+The lore doc says the seed six *"remain unseatable until they have portraits"*
+and that scaling past 24 is *"the same kind of blocked."* **That is stale.** You
+sent those portraits and they went in — `PT_ART_POOL` holds **30** names, all
+seatable. Ferrand included, which the doc specifically wanted, since his
+conditional Grog-beaten line is the system's own worked example. No art blocker
+remains on the named cast.
+
+---
+
 ## A. Ratify (or overturn) three calls I already shipped
 
 These are live in the build right now. I made them because the work couldn't
