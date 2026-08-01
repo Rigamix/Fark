@@ -9696,10 +9696,23 @@ function _drainFeatUnlockQueue(onDone){
   if(!feats.length){if(onDone)onDone();return;}
   var _hasArt=function(f){return typeof FEAT_ART!=='undefined'&&FEAT_ART[f.id]&&typeof _featCeremony==='function'
     &&!(S.featsPinned&&S.featsPinned[f.id]);};
-  var withArt=feats.filter(_hasArt),plain=feats.filter(function(f){return !_hasArt(f);});
-  var seq=Promise.resolve();
-  if(withArt.length)seq=seq.then(function(){return _featCeremony(withArt);});
-  plain.forEach(function(f){seq=seq.then(function(){return _showFeatUnlock(f);});});
+  /* NO FULL-SCREEN SPLASH, EVER. P338 retired the feats CEREMONY but left this
+     second, louder overlay wired up, so the interruption never actually went
+     away - reported as STILL happening. Measured on a forced win from a live
+     patron seat: three back-to-back 2.4s bursts of #feat-ov at opacity 1 over
+     the loadout screen (CRUSHING WIN, LIGHTNING ROUND, ONE-TURN WONDER), 7.2
+     seconds of it.
+     TWO INDEPENDENT HOLES FED THAT, which is why filling in the missing art
+     would have fixed neither half. FEAT_ART names 12 ids while FEATS has 32,
+     so the other 20 could never take the silent route. And _hasArt also
+     required the feat not already be in S.featsPinned - which is LIFETIME -
+     while the award dedup S.run.feats is PER RUN, so even an arted feat fell
+     into the loud bucket on every run after the first.
+     All feats now award silently, which is what the ceremony's PIN button did
+     anyway. Progression is untouched: evaluateFeats wrote renown and
+     S.featsDone long before this runs, and the win panel's res-feats rows stay
+     the in-context readout. */
+  var seq=_featCeremony(feats.filter(_hasArt));
   seq.then(function(){if(onDone)onDone();});
 }
 /* Returns an ordered list of rank suffixes for dialogue lookup —
@@ -9729,6 +9742,15 @@ function awardRenown(amount, label){
 function _showFeatUnlock(feat,opts){
   opts=opts||{};
   return new Promise(function(resolve){
+    /* RETIRED, AND DELIBERATELY UNREACHABLE. This is the overlay that survived
+       P338 and kept interrupting the loadout screen. The drain above no longer
+       calls it and its only other caller, _showFeatUnlocksSequential, was
+       already dead - so this guard is what makes the symptom impossible rather
+       than merely unreached. That distinction is the whole lesson here: this is
+       the third time an overlay was removed while a second producer survived.
+       The body below is kept only so the #feat-ov markup and its CSS stay
+       documented next to the code that used to drive them. */
+    resolve();return;
     var ov=document.getElementById('feat-ov');
     if(!ov||!feat){resolve();return;}
     var n=document.getElementById('featName');
