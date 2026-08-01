@@ -38,7 +38,7 @@ Every speakable line, whatever it belongs to, is the same small record:
 
 ```
 {
-  speaker_pool: "patron:ollis" | "gossip:town" | ...
+  speaker_pool: "patron:hollis" | "gossip:town" | ...
   min_stage: <int>       // floor, not exact match — see resolution below
   conditions: [ <predicate>, ... ]   // optional, all must hold (AND)
   text: "..."
@@ -237,8 +237,8 @@ thinner and lower-frequency than a patron's own personal content.
 The cast is all anthropomorphic animals, and that can flavor the
 DIALECT the way real English borrows animal behavior into idiom —
 *"stubborn as a badger in a hedge," "keeps his coin like a squirrel
-keeps its nuts."* That second one fits Ollis's established coin-
-anxiety without needing to know or ever state what species Ollis
+keeps its nuts."* That second one fits Hollis's established coin-
+anxiety without needing to know or ever state what species Hollis
 actually is — it works as ambient vernacular anyone might use, not a
 joke ABOUT a specific character's own species. Hard rule: never let an
 idiom become a running gag pattern, never make species itself the
@@ -422,10 +422,7 @@ but he's no longer down to exactly one line of his own.
   obvious."*
 Works standalone either order; pays off best if the player's heard both.
 
-**OLLIS** — anxious, careful with coin, clerk-adjacent. (Named HOLLIS in the
-first two passes of this doc; the painting arrived as Ollis.png and a seat's
-name is its portrait's filename, so OLLIS is the name. Renamed throughout
-rather than left disagreeing with the build.) GOAL: saving
+**HOLLIS** — anxious, careful with coin, clerk-adjacent. GOAL: saving
 toward a Ward enchant — "the shield," in his own words, never the game's
 exact term. QUIRK: counts and recounts his coin visibly. EXTENDED one
 stage further, since his arc is a genuine, earned progression rather
@@ -490,7 +487,7 @@ worth the losing. Don't tell her I said the losing part."*
 
 ---
 
-Connection density check on this seed batch: Odo, Ollis, and Ferrand
+Connection density check on this seed batch: Odo, Hollis, and Ferrand
 touch something beyond themselves (a debt pair plus a goal-condition) —
 3 of 6 for PATRON-to-patron/mechanic connections specifically, closer
 to 50% than the original 60% target, with Peck now carrying ambient
@@ -751,7 +748,7 @@ with the tavern.
 
 **Seed six, deepened to the same standard where their design allows
 it:** Odo goes from one line of his own to three (interchangeable).
-Ollis gains a genuine stage 2 — his coin-saving arc actually pays
+Hollis gains a genuine stage 2 — his coin-saving arc actually pays
 off now, which is exactly what stage-gating was built for. Ferrand
 was already at comparable depth (two conditional variants plus a
 personal King-override) and needed no further work. Fenn and Tam
@@ -943,7 +940,111 @@ shallow, repetitive-feeling filler across 24 characters rather than
 real variety. Named-patron bespoke in-match overrides (currently just
 Sil and Regis) are the same kind of deferred-not-forgotten item.
 
-## Win/loss reactions — patrons and bosses, NEW major addition
+## Patron progression — decks, dice, and enchants scale with tier
+
+**Real problem this closes:** with ~30 named patrons and a full run
+spanning 8 nights, players will face the same patrons repeatedly across
+runs, at every stage of a run's own escalation. A patron whose build
+never changes regardless of when you meet them either trivializes late
+encounters (still on starting bone dice at night 7) or breaks the
+early-game curve (a night-1 patron somehow holding a fully-brewed
+late-game loadout). Needs to scale.
+
+**TIER-DETERMINED, not encounter-count-determined — this is the actual
+design call, not just an implementation detail.** A version tied to how
+many times THIS PLAYER has personally beaten a patron was considered and
+rejected: it needs persistent cross-run memory, which contradicts every
+other piece of state in this system (stage counters, heard-sets — all
+per-run, all reset). Tier-determined is simpler and more robust: a
+patron's loadout is a function of WHICH NIGHT you're facing them, not
+how many times you individually have. Works identically whether a
+player meets a given patron once, early, or many times across many runs
+— no special-casing needed for either.
+
+**Banding, reusing the same night-band pattern the King thread already
+uses (1-2 / 3-5 / 6-8):**
+- Early (nights 1-2): mostly bone dice, at most one low-tier family die,
+  one basic card, no enchants.
+- Mid (nights 3-5): real family dice enter, two cards leaning into the
+  patron's own family affinity.
+- Late (nights 6-8): a fully realized build — mostly their affinity
+  family, three synergized cards, one or two enchants.
+
+**DEPENDS ON the family-affinity proposal from the earlier patron-
+synergy discussion — flagging this honestly, not hiding the
+dependency.** This system only produces a coherent, ON-THEME build if
+each named patron already has a confirmed primary family affinity to
+escalate INTO. Without that, "tier-appropriate" has nothing to lean
+toward and just means "more dice, more cards" with no throughline. Build
+this after that proposal locks, not before — implementing it first would
+mean redoing the escalation curve once affinities exist anyway.
+
+**Dialogue hook — small addition to existing state, not a new
+mechanism.** The per-run stage counter already tracks how many times a
+player has met a given patron. Add ONE more piece of state alongside it:
+the TIER they were last met at. That unlocks a new condition — "met
+this patron before, at a lower tier than now" — checked the same way
+every other condition in this system already gets checked, gating a new
+growth-commentary pool. Tone target, explicit: mutual, "we're all in
+this together," not one-sided boasting — most lines should frame BOTH
+sides as having grown, not just the patron.
+
+Representative spread across already-established voices, proving the
+range before committing to all ~30:
+
+**Osgood** — *"Still here, still standing. Reckon that makes two of us
+who've held up better than we'd any right to."*
+**Tuck** — *"Kitchen's gotten better since you were last through. You're
+looking like you've had a few good meals of your own since then, too."*
+**Mudge** — *"Different river than the one you crossed with me last
+time, in a manner of speaking. We've both come a way, I'd wager."*
+**Corbin** — *"Been keeping better books since you last sat here.
+Suppose we've both sharpened up some."*
+**Rask** — *"Bit better armed than last time you saw me. You look like
+you've picked up a trick or two yourself."*
+**Regis** — *"I've refined my approach considerably since we last
+crossed paths. Do try to keep up this time."*
+
+Most lean mutual (Osgood, Tuck, Mudge, Corbin all explicitly frame it as
+BOTH parties having grown); a couple stay more personality-forward
+(Regis pompous, Rask rough) — variety of voice within the same
+emotional target, not six restatements of one sentiment.
+
+**NOT done here:** the full ~30-patron family-affinity assignment this
+depends on, the complete escalation table per family, and growth lines
+for the rest of the cast beyond this representative sample. All real,
+sized follow-up work, not implied to be finished by this section.
+
+
+## Greeting tier and gradual density ramp — closes a real playtest bug
+
+**Bug found in actual play, not simulation:** a tier-2 King speculation line
+fired with zero tier-1 intro ever having happened that run. The `heard()`
+gate specified for the King pool either isn't implemented or isn't wired
+correctly — flag directly to Code as a bug against an already-correct
+design, not a request to redesign the gating logic itself.
+
+**New tier, sits BEFORE everything else in this document:** `greeting`, a
+flat pool, mandatory and exclusive on a patron's first-ever encounter in a
+run — personal/backstory content only becomes eligible from the SECOND
+encounter onward. Same resolver, same mechanism, just a new pool that
+wins by being the only thing eligible at stage 0 specifically:
+
+*"Sit if you like."* / *"Evening. Mind the dice, they bite."* / *"Pull up
+a seat, if you're staying."* / *"Another one for the table."* / *"Coin's
+on you if you're playing."* / *"Room for one more."* / *"Sit, or don't.
+Table's here either way."* / *"Evening to you."*
+
+**Gradual density ramp, new requirement, not previously specified:**
+ambient/personal content should scale with night number, not fire at full
+rate from night 1. Proposed default: nights 1-2 mostly greeting-only, rare
+ambient beyond that; ramping to the density already specified (roughly
+once per match) by night 3+. This is what actually closes the "world
+opens up gradually" gap — the King pool's own tier gating controls
+WHETHER a line can fire at all, this controls how OFTEN anything beyond
+greeting fires early in a run. Both needed, neither replaces the other.
+
+
 
 **Scope correction first, since it changes what belongs here:** win/loss
 content must be about the OUTCOME specifically — "you beat me" / "I beat
@@ -952,12 +1053,13 @@ general backstory pools (the 138 patron lines, the King/gossip pools)
 stay where they are; none of that content belongs here, and none of it
 is duplicated below. This also means the earlier recommendation that
 general backstory content renders on the win/loss screen was wrong in
-scope — win/loss needed its OWN dedicated content, not a redirect. Where
-the general backstory pool actually renders is a REOPENED, still-open
-question — best current guess is the match-START moment (sitting down,
-before the first roll), additive to the same in-match hooks the trait
-reactions already use, but this is a guess flagged for confirmation, not
-a ruling made here.
+scope — win/loss needed its OWN dedicated content, not a redirect.
+**Where the general backstory pool actually renders is RESOLVED**
+elsewhere in this document (see "Everything ambient... lives INSIDE
+matches, at natural pauses" below) — this note is stale otherwise; it
+previously called that an open question after it had already been
+answered, the second occurrence of that exact gap this document has
+had. Fixed here rather than left contradicting the resolved section.
 
 **Architecture: no new mechanism.** At match end the engine already knows
 win or loss — that's how it picks which end screen to show. Filtering a
