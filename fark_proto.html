@@ -3674,7 +3674,73 @@ body.crit-dilate{animation:critDilate .55s ease-out both}
      cards 60.5-86    deck 86.5-93    button 93.5-99 */
 #end-ov.win-art-on .res-card{top:60.5%!important;width:62%!important}
 
+/* ═══ THE END-OF-MATCH DRAFT ═══════════════════════════════════════════
+   These classes did not exist until P422 - the block was built out of inline
+   styles, which is why every stylesheet rule aimed at it missed. */
+.fo-title,.fo-decklbl{font-size:12px;letter-spacing:2px;color:#999}
+.fo-title{margin-bottom:10px}
+.fo-decklbl{margin:10px 0 4px;font-size:11px}
+.fo-offer{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+
+/* THE FAMILY GLOW. --fglow is set per card from FAMILIES[fam].color, the same
+   value the card's own border uses, so the halo agrees with the art instead of
+   introducing a second palette. Two shadows: a tight one that reads as edge
+   light and a wide soft one that reads as glow. */
+.fo-card{position:relative;border-radius:9px;
+  filter:drop-shadow(0 0 3px var(--fglow)) drop-shadow(0 0 11px color-mix(in srgb,var(--fglow) 55%,transparent));
+  transition:filter .18s ease,transform .18s ease}
+.fo-card:active{transform:translateY(1px) scale(.985)}
+@media (prefers-reduced-motion:no-preference){
+  .fo-card{animation:foPulse 2.6s ease-in-out infinite}
+  .fo-card:nth-child(2){animation-delay:.35s}
+  .fo-card:nth-child(3){animation-delay:.7s}
+}
+@keyframes foPulse{
+  0%,100%{filter:drop-shadow(0 0 3px var(--fglow)) drop-shadow(0 0 9px color-mix(in srgb,var(--fglow) 45%,transparent))}
+  50%    {filter:drop-shadow(0 0 4px var(--fglow)) drop-shadow(0 0 16px color-mix(in srgb,var(--fglow) 70%,transparent))}
+}
+
 /* ── YOUR DECK, AS A HAND ── three full-size dashed boxes in a row read as a
+   second offer competing with the real one. Overlapped, tilted and smaller
+   they read as what they are: the cards you already hold, shown so you can see
+   what a new one would replace. Sized off the card aspect (911x1298) so the
+   filled and empty slots always agree. */
+.fo-deck{display:flex;justify-content:center;align-items:flex-start;gap:0;
+  padding-top:6px}
+.fo-slot{width:19%;aspect-ratio:911/1298;border-radius:6px;flex:none;
+  transition:transform .18s ease}
+.fo-slot+.fo-slot{margin-left:-5%}
+.fo-slot:first-child{transform:rotate(-7deg) translateY(2px)}
+.fo-slot:nth-child(2){transform:translateY(-3px);z-index:2}
+.fo-slot:last-child{transform:rotate(7deg) translateY(2px)}
+.fo-slot.filled{cursor:pointer}
+.fo-slot.filled:active{transform:translateY(-4px) scale(1.04);z-index:3}
+.fo-slot.empty{border:1px dashed #554;display:flex;align-items:center;
+  justify-content:center;color:#554;font-size:18px}
+
+/* ── SKIP ── the coin makes the trade readable at a glance: a card, or this
+   much gold. Was a dashed rectangle, which is the one control on this screen
+   that did not look like the game's other buttons. */
+.fo-skip{display:flex;align-items:center;justify-content:center;gap:.4em;
+  cursor:pointer;margin-top:10px;padding:9px 12px;border-radius:8px;
+  font-family:var(--font-px);font-size:13px;letter-spacing:.06em;color:#f0d79a;
+  background:linear-gradient(#3a2a15,#241809);
+  border:1px solid #6b4a26;box-shadow:0 2px 0 rgba(0,0,0,.45)}
+.fo-skip:active{transform:translateY(1px);box-shadow:0 1px 0 rgba(0,0,0,.45)}
+.fo-coin{width:1.05em;height:1.05em;border-radius:50%;flex:none;
+  background:radial-gradient(circle at 35% 30%,#ffe9a8,#d8a83c 60%,#9a6f1c);
+  box-shadow:0 0 0 1px rgba(90,62,14,.7) inset}
+
+/* the painted screen is tighter than the old plain one - the panel's lower
+   edge is at 58.7% and everything below has to fit above the safe area */
+#end-ov.win-art-on .fo-wrap{padding:4px 6px}
+#end-ov.win-art-on .fo-title{margin-bottom:6px}
+#end-ov.win-art-on .fo-deck{padding-top:2px}
+
+/* SUPERSEDED: these aimed at .end-draft-slots, which is a real class on a
+   DIFFERENT draft surface and does not exist on this screen at all. Kept only
+   as a marker so the next reader does not re-derive the same wrong target.
+   ── YOUR DECK, AS A HAND ── three full-size dashed boxes in a row read as a
    second offer competing with the real one. Overlapped and tilted they read as
    what they are: the cards you already hold, shown so you can see what a new
    one would replace. Still full drop targets - only the look changes, the
@@ -12926,37 +12992,61 @@ function famCardSheet(id,tier,opts){
     +'</div>';
   _gbSheetOpen(h);
 }
+/* SHOW THE SCROLL ONLY IF SOMEBODY SPEAKS. The bubble draws a painted
+   parchment behind whatever line the dialogue resolver returns - and when it
+   returns nothing, the parchment still drew: an empty cream pill sitting
+   between the board and the offer. Every caller went through
+   classList.add('show') with no check on what it was showing. */
+function _resDlgShow(el){
+  if(!el)return;
+  var txt=(el.textContent||'').replace(/\s+/g,'');
+  if(!txt){el.classList.remove('show');el.innerHTML='';return;}
+  el.classList.add('show');
+}
 function famOfferHtml(offer,pickFn,declineGold){
-  var h='<div style="font-family:monospace;color:#eee;text-align:left;padding:10px 6px">'
-    +'<div style="font-size:12px;letter-spacing:2px;color:#999;margin-bottom:10px">CHOOSE A CARD</div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">';
+  /* CLASSES, because there were none. This block used to be pure inline style,
+     which is why every stylesheet rule aimed at it missed - including mine, at
+     `.end-draft-slots`, a real class that lives on a different draft surface
+     entirely. The flow is unchanged; these are hooks, not behaviour. */
+  var h='<div class="fo-wrap" style="font-family:monospace;color:#eee;text-align:left;padding:10px 6px">'
+    +'<div class="fo-title">CHOOSE A CARD</div>'
+    +'<div class="fo-offer">';
   offer.forEach(function(o,i){
-    h+=famCardHtml(o.id,o.tier,{onclick:"famCardSheet('"+o.id+"',"+o.tier
-      +",{btn:'CLAIM',badge:"+(o.upgrade?"'UPGRADE'":"null")+",cb:'function(){"+pickFn+"("+i+");}'})",
-      badge:(o.upgrade?'UPGRADE':null)});
+    /* the glow is the FAMILY's own colour, from the same FAMILIES table the
+       card's border and tier numeral already read, so an offer glows the colour
+       it is edged with rather than something invented for this screen */
+    var _fd=famDef(o.id)||{},_fc=((FAMILIES[_fd.fam]||{}).color)||'#a58a3c';
+    h+='<div class="fo-card" style="--fglow:'+_fc+'">'
+      +famCardHtml(o.id,o.tier,{onclick:"famCardSheet('"+o.id+"',"+o.tier
+        +",{btn:'CLAIM',badge:"+(o.upgrade?"'UPGRADE'":"null")+",cb:'function(){"+pickFn+"("+i+");}'})",
+        badge:(o.upgrade?'UPGRADE':null)})
+      +'</div>';
   });
   h+='</div>';
   /* what the player already holds, under the offer. Three cards is the cap,
      so the empty ones show as slot outlines rather than as nothing - the
      player needs to see "I have room" as clearly as "I have these". */
   _getS();S.run.fcards=S.run.fcards||[];
-  h+='<div style="font-size:11px;letter-spacing:2px;color:#999;margin:12px 0 6px">YOUR DECK</div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">';
+  h+='<div class="fo-decklbl">YOUR DECK</div>'
+    +'<div class="fo-deck">';
   for(var _s=0;_s<3;_s++){
     var _c=S.run.fcards[_s];
     if(_c){
       var _cd=famDef(_c.id);
-      h+='<div style="cursor:pointer" onclick="famCardSheet(\''+_c.id+'\','+_c.tier+')">'
+      h+='<div class="fo-slot filled" onclick="famCardSheet(\''+_c.id+'\','+_c.tier+')">'
         +famCardArt(_c.id,_c.tier,{tierAlways:(_cd&&_cd.fam!=='tavern')})+'</div>';
     }else{
-      h+='<div style="aspect-ratio:911/1298;border:1px dashed #554;border-radius:6px;'
-        +'display:flex;align-items:center;justify-content:center;color:#554;font-size:20px">+</div>';
+      h+='<div class="fo-slot empty">+</div>';
     }
   }
   h+='</div>';
   if(declineGold!=null){
-    h+='<div onclick="famDraftDecline()" style="cursor:pointer;margin-top:9px;padding:8px;'
-      +'border:1px dashed #776;color:#dc5;text-align:center">DECLINE — TAKE '+declineGold+'g</div>';
+    /* the coin makes the trade legible at a glance - a card, or this much
+       gold. NOTE: the brief also asks this to flip to CONTINUE once a card is
+       picked, which needs a select-then-confirm state this surface does not
+       have: tapping a card opens its sheet and CLAIM takes it on the spot. */
+    h+='<div class="fo-skip" onclick="famDraftDecline()">'
+      +'<span>SKIP — TAKE</span><span class="fo-coin"></span><span>'+declineGold+'</span></div>';
   }
   return h+'</div>';
 }
@@ -28429,7 +28519,7 @@ function endMatch(win){
       dlgDiv.className='res-dlg';
       dlgDiv.innerHTML=_bossLossData.dlgHTML;
       var _rde=document.getElementById('resDlg');
-      if(_rde){_rde.innerHTML='';_rde.appendChild(dlgDiv);_rde.classList.add('show');}
+      if(_rde){_rde.innerHTML='';_rde.appendChild(dlgDiv);_resDlgShow(_rde);}
       /* Hide the dialog text until the parchment canvas is drawn — otherwise
          the text appears on its own first, with the scroll background popping
          in 1s later. We draw, position, then fade in the text together. */
@@ -28692,7 +28782,7 @@ function handleContinue(){
           var dlgDiv=document.createElement('div');
           dlgDiv.className='res-dlg';dlgDiv.innerHTML=d.dlgHTML;
           var _rde=document.getElementById('resDlg');
-          if(_rde){_rde.innerHTML='';_rde.appendChild(dlgDiv);_rde.classList.add('show');}
+          if(_rde){_rde.innerHTML='';_rde.appendChild(dlgDiv);_resDlgShow(_rde);}
           requestAnimationFrame(()=>{var cv=dlgDiv.querySelector('.res-dlg-canvas');if(cv)drawPixelScroll(cv);});
         }
       }else if(d.dlgHTML&&d.isRematchWinDlg){
@@ -28700,7 +28790,7 @@ function handleContinue(){
         var dlgDiv=document.createElement('div');
         dlgDiv.className='res-dlg';dlgDiv.innerHTML=d.dlgHTML;
         var _rde=document.getElementById('resDlg');
-        if(_rde){_rde.innerHTML='';_rde.appendChild(dlgDiv);_rde.classList.add('show');}
+        if(_rde){_rde.innerHTML='';_rde.appendChild(dlgDiv);_resDlgShow(_rde);}
         requestAnimationFrame(()=>{var cv=dlgDiv.querySelector('.res-dlg-canvas');if(cv)drawPixelScroll(cv);});
       }else{gw.style.display='none';}
     }
