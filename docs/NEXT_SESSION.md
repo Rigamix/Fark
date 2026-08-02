@@ -7,13 +7,13 @@ Written before a context compaction. Everything needed to pick up cleanly.
 
 ---
 
-## 1. THE NEXT TASK — Visual plan Phase 5, the asset registry
+## 1. THE NEXT TASK — Effect plan Phase 1, the inventory
 
-One table mapping logical name → path, so the previous game's `assets/` folder
-becomes unreachable by accident. **Highest-value remaining item and the only
-non-probe one** — it's the fix for the failure that cost the most time
-(reaching into `assets/` instead of `Art/Assets/`: the font, the coin, the
-diamond, three times in one session).
+Decompose ~50 cards, enchants and badges into **trigger / condition / effect**.
+The *misfits* — the ones that don't fit the three-part shape — are the valuable
+output, because they're where the architecture would have to bend.
+
+Backup tag `pre-effect-system` (`a0aed7d`) exists for exactly this work.
 
 **Then write the Phase report** — one after every phase, in
 `docs/PHASE_REPORTS.md`, same fixed format.
@@ -22,14 +22,17 @@ diamond, three times in one session).
 
 ## 2. AFTER THAT
 
-- **Effect plan Phase 1** — the inventory: decompose ~50 cards/enchants/badges
-  into trigger/condition/effect. The *misfits* are the valuable output.
 - Fix the two remaining Phase 2 reds: relic `.dtype-` blocks (8), and `MATCOL`'s
   4 retired materials (defence-in-depth — **not reachable**, migration converts
   them on load before any render).
-- **Harden or demote `apv_bust_settle`.** It flapped during Phase 4 — red in a
-  full run, green twice in isolation, nothing changed between. A flapping probe
-  is not a regression signal.
+- **The two stale asset paths** Phase 5 named and did not touch:
+  `Environment_ART/gameover.png` (its only twin is a `.psd`) and
+  `Menu_Art/Settings.png` (twin at `Art/Assets/Panels/Settings/settings.png`).
+  Swapping them is a look change, so it's Denis's call.
+- **`assets/` has no owner.** 47 live dependencies with no replacement in the
+  current tree — every font, all audio, nine character portraits, eight match
+  frames, the Night_Art UI set. Whether those get redrawn is an art decision
+  nobody has made.
 
 ---
 
@@ -92,18 +95,22 @@ BRANCH:path`), then remove and re-merge. **Never push to `main`.**
 **Never `git add -A`.** Denis generates art into `Art/` mid-session. Stage
 explicit paths only.
 
-**`Art/Assets/` is where ART comes from. `assets/` is NOT simply dead** — and
-the flat version of this rule, which I wrote here myself, is wrong. Measured:
-**91 live references point into `assets/`**, including **every font in the
-game**. `'JMH Beda'` — the font I kept telling Denis is "the game's font" —
-loads from `assets/_mockups/new_main/JMH Beda.ttf`. Following "never look in
-`assets/`" literally would break the page.
+**USE `FK_ART`. It is the answer to "where does X live", and it exists because
+this exact question kept being answered wrong.** One table near the top of the
+script: 21 entries, both trees, with the old-tree ones marked deliberate. Add to
+it rather than writing a raw path — `apv_asset_registry` fetches every entry, so
+a rotted one fails on the next run.
 
-The true rule is narrower: **new art goes in `Art/Assets/`; `assets/` still
-holds the fonts and some legacy environment/night art nobody has replaced yet.**
-The three mistakes that produced the flat rule (font, coin, diamond) were about
-*art*, not about the folder as a whole. `--font-px` is still the old pixel font
-and still the wrong one to reach for.
+**`assets/` is NOT dead**, and the flat rule I wrote here myself was wrong.
+Measured: 47 live references into it have **no replacement anywhere** in the
+current tree — every font, all audio, nine character portraits, eight match
+frames, the Night_Art UI set. `'JMH Beda'` loads from
+`assets/_mockups/new_main/`. "Never look in `assets/`" would break the page.
+
+The true rule is narrower: **new art goes in `Art/Assets/`.** The three mistakes
+that produced the flat rule (font, coin, diamond) were about *art*, not the
+folder. `--font-px` is still the old pixel font and still the wrong reach —
+`FK_ART.font` is the right one.
 
 **Patches with backslashes go through a Write-tool `.py` file, never a bash
 heredoc.** Heredocs mangled a regex twice.
@@ -132,11 +139,13 @@ question alone before counting the folder.
 
 ## 5. STATE
 
-- **Suite:** 13 probes — 12 pass, 1 fail carrying two known reds (`MATCOL`'s
+- **Suite:** 17 probes — 16 pass, 1 fail carrying two known reds (`MATCOL`'s
   retired materials, relic `.dtype-`). Baseline in `tools/probe_baseline.json`,
-  re-recorded at `d6772fc`. Full run ≈ 8–12 min.
-- **Phases done:** 1 (runner), 2 (totality), 3 (CSS live), 4 (feat roster).
-  Reports in `docs/PHASE_REPORTS.md`.
+  re-recorded at `31adddd`. Full run ≈ 12–18 min.
+- **Phases done:** 1 (runner), 2 (totality), 3 (CSS live), 4 (feat roster),
+  4b (badge remap), 5 (asset registry). Reports in `docs/PHASE_REPORTS.md`.
+- **Deployed HEAD is `31adddd` on `fark`** — the header at the top of this file
+  names the older one; this line is the current truth.
 - **Plans:** `docs/EFFECT_SYSTEM_PLAN.md`, `docs/VISUAL_INTEGRITY_PLAN.md`.
 - **Sim numbers are stale** — every figure in `SIM_RESULTS_2026-07-31.md`
   predates the sweep removal, the Trade harness fix and today's five rulings.

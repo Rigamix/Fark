@@ -852,3 +852,165 @@ introduced is worse than no baseline.
 ## What's next
 
 Visual plan **Phase 5 — the asset registry**.
+
+---
+
+# Phase 5 — The asset registry
+
+**Status:** complete, deployed `31adddd`. Suite is 17 probes: 16 pass, 1 fail
+(the two known Phase 2 reds), 0 error.
+
+## The headline: the plan's premise was wrong, and measuring it first is the whole story
+
+The visual plan says this, and it is the reason Phase 5 was ranked highest:
+
+> *"`assets/` is the **previous game's** art. `Art/Assets/` is current. Nothing in
+> the code says so, so every lookup is a chance to reach into the wrong one — and
+> I did it three times today (font, coin, diamond)."*
+> *"A registry … makes the old folder **unreachable by accident** rather than
+> merely discouraged."*
+
+Measured before building anything:
+
+| | |
+|---|---|
+| static asset paths that resolve | 77 (28 current tree, 49 old tree) |
+| static asset paths that **do not** resolve | **0** |
+| old-tree paths with a replacement in the current tree | **2** — and one is a `.psd` |
+| old-tree paths with **no** replacement anywhere | **47** |
+
+**`assets/` is not a graveyard being wrongly referenced. It is a live
+dependency.** Those 47 are every font in the game, all the audio, the nine
+character portraits, the eight match frames and the whole Night_Art UI set.
+
+**A registry that made the folder unreachable would have broken the page** — and
+would have taken `'JMH Beda'` with it, the family this project keeps calling
+"the game's font", which loads from `assets/_mockups/new_main/`.
+
+The three mistakes that motivated the plan were real. But they were about
+**reaching for the wrong source when writing new code**, not about the code
+pointing at stale files. Only two paths do that, and one of them resolves to a
+Photoshop document nothing can display. So the registry **names** rather than
+**bans**, and that is a different artefact than the one specified.
+
+## What was built
+
+**`FK_ART`, 21 entries**, in its own script block ahead of everything that reads
+it:
+
+- **Directories in the current tree** (13) — homescreen, buttons, icons, new
+  run, store, patron frames, patron characters, traits, props, last orders,
+  hearts, boss backgrounds, feats, win plates.
+- **Directories in the OLD tree** (3) — mockups, enchant icons, fonts. Marked
+  **deliberate, measured, not stale**, so the next person does not "fix" them.
+- **Single files this project has picked wrong before** (3) — the coin, the
+  diamond, the shelf background.
+- **The font family.** Not a path. The entry most likely to actually save
+  someone: `--font-px` is `'Alagard','Press Start 2P'`, the previous game's
+  pixel font, and it reads as the obvious choice right up until Denis points out
+  the score is in the wrong typeface.
+
+**A registry nobody calls is a comment.** The thirteen prefix constants
+scattered across 22,000 lines are now *redefined from it* — `var
+PT_P=FK_ART.patronFrames;` — so every call site is untouched (zero blast radius)
+while there is exactly one place the strings live. Two of them, `BT` and `BTP`,
+were the same directory declared twice 20k lines apart; now one entry.
+
+**`apv_asset_registry` gives it teeth.** Three ways a registry dies, one check
+each:
+
+| Failure | Check |
+|---|---|
+| an entry rots — art moves, the registry keeps the old path, and the one place people trust becomes the one place that lies | every entry **fetched**, directories included, so a deleted folder cannot hide behind "it's only a prefix" |
+| the font entry is declared but nothing uses it | checked **as a font** — declared *and* first-choice for some element. That is the Metamorphous test |
+| someone re-hardcodes a path and the registry quietly stops being read | the served source is grepped for `var NR='Art/…'` — the values would still match, so comparing values alone would pass |
+
+## What it found
+
+**528 image loads across six screens, zero dead** (`apv_asset_404`). That probe
+covers what a static scan cannot: 54 of the file's asset paths are built at
+runtime from a prefix plus a name, and the join is where a 404 hides —
+`Death&Taxes.png` needs URL-encoding at one call site and not another.
+
+**One genuinely dead font, not fifty-eight references.** This one is a
+correction to my own earlier report, and the mistake is worth stating: I read
+`document.fonts.status === 'unloaded'` as *unreferenced*. It is not. **Unloaded
+means the browser never fetched it**, which happens whenever no rendered text
+has resolved to it *yet*. Measured properly — all nine screens, counting
+elements whose **computed** `font-family` names each family *first*:
+
+| Family | Elements | |
+|---|---|---|
+| Uncial Antiqua | 270 | live |
+| IM Fell English | 61 | live |
+| Jacquard 24 | 9 | live |
+| Macondo | 7 | live |
+| **Metamorphous** | **0** | dead — one `@font-face`, zero uses |
+| Press Start 2P | 0 primary | kept — it is the fallback inside `--font-px` |
+
+One declaration deleted. **Had I acted on my own earlier claim, five live fonts
+would have gone with it.**
+
+## Guideline compliance
+
+| Requirement | Where from | Met? |
+|---|---|---|
+| One table, logical name → path | Visual plan Phase 5 | **Yes** — 21 entries |
+| Make the wrong folder hard to reach by accident | Visual plan Phase 5 | **Reinterpreted, and said so.** Unreachable was measured impossible; the registry names both trees and marks the old-tree entries deliberate |
+| Give Phase 2 something to assert against | Visual plan Phase 5 | **Yes** — `apv_asset_registry`, three failure modes |
+| Additive; no behaviour change | Visual plan | **Yes** — constants redefined, call sites untouched |
+| Verify measured, not reasoned | Standing rule | **Yes** — every entry fetched; match screen re-shot after the rewire (106 images, 0 dead) |
+| Patch via `.py`, not heredoc | Standing rule | **Yes** |
+| Parse gate must fail the chain | Standing rule | **Yes** — 3 scripts now, all pass |
+
+## Two probe bugs found by writing the probes
+
+Both worth recording, because both would have sent someone hunting a bug that
+does not exist:
+
+1. **`NR` reported as "not reading the registry".** Seven of the thirteen
+   rewired constants are `var`s **inside a function** and are simply not in
+   scope for a page-scope `eval`. "Cannot be seen from here" is a different fact
+   from "is wrong". The source-grep covers those seven instead.
+2. **The rule-migration test reported a working migration as broken** (Phase 4b
+   / P428). The migration lives inside `if(!S){…}` in `_getS` — correct, that is
+   run-load — so calling `_getS()` twice on a warm page skips it entirely. The
+   test has to reproduce a **cold start**.
+
+## And a flake finally fixed rather than recorded around
+
+`apv_bust_settle` had been flapping red/green for three phases. Its
+`pauseLooksRight` key asserted a hand-picked **400–1600ms window** on a gap
+produced by a physics solve over real dice — a guess about a duration nobody
+specified, dressed as an assertion.
+
+Demoted to a reported number. **The ordering is the real claim** — the bust
+verdict must not reach the player before the dice stop — and that stays an
+assertion, true or false regardless of how long the solve took. The duration is
+still measured, so if it ever needs a bound, the number to bound it with is in
+the output.
+
+I had already recorded a baseline with that red in it, twice this session
+(the other was the terminology red). Both re-recorded before committing: **a
+baseline that blesses a red you just introduced is worse than no baseline.**
+
+## What this does *not* cover
+
+- **The registry is not enforced at new call sites.** Nothing stops someone
+  writing a raw path tomorrow; the probe catches a re-hardcoded *constant*, not
+  a fresh literal in a new function. Making that impossible needs a lint over
+  the source, which is a bigger and separate tool.
+- **`assets/` still has no owner.** 47 live dependencies with no replacement is
+  a fact, not a plan. Whether the character portraits and match frames should be
+  redrawn into the current tree is an art decision nobody has made.
+- **Two stale paths remain**, named and not touched: `Environment_ART/gameover.png`
+  (its twin is a `.psd`) and `Menu_Art/Settings.png` (twin exists at
+  `Art/Assets/Panels/Settings/settings.png`). Swapping them is a look change.
+- **Nine screens, not every state.** The font reachability sweep covers the
+  screens the game can be driven to; modal states inside them were not
+  enumerated.
+
+## What's next
+
+Effect plan **Phase 1 — the inventory**: decompose ~50 cards, enchants and
+badges into trigger / condition / effect. The *misfits* are the valuable output.
