@@ -65,7 +65,50 @@ Vanguard). So a few can't be restored as written even if the roster is chosen.
 Six of those are per-boss feats — and the art set contains only one boss-specific
 painting (`Death&Taxes`, Ambrose's), currently pointed at Corvus.
 
-## What this needs from you
+## RULED — Option 1, the brief's 24
+
+Denis, and the reasoning corrects my framing: **this was never a coin flip
+between three even options.** The 24 was the original authored scope — 24
+achievement pins, two sheets of 12, planned early. **The 32 in code is drift, not
+a deliberate expansion anyone decided on.** Feats are permanently
+non-power-granting wall decoration, so there is no gameplay argument for a bigger
+number, only an art-budget one, and the art budget already said 24.
+
+**The six mismatched mappings resolve as a side effect, not as a separate fix.**
+They only exist because the current twelve are guesses against the wrong list.
+Restore the list and Death&Taxes is naturally Ambrose's condition, Teetotaller is
+naturally the bank-threshold one. Fix the roster, the mappings follow.
+
+### Three things that ride along
+
+1. **BOOKKEEPER is already retired**, ruled earlier this session — Bookends'
+   collapse into Vanguard was a deliberate simplification and is not being
+   reversed. This document treated it as open because it predates that ruling.
+   **That leaves 23 usable conditions and one orphaned painting** with no natural
+   home under current mechanics. Small residual, not a blocker.
+2. **NO CLAIM gets its condition rewritten, not cut.** It references
+   Insurance-the-card, which is gone, but what it rewarded — defensive,
+   bust-averse play — still exists via Ward. Rewrite against Ward; exact wording
+   is a follow-up.
+3. **The six per-boss `beat_<boss>` feats are cut**, and that is real content
+   loss worth naming rather than hiding inside "rewriting 20 conditions". If
+   dedicated per-boss recognition matters, it wants its own future category with
+   its own art ask — not a reason to keep the drifted 32.
+
+### The work, sized
+
+- Replace `FEATS` (32 rows) with the brief's list (23 live + 1 parked).
+- Remap `FEAT_ART` — which becomes near-total by construction, since the
+  paintings and the roster finally describe the same set.
+- Rewrite NO CLAIM against Ward.
+- Rerun `apv_table_totality.js`: `FEAT_ART` should go from 12/32 to 23/23, and
+  the baseline will prove it.
+
+**Not started in the session that recorded this ruling** — it is a content change
+across the whole feat list, and beginning it without room to finish is how a
+half-migration happens.
+
+## (superseded by the ruling above) What this needs from you
 
 Not an engineering fix — **a decision about which roster is real.**
 
