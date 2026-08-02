@@ -715,3 +715,140 @@ exit 1.
 Visual plan **Phase 5 — the asset registry**: one table mapping logical name to
 path, so the previous game's `assets/` folder becomes unreachable by accident.
 Highest-value remaining item and the only non-probe one.
+
+---
+
+# Phase 4b — The badge remap
+
+**Status:** complete, deployed `9082bf1`. Suite is 14 probes: 13 pass, 1 fail
+(the two known Phase 2 reds), 0 error.
+
+## The headline: a rule can be live through one door and dead through the other two
+
+A table rule is reachable three ways — a boss's **badge**, a **sleeve** the
+player wears, and a **sealed seat**. They are three doors to one rule, and this
+remap turned up two rules that only worked through some of them.
+
+**ZERO HOUR was live as Grog's badge and dead through a sleeve and a sealed
+seat.** The brief's "Grog: Last Call → Zero Hour" had shipped by *recycling the
+id* rather than minting a new one, so `last_call` the id carried Zero Hour the
+rule. `_RETIRED_RULES={last_call:1}` then switched that id off everywhere
+`_ruleActive` is consulted — which is every door except the badge, because
+`_iconFire` reads `G._tell.id` directly and bypasses it.
+
+**Zero Hour is claimable as boss spoils.** A player could win it and have it do
+nothing. The code comment at `_RETIRED_RULES` names this exact trap and states
+it is not fixed; giving the two rules honest ids (`last_call` / `zero_hour`)
+removes the reason the guard existed, and the table is now empty.
+
+**Steeped had the same split, pointing the other way** — and parking it is what
+exposed it. The bonus **accrues** through `_ruleActive`, which sees all three
+doors. It **paid out, displayed, and reset** through `G._tell.id === 'steeped'`,
+which sees only a badge. Those two agreed for exactly as long as Mabel wore it.
+Parked, a cursed seat rolling Steeped would have accrued a bonus every roll and
+paid none of it, forever. Four sites moved to `_ruleActive`.
+
+That is the same bug this phase set out to fix, reappearing in the same commit
+that fixed it. Which is why the new probe asserts the shape rather than the
+instances.
+
+## What was ruled
+
+- **Zero Hour → Mabel, by name.** The position framing ("last slot before
+  Ambrose") is dropped: it never checked against existing assignments, and
+  there is no confirmed order for the middle six anyway. Aldric already carries
+  enchant suppression (Still Waters) and Brutus a turn-length constraint (Drill
+  Order), so either would have doubled a theme that boss already owns.
+- **Grog keeps LAST CALL, retuned to 800.** Not a fresh number — it is the bar
+  TEETOTALLER already uses for "never a bank under X", so the game states one
+  threshold instead of two arbitrary ones. 500 read weak because most ordinary
+  turns clear it without trying.
+- **Steeped is parked, not deleted.** Every other candidate boss already carried
+  a rule, so *something* was displaced whichever name was picked; once
+  displacement is unavoidable, throwing away tested, shipped work is the worse
+  trade.
+- **Boss counters are per-run.**
+
+## A correction I owe on the question I asked
+
+I reported Last Call as *"dead code in an `if(false)` block, so reviving is
+cheap."* Half right, and the wrong half mattered: the **mechanic** was indeed
+sitting in `if(false)` at 500 — but the **id had been reused for Zero Hour**,
+so reviving it was never a one-line flag flip. It needed a new id, a rule moved
+off another boss, and the retired-rules guard untangled. The design ruling was
+unaffected; the cost estimate was wrong.
+
+## What was built
+
+| Change | Why it is not just a rename |
+|---|---|
+| Grog → `last_call` / **LAST CALL** / `minBank:800` | the rule did not exist; the id was occupied |
+| Mabel → `zero_hour` / **ZERO HOUR** | frees `last_call`, and gives the rule an id that means it |
+| `PARKED_TELLS` | `_tellById` **scans RUNGS** — a rule existed only while a boss carried it, so "keep the rule, drop the badge" was not expressible |
+| `_RETIRED_RULES` → `{}` | kept as an empty table, not deleted: the mechanism is right, its one entry was not |
+| `_SEAL_POOL` + `zero_hour` | a parked rule stays playable as a cursed seat, which is the point of parking it |
+| `_iconFire` → `_ruleActive('zero_hour','p')` | the direct read *was* the bug |
+| bank-void back on, threshold read from the rule | `G._tell` is null for a sleeved or sealed Last Call — the same direct-read mistake |
+| `S.npcState={}` at run start | streak and carryover lived on `S`, so they persisted across runs |
+
+**The voice moves with the rule.** Grog's Zero Hour line was a bar-closing line
+and read wrong in Mabel's mouth. Hers is stitchwork, which is also what her
+cards are made of. This was Denis's check, and it was the right one to make:
+there is no separate bark file, so **the tell's `desc` and `icon` ARE the
+flavour** — nothing else keys off a tell id for dialogue.
+
+## What it found that nobody asked about
+
+**Three more badges still carry recycled ids.** Measured off the live roster:
+
+| Boss | Rule shown | Id underneath |
+|---|---|---|
+| Corvus | FIRST STRIKE | `in_arrears` |
+| Aldric | STILL WATERS | `confession` |
+| Whisper | KINDRED | `counterfeit` |
+
+Harmless **today**, because `_RETIRED_RULES` is empty. But it is the same
+divergence that produced the Zero Hour bug, and any future "retire the old rule
+ahead of its replacement" entry re-arms the identical trap on whichever of the
+three it names. Left alone deliberately — renaming touches many sites and is a
+call to make on purpose, not in passing.
+
+## The check that caught me
+
+`apv_terminology` went red within a minute of the Mabel line being written: I
+wrote *"Touch a **marked** die at my table"*, and the rule is that a mark on a
+die is an **enchant** now — a rule Grog's original text had already been
+corrected for. I inherited the wrong word from the line I was replacing.
+
+Worth recording because I had already recorded a baseline with that red in it.
+Fixed and re-recorded before the commit; a baseline that blesses a bug you just
+introduced is worse than no baseline.
+
+## Guideline compliance
+
+| Requirement | Where from | Met? |
+|---|---|---|
+| Zero Hour to Mabel by name | Ruling | **Yes** |
+| Last Call at 800 | Ruling | **Yes** — read from the rule, not hard-coded at the call site |
+| Steeped parked, not deleted | Ruling | **Yes** — `PARKED_TELLS`, still in the seal pool, still paying out |
+| Check Mabel's bark for Steeped flavour | Denis's added check | **Yes** — no separate bark exists; the tell `desc` is the flavour and both moved rules were rewritten in voice |
+| Boss counters per-run | Ruling | **Yes** |
+| Patch via `.py`, not heredoc | Standing rule | **Yes** |
+| Parse gate must fail the chain | Standing rule | **Yes — and it did.** Caught a brace-arithmetic slip that emitted `}}},`. That is the first time this gate has failed anything; it had been reading a stale scratch file until an hour earlier |
+| Verify measured, not reasoned | Standing rule | **Yes** — new probe drives each rule through all three doors |
+
+## What this does *not* cover
+
+- **`minBank:800` is unplayed.** The rule fires from real state and the void
+  path is restored, but no live match has yet banked under 800 against Grog.
+  Wants a playtest before the number is trusted.
+- **The three recycled ids above** are named, not fixed.
+- **`last_call` is also a handicap id** — an unrelated system that raises the
+  target 1.5x. Now that the tell of the same name is live again, the collision
+  is genuinely confusing to read even though the two never interact.
+- **Per-run `npcState` is untested across a run boundary.** It resets where the
+  run resets; nothing has yet played two runs to watch a streak not carry.
+
+## What's next
+
+Visual plan **Phase 5 — the asset registry**.
