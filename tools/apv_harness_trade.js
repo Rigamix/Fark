@@ -2,6 +2,14 @@
  * The old failure was silent by construction, so this checks the one thing
  * nothing checked: what was ASKED FOR against what is STANDING on the table
  * once newG (and therefore _enchInit) has run. */
+/* LOADS ITS OWN DEPENDENCY. FSIM lives in tools/sim_harness.js and is not part
+   of the page, so run standalone this probe used to throw and report nothing.
+   A probe that only works inside a bespoke wrapper is a probe the suite cannot
+   run. */
+if(typeof FSIM==='undefined'){
+  try{ (0,eval)(await (await fetch('tools/sim_harness.js')).text()); }
+  catch(e){ return {err:'sim harness would not load: '+e.message}; }
+}
 const R={};
 try{
   /* the guards the harness has to satisfy, read from the game rather than
