@@ -35,7 +35,10 @@ const WATCH = {
   match: [
     {sel:'.ptcard .lwho', box:false},   /* the patron bust. Lost to a comment. */
     {sel:'.ptcard .lfront', box:false},
-    {sel:'#playerDiceRow', box:true}
+    /* box:false - the row legitimately has no size before the first roll, and
+       this is checked at phase 'idle'. Asserting a box here would fail on
+       correct behaviour, which is how a suite trains people to ignore it. */
+    {sel:'#playerDiceRow', box:false}
   ],
   win: [
     {sel:'.win-art',    box:true},      /* collapsed to 0x0 on a specificity loss */
@@ -64,7 +67,16 @@ const out = { missingFromCSSOM:[], matchedNothing:[], zeroBox:[], checked:0 };
 function checkSet(list, screen){
   for (const w of list){
     out.checked++;
-    if (!parsed.has(w.sel)) out.missingFromCSSOM.push(w.sel + ' (' + screen + ')');
+    /* PRESENCE MEANS "SOME RULE TARGETS THIS", NOT "A RULE IS SPELLED EXACTLY
+       THIS WAY". The first run of this check reported .win-art and .win-board
+       missing - both are perfectly present, as `#end-ov .win-art`, because that
+       specificity was RAISED ON PURPOSE to beat `#end-ov>*{position:relative}`.
+       An exact-string test therefore fails precisely the rules someone took
+       care over, which is the worst possible bias in a lint. Match on the token
+       instead. */
+    const tok = w.sel.split(/\s+/).pop();
+    if (![...parsed].some(sel => sel.indexOf(tok) >= 0))
+      out.missingFromCSSOM.push(w.sel + ' (' + screen + ')');
     const els = document.querySelectorAll(w.sel);
     if (!els.length){ out.matchedNothing.push(w.sel + ' (' + screen + ')'); continue; }
     if (w.box){
@@ -96,7 +108,15 @@ checkSet(WATCH.match.filter(w=>w.sel.indexOf('.ptcard')!==0), 'match');
 try{ dbgWin(); }catch(e){ out.winErr=String(e); }
 await until(()=>vis(document.getElementById('end-ov')),9000);
 await sleep(3000);
-checkSet(WATCH.win, 'win');
+/* THE ART IS UP IMMEDIATELY; THE DRAFT IS NOT. The win screen animates - title,
+   scores, the coin count-up - and only then renders the card offer. Checking
+   .fo-offer at a fixed 3s reported it "matched nothing" on a screen where it was
+   simply not built yet, which would have been a false failure on correct
+   behaviour. Wait for the thing, then check it. */
+checkSet(WATCH.win.filter(w=>w.sel.indexOf('.win-')===0), 'win art');
+const drafted = await until(()=>document.querySelector('.fo-offer'),12000);
+if(!drafted) out.note='the draft never rendered within 12s';
+checkSet(WATCH.win.filter(w=>w.sel.indexOf('.fo-')===0), 'win draft');
 
 out.verdict = {
   allRulesParsed:   out.missingFromCSSOM.length === 0,
