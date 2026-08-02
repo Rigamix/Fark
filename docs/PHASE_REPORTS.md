@@ -426,7 +426,7 @@ home screen, so a naive sweep reports false failures for everything off stage.
 ## What's next
 
 The feat roster migration — 32 → the brief's 24, now ruled. Sized in
-`FEAT_DISCREPANCIES.md` and deliberately not started at the end of a long
+`archive/FEAT_DISCREPANCIES.md` and deliberately not started at the end of a long
 session: it is a content change across the whole list, and starting without room
 to finish is how a half-migration happens.
 
@@ -444,7 +444,7 @@ the first time.
 
 ## The headline: there were three rosters, not two
 
-`FEAT_DISCREPANCIES.md` reported 24 paintings against 32 shipped feats and
+`archive/FEAT_DISCREPANCIES.md` reported 24 paintings against 32 shipped feats and
 called that the discrepancy. Both numbers were right and the framing was
 incomplete. Counting the code turned up a **third and a fourth** list:
 

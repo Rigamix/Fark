@@ -55,7 +55,7 @@ queries — on the re-scoped shape.
 ## 1b. DONE — the feat roster migration (`d6772fc`)
 
 Ruled, built, deployed. `FEAT_ART` is **23/23**, measured both directions.
-Full write-up in `docs/PHASE_REPORTS.md` Phase 4; `FEAT_DISCREPANCIES.md` now
+Full write-up in `docs/PHASE_REPORTS.md` Phase 4; `archive/FEAT_DISCREPANCIES.md` now
 carries a correction header.
 
 **What it turned up that the discrepancy doc had missed:** there were **four**
@@ -173,7 +173,7 @@ question alone before counting the folder.
 - **Deployed HEAD is `31adddd` on `fark`** — the header at the top of this file
   names the older one; this line is the current truth.
 - **Plans:** `docs/EFFECT_SYSTEM_PLAN.md`, `docs/VISUAL_INTEGRITY_PLAN.md`.
-- **Sim numbers are stale** — every figure in `SIM_RESULTS_2026-07-31.md`
+- **Sim numbers are stale** — every figure in `archive/SIM_RESULTS_2026-07-31.md`
   predates the sweep removal, the Trade harness fix and today's five rulings.
   Directions hold; magnitudes don't. Re-run before tuning.
 - **Win screen** is built and matches the mockup. Two open notes: the deck

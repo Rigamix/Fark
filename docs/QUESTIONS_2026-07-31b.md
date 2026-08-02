@@ -345,7 +345,7 @@ brief says "Tune TARGETS down before inflating player scoring."
 
 ### C4. Should I re-run the sim?
 
-Every number in `SIM_RESULTS_2026-07-31.md` predates: the zero-point sweep
+Every number in `archive/SIM_RESULTS_2026-07-31.md` predates: the zero-point sweep
 removal (worth +80.5 points on its own), the Trade harness fix, and today's five
 rulings. **Directions are still safe; magnitudes are not.** Nothing should be
 tuned against those numbers as they stand.
