@@ -4,8 +4,16 @@ One entry per completed phase of `EFFECT_SYSTEM_PLAN.md` and
 `VISUAL_INTEGRITY_PLAN.md`. Written to be circulated — each entry is
 self-contained and can be pasted on its own.
 
-Format, fixed, so entries stay comparable: **what the plan asked for → what was
-built → what it found → did it follow the guidelines → what's next**.
+Format, fixed, so entries stay comparable: **the headline → what the plan asked
+for → what was built → what it found → did it follow the guidelines → what's
+next**.
+
+**Self-contained means self-contained.** Any reference to a past bug, a probe or
+a code path has to carry enough of its own context to land on someone who was
+not there — a Phase 1 draft failed this by justifying a kept probe with "it
+measures the second roll, which is where the rival gate failed", which is
+meaningless without the rival-gate story. If an entry names something, it
+explains it.
 
 ---
 
@@ -13,6 +21,32 @@ built → what it found → did it follow the guidelines → what's next**.
 
 **Status:** complete, deployed `ff368f5`. Backup tag `pre-effect-system` on
 `a0aed7d`.
+
+## The headline: the suite caught itself lying, on its first run
+
+Before it was ever pointed at game code, the runner found a bug **in its own
+verdict-checking**.
+
+It tested each verdict key with `=== false`. One probe, `apv_bust_settle`,
+returned the **string** `"no bust this roll"` for a check whose forced bust
+hadn't fired — a leftover status message where a boolean belonged. `"no bust
+this roll" === false` is `false`, so **the check passed, and the probe was
+reported green.**
+
+That is exactly the "lying suite" failure the runner exists to prevent: an
+indeterminate result presented as a confirmed pass. It surfaced on run one,
+against the verification tooling itself.
+
+**Why this is the finding and not a footnote:** the project's standing rule is
+*verify computed, never authored* — don't trust what the code says, measure what
+it does. This is that rule applied **recursively, to the verifier**. The runner
+was not trusted to be correct because it had been written carefully; it was
+measured, and it was wrong. Verdict keys must now be booleans, and anything else
+reports INDETERMINATE, counted apart from both pass and fail.
+
+**Read the clean result below in that light.** "11 pass, 0 fail, 0 error" is
+true, but it is the number *after* a bug in the test infrastructure was found
+and fixed. The first run of this suite was not green.
 
 ## What the plan asked for
 
@@ -53,15 +87,22 @@ act was to audit itself.
 |---|---|---|
 | `break_borrowed` | Needs ≥3 free dice; the roll decides | A probe that **declines** is not a probe that **failed** — `{err\|skip}` with no verdict is now a SKIP |
 | `harness_trade` | Needed `FSIM`, absent from the page — only ever worked inside a bespoke wrapper | Loads its own dependency. A probe the suite can't run standalone isn't in the suite |
-| `bust_settle_p2` | Superseded scratch that happened to contain the word "verdict" | Explicit `SUITE: exclude` marker, not deleted — it measures the second roll, which is where the rival gate failed |
+| `bust_settle_p2` | Superseded scratch that happened to contain the word "verdict" | Explicit `SUITE: exclude` marker, not deleted — see below |
 
-**And the first baseline caught a hole in the runner itself.** `apv_bust_settle`
-returned `"no bust this roll"` — a **string** — for a check whose forced bust
-hadn't fired, and the `=== false` test passed it happily. An indeterminate check
-reported as a pass is exactly the lying-suite failure the runner's own header
-warns about. Verdict keys must now be booleans; anything else reports
-INDETERMINATE and is counted apart from both pass and fail. Re-recorded clean
-after the fix.
+**Why `bust_settle_p2` was kept rather than deleted.** The bust-timing bug had
+two halves. The player's was a flat 1,100ms budget. The rival's was subtler: the
+gate that waited for the dice tested `d.roll`, the physics playback tape, which
+only exists once the solve has *started* — and the start can be deferred by up to
+a second. On the **first** throw of a match the tape happened to start in time
+and the gate looked correct; on the **second** it hadn't, so "not thrown yet" was
+read as "finished" and the rival busted over four dice that hadn't been rolled.
+`bust_settle_p2` is the probe that isolates that second throw specifically. The
+shipped assertion (`apv_bust_settle`) covers the fixed behaviour, but if this
+ever regresses, the second-throw case is where it will show, and re-deriving that
+setup from scratch would cost an hour. It measures; it doesn't claim; it stays.
+
+(The runner's own bug — the string verdict — is covered in **The headline**
+above.)
 
 ## Guideline compliance
 
