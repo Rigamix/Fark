@@ -1,5 +1,10 @@
 # Effect system — how I'd tackle it
 
+> **STATUS: Phase 1 is complete (`1850e3c`) and its findings challenge Phases 3
+> and 4 as written.** Both carry a CHALLENGED banner below. The plan's own
+> closing instruction was *"start with Phase 1 alone and re-plan after it"* —
+> this is that re-plan, awaiting a decision. Map: `EFFECT_INVENTORY.md`.
+
 Plan for `docs/briefs/FARK_EFFECT_SYSTEM_PROPOSAL.md`. No code yet.
 
 **Backup done:** tag `pre-effect-system` on `a0aed7d`, pushed. That's the last
@@ -99,6 +104,27 @@ Three I'd expect to fight, from having just worked in this code:
 
 ### Phase 3 — The resolver and the ordering rule
 
+> **CHALLENGED BY PHASE 1'S FINDINGS — awaiting Denis. Do not build this as
+> written.** See `EFFECT_INVENTORY.md` §2b and the Phase 1 report.
+>
+> **The multiplier decision below should be dropped.** Kindred is the only
+> doubling in the game and it is NOT a multiplier: "double strength" means
+> something structurally different for each of the five whitelisted enchants —
+> Tithe 2× gold, Ward two-thirds instead of a half, Snare halves twice on one
+> shot, Snuff and Fog hold a seat two turns rather than two lanes. Break and
+> Trade are excluded because no coherent 2× exists. **Nothing multiplies, and
+> nothing will.** Settling an arithmetic rule for it invents a requirement.
+>
+> **What Phase 3 should settle instead: EFFECT LIFETIME.** Four enchants
+> (Snare, Snuff, Fog, Trade) are lane markers with a placement, a window and an
+> expiry — Snare's whole design correction was *shortening the window*. Nothing
+> in the vocabulary below expresses that, and it is the concept the content
+> actually needs.
+>
+> **The trigger bus is 69% built already.** `CFX` dispatches on seven hooks and
+> carries 20 of 29 live cards. This phase is finishing and naming it, not
+> designing it.
+
 The trigger bus, the three-phase resolution (Tier-2 modifiers → Tier-1 effects →
 Observers), and the additive-then-multiplicative rule.
 
@@ -107,6 +133,23 @@ proposal is right that this is the one that silently changes numbers later. Chea
 now, expensive after content depends on the accident.
 
 ### Phase 4 — Migrate, in dependency order
+
+> **CHALLENGED BY PHASE 1'S FINDINGS — awaiting Denis. Two corrections.**
+>
+> **1. The first group is wrong.** Enchants are called "newest, best
+> understood" — true, and they are also where the vocabulary needs its HARDEST
+> new concept: four of the seven are lifetime-markers and Quicksilver is a
+> permission rather than an effect. **The 20 cards already on `CFX` are the
+> honest first group** — the ones the existing vocabulary already fits.
+>
+> **2. A group is missing from this list entirely.** Nine live cards are
+> hardcoded at call sites with NO `CFX` entry: `bloom`, `cultivate`,
+> `vanguard_f`, `for_keeps` and all five tavern cards. A migration that
+> enumerates the effect table cannot see them, which is exactly where the
+> half-migration this plan warns about would leave its hole. (The five tavern
+> cards may not belong on a match-scoped bus at all — they act on the RUN.)
+>
+> Counts below are also stale: 69 items, not ~50; 29 live cards, not ~31.
 
 Enchants first (7, newest, best understood, already share `_iconFire`), then
 family traits (6), then cards (~31), then badges (8, the Tier-2 shape).
