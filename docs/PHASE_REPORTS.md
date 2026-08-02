@@ -437,8 +437,10 @@ prove it.
 
 # Phase 4 — The feat roster migration
 
-**Status:** complete, deployed `d6772fc`. Suite is 13 probes: 12 pass, 1 fail
-(two known reds inside it), 0 error. `FEAT_ART` is green for the first time.
+**Status:** complete, deployed `d6772fc`; all five open decisions ruled and the
+one code change shipped in `37eff42`. Suite is 13 probes, no regressions;
+`apv_table_totality` carries the two known Phase 2 reds. `FEAT_ART` is green for
+the first time.
 
 ## The headline: there were three rosters, not two
 
@@ -610,7 +612,7 @@ underneath it.
 - **Old saves keep dead ids.** A save holding `beat_corvus` simply stops
   rendering it. No migration written; the wall filters on `FEAT_ART` already.
 
-## Decisions needed
+## Decisions needed (all five ruled — see the section after next)
 
 1. **STICKY FINGERS' wording** — the amber rewrite above, or something else.
 2. **NO CLAIM's exact wording** — ruled as "rewrite against Ward"; this is the
@@ -632,6 +634,81 @@ own header calls this out as failure mode 5 — *"any probe that flaps between
 runs belongs in the measure pile, not here"*. It is a timing probe over real
 dice physics. Recorded green in the baseline; it needs hardening or demoting,
 and it should not be trusted as a regression signal until then.
+
+## RULED — all five, and one of them changed the code (`37eff42`)
+
+**1. STICKY FINGERS — not the amber rewrite. Back to Vagabond.** The draft was
+wrong on the name, and the reasoning is worth keeping: *sticky fingers* is a
+thief, not something that holds. Tar Pit was Vagabond-flavoured to begin with,
+so moving the feat to amber relocated it to a different family for a reason
+having nothing to do with the name.
+
+Now written against **Vagabond's break row**, which takes what the rival banked
+— a hand in someone else's purse. Same family the condition always belonged to,
+and the name finally describes the mechanic.
+
+Implemented: the hook sits inside the `steal>0` branch, so **only a steal that
+actually took something counts.** The row still fires when the rival busted
+their turn away and left nothing to lift, and a feat that paid out for reaching
+into an empty purse would be the same class of bug this whole phase exists to
+remove. The amber counter went with the draft — it existed only for it.
+
+**2. NO CLAIM — confirmed as written, shipped unchanged.** *No claim* is
+insurance language for a policy you carried and never had to use: Ward present,
+the bust-save never triggered because there was never a bust. The condition
+already reads exactly that.
+
+**3. The early-run drip-feed — nothing goes back into the feat list.** Adding
+early feats to patch an onboarding gap is the exact drift this migration just
+removed; re-diluting the wall on day one would undo the fix.
+
+Treated instead as a **separate problem with a separate answer**. Circles, gold
+and first-badge progress already work as early reward loops independent of the
+wall, and if the early game isn't landing, that is where it gets fixed.
+
+**Still open, and deliberately not resolved here.** This is a real tension
+between the design law (feats are rare, meaningful, never for sale) and real
+prior playtest feedback that progression was too slow. It wants a direct call
+rather than a unilateral one in either direction — and "don't touch the feat
+list" settles what *not* to do without settling what to do instead.
+
+**4. DEATH AND TAXES vs OWN THE NIGHT — not a bug, both fire.** They recognise
+different scopes of the same moment: one the specific fight, one completing the
+run. Several achievements landing on one climactic beat is an ordinary pattern.
+Cutting either would lose a real distinction to fix a coincidence that is not a
+problem. No change.
+
+**5. Bookkeeper's painting — leave it unused.** None of the 23 restored feats
+is ledger or counting content, so retargeting it now would recreate exactly the
+picture-doesn't-match-meaning problem this migration exists to fix. Corvus's
+identity is economy-adjacent, so a future economy-flavoured feat is its natural
+home. Forcing a mismatch today to avoid one idle asset is the worse trade.
+
+## And a gate that was not gating
+
+Caught while applying the STICKY FINGERS patch: **`zv_trade_parsegate.js` had
+been passing vacuously.** Its default argument was
+`tools/_zv_trade_scratch.html` — an untracked scratch build frozen since 31 July
+— so every bare `node tools/zv_trade_parsegate.js` compiled *that* file and
+reported PASS regardless of what had just been edited.
+
+The rule it enforces is *the parse gate must fail the chain*. It could not fail
+anything: this whole session's patches to `fark_proto.html` were gated against a
+file none of them touched.
+
+**Nothing was damaged** — the live file compiles clean, and the probe suite runs
+against the real served page, which is a stronger check that was passing all
+along. But the cheap check was worthless, and it was worthless silently.
+
+**Found by noticing the reported char count never moved across three different
+edits.** Not by reading the script — by a number that should have changed and
+did not.
+
+Fixed: the default is the game, a missing file exits 1, and **the file actually
+read is printed with its mtime**, so a stale input appears in the output instead
+of hiding behind the word PASS. Verified three ways — bare invocation gates
+`fark_proto.html`, a missing path fails, and an injected syntax error fails with
+exit 1.
 
 ## What's next
 

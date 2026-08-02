@@ -45,11 +45,24 @@ forever — and `FTEXT` held twelve authored descriptions that outranked the liv
 condition on the wall. Also `first_blood` awarded for the first **match** of a
 run rather than the first **boss**, so its painting hung for beating a drunk.
 
-**Five decisions are waiting on Denis** — see the Phase 4 report's *Decisions
-needed*. The two that actually change content: **STICKY FINGERS' wording** (Tar
-Pit is retired; written against amber's break-trigger as a first draft) and
-**the early-run drip-feed**, which the restore removes entirely — a new
-player's first hour now produces no wall at all.
+**All five decisions ruled**, one changed code (`37eff42`): STICKY FINGERS
+moved off amber and back to **Vagabond's break-row steal** — the name is a
+thief, not something that holds. NO CLAIM shipped as written. The
+Death&Taxes / Own the Night overlap stands. Bookkeeper's painting stays unused.
+
+**One is settled only halfway and is worth carrying forward.** The early-run
+drip-feed: ruled that **nothing goes back into the feat list** — that would be
+the same drift this migration removed. But the underlying tension (design law
+says feats are rare and never for sale; prior playtest feedback said
+progression was too slow) is unresolved, and the answer, if there is one,
+belongs in circles / gold / first-badge progress, not in loosening feat
+scarcity.
+
+**And the parse gate was not gating.** Its default argument pointed at an
+untracked scratch build frozen since 31 July, so every bare invocation reported
+PASS on a file none of the session's patches touched. Fixed in `37eff42` —
+default is the game, missing file exits 1, and the file read is printed with
+its mtime. Nothing was damaged; the live file compiles clean.
 
 ---
 
@@ -86,7 +99,10 @@ The game's font is **`'JMH Beda'`** (56 uses); `--font-px` is the old pixel font
 **Patches with backslashes go through a Write-tool `.py` file, never a bash
 heredoc.** Heredocs mangled a regex twice.
 
-**Run the parse gate after every edit:** `node tools/zv_trade_parsegate.js`.
+**Run the parse gate after every edit:** `node tools/zv_trade_parsegate.js`. It
+now prints the file it read and its mtime — **look at that line.** Its default
+used to be an untracked scratch build and it passed vacuously for a whole
+session. A gate that cannot fail is worse than no gate, because it is credited.
 
 **Run probes through `node tools/run_probes.js`, never `shoot.js` directly** —
 the runner has the pre-flight. The dev server dies often; when it does, every
