@@ -272,7 +272,39 @@ had collapsed it. The table gap is real; the bug is not. Still worth the
 ten-minute fix as defence-in-depth if the migration is ever bypassed, but it
 carries none of the urgency the headline implied.
 
-### FEAT_ART is WORSE than reported — the reclassification was premature
+### FEAT_ART, third answer, and this one is measured: TWO DIFFERENT ROSTERS
+
+I called it an art gap, then a behaviour bug. Both wrong, because I never looked
+in `Art/Assets/Feats`. There are **24 painted feats**. `FEAT_ART` maps **12**.
+
+But the other twelve are not simply unmapped — **they do not correspond to any
+shipped feat id.** Measured:
+
+**Painted, not in the code (12):** ForKeeps, FullBloom, GreenThumb,
+HisOwnMedecine, NoClaim, OmensTrue, OwnTheNight, PowderMonkey, SlowBoiled,
+StickyFingers, TwiceSaved, WishGranted.
+
+**Shipped, not painted (20):** crushing_win, lightning_round, big_turn,
+no_actives, full_straight, boss_slayer, hot_hand, one_turn_wonder,
+tempting_fate, brinksman_feat, boss_crusher, two_bosses, quick_climb,
+five_bosses, and the six `beat_<boss>` feats.
+
+**Those twelve painted names are the master brief's own §8 feat list** — GREEN
+THUMB, FULL BLOOM, SLOW BOILED, STICKY FINGERS, TWICE SAVED, NO CLAIM, POWDER
+MONKEY, WISH GRANTED, OMENS TRUE, FOR KEEPS, HIS OWN MEDICINE, OWN THE NIGHT.
+
+So this is not a table with holes. **The art was painted for the brief's feat
+roster, and the code ships a different one.** Twelve overlap; twelve paintings
+have no feat; twenty feats have no painting.
+
+That is a content decision, not a bug: which roster is real. Nothing to fix
+until that is answered.
+
+**Three wrong answers before measuring, on the same question.** The first two
+were reasoned from a changelog and from one consumer; this one is counted off
+the filesystem. The standing rule exists for exactly this.
+
+### (superseded) FEAT_ART is WORSE than reported — the reclassification was premature
 
 I downgraded it to "an art gap" after checking **one** consumer, the overlay path
 in `_drainFeatUnlockQueue`. There are **seven**. The others are the feats wall:
