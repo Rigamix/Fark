@@ -1,9 +1,9 @@
 # Effect system — how I'd tackle it
 
-> **STATUS: Phase 1 is complete (`1850e3c`) and its findings challenge Phases 3
-> and 4 as written.** Both carry a CHALLENGED banner below. The plan's own
-> closing instruction was *"start with Phase 1 alone and re-plan after it"* —
-> this is that re-plan, awaiting a decision. Map: `EFFECT_INVENTORY.md`.
+> **STATUS: Phase 1 complete. The re-plan it produced was RULED — all three
+> changes taken.** Phases 3 and 4 below are rewritten accordingly; the
+> superseded text is kept underneath each, struck, so the change is traceable.
+> Map: `EFFECT_INVENTORY.md`.
 
 Plan for `docs/briefs/FARK_EFFECT_SYSTEM_PROPOSAL.md`. No code yet.
 
@@ -104,10 +104,18 @@ Three I'd expect to fight, from having just worked in this code:
 
 ### Phase 3 — The resolver and the ordering rule
 
-> **CHALLENGED BY PHASE 1'S FINDINGS — awaiting Denis. Do not build this as
-> written.** See `EFFECT_INVENTORY.md` §2b and the Phase 1 report.
+> **RULED — all three re-plan changes taken.** What follows is the current
+> shape of this phase. See `EFFECT_INVENTORY.md` §2b and the Phase 1 report.
 >
-> **The multiplier decision below should be dropped.** Kindred is the only
+> **The multiplier decision is DROPPED.** Re-derived rather than taken on the
+> count: Ward becomes a two-thirds save (not "half times two", which is not a
+> coherent number), Snare halves twice on the same window (not "the fraction
+> times two"), Snuff and Fog extend to two turns, Break and Trade never double.
+> **None of these is one operation scaled by a shared multiplier** — they are
+> five hand-authored alternate definitions that all get colloquially called
+> doubling. A primitive built on numeric multiplication was never going to fit.
+>
+> Kindred is the only
 > doubling in the game and it is NOT a multiplier: "double strength" means
 > something structurally different for each of the five whitelisted enchants —
 > Tithe 2× gold, Ward two-thirds instead of a half, Snare halves twice on one
@@ -115,7 +123,9 @@ Three I'd expect to fight, from having just worked in this code:
 > Trade are excluded because no coherent 2× exists. **Nothing multiplies, and
 > nothing will.** Settling an arithmetic rule for it invents a requirement.
 >
-> **What Phase 3 should settle instead: EFFECT LIFETIME.** Four enchants
+> **PHASE 3 SETTLES EFFECT LIFETIME INSTEAD.** A real shared architectural
+> need: Ward's armed-state duration, and Snare's mark surviving into the
+> opponent's next turn specifically. Four enchants
 > (Snare, Snuff, Fog, Trade) are lane markers with a placement, a window and an
 > expiry — Snare's whole design correction was *shortening the window*. Nothing
 > in the vocabulary below expresses that, and it is the concept the content
@@ -134,20 +144,25 @@ now, expensive after content depends on the accident.
 
 ### Phase 4 — Migrate, in dependency order
 
-> **CHALLENGED BY PHASE 1'S FINDINGS — awaiting Denis. Two corrections.**
+> **RULED — both corrections taken, and a third group added.**
 >
-> **1. The first group is wrong.** Enchants are called "newest, best
-> understood" — true, and they are also where the vocabulary needs its HARDEST
-> new concept: four of the seven are lifetime-markers and Quicksilver is a
-> permission rather than an effect. **The 20 cards already on `CFX` are the
-> honest first group** — the ones the existing vocabulary already fits.
+> **1. FIRST GROUP: the 20 cards already on `CFX`.** Start where partial
+> infrastructure exists, prove the machinery, then take the hard cases. The
+> enchants were only ASSUMED simple because the original proposal's worked
+> examples happened to use them — that was which examples got picked, not
+> evidence. Four of the seven are lifetime-markers and Quicksilver is a
+> permission grant; none is a simple fire-once trigger.
 >
-> **2. A group is missing from this list entirely.** Nine live cards are
-> hardcoded at call sites with NO `CFX` entry: `bloom`, `cultivate`,
-> `vanguard_f`, `for_keeps` and all five tavern cards. A migration that
-> enumerates the effect table cannot see them, which is exactly where the
-> half-migration this plan warns about would leave its hole. (The five tavern
-> cards may not belong on a match-scoped bus at all — they act on the RUN.)
+> **2. NEW EXPLICIT GROUP: the 9 hardcoded cards** — `bloom`, `cultivate`,
+> `vanguard_f`, `for_keeps` and all five tavern cards. No `CFX` entry, so a
+> migration that enumerates the effect table **structurally cannot see them.**
+>
+> Ruled as the most important finding in the re-plan, not a footnote: this is
+> the identical *"a lookup and its true domain drifted, and nothing compared
+> them"* pattern the visual-integrity plan exists to catch, surfacing in the
+> effect system instead. Finding it before the migration runs is the plan
+> working. (The five tavern cards may not belong on a match-scoped bus at all —
+> they act on the RUN.)
 >
 > Counts below are also stale: 69 items, not ~50; 29 live cards, not ~31.
 
