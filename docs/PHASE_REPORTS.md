@@ -351,3 +351,84 @@ an engineering one.** Twenty feats have no art. Since P414 that costs nothing
 functionally. Options are to commission twenty, to cut the feat list to the
 twelve that have art, or to accept that most feats are text-only on the wall.
 
+---
+
+# Phase 3 — Does the rule exist, and does it hit anything?
+
+**Status:** complete, deployed `2b72452`. Suite now 13 probes: 12 pass, 1 known
+red (the relic `.dtype-` gap from Phase 2).
+
+## The headline: three for three — the check found bugs in the check
+
+Phase 1's runner caught a bug in its own verdict-checking. Phase 2's assertion
+found an unpredicted red. **Phase 3's first run reported ten failures, and all
+ten were wrong.**
+
+1. **Exact-string presence flagged `.win-art` and `.win-board` as missing.** Both
+   are present — as `#end-ov .win-art`, because that specificity was *raised on
+   purpose* to beat `#end-ov>*{position:relative}`. **An exact-match lint fails
+   precisely the rules someone took care over**, which is the worst possible bias
+   a lint can have. Now matches on the token.
+2. **`#playerDiceRow` was box-checked at phase `idle`**, where it legitimately has
+   no size because no dice have been rolled. Asserting a box on correct
+   behaviour is how a suite teaches people to ignore it.
+3. **The draft selectors were checked at a fixed 3s**, before the win screen's
+   animation had rendered the offer. Now waits for it.
+
+None of the three was a game bug. All three would have been false failures — the
+failure mode that costs a suite its credibility faster than missing a real bug.
+
+**And a fourth, mine rather than the probe's:** I ran it directly instead of
+through `run_probes.js`, the dev server was down, and all ten checks "failed".
+That is exactly what the pre-flight built in Phase 1 exists to prevent, and I
+bypassed it by not using my own tool.
+
+## What the plan asked for
+
+Denis's correction to the visual plan, which split a check I had conflated:
+
+> *"3a asks whether the browser has the rule. 3b asks whether the rule found the
+> thing. Two of today's bugs sat on each side of that line."*
+
+## What was built
+
+`tools/apv_css_live.js` — 10 checks over 3 screens.
+
+- **3a, presence:** would have caught `.ptcard .lwho`, swallowed whole when a
+  comment lost its opener and CSS error-recovery ate the following rule. Four
+  rounds of "the busts are too small" were that one rule never parsing.
+- **3b, matching:** would have caught `.end-draft-slots` — which parsed
+  perfectly and targeted a class absent from the screen it was written for. 3a
+  passes that; only asking whether it matches a live element catches it.
+- **3b extended to a non-zero box:** would have caught `.win-art` collapsing to
+  0×0 after losing a specificity fight.
+
+**It drives the game** — home → patron select → match → win — and checks each
+set while that screen is actually up. A match-screen selector cannot match on the
+home screen, so a naive sweep reports false failures for everything off stage.
+
+## Guideline compliance
+
+| Requirement | Where from | Met? |
+|---|---|---|
+| Split 3a from 3b | Denis's correction | **Yes** — separate checks, separate verdict keys |
+| Additive; no game logic | Visual plan | **Yes** — one file in `tools/` |
+| Verify computed, never authored | Standing rule | **Yes** — reads the CSSOM and live boxes |
+| Record known-red | Visual plan | **Yes** — baseline re-recorded at 13 probes |
+| Anticipate order-of-operations | Denis's instruction | **Partly** — I anticipated the screen problem and designed for it, but not the animation-timing one, and I bypassed my own pre-flight |
+
+## What this does *not* cover
+
+- **10 selectors, not all of them.** These are the ones with a failure history.
+- **A rule can match and still be wrong.** Same limit as Phase 2's totality: this
+  proves a rule exists and hits something, never that what it does is right.
+
+## What's next
+
+The feat roster migration — 32 → the brief's 24, now ruled. Sized in
+`FEAT_DISCREPANCIES.md` and deliberately not started at the end of a long
+session: it is a content change across the whole list, and starting without room
+to finish is how a half-migration happens.
+
+`FEAT_ART` should go 12/32 → 23/23 when it lands, and the Phase 2 baseline will
+prove it.
