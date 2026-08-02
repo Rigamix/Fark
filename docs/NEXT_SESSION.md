@@ -92,9 +92,18 @@ BRANCH:path`), then remove and re-merge. **Never push to `main`.**
 **Never `git add -A`.** Denis generates art into `Art/` mid-session. Stage
 explicit paths only.
 
-**`Art/Assets/` is the source of truth. `assets/` is the PREVIOUS game's.** I
-reached into the wrong one three times today — the font, the coin, the diamond.
-The game's font is **`'JMH Beda'`** (56 uses); `--font-px` is the old pixel font.
+**`Art/Assets/` is where ART comes from. `assets/` is NOT simply dead** — and
+the flat version of this rule, which I wrote here myself, is wrong. Measured:
+**91 live references point into `assets/`**, including **every font in the
+game**. `'JMH Beda'` — the font I kept telling Denis is "the game's font" —
+loads from `assets/_mockups/new_main/JMH Beda.ttf`. Following "never look in
+`assets/`" literally would break the page.
+
+The true rule is narrower: **new art goes in `Art/Assets/`; `assets/` still
+holds the fonts and some legacy environment/night art nobody has replaced yet.**
+The three mistakes that produced the flat rule (font, coin, diamond) were about
+*art*, not about the folder as a whole. `--font-px` is still the old pixel font
+and still the wrong one to reach for.
 
 **Patches with backslashes go through a Write-tool `.py` file, never a bash
 heredoc.** Heredocs mangled a regex twice.
