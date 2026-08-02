@@ -9629,6 +9629,12 @@ function save(){
   try{localStorage.setItem('gambit4_proto',JSON.stringify(S));}catch(e){/* storage full or unavailable */}}
 function startNewRun(){
   S.run=_freshRun();
+  /* BOSS COUNTERS ARE PER-RUN. npcState carries each rival's streak (which
+     feeds their aggression) and their carryover (which hands the player a
+     head start), and it lived on S - so it persisted across runs. A fixed
+     cross-run read becomes a memorised answer after the first encounter,
+     which is the opposite of the "adapt your plan" intent. Fresh each run. */
+  S.npcState={};
   S.run._famFirstDraft=true;/* brief §4: draft 1 of 3 before the first seat */
   /* Snapshot renown at run start so the death summary can show how much
      was banked THIS run (renown is the one thing that persists). */
@@ -10809,13 +10815,33 @@ const RUNGS=[
        the enchant-icon fire path. The old wording is also why the designer had
        to ask what Zero Hour even was: its only explanation leaned on a word the
        game never defines. */
-    tell:{id:'last_call',name:'ZERO HOUR',desc:"“Take an enchanted face at my table and your turn is over.”",icon:'🍻'}},
+    /* GROG — LAST CALL, restored under its OWN id and retuned to 800.
+       It never actually went away: the mechanic sat in an `if(false)` block
+       at 500 while the ID was recycled to carry ZERO HOUR, which is how the
+       retired-rules guard ended up switching off the live rule wearing the
+       dead one's name. 800 is not a fresh number - it is the same bar
+       TEETOTALLER uses for "never a bank under X", so the game states one
+       threshold rather than two arbitrary ones. 500 read weak because most
+       ordinary turns clear it without trying. */
+    tell:{id:'last_call',name:'LAST CALL',desc:"“Nothing under eight hundred crosses my bar. Drink deep or get out.”",icon:'🍻',minBank:800}},
   {id:1,name:'MABEL',key:'peasant',icon:'👨‍🌾',tier:'regular',target:5600,gold:175,buyIn:20,
     boss:null,bossDesc:null,
     agg:.58,cardRarity:'tin',wager:true,wagerCount:1,wagerMode:'best',minBank:200,diceStop:2,chaotic:false,adaptive:false,
     dice:['bone','bone','iron','iron','amber','amber'],
     cardPool:['the_last_stitch_npc','measure_twice','worn_thimble','the_nightshift','mabels_pinch'],cardCount:3,
-    tell:{id:'steeped',name:'STEEPED',desc:"“Each extra roll, I'll add 100 to your bank — bust and it all spills.”",icon:'🍵',perRoll:100}},
+    /* MABEL — ZERO HOUR, moved off Grog. Chosen by NAME, not by slot:
+       Aldric already carries an enchant-suppression rule (Still Waters) and
+       Brutus already carries a turn-length constraint (Drill Order), so
+       either would have doubled a theme that boss already owns. Steeped is
+       pure passive accumulation with no overlap with enchant tempo.
+       THE VOICE MOVES WITH THE RULE. Grog's line was a bar-closing line and
+       read wrong in Mabel's mouth; hers is stitchwork, which is also what
+       her cards are made of. The mechanic is untouched. */
+    /* "enchanted", never "marked". A mark on a die IS an enchant now, and the
+       terminology probe asserts no tell says otherwise — it caught this line
+       within a minute of it being written. The word was inherited from Grog's
+       original Zero Hour text, which had been corrected for the same reason. */
+    tell:{id:'zero_hour',name:'ZERO HOUR',desc:"“Take an enchanted face at my table, dear, and I cut the thread.”",icon:'✂️'}},
   {id:2,name:'FINNICK',key:'commoner',icon:'🎭',tier:'known',target:7200,gold:250,buyIn:35,
     boss:null,bossDesc:null,
     agg:.62,cardRarity:'tin',wager:true,wagerCount:1,wagerMode:'best',minBank:250,diceStop:2,chaotic:false,adaptive:true,
@@ -11191,11 +11217,26 @@ function _initHandicapHUD(){
    match-long passive that warps play (Balatro-style boss blind).
    _applyTell() sets up G-side state. _initTellHUD() builds a persistent
    badge near the player dice. _showTellSplash() does the match-start reveal. */
-var _SEAL_POOL=['last_call','steeped','pickpocket','in_arrears','drill_order','counterfeit','reckoning'];
+/* zero_hour joins; last_call and steeped both stay - one is a live badge
+   rule again, the other is parked but still perfectly playable as a cursed
+   seat, which is the whole point of parking it rather than deleting it. */
+var _SEAL_POOL=['last_call','zero_hour','steeped','pickpocket','in_arrears','drill_order','counterfeit','reckoning'];
 function _rollSealTell(){return _SEAL_POOL[Math.floor(Math.random()*_SEAL_POOL.length)];}
+/* PARKED RULES — real, working table rules that no boss currently wears.
+   Steeped is the first: Zero Hour took Mabel's badge, and every other
+   candidate boss already carried a rule of their own, so SOMETHING was
+   always going to be displaced whichever name got picked. Deleting tested,
+   shipped work once displacement is unavoidable is the worse trade.
+   THIS TABLE HAS TO EXIST because _tellById scans RUNGS - a rule only
+   existed while a boss carried it, so "keep the rule, drop the badge" was
+   not expressible at all: the seal pool would have looked Steeped up and
+   got null. Cursed seats already draw from the full rule pool, so Steeped
+   keeps exactly the role it always had, minus one name attached to it.
+   If a future reshuffle needs an eighth rule, it is sitting here intact. */
+var PARKED_TELLS={steeped:{id:'steeped',name:'STEEPED',desc:"“Each extra roll, I'll add 100 to your bank — bust and it all spills.”",icon:'🍵',perRoll:100}};
 function _tellById(id){
   for(var i=0;i<RUNGS.length;i++)if(RUNGS[i].tell&&RUNGS[i].tell.id===id)return RUNGS[i].tell;
-  return null;
+  return PARKED_TELLS[id]||null;
 }
 /* is a table rule live for this side? boss tell binds the player only;
    a sleeved tell binds BOTH sides (brief §7) */
@@ -11218,7 +11259,14 @@ function _tellById(id){
    the ids sat here, a SLEEVED or SEALED Still Waters and a sleeved or sealed
    Kindred did nothing whatever - and both are claimable as boss spoils, so
    that was a rule the player had won and could not use. */
-var _RETIRED_RULES={last_call:1};
+/* EMPTY, AND THAT IS THE FIX. last_call sat here because the id carried
+   ZERO HOUR while the table still called the id retired - so a sleeved or
+   sealed Zero Hour did nothing, on a rule the player can WIN as boss
+   spoils. The two rules have their own ids now (last_call / zero_hour) and
+   both are live, so there is nothing left to guard against. Kept as an
+   empty table rather than deleted: the mechanism is still the right one
+   the next time a rule is retired ahead of its replacement. */
+var _RETIRED_RULES={};
 function _ruleActive(id,side){
   if(!G)return false;
   if(_RETIRED_RULES[id]&&!(G._tell&&G._tell.id===id))return false;
@@ -11274,6 +11322,7 @@ function _applyTell(){
   G._tellState={};
   switch(G._tell.id){
     case 'last_call':/* threshold-only, no per-match state */ break;
+    case 'zero_hour':/* fires off the icon path, no per-match state */ break;
     case 'steeped': G._tellState.bonus=0; break;
     case 'pickpocket':/* per-roll RNG, no persistent state */ break;
     case 'in_arrears': G._tellState.totalRollCost=0; break;
@@ -17865,8 +17914,10 @@ function _iconFire(d,side){
   var mult=(def.doubles&&_kindredActive())?2:1;
   try{def.fire({die:d,side:side||'p',lane:_laneOf(d),mult:mult});}
   catch(e){try{console.error('icon '+d.ench.t,e);}catch(e2){}}
-  /* Grog's Zero Hour: keeping any icon face ends the acting side's turn */
-  try{if(G&&G._tell&&G._tell.id==='last_call')G._zeroHourEnds=true;}catch(e){}
+  /* ZERO HOUR: keeping any icon face ends the acting side's turn. Reads
+     _ruleActive, not G._tell - the direct read is exactly why the rule
+     worked as a badge and was dead through a sleeve and a sealed seat. */
+  try{if(_ruleActive('zero_hour','p'))G._zeroHourEnds=true;}catch(e){}
   return 0;/* ALWAYS zero */
 }
 /* GROG - ZERO HOUR: a branded keep ends the turn on the spot, whichever
@@ -22529,7 +22580,7 @@ function _projectedBank(){
   var t=(G.turnPts||0);
   try{
     if(G._tell){
-      if(G._tell.id==='steeped'&&G._tellState&&G._tellState.bonus>0)t+=G._tellState.bonus;
+      if(_ruleActive('steeped','p')&&G._tellState&&G._tellState.bonus>0)t+=G._tellState.bonus;
       if(typeof _ruleActive==='function'&&_ruleActive('reckoning','p')
          &&G._tellState&&G._tellState.lastNpcBank>0&&t<G._tellState.lastNpcBank)return 0;
     }
@@ -23554,7 +23605,7 @@ function startPTurn(){
   /* ── TELL: turn-start hooks ── */
   if(G._tell){
     /* Steeped: reset accumulated bonus each turn */
-    if(G._tell.id==='steeped'&&G._tellState){G._tellState.bonus=0;_updateTellHUD();}
+    if(_ruleActive('steeped','p')&&G._tellState){G._tellState.bonus=0;_updateTellHUD();}
     /* Drill Order: refresh roll counter HUD */
     /* the RULE, not the tell: a sleeved Drill Order never refreshed, so its
      count sat wherever the turn started. Each surface ignores the call when it
@@ -25465,7 +25516,7 @@ function doBust(){
   /* Stakes Rising bonus is also lost on bust (it was "on the table" turn pts) */
   G._turnBonusPot=0;
   /* TELL: Steeped — bust loses accumulated bonus, refresh HUD immediately */
-  if(G._tell&&G._tell.id==='steeped'&&G._tellState){G._tellState.bonus=0;_updateTellHUD();}
+  if(_ruleActive('steeped','p')&&G._tellState){G._tellState.bonus=0;_updateTellHUD();}
   /* ── Handicap: Rising Stakes — reset streak on bust ── */
   if(G._handicap==='rising_stakes'&&G._rsBankStreak>1){
     G._rsBankStreak=0;G._rsMultiplier=1.0;
@@ -26203,7 +26254,7 @@ function handleBank(){
   /* ── TELL HOOKS (applied after all card bonuses, before celebration) ── */
   if(G._tell){
     /* Steeped (Mabel): +50 per roll past first, accumulated in G._tellState.bonus */
-    if(G._tell.id==='steeped'&&G._tellState&&G._tellState.bonus>0){
+    if(_ruleActive('steeped','p')&&G._tellState&&G._tellState.bonus>0){
       total+=G._tellState.bonus;
       bonusMsg+=' +'+G._tellState.bonus+' STEEPED';
       G._tellState.bonus=0;_updateTellHUD();
@@ -26217,15 +26268,20 @@ function handleBank(){
       try{Haptic.bust&&Haptic.bust();}catch(e){}
       _flashTellRule();
     }
-    /* Last Call (Grog): bank below threshold scores 0 */
-    /* Zero Hour replaces Last Call's under-threshold rejection: the badge
-       now ends the turn on an icon keep instead of voiding small banks. */
-    if(false){
-      var _lcT=500;
-      total=0;bonusMsg='';
-      /* Distinct harsh sound — was reusing SFX.bust which felt like a
-         normal bust; this is a house-rule rejection and deserves its own
-         tone (square-wave descending fail + thud). */
+    /* LAST CALL (Grog): a bank under the threshold is refused outright.
+       Back on after sitting in an `if(false)` since Zero Hour took the id.
+       THE THRESHOLD COMES FROM THE RULE, not from G._tell, because a
+       sleeved or sealed Last Call has no G._tell to read - the same
+       direct-read mistake that left Zero Hour dead outside Grog's badge.
+       total>0 guards it: a scoreless turn is a bust, not a refusal, and
+       handleBank already returns before here on total<=0. */
+    var _lcRule=_tellById('last_call');
+    var _lcT=(_lcRule&&_lcRule.minBank)||800;
+    if(_ruleActive('last_call','p')&&total>0&&total<_lcT){
+      total=0;bonusMsg=' LAST CALL — BANK <'+_lcT;
+      setStatusMsg('LAST CALL — NOTHING UNDER '+_lcT,'red');
+      /* Distinct harsh sound - reusing SFX.bust felt like a normal bust;
+         this is a house-rule rejection and deserves its own tone. */
       try{(SFX.lastCallFail||SFX.bust).call(SFX);}catch(e){}
       try{Haptic.bust&&Haptic.bust();}catch(e){}
       _flashTellRule();
