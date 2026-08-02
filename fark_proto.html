@@ -9393,6 +9393,61 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
 <script src="assets/models/dice/ench_icons.js"></script>
 <script src="assets/models/dice/skins.js"></script>
 <script>
+/* ══ FK_ART — one place the asset paths live ═════════════════════════════
+   Phase 5 of the visual-integrity plan.
+
+   THE TWO TREES, stated once so nobody has to work it out again:
+     Art/Assets/   the CURRENT art. Everything new goes here.
+     assets/       the previous game's tree, and STILL LOAD-BEARING. Measured:
+                   47 live references with no replacement anywhere in the
+                   current tree — every font, all audio, the nine character
+                   portraits, the eight match frames, the Night_Art UI set.
+                   "Never look in assets/" is a rule that would break the page.
+                   The real rule is narrower: NEW ART GOES IN Art/Assets.
+
+   This table exists because of a specific, repeated failure — reaching for the
+   wrong source when writing new code. The font, the coin and the diamond were
+   each picked out of the old tree in a single session, not because the code
+   pointed there but because nothing said which tree was which. Every entry
+   below is either a directory something already used, or a single file that
+   has been got wrong before.
+
+   ADDING TO IT: put the path here, not at the call site, and
+   tools/apv_asset_registry.js will check it resolves over HTTP on the next
+   run. A path that only exists in one function is a path the next person
+   guesses at. */
+var FK_ART={
+  /* ── directories, current tree ── */
+  homescreen:   'Art/Assets/Homescreen/',
+  buttons:      'Art/Assets/Buttons/',   /* was declared twice, 20k lines apart */
+  icons:        'Art/Assets/Icons/',
+  newRun:       'Art/Assets/NewRun/',
+  store:        'Art/Assets/Store/',
+  patronFrames: 'Art/Assets/Frames/Patrons/',
+  patronChars:  'Art/Assets/Frames/Patrons/Characters/optimized/',
+  traits:       'Art/Assets/traits/',
+  props:        'Art/Assets/Match/Commoner/Props/',
+  lastOrders:   'Art/Assets/LastOrders/optimized/',
+  hearts:       'Art/Assets/Hearts/optimized/',
+  bossBg:       'Art/Assets/Backgrounds/MAIN/',
+  feats:        'Art/Assets/Feats/',
+  winPlates:    'Art/Assets/Icons/Wins/optimized/',
+  /* ── directories, OLD tree — deliberate, measured, not stale ── */
+  mockups:      'assets/_mockups/new_main/',  /* hearts + the game's font live here */
+  enchIcons:    'assets/ench_icons/',
+  fonts:        'assets/Fonts/',
+  /* ── single files this project has picked wrong before ── */
+  coin:         'Art/Assets/Icons/optimized/coin_opt.webp',
+  diamond:      'Art/Assets/Panels/optimized/SitDown_diamond_opt.webp',
+  shelfBg:      'Art/Assets/Shelf/optimized/shelf_bg_opt.webp',
+  /* NOT A PATH — the family name, and the entry most likely to save someone.
+     `--font-px` is 'Alagard','Press Start 2P', the PREVIOUS game's pixel font,
+     and it reads as the obvious choice right up until Denis points out the
+     score is in the wrong typeface. The game's font is JMH Beda, 56 uses. */
+  font:         "'JMH Beda'"
+};
+</script>
+<script>
 /* Does this engine implement CanvasRenderingContext2D.filter? WebKit shipped
    it in Safari 18; before that the assignment silently does nothing, which
    quietly broke both the selection glow and the dice ground shadows on
@@ -13342,7 +13397,7 @@ function famRunDraftShow(){
       _starterOffer.push(pool.splice(Math.floor(Math.random()*pool.length),1)[0]);
     }
   }
-  var NR='Art/Assets/NewRun/';
+  var NR=FK_ART.newRun;
   var ov=document.createElement('div');ov.id='famRunDraft';
   ov.style.cssText='position:fixed;inset:0;background:#0a0806;z-index:9500';
   var dice='';
@@ -13759,7 +13814,7 @@ function famLoadoutShow(){
   _getS();S.run.fcards=S.run.fcards||[];_famDiceMigrate();_enchInit();_gbSheetInfra();
   var old=document.getElementById('gbLoadout');if(old)old.remove();
   var ov=document.createElement('div');ov.id='gbLoadout';
-  var BG='Art/Assets/Shelf/optimized/shelf_bg_opt.webp';
+  var BG=FK_ART.shelfBg;
   /* badge case: claimed tells wear their boss's brooch (debug flag
      lays out all nine while the system grows into badges proper) */
   var BADGE={grog:'TheBoot',finnick:'ThePalm',mabel:'TheKettle',brutus:'TheDentedHelm',
@@ -14473,7 +14528,7 @@ function _gbTitle(){
   var scr=document.getElementById('screen-menu');if(!scr)return;
   var host=document.getElementById('gbTitle');
   if(!host){host=document.createElement('div');host.id='gbTitle';scr.appendChild(host);}
-  var HS='Art/Assets/Homescreen/',BT='Art/Assets/Buttons/',IC='Art/Assets/Icons/';
+  var HS=FK_ART.homescreen,BT=FK_ART.buttons,IC=FK_ART.icons;
   var live=!!(S.run&&!S.run._died&&(S.run.tier||0)<TIERS.length&&(S.run.night||(S.run.tier||0)>0));
   var btns='';
   if(live){
@@ -14868,12 +14923,12 @@ function _gbBarred(){
   host.innerHTML=h;
 }
 /* ═══ PAINTED ROOM (P22) — main-screen mockup wired to live state ═══ */
-var PT_A='assets/_mockups/new_main/';
-var PT_P='Art/Assets/Frames/Patrons/';
+var PT_A=FK_ART.mockups;
+var PT_P=FK_ART.patronFrames;
 /* the busts live in Characters/ and are served from the optimized copies, the
    same way every other picture in this game is - the masters are 7.2MB of PNG
    against 0.9MB of webp, and the phone downloads whichever this points at. */
-var PT_CHAR='Art/Assets/Frames/Patrons/Characters/optimized/';
+var PT_CHAR=FK_ART.patronChars;
 var PT_CHAR_EXT='_opt.webp';
 /* ALL of them. This was four names while twenty-four busts sat on disk, so
    twenty patrons could never appear however long anyone played. */
@@ -14881,7 +14936,7 @@ var PT_CHAR_EXT='_opt.webp';
    had been written and unseatable since the lore system went in. */
 var PT_ART_POOL=['Corbin','Dunstan','Eira','Golgoth','Krox','Mudge','Nebb','Nell','Nix','Osgood','Pell','Poll','Rask','Regis','Remny','Rilla','Roan','Sil','Sparr','Squib','Thorne','Tuck','Twill','Vess','Odo','Ollis','Peck','Ferrand','Fenn','Tam'];
 var PT_TRAIT={ones:'steady',hoard:'greedy',aggro:'reckless',triples:'strong',straights:'orderly',combo:'cunning'};
-var PT_TRAITDIR='Art/Assets/traits/';
+var PT_TRAITDIR=FK_ART.traits;
 var PT_COLORS=['green','purple','blue','red'];
 /* ══ PATRON LORE ═══════════════════════════════════════════════════════════
    FARK_PATRON_LORE.md, implemented as its own brief demands: ONE resolver,
@@ -15484,7 +15539,7 @@ function _ptRoom(host,tier,bossReady){
      Missing art falls back to the mockup tavern (bg3/fg3). */
   var bossStage=bossReady?'ready':((pts>=Math.ceil(need/2)&&pts>0)?'curious':'idle');
   var nice=bossName.charAt(0)+bossName.slice(1).toLowerCase();
-  var bossDir='Art/Assets/Backgrounds/MAIN/'+bossName+'/';
+  var bossDir=FK_ART.bossBg+bossName+'/';
   var envBg=bossDir+nice+'_env_BG.png';
   var envFg=bossDir+nice+'_env_Foreground_'+bossStage+'.png';
   var fgSwap=(window._ptBossStage&&window._ptBossStage!==bossStage&&window._ptBossKey===bossName);
@@ -16666,7 +16721,7 @@ function _matchDress(isBoss){
      should read as a towel, not as a cube. */
   function _propBase(n){return String(n||'').replace(/_?\d+$/,'');}
   function _propAspect(n){return ASPECT[n]||ASPECT[_propBase(n)]||[1,1];}
-  var PP='Art/Assets/Match/Commoner/Props/';
+  var PP=FK_ART.props;
   var TOP={TL:[-4,15],TR:[78,15]};
   var COIN=['coins','singleCoin'],CUP=['mug01','mug_empty','jug','bottle'];
   var REST=['bread','candle','cheese','olives','package','pouch','pouch02','spoon','towel'];
@@ -31722,7 +31777,7 @@ function _gbShop(fresh){
   if(fresh)_stFresh=true;
   if(!S.run.diceStock)S.run.diceStock=_initDiceStock();
   var roll=_shopRollNight();
-  var ST='Art/Assets/Store/';
+  var ST=FK_ART.store;
   /* the night's stock fills up to four stands */
   var owned=(S.run.dice||[]).concat(S.run.diceInv||[]);
   var famStock=[],mundane=[];
@@ -32228,7 +32283,7 @@ function _wardOwned(skipIdx){
    brands then Quicksilver, which is the odd one out (a whole-die ability with
    no face at all, so it skips the brand step entirely). */
 var ENCH_GRID=['tithe','ward','snare','break','trade','snuff','fog','quicksilver'];
-var ENCH_ICON_DIR='assets/ench_icons/';
+var ENCH_ICON_DIR=FK_ART.enchIcons;
 /* names that do not fit a plaque on one line, broken where they read best */
 var ENCH_LABEL={quicksilver:'Quick<br>silver'};
 function _enchShopHTML(){
@@ -34312,7 +34367,7 @@ function _showLastOrders(){
      was one tap behind an overlay that contradicted it. On the death path it
      steps aside and the painted screen is the ending. */
   if(S&&S.run&&S.run._died){showScreen('gameover');return;}
-  var LO='Art/Assets/LastOrders/optimized/',HRT='Art/Assets/Hearts/optimized/';
+  var LO=FK_ART.lastOrders,HRT=FK_ART.hearts;
   var c=Math.max(0,S.run.coins||0);/* after the heart was taken */
   var night=(S.run.tier||0)+1;
   /* three hearts, from the art rather than from emoji - full while they last,
@@ -35230,7 +35285,7 @@ function _goGameOver(){
       +'</div>';
   });
   host.innerHTML=h;
-  var BTP='Art/Assets/Buttons/';
+  var BTP=FK_ART.buttons;
   btns.innerHTML=
      '<div class="hsBtn" onclick="SFX.nav();startNewRun();showScreen(\'gauntlet\')">'
     +'<img class="plq" src="'+BTP+'Button_new_01.png" alt=""><span>NEW RUN</span></div>'
