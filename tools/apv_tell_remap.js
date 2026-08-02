@@ -44,10 +44,18 @@ function doors(id){
   G = { _tell: null,       _sleeve: null, _sealRule: id   }; r.seal   = _ruleActive(id, 'p');
   return r;
 }
+/* ALL EIGHT, plus the parked one. P428 renamed three ids to match the rules
+   they carry (first_strike/still_waters/kindred, formerly in_arrears/
+   confession/counterfeit) - a rename is exactly the change that can leave a
+   rule resolving through one door and not another, so every rule the game has
+   is walked rather than a chosen five. */
 out.doors = {};
-['last_call', 'zero_hour', 'steeped', 'reckoning', 'drill_order'].forEach(id => {
+['last_call', 'zero_hour', 'pickpocket', 'first_strike', 'drill_order',
+ 'still_waters', 'kindred', 'reckoning', 'steeped'].forEach(id => {
   out.doors[id] = doors(id);
 });
+/* and no rule may still answer to a retired id */
+out.staleIds = ['in_arrears', 'confession', 'counterfeit'].filter(id => !!_tellById(id));
 out.retiredRules = Object.keys(_RETIRED_RULES || {});
 
 /* ── the payout path, not just the flag ── */
@@ -73,6 +81,9 @@ out.verdict = {
   /* the headline: every rule reachable through all three doors */
   allRulesReachAllDoors: Object.keys(out.doors).every(id =>
     out.doors[id].badge && out.doors[id].sleeve && out.doors[id].seal),
+  noStaleRuleIds: out.staleIds.length === 0,
+  everyBadgeIdMatchesItsRule: RUNGS.filter(r => r.tell).every(r =>
+    r.tell.id === r.tell.name.toLowerCase().replace(/^the /, '').replace(/\s+/g, '_')),
   noDirectTellReads:  out.steepedDirectReads === 0 && out.zeroHourDirectReads === 0
 };
 return out;

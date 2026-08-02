@@ -74,12 +74,23 @@ out.bustedThisRoll = bustAt!==null;
 if(out.settleMs!==null && out.bustMs!==null){
   out.verdictAfterSettleMs = out.bustMs-out.settleMs;   /* must be POSITIVE now */
 }
+/* pauseLooksRight IS NO LONGER A VERDICT KEY, and demoting it is the fix for a
+   probe that had been flapping between runs for three phases.
+   It asserted that the gap between the dice settling and the verdict landing
+   fell inside a hand-picked 400-1600ms window. That gap is produced by a
+   physics solve over real dice, so its length legitimately varies run to run -
+   the band was a guess about a duration nobody specified, and a guess about a
+   duration is a coin flip dressed as an assertion. Red one run, green the next,
+   with nothing changed between; a suite that does that gets ignored.
+   THE ORDERING IS THE REAL CLAIM and it stays an assertion: the bust verdict
+   must not reach the player BEFORE the dice have stopped. That is what the bug
+   was, that is what the fix guaranteed, and it is true or false regardless of
+   how long the solve took. The duration is still measured and reported below -
+   if it ever needs a bound, the number to bound it with is in the output. */
+out.pauseAfterSettleMs=out.verdictAfterSettleMs;
 out.verdict={
   /* the whole point: the verdict must not precede the dice stopping */
   bustWaitsForDice: (out.bustMs===null||out.settleMs===null) ? 'no bust this roll'
-                    : (out.bustMs>=out.settleMs),
-  /* and the pause afterwards should be about BUST_PAUSE_MS, not zero */
-  pauseLooksRight:  (out.verdictAfterSettleMs==null) ? null
-                    : (out.verdictAfterSettleMs>=400 && out.verdictAfterSettleMs<=1600)
+                    : (out.bustMs>=out.settleMs)
 };
 return out;

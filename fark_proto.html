@@ -373,7 +373,13 @@ html.fkSA #gbSheet,html.fkSA #peekSheet{padding-bottom:env(safe-area-inset-botto
 /* CAPITAL F. The tree is assets/Fonts; these two asked for assets/fonts and
    so 404'd on GitHub Pages, which is case-sensitive, while working fine on
    Windows and macOS, which are not. */
-@font-face{font-family:'Metamorphous';src:url('assets/Fonts/Metamorphous.ttf') format('truetype')}
+/* Metamorphous DELETED - the only occurrence of the name in this file was
+   its own @font-face, so it was a download nothing could ever use. The four
+   families reported alongside it were NOT dead: reading fonts.status as
+   "unreferenced" was the mistake. IM Fell English reaches 61 elements,
+   Uncial Antiqua 270, Jacquard 24 nine, Macondo seven, measured across all
+   nine screens by computed font-family rather than by load state. The .ttf
+   stays on disk; only the declaration goes. */
 @font-face{font-family:'Macondo';src:url('assets/Fonts/Macondo.ttf') format('truetype')}
 /* the five that used to come from Google, now local. font-display:swap keeps
    the old behaviour of painting text immediately in the fallback. */
@@ -8408,19 +8414,19 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
 .tell-badge.tell-steeped .tb-val[data-tier="2"]{color:#d8f8c8;text-shadow:0 0 14px rgba(180,250,160,.85),0 0 24px rgba(80,220,120,.5)}
 .tell-badge.tell-steeped .tb-val[data-tier="3"]{color:#fff8a8;text-shadow:0 0 16px rgba(255,240,160,.95),0 0 26px rgba(255,200,80,.6);animation:rsFire .5s infinite alternate}
 /* Each tell variant's color matches its emoji's dominant hue:
-   ✋ cutpurse = skin/amber, 📒 in_arrears = red-brown ledger,
-   ⛪ confession = stone grey, 💀 counterfeit = bone pale,
+   ✋ cutpurse = skin/amber, 📒 first_strike = red-brown ledger,
+   ⛪ still_waters = stone grey, 💀 kindred = bone pale,
    ⚖️ reckoning = brass gold. */
 .tell-badge.tell-pickpocket{color:#e0b878}
 .tell-badge.tell-pickpocket .tb-name{color:#e8c088;text-shadow:0 0 8px rgba(220,180,120,.45)}
-.tell-badge.tell-in_arrears{color:#e8c850}
-.tell-badge.tell-in_arrears .tb-name{color:#f0d868;text-shadow:0 0 8px rgba(220,180,40,.5)}
+.tell-badge.tell-first_strike{color:#e8c850}
+.tell-badge.tell-first_strike .tb-name{color:#f0d868;text-shadow:0 0 8px rgba(220,180,40,.5)}
 .tell-badge.tell-drill_order{color:#90b0d8}
 .tell-badge.tell-drill_order .tb-name{color:#a8c4e8;text-shadow:0 0 8px rgba(140,180,230,.45)}
-.tell-badge.tell-confession{color:#b8b8c0}
-.tell-badge.tell-confession .tb-name{color:#d0d0d8;text-shadow:0 0 8px rgba(200,200,210,.45)}
-.tell-badge.tell-counterfeit{color:#c8c8b8}
-.tell-badge.tell-counterfeit .tb-name{color:#dcdccc;text-shadow:0 0 8px rgba(220,220,200,.45)}
+.tell-badge.tell-still_waters{color:#b8b8c0}
+.tell-badge.tell-still_waters .tb-name{color:#d0d0d8;text-shadow:0 0 8px rgba(200,200,210,.45)}
+.tell-badge.tell-kindred{color:#c8c8b8}
+.tell-badge.tell-kindred .tb-name{color:#dcdccc;text-shadow:0 0 8px rgba(220,220,200,.45)}
 .tell-badge.tell-reckoning{color:#e0a848}
 .tell-badge.tell-reckoning .tb-name{color:#f0c060;text-shadow:0 0 10px rgba(220,150,40,.55)}
 
@@ -8455,13 +8461,13 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
 }
 
 /* ── Counterfeit dice — purple smoke + skull overlay ── */
-.die.die-counterfeit{position:relative}
-.die.die-counterfeit::after{
+.die.die-kindred{position:relative}
+.die.die-kindred::after{
   content:'💀';position:absolute;top:-2px;right:-2px;font-size:10px;
   filter:drop-shadow(0 0 3px rgba(180,80,200,.8));pointer-events:none;
   animation:cfSkullFloat 2.6s ease-in-out infinite;
 }
-.die.die-counterfeit::before{
+.die.die-kindred::before{
   content:'';position:absolute;inset:-4px;pointer-events:none;
   background:radial-gradient(circle at 50% 60%, rgba(180,80,220,.35) 0%, rgba(120,40,160,.18) 35%, transparent 70%);
   filter:blur(2px);
@@ -9594,6 +9600,21 @@ function _getS(){
       while(S.run.cards.length<4)S.run.cards.push(null);
       if(S.run.cards.length>4)S.run.cards.length=4;
     }
+    /* RULE-ID MIGRATION (P428). Three badges carried a rule under the id of
+       the rule it replaced: FIRST STRIKE as in_arrears, STILL WATERS as
+       confession, KINDRED as counterfeit. The ids now match the rules.
+       THIS RUNS BECAUSE SAVES HOLD THEM. S.run.sleeve is a rule the player
+       chose to wear; S.run.tells is the list they WON off bosses. A bare
+       rename would orphan both - the sleeve would resolve to nothing and a
+       hard-won spoil would vanish off the shelf. Same shape as the
+       last_call -> closing_bell card rename above. */
+    var _ruleRename={in_arrears:'first_strike',confession:'still_waters',counterfeit:'kindred'};
+    if(S.run.sleeve&&_ruleRename[S.run.sleeve])S.run.sleeve=_ruleRename[S.run.sleeve];
+    if(Array.isArray(S.run.tells))S.run.tells=S.run.tells.map(function(t){return _ruleRename[t]||t;});
+    /* a sealed seat's rule is rebuilt per night, but an in-flight night can
+       be holding one across a reload */
+    if(S.run.night&&S.run.night.sealTell&&_ruleRename[S.run.night.sealTell])
+      S.run.night.sealTell=_ruleRename[S.run.night.sealTell];
     /* Migrate stale boss-inventory state (from a removed earlier design) */
     if(S.run.bossInventory)delete S.run.bossInventory;
     /* Pouch migration: ensure S.run.pouch exists for old saves. 3 slots (gated by renown perks). */
@@ -10865,7 +10886,7 @@ const RUNGS=[
        no scoring signature to measure, validated qualitatively only.
        REAL COST: In Arrears was the only economy tell in the roster, so no
        badge taxes gold any more. Needs a new home if it is missed. */
-    tell:{id:'in_arrears',name:'FIRST STRIKE',desc:"“Reach across the table and I read both sides of the book.”",icon:'📒'}},
+    tell:{id:'first_strike',name:'FIRST STRIKE',desc:"“Reach across the table and I read both sides of the book.”",icon:'📒'}},
   {id:4,name:'BRUTUS',key:'soldier',icon:'⚔️',tier:'respected',target:9500,gold:500,buyIn:70,
     boss:null,bossDesc:null,
     agg:.75,cardRarity:'silver',wager:true,wagerCount:1,wagerMode:'best',minBank:550,diceStop:2,chaotic:false,adaptive:true,
@@ -10881,7 +10902,7 @@ const RUNGS=[
        die loses its FAMILY trait for the match; its enchant still fires.
        Sim, Obsidian only: strips ~644 points, ~14.5% of that build's match
        value. The other families' suppression is inferred, not validated. */
-    tell:{id:'confession',name:'STILL WATERS',/* "A WORKED DIE" WAS TRUE UNTIL P412 AND IS NOW FALSE. Still Waters used
+    tell:{id:'still_waters',name:'STILL WATERS',/* "A WORKED DIE" WAS TRUE UNTIL P412 AND IS NOW FALSE. Still Waters used
        to hush only branded dice - that was the bug ruling D closed, because it
        punished exactly the dice the player had paid to enchant while a plain
        one of the same family sailed through. It now hushes by MATERIAL FAMILY,
@@ -10906,7 +10927,7 @@ const RUNGS=[
        engine has no way to run. */
     /* Kindred was already describing enchants under the old word -
        _kindredActive grants on 2+ ENCHANTED dice, counted from S.run.dieEnch. */
-    tell:{id:'counterfeit',name:'KINDRED',desc:"“Enchanted dice sing louder at my table.”",icon:'💀'}},
+    tell:{id:'kindred',name:'KINDRED',desc:"“Enchanted dice sing louder at my table.”",icon:'💀'}},
   {id:7,name:'AMBROSE',key:'bishop',icon:'✝️',tier:'renowned',target:12500,gold:1300,buyIn:200,
     boss:null,bossDesc:null,
     agg:.88,cardRarity:'gold',wager:true,wagerCount:3,wagerMode:'all',minBank:900,diceStop:1,chaotic:false,adaptive:true,
@@ -11220,7 +11241,7 @@ function _initHandicapHUD(){
 /* zero_hour joins; last_call and steeped both stay - one is a live badge
    rule again, the other is parked but still perfectly playable as a cursed
    seat, which is the whole point of parking it rather than deleting it. */
-var _SEAL_POOL=['last_call','zero_hour','steeped','pickpocket','in_arrears','drill_order','counterfeit','reckoning'];
+var _SEAL_POOL=['last_call','zero_hour','steeped','pickpocket','first_strike','drill_order','kindred','reckoning'];
 function _rollSealTell(){return _SEAL_POOL[Math.floor(Math.random()*_SEAL_POOL.length)];}
 /* PARKED RULES — real, working table rules that no boss currently wears.
    Steeped is the first: Zero Hour took Mabel's badge, and every other
@@ -11252,8 +11273,8 @@ function _tellById(id){
    a sealed seat can roll a rule this very table calls retired. Reported to
    whoever owns Zero Hour; the fix is the same shape as the two removals
    below. */
-/* in_arrears left when First Strike replaced In Arrears (the gold drain is
-   switched off at its only site). confession and counterfeit leave now: the
+/* first_strike left when First Strike replaced In Arrears (the gold drain is
+   switched off at its only site). still_waters and kindred leave now: the
    old card-sealing and die-cursing they were guarding is DELETED below, so
    the only things answering to those ids are Still Waters and Kindred. While
    the ids sat here, a SLEEVED or SEALED Still Waters and a sleeved or sealed
@@ -11289,7 +11310,7 @@ function _applySleeve(){
     var t=_tellById(G._sleeve);
     if(t){G._tell=t;G._tellState={};
       if(t.id==='steeped')G._tellState.bonus=0;
-      if(t.id==='in_arrears')G._tellState.totalRollCost=0;
+      if(t.id==='first_strike')G._tellState.totalRollCost=0;
       if(t.id==='reckoning')G._tellState.lastNpcBank=0;
     }
   }
@@ -11305,7 +11326,7 @@ function _applySeal(){
   if(!G._tell){
     var t=_tellById(G._sealRule);
     if(t){G._tell=t;
-      if(t.id==='in_arrears')G._tellState.totalRollCost=0;
+      if(t.id==='first_strike')G._tellState.totalRollCost=0;
     }
   }
   /* THE CURSE, not SEALED SEAT - the word is retired for this meaning. Not
@@ -11325,14 +11346,14 @@ function _applyTell(){
     case 'zero_hour':/* fires off the icon path, no per-match state */ break;
     case 'steeped': G._tellState.bonus=0; break;
     case 'pickpocket':/* per-roll RNG, no persistent state */ break;
-    case 'in_arrears': G._tellState.totalRollCost=0; break;
+    case 'first_strike': G._tellState.totalRollCost=0; break;
     case 'drill_order':/* uses turnRollCount + maxRolls */ break;
     /* Still Waters and Kindred are both stateless reads - of the die, and of
        the loadout - so there is nothing to set up. The sealedCard and
        cursedDice fields these two seeded belonged to Confession and
        Counterfeit, and both of those are deleted. */
-    case 'confession':/* Still Waters: no per-match state */ break;
-    case 'counterfeit':/* Kindred: no per-match state */ break;
+    case 'still_waters':/* Still Waters: no per-match state */ break;
+    case 'kindred':/* Kindred: no per-match state */ break;
     case 'reckoning': G._tellState.lastNpcBank=0; break;
   }
 }
@@ -11445,7 +11466,7 @@ function _updateTellHUD(){
     var r=document.getElementById('reckoningVal');
     if(r){var f=(G._tellState&&G._tellState.lastNpcBank)||0;r.textContent='≥'+f;}
   }
-  if(t.id==='in_arrears'){
+  if(t.id==='first_strike'){
     var ar=document.getElementById('arrearsVal');
     if(ar){
       var _arCost=(G._tellState&&G._tellState.totalRollCost)||0;
@@ -11469,7 +11490,7 @@ function _flashTellRule(){
 /* COUNTERFEIT's cursed dice are DELETED, not stubbed. Kindred curses nothing
    - it amplifies dice the player chose to have worked - so these two no-op
    functions had no job left and, once their two call sites went with them, no
-   caller either. They were also the reason `counterfeit` had to stay in
+   caller either. They were also the reason `kindred` had to stay in
    _RETIRED_RULES, and that entry was switching KINDRED off for every sleeve
    and every sealed seat. */
 
@@ -12407,7 +12428,7 @@ const _BOSS_PERSONAS={
   merchant:'hoard',  /* Corvus — ledger / economy */
   soldier:'triples', /* Brutus — brute-force triples */
   knight:'straights',/* Aldric — order & discipline */
-  noble:'aggro',     /* Whisper — counterfeit disruption */
+  noble:'aggro',     /* Whisper — kindred disruption */
   bishop:'combo'     /* Ambrose — blessings & sets */
 };
 /* Resolve the persona for any rung (boss key → fixed; patron → its
@@ -17865,7 +17886,7 @@ function _kindredActive(){
     /* _ruleActive, not G._tell.id - the id also arrives by sleeve and by a
        sealed seat, and reading the tell directly made the badge silently do
        nothing in every match except Whisper's own. */
-    if(!_ruleActive('counterfeit','p'))return false;
+    if(!_ruleActive('kindred','p'))return false;
     /* THE LOADOUT, NOT THE LIVE ARRAY. The brief grants this on what the
        player BROUGHT - "2+ enchanted dice in their loadout" - and grants it
        "for the match". G._enchArr is neither: it is the live match array, and
@@ -17980,7 +18001,7 @@ function _firstStrike(side){
   /* _ruleActive, not G._tell.id - the id also arrives by sleeve and by sealed
      seat, and reading the tell directly made the badge silently do nothing in
      exactly the boss matches it was written for. */
-  if(!_ruleActive('in_arrears','p'))return;
+  if(!_ruleActive('first_strike','p'))return;
   /* the player's reveal. It used to be a race - either side firing a lane icon
      opened both books - and the downgrade makes it one-way. Nothing on the
      rival's side fires a lane icon today, so this is a guard against the
@@ -18022,7 +18043,7 @@ function _stillWaters(){
   /* _ruleActive, not G._tell.id - the id also arrives by sleeve and by a
      sealed seat, and reading the tell directly made the badge silently do
      nothing in every match except Aldric's own. */
-  try{return !!_ruleActive('confession','p');}catch(e){return false;}
+  try{return !!_ruleActive('still_waters','p');}catch(e){return false;}
 }
 /* Is THIS die's family hushed? BY MATERIAL FAMILY, NOT BY BRAND - d.ench is
    not consulted here and must not be. It used to read
@@ -18078,7 +18099,7 @@ function _dieEffect(d){
    bonus is paid on rather than on a definition invented for it.
    _dieEffect, NOT getDie(d.mat).effect. Routing through _dieEffect is what
    finally puts this trait behind Still Waters: _famHushed is true for a WORKED
-   die while confession is live, _dieEffect then returns null, and the die pays
+   die while still_waters is live, _dieEffect then returns null, and the die pays
    nothing. Suppression comes for free with the routing - no separate check.
    The old loadout count could never be hushed for the structural reason
    _famHushed's own comment gives for Brass and the shield: it walked
@@ -24246,7 +24267,7 @@ function _afterRollImpl(){
       /* save() persists S to localStorage. Was `saveState()` which doesn't
          exist — threw a ReferenceError that crashed afterRoll mid-flight,
          leaving phase stuck on "rolling" with no way for the player to
-         act. Reproduces on Corvus matches (his Tell is in_arrears). */
+         act. Reproduces on Corvus matches (his Tell is first_strike). */
       try{save();}catch(e){}
     }
     /* Drill Order: update HUD counter */
@@ -28243,7 +28264,7 @@ function endMatch(win){
   _dragState=null;
   /* TELL: cleanup persistent HUD + lingering visual classes */
   document.querySelectorAll('.tell-badge,.tell-cursed-overlay').forEach(function(e){e.remove();});
-  document.querySelectorAll('.die-counterfeit,.die-palmed').forEach(function(e){e.classList.remove('die-counterfeit','die-palmed');});
+  document.querySelectorAll('.die-kindred,.die-palmed').forEach(function(e){e.classList.remove('die-kindred','die-palmed');});
   document.querySelectorAll('.mcard.card-sealed').forEach(function(e){e.classList.remove('card-sealed');});
   /* SFX moved to the animation-sequence block below — was firing here AND
      there, causing the win/lose sound to stack on itself. */
@@ -28463,7 +28484,7 @@ function endMatch(win){
      boss-gold path below. Player feedback: "Maybe you win Corvus lost
      gold through the match when you beat him, makes it sweeter". */
   var _arrearsRefund=0;
-  if(win&&G&&G._tell&&G._tell.id==='in_arrears'&&G._tellState&&G._tellState.totalRollCost>0){
+  if(win&&G&&G._tell&&G._tell.id==='first_strike'&&G._tellState&&G._tellState.totalRollCost>0){
     _arrearsRefund=G._tellState.totalRollCost;
     if(!isBoss){
       /* Fold into the patron-gold count-up so it reads as a single reward */
@@ -28492,7 +28513,7 @@ function endMatch(win){
   }else if(win&&isBoss){
     /* Boss win: award gold and show +Xg animation */
     var _bossGold=(G.rung&&G.rung.gold)||0;
-    /* Fold any in_arrears refund into the boss payout too, in case a future
+    /* Fold any first_strike refund into the boss payout too, in case a future
        boss form ever uses Corvus's tell. Today only patron Corvus does, but
        the refund block above runs unconditionally so we mirror it here. */
     if(_arrearsRefund>0)_bossGold+=_arrearsRefund;
