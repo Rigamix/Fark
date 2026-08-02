@@ -432,3 +432,209 @@ to finish is how a half-migration happens.
 
 `FEAT_ART` should go 12/32 → 23/23 when it lands, and the Phase 2 baseline will
 prove it.
+
+---
+
+# Phase 4 — The feat roster migration
+
+**Status:** complete, deployed `d6772fc`. Suite is 13 probes: 12 pass, 1 fail
+(two known reds inside it), 0 error. `FEAT_ART` is green for the first time.
+
+## The headline: there were three rosters, not two
+
+`FEAT_DISCREPANCIES.md` reported 24 paintings against 32 shipped feats and
+called that the discrepancy. Both numbers were right and the framing was
+incomplete. Counting the code turned up a **third and a fourth** list:
+
+| Where | Rows | Reaches the player? |
+|---|---|---|
+| `FEATS` — evaluated on every win | 32 | only the 12 in `FEAT_ART` |
+| `_famFeats()` — granted straight into `S.featsDone` | 5 | **none** — no art, so no trinket, ever |
+| `FTEXT` — authored name + description on the wall | 12 | debug viewer only |
+| paintings on disk | 24 | 12 |
+
+**Five feats were being awarded that nobody could ever see.** `_famFeats` writes
+`S.featsDone` and bumps the lifetime counter, but the wall only renders ids
+present in `FEAT_ART`, and none of those five were. Two of them —
+`never_small` ("never a bank under eight hundred") and `ember_night` ("a night
+won on three embers") — are the brief's TEETOTALLER and THREE TORCHES,
+implemented in the other system, under different ids, at different numbers.
+
+And `FTEXT` was consulted **before** the live feat, so the twelve "uncoded"
+paintings carried hand-written descriptions that outranked whatever the game
+actually checked. Restoring the roster without touching it would have left
+NO CLAIM on the wall reading *"decline a victory draft and take the gold"* while
+the code awarded it for winning without busting.
+
+None of this was visible from the two counts in the discrepancy doc. It came out
+of reading the consumers, which is the lesson: **counting a table tells you its
+size, not how many tables there are.**
+
+## What was ruled
+
+> *"Option 1, the brief's 24. Not a coin flip between three even options — the 24
+> was the original, authored scope … The 32 in code is drift."*
+
+## What was built
+
+**The roster.** `FEATS` is now the brief's section-8 list: **23 live, one
+parked.** `FEAT_ART` is 23 entries, one painting each. The mapping is total *by
+construction* — not by twelve hand-written guesses that nothing verified.
+
+**Ten additive telemetry channels**, because a restored condition has to be
+readable. Every one is a counter or a flag placed beside state the game already
+keeps; none changes a score, a roll, or a branch that already existed:
+
+| Channel | Site | Feeds |
+|---|---|---|
+| `_featBloom` | Bloom's commit hook | FULL BLOOM |
+| `_featJade` | commit, settled at the bank | GREEN THUMB |
+| `_featShatterBanked` | obsidian break, settled at the bank | POWDER MONKEY |
+| `_featStarChain` | Falling Star's bank hook | WISH GRANTED |
+| `_featOmenTrue` | Ill Omen resolution, hit branch | OMENS TRUE |
+| `_featAmberAte` | amber immunity spend | STICKY FINGERS |
+| `_featWardSaves` | the ward branch in `doBust` | TWICE SAVED |
+| `_featMaxRolls` | bank **and** bust | SLOW BOILED |
+| `_featMaxDeficit` | beside the existing comeback flag | THE LONG ROAD |
+| `_loNight` | `_checkNightFail` | SECOND WIND |
+
+Two of those deserve their reasoning stated. **`_featJade` and
+`_featShatterBanked` are pending flags that settle at the bank**, because both
+conditions are phrased *"bank a …"* — a straight the player rolled and then
+busted away has not been banked, and a flag set at commit time would have paid
+out for it. `_featMaxRolls` settles at **both** exits: a six-roll turn is a
+six-roll turn whether it paid or not.
+
+**`_loNight` is stamped with the tier rather than set to `true`**, so it expires
+by itself when the run advances. There is no "clear the flag" path for a future
+edit to forget to call.
+
+## What it found
+
+**Measured, live:**
+
+```
+FEAT_ART   have 23   want 23   missing []   strayKeys []
+```
+
+Both directions: every feat has a painting, and no painting entry lacks a feat.
+
+**On the wall** — four feats seeded through the real store, loadout opened,
+pixels read: four trinkets hang, all four decode (295x470, 272x441, 306x336,
+438x341), all four opaque and topmost, all 23 filenames present on disk.
+Screenshot confirms.
+
+**Six of the twelve old mappings were wrong**, and they resolved as a side
+effect rather than as twelve separate fixes — exactly as the ruling predicted.
+Death&Taxes is Ambrose's painting and is now Ambrose's condition.
+
+**`first_blood` was quietly wrong in a way nobody had reported.** Its painting
+says *first boss badge taken*; its check awarded for the first **match** of a
+run, boss or not. FirstBlood was hanging on the wall for beating a drunk at a
+patron table.
+
+## A red the migration created, and what it means
+
+`apv_feat_splash` went red on `featsStillEarned`. It was not a bug — and that is
+the point worth reporting.
+
+The probe drives a real first-night patron match and forces a win. Under the old
+32, that fired several feats immediately (Crushing Win, Lightning Round, Hot
+Hand, First Blood — the batch added under *"easier renown sources … per player
+feedback that perks were too hard to reach"*). **Under the brief's 24, a
+first-night patron win earns nothing at all.** Most of the restored roster is
+boss-scoped or needs specific play.
+
+So the probe was measuring the roster while claiming to measure the award path.
+It now arms a condition it owns (HIGH ROLLER, a pure telemetry read) and asserts
+that a *met* condition still reaches the queue — which is what it always meant.
+
+**The finding underneath it is a design one, and it is the second content loss
+in this migration.** The six per-boss feats were named as a cut up front. The
+early-run drip-feed is the one nobody named: the brief's roster front-loads
+nothing, so a new player's first hour now produces no wall at all. That may be
+correct — feats are meant to be earned — but it is a change, it came in
+sideways, and it is a design call.
+
+## Guideline compliance
+
+| Requirement | Where from | Met? |
+|---|---|---|
+| Restore the brief's section-8 list | Denis's ruling | **Yes** — 23 live + BOOKKEEPER parked |
+| Remap `FEAT_ART` | Ruling | **Yes** — 23/23, measured both directions |
+| BOOKKEEPER stays retired | Ruling | **Yes** — parked, its painting is the one orphan |
+| NO CLAIM rewritten, not cut | Ruling | **Yes** — against Ward |
+| Six `beat_<boss>` cut, named | Ruling | **Yes** — named in code and here |
+| `FEAT_ART` 12/32 to 23/23 | Ruling's success test | **Yes** — measured, baseline re-recorded |
+| Patch via `.py`, not heredoc | Standing rule | **Yes** — `p425_feat_roster.py`, `p425b_ftext.py` |
+| Parse gate must fail the chain | Standing rule | **Yes** — run after each patch, both pass |
+| Verify rendered, not authored | Standing rule | **Yes** — computed styles and a screenshot, not the source |
+| Probes via `run_probes.js` | Phase 1 lesson | **Yes** for the suite; `shoot.js` direct only for detail, after the runner's pre-flight had proved the server up |
+
+## Three conditions named mechanics that no longer exist
+
+Rewritten rather than deleted, because what each rewarded still exists. **The
+first was ruled; the other two are new and need a decision:**
+
+1. **NO CLAIM** held Insurance, now **Ward**. Ruled. Reads *win carrying a ward
+   without ever busting*, and reads the owned loadout rather than the live
+   table, so a die broken mid-match cannot deny a claim about the build.
+2. **STICKY FINGERS** used Tar Pit, which is retired in favour of Snuff. **Not
+   previously identified** — the discrepancy doc named only NO CLAIM and
+   BOOKKEEPER. Written against amber's live break-trigger (*win a match in which
+   the amber held and ate a bust*). The name still fits — the tar holds — but
+   the wording is a design call.
+3. **BOOKKEEPER** needed Bookends, collapsed into Vanguard. Parked per the
+   ruling. Its painting is the single orphan.
+
+**Badges do not exist in this build** — tells replaced them. FIRST BLOOD, HIS
+OWN MEDICINE and THE COLLECTOR are stated against tells. The discrepancy doc
+quoted the brief's badge wording without noticing the mechanic had been renamed
+underneath it.
+
+## What this does *not* cover
+
+- **The totality assertion still cannot see a painting with no feat.** Its
+  domain is `FEATS`, so `Bookkeeper.png` sitting unused is invisible to it. The
+  orphan is tracked here and in the code comment, not by the suite.
+- **Totality is not correctness.** Same limit as Phase 2. Every feat has art;
+  nothing proves the art *means* the condition. That check is a human reading
+  24 pictures against 24 sentences.
+- **The conditions are unplayed.** They parse, they read real state, and the
+  wall renders — but only HIGH ROLLER has been fired through a live match. The
+  narrow ones (WISH GRANTED's two chained extra turns, TWICE SAVED's two ward
+  saves) want a sim pass or a playtest before anyone trusts the numbers.
+- **`_famFeats` still grants three invisible feats** — `three_lucky`,
+  `own_reckoning`, `keg_triple`. They have no art and cannot be seen. Left in
+  place: deleting drift is a separate decision from restoring a roster.
+- **Old saves keep dead ids.** A save holding `beat_corvus` simply stops
+  rendering it. No migration written; the wall filters on `FEAT_ART` already.
+
+## Decisions needed
+
+1. **STICKY FINGERS' wording** — the amber rewrite above, or something else.
+2. **NO CLAIM's exact wording** — ruled as "rewrite against Ward"; this is the
+   first draft of that sentence.
+3. **The early-run drip-feed.** Restoring the 24 removes every feat that fired
+   in a new player's first hour. Intended, or does the roster want one or two
+   early ones?
+4. **DEATH AND TAXES vs OWN THE NIGHT.** The brief defines them as *beat
+   Ambrose* and *win the run* — and Ambrose is the final boss, so both fire on
+   the same act. That overlap is in the brief, not introduced here, but two pins
+   for one moment is probably not what was meant.
+5. **Bookkeeper's painting** — leave it unused, or retarget it.
+
+## One note on the suite
+
+`apv_bust_settle` **flapped** during this phase: red in one full run, green
+twice in isolation immediately after, with nothing changed between. The runner's
+own header calls this out as failure mode 5 — *"any probe that flaps between
+runs belongs in the measure pile, not here"*. It is a timing probe over real
+dice physics. Recorded green in the baseline; it needs hardening or demoting,
+and it should not be trusted as a regression signal until then.
+
+## What's next
+
+Visual plan **Phase 5 — the asset registry**: one table mapping logical name to
+path, so the previous game's `assets/` folder becomes unreachable by accident.
+Highest-value remaining item and the only non-probe one.

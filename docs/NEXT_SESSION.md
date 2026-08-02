@@ -2,58 +2,54 @@
 
 Written before a context compaction. Everything needed to pick up cleanly.
 
-**Deployed HEAD: `7a4ad60` on branch `fark`. Backup tag: `pre-effect-system`
+**Deployed HEAD: `d6772fc` on branch `fark`. Backup tag: `pre-effect-system`
 (`a0aed7d`) — the last commit before the plan work began.**
 
 ---
 
-## 1. THE NEXT TASK — the feat roster migration
+## 1. THE NEXT TASK — Visual plan Phase 5, the asset registry
 
-**Ruled by Denis. Sized. Deliberately not started** because it's a content change
-across the whole feat list and beginning it without room to finish is how a
-half-migration happens. Full detail in `docs/FEAT_DISCREPANCIES.md`.
+One table mapping logical name → path, so the previous game's `assets/` folder
+becomes unreachable by accident. **Highest-value remaining item and the only
+non-probe one** — it's the fix for the failure that cost the most time
+(reaching into `assets/` instead of `Art/Assets/`: the font, the coin, the
+diamond, three times in one session).
 
-**The finding:** `Art/Assets/Feats/` holds **24 paintings**. The code ships **32
-feats**. `FEAT_ART` maps 12 — and **six of those twelve point at the wrong
-thing** (`Death&Taxes`, which the brief defines as *beat Ambrose*, currently
-awards for beating **Corvus**; `Teetotaller`, *never bank under 500*, awards for
-beating **Grog**).
-
-**The ruling:** restore the brief's §8 list of 24. The 32 in code is **drift**,
-not a decision anyone made. Feats are permanently non-power-granting wall
-decoration, so there's no gameplay argument for more — only an art-budget one,
-and the art budget already said 24.
-
-**The work:**
-1. Replace `FEATS` (32 rows) with the brief's list — **23 live + 1 parked**.
-2. Remap `FEAT_ART`. Becomes near-total *by construction* once the paintings and
-   the roster describe the same set.
-3. **BOOKKEEPER stays retired** — Bookends' collapse into Vanguard was a
-   deliberate simplification, already ruled. Its painting is the orphan.
-4. **NO CLAIM: rewrite the condition against Ward**, don't cut it. It referenced
-   Insurance-the-card (retired), but what it rewarded — bust-averse play — still
-   exists via Ward.
-5. **The six `beat_<boss>` feats are cut.** Real content loss, named on purpose.
-   If per-boss recognition matters it wants its own category with its own art
-   ask — not a reason to keep the drifted 32.
-6. Rerun `node tools/run_probes.js`. **`FEAT_ART` should go 12/32 → 23/23** and
-   the baseline will prove it.
-
-**Then write the Phase report** — Denis wants one after every phase, in
+**Then write the Phase report** — one after every phase, in
 `docs/PHASE_REPORTS.md`, same fixed format.
 
 ---
 
 ## 2. AFTER THAT
 
-- **Visual plan Phase 5** — the asset registry. One table mapping logical name →
-  path, so the previous game's `assets/` folder is unreachable by accident. This
-  is the highest-value remaining item and the only non-probe one.
 - **Effect plan Phase 1** — the inventory: decompose ~50 cards/enchants/badges
   into trigger/condition/effect. The *misfits* are the valuable output.
-- Fix the three Phase 2 reds: relic `.dtype-` blocks (8), `MATCOL`'s 4 retired
-  materials (defence-in-depth — **not reachable**, migration converts them on
-  load before any render), `FEAT_ART` (handled by §1).
+- Fix the two remaining Phase 2 reds: relic `.dtype-` blocks (8), and `MATCOL`'s
+  4 retired materials (defence-in-depth — **not reachable**, migration converts
+  them on load before any render).
+- **Harden or demote `apv_bust_settle`.** It flapped during Phase 4 — red in a
+  full run, green twice in isolation, nothing changed between. A flapping probe
+  is not a regression signal.
+
+---
+
+## 1b. DONE — the feat roster migration (`d6772fc`)
+
+Ruled, built, deployed. `FEAT_ART` is **23/23**, measured both directions.
+Full write-up in `docs/PHASE_REPORTS.md` Phase 4; `FEAT_DISCREPANCIES.md` now
+carries a correction header.
+
+**What it turned up that the discrepancy doc had missed:** there were **four**
+rosters, not two. `_famFeats` was granting five feats with no art — invisible,
+forever — and `FTEXT` held twelve authored descriptions that outranked the live
+condition on the wall. Also `first_blood` awarded for the first **match** of a
+run rather than the first **boss**, so its painting hung for beating a drunk.
+
+**Five decisions are waiting on Denis** — see the Phase 4 report's *Decisions
+needed*. The two that actually change content: **STICKY FINGERS' wording** (Tar
+Pit is retired; written against amber's break-trigger as a first draft) and
+**the early-run drip-feed**, which the restore removes entirely — a new
+player's first hour now produces no wall at all.
 
 ---
 
@@ -111,10 +107,11 @@ question alone before counting the folder.
 
 ## 5. STATE
 
-- **Suite:** 13 probes — 12 pass, 1 known red (relic `.dtype-`). Baseline in
-  `tools/probe_baseline.json`. Full run ≈ 8–12 min.
-- **Phases done:** 1 (runner), 2 (totality), 3 (CSS live). Reports in
-  `docs/PHASE_REPORTS.md`.
+- **Suite:** 13 probes — 12 pass, 1 fail carrying two known reds (`MATCOL`'s
+  retired materials, relic `.dtype-`). Baseline in `tools/probe_baseline.json`,
+  re-recorded at `d6772fc`. Full run ≈ 8–12 min.
+- **Phases done:** 1 (runner), 2 (totality), 3 (CSS live), 4 (feat roster).
+  Reports in `docs/PHASE_REPORTS.md`.
 - **Plans:** `docs/EFFECT_SYSTEM_PLAN.md`, `docs/VISUAL_INTEGRITY_PLAN.md`.
 - **Sim numbers are stale** — every figure in `SIM_RESULTS_2026-07-31.md`
   predates the sweep removal, the Trade harness fix and today's five rulings.

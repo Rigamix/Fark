@@ -1,5 +1,24 @@
 # Feats — the art and the code are two different rosters
 
+> **DONE — migrated in `d6772fc`.** Full write-up in `PHASE_REPORTS.md`,
+> Phase 4. `FEAT_ART` is 23/23, measured both directions.
+>
+> **This document was incomplete, and the way it was incomplete matters.** It
+> counted two rosters. There were four: `FEATS` (32), `_famFeats` (5 more,
+> granted straight into `S.featsDone` with **no art, so invisible**), `FTEXT`
+> (12 authored descriptions that outranked the live feat on the wall), and the
+> paintings on disk (24). Counting a table tells you its size, not how many
+> tables there are.
+>
+> **Two further corrections it got wrong:**
+> - **STICKY FINGERS is a third retired-mechanic feat**, not just NO CLAIM and
+>   BOOKKEEPER — Tar Pit was retired in favour of Snuff.
+> - **Badges do not exist in this build**; tells replaced them. Sections below
+>   quote the brief's badge wording without noticing the rename, which affects
+>   FIRST BLOOD, HIS OWN MEDICINE and THE COLLECTOR.
+>
+> Kept as written below for the record.
+
 Counted off `Art/Assets/Feats/` and the shipped `FEATS` array, not reasoned.
 Self-contained; paste it on its own.
 
