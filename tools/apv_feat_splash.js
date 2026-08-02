@@ -34,6 +34,19 @@ const watch=setInterval(()=>{
   if(o>0.05){flashes++;const t=(ov.textContent||'').trim();if(t&&names.indexOf(t)<0)names.push(t.slice(0,60));}
 },80);
 
+/* ARM A CONDITION THE PROBE OWNS, rather than trusting the scenario to
+   qualify for something. The P425 roster restore turned this assertion red
+   without breaking anything: the old 32 included drip-feed feats that fired
+   on any early win (Crushing Win, Lightning Round, Hot Hand), the brief's 24
+   do not, so a first-night patron win now legitimately earns nothing and
+   "featsStillEarned" measured the roster instead of the award path.
+   HIGH ROLLER is a pure telemetry read - a bank of 2,500+ - so setting the
+   counter makes the probe prove what it means: evaluateFeats still runs, and
+   a met condition still reaches the queue. dbgWin only fills in feat defaults
+   that are UNDEFINED, so this value survives it. */
+out.armed='high_roller (bank 2500+)';
+try{ G._featMaxBank=3000; }catch(e){ out.armErr=String(e); }
+
 /* force the win through the real path: endMatch -> evaluateFeats -> queue */
 try{ dbgWin(); }catch(e){ out.winErr=String(e); }
 await sleep(2500);
@@ -50,6 +63,9 @@ out.overlayPeakOpacity=peak;
 out.overlayFlashSamples=flashes;
 out.overlayNamesShown=names;
 out.featsBanked=Object.keys((S&&S.featsDone)||{}).length;
+/* named, not just counted - a count cannot tell you the roster changed */
+out.featsBankedIds=Object.keys((S&&S.featsDone)||{});
+out.rosterSize=(typeof FEATS!=='undefined')?FEATS.length:-1;
 
 out.verdict={
   splashNeverPainted: peak<=0.05 && flashes===0,

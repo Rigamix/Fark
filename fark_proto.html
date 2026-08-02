@@ -9693,116 +9693,147 @@ function dbgLose(){
   endMatch(false);
 }
 
-/* ── Feats (renown sources — once per run each) ────────────────────────
-   Evaluated at end of each WIN. Each feat checks G + match summary and
-   awards a fixed renown amount the first time it's earned in a run. */
-const FEAT_ART={naked_run:'Barehands',five_banker:'Bookkeeper',no_busts:'CleanNight',
-  beat_corvus:'Death&Taxes',first_blood:'FirstBlood',high_roller:'HighRoller',
-  survivor:'LastManSitting',persistent:'LongRoad',comeback:'SecondWind',
-  beat_grog:'Teetotaller',card_collector:'TheCollector',hot_storm:'ThreeTorches'};
+/* ── FEATS — the brief's §8 roster, one per painting ────────────────
+   RESTORED FROM DRIFT. The code had grown to 32 feats against 24 authored
+   paintings and FEAT_ART could map only 12 — six of those to the wrong
+   condition, the clearest being Death&Taxes, which is Ambrose's painting,
+   awarded for beating Corvus. The 24 was the authored scope; the 32 was
+   accretion nobody decided on. Restoring the list makes the art mapping
+   total BY CONSTRUCTION rather than by twelve hand-written guesses.
+
+   THREE CONDITIONS NAMED MECHANICS THAT NO LONGER EXIST and are rewritten
+   rather than cut, because what each rewarded still exists:
+     NO CLAIM held Insurance   → Ward does that job now.
+     STICKY FINGERS used Tar Pit → amber's break-trigger eats a bust instead.
+     BOOKKEEPER needed Bookends → collapsed into Vanguard, no analogue left.
+   Bookkeeper is therefore PARKED, and its painting is the single orphan.
+
+   BADGES DO NOT EXIST IN THIS BUILD — tells replaced them. FIRST BLOOD, HIS
+   OWN MEDICINE and THE COLLECTOR are stated against tells accordingly.
+
+   Cut with this: the six per-boss beat_<boss> feats, and the twenty other
+   drifted rows. That is real content loss and it is named on purpose — if
+   per-boss recognition matters it wants its own category with its own art
+   ask, not a reason to keep a roster nobody authored. */
+const FEAT_ART={
+  /* FAMILY STUNTS — two per family */
+  green_thumb:'GreenThumb',        full_bloom:'FullBloom',
+  slow_boiled:'SlowBoiled',        sticky_fingers:'StickyFingers',
+  twice_saved:'TwiceSaved',        no_claim:'NoClaim',
+  powder_monkey:'PowderMonkey',    three_torches:'ThreeTorches',
+  wish_granted:'WishGranted',      omens_true:'OmensTrue',
+  for_keeps_feat:'ForKeeps',
+  /* vagabond's second stunt is BOOKKEEPER, parked — see the note above */
+  /* TABLE STORIES */
+  first_blood:'FirstBlood',        his_own_medicine:'HisOwnMedecine',
+  clean_night:'CleanNight',        long_road:'LongRoad',
+  death_and_taxes:'Death&Taxes',   last_man_sitting:'LastManSitting',
+  high_roller:'HighRoller',        teetotaller:'Teetotaller',
+  second_wind:'SecondWind',        bare_hands:'Barehands',
+  the_collector:'TheCollector',    own_the_night:'OwnTheNight'};
+/* HisOwnMedecine is spelled that way ON DISK. The filename is the contract
+   here, not the English — renaming it is Denis's call, not a typo fix. */
 const FEATS=[
-  {id:'crushing_win',   label:'Crushing Win',     desc:'Beat opponent by 1000+ points',  renown:5,
-    check:function(G){return (G.pPts||0)-(G.oPts||0)>=1000;}},
-  {id:'lightning_round',label:'Lightning Round',  desc:'Win in 3 banks or fewer',        renown:5,
-    /* Excludes Sudden Death — that handicap is only 3 turns, so "win in ≤3 banks"
-       is the default there and the feat would be meaningless. */
-    check:function(G){return (G._featBanks||0)<=3 && G._handicap!=='sudden_death';}},
-  {id:'big_turn',       label:'Big Turn',         desc:'Score 3000+ in a single turn',   renown:10,
-    check:function(G){return (G._featMaxBank||0)>=3000;}},
-  {id:'no_busts',       label:'Untouchable',      desc:'Win the match without busting',  renown:10,
-    check:function(G){return (G._featBusts||0)===0;}},
-  {id:'no_actives',     label:'Pure Bones',       desc:'Win without using any active cards', renown:10,
+  /* ── JADE ── */
+  {id:'green_thumb',     label:'Green Thumb',      desc:'Bank a straight completed by a jade wild', renown:10,
+    check:function(G){return !!G._featJade;}},
+  {id:'full_bloom',      label:'Full Bloom',       desc:'Bloom fires three times in one match', renown:10,
+    check:function(G){return (G._featBloom||0)>=3;}},
+  /* ── AMBER ── */
+  {id:'slow_boiled',     label:'Slow Boiled',      desc:'A single turn of six or more rolls', renown:10,
+    check:function(G){return (G._featMaxRolls||0)>=6;}},
+  {id:'sticky_fingers',  label:'Sticky Fingers',   desc:'Win a match in which the amber held and ate a bust', renown:10,
+    /* THE BRIEF SAYS TAR PIT, WHICH IS RETIRED. Rewritten onto amber's live
+       identity — the tar that holds — rather than deleted. Exact wording is
+       Denis's, flagged in the phase report. */
+    check:function(G){return (G._featAmberAte||0)>=1;}},
+  /* ── SILVER ── */
+  {id:'twice_saved',     label:'Twice Saved',      desc:'Two ward saves in one match, then win', renown:15,
+    check:function(G){return (G._featWardSaves||0)>=2;}},
+  {id:'no_claim',        label:'No Claim',         desc:'Win carrying a ward without ever busting', renown:15,
+    /* THE BRIEF SAYS INSURANCE, WHICH IS RETIRED. Ward inherited the job, so
+       the condition follows it. Reads the OWNED loadout, not the live table:
+       a die broken mid-match should not deny a claim about the build. */
     check:function(G){
-      if(!G||!G.pCards)return false;
-      var hasActive=G.pCards.some(function(cid){var c=getCard(cid);return c&&c.type==='active';});
-      return hasActive&&!(G._featActivesUsed);
+      if((G._featBusts||0)!==0)return false;
+      try{return !!(typeof _wardOwned==='function'&&_wardOwned(-1));}catch(e){return false;}
     }},
-  {id:'full_straight',  label:'Straight Flush',   desc:'Roll a full straight (1-6)',     renown:5,
-    check:function(G){return !!G._featFullStraight;}},
-  {id:'hot_storm',      label:'Hot Storm',        desc:'Trigger Hot Dice 3+ times in one match', renown:10,
-    check:function(G){return (G._featHotDiceCount||0)>=3;}},
-  {id:'boss_slayer',    label:'Boss Slayer',      desc:'Beat a boss without losing any cards in this run', renown:15,
+  /* ── OBSIDIAN ── */
+  {id:'powder_monkey',   label:'Powder Monkey',    desc:"Bank a shatter's +1000", renown:10,
+    check:function(G){return !!G._featShatterBanked;}},
+  {id:'three_torches',   label:'Three Torches',    desc:'Win a night fielding three obsidian dice', renown:15,
     check:function(G){
-      var runLosses=(typeof S!=='undefined'&&S&&S.run&&S.run._cardsLostThisRun)||0;
-      return G._isBoss && !(G._bossLossData) && runLosses===0;
+      if(!G._isBoss)return false;
+      var md=(typeof S!=='undefined'&&S&&S.run&&Array.isArray(S.run.dice))?S.run.dice:[];
+      return md.filter(function(m){return m==='obsidian'||m==='grogs_tooth';}).length>=3;
     }},
-  /* ── Easier renown sources (added per player feedback that perks were too
-     hard to reach). Each only worth 5 but firing on common play patterns. */
-  {id:'hot_hand',       label:'Hot Hand',         desc:'Trigger Hot Dice in a match',    renown:5,
-    check:function(G){return (G._featHotDiceCount||0)>=1;}},
-  {id:'first_blood',    label:'First Blood',      desc:'Win your first match of the run', renown:5,
-    check:function(G){return (typeof S!=='undefined'&&S&&S.run)?(S.run.bossesBeaten||[]).length===0&&(S.run._matchWinsThisRun||0)<=1:false;}},
-  {id:'comeback',       label:'Comeback',         desc:'Win after trailing by 50% of target', renown:10,
-    check:function(G){return !!G._featTrailedDeep;}},
-  {id:'high_roller',    label:'High Roller',      desc:'Bank 1500+ in a single turn',    renown:5,
-    check:function(G){return (G._featMaxBank||0)>=1500;}},
-  {id:'one_turn_wonder',label:'One-Turn Wonder',  desc:'Win the match in a single turn', renown:15,
-    check:function(G){return (G.turnNum||0)<=1;}},
-  /* ── Risk-taking feats — reward gambling instead of safe banking. ── */
-  {id:'tempting_fate',  label:'Tempting Fate',    desc:'Roll again after scoring triple 1s, then bank that turn', renown:10,
-    check:function(G){return !!G._featTemptingFate;}},
-  {id:'brinksman_feat', label:'Brinksman',        desc:'Win on a turn that took 5+ rolls', renown:10,
-    check:function(G){return (G._featWinBankRolls||0)>=5;}},
-  {id:'naked_run',      label:'Naked Run',        desc:'From the 3rd tier on, win using only plain dice (no special materials)', renown:15,
+  /* ── STARSTONE ── */
+  {id:'wish_granted',    label:'Wish Granted',     desc:'Chain two Falling Star extra turns', renown:15,
+    check:function(G){return (G._featStarChain||0)>=2;}},
+  {id:'omens_true',      label:'Omens True',       desc:'Win the pot on a correct Ill Omen call', renown:10,
+    check:function(G){return !!G._featOmenTrue;}},
+  /* ── VAGABOND ── (BOOKKEEPER parked — Bookends is retired) */
+  {id:'for_keeps_feat',  label:'For Keeps',        desc:'Win a match played for dice', renown:15,
+    check:function(G){return !!G._forKeeps;}},
+  /* ── TABLE STORIES ── */
+  {id:'first_blood',     label:'First Blood',      desc:'Take your first boss', renown:10,
+    /* BADGES BECAME TELLS, but "your first boss" survives the rename intact.
+       The old check awarded for the first MATCH of a run, boss or not — which
+       is why FirstBlood hung on the wall after beating a drunk at a table. */
     check:function(G){
-      /* Gated to tier 2+ (the 3rd tier onward). Winning bone-only is
-         trivial early but genuinely hard deeper in, so the feat only
-         counts where it means something — and it stops the easy early
-         matches from front-loading every feat at once. */
-      if(!(typeof S!=='undefined'&&S&&S.run)||(S.run.tier||0)<2)return false;
-      /* THE OWNED LOADOUT, NOT THE LIVE TABLE (#19). This read G.matchDice,
-         which is whatever survived the fight - so a Break, an Obsidian shatter
-         or a Trade could each award this feat for dice the player never built
-         with, or deny it for a build that qualified. "No special materials" is
-         a claim about the BUILD, and reading S.run.dice makes that whole
-         false-positive class disappear instead of patching its instances. */
-      var md=Array.isArray(S.run.dice)?S.run.dice
+      if(!G._isBoss)return false;
+      return (typeof S!=='undefined'&&S&&S.run&&Array.isArray(S.run.bossesBeaten))
+        ?S.run.bossesBeaten.length===0:false;
+    }},
+  {id:'his_own_medicine',label:'His Own Medicine', desc:'Beat a boss with a rule you took off a boss', renown:20,
+    check:function(G){return !!(G._isBoss&&G._sleeve);}},
+  {id:'clean_night',     label:'Clean Night',      desc:'Clear a night without losing a seat', renown:15,
+    /* Read at the BOSS win, which is what clears a night. The seat this match
+       occupies is not marked until the settle path runs, so this asks only
+       whether any EARLIER seat was lost — and the current one is a win. */
+    check:function(G){
+      if(!G._isBoss)return false;
+      var n=(typeof S!=='undefined'&&S&&S.run)?S.run.night:null;
+      if(!n||!Array.isArray(n.results))return false;
+      return n.results.indexOf('lost')<0;
+    }},
+  {id:'long_road',       label:'The Long Road',    desc:'Win from 2,000 or more behind', renown:15,
+    check:function(G){return (G._featMaxDeficit||0)>=2000;}},
+  {id:'death_and_taxes', label:'Death and Taxes',  desc:'Beat Ambrose', renown:20,
+    check:function(G){return !!(G&&G.rung&&G.rung.key==='bishop');}},
+  {id:'last_man_sitting',label:'Last Man Sitting', desc:'Win a sudden-death turn', renown:15,
+    check:function(G){return G._handicap==='sudden_death';}},
+  {id:'high_roller',     label:'High Roller',      desc:'A single bank of 2,500 or more', renown:10,
+    check:function(G){return (G._featMaxBank||0)>=2500;}},
+  {id:'teetotaller',     label:'Teetotaller',      desc:'Win without ever banking under 500', renown:10,
+    /* The brief's number is 500. A live grant in _famFeats used 800 under the
+       id never_small and had no painting, so nobody could see it either way. */
+    check:function(G){return (G._famBankCount||0)>=1&&(G._famMinBank||0)>=500;}},
+  {id:'second_wind',     label:'Second Wind',      desc:'Win the night after LAST ORDERS took a heart', renown:15,
+    check:function(G){
+      if(!G._isBoss)return false;
+      return (typeof S!=='undefined'&&S&&S.run&&S.run._loNight===S.run.tier);
+    }},
+  {id:'bare_hands',      label:'Bare Hands',       desc:'Beat a boss with all-bone dice', renown:20,
+    check:function(G){
+      if(!G._isBoss)return false;
+      /* THE OWNED LOADOUT, NOT THE LIVE TABLE. G.matchDice is whatever
+         survived the fight, so a Break or a Trade could award this for dice
+         the player never built with, or deny it for a build that qualified. */
+      var md=(typeof S!=='undefined'&&S&&S.run&&Array.isArray(S.run.dice))?S.run.dice
         :((G&&Array.isArray(G.matchDice))?G.matchDice:null);
       if(!md||!md.length)return false;
       return md.every(function(m){var d=(typeof getDie==='function')?getDie(m):null;return !d||!d.effect;});
     }},
-  /* ── Drip-feed feats (regular renown payouts on common play patterns
-     and per-boss firsts). Each fires once per RUN since evaluateFeats
-     gates on S.run.feats[id], so repeat runs let players re-earn them
-     for steady progression. */
-  {id:'boss_crusher',   label:'Boss Crusher',     desc:'Beat a boss by 2000+ points',    renown:10,
-    check:function(G){return !!G._isBoss && ((G.pPts||0)-(G.oPts||0))>=2000;}},
-  {id:'five_banker',    label:'Five Banker',      desc:'Bank 5+ times in a single match',renown:5,
-    check:function(G){return (G._featBanks||0)>=5;}},
-  {id:'survivor',       label:'Survivor',         desc:'Win a match after busting at least once',renown:5,
-    check:function(G){return (G._featBusts||0)>=1;}},
-  /* ── Progressive run-milestone feats — fire at staggered points as the
-     run advances so renown keeps dripping mid-to-late instead of all
-     bunching up in the first couple of matches. Each fires once per run
-     when its threshold is first crossed. ── */
-  {id:'two_bosses',     label:'Up the Ranks',     desc:'Beat 2 bosses in one run',       renown:10,
-    check:function(G){return (typeof S!=='undefined'&&S&&S.run&&Array.isArray(S.run.bossesBeaten))?S.run.bossesBeaten.length>=2:false;}},
-  {id:'quick_climb',    label:'Quick Climb',      desc:'Beat 3 or more bosses in one run',renown:15,
-    check:function(G){return (typeof S!=='undefined'&&S&&S.run&&Array.isArray(S.run.bossesBeaten))?S.run.bossesBeaten.length>=3:false;}},
-  {id:'five_bosses',    label:'Gauntlet Veteran', desc:'Beat 5 bosses in one run',       renown:20,
-    check:function(G){return (typeof S!=='undefined'&&S&&S.run&&Array.isArray(S.run.bossesBeaten))?S.run.bossesBeaten.length>=5:false;}},
-  {id:'persistent',     label:'On a Roll',        desc:'Win 6 matches in one run',       renown:10,
-    check:function(G){return (typeof S!=='undefined'&&S&&S.run&&(S.run._matchWinsThisRun||0)>=6);}},
-  {id:'card_collector', label:'Full Hand',        desc:'Win a match with 4+ cards equipped',renown:5,
-    check:function(G){return G&&Array.isArray(G.pCards)&&G.pCards.filter(function(c){return c;}).length>=4;}},
-  /* Per-boss firsts — one feat per matchup, fires once per run. Gives a
-     dependable +10 renown each time the player clears a new opponent. */
-  {id:'beat_grog',      label:'Drinking Buddy',   desc:'Beat Grog',                      renown:10,
-    check:function(G){return G&&G.rung&&G.rung.key==='drunkard';}},
-  {id:'beat_mabel',     label:'Peasant Wrangler', desc:'Beat Mabel',                     renown:10,
-    check:function(G){return G&&G.rung&&G.rung.key==='peasant';}},
-  {id:'beat_finnick',   label:'Trickster Tamer',  desc:'Beat Finnick',                   renown:10,
-    check:function(G){return G&&G.rung&&G.rung.key==='commoner';}},
-  {id:'beat_corvus',    label:'Merchant Mauler',  desc:'Beat Corvus',                    renown:10,
-    check:function(G){return G&&G.rung&&G.rung.key==='merchant';}},
-  {id:'beat_brutus',    label:'Soldier Slayer',   desc:'Beat Brutus',                    renown:10,
-    check:function(G){return G&&G.rung&&G.rung.key==='soldier';}},
-  {id:'beat_aldric',    label:'Knight Killer',    desc:'Beat Aldric',                    renown:10,
-    check:function(G){return G&&G.rung&&G.rung.key==='knight';}},
-  {id:'beat_whisper',   label:'Noble Toppler',    desc:'Beat Whisper',                   renown:10,
-    check:function(G){return G&&G.rung&&G.rung.key==='noble';}},
-  {id:'beat_ambrose',   label:'Bishop Breaker',   desc:'Beat Ambrose',                   renown:15,
-    check:function(G){return G&&G.rung&&G.rung.key==='bishop';}},
+  {id:'the_collector',   label:'The Collector',    desc:'Hold four rules at once', renown:15,
+    check:function(G){return (typeof S!=='undefined'&&S&&S.run&&Array.isArray(S.run.tells))
+      ?S.run.tells.length>=4:false;}},
+  {id:'own_the_night',   label:'Own the Night',    desc:'Win the run', renown:25,
+    check:function(G){
+      if(!G._isBoss)return false;
+      return (typeof S!=='undefined'&&S&&S.run&&typeof TIERS!=='undefined'
+              &&(S.run.tier||0)>=TIERS.length-1);
+    }},
 ];
 
 /* ── Renown Perks (curated, threshold-based unlocks — never spent) ──
@@ -12714,7 +12745,9 @@ CFX.pickpocket={
 };
 CFX.falling_star={
   bank:function(ev){if(!ev.mine||ev.owner!=='p')return;
-    if(ev.amt>=ev.P&&!G._fExtraTurn){G._fExtraTurn=true;famLog('FALLING STAR — ANOTHER TURN COMES');}}
+    if(ev.amt>=ev.P&&!G._fExtraTurn){G._fExtraTurn=true;
+      G._featStarChain=(G._featStarChain||0)+1;/* WISH GRANTED */
+      famLog('FALLING STAR — ANOTHER TURN COMES');}}
 };
 CFX.encore={
   /* NOT WHILE ITS OWN REROLL IS RESOLVING. use() schedules the scoring check
@@ -13155,11 +13188,13 @@ function _famFeats(win){
     famLog('FEAT — '+msg);try{save();}catch(e){}
   }
   if(!win||!G)return;
-  if((G._famMinBank||0)>=800&&(G._famBankCount||0)>=2)grant('never_small','NEVER A BANK UNDER EIGHT HUNDRED',20);
+  /* never_small RETIRED HERE: it is TEETOTALLER now, in FEATS, with the
+     brief's 500 and a painting. Keeping both paid renown twice for one act
+     and only one of them could ever be seen. */
   if((S.run.luckyNames||[]).length>=3)grant('three_lucky','THREE LUCKY DICE IN ONE RUN',25);
   if(G._sleeve==='reckoning')grant('own_reckoning','WON UNDER YOUR OWN RECKONING',30);
-  if(G._isBoss&&(S.run.dice||[]).filter(function(m){return m==='obsidian'||m==='grogs_tooth';}).length>=3)
-    grant('ember_night','A NIGHT WON ON THREE EMBERS',25);
+  /* ember_night RETIRED HERE: it is THREE TORCHES now, in FEATS, with a
+     painting. Same condition, same act, one grant. */
   if(G._famKegTriple)grant('keg_triple','POWDER KEG INTO A TRIPLE',20);
 }
 function famFkTake(i){
@@ -13396,7 +13431,11 @@ function famCommitBonus(selD,pts){
   var _jadeDice=selD.filter(function(d){return (d.mat||'').indexOf('jade')===0;});
   if((inst=famInst('bloom'))&&(_isTriple||_isStraight)&&_jadeDice.length){
     var P=famDef('bloom').p[inst.tier-1];pts+=P;_famPop('+'+P+' BLOOM');
+    G._featBloom=(G._featBloom||0)+1;/* FULL BLOOM */
   }
+  /* GREEN THUMB - a straight a jade wild completed. Pending until banked:
+     the feat is about a straight that PAID, and a bust takes it back. */
+  if(_isStraight&&_jadeDice.length)G._featJadePend=true;
   if((inst=famInst('cultivate'))&&(_isTriple||_isStraight)&&_jadeDice.length){
     /* the jade wild fired: those dice grow, and their growth pays now */
     var grown=0;
@@ -13713,25 +13752,23 @@ function famLoadoutShow(){
   /* feats wall: earned feats hang as trinkets on the nail grid
      (FEAT_ART is global — the ceremony uses it too) */
   var _fd={};FEATS.forEach(function(f){_fd[f.id]=f;});
-  /* authored texts for images whose feats are not coded yet */
+  /* THE ONE PAINTING WITH NO FEAT BEHIND IT. This table used to carry all
+     twelve uncoded images and was consulted BEFORE the live feat, so once the
+     roster was restored it would have kept describing conditions the game no
+     longer has - "Own the Night: clear every seat", "No Claim: decline a
+     draft". The roster is the source of truth now; this is the fallback for
+     art with nothing behind it, and Bookkeeper is the only such art (Bookends
+     collapsed into Vanguard, so its condition has no home). */
   var FTEXT={
-    ForKeeps:['For Keeps','Win a for-keeps match and pocket their die.'],
-    FullBloom:['Full Bloom','Sit down with six family dice \u2014 not a bone among them.'],
-    GreenThumb:['Green Thumb','Grow a triple out of Jade wilds.'],
-    HisOwnMedecine:['His Own Medicine','Beat a boss with his own rule on the table.'],
-    NoClaim:['No Claim','Decline a victory draft and take the gold instead.'],
-    OmensTrue:['Omens True','Call the omen and watch it land.'],
-    OwnTheNight:['Own the Night','Clear every seat in a single night.'],
-    PowderMonkey:['Powder Monkey','Fire the flintlock three times in one match.'],
-    SlowBoiled:['Slow Boiled','Win a match that runs all the way to the cap.'],
-    StickyFingers:['Sticky Fingers','Lift gold from the same patron three times.'],
-    TwiceSaved:['Twice Saved','Cheat two busts in a single match.'],
-    WishGranted:['Wish Granted','Bank the exact target score.']};
+    Bookkeeper:['Bookkeeper','Parked \u2014 Bookends folded into Vanguard.']};
   var _artFeat={};Object.keys(FEAT_ART).forEach(function(id){_artFeat[FEAT_ART[id]]=id;});
+  /* LIVE FEAT FIRST, authored text second. The old order let a stale
+     hand-written line outrank the condition the game actually checks. */
   var _ftext=function(n){
-    if(FTEXT[n])return{nm:FTEXT[n][0],ds:FTEXT[n][1]};
     var id=_artFeat[n],f=id&&_fd[id];
-    return{nm:(f&&f.label)||n.replace(/([A-Z])/g,' $1').trim(),ds:(f&&f.desc)||''};
+    if(f)return{nm:f.label,ds:f.desc||''};
+    if(FTEXT[n])return{nm:FTEXT[n][0],ds:FTEXT[n][1]};
+    return{nm:n.replace(/([A-Z])/g,' $1').trim(),ds:''};
   };
   var fEarn=[];
   S.featsPinned=S.featsPinned||{};
@@ -16759,7 +16796,7 @@ if(/hsdebug/.test(location.search))try{localStorage.setItem('fk_dbg','1');}catch
      and the ceremony plays; repeatable (re-tap re-arms it) */
   window._fkFeats=function(){_getS();
     S.featsDone=S.featsDone||{};S.featsPinned=S.featsPinned||{};
-    ['first_blood','no_busts','comeback'].forEach(function(id){
+    ['first_blood','clean_night','long_road'].forEach(function(id){
       S.featsDone[id]=1;delete S.featsPinned[id];});
     save();showScreen('gauntlet');};
   document.addEventListener('click',function(e){
@@ -18014,6 +18051,7 @@ function _starstonePay(dice){
    a reskin of Obsidian's. */
 var BREAK_TRIGGERS={
   obsidian:{msg:'OBSIDIAN SHATTERS — +1000',fire:function(){
+    G._featShatterPend=true;/* POWDER MONKEY - claimed only if banked */
     G.turnPts=(G.turnPts||0)+1000;
     G.kept.push({vals:[],mat:'obsidian',pts:1000,dice:[]});
     try{updHUD();refreshKeptTray();}catch(e){}}},
@@ -22648,6 +22686,10 @@ function updHUD(){
   /* Comeback feat tracking — flag the moment opponent is up by 50% target.
      If the player still wins after that, the Comeback feat awards renown. */
   if(G.target&&(G.oPts-G.pPts)>=G.target*0.5)G._featTrailedDeep=true;
+  /* THE LONG ROAD wants an absolute gap, not a fraction of target: the
+     brief says 2,000 behind and a tier-7 target would make 50% mean 8,500. */
+  var _dfc=(G.oPts||0)-(G.pPts||0);
+  if(_dfc>(G._featMaxDeficit||0))G._featMaxDeficit=_dfc;
   /* ── Handicap: Sudden Death — show ROUND X / 3 ── */
   if(G._handicap==='sudden_death'){
     _turnLabel('','');/* hide normal turn */
@@ -25035,6 +25077,7 @@ function doBust(){
        - the play-on path at the bottom, and the !_amOK bank-out - leave the
        save used, so no route out of here still owes the player one. */
     G._bustImmuneTurn=false;
+    G._featAmberAte=(G._featAmberAte||0)+1;/* STICKY FINGERS */
     try{setStatusMsg('AMBER HOLDS — THAT SAVE IS SPENT','gold');famLog('AMBER HOLDS — ONE BUST EATEN, THE NEXT ONE LANDS');}catch(e){}
     var _amFree=G.pool.filter(function(d){return !d.committed;});
     /* Keep rerolling until the hand can actually be played. Without this the
@@ -25113,6 +25156,7 @@ function doBust(){
      turn, armed by the first branded face kept. */
   if(G._wardArmed){
     G._wardArmed=false;
+    G._featWardSaves=(G._featWardSaves||0)+1;/* TWICE SAVED */
     /* the whole turn, not just G.kept - the Stakes Rising seed lives outside
        it and was being dropped rather than halved */
     var _wardTotal=_bustLost+(G._turnBonusPot||0);
@@ -25148,6 +25192,10 @@ function doBust(){
   _bustTolls();
   /* Feat tracking: count player busts for "Untouchable" feat */
   G._featBusts=(G._featBusts||0)+1;
+  /* The pending claims die with the turn; the ROLL COUNT does not - Slow
+     Boiled is about how long you sat there, not about whether it paid. */
+  if((G.turnRollCount||0)>(G._featMaxRolls||0))G._featMaxRolls=G.turnRollCount||0;
+  G._featJadePend=false;G._featShatterPend=false;
   /* Rusty Spur: bias was earned by banking — a bust resets it so the bias doesn't carry past failure */
   if(G.spurActive){G.spurActive=0;}
   /* Hot Hand chain reset on bust — losing the chain is the real cost. */
@@ -26232,6 +26280,15 @@ function handleBank(){
   /* Tempting Fate feat: banked a turn in which the player committed a
      triple of 1s AND chose to roll again afterward. */
   if(G._rolledAfterTriple1)G._featTemptingFate=true;
+  /* THE BANK IS WHERE A TURN'S CLAIMS SETTLE. Green Thumb and Powder
+     Monkey are both stated as "bank a ...", so their pending flags are
+     promoted here and dropped in doBust - a turn that busts proves
+     neither. Slow Boiled wants the LONGEST turn, which is why it is a max
+     and not the winning turn's count (that is _featWinBankRolls). */
+  if(G._featJadePend)G._featJade=true;
+  if(G._featShatterPend)G._featShatterBanked=true;
+  G._featJadePend=false;G._featShatterPend=false;
+  if((G.turnRollCount||0)>(G._featMaxRolls||0))G._featMaxRolls=G.turnRollCount||0;
   updHUD();refreshKeptTray();clearRow('playerDiceRow');G.pool=[];setBtns(false,false);
   try{_renderSelTags([],0,true);}catch(e){}
   if(G.pPts>=G.target){setTimeout(()=>endMatch(true),700);return;}
@@ -27550,6 +27607,7 @@ function runOppTurn(){
     if(G._famIllOmen){
       var _ioT=G._famIllOmen.tier||1,_ioP=famDef('ill_omen').p[_ioT-1];
       if(pts<=0){var take=Math.min(_ioP[0],G.oPts);G.oPts-=take;G.pPts+=take;
+        G._featOmenTrue=true;/* OMENS TRUE */
         famLog('THE OMEN LANDS — YOU TAKE '+take);}
       else{G.oPts+=_ioP[1];famLog('THE OMEN MISSES — THEY GAIN '+_ioP[1]);}
       G._famIllOmen=null;try{updHUD();}catch(e){}
@@ -34157,6 +34215,10 @@ function _checkNightFail(){
   S.run.coins=Math.max(0,(S.run.coins||0)-1);
   if(S.run.coins<=0)S.run._died=true;
   S.run.points=0;S.run._chalkMeta=[];S.run.night=null;S.run._lastOrders=true;
+  /* SECOND WIND reads this. Stamped with the TIER rather than set to true
+     so it expires on its own when the run advances: there is no "clear the
+     flag" path that a future edit can forget to call. */
+  S.run._loNight=S.run.tier;
 }
 function _showLastOrders(){
   /* addendum-locked: near-dark, one heart visibly breaking, NEXT NIGHT
