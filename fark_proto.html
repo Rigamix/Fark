@@ -9742,11 +9742,14 @@ const FEATS=[
   /* ── AMBER ── */
   {id:'slow_boiled',     label:'Slow Boiled',      desc:'A single turn of six or more rolls', renown:10,
     check:function(G){return (G._featMaxRolls||0)>=6;}},
-  {id:'sticky_fingers',  label:'Sticky Fingers',   desc:'Win a match in which the amber held and ate a bust', renown:10,
-    /* THE BRIEF SAYS TAR PIT, WHICH IS RETIRED. Rewritten onto amber's live
-       identity — the tar that holds — rather than deleted. Exact wording is
-       Denis's, flagged in the phase report. */
-    check:function(G){return (G._featAmberAte||0)>=1;}},
+  {id:'sticky_fingers',  label:'Sticky Fingers',   desc:'Win a match after lifting a rival bank', renown:10,
+    /* THE BRIEF SAYS TAR PIT, WHICH IS RETIRED, and the first rewrite put
+       this on amber — wrong on the name. Sticky fingers are a THIEF, not
+       something that holds, and Tar Pit was Vagabond-flavoured to begin
+       with. Vagabond's break row takes what the rival banked, which is a
+       hand in someone else's purse: the family the feat always belonged to
+       and a mechanic the name actually describes. */
+    check:function(G){return (G._featSticky||0)>=1;}},
   /* ── SILVER ── */
   {id:'twice_saved',     label:'Twice Saved',      desc:'Two ward saves in one match, then win', renown:15,
     check:function(G){return (G._featWardSaves||0)>=2;}},
@@ -18110,6 +18113,9 @@ var BREAK_TRIGGERS={
   vagabond:{msg:'VAGABOND TAKES WHAT THEY HELD',fire:function(){
     var steal=Math.max(0,G._oLastBank||0);
     if(steal>0){
+      G._featSticky=(G._featSticky||0)+1;/* STICKY FINGERS - only a steal
+        that TOOK something counts; a rival who busted their turn away
+        leaves nothing to lift, and the row still fires. */
       G.turnPts=(G.turnPts||0)+steal;
       G.kept.push({vals:[],mat:'vagabond',pts:steal,dice:[]});
       /* A STEAL, NOT A GAIN (#6/#8). It used to add to the player and leave the
@@ -25077,7 +25083,6 @@ function doBust(){
        - the play-on path at the bottom, and the !_amOK bank-out - leave the
        save used, so no route out of here still owes the player one. */
     G._bustImmuneTurn=false;
-    G._featAmberAte=(G._featAmberAte||0)+1;/* STICKY FINGERS */
     try{setStatusMsg('AMBER HOLDS — THAT SAVE IS SPENT','gold');famLog('AMBER HOLDS — ONE BUST EATEN, THE NEXT ONE LANDS');}catch(e){}
     var _amFree=G.pool.filter(function(d){return !d.committed;});
     /* Keep rerolling until the hand can actually be played. Without this the
