@@ -25,6 +25,7 @@ to what it was made against, not because anything still reads it.
 | `MASTER_PLAN.md` | Targets `fark_nights.html`, a vehicle that no longer exists — the nights rework landed in `fark_proto.html`. |
 | `NIGHTS_NOTES.md` | Same dead vehicle. |
 | `FARK_MASTER_BRIEF.md` | **Stale duplicate**, eight days behind `briefs/FARK_MASTER_BRIEF.md` and still being read from. Same trap as the match brief below, found the same way. |
+| `QUESTIONS_2026-07-31b.md` | Folded into `docs/OPEN.md`, which is now the single questions file. Kept for the long-form reasoning behind each item — OPEN.md carries the question and the recommendation, not the derivation. |
 
 ## What is still live, in `docs/`
 
