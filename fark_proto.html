@@ -107,14 +107,17 @@ body::before{
   /* the same plate as the match table below, because it always was the same
      asset - leaving this on the 07-11 art while the table moved to the 07-27
      painting would put two different tables in one session.
-     STILL STRETCHES, and that is a known fault left alone on purpose: `100%
-     100%` scales both axes independently, which is the exact thing the match
-     rule below records fixing for itself, and the new plate's aspect (0.537 vs
-     0.554) makes it slightly worse. But this rule is the backdrop for EVERY
-     screen, so changing it reframes all of them - a wider change than the one
-     being made here. Written down rather than quietly widened. */
+     STRETCH FIXED, AND IT CHANGES NOTHING TODAY. Measured before touching it:
+     this pseudo-element computes to display:none - the body::before,body::after
+     kill rule further down switches both off, because every screen paints its
+     own plate now. So the old `100% 100%` stretched nothing; it reached no
+     pixel. `cover` is what the match rule below already uses, and the earlier
+     note here - that fixing this would reframe every screen - was reasoning
+     from a rule that does not paint. Corrected anyway: a wrong value sitting in
+     a file is a trap for whoever re-enables it. Effect today: none, stated
+     plainly rather than reported as a fix. */
   background-image:url('assets/Environment_ART/table_commoner.webp?v=1');
-  background-size:100% 100%;
+  background-size:cover;
   background-position:center top;
   background-repeat:no-repeat;
   image-rendering:pixelated;
@@ -8643,7 +8646,7 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
     <div class="menu-btn" onclick="SFX.nav();openSettings()">
       <canvas></canvas>
       <span class="btn-label">SETTINGS</span>
-      <img class="btn-icon" src="assets/Menu_Art/Settings.png" alt="Settings">
+      <img class="btn-icon" src="Art/Assets/Panels/Settings/settings.png" alt="Settings">
     </div>
   </div>
 
@@ -9594,9 +9597,20 @@ function _famDiceMigrate(){
 function _getS(){
   if(typeof S!=='undefined'&&S){
     S.settings=S.settings||{};
-    if(!S.settings._protoMuted){/* proto build: audio off by default (Denis) */
-      S.settings._protoMuted=true;
-      S.settings.music=false;S.settings.ambience=false;S.settings.sfx=false;
+    /* AUDIO ON BY DEFAULT. This used to force all three channels off on first
+       touch and latch the fact, so every feel assessment of this build has been
+       of a silent game - which is a bad way to judge a game about a tavern.
+       DELETING THE BLOCK IS NOT ENOUGH BY ITSELF: any save that already took
+       the mute has music/ambience/sfx PERSISTED false, and would stay silent
+       forever. The one-shot below turns them back on exactly once. It latches
+       on its own flag, so a player who then mutes deliberately keeps that
+       choice - the un-mute never fights the user. */
+    if(!S.settings._protoUnmuted){
+      S.settings._protoUnmuted=true;
+      if(S.settings._protoMuted){
+        S.settings.music=true;S.settings.ambience=true;S.settings.sfx=true;
+        delete S.settings._protoMuted;
+      }
     }
   }
   if(typeof S!=='undefined'&&S&&S.renownPerks&&Object.keys(S.renownPerks).length){
@@ -14908,8 +14922,20 @@ function _gbBarred(){
   var h='<div class="gbx" style="min-height:100%;display:flex;flex-direction:column;padding:10px 14px 14px">'
     +'<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px">';
   if(won){
-    h+='<div class="gbx-box" style="width:230px;height:64px">LAST ORDERS RUNG<br><span class="gbx-label">you own the night</span></div>'
-      +'<div class="gbx-box sub" style="width:230px;height:64px;font-size:12px">trophy → shelf · '+playerTitle()+' · renown '+(S.renown||0)+'</div>';
+    /* RULED (AUDIT_RESOLUTIONS #4). "LAST ORDERS RUNG" is the NIGHT-END beat -
+       _showLastOrders' own comment says that screen must be impossible to
+       misread as a win - and it was being used for the run-END one too, so the
+       single biggest moment in the game shared its headline with a night you
+       failed. The Ambrose-reuse alternative was rejected outright: the same
+       line twice running reads as copy-paste, not callback.
+       THE SUB-LINE GOES FOR A DIFFERENT REASON. Master brief section 8 deletes
+       the renown counter and states there is NO trophy shelf - the feats wall
+       is the only meta surface. This box promised a trophy to a shelf that does
+       not exist and printed a counter that does not either. What replaces it is
+       what the brief actually asks 3.11 to show: the run, and the wall. */
+    h+='<div class="gbx-box" style="width:230px;height:64px">THE HOUSE IS YOURS<br><span class="gbx-label">you own the night</span></div>'
+      +'<div class="gbx-box sub" style="width:230px;height:64px;font-size:12px">'
+      +((S.run&&S.run._featsThisRun)||0)+' feats this run · '+((S.run&&S.run.gold)||0)+'g in the purse</div>';
   }else{
     h+='<div class="gbx-box" style="width:230px;height:64px">BARRED<br><span class="gbx-label">'+(tier.boss?tier.boss.name:'the house')+' took your last heart — night '+((S.run?S.run.tier||0:0)+1)+'</span></div>'
       +'<div class="gbx-box sub" style="width:230px;height:84px;font-size:12px">'+(S.run?(S.run.gold||0):0)+'g in the purse · '
