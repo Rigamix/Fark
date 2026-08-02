@@ -2,7 +2,7 @@
 
 Written before a context compaction. Everything needed to pick up cleanly.
 
-**Deployed HEAD: `d6772fc` on branch `fark`. Backup tag: `pre-effect-system`
+**Deployed HEAD: `2c127cd` on branch `fark`. Backup tag: `pre-effect-system`
 (`a0aed7d`) — the last commit before the plan work began.**
 
 ---
@@ -71,17 +71,27 @@ its mtime. Nothing was damaged; the live file compiles clean.
 
 ## 3. BLOCKED ON DENIS
 
-1. **The current `FARK_ENCHANT_BADGE_REWORK.md`.** He says Corvus's two problems
-   were resolved in a prior round; my copy doesn't contain it. I'm a revision
-   behind and will otherwise build against stale text.
-2. **Where Kindred goes.** Zero Hour moves to "the last slot before Ambrose" =
-   **Whisper**, who already carries Kindred. Three-cornered, not two. Kindred
-   can't take Grog's vacated slot — it needs 2+ enchanted dice, the exact
-   night-one no-op we just fixed.
-3. **Retuned Last Call numbers** for Grog (it's dead code in an `if(false)`
-   block, so reviving is cheap; the number is a design call).
-4. Boss win/loss counters: per-run or cross-run. Greeting pool: named patrons
-   only or everyone. Full list in `docs/QUESTIONS_2026-07-31b.md`.
+**Nothing blocks the next task.** All four items that used to sit here were
+answered and are now built — the enchant/badge brief arrived, Zero Hour went to
+Mabel, Last Call was retuned to 800, boss counters and greetings are per-run.
+See Phase 4b in `docs/PHASE_REPORTS.md`.
+
+What is genuinely open, none of it blocking:
+
+1. **The early-run drip-feed.** Ruled that nothing goes back into the feat list.
+   Where the early signal comes from instead is unresolved — the proposal is
+   that dialogue beats (greeting tiers, first backstory unlocks, the King
+   thread's intro) already do that job, flagged as needing a real playtest
+   reaction rather than reasoning.
+2. **The two stale asset paths** and **`assets/` having no owner** — see §2.
+3. **Three recycled ids are gone, but the pattern isn't.** All eight badge ids
+   now match their rules. The thing to keep in mind: a `_RETIRED_RULES` entry
+   naming an old rule silently kills the NEW rule wearing its id, everywhere
+   except the boss's own badge. That table is empty now. Keep it that way unless
+   the replacement genuinely does not exist yet.
+4. **Numbers that are unplayed:** Last Call's 800, and most of the restored feat
+   conditions. They read real state and the wall renders, but only HIGH ROLLER
+   has fired through a live match.
 
 ---
 
