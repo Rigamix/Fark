@@ -246,9 +246,62 @@ an additive pass.
   six relics whose tints were byte-identical to their family colour — that needed
   a *separation* assertion, which lives in the P417 patch script, not here.
 
+## CORRECTION — both interpretations above were wrong, in opposite directions
+
+Denis's review asked two empirical questions I had answered by reasoning rather
+than measuring. In a report whose own standard is *verify computed, never
+authored*, that is the one thing it should not have done. Both are now measured,
+and both change the conclusion.
+
+### MATCOL is NOT reachable — downgrade it
+
+`fark_proto.html:9515` converts retired materials on load, guarded by
+`S.run._diceMigrated`:
+
+```js
+var refund={brass:350,crystal:700,ruby:400,jade3:1100};
+S.run[k]=S.run[k].map(function(m){ if(refund[m]){got+=refund[m];return 'bone';} return m; });
+```
+
+A legacy save holding one becomes **`bone`, refunded, before anything renders**.
+So there is no state in which a player sees an untinted retired die.
+
+**This is defensive completeness for a state nobody will ever witness, not a
+rare-but-reachable bug** — exactly the distinction the review asked for, and I
+had collapsed it. The table gap is real; the bug is not. Still worth the
+ten-minute fix as defence-in-depth if the migration is ever bypassed, but it
+carries none of the urgency the headline implied.
+
+### FEAT_ART is WORSE than reported — the reclassification was premature
+
+I downgraded it to "an art gap" after checking **one** consumer, the overlay path
+in `_drainFeatUnlockQueue`. There are **seven**. The others are the feats wall:
+
+```js
+list=list.filter(function(f){return f&&FEAT_ART[f.id]&&!S.featsPinned[f.id];});   /* :13898 */
+```
+
+**The wall filters out every feat without art.** So the 20 artless feats are not
+"text-only on the wall" — on that path they may not appear at all. That is a
+behaviour consequence, and my severity downgrade moved it the wrong way.
+
+Flagged rather than fixed here: confirming what a player actually sees on the
+wall needs its own probe, and this report should not claim a second time without
+measuring.
+
+**The lesson is the report's own:** "both routes are silent since the splash was
+removed" was a claim about game behaviour sourced from a changelog entry. The
+standard this document sets for game code applies to statements about game code.
+
 ## What's next
 
-Two candidates, and this is a real choice rather than an obvious next step:
+**The recommendation changes because of the correction above.** Phase 3 goes
+after bug classes that have already cost real time twice — `.lwho` at four
+rounds, `.end-draft-slots` at two wasted attempts. MATCOL's gap is real but
+currently unwitnessable. **Phase 3 first**, then the MATCOL fix as
+defence-in-depth, and a probe for what the feats wall actually shows.
+
+The original framing, kept because the reasoning is still worth reading:
 
 - **Phase 3** — the CSSOM presence check (3a) and the selector-actually-matches
   check (3b) Denis's correction added. Catches the `.lwho` and `.end-draft-slots`
