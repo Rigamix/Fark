@@ -72,13 +72,26 @@ Each is a few lines, and each would have caught a real bug today:
 **Rule going in:** a lookup table keyed by id must assert it is total over that
 id's source of truth, in the same commit that adds it.
 
-### Phase 3 — CSSOM presence for load-bearing selectors
+### Phase 3 — Does the rule exist, *and* does it hit anything?
 
-`tools/apv_css_dropped.js` already does this — it walks `document.styleSheets`
-and asserts named selectors are actually present, and it caught the `.lwho` bug
-*and* my re-break of it. It needs a real list, not the six I hard-coded.
+**Two different checks, and conflating them is what made the first version of
+this plan overstate its own coverage.**
 
-Plus the raw scan for an unbalanced comment marker, which is already in it.
+**3a — presence in the CSSOM.** `tools/apv_css_dropped.js` already does this:
+walks `document.styleSheets`, asserts named selectors are present. Caught the
+`.lwho` bug *and* my re-break of it. Needs a real list, not the six I
+hard-coded. Plus the raw unbalanced-comment-marker scan already in it.
+
+**3b — the selector matches something, and that something has a box.** `.lwho`
+was a rule that never parsed. `.end-draft-slots` was the opposite: **it parsed
+perfectly and targeted a class that does not exist on that screen.** 3a passes
+it. Only `querySelectorAll(sel).length > 0` on the screen the rule is *for*
+catches it — and extending that to a non-zero rendered box also catches
+`.win-art` collapsing to 0×0, which otherwise relies on someone thinking to
+measure.
+
+The distinction: **3a asks whether the browser has the rule. 3b asks whether the
+rule found the thing.** Two of today's bugs sat on each side of that line.
 
 ### Phase 4 — Two standing rules, enforced not remembered
 
@@ -112,7 +125,7 @@ merely discouraged. It also gives Phase 2 something to assert against.
 | Touches game logic | Yes, ~50 pieces | No |
 | Needs a migration | Yes | No |
 | Half-done state | Worse than not starting | Fine — each assertion stands alone |
-| Would have caught today's bugs | The 5 logic ones | **8 of the 10 visual ones** |
+| Would have caught today's bugs | The 5 logic ones | **7 of 10 automatically** (see below) |
 | Rollback risk | Real | None |
 
 It's additive, incremental, and every phase is independently useful. It's also
@@ -120,6 +133,47 @@ It's additive, incremental, and every phase is independently useful. It's also
 runner both plans need, so building it serves both.
 
 ---
+
+## The count, named rather than rounded
+
+The first version of this plan claimed "8 of 10" without saying which two. That
+was the same sin the plan is about — an unverified claim about coverage. Here is
+every one, and what actually catches it:
+
+| # | Bug | Caught by |
+|---|---|---|
+| 1 | `ASPECT` 15/38 → square shadows | **2** totality |
+| 2 | `MATCOL` `corvus_ledger` vs `..._d` | **2** totality |
+| 3 | `FEAT_ART` 12/32 → 20 loud feats | **2** totality |
+| 4 | `.ptcard .lwho` swallowed by a lost `/*` | **3a** CSSOM presence |
+| 5 | my comment re-breaking the same rule | **3a** CSSOM presence |
+| 6 | `.end-draft-slots` — parsed, matched nothing | **3b** selector-matches |
+| 7 | `.win-art` collapsed to 0×0 | **3b** non-zero box |
+| 8 | `_cfBlur` fooled on iOS | **4** — a *rule*, not an assertion. Only holds if the next feature test is written the reference way. |
+| 9 | `--font-px` instead of JMH Beda | **not caught.** Nothing can tell a wrong-but-valid font from a right one. |
+| 10 | hand-drawn coin and diamond | **not caught.** Phase 5's registry makes the right asset findable; it can't force its use. |
+
+**Seven caught by assertions that run.** One by a standing rule that depends on
+being followed. Two not caught at all — and both of those are the same error:
+*I didn't look.* Worth naming, because it's the failure mode the tooling can't
+reach and the one I made most often today.
+
+## The boundary with the effect plan — stated, so nobody builds it twice
+
+**This plan checks WHICH asset or rule got selected. It does not check WHEN, and
+it shouldn't.**
+
+Once visuals fire off the effect system's resolved trigger output rather than
+reading state independently, timing-class visual bugs are covered *for free* by
+that pipeline's ordering guarantee — Tier 2 modifiers, then Tier 1 effects, then
+Observers. A visual that reads a value before it finalises (the shape of the
+double-count bug, and of the "cheerful line over a voided bank" risk the lore
+brief flagged) is an ordering problem, and ordering is the other plan's job by
+construction.
+
+Left unstated this reads two bad ways: either someone builds a redundant
+timing-check layer here, or a reader concludes timing bugs fall between the two
+plans. Neither is true. **Selection is this plan. Sequencing is that one.**
 
 ## What it does *not* fix
 
