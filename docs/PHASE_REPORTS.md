@@ -1014,3 +1014,145 @@ baseline that blesses a red you just introduced is worse than no baseline.**
 
 Effect plan **Phase 1 — the inventory**: decompose ~50 cards, enchants and
 badges into trigger / condition / effect. The *misfits* are the valuable output.
+
+---
+
+# Effect plan Phase 1 — The inventory
+
+**Status:** complete, deployed `1850e3c`. Full decomposition in
+`docs/EFFECT_INVENTORY.md`; this is the summary and the re-plan it triggers.
+No game code was touched.
+
+## The headline: the trigger bus already exists, and it is 69% done
+
+The plan is written as though the bus has to be designed. **`CFX` is shipped.**
+It dispatches on seven hooks — `canUse`, `use`, `roll`, `bank`, `bankBonus`,
+`turnStart`, `bust` — and **20 of the 29 live family cards already route through
+it.**
+
+That is the vocabulary Phase 3 was going to spend its time inventing, already in
+the codebase, already carrying two thirds of the content.
+
+**The nine that do not route through it are the finding underneath.** `bloom`,
+`cultivate` and `vanguard_f` live inside `famCommitBonus`; `for_keeps` and all
+five tavern cards are wired wherever they happen to act. They have no `CFX`
+entry, so **a migration that starts from the effect table cannot see them** —
+which is precisely where a half-migration would leave a hole, and the plan does
+not mention them at all.
+
+## What the plan asked for
+
+> *"Decompose all ~50 cards, enchants, badges and relics into
+> trigger / condition(s) / effect(s)."*
+> *"**The valuable output is the rows that DON'T fit.** A clean table proves
+> nothing except that the vocabulary was written by someone who'd seen the
+> content."*
+
+**69 items, not ~50** — 8 enchants, 6 Break death rows, 29 live family cards,
+9 table rules, 8 relics, 9 material traits. Read out of the running game via
+`tools/effect_inventory.js`, not off a document, because every wrong answer this
+project has produced came from the other way round.
+
+## What it found
+
+**All three predicted misfits confirmed** — Jade's Break row (a re-entrancy rule
+about a roll already in flight), Fair Trade (a lease with its own clock), and
+Honeytrap (a constraint on generation, not an effect on a result).
+
+**Six more, and one of them changes a planned decision:**
+
+- **Kindred is not a multiplier.** Its "double strength" means something
+  *structurally different* for each of the five whitelisted enchants: Tithe pays
+  2× gold, Ward saves **two-thirds instead of a half**, Snare halves **twice on
+  the same shot** rather than watching a longer window, Snuff and Fog hold their
+  seat for **two turns rather than two lanes**. Break and Trade are excluded
+  because no coherent 2× exists.
+
+  Phase 3 says *"decide the multiplier rule now even though nothing multiplies
+  yet — this is the one that silently changes numbers later."* Measured,
+  **nothing multiplies and nothing will.** The only doubling in the game is five
+  bespoke rules sharing a badge. Settling an arithmetic rule for it would be
+  inventing a requirement rather than answering one.
+
+- **Quicksilver is a permission, not an effect** — it grants an option, and the
+  player is the trigger. It already sits in a different table from the other
+  seven, which is a shape finding rather than bookkeeping.
+- **Silver's weighted face table is the die's base geometry**, not an effect at
+  all — the brief exempts it explicitly, and the bus needs somewhere else to put
+  "this die's distribution differs".
+- **Still Waters operates ON the system** — it changes whether other things
+  fire. Tier-2, and the one rule that needs the bus to exist first.
+- **Zero Hour triggers on another effect firing**, not on a game event.
+- **Four enchants are markers with a lifetime, not effects with a moment.**
+  Snare, Snuff, Fog and Trade each mark a lane, wait, resolve on the opponent's
+  next turn, then clear. Snare's whole design correction was *shortening the
+  window* — a statement about lifetime, which "effect" does not carry.
+
+**And two whole groups may not belong on a match-scoped bus at all:** the five
+tavern cards act on the RUN (`the_tab` is a debt with a due date;
+`hair_of_the_dog` fires next match), and `for_keeps` is a stake whose effect is
+a change to the reward screen.
+
+## Two simplifications, worth as much as the misfits
+
+- **Relics are not a category.** Six of the eight reuse a material's mechanic —
+  `grogs_tooth`/`obsidian` both `shatter_bonus`, `mabels_thimble`/`amber` both
+  `triple_bonus`, `corvus_ledger_d`/`starstone` both `starstone_bonus`. A
+  seventh is a die born carrying an enchant. **They need the material
+  vocabulary plus a numeric override, not one of their own.**
+- **Last Call and The Reckoning are one rule.** Both void a bank under a
+  threshold; only the source of the threshold differs.
+
+## A dividing line nobody had drawn
+
+Of the nine table rules, **four carry a numeric field and five carry none**:
+`last_call`/`minBank`, `drill_order`/`maxRolls`, `pickpocket`/`chance`,
+`steeped`/`perRoll` — versus `zero_hour`, `first_strike`, `still_waters`,
+`kindred`, `reckoning`.
+
+The four are **data**. The five are **code** — and every one of them is either a
+misfit above or acts on the system itself. That split predicts the migration
+cost almost exactly, and nobody had noticed it because the rules are declared
+inline on eight different bosses.
+
+## Guideline compliance
+
+| Requirement | Where from | Met? |
+|---|---|---|
+| Decompose all content into trigger/condition/effect | Effect plan Phase 1 | **Yes** — 69 items, `docs/EFFECT_INVENTORY.md` |
+| The misfits are the output | Effect plan Phase 1 | **Yes** — 3 predicted + 6 new + 2 whole groups |
+| Touch no game code | Effect plan Phase 1 | **Yes** — one extraction tool, one doc |
+| Measure, don't reason | Standing rule | **Yes** — read out of the running game; corrected my own arithmetic before shipping (18→20, 11→9) |
+| Start with Phase 1 alone and re-plan | Plan's own closing instruction | **Yes — see below** |
+
+## THE RE-PLAN — what Phase 1 says to change
+
+The plan's own last line: *"I'd start with Phase 1 alone and re-plan after it.
+It's the only thing that can tell us whether the rest of this plan is the right
+shape."* It has, and three things change:
+
+1. **Phase 3 loses the multiplier decision.** There is nothing to multiply.
+   What Phase 3 should settle instead is **effect lifetime** — four enchants are
+   markers with a placement, a window and an expiry, and nothing in the plan's
+   vocabulary expresses that.
+2. **Phase 4's first group is wrong.** It says enchants first, "newest, best
+   understood". True, but four of seven are lifetime-markers and one is a
+   permission — enchants are where the vocabulary needs its *hardest* new
+   concept. **The 20 cards already on `CFX` are the honest first group**: the
+   ones the existing vocabulary already fits.
+3. **A new group exists that the plan does not list:** the nine hardcoded cards.
+   They are not on the effect table, so they will not appear in any migration
+   that enumerates it.
+
+**None of this is a decision I should make alone** — it re-scopes two phases of
+a plan Denis approved. The recommendation is above; the call is his.
+
+## What this does *not* cover
+
+- **Decomposition by shape, not by reading every implementation.** A card whose
+  hooks look ordinary may still do something structural inside them. Slow Cook
+  (four hooks) is the most likely to be under-described.
+- **No decision, no code.** This is the map.
+- **Opponent-side effects do not exist**, so every "affects the opponent" row is
+  one-directional today. The brief defers that deliberately, and it will change
+  the vocabulary when it lands.

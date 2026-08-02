@@ -7,13 +7,29 @@ Written before a context compaction. Everything needed to pick up cleanly.
 
 ---
 
-## 1. THE NEXT TASK — Effect plan Phase 1, the inventory
+## 1. THE NEXT TASK — Denis's call on the effect re-plan
 
-Decompose ~50 cards, enchants and badges into **trigger / condition / effect**.
-The *misfits* — the ones that don't fit the three-part shape — are the valuable
-output, because they're where the architecture would have to bend.
+**Effect Phase 1 is done** (`1850e3c`) and it re-scopes two later phases, which
+is a call for Denis, not for me. Full report in `docs/PHASE_REPORTS.md`, map in
+`docs/EFFECT_INVENTORY.md`.
 
-Backup tag `pre-effect-system` (`a0aed7d`) exists for exactly this work.
+The three changes it recommends:
+
+1. **Phase 3 loses the multiplier decision** — Kindred is not a multiplier, its
+   "double" means something structurally different for each of five enchants, so
+   there is nothing to multiply and nothing that will be. Phase 3 should settle
+   **effect lifetime** instead: four enchants are lane markers with a placement,
+   a window and an expiry, and the plan's vocabulary cannot express that.
+2. **Phase 4's first group is wrong** — it says enchants first, but four of the
+   seven are lifetime-markers and one is a permission, so that is the HARDEST
+   group, not the easiest. The 20 cards already on `CFX` are the honest start.
+3. **A group the plan does not list**: nine live cards are hardcoded at call
+   sites with no `CFX` entry (`bloom`, `cultivate`, `vanguard_f`, `for_keeps`,
+   the five tavern cards). A migration enumerating the effect table cannot see
+   them.
+
+**If Denis approves, the next build step is Phase 2** — shared conditions and
+queries — on the re-scoped shape.
 
 **Then write the Phase report** — one after every phase, in
 `docs/PHASE_REPORTS.md`, same fixed format.
