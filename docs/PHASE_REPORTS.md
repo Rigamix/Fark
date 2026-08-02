@@ -153,3 +153,116 @@ Nothing here needs a decision. One thing worth knowing: the runner takes roughly
 8–12 minutes for a full pass, because each probe gets its own browser to avoid
 the shared-state problem. That's the cost of the six probes that stub globals,
 and it's not negotiable without giving up the isolation.
+
+---
+
+# Phase 2 — Totality assertions
+
+**Status:** complete, deployed `8654acb`. Suite is now 12 probes: 11 pass,
+1 fail (three known reds inside it), 0 error.
+
+## The headline: the assertion found a bug nobody was looking for
+
+The plan predicted one red — no relic has a `.dtype-` CSS block — and it was
+there. The one that mattered was the one nobody predicted.
+
+**`MATCOL` is missing `jade3`, `brass`, `crystal` and `ruby`.** Those four are
+RETIRED materials: the master brief removed them from shop and drops. But they
+are still in `DICE_TYPES`, deliberately, because the same brief promises
+migration *converts* a legacy save that holds one rather than dropping it. So a
+save carrying a retired die renders it **with no tint at all.**
+
+Rare, real, and precisely the class the assertion exists for: **the domain
+drifted when the materials were retired, and nothing compared the two.** No
+amount of reading the tint table would have surfaced it — the table looks
+complete until you ask it what it is supposed to cover.
+
+## What the plan asked for
+
+> *"Totality assertions on every lookup table … each is a few lines, and each
+> would have caught a real bug today."*
+> *"A lookup table keyed by id must assert it is total over that id's source of
+> truth, in the same commit that adds it."*
+
+## What was built
+
+`tools/apv_table_totality.js`, six assertions, picked up automatically by the
+Phase 1 runner:
+
+| Table | Domain | Result |
+|---|---|---|
+| `ASPECT` | props the shipped templates reference | **38 keys / 19 needed** — green |
+| card art | every live `FAM_LIVE` id | **31 / 29** — green (two are aliases needing none) |
+| patron portraits | `PT_ART_POOL` | **30 / 30** — green |
+| `MATCOL` | every `DICE_TYPES` id | **20 / 24** — RED, see headline |
+| `FEAT_ART` | every `FEATS` id | **12 / 32** — RED |
+| `.dtype-` CSS | every relic id | **0 / 8** — RED, predicted |
+
+## What it found
+
+**`.dtype-` blocks, 0 of 8 relics.** The predicted one. Relics draw with default
+die vars anywhere the 2D renderer runs — shelf, loadout. The 3D tint landed in
+P417; this is its other half, and it is the change Denis's dice-art pass will
+most naturally absorb.
+
+**`FEAT_ART`, 12 of 32 — and the assertion RECLASSIFIED it.** Before P414 the 20
+artless feats took the loud full-screen overlay path, so this was a *behaviour*
+bug — it is why the same feats kept interrupting the loadout screen. Since the
+splash was removed, both routes are silent, so the same 12-of-32 is now purely an
+*art* gap. Same number, different severity. **The assertion is what made that
+distinction visible**, which is the argument for writing assertions rather than
+tracking known issues in prose.
+
+**`MATCOL` — see the headline.**
+
+## Guideline compliance
+
+| Requirement | Where from | Met? |
+|---|---|---|
+| Assert totality over the id's source of truth | Visual plan Phase 2 | **Yes** — six tables, each against its real domain |
+| Additive; touch no game logic | Visual plan | **Yes** — one new file in `tools/` |
+| Record known-red rather than leave it to drown new-red | Visual plan Phase 1 | **Yes** — all three reds baselined |
+| Don't half-do it | Effect plan | **Yes** — the unit is the assertion set, and it is whole |
+| Verify computed, never authored | Standing rule | **Partly — one row is weaker, and says so** |
+
+**The one honest weakness.** `ASPECT` is function-scoped and cannot be read from
+page scope. The choice was to change game code to expose it, or to parse it out
+of the served source. **Changing the game to make a test pass is the wrong way
+round**, so it is parsed from source and tagged `via:'source'` in the output.
+That proves the literal in the file is total — not that the live object is. A
+weaker claim, marked as weaker, rather than a strong claim quietly resting on a
+weaker method.
+
+**Repairs deliberately excluded.** Phase 2 is assertions. Fixing the three reds
+inside it would have made the phase unreviewable and hidden game changes inside
+an additive pass.
+
+## What this does *not* cover
+
+- **Six tables, not all of them.** These are the ones with a known failure
+  history. `ENCH_ICONS`, `FAMILIES`, `BOSS_FAM` and the dialogue pools are
+  unasserted.
+- **Totality is not correctness.** `MATCOL` being total would not have caught the
+  six relics whose tints were byte-identical to their family colour — that needed
+  a *separation* assertion, which lives in the P417 patch script, not here.
+
+## What's next
+
+Two candidates, and this is a real choice rather than an obvious next step:
+
+- **Phase 3** — the CSSOM presence check (3a) and the selector-actually-matches
+  check (3b) Denis's correction added. Catches the `.lwho` and `.end-draft-slots`
+  classes of bug.
+- **Fix the three reds** — `MATCOL`'s four retired materials is a ten-minute
+  change and a genuine, if rare, rendering bug.
+
+**Recommendation: the `MATCOL` fix first** (small, real, and the baseline will
+prove it went green), then Phase 3.
+
+## For the team
+
+One decision worth having: **`FEAT_ART` at 12 of 32 is now an art question, not
+an engineering one.** Twenty feats have no art. Since P414 that costs nothing
+functionally. Options are to commission twenty, to cut the feat list to the
+twelve that have art, or to accept that most feats are text-only on the wall.
+
