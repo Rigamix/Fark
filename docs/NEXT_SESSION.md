@@ -7,7 +7,22 @@ Written before a context compaction. Everything needed to pick up cleanly.
 
 ---
 
-## 1. THE NEXT TASK — Effect Phase 3 (groundwork DONE, see EFFECT_LIFETIME.md)
+## 1. THE NEXT TASK — Effect Phase 3 (lane markers BUILT; see EFFECT_LIFETIME.md)
+
+**BUILT (`P444`):** the lane-marker lifetime — `_lmArm` / `_lmDue` / `_lmSpend`
+/ `_lmRetire`, with the window gate inside `_lmDue` so it cannot be skipped.
+Snare, Snuff and Fog migrated. `apv_lane_lifetime.js`, 10 checks.
+
+**Snuff now gates on its armed turn.** Building the primitive forced the
+decision the measurement deliberately left open. Verified behaviour-identical
+on the live path (`dueOnArmedTurn`) and different only where `live`-alone would
+wrongly have fired (`notDueOnLaterTurn`).
+
+**Snare keeps a separate verb.** `_lmRetire` ≠ `_lmSpend`: Snare is consumed on
+the bite, and folding it into the turn counter would have handed it a second
+turn — the exact wager its own comment says it must not have.
+
+**STILL OPEN: Trade.** Excluded in writing at the primitive. Nothing to build.
 
 **The measurement is done and it corrected the plan.** `docs/EFFECT_LIFETIME.md`
 + `tools/effect_lifetime.py`. Three findings that change what Phase 3 builds:
@@ -21,9 +36,13 @@ Written before a context compaction. Everything needed to pick up cleanly.
   on `live` alone. Not a demonstrable live bug — `oppTurnCount` increments
   before the check, so the paths coincide today. Left unfixed ON PURPOSE: it is
   a behaviour change on Kindred's two-turn hold and belongs with the primitive.
-- **Ward retires in two functions** (`doBust` ×2, `startPTurn`); every other
-  marker retires in one. That distributed definition is exactly what Phase 3 is
-  asked to name, so Ward is the worked example.
+- **Ward: I got this one wrong, then corrected it.** The audit grouped by name
+  prefix and reported Ward's retirement as scattered. `_ward` is a prefix shared
+  by THREE unrelated features — the enchant (`_wardArmed`/`_wardBoost`, one
+  turn), the `warded` card's persistent charge pool (`_wardCharges`), and a
+  bank counter (`_wardBanks`). The enchant's two expiry sites are both correct:
+  `doBust` is CONSUMED, `startPTurn` is EXPIRED. Nothing distributed to fix;
+  Phase 3 item 2 is **withdrawn**, and the naming it actually needed is done.
 
 ---
 

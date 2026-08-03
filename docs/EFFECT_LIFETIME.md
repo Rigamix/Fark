@@ -72,21 +72,45 @@ would impose a window on something whose whole design is that it has none.**
 This is the `_fxFreeDice()` lesson from Phase 2, one layer up: four things that
 share a name are not four instances of one thing.
 
-## 3. Ward's lifetime is a convention spread across three functions
+## 3. Ward — THIS SECTION WAS WRONG, and it is the useful kind of wrong
 
-Four state variables (`_wardArmed`, `_wardCharges`, `_wardBanks`, `_wardBoost`)
-and **expiry in two different functions** — `doBust` twice, `startPTurn` once.
+**What it said:** four state variables and expiry in two functions, so Ward's
+retirement is a distributed convention, the strongest case for the primitive,
+and the worked example.
 
-Every other marker here retires in exactly one place. Ward's "when does it end"
-is currently distributed, which is the definition the re-plan asks Phase 3 to
-name. It is the strongest case for the primitive and should be the worked
-example.
+**What is actually true:** `_ward` is a PREFIX shared by three unrelated
+features, and the audit grouped by name.
+
+| variable | what it is | lifetime? |
+|---|---|---|
+| `_wardArmed` + `_wardBoost` | the Ward **enchant** — armed on your turn against your bust | one turn |
+| `_wardCharges` | the `warded` **card**'s charge pool — saved in `saveMatchState`, restored in `initMatchScreen` | none, it persists |
+| `_wardBanks` | a counter in `handleBank` paying a bonus every third bank | none, not a lifetime |
+
+And the two expiry sites are **both correct**: `doBust` is *consumed* — the save
+paid out — and `startPTurn` is *expired* — a new turn began without a bust. An
+armed-for-one-turn state that can be spent needs exactly those two, and merging
+them would lose the difference between "it worked" and "it never came up".
+
+**So there is nothing distributed to fix.** Ward's window is coherent; what it
+lacked was a sentence saying so, now at the arm site.
+
+**This is the fourth instrument-derived false finding today and the only one
+that reached a design doc** — it named a worked example and recommended
+restructuring something already correct. Which is precisely the compounding
+cost: a missed finding waits to be found, a manufactured one gets built on. It
+was caught by reading the sites rather than the summary, the same way as the
+other three.
+
+Ward is also **not a lane marker** and must not go on `_lmArm`/`_lmDue`: no
+lane, no opponent turn, armed against your own bust.
 
 ## 4. What Phase 3 has to cover
 
 1. **A lane-marker lifetime** — `{lane, live, turn}` with the window gate
    enforced rather than optional. Fixes snuff by construction.
-2. **Ward's armed window**, currently spread across three functions.
+2. ~~Ward's armed window~~ — **withdrawn.** Measured properly, it is coherent;
+   see §3. The only work it needed was naming, which is done.
 3. **Trade excluded, explicitly and in writing**, or the next reader re-derives
    it from the plan's own sentence and forces a window onto it.
 
@@ -104,8 +128,18 @@ the lines it was describing:
    counted as writes** and all three markers looked like they never read their
    own window field.
 
-Each error made the tool report *more* findings than were real. An instrument
-whose failure mode is manufacturing findings is more dangerous than one that
-misses them — the false alarms are the interesting-looking part, and there is no
-prompt to go and check them. Both today's other instrument errors were the same
-direction: the font probe "found" overflow on dice containing no text.
+Each error made the tool report *more* findings than were real, and all three
+made the markers look **less coherent than they are**.
+
+**A false positive is not merely worse than a false negative — it is worse in a
+way that compounds.** A missed finding sits there waiting to be found later. A
+manufactured one *gets acted on*. Any one of these three, landing unchecked in a
+design doc, would have shaped Phase 3 around a problem that does not exist — and
+the design would then have code embodying it, at which point the cost is a
+rewrite rather than a corrected sentence. There is no prompt to go back and
+re-check a finding you already believe.
+
+Today's other instrument error ran the same direction: the font probe's first
+pass "found" overflow on dice containing no text. Both were caught the same way
+— by reading the lines the tool was describing rather than the tool's summary of
+them.

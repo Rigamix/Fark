@@ -17605,6 +17605,26 @@ var ENCH_ICONS={
     desc:'Brand a shield on one face. Keep it: it banks nothing and arms this turn — a bust halves your bank instead of taking it all.',
     doubles:true,
     fire:function(c){
+      /* WARD'S LIFETIME (Phase 3), and it is NOT a lane marker - it is armed on
+         YOUR turn against YOUR bust, with no lane and no opponent turn. Do not
+         put it on _lmArm/_lmDue.
+         It ends in TWO places and both are correct, which is worth saying
+         because two expiry sites read like a distributed mess and this one is
+         not: `_wardArmed=false` in doBust is CONSUMED - the save paid out - and
+         `_wardArmed=false` in startPTurn is EXPIRED - a new turn began without a
+         bust. An armed-for-one-turn state that can be spent needs exactly those
+         two, and collapsing them would lose the difference between "it worked"
+         and "it never came up".
+
+         THREE FEATURES SHARE THE `_ward` PREFIX and only this one is a window:
+           _wardArmed/_wardBoost  this enchant, one turn, spent or expired
+           _wardCharges           the `warded` CARD's charge pool - saved and
+                                  restored across matches, not a window at all
+           _wardBanks             a counter in handleBank for a bonus every
+                                  third bank - not a lifetime in any sense
+         A lifetime audit that grouped by name treated all four as one feature
+         and concluded Ward's retirement was scattered across three functions.
+         It is not. The prefix is the only thing they share. */
       if(G._wardArmed){try{famLog('ALREADY WARDED THIS TURN');}catch(e){}return;}
       G._wardArmed=true;
       /* KINDRED (#32): two-thirds survives instead of half. Deliberately NOT a
@@ -17640,7 +17660,7 @@ var ENCH_ICONS={
          enchants never fired once. */
       /* KINDRED (#32): halves TWICE on the same next-turn shot - not a longer
          window, which would risk the 97.7%-fires problem the short one fixed */
-      G._snare={lane:c.lane,live:true,turn:(G.oppTurnCount||0)+1,x2:(c&&c.mult===2)||false};
+      _lmArm('_snare',c.lane,1,{x2:(c&&c.mult===2)||false});
       _firstStrike(c.side);
       try{famLog('SNARE SET — LANE '+(c.lane+1));}catch(e){}
     }},
@@ -17735,8 +17755,7 @@ var ENCH_ICONS={
     fire:function(c){
       /* KINDRED (#32): two opponent turns, not two lanes - a second lane would
          be a far bigger spike than "double" should mean */
-      G._snuff={lane:c.lane,live:true,turn:(G.oppTurnCount||0)+1,
-        turns:((c&&c.mult===2)?2:1)};/* see the note on _snare */
+      _lmArm('_snuff',c.lane,((c&&c.mult===2)?2:1));
       _firstStrike(c.side);
       try{famLog('SNUFFED — THEY PLAY A DIE SHORT');}catch(e){}
     }},
@@ -17749,8 +17768,7 @@ var ENCH_ICONS={
     doubles:true,
     fire:function(c){
       /* KINDRED (#32): two opponent turns, same reading as Snuff */
-      G._fog={lane:c.lane,live:true,turn:(G.oppTurnCount||0)+1,
-        turns:((c&&c.mult===2)?2:1)};/* see the note on _snare */
+      _lmArm('_fog',c.lane,((c&&c.mult===2)?2:1));
       _firstStrike(c.side);
       try{famLog('FOG — THEY WILL NOT SEE THAT SEAT');}catch(e){}
     }}
@@ -18003,6 +18021,60 @@ function _iconRescuesRow(){
    sees the other's full six-seat material layout for the rest of the match.
    Pure information - no scoring signature to sim, validated qualitatively
    only, and it fits Corvus's counting-house-sees-all identity. */
+/* == LANE-MARKER LIFETIME (Phase 3) ====================================
+   Snare, Snuff and Fog each put a mark on ONE LANE of the opponent's row, for
+   a SPECIFIC opponent turn, and then retire. That is a lifetime: a placement,
+   a window and an expiry. Before this it was an idiom copied three times -
+   {lane, live, turn} - and copied idioms drift. It had: Snare and Fog gated on
+   `turn===G.oppTurnCount`; SNUFF SET THAT FIELD TWICE AND NEVER READ IT, so its
+   window was "the next time this check runs" rather than a turn it named.
+
+   THE GATE LIVES IN _lmDue SO IT CANNOT BE SKIPPED. That is the whole point of
+   the primitive - not that the three become shorter, but that a fourth marker
+   cannot be written without a window, and this one cannot lose its window to a
+   later edit.
+
+   Snuff's gate is a real behaviour decision, taken here rather than guessed
+   earlier: a lane marker is armed for a NAMED opponent turn. Identical on
+   today's paths - oppTurnCount increments before every one of these checks and
+   placement always arms for +1, measured, not assumed - and different on the
+   paths where the count and the mark disagree, which is what a window is for.
+
+   RETIREMENT IS NOT SHARED, deliberately. Snare is ONE turn and is consumed on
+   the bite: it clears inside the branch where it actually halved something, and
+   its one-turn window is enforced by the gate rather than by clearing. Fog and
+   Snuff run for `turns` turns and re-arm. Giving Snare a shared _lmSpend would
+   hand it a second turn - the exact wager its own comment says it must not
+   have ("until it fires tested at 97.7% inside six turns, which is not a bet").
+
+   TRADE IS NOT ONE OF THESE and must not be migrated onto it. The effect-system
+   plan's own sentence groups Trade with these three; measured, G._tradeSwaps is
+   an ARRAY of swap records unwound newest-first, with no live, no turn and no
+   window, and it snapshots across a save. It has an undo, not an expiry. */
+function _lmArm(key,lane,turns,extra){
+  if(!G)return;
+  var m={lane:lane,live:true,turn:(G.oppTurnCount||0)+1,turns:turns||1};
+  if(extra)for(var k in extra)if(extra.hasOwnProperty(k))m[k]=extra[k];
+  G[key]=m;
+}
+/* THE WINDOW GATE. Every read of a lane marker goes through this. */
+function _lmDue(key){
+  var m=G&&G[key];
+  return !!(m&&m.live&&m.turn===G.oppTurnCount);
+}
+/* CONSUMED. Distinct from _lmSpend on purpose: a marker that fired is gone
+   whatever its turn count said, whereas spending a turn may re-arm. Snare is
+   the only consumer today - it retires inside the branch where it actually
+   halved something. */
+function _lmRetire(key){var m=G&&G[key];if(m)m.live=false;}
+/* Spend one turn of the window: re-arm for the next opponent turn, or retire.
+   Snare does not call this - see the note above. */
+function _lmSpend(key){
+  var m=G&&G[key];if(!m)return;
+  m.turns=(m.turns||1)-1;
+  if(m.turns>0)m.turn=(G.oppTurnCount||0)+1;
+  else m.live=false;
+}
 function _firstStrike(side){
   /* _ruleActive, not G._tell.id - the id also arrives by sleeve and by sealed
      seat, and reading the tell directly made the badge silently do nothing in
@@ -26953,13 +27025,11 @@ function runOppTurn(){
      then returns. Pulling one die from a six-die hand costs that turn about
      36% of its average value. */
   var _snuffLane=-1;
-  if(G._snuff&&G._snuff.live){
+  if(_lmDue('_snuff')){
     _snuffLane=G._snuff.lane;
     /* KINDRED holds it for a second turn: spend one, and re-arm for the next
        opponent turn rather than clearing */
-    G._snuff.turns=(G._snuff.turns||1)-1;
-    if(G._snuff.turns>0)G._snuff.turn=(G.oppTurnCount||0)+1;
-    else G._snuff.live=false;
+    _lmSpend('_snuff');
     if(_snuffLane>=0&&left>1){
       left--;/* the seat itself is dropped where rungDice is built, below */
       try{setStatusMsg('THEIR '+(_snuffLane+1)+(_snuffLane===0?'ST':(_snuffLane===1?'ND':(_snuffLane===2?'RD':'TH')))+' DIE IS SNUFFED','gold');}catch(e){}
@@ -27129,7 +27199,7 @@ function runOppTurn(){
          physically there and still rolls - the AI's maths simply cannot see
          its value, so that seat resolves to whatever the rest implies. */
       var _fogV=fV.slice(),_fogM=fMats.slice();
-      if(G._fog&&G._fog.live&&G._fog.turn===G.oppTurnCount){
+      if(_lmDue('_fog')){
         var _fi=-1;
         for(var _fj=0;_fj<_oFree.length;_fj++)if(_oFree[_fj].lane===G._fog.lane){_fi=_fj;break;}
         if(_fi>=0&&_fogV.length>1){
@@ -27137,9 +27207,7 @@ function runOppTurn(){
           try{famLog('FOG — THEY MISREAD A SEAT');}catch(e){}
         }
         /* KINDRED holds it for a second opponent turn (#32) */
-        G._fog.turns=(G._fog.turns||1)-1;
-        if(G._fog.turns>0)G._fog.turn=(G.oppTurnCount||0)+1;
-        else G._fog.live=false;
+        _lmSpend('_fog');
       }
       crowsCtx.crowsLuckFiredThisRoll=false;
       var{total,used,context:newCtx}=scoreRoll(_fogV,G.oCards,oppBank,crowsCtx,_fogM);crowsCtx=newCtx||crowsCtx;
@@ -27148,13 +27216,13 @@ function runOppTurn(){
          during this turn. The mark then clears whether it fired or not -
          "until it fires" tested at 97.7% inside six turns, which is not a
          bet. One opposing turn is what makes it a wager. */
-      if(G._snare&&G._snare.live&&G._snare.turn===G.oppTurnCount){
+      if(_lmDue('_snare')){
         var _snIdx=-1;
         for(var _si=0;_si<_oFree.length;_si++)if(_oFree[_si].lane===G._snare.lane){_snIdx=_si;break;}
         if(total>0&&_snIdx>=0&&used&&used[_snIdx]){
           var _snX2=!!G._snare.x2;
           total=Math.floor(total/(_snX2?4:2));/* Kindred halves it twice */
-          G._snare.live=false;
+          _lmRetire('_snare');
           try{famLog('THE SNARE BITES — '+(_snX2?'HALVED TWICE':'HALVED'));}catch(e){}
           try{setStatusMsg('YOUR SNARE CATCHES THEM — '+(_snX2?'A QUARTER':'HALF'),'gold');}catch(e){}
         }
