@@ -104,6 +104,30 @@ the master brief already has an instruction on the order of those
 
 ---
 
+## 1e. Break rows — all six measured, and one is a design note for you
+
+`docs/BREAK_ROWS_2026-08-03.md`. Not acted on.
+
+**Brief §4's timing finding generalises to every family.** It was written from
+Obsidian alone; measured, all six reward holding the skull for the last turn, by
++625 to +834 bank, confidence intervals separated on all six.
+
+**And Obsidian is the weakest case of it** — +422 against +625 to +834. The row
+picked to teach the mechanic demonstrates it *less* clearly than any row it was
+generalised to. That's only a problem if Obsidian is the tutorial example, which
+is your call.
+
+**The mechanism, which the brief didn't state:** informed bust rate is lower in
+every family (e.g. 32.7% → 23.3%). **The cost of breaking early isn't the row's
+payout — it's the die you no longer have.** That may be worth saying out loud in
+the brief, since it's the actual reason the timing read exists.
+
+**Not established:** row-value *ranking*. The family die contributes its family
+trait all match, so naive bank confounds trait with payout. Isolating that needs
+a different design.
+
+---
+
 ## 2. Early-game signal — waiting on a playtest, not on reasoning
 
 Restoring the brief's 24 feats removed every feat that fired in a new player's

@@ -22,7 +22,7 @@
 var seed=(window.__FSIM_SEED!==undefined)?window.__FSIM_SEED:20260803;
 var N=(window.__FSIM_N!==undefined)?window.__FSIM_N:2000;
 var BASE=(window.__FSIM_BASE!==undefined)?window.__FSIM_BASE:'bea';
-var FAM=(window.__FSIM_FAM!==undefined)?window.__FSIM_FAM:'obsidian';
+var FAM=(window.__FSIM_FAM!==undefined)?window.__FSIM_FAM:'vagabond';
 var out={base:BASE,fam:FAM,n:N,tier:4,seed:seed};
 
 function informedOf(base){

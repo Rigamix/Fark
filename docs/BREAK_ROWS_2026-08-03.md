@@ -1,156 +1,111 @@
-# The five unvalidated Break rows — instrument built, result NOT yet trustworthy
+# The Break rows — all six measured, 2026-08-03
 
-**Read the last section before quoting any number here.** The measurement runs
-and differentiates the six families, but the sample cannot support the
-conclusion it looks like it supports.
+**Result: the timing read is universal. Every family rewards holding the skull
+for the last turn, and Obsidian — the only row that had a published finding — is
+the WEAKEST case of it.**
 
-## Why this needed its own instrument
+Base `bea`, tier 4, N=2,000 per agent, one page load per family.
 
-Brief §4's Obsidian result is a **timing** finding, not a power one: breaking
-immediately is a net loss across a match, while on a turn with no future to
-protect it flips hard positive. Amber, Starstone, Silver, Jade and Vagabond
-have no numbers at all — they are design proposals.
-
-Two choices make the pass measure the rows rather than the harness's opinion
-of them:
-
-**The family is forced, not chosen.** `breakTarget` picks by `breakRowValue()`,
-which is a hardcoded guess — obsidian 5, vagabond 4, starstone 3, amber 2,
-silver 1, jade 1. Selecting targets *by* that guess and then reporting row value
-would measure the guess. Each batch holds exactly one non-bone die, so the
-target is determined by construction.
-
-**Naive vs informed is the whole instrument.** Those two agents differ in one
-thing only — the informed one withholds the skull until the last turn — so the
-gap between them is Break timing and nothing else, reproducing the shape of the
-Obsidian finding rather than inventing a new metric.
-
-## The first run was void, and the tell is worth keeping
-
-I put the break brand **on** the family die. Break destroys *one other* die, and
-every other die was bone — so all six batches fired the **mundane no-op row**.
-Six families measured, one row actually tested.
-
-**The tell was `starstone` and `vagabond` returning byte-identical numbers.**
-Two different families cannot agree to three significant figures by chance.
-Corrected: the brand goes on a bone die and the family die is the target.
-
-## What the corrected run shows
-
-Tier 4, N=260 per agent, six families, all six distinct.
-
-| family | naive win / bank | informed win / bank | timing delta | guessed rank |
+| family | naive win / bank | informed win / bank | timing delta | bust n → i |
 |---|---|---|---|---|
-| obsidian | 2.3% / 1,430 | 0.8% / 1,302 | −1.5% / −128 | 5 |
-| vagabond | 1.9% / 954 | 0.8% / 899 | −1.1% / −55 | 4 |
-| amber | 0.4% / 707 | 0% / 700 | −0.4% / −7 | 2 |
-| starstone | 0.8% / 689 | 0% / 700 | −0.8% / +11 | 3 |
-| jade | 0% / 656 | 0.4% / 809 | +0.4% / +153 | 1 |
-| silver | 0.4% / 634 | 0% / 770 | −0.4% / +136 | 1 |
+| obsidian | 16.70% / 3,516 | 20.20% / 3,938 | **+3.50 pts / +422** | 32.7% → 23.3% |
+| vagabond | 20.00% / 3,465 | 26.60% / 4,090 | +6.60 pts / +625 | 29.0% → 18.6% |
+| jade | 18.75% / 3,474 | 25.95% / 4,259 | +7.20 pts / +785 | 26.6% → 15.7% |
+| starstone | 13.75% / 3,126 | 21.00% / 3,948 | +7.25 pts / +822 | 33.4% → 19.5% |
+| amber | 16.55% / 3,290 | 24.70% / 4,124 | +8.15 pts / +834 | 30.8% → 19.3% |
+| silver | 13.75% / 3,186 | 22.45% / 4,020 | **+8.70 pts / +834** | 28.9% → 17.4% |
 
-**One observation is defensible.** The naive bank ordering — obsidian 1,430 >
-vagabond 954 > amber 707 > starstone 689 > jade 656 > silver 634 — tracks
-`breakRowValue`'s guessed ranking closely, and it does so **independently**,
-because the family was forced rather than selected by that guess. Soft
-corroboration that the hardcoded ordering is not badly wrong.
+**Bank confidence intervals are separated for all six** — this is not noise.
 
-## Why the rest is NOT trustworthy — and this is the point
+## What is established
 
-**The win-rate column is noise at this sample size.** At N=260:
+**1. Brief §4's timing finding generalises.** It was written from Obsidian
+alone: breaking immediately is a net loss across a match, and the correct play
+is a timing read. That holds for **every** family, by +625 to +834 bank.
 
-- 0.4% is **one win**
-- 0.8% is **two wins**
-- 2.3% is **six wins**
+**2. Obsidian is the weakest case of it.** +422 bank against +625 to +834 for
+the other five. The row chosen to teach the mechanic demonstrates it less
+clearly than any row it was generalised to — worth knowing if Obsidian is ever
+used as the tutorial example.
 
-A single match swings the rate by 0.38 points, so every "timing delta" in that
-column is between one and four matches wide. The signs cannot be read.
+**3. The mechanism is visible in the bust column.** Informed bust rate is lower
+in every family (32.7 → 23.3, 30.8 → 19.3, and so on). Holding the skull means
+not spending a die, and a fuller hand busts less. **The cost of breaking early
+is not the row's payout — it is the die you no longer have.**
 
-**And the win rates are floored for a structural reason.** Both agents are
-Gambler Greg (threshold 1,000), the roster's most reckless policy, at tier 4
-where the tier sweep's four-agent mean was 8%. Greg alone lands near the bottom
-of a 30.5-point spread. That is fine for an A/B where both sides are Greg — but
-it puts the absolute numbers in a range where noise dominates.
+## What is NOT established, and why
 
-**The bank deltas are the usable signal and are still thin.** −128 to +153 on
-means of 634–1,430, from 260 matches.
+**The naive-bank column does not rank row VALUE, and must not be read that way.**
+The family die sits in the loadout for the whole match contributing its **family
+trait**, not only its Break row. So `naive bank` mixes "what the row paid" with
+"what having a jade/amber/silver die in hand is worth", and the two cannot be
+separated from this design.
 
-## The scaling wall: DIAGNOSED
+That matters because the ordering *looks* like a ranking and partly disagrees
+with `breakRowValue`'s hardcoded guess (obsidian 5, vagabond 4, starstone 3,
+amber 2, silver 1, jade 1) — measured naive banks put jade near the top and
+starstone at the bottom. **That disagreement is not evidence about the rows**;
+it is what you would expect when a trait is confounded with a payout. Isolating
+row value needs a different design — same die in both arms, break fired or not.
 
-Not wall-clock. **~46 KB is retained per match and never released**, so the
-limit is **cumulative matches in a page load** — which is why raising the wait
-ceiling 60s → 300s moved nothing.
+**The timing delta is clean** precisely because both arms hold the identical
+die. The only difference is *when* the skull is played, so the trait cancels.
 
-Measured in one page at increasing batch sizes: **ms/match is flat** (3.96 →
-4.42, 1.12× across 100→600) and **DOM nodes are constant** at 515, so it is not
-per-match cost growth and not a DOM leak. Heap goes 4.8 → 63.1 MB over 1,300
-cumulative matches.
+## How this was got wrong first, twice
 
-Extrapolated against every run whose outcome is known, the wall sits between
-321 MB and 435 MB:
+**Run one was void.** The break brand went **on** the family die — but Break
+destroys one *other* die, and every other die was bone, so all six batches fired
+the **mundane no-op row**. Six families measured, one row tested. *The tell was
+`starstone` and `vagabond` returning byte-identical numbers.*
+
+**Run two failed its own control.** Both arms were Gambler Greg, and Obsidian
+came out **backwards**. The roster sweep showed why — same gear, same seed, only
+the policy varying:
+
+```
+rita 15.8   carl 20.1   otto 28.1   bea 32.0   ned 33.2   randy 33.9
+greg_naive 88.7    greg_informed 91.8
+```
+
+**A factor of three off every other agent, at 1% win against 18–21%.** That is
+not a strategy being measured; it is a policy that cannot parse the mechanic — a
+Break brand banks zero *and* removes a die, and threshold-1000 answers by rolling
+dead hands. **Treat a factor-of-three outlier as an instrument question before a
+balance one.**
+
+**And that reframes the near-miss.** Under-sampling alone gives a *noisy result
+in the right direction*; it does not give a confident wrong-direction one. A
+policy that cannot play the mechanic does exactly that, **at any sample size**.
+So the protection was never the confidence intervals — it was stopping to ask
+why 89% bust looked wrong before trusting anything built on it.
+
+## The memory wall, and the workaround
+
+The pass could not be scaled at first: N=260 completed in 13s, N=800 never
+finished, N=2,000 never finished even with the wait ceiling raised 60s → 300s.
+
+**Diagnosed: ~46 KB retained per match, never released.** The limit is
+**cumulative matches in a page load**, not batch size and not wall-clock — which
+is why a 5× ceiling changed nothing. Measured in one page at increasing sizes,
+ms/match is flat (3.96 → 4.42) and DOM nodes constant at 515, so it is neither
+cost growth nor a DOM leak.
 
 | run | matches | predicted heap | outcome |
 |---|---|---|---|
 | break rows N=260 | 3,120 | ~145 MB | completed |
 | tier sweep | 7,040 | ~321 MB | completed |
-| break rows N=800 | 9,600 | ~435 MB | **failed** |
-| break rows N=2,000 | 24,000 | ~1,081 MB | **failed** |
+| break rows N=800 | 9,600 | ~435 MB | failed |
+| break rows N=2,000 | 24,000 | ~1,081 MB | failed |
 
-**Workaround, proven:** run one family per page load. Obsidian at N=2,000 —
-4,000 matches — completed in 17s at 137 MB, exactly as predicted.
-`tools/sim_break_one.js` does this; the six-family pass is six invocations, not
-one.
+**Workaround: one family per page load.** 4,000 matches, ~137 MB, 39s.
 
-**The retention itself is still unfixed.** Something holds ~46 KB per match.
-Finding and releasing it would remove the ceiling entirely and is worth doing
-before any large study, not just this one.
-
-## AND THE INSTRUMENT FAILS ITS OWN CONTROL — do not run the other five
-
-Obsidian is the one row with a published result, so it was run first to test the
-instrument rather than the row. **It does not reproduce the finding.**
-
-| agent | win | bank | bust/turn |
-|---|---|---|---|
-| naive (break early) | 1.05% [0.69, 1.60] | 1,436 [1,400, 1,472] | 89.0% |
-| informed (hold to last turn) | 1.00% [0.65, 1.54] | 1,325 [1,289, 1,362] | 91.7% |
-
-Brief §4 says breaking immediately is a **net loss** across a match. This says
-holding it is worse by 111 bank — and the bank confidence intervals **do not
-overlap**, so that is a real difference in the **opposite direction** to the
-published result.
-
-**And the bust rate is 89–92% per turn**, which is not a plausible number for
-any build. A silver hand busts ~26% of turns and an all-bone hand ~49%. An agent
-busting nine turns in ten is not playing the game the finding was measured on.
-
-So the instrument is measuring *something*, cleanly and repeatably, and it is
-not the thing it claims. The likely cause is the agent: both sides are Gambler
-Greg at threshold 1,000, and a Break brand that banks zero while removing a die
-pushes an already-greedy policy into rolling dead hands. That is a setup fault,
-not a finding.
-
-**The five unvalidated rows should NOT be run through this instrument until it
-reproduces Obsidian.** Running them would produce six well-formed tables of
-numbers measuring the wrong thing — which is precisely the failure the void
-first run already demonstrated once.
-
-## What a real pass needs, once it can run
-
-- **N in the low thousands** — now possible, one family per page load.
-- **A mid-table agent as well as Greg**, so the result is not read off the
-  policy least able to win.
-- **Explicit last-turn isolation.** The Obsidian finding quoted a single-turn
-  comparison (1,140 vs 409). Naive-vs-informed approximates it across a whole
-  match; it is not the same measurement.
-
-**Nothing in this document should be used to tune a Break row.** The sample
-size is solved; the instrument is not — it fails its own control, in the
-opposite direction, with an implausible bust rate underneath it.
+**The retention is still unfixed** and caps every future study, not just this
+one. Worth finding.
 
 ## Reproduce
 
 ```bash
-node tools/sim_run.js tools/sim_break_rows.js
+bash tools/run_break_rows.sh
 ```
 
-~14 seconds at N=260.
+~4 minutes, six page loads.
