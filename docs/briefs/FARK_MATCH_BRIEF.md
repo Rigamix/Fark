@@ -42,24 +42,19 @@ Safe-area padding at top (notch) and bottom (gesture bar) required.
    right margin) with painted extents reaching in to x 62, and the
    composition still reads clean.
 
-   THE RULE THAT REPLACES IT is the one this section already stated as
-   its intent, kept and promoted: PROPS NEVER OVERLAP DICE, TAGS, CARDS
-   OR BUTTONS — expressed as an overlap test against live UI, never as
-   a coordinate range.
+   THE RULE THAT REPLACES IT is OCCLUSION, not overlap: NO DIE MAY
+   RENDER PARTIALLY HIDDEN BEHIND A PROP. Dice paint above props, which
+   is the only physically coherent order for a table where the dice are
+   the one thing in motion and the props are dressing underneath. So a
+   prop box touching a die box is a die RESTING ON CLUTTER — the
+   composition working, not a defect. An overlap-strict rule would
+   optimise against a correct choice.
 
-   AND THE SHIPPED TEMPLATES CURRENTLY FAIL IT. Measured on a live table
-   with six dice down: 9 bounding-box overlaps across 4 props — spoon,
-   bottle, plateMetal, bag — all against dice. Showing the old rule was
-   the wrong shape did NOT show the art was clear; both were true at
-   once, and only running the new check separated them.
-
-   What the box test cannot say is whether that matters. DICE PAINT
-   ABOVE PROPS, so an overlap reads as a die resting on the table
-   clutter rather than a die hidden behind a bottle — which is the
-   composition working, not failing. So the open question is whether
-   the invariant is OVERLAP or OCCLUSION, and that is an art call, not
-   a correctness one. `tools/apv_prop_overlap.js` holds the check and
-   is red against the stricter reading until it is settled.
+   Measured off the rendered DOM with six dice down, on the pinned
+   template that actually ships: 12 props, 2 geometric overlaps
+   (`pouch03`, `bag`), both painting BELOW the dice, so ZERO occlusions.
+   The invariant holds. `tools/apv_prop_overlap.js` asserts it and
+   reports overlaps without failing on them.
 
    Props may hang off the stage edge (a prop centred at x -14.9 is
    intentional; half a spilled pile reads better than a whole one

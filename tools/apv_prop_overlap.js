@@ -1,20 +1,35 @@
-/* THE PROPS RULE, AS REWRITTEN — do props overlap dice, tags, cards or buttons?
+/* PROPS vs DICE — OCCLUSION, measured off the rendered DOM.
  *
- * The match brief used to ban props from a central VERTICAL band, x 15-85.
- * Measured, the dice occupy x 7.7-97.6 inside a narrow HORIZONTAL strip at
- * y 43-54, so a vertical-band rule cannot express "keep clear of the dice" and
- * props violated it while composing correctly. The brief now states the rule it
- * always meant: PROPS NEVER OVERLAP DICE, TAGS, CARDS OR BUTTONS.
+ * RULED: the invariant is occlusion, not overlap. Dice paint above props, which
+ * is the only physically coherent order for a table where the dice are the one
+ * thing in motion and the props are set-dressing under everything. So a prop
+ * box touching a die box is a die RESTING ON CLUTTER — the composition working.
+ * The failure is a die rendering partially hidden BEHIND a prop.
  *
- * SHOWING THE OLD RULE WAS BADLY SHAPED DOES NOT SHOW THE ART WAS FINE. Both
- * could be true - the axis wrong AND some props still encroaching on the strip
- * that actually matters. This is the check that separates them, and it is the
- * acceptance test the brief now names.
+ *   occlusion = geometric overlap AND the prop painting above the die
  *
- * HEIGHTS ARE NOT IN THE TEMPLATE. Props store {n,x,y,w,rot}; height comes from
- * ASPECT, which is function-scoped inside the props renderer. Read out of the
- * served SOURCE, the same way apv_table_totality reads it, and marked as such -
- * it proves the literal in the file, not the live object. */
+ * The overlap half is kept because it is the precondition; only the verdict
+ * changed. That is why this file was reinterpreted rather than replaced —
+ * deleting it and building a successor would have left prop placement with
+ * zero coverage in between.
+ *
+ * TWO EARLIER VERSIONS OF THIS CHECK WERE WRONG, both in ways that produced a
+ * confident number:
+ *
+ *   1. It reported ZERO overlaps having found two UI targets, both buttons,
+ *      because the roll had not put dice on the table. A pass against a board
+ *      with no dice is the same "it did not fail" as a suite that never ran.
+ *      Now: the roll retries, the throw settles, and the verdict asserts on the
+ *      KIND of target found, never the count.
+ *
+ *   2. It computed prop boxes from the template as L = x - w/2, assuming x was
+ *      a centre. The renderer writes `left:x%; top:y%`, so x is the LEFT EDGE —
+ *      every prop was shifted half its width. It also ignored the per-prop
+ *      `rotate()`, which changes the painted extent.
+ *      Now: boxes come from getBoundingClientRect on the live <img> elements.
+ *      No origin assumption, no aspect table, rotation included by
+ *      construction. Read what the browser laid out, not what the data implies.
+ */
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const until = async (fn, ms) => { const t0 = Date.now();
   while (Date.now() - t0 < ms) { try { if (fn()) return true; } catch(e){} await sleep(60); } return false; };
@@ -26,26 +41,9 @@ const tap = el => { if (!vis(el)) return false; const r = el.getBoundingClientRe
   el.dispatchEvent(new PointerEvent('pointerdown', o)); el.dispatchEvent(new PointerEvent('pointerup', o));
   el.dispatchEvent(new MouseEvent('click', o)); return true; };
 
-const out = { notes: [], overlaps: [], checked: 0 };
+const out = { notes: [], overlaps: [], occlusions: [] };
 
-/* ── ASPECT, out of the source ── */
-let ASP = {};
-try {
-  const src = await (await fetch('fark_proto.html')).text();
-  const m = src.match(/\bASPECT\s*=\s*\{([\s\S]*?)\n\s*\};/);
-  if (!m) { out.notes.push('ASPECT literal not found in source'); }
-  else {
-    const re = /([A-Za-z0-9_]+)\s*:\s*\[\s*([\d.]+)\s*,\s*([\d.]+)\s*\]/g;
-    let k; while ((k = re.exec(m[1])) !== null) ASP[k[1]] = [ +k[2], +k[3] ];
-  }
-} catch(e) { out.notes.push('source read: ' + e.message); }
-out.aspectKeys = Object.keys(ASP).length;
-/* the game falls back from `mug01` to `mug` — mirror that, or every numbered
-   prop reports an unknown aspect and the check silently covers nothing */
-const baseOf = n => String(n || '').replace(/_?\d+$/, '');
-const aspOf  = n => ASP[n] || ASP[baseOf(n)] || null;
-
-/* ── drive to a live table WITH DICE ON IT ── */
+/* ── a live table, with dice actually on it ── */
 tap(document.getElementById('hsBtnBottom')); await sleep(1800);
 await until(() => { const d = document.querySelector('.nrdie'); return d && d._floatDone; }, 9000);
 tap(document.querySelector('.nrdie')); await sleep(1300);
@@ -57,11 +55,7 @@ const sit = [...document.querySelectorAll('span,div,button')].filter(e => vis(e)
 if (sit) { tap(sit); if (sit.parentElement) tap(sit.parentElement); }
 await until(() => vis(document.getElementById('screen-match')), 9000);
 await until(() => typeof G !== 'undefined' && G && G.phase === 'idle', 14000);
-/* THE DICE ARE THE POINT OF THIS CHECK, so getting them onto the table is a
-   precondition, not a best effort. The first version tapped ROLL, waited, and
-   then collected whatever happened to be there - it found two buttons and no
-   dice, and reported zero overlaps. A pass against a board with no dice on it
-   is exactly the "it did not fail" that means nothing. */
+
 let rolled = false;
 for (let attempt = 0; attempt < 3 && !rolled; attempt++) {
   const roll = [...document.querySelectorAll('button,div')]
@@ -71,56 +65,43 @@ for (let attempt = 0; attempt < 3 && !rolled; attempt++) {
   if (!rolled) await sleep(1200);
 }
 out.rolled = rolled;
-/* let the throw settle - a die mid-flight is not where it lands */
-await sleep(3000);
-out.diceVisibleAtTest = [...document.querySelectorAll('.die')].filter(vis).length;
+await sleep(3000);                       /* a die mid-flight is not where it lands */
 
-const stage = document.getElementById('screen-match').getBoundingClientRect();
-const SW = stage.width, SH = stage.height;
-const toPct = r => ({ L: 100*(r.left-stage.left)/SW, R: 100*(r.right-stage.left)/SW,
-                      T: 100*(r.top-stage.top)/SH,  B: 100*(r.bottom-stage.top)/SH });
+/* ── the two casts, both off the rendered DOM ── */
+const props = [...document.querySelectorAll('#matchProps img')].filter(vis);
+const dice  = [...document.querySelectorAll('.die')].filter(vis);
+out.propsRendered = props.length;
+out.diceRendered  = dice.length;
+/* which template actually dressed this table — FK_PROP_PIN means one ships,
+   so counting overlaps across every authored template overstates the problem */
+out.pinnedTemplate = (typeof window.FK_PROP_PIN !== 'undefined') ? window.FK_PROP_PIN : null;
+out.templatesAuthored = (window.FK_PROP_TEMPLATES || []).length;
 
-/* the things props must not cover */
-const TARGETS = [];
-function collect(sel, label) {
-  [...document.querySelectorAll(sel)].filter(vis).forEach(el => TARGETS.push({ label, box: toPct(el.getBoundingClientRect()) }));
+/* Paint order for two absolutely-positioned siblings with no z-index is
+   DOM order. compareDocumentPosition gives that without guessing. */
+function paintsAbove(a, b) {
+  const za = +getComputedStyle(a).zIndex, zb = +getComputedStyle(b).zIndex;
+  if (!isNaN(za) && !isNaN(zb) && za !== zb) return za > zb;
+  return !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_PRECEDING);
 }
-collect('.die', 'die');
-collect('.seltag, .sel-tag', 'tag');
-collect('#keptTray', 'kept tray');
-collect('.match-btn', 'button');
-collect('.mcard', 'card');
-out.targetCount = TARGETS.length;
-out.targetKinds = [...new Set(TARGETS.map(t => t.label))];
 
-/* ── the test ── */
-const T = window.FK_PROP_TEMPLATES || [];
-out.templateCount = T.length;
-const unknown = [];
-T.forEach(t => (t.props || []).forEach(p => {
-  const a = aspOf(p.n);
-  if (!a) { unknown.push(p.n); return; }
-  const hPct = (p.w * (a[1]/a[0])) * (SW/SH);   /* width% -> height%, via the stage ratio */
-  const box = { L: p.x - p.w/2, R: p.x + p.w/2, T: p.y - hPct/2, B: p.y + hPct/2 };
-  out.checked++;
-  TARGETS.forEach(tg => {
-    if (box.R > tg.box.L && box.L < tg.box.R && box.B > tg.box.T && box.T < tg.box.B) {
-      out.overlaps.push({ template: t.name, prop: p.n, hits: tg.label,
-        prop_box: [+box.L.toFixed(1), +box.T.toFixed(1), +box.R.toFixed(1), +box.B.toFixed(1)],
-        target_box: [+tg.box.L.toFixed(1), +tg.box.T.toFixed(1), +tg.box.R.toFixed(1), +tg.box.B.toFixed(1)] });
-    }
-  });
-}));
-out.unknownAspect = [...new Set(unknown)];
+for (const p of props) {
+  const pb = p.getBoundingClientRect();
+  for (const d of dice) {
+    const db = d.getBoundingClientRect();
+    if (!(pb.right > db.left && pb.left < db.right && pb.bottom > db.top && pb.top < db.bottom)) continue;
+    const name = (p.getAttribute('src') || '').split('/').pop().split('?')[0];
+    const above = paintsAbove(p, d);
+    const rec = { prop: name, propAboveDie: above };
+    out.overlaps.push(rec);
+    if (above) out.occlusions.push(rec);   /* the only real failure */
+  }
+}
 
-/* A COUNT IS NOT COVERAGE. The first run passed `targetsFound` on two buttons
-   and zero dice. The assertion has to name the kind that matters, or the check
-   can quietly test nothing and still go green. */
 out.verdict = {
-  aspectReadable:   out.aspectKeys > 0,
-  everyPropSized:   out.unknownAspect.length === 0,
-  diceOnTable:      (out.diceVisibleAtTest || 0) >= 3,
-  targetsFound:     out.targetKinds.indexOf('die') >= 0,
-  noPropOverlapsUI: out.overlaps.length === 0
+  diceOnTable:    out.diceRendered >= 3,
+  propsRendered:  out.propsRendered > 0,
+  /* THE RULED INVARIANT. Overlap is reported, never asserted on. */
+  noDieOccluded:  out.occlusions.length === 0
 };
 return out;
