@@ -18,10 +18,40 @@ under each banner). Remaining queue, in order:
 | 17 | `famLog` message queue — one line holds one message, so two effects firing together means one is never announced, and anything firing in the shop is announced into a hidden div | medium |
 | 16 | Rules-screen audit — the only teaching surface, and it teaches six things the code does not do | medium |
 | 20 | Update the props brief to match what shipped (ruled: don't move the art) | doc |
-| 3 | **Preserve** — built and never applied. Ruled: finish it | large |
+| 3 | **Preserve** — see the note below before writing a line of it | large |
 | 4 | Difficulty flat tier 3–7 — raise NPC aggression with tier, make cap-endings legible | large |
 | 18 | Harness passes on the five unvalidated Break rows (Amber, Starstone, Silver, Jade, Vagabond) | large |
 | 19 | Re-run the sim — every archived figure predates the sweep removal, the Trade fix and the 2026-08-02 rulings | large |
+
+### Before starting Preserve — measured, and it changes the build order
+
+**The structure is free to extend.** `G._famPreserve` is `{val,pts,crack}` and
+has exactly two readers. `_breakPreserved` **already reads `p.die` and
+`p.lane`** — written defensively for this, with a comment saying so, so adding
+them arms a guard that has been waiting. `startPTurn` reads only
+`val/pts/crack`; extra fields are inert to it. Nothing collides.
+
+**But the consumer is dead, and it lies.** `startPTurn` sets
+`G.kept=[{...}]` and `G.numDice=5` — and then **four lines later, in the same
+function with no early return between, `G.kept=[]` and
+`G.numDice=G.matchDice.length` overwrite both.**
+
+Verified on a live match by setting the exact state `CFX.preserve.use` writes
+and calling the consumer: `kept` came back `[]`, `numDice` 6, stash consumed.
+
+So Preserve today **spends its charge, prints "THE AMBER CRACKS — A 1 ALREADY
+KEPT", and delivers nothing.** The player is told it worked.
+
+Two more faults sit underneath, and they only surface once the clobber is gone:
+
+- **`mat:'bone'` is hardcoded** — a preserved amber or jade die returns as
+  bone, losing its material and any enchant it carried.
+- **`G.numDice=5` is hardcoded** — assumes a six-die loadout, so it is wrong
+  whenever Break has already taken one.
+
+**Build order, therefore: fix the consumer FIRST, then extend the structure.**
+Adding `die` first and testing would have shown "still does not work" and sent
+the hunt to the wrong place entirely.
 
 Then **Effect Phase 2** — shared conditions and queries — which is the first
 phase that builds machinery rather than mapping it.
