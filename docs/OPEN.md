@@ -78,6 +78,32 @@ in place.
 
 ---
 
+## 1d. The sim re-run — deltas are in, and they are large
+
+`docs/SIM_RERUN_2026-08-03.md`. Not acted on, per your ruling. The three that
+matter:
+
+**Win rate on an un-upgraded build collapsed ~4x.** Tiers 3–7 were
+`30.8 / 33.0 / 36.4 / 33.9 / 32.3`; they are now `8.1 / 8.0 / 8.9 / 11.1 / 8.2`.
+
+**Cap endings start much earlier** — 55.4% at tier 3, not the 0.3% reported.
+
+**And the mechanism is now visible:** median turns pins to the cap from tier 3
+and never moves, while player bank plateaus (1,971 → 1,933 across five tiers)
+and opponent bank keeps climbing (5,727 → 6,436). The ladder scales; a held-still
+player does not.
+
+Also: **agent spread narrows as tiers rise** (60.9 → 23.6), so how well you play
+matters *less* the higher you climb — the strongest support yet for "longer, not
+harder".
+
+**No recommendation attached on purpose.** Raising aggression, lowering late
+targets and letting player scoring grow are all consistent with this table, and
+the master brief already has an instruction on the order of those
+(*"tune TARGETS down before inflating player scoring"*). Which lever is yours.
+
+---
+
 ## 2. Early-game signal — waiting on a playtest, not on reasoning
 
 Restoring the brief's 24 feats removed every feat that fired in a new player's
