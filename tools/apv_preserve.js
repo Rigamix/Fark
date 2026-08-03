@@ -38,8 +38,28 @@ const pc = [...document.querySelectorAll('.ptcard')].filter(vis)[0]; if (pc) { t
 const sit = [...document.querySelectorAll('span,div,button')].filter(e => vis(e) && e.children.length <= 1
   && /^SIT\s*DOWN$/i.test((e.textContent || '').trim()))[0];
 if (sit) { tap(sit); if (sit.parentElement) tap(sit.parentElement); }
-await until(() => vis(document.getElementById('screen-match')), 9000);
-await until(() => typeof G !== 'undefined' && G && G.phase === 'idle', 14000);
+const _atMatch = await until(() => vis(document.getElementById('screen-match')), 9000);
+const _idle    = await until(() => typeof G !== 'undefined' && G && G.phase === 'idle', 14000);
+
+/* THE PRECONDITION HAS TO HOLD, AND UNTIL() RETURNS FALSE RATHER THAN THROWING.
+   Ignoring that return value made this probe flap: standalone it passes every
+   time, inside the full suite it intermittently reported dieArrived,
+   materialKept, pointsCarried and playerCanSeeIt all false - which reads as
+   "Preserve is broken" and is not what happened.
+   The tell was the one check that still PASSED. stashConsumed true means
+   G._famPreserve really was set and really was consumed; the die was placed and
+   then something wiped G.kept afterwards. That is the signature of startPTurn
+   being called here while the match was still initialising, so init's own turn
+   start ran second and cleared the tray - a race the probe creates, not a fault
+   in the feature.
+   So: if the match is not idle, DECLINE. "I could not run" is a different fact
+   from "the game is wrong", and a probe that reports the second when it means
+   the first is worse than no probe - it spends someone's afternoon. */
+if (!_atMatch || !_idle || typeof G === 'undefined' || !G) {
+  return { skip: 'setup did not reach an idle match (atMatch=' + _atMatch
+                 + ' idle=' + _idle + ' phase=' + (typeof G !== 'undefined' && G ? G.phase : 'no G')
+                 + ') - not a Preserve result either way' };
+}
 
 out.loadoutSize = (G.matchDice || []).length;
 

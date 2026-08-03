@@ -51,25 +51,6 @@ I'll ship yours instead.
 
 ---
 
-## 1c. Two card faces are drawn that no card can use
-
-`Art/Assets/Cards/Silver/card_face_ward.png` and `card_face_insurance.png` — both
-also already optimized into `assets/cards/`, so they are one card definition away
-from rendering. But:
-
-- **`ward` is an enchant, not a card.** It's in `ENCH_GRID` alongside tithe,
-  snare and break. Nothing in the card roster has that id.
-- **`insurance` doesn't exist anywhere in the game.**
-
-Silver has 4 cards built (fair trade, reprisal, retort, steady hand) and 6 faces
-painted. **Were these two meant to be Silver cards?** If ward was drawn as a card
-before it became an enchant, the file is spent work and should be retired so the
-next person doesn't try to wire it up. If Silver is meant to be a 6-card family,
-that's two cards to design.
-
-*No recommendation — I can't tell which of those happened from the files.*
-
----
 
 ## 1d. The sim re-run — deltas are in, and they are large
 
@@ -97,31 +78,36 @@ the master brief already has an instruction on the order of those
 
 ---
 
-## 1e. The previous game's card roster — is any of it meant to survive?
+## 1e. The old roster — answered by the file, and it was already ruled once
 
-You flagged old card art on screen. Chasing it down found something bigger than
-the art.
+You were right that "unused on every path I drove" isn't "unreachable on every
+path that exists." It's checkable, and the answer is **retired, deliberately,
+and the same call you just made was made once already.**
 
-**The live game doesn't use it.** A full played match makes **zero** requests to
-`assets/Card_ART/` and **zero** calls to the function that loads it. Family cards
-render your new art correctly. The old art I screenshotted was on the **draft
-screen, which is dead** — its only reference is the `case 'draft'` line inside
-`showScreen`; nothing calls `showScreen('draft')`. I opened it by hand.
+`PROTO_NOTES.md`, P1b: *"~330 old effect sites now inert; physical deletion
+deferred (dead code, no behavior)."*
 
-**But 233 old cards are still defined**, with 147 art files, and five surfaces
-still reference them in code (the card bar, the mini-card, end-of-match draft
-slots, the pouch slot, the boss loadout). None of the five fired during a full
-match — but "didn't fire in the one run I drove" is weaker than "can't fire", and
-I can't get to "can't" without knowing your intent.
+**It's held dead by three one-line stubs** — a `return []` on the first line of
+`effectiveCards`, `initMatchScreen`'s `pCards`, and `generateOppCards`. The
+twenty lines below each stub still read the old pools and still work.
 
-**Is the old roster retired?** If yes, this is a large, clean deletion — 233
-definitions, 147 art files, three dead screens (`draft`, `bossreward`,
-`reshuffleDraft`). If some of it is still meant to be live — the NPC/boss cards
-are the likely candidate, `her_lucky_coin` and `grogs_bump` are Grog's — then
-those need new-style art, because two of them 404 today.
+**Not legacy-by-omission.** Zero definitions added, removed or edited since the
+family engine landed; `FAM_CARDS` moved 12 times over the same span.
 
-*My rec: tell me which of the 233 (if any) survive, and I'll delete the rest.*
-Not doing it unprompted — that's a lot of authored content.
+**One correction to my own number:** it's **133** cards, not 233. I'd counted
+`{id:` matches across the whole file, which swept in boss tells and NPC entries.
+
+**Tagged, not deleted**, per your call — and the tag is enforced:
+`apv_legacy_retired.js` *calls* all three stubs (a commented-out `return []`
+still greps as a `return []`) and fails if any starts dealing again.
+
+**The one thing that genuinely isn't deletable:** NPC cards come back in P5 as
+*family* cards, so the authored boss pools are the design record of what each
+boss's cards mean. `tamper` is already blocked on the same phase.
+
+**Left for you:** whether to also archive the 147 art files in
+`assets/Card_ART/`. Tagging covers this pass; the art move is a bigger diff and
+nothing forces it now.
 
 ---
 
