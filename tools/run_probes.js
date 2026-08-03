@@ -124,6 +124,33 @@ for (const p of probes) {
 
 console.log('\n' + pass + ' pass, ' + fail + ' fail, ' + err + ' error');
 
+/* ── EVERY RUN IS RECORDED, because an intermittent failure that is only ever
+   printed to a terminal is unfindable by construction ──────────────────────
+   On 2026-08-03 one run of four showed a FAIL that the next three did not, and
+   the name was lost with the scrollback. That is the second intermittent in
+   this suite - apv_bust_settle flapped earlier the same day - and neither got
+   diagnosed, because by the time you know it flaps the evidence is gone.
+   Three clean runs afterwards are not an explanation; they are three chances
+   to observe it that were not taken.
+   So: one line per run, appended, naming exactly what was not green. Cheap
+   enough to leave on forever, and the next flap arrives with its own evidence
+   instead of a memory of one. */
+try {
+  const notGreen = {};
+  for (const p of Object.keys(results)) {
+    const v = results[p];
+    if (v.error) { notGreen[p] = 'error'; continue; }
+    if (v.skipped) { notGreen[p] = 'skip'; continue; }
+    const bad = Object.keys(v).filter(k => v[k] === false);
+    const ind = Object.keys(v).filter(k => typeof v[k] !== 'boolean');
+    if (bad.length) notGreen[p] = 'FAIL:' + bad.join(',');
+    else if (ind.length) notGreen[p] = 'INDET:' + ind.join(',');
+  }
+  fs.appendFileSync(path.join(HERE, 'probe_history.jsonl'),
+    JSON.stringify({ at: new Date().toISOString(), pass, fail, err,
+                     notGreen }) + '\n');
+} catch (e) { console.log('(history not written: ' + e.message + ')'); }
+
 /* ── compare to the baseline, so only NEW breakage is alarming ── */
 if (RECORD) {
   fs.writeFileSync(BASELINE, JSON.stringify(results, null, 1));

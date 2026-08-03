@@ -48,8 +48,40 @@ would have been **introduced** by migrating onto an add-only bus, since
 fix a bug. Overstating it would have been the Ward mistake again — naming a
 defect in code that was already correct.
 
-**Still missing: the `deadRoll` and `rivalTurn` seams** for `fools_gold_f` and
-`ill_omen`.
+### BUILT: `deadRoll` and `rivalTurn` (P446) — all three seams closed
+
+- **`deadRoll`** — nothing scored, before the bust resolves. `fools_gold_f`
+  rerolls here and can **claim** the roll, cancelling the bust.
+- **`rivalTurn`** — the rival's turn resolved, with `ev.pts` as what they
+  scored. `ill_omen` was declared a turn earlier on `use` and pays out here.
+
+**`ev.claim()` is a fourth verb, not a number.** A dead roll has two outcomes —
+the turn continues or it ends — and that is a decision. Encoding it as a
+quantity means picking a sentinel every future claiming card has to know. Same
+argument as Snare's `_lmRetire` being separate from `_lmSpend`.
+
+**The NPC's own cards in that block are NOT migrated.** `slow_cook`,
+`double_or_nothing`, `pickpocket` and `retort` resolve there via `_npcFamCard`
+— the opponent-side implementation, deliberately separate until P5. `rivalTurn`
+is for the *player's* cards that resolve during the rival's turn, a different
+thing that happens to share a moment. Migrating them would quietly do P5's job
+with none of P5's decisions.
+
+### And the probe found a real crash in `famFire`
+
+`ev.P` was computed as `var d=famDef(inst.id); return (d.p?…)` — **no null
+guard**. `famDef` returns null for an id with no definition, and `d.p` then
+throws on **every hook, not just that card's**.
+
+It is reachable: `FAM_CARDS` lost four cards this rework. `anchor_f` and
+`bookends_f` alias to `vanguard_f`, but **`insurance` and `ward` were cut
+outright**, so a save still holding one crashes the whole effect bus.
+
+Found because a fixture equipped an id with no definition — the same shape that
+reaches a real player through an old save. Guarded.
+
+**Still open:** the five tavern cards (`OPEN.md` §0), and `for_keeps` /
+`tar_pit`, which need reading before anyone counts them as migratable.
 
 **So Phase 4's blocker is not migration, it is missing seams.** Three moments
 the seven hooks do not expose. And `bloom`, `cultivate` and `vanguard_f` — three

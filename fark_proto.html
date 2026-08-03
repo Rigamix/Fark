@@ -12588,13 +12588,26 @@ function famFire(hook,ev){
   ev=ev||{};ev._delta=0;ev._mul=1;
   ev.add=function(n){ev._delta+=n;};
   ev.mul=function(n){ev._mul*=n;};
+  /* CLAIM IS A DECISION, NOT A QUANTITY. deadRoll has two outcomes - the turn
+     continues or it ends - and encoding that as a number would mean choosing a
+     sentinel that every future claiming card has to know. Same argument as
+     Snare's _lmRetire being separate from _lmSpend: a distinct outcome earns a
+     distinct verb rather than an overloaded one. */
+  ev._claimed=false;ev.claim=function(){ev._claimed=true;};
   ['p','o'].forEach(function(owner){
     var list=owner==='p'?(G.pF||[]):(G.oF||[]);
     for(var i=0;i<list.length;i++){
       var inst=list[i],fx=CFX[inst.id];
       if(!fx||!fx[hook])continue;
       ev.owner=owner;ev.mine=(ev.actor===owner);ev.me=inst;
-      ev.P=(function(inst){var d=famDef(inst.id);return (d.p?d.p[inst.tier-1]:0);})(inst);
+      /* NULL-GUARDED, because famDef CAN return null and this crashed the
+         whole bus when it did. FAM_CARDS lost four cards this rework -
+         anchor_f and bookends_f alias to vanguard_f, but insurance and ward
+         were cut outright - so a save still holding one resolves to null and
+         `d.p` throws on EVERY hook, not just that card's. Found by a probe
+         equipping an id with no definition; the same shape reaches a real
+         player through an old save. */
+      ev.P=(function(inst){var d=famDef(inst.id);return (d&&d.p?d.p[inst.tier-1]:0);})(inst);
       try{fx[hook](ev);}catch(e){console.error('famFX',inst.id,hook,e);}
     }
   });
@@ -13575,6 +13588,10 @@ function famApplyRollForces(){
   }
 }
 /* fool's gold: auto-fires on a dead roll, one reroll; double-fail burns */
+/* THE BODY OF CFX.fools_gold_f.deadRoll, kept as a named function.
+   The hook is the seam; this is still where the work reads best, and inlining
+   sixteen lines into a CFX entry would bury the one branch that matters (the
+   second roll failing is what arms the burn). Called ONLY from the hook. */
 function famFoolsGold(free){
   var inst=famInst('fools_gold_f');
   if(!inst||inst.charges<=0)return false;
@@ -13592,6 +13609,14 @@ function famFoolsGold(free){
   return false;
 }
 CFX.fools_gold_f={
+  /* TWO MOMENTS, BY DESIGN, and this is why the card looked half-migrated:
+     "Rolled nothing? Reroll everything. But if the second roll fails too, the
+     bust burns your turn AND the same amount from your banked points."
+     The reroll fires on the dead roll; the burn fires on the bust that follows
+     it. Complementary, not duplicated - the bus simply had no dead-roll seam
+     until now. */
+  deadRoll:function(ev){if(!_fxMine(ev))return;
+    if(famFoolsGold(ev.free))ev.claim();},
   bust:function(ev){if(!_fxMine(ev)||!ev.me.state.burn)return;
     var burn=ev.lost||0;
     if(burn>0){G.pPts=Math.max(0,G.pPts-burn);famLog("FOOL'S GOLD BURNS "+burn+' MORE FROM YOUR BANK');try{updHUD();}catch(e){}}
@@ -13726,6 +13751,14 @@ CFX.honeytrap={
   }
 };
 CFX.ill_omen={
+  /* declared on `use`, paid here, one rival turn later */
+  rivalTurn:function(ev){if(!_fxMine(ev)||!G._famIllOmen)return;
+    var _ioT=G._famIllOmen.tier||1,_ioP=famDef('ill_omen').p[_ioT-1];
+    if(ev.pts<=0){var take=Math.min(_ioP[0],G.oPts);G.oPts-=take;G.pPts+=take;
+      G._featOmenTrue=true;/* OMENS TRUE */
+      famLog('THE OMEN LANDS — YOU TAKE '+take);}
+    else{G.oPts+=_ioP[1];famLog('THE OMEN MISSES — THEY GAIN '+_ioP[1]);}
+    G._famIllOmen=null;try{updHUD();}catch(e){}},
   canUse:function(){return G&&G.phase!=='opp'&&!G._famIllOmen;},
   use:function(inst){
     G._famIllOmen={tier:inst.tier};
@@ -24667,7 +24700,11 @@ function _afterRollImpl(){
      mutate d.val in place, so the snapshot taken at function entry would be stale. */
   freeV=free.map(d=>d.val);
   if(!anyScoring(freeV,cards,freeMats,free)&&!_anchorRescues(cards)){
-    if(famFoolsGold(free))return;
+    /* THE deadRoll SEAM: nothing scored, and the bust has not resolved yet.
+       A hook may claim the roll, which cancels the bust. */
+    var _drEv={actor:'p',free:free};
+    famFire('deadRoll',_drEv);
+    if(_drEv._claimed)return;
     if(_tryBustSave(free))return;
     _delayedDoBust(free);return;
   }
@@ -27884,15 +27921,16 @@ function runOppTurn(){
          undefined now and this would have thrown the moment an NPC held it. */
       try{updHUD();}catch(e){}
     })();
-    /* ILL OMEN resolution: declared before this rival turn */
-    if(G._famIllOmen){
-      var _ioT=G._famIllOmen.tier||1,_ioP=famDef('ill_omen').p[_ioT-1];
-      if(pts<=0){var take=Math.min(_ioP[0],G.oPts);G.oPts-=take;G.pPts+=take;
-        G._featOmenTrue=true;/* OMENS TRUE */
-        famLog('THE OMEN LANDS — YOU TAKE '+take);}
-      else{G.oPts+=_ioP[1];famLog('THE OMEN MISSES — THEY GAIN '+_ioP[1]);}
-      G._famIllOmen=null;try{updHUD();}catch(e){}
-    }
+    /* THE rivalTurn SEAM: the rival's turn has resolved and pts is what they
+       scored. Ill Omen is declared a whole turn earlier on `use` and lands
+       here, which is why it looked half-migrated - nothing on the bus reached
+       this moment.
+       ev.pts is READ-ONLY input, not an accumulator. The NPC's own cards
+       resolve just above via _npcFamCard and are NOT on this hook: that is the
+       opponent-side implementation, deliberately separate until P5. This hook
+       is for the PLAYER's cards that resolve during the rival's turn - a
+       different thing that happens to share a moment. */
+    famFire('rivalTurn',{actor:'p',pts:pts});
     if(pts>0){
       /* STAKES RISING NPC mirror: surface the +300 seed bonus (already in
          oppBank/pts). Reset the carry-over flag. Mirrors player handleScore
