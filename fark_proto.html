@@ -12495,6 +12495,21 @@ function famFire(hook,ev){
    synchronous run of the game loop; only holding the messages somewhere can
    preserve both. */
 var _famQ=[],_famQTimer=null;
+/* ── SHARED CONDITION #1: does this event belong to the player, as MINE? ──
+   Nine handlers asked this by hand, spelled identically, and famFire computes
+   half of it (ev.mine) before handing the event over. One meaning, one place.
+
+   IT IS CALLED PER HANDLER, NEVER HOISTED INTO famFire. Only 9 of 42 hooks ask
+   it, so filtering in the dispatcher would silently change the other 33 - and
+   powder_keg.use guards with _tryBustSave(), which SPENDS a bust save, so any
+   speculative or shared evaluation of guards would double-spend it. Conditions
+   in this layer are helpers the handler calls at its own moment, not a filter
+   applied on its behalf.
+
+   NOT THE SAME AS `ev.owner==='p'` ALONE, which three handlers use inline -
+   see the note at slow_cook. That form omits ev.mine and therefore also fires
+   when the RIVAL is the actor. Different question, deliberately left alone. */
+function _fxMine(ev){return !!(ev&&ev.mine&&ev.owner==='p');}
 function famLog(msg,color){
   if(msg===undefined||msg===null||msg==='')return;
   _famQ.push({m:String(msg),c:color||'gold'});
@@ -12549,10 +12564,18 @@ function famGive(id,tier){_getS();S.run.fcards=S.run.fcards||[];
 /* ── effects ── */
 var CFX={};
 CFX.slow_cook={
-  roll:function(ev){if(!ev.mine||ev.owner!=='p')return;
+  roll:function(ev){if(!_fxMine(ev))return;
     if((G.turnRollCount||0)>=3){ev.me.state.acc=(ev.me.state.acc||0)+ev.P;_famPop('+'+ev.P+' SLOW COOK');}},
-  bankBonus:function(ev){if(!ev.mine||ev.owner!=='p')return;
+  bankBonus:function(ev){if(!_fxMine(ev))return;
     var a=ev.me.state.acc||0;if(a>0){ev.add(a);famLog('SLOW COOK +'+a);}ev.me.state.acc=0;},
+  /* `ev.owner==='p'` ALONE, not _fxMine - and the difference is real, not a
+     spelling. ev.mine is (ev.actor===owner), so this ALSO fires when the RIVAL
+     is the actor: the accumulator resets on their turn start as well as yours.
+     Left exactly as it was. Whether that is intended (reset before your turn,
+     whoever triggered it) or an oversight is a BEHAVIOUR question, and
+     unifying the two spellings would have answered it silently in whichever
+     direction the shared helper happened to pick. Same shape as short_fuse's
+     turnStart and slow_cook's bust below. */
   turnStart:function(ev){if(ev.owner==='p')ev.me.state.acc=0;},
   bust:function(ev){if(ev.owner==='p')ev.me.state.acc=0;}
 };
@@ -12659,23 +12682,23 @@ CFX.fair_trade={
   }
 };
 CFX.retort={
-  bust:function(ev){if(!ev.mine||ev.owner!=='p')return;
+  bust:function(ev){if(!_fxMine(ev))return;
     G.oPts=Math.max(0,G.oPts-ev.P);famLog('RETORT — THEY LOSE '+ev.P);try{updHUD();}catch(e){}}
 };
 CFX.reprisal={
-  bank:function(ev){if(!ev.mine||ev.owner!=='p')return;
+  bank:function(ev){if(!_fxMine(ev))return;
     var trailing=(G.oPts-(G.pPts-ev.amt))>=1000; /* judged before this bank landed */
     if(!trailing)return;
     var steal=Math.min(Math.round(ev.amt*ev.P),G.oPts);
     if(steal>0){G.oPts-=steal;famLog('REPRISAL TAKES '+steal+' FROM THEM');try{updHUD();}catch(e){}}}
 };
 CFX.pickpocket={
-  bank:function(ev){if(!ev.mine||ev.owner!=='p')return;
+  bank:function(ev){if(!_fxMine(ev))return;
     var lift=Math.min(ev.P,G.oPts);
     if(lift>0){G.oPts-=lift;G.pPts+=lift;famLog('PICKPOCKET LIFTS '+lift);try{updHUD();}catch(e){}}}
 };
 CFX.falling_star={
-  bank:function(ev){if(!ev.mine||ev.owner!=='p')return;
+  bank:function(ev){if(!_fxMine(ev))return;
     if(ev.amt>=ev.P&&!G._fExtraTurn){G._fExtraTurn=true;
       G._featStarChain=(G._featStarChain||0)+1;/* WISH GRANTED */
       famLog('FALLING STAR — ANOTHER TURN COMES');}}
@@ -12717,7 +12740,7 @@ CFX.encore={
 CFX.double_or_nothing={
   canUse:function(inst){return G&&(G.phase==='choosing'||G.phase==='idle')&&!inst.state.armed;},
   use:function(inst){inst.state.armed=true;famLog('DOUBLE OR NOTHING ARMED — NEXT BANK FLIPS');return true;},
-  bank:function(ev){if(!ev.mine||ev.owner!=='p'||!ev.me.state.armed)return;
+  bank:function(ev){if(!_fxMine(ev)||!ev.me.state.armed)return;
     ev.me.state.armed=false;
     var winFlip=Math.random()<0.5;
     if(winFlip){G.pPts+=ev.amt;famLog('THE FLIP LANDS — BANK DOUBLED (+'+ev.amt+')');_famPop('x2 BANK');}
@@ -13399,7 +13422,7 @@ function famCommitBonus(selD,pts){
 }
 CFX.short_fuse={
   turnStart:function(ev){if(ev.owner==='p')ev.me.state.lit=false;},
-  bust:function(ev){if(!ev.mine||ev.owner!=='p'||!ev.me.state.lit)return;
+  bust:function(ev){if(!_fxMine(ev)||!ev.me.state.lit)return;
     var burn=ev.lost||0;
     if(burn>0){G.pPts=Math.max(0,G.pPts-burn);famLog('THE FIRE SPREADS — '+burn+' BURNS OFF YOUR BANK');try{updHUD();}catch(e){}}
     ev.me.state.lit=false;}
@@ -13435,7 +13458,7 @@ function famFoolsGold(free){
   return false;
 }
 CFX.fools_gold_f={
-  bust:function(ev){if(!ev.mine||ev.owner!=='p'||!ev.me.state.burn)return;
+  bust:function(ev){if(!_fxMine(ev)||!ev.me.state.burn)return;
     var burn=ev.lost||0;
     if(burn>0){G.pPts=Math.max(0,G.pPts-burn);famLog("FOOL'S GOLD BURNS "+burn+' MORE FROM YOUR BANK');try{updHUD();}catch(e){}}
     ev.me.state.burn=false;}

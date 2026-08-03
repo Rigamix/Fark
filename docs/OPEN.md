@@ -129,6 +129,24 @@ a different design.
 
 ---
 
+## 1f. Two dead effect handlers — delete or park?
+
+`CFX` carries handlers for **`tar_pit`** and **`_ward_retired`**. Neither is in
+`FAM_LIVE`, so neither can ever be equipped, so `famFire` can never reach them.
+Now caught automatically by `apv_cfx_reachable` rather than by accident.
+
+*My rec: delete both.* The park-don't-delete rule applies when a future version
+might need the thing intact — and both were retired **because something else
+does the job**: Tar Pit in favour of Snuff ("two systems for one effect"), and
+Ward-the-card when the Ward enchant took bust mitigation. Neither has a future
+to be kept for, and an effect-system migration would otherwise carry both
+forward as though they were live content.
+
+Small, and it's dead code rather than authored copy — but it's still content, so
+it's your call rather than mine.
+
+---
+
 ## 2. Early-game signal — waiting on a playtest, not on reasoning
 
 Restoring the brief's 24 feats removed every feat that fired in a new player's
