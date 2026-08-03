@@ -36,11 +36,40 @@ queries — on the re-scoped shape.
 
 ---
 
+## 1c. HOW FAR ALONG — say it in units, never as one number
+
+Two strands, two different questions. **Do not blend them and do not put two
+percentages next to each other** — a table of percentages is what produced a
+blended "70%" that matched none of its own rows.
+
+> **85% of the behaviour is built. 0% of the shared machinery that behaviour
+> runs on.**
+
+- **Behaviour** — the enchant/badge rework's own §6 checklist: Silver reworked,
+  Ward/Insurance retired, three enchants cut, seven icon enchants firing through
+  one rule, Break's death rows, four badge remaps, the face restriction, the
+  feat roster. Enumerable, mostly shipped, **~20% validated** — only Obsidian's
+  Break row has sim numbers and almost nothing has been played.
+- **Machinery** — the effect system. 1 of 5 phases (inventory only). `CFX`
+  routes 20 of 29 cards, but routing is not the problem: there is **no shared
+  condition layer and no shared effect application**, and that is where every
+  bug this rework exists to stop actually happened.
+
+**Denominators:** 69 items exist, ~65 are player-reachable. Totality assertions
+use 69; migration progress uses 65. See `EFFECT_INVENTORY.md` §1.
+
+---
+
 ## 2. AFTER THAT
 
 - Fix the two remaining Phase 2 reds: relic `.dtype-` blocks (8), and `MATCOL`'s
-  4 retired materials (defence-in-depth — **not reachable**, migration converts
-  them on load before any render).
+  4 missing materials. **Still not reachable — but not for the reason I first
+  gave.** I said migration converts them on load before any render. The real
+  reason, measured: `brass` and `crystal` are handed out only by
+  `generateDiceLoadout`, which is called only by `initBossRewardScreen`, and
+  **nothing calls `showScreen('bossreward')`** — that screen has no entry point.
+  The conclusion held; the justification did not, and a right answer resting on
+  a wrong reason breaks silently the moment someone wires that screen back up.
 - **The two stale asset paths** Phase 5 named and did not touch:
   `Environment_ART/gameover.png` (its only twin is a `.psd`) and
   `Menu_Art/Settings.png` (twin at `Art/Assets/Panels/Settings/settings.png`).

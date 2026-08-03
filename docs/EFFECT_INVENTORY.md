@@ -7,11 +7,30 @@ Self-contained; paste it on its own.
 
 ---
 
-## 0. The headline: the bus already exists, and it already covers 20 of 29 cards
+## 0. The headline: a dispatch bus exists. A shared condition layer does not.
 
-The plan is written as though a trigger bus has to be designed. One is shipped.
-`CFX` — the family-card effect table — dispatches on **seven hooks**, and they
-are the vocabulary someone would otherwise spend Phase 3 inventing:
+The plan is written as though a trigger bus has to be designed. **Routing is
+shipped. The layer underneath it is not, and the distinction is the whole
+point** — every bug this rework exists to stop happened in code that was
+already being routed correctly.
+
+`famFire` iterates both sides' equipped cards, calls `CFX[id][hook]` if it
+exists, and hands the handler two conveniences: `ev.P` (that tier's numeric
+payload) and `ev.add(n)` (a delta accumulator). That is all it does.
+
+**It carries no condition checking.** Every handler opens with its own
+hand-written guard — `slow_cook` starts `if(!ev.mine||ev.owner!=='p')return;`
+and so does effectively every other one. `famFire` even computes `ev.mine` for
+them and they re-derive it by hand anyway.
+
+So Vagabond reading a stale variable, Starstone gating on the wrong thing,
+Still Waters checking `d.ench` instead of the family — all three were dispatched
+perfectly and then went wrong in the bespoke half. **"The bus exists" describes
+the shallower of the two problems and must not be allowed to imply progress on
+the deeper one.**
+
+The seven hooks are still a real asset — this is the vocabulary someone would
+otherwise spend Phase 3 inventing:
 
 | Hook | What fires it |
 |---|---|
@@ -21,15 +40,22 @@ are the vocabulary someone would otherwise spend Phase 3 inventing:
 | `turnStart` | a turn begins |
 | `bust` | a bust resolves |
 
-**20 of the 29 live family cards route through it. The other 9 are hardcoded
-at call sites** — `bloom`, `cultivate` and `vanguard_f` live inside
+**20 of the 29 live family cards are ROUTED through it. The other 9 are
+hardcoded at call sites** — `bloom`, `cultivate` and `vanguard_f` live inside
 `famCommitBonus`; the five tavern cards and `for_keeps` are wired wherever they
 happen to act.
 
-That reframes the migration. It is not "build a bus and move 50 things onto it".
-It is **"finish a bus that is 69% done, then decide whether the other four
-content types belong on it at all"** — which is a much smaller and much better
-understood job, and it changes what Phase 3 is for.
+That reframes the migration, but not as far as it first looks:
+
+| | Built |
+|---|---|
+| Dispatch — an event reaches the right handler | 20 of 29 cards |
+| Shared condition checking | **none** |
+| Shared effect application | **none** |
+
+So Phase 3 is not "finish a bus that is two-thirds done". It is **"keep the
+routing, build the layer underneath it that never existed"** — plus decide
+whether the other four content types belong on it at all.
 
 ---
 
@@ -42,8 +68,30 @@ understood job, and it changes what Phase 3 is for.
 | Family cards | 29 of 30 | Tar Pit is retired |
 | Table rules (badges) | 9 | 8 worn + Steeped, parked |
 | Relics | 8 | |
-| Material family traits | 9 | includes jade2/jade3 tiers and two retired materials |
+| Material family traits | 9 | includes the jade2/jade3 tiers |
 | **Total** | **69** | |
+
+### Which question is 69 answering?
+
+**69 is what EXISTS in the codebase. It is not what a player can reach**, and
+Phase 2–5 progress gets measured against one of these, so the difference has to
+be stated rather than inherited:
+
+- **Steeped** has no boss since the badge remap. Reachable only as a cursed-seat
+  draw, never as a worn badge.
+- **`brass` and `crystal`** are handed out by `generateDiceLoadout`, which is
+  called only from `initBossRewardScreen` — and **nothing anywhere calls
+  `showScreen('bossreward')`.** That screen has no entry point, so those two
+  materials cannot reach a player at all.
+- **`jade3`** is not in any tier's `diceWeights`; whether an upgrade path
+  reaches it is **not verified** and should be before anyone leans on the count.
+
+So roughly **65 reachable of 69 existing**, with `jade3` the open one.
+
+**Use 69 for totality assertions** — a lookup table still has to cover the
+unreachable four, which is exactly what Phase 2's `MATCOL` red is about.
+**Use ~65 for migration progress** — there is no point migrating behaviour
+nobody can trigger.
 
 ---
 

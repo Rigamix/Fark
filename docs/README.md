@@ -26,8 +26,8 @@ open decisions, and the gotchas that have already cost time.
 
 | File | Status |
 |---|---|
-| `EFFECT_SYSTEM_PLAN.md` | Phase 1 done. **Phases 3 and 4 carry a CHALLENGED banner** — Phase 1's findings re-scope them, and that is Denis's call, not a change made for him. |
-| `EFFECT_INVENTORY.md` | Phase 1's output: all 69 pieces of content decomposed, and the rows that do not fit. |
+| `EFFECT_SYSTEM_PLAN.md` | Phase 1 done. Phases 3 and 4 **re-scoped and ruled** — the superseded text is kept under each banner so the change is traceable. |
+| `EFFECT_INVENTORY.md` | Phase 1's output: all 69 pieces of content decomposed, the rows that do not fit, and the 69-exists / ~65-reachable split. |
 | `VISUAL_INTEGRITY_PLAN.md` | Phases 1–5 complete. |
 
 ## Reference
