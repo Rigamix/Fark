@@ -223,3 +223,75 @@ summary:
 The last one is the instructive one: it left **one** survivor out of an original
 eighteen, which is exactly when a wrong finding is most believable — it looks
 like a careful audit that narrowed to a single real problem.
+
+
+---
+
+# Run-scoped cards — measured before building the primitive
+
+## The four do NOT share one lifecycle
+
+The direction says to build a shared run-scoped primitive first, *"same
+reasoning as lane markers before Snare/Snuff/Fog."* That reasoning includes the
+step that mattered: measuring the candidates. Doing it here gives the Trade
+result again.
+
+| | arms it | carries | resolves |
+|---|---|---|---|
+| **Double Stakes** | player, in the Room | boolean | `launchSeat` |
+| **For Keeps** | player, in the Room | boolean | `launchSeat` |
+| **The Tab** | player (`famTabTake`) | **a quantity** (400) checked against gold | **two paths** — voluntary `famTabPay`, forced `_tabSettle` at last orders |
+| **Hair of the Dog** | **an outcome, not the player** | boolean | **mid-match**, at the next first bank |
+
+**Only two of the four share a shape** — Double Stakes and For Keeps are
+player-armed booleans consumed at `launchSeat`, and they are genuinely
+identical. The other two differ on a *different axis each*: The Tab carries a
+quantity with two settlement paths and a night deadline; Hair of the Dog is
+armed by an outcome the player did not choose and resolves inside a later match.
+
+**A single arm/resolve primitive covering all four would have to invent a
+"maybe the player armed it, maybe an outcome did" concept, and a resolve that
+might be a seat boundary, a bank, or a night ending.** That is not a primitive,
+it is a switch with three arms wearing one name. The honest shape is a small
+one covering the two that match, and leaving the other two as what they are.
+
+*Not built yet — this changes the scope the direction assumed, so it is a
+finding to rule on rather than a decision to take unilaterally.*
+
+## Bet Law: both fixes built and verified (P447)
+
+Copy and mechanic, both from the direction verbatim.
+
+- **Hair of the Dog** — *"…doubled — but bust before banking, and it costs an
+  extra circle."* The automatic-on-loss trigger stays; the response is now the
+  wager. `_hotdToll()` charges one circle if you bust with `_famBankCount===0`,
+  and clears the flag so a second bust cannot charge twice.
+- **Cursed Table** — *"…THREE circles, not two — lose, and it costs you two
+  circles, not one."* Symmetric now.
+
+**One helper, because this would have been the third copy.** The chalk board is
+two structures — `S.run.points` and the parallel `S.run._chalkMeta` — and they
+must move together or the board disagrees with its own history. That pairing was
+already duplicated at the tab default and the cursed-seat loss. `_rubOutCircles(n)`
+names it once; all three sites use it.
+
+**Verified, 6 checks:** the helper moves both structures and floors at zero;
+busting before a bank costs a circle; having banked costs nothing; unarmed costs
+nothing; and it charges exactly once.
+
+**`_hotdToll` had to be re-homed.** It first landed next to `_bustTolls` — which
+is itself declared *inside* `doBust`, so the new function was invisible to
+everything outside and untestable. Top level now.
+
+## Markers (#1): the gap tracks a line, it isn't three oversights
+
+Double Stakes, The Tab and For Keeps render an armed chip; Hair of the Dog,
+Cursed Table and High Table render nothing. **That split is exactly the
+"player does something" line** — the three with chips have them because they are
+interactive *controls* (arm it, pay it), not because anyone built markers. So
+#1 is not "add three more chips to the existing pattern"; those three have no
+control to hang a chip on, which is a different build.
+
+Worth knowing before it starts: the existing chip row is **hand-written twice**,
+in `_gbRenderRoom` and `_ptRoom`, for all three cards. A marker step should
+absorb that rather than add a third copy.

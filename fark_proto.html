@@ -12501,7 +12501,7 @@ var FAM_CARDS=[
  {id:'the_tab',fam:'tavern',kind:'active',name:'The Tab',consumable:true,
   text:['Borrow 250 gold from the innkeep right now. Owe 400 by last orders, or it costs a chalk circle.','','']},
  {id:'hair_of_the_dog',fam:'tavern',kind:'passive',name:'Hair of the Dog',
-  text:['Lose a match, and your first bank next match is doubled.','','']},
+  text:['Lose a match, and your first bank next match is doubled \u2014 but bust before banking, and it costs an extra circle.','','']},
  /* CURSED TABLE, not Marked Table. Two renames land on this one card: the
      cursed seat is no longer a seal, and a mark on a die now means an enchant -
      so a card called Marked Table read like an enchant card. The brief already
@@ -12516,7 +12516,7 @@ var FAM_CARDS=[
      patron chalks two, three with this card - and losing to the cursed patron
      rubs one out. This card only changes the WIN side, so the copy only claims
      the win side. Names the smoke, which is what a player can point at. */
-  text:['Beat the patron the smoke clings to and the board chalks you THREE circles, not two.','','']},
+  text:['Beat the patron the smoke clings to and the board chalks you THREE circles, not two \u2014 lose, and it costs you two circles, not one.','','']},
  {id:'high_table',fam:'tavern',kind:'passive',name:'High Table',
   text:['When you sit down, raise the match target by 500 for both sides. Win: the pot pays half again more, and GREEDY or BULLISH patrons pay double.','','']}
 ];
@@ -12993,13 +12993,46 @@ function famBurn(id){
     save();
   }
 }
+/* RUB OUT N CIRCLES. The chalk board is TWO structures - S.run.points is the
+   count and S.run._chalkMeta is the per-circle history - and they must move
+   together or the board disagrees with its own record. That pairing was already
+   duplicated at the tab default and the cursed-seat loss; this patch would have
+   made it three. Named once instead. */
+function _rubOutCircles(n){
+  if(!S||!S.run)return 0;
+  var gone=0;
+  for(var i=0;i<(n||1);i++){
+    if((S.run.points||0)<=0)break;
+    S.run.points=Math.max(0,(S.run.points||0)-1);
+    if(Array.isArray(S.run._chalkMeta))S.run._chalkMeta.pop();
+    gone++;
+  }
+  return gone;
+}
+/* HAIR OF THE DOG, THE LOSING HALF. The card used to be a consolation
+   payout: it armed automatically on a loss and cost nothing, which is not a
+   bet. Now the doubled bank is the prize and busting before you have banked
+   anything is the price.
+   GATED ON _famBankCount===0, not on "did this turn bust" - the wager is about
+   reaching a bank at all this match. Once the first bank lands the card has
+   already paid and cleared itself, so a later bust cannot charge for it twice.
+   Called from _bustTolls, which is itself declared INSIDE doBust - so this
+   lived there too until a probe could not see it. Top level now: a toll the
+   rest of the game can call, and can be tested without driving a real bust. */
+function _hotdToll(){
+  if(!S||!S.run||!S.run._hotdNext)return;
+  if(!G||(G._famBankCount||0)>0)return;
+  S.run._hotdNext=false;
+  var gone=_rubOutCircles(1);
+  try{save();}catch(e){}
+  if(gone)try{famLog('THE HANGOVER BITES — A CIRCLE RUBBED OUT');}catch(e){}
+}
 function _tabSettle(){
   if(!S.run||!S.run._tabOwed)return;
   var owed=S.run._tabOwed;S.run._tabOwed=0;
   if((S.run.gold||0)>=owed){S.run.gold-=owed;famLog('THE TAB IS PAID — '+owed+'g TO THE INNKEEP');}
   else{
-    S.run.points=Math.max(0,(S.run.points||0)-1);
-    if(Array.isArray(S.run._chalkMeta))S.run._chalkMeta.pop();
+    _rubOutCircles(1);
     famLog('THE TAB GOES UNPAID — A CIRCLE RUBBED OUT');
   }
 }
@@ -25437,6 +25470,7 @@ function doBust(){
      path calls it below. Amber, above, reaches neither - immunity means no
      bust happened at all. */
   function _bustTolls(){
+  try{_hotdToll();}catch(e){}
     if(G._oIllOmen){/* they called your bust: pay them */
       /* famDef returns null for an id it does not carry. That could never
          bite while this sat in a branch nothing could reach; it is on the
@@ -26569,6 +26603,8 @@ function handleBank(){
     }
     G._prevBankAmt=total;
     G._famBankCount=(G._famBankCount||0)+1;
+    /* HAIR OF THE DOG pays here and is SPENT here - see the bust half in
+       doBust. Banking first is what wins the wager. */
     if(G._famBankCount===1&&S&&S.run&&S.run._hotdNext){
       total*=2;S.run._hotdNext=false;try{save();}catch(e){}
       famLog('HAIR OF THE DOG — FIRST BANK DOUBLED');_famPop('×2 HAIR OF THE DOG');
@@ -29307,8 +29343,11 @@ function _settleEndRoute(route){
     if(S.run.coins<=0)S.run._died=true;
     else route._heartAnim='lose';
   }else if(!route.win&&route.isHandicap){
-    S.run.points=Math.max(0,S.run.points-1);
-    if(Array.isArray(S.run._chalkMeta))S.run._chalkMeta.pop();/* the board rubs one out */
+    /* CURSED TABLE now cuts BOTH ways. It used to amplify only the win side
+       (3 circles instead of 2) while the loss stayed at the baseline 1 - a
+       pure upside, which the Bet Law forbids. Symmetric now: the card that
+       wins you an extra circle costs you an extra one. */
+    _rubOutCircles((G&&G._sealRule&&famOwnTier('marked_table')>0)?2:1);
     _markSeatResult(route);
     _checkNightFail();
   }else if(!route.win&&!route.isBoss){
