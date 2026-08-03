@@ -14516,18 +14516,30 @@ function _gbPeek(i){
     +'</div></div>';
   if(cards)h+='<h2>their cards — read them before you sit</h2><div style="display:flex;gap:6px;flex-wrap:wrap">'+cards+'</div>';
   h+='<h2>the game</h2><div style="display:flex;gap:8px">'
-    +'<div class="gbx-box sub" style="flex:1;height:40px">target '+(pat.target||0).toLocaleString()+'</div>'
+    /* HIGH TABLE'S +500 IS APPLIED IN launchSeat, AFTER this sheet closes,
+       so the target here was the one the player would NOT be playing against.
+       Shown, not applied: the roster object stays untouched because launchSeat
+       still mutates it, and doing both would raise the target by 1000. */
+    +'<div class="gbx-box sub" style="flex:1;height:40px">target '
+      +((pat.target||0)+((famOwnTier('high_table')>0)?500:0)).toLocaleString()
+      +((famOwnTier('high_table')>0)?' <span style="opacity:.7">+500 high table</span>':'')
+      +'</div>'
     +'<div class="gbx-box sub" style="flex:1;height:40px">buy-in '+buy+'g</div>'
     +'<div class="gbx-box sub" style="flex:1;height:40px">pot '+(reward+buy)+'g</div></div>';
   if(sealed&&tellD){
-    var circ=(famOwnTier('marked_table')>0)?'THREE circles':'2 circles';
     h+='<h2>the curse — one rule, both sides</h2>'
       +'<div class="gbx-box sub" style="min-height:44px;font-size:12px;padding:8px;border:2px solid #222">'
       +tellD.icon+' '+tellD.name+' — '+tellD.desc+'</div>';
   }
   if(S.run._fkArmed)h+='<div class="gbx-box sub" style="height:30px;font-size:12px;margin-top:8px;border:2px solid #8a2d2d">FOR KEEPS — this match is for dice</div>';
   h+='<div class="gbx-btn primary" style="height:60px;margin-top:12px" onclick="_gbSheetClose();launchSeat('+i+')">SIT DOWN — '+buy+'g'
-    +(sealed?' · cursed: win '+((famOwnTier('marked_table')>0)?'3':'2')+' circles / lose 1':'')+'</div>';
+    /* BOTH NUMBERS READ THE CARD. `lose 1` used to be hardcoded, and P447
+       made it a lie: Cursed Table now costs TWO circles on a loss, which is
+       the Bet Law fix that stopped it being pure upside. Advertising the old
+       one-sided deal at the moment the player commits is the worst place for
+       it to be wrong. */
+    +(sealed?' · cursed: win '+((famOwnTier('marked_table')>0)?'3':'2')
+      +' circles / lose '+((famOwnTier('marked_table')>0)?'2':'1'):'')+'</div>';
   _gbSheetOpen(h);
 }
 /* ── boss peek sheet (flow spec 4) ── */
