@@ -17,14 +17,41 @@ Safe-area padding at top (notch) and bottom (gesture bar) required.
    Boss matches instead use that boss's bespoke full plate (boss
    painted in, upper two thirds).
 2. PROPS LAYER — individual PNG sprites (mug, candle, coins, cup,
-   jug, cloth...) scattered by code at match start. Each sprite has
-   its own baked contact shadow. Placement: fixed anchor slots along
-   the LEFT and RIGHT table margins only; per-match seeded shuffle of
-   which anchors are filled (fill 3-5 of ~8). HARD EXCLUSION ZONE:
-   the central vertical band (x: 15%-85%) between the opponent edge
-   and the player cards — nothing spawns there. Props never overlap
-   dice, tags, cards, or buttons; anchors are authored to guarantee
-   this, no runtime collision needed.
+   jug, cloth...) placed from HAND-AUTHORED TEMPLATES at match start.
+   Each sprite has its own baked contact shadow.
+
+   REVISED 2026-08-02 to match what shipped. The original spec below
+   was written before the templates existed and is wrong on two counts;
+   the art was ruled correct and this text is what changes.
+
+   PLACEMENT IS AUTHORED, NOT PROCEDURAL. The spec called for fixed
+   anchor slots with a per-match seeded shuffle filling 3-5 of ~8.
+   Shipped: `FK_PROP_TEMPLATES`, hand-made sets (currently 2, of 11 and
+   12 props), placed whole. No shuffle, no fill count. A human
+   composing a table beats a scatter function, and the shipped system
+   deliberately lets the template win.
+
+   THE EXCLUSION ZONE WAS STATED ON THE WRONG AXIS. The spec banned a
+   central VERTICAL band (x 15%-85%). Measured with six dice on the
+   table, the dice occupy x 7.7%-97.6% — very nearly the full width —
+   inside a narrow HORIZONTAL strip at y 43.3%-53.7%. A vertical-band
+   rule cannot express "keep clear of the dice", because the dice are
+   not in a vertical band. It is the wrong shape of constraint, so
+   props were always going to violate it while looking correct: 10 of
+   23 prop centres sit inside x 15-85 (clustered x 76-85, hugging the
+   right margin) with painted extents reaching in to x 62, and the
+   composition still reads clean.
+
+   THE RULE THAT REPLACES IT is the one this section already stated as
+   its intent, kept and promoted: PROPS NEVER OVERLAP DICE, TAGS, CARDS
+   OR BUTTONS. That is the invariant worth holding. It is expressed as
+   an overlap test against live UI, never as a coordinate range, and
+   templates are authored to satisfy it — no runtime collision needed.
+
+   Props may hang off the stage edge (a prop centred at x -14.9 is
+   intentional; half a spilled pile reads better than a whole one
+   floating). Left/right need not be symmetric — the shipped pair runs
+   9 left, 14 right.
 3. OPPONENT PRESENCE — patron matches: paws + muzzle sliver entering
    from the top edge (one sprite set, tinted per patron fur colour if
    cheap; otherwise one generic dark set). Their face-down cards lie
@@ -327,7 +354,11 @@ above the race bar except pause.
   a plain patron match.
 - Rotating a patron's family/persona changes: paws tint (if built),
   card back colours, race fill accent — nothing else moves.
-- Props never intersect the centre band, tags, cards, or buttons
-  across 100 seeded scatters (automated check).
+- Props never overlap dice, tags, cards or buttons in any shipped
+  template (automated check — an overlap test against the live UI, NOT
+  a coordinate range; see the props layer note above for why the
+  original x 15-85 version tested the wrong axis). "100 seeded
+  scatters" no longer applies: placement is authored, not scattered,
+  so the check runs once per template rather than over random fills.
 - Bust-to-opponent-turn transition completes < 600ms.
 - Boss match shows hearts; patron match never does.
