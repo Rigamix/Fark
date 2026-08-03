@@ -21,6 +21,11 @@
  *   informed - naive  <  0   the row wants to be spent early
  */
 var seed=(window.__FSIM_SEED!==undefined)?window.__FSIM_SEED:20260803;
+/* 260 IS TOO SMALL AND THE FILE SHOULD SAY SO. At tier 4 both Gregs win about
+   1% of matches, so 260 runs puts every win-rate figure between one and six
+   MATCHES - a single result moves the rate .38 points and no timing sign can
+   be read off it. Raise this to the low thousands for anything quotable;
+   docs/BREAK_ROWS_2026-08-03.md has the full caveat. */
 var N=(window.__FSIM_N!==undefined)?window.__FSIM_N:260;
 var TIER=(window.__FSIM_TIER!==undefined)?window.__FSIM_TIER:4;
 var FAMS=['obsidian','amber','starstone','silver','jade','vagabond'];
@@ -30,8 +35,17 @@ var out={seed:seed,n:N,tier:TIER,rows:{},notes:[],
 FSIM.quiet();
 var t0=performance.now();
 FAMS.forEach(function(fam){
+  /* THE BRAND GOES ON A BONE DIE AND THE FAMILY DIE IS THE TARGET, which is
+     the opposite of the first version of this file and the whole reason its
+     numbers were void. Break destroys ONE OTHER die: with the brand on the
+     family die and bone everywhere else, every batch destroyed bone and fired
+     the MUNDANE NO-OP row - six families measured, one row actually tested.
+     The tell was starstone and vagabond coming back byte-identical.
+     With exactly one non-bone die in the loadout the target is still
+     determined by construction, since breakRowValue scores bone at 0 and every
+     family above it - so this does not reintroduce the guess it avoids. */
   var gear={key:'brk_'+fam,
-            dice:[fam,'bone','bone','bone','bone','bone'],
+            dice:['bone',fam,'bone','bone','bone','bone'],
             ench:['break',null,null,null,null,null],
             badge:null,fcards:[]};
   var r={};
