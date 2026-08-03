@@ -216,6 +216,25 @@ that produced the flat rule (font, coin, diamond) were about *art*, not the
 folder. `--font-px` is still the old pixel font and still the wrong reach —
 `FK_ART.font` is the right one.
 
+**A NAMING CONVENTION IS NOT A SHARED-STRUCTURE CLAIM.** The Ward withdrawal
+was not a measurement error inside a correct question - it was the wrong
+question. `_wardArmed`, `_wardBoost`, `_wardCharges` and `_wardBanks` share a
+prefix; the audit grouped by prefix and concluded they shared a LIFETIME, then
+recommended restructuring three unrelated features into one. Three of them have
+no lifetime at all.
+
+That is the identical surface-resemblance mistake this session kept finding in
+the game's own code - `.gcard` "from main game", the four `_fxFreeDice` sets,
+Trade grouped with the lane markers - caught this time in the audit that was
+hunting for it. It is also the most expensive kind that has come up: the other
+instrument errors made things look LESS coherent than they were, which invites
+a second look. This one made three coherent things look like one broken thing
+and proposed a fix, which invites a rewrite.
+
+**Before grouping N things by a shared name, check they answer the same
+question.** If the tool groups by prefix, the report must say "these share a
+prefix" and nothing more until each is read.
+
 **EVERY PROBE MUST JUSTIFY WHICH DOM SURFACE IS AUTHORITATIVE** before it
 asserts anything — not that a plausible selector exists, but that the one it
 reads is the one the live build actually paints. FIVE instances in one session

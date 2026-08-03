@@ -3,7 +3,41 @@
 The only file you need to read. Everything has my recommendation, so **"yours"
 is a valid answer.** Answered items are deleted, not marked — this stays short.
 
-**Nothing is blocking.**
+**One decision is needed before Phase 4 builds: §0.**
+
+---
+
+## 0. Do the five tavern cards belong on the match bus at all?
+
+Phase 4's next chunk is ten family cards that have no effect-table entry, so
+they need one written. **Five of the ten are the tavern cards** — `double_stakes`,
+`the_tab`, `hair_of_the_dog`, `marked_table`, `high_table`.
+
+The effect plan flags the problem and never resolves it: **they act on the RUN,
+not the match.** The bus they'd go onto is match-scoped — it fires on rolls,
+banks and busts, and it is thrown away when the match ends.
+
+So writing them onto it means either giving them a lifetime the bus can't
+express, or quietly changing what they do to fit.
+
+**Three ways this can go:**
+
+- **A run-scoped seam** alongside the match bus. Most correct, most work, and
+  nothing else needs it yet.
+- **Leave the five hardcoded** and migrate the other five now. Honest, and the
+  group stays half-done — which the plan warns is the worst state.
+- **Confirm they really are match-scoped** and I've read them wrong, in which
+  case they go on the bus with everything else.
+
+*My rec: the middle one, with the five named in code as deliberately off the
+bus.* Half a group is bad, but a run-scoped card faking a match lifetime is
+worse, and the seam isn't worth building for five cards until something else
+wants it.
+
+I need your read on what these five are supposed to do across a run before I
+pick — this is a design question about the cards, not a code-shape question.
+
+---
 
 ---
 
