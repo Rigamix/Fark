@@ -2,14 +2,47 @@
 
 `tools/cfx_coverage.js` (live) and `tools/cfx_bespoke.py` (static) rerun this.
 
-## Group 1 is a no-op, and that is the useful result
+## CORRECTION (same day): group 1 is NOT clean
+
+**The section below was published saying all 20 on-bus cards are clean. That is
+wrong and it is retracted.** At least one card is genuinely half-on:
+
+**`short_fuse` sits on `CFX` for `turnStart` and `bust`, and its x2 is
+hardcoded in `famCommitBonus`** (line 13493, `famInst('short_fuse')`). Read by
+eye, not inferred.
+
+**Why the check missed it.** It classified any line where the id appeared inside
+quotes as a log string. `famInst('short_fuse')` is quoted — and it is a lookup,
+not a log. **The seventh instrument artifact of the day and the first false
+NEGATIVE.** The other six invented work; this one hid it, which is worse here,
+because a clean result *ends the investigation* and an invented one gets checked.
+
+It also fits the pattern exactly as described: a number that visibly narrowed
+from 18 to 1 to 0 reads as diligence — each correction looking like the process
+working — and that earned trust the final answer had not separately earned.
+
+**What is now established, all eye-verified:**
+
+- `short_fuse` is genuinely half-on. Real.
+- `_npcFamCard(...)` sites are the **opponent-side** implementation, separate by
+  design — `PROTO_NOTES` has NPC usage landing in P5 with `G.oF` empty until
+  then. Not drift.
+- `pickpocket` in `_SEAL_POOL` is a **name collision**: the sealed-seat table
+  rule and the vagabond card share a string and are unrelated. The same trap as
+  Ward's shared prefix, one level down.
+
+**What is NOT established: the final count.** After separating those two
+categories, nine cards still show sites needing to be read individually. That
+work is not done, and no migration has been built on any of it.
+
+## ~~Group 1 is a no-op~~ — RETRACTED, see above
 
 The plan says *"start where partial infrastructure exists, prove the machinery,
 then take the hard cases."* Measured, the machinery is already proved:
 
-**All 20 on-bus cards are genuinely on the bus.** Every mention of their ids
-outside their own `CFX` entry is the card's `FAM_CARDS` definition, the
-`FAM_LIVE` table, or a log string. **Not one has a second implementation.**
+~~**All 20 on-bus cards are genuinely on the bus.**~~ **RETRACTED.** The claim
+rested on treating every quoted id as a log string; `famInst('short_fuse')` is
+a lookup. At least `short_fuse` has a second implementation.
 
 That was worth checking rather than assuming, because "has a CFX entry" and
 "CFX is where its behaviour lives" are different claims, and a card that is both
