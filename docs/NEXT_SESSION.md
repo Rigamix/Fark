@@ -193,6 +193,22 @@ that produced the flat rule (font, coin, diamond) were about *art*, not the
 folder. `--font-px` is still the old pixel font and still the wrong reach —
 `FK_ART.font` is the right one.
 
+**CHECK A SURFACE IS REACHABLE BEFORE AUDITING WHAT IT SAYS.** Three-for-three
+this session, and in every case reading the code would have confirmed the wrong
+thing: `#rulesOverlay` (six false claims, no visible entry point),
+`#screen-bossreward` (nothing calls `showScreen('bossreward')`, and it decided
+whether a Phase 2 red was live), `body::before` (a real stretch bug in a rule
+that computes to `display:none`). Ask "can a player see this" first — it is the
+cheaper question and it decides whether the accuracy work is worth doing.
+
+**And when DELETING dead content, test the behaviour AROUND the deletion**, not
+just that the target lines are gone. Cutting the rules overlay left a
+`renderRulesScroll()` call in the BOOT resize handler — every window resize
+would have thrown. A cleanup that introduces a crash is worse than what it
+removed. *(Worth building: a probe that enumerates `showScreen` cases with no
+caller, and overlays with no visible entry point. Three found by hand is enough
+to justify automating the fourth.)*
+
 **Patches with backslashes go through a Write-tool `.py` file, never a bash
 heredoc.** Heredocs mangled a regex twice.
 
