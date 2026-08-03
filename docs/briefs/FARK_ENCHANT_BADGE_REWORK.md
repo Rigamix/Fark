@@ -486,21 +486,44 @@ before this rework).
 
 (Historical: Obsidian was the only row with numbers when this was written; the
 shape of the finding — not the specific figures — was said to apply to every
-family in the table above. It does.)
+family in the table above. All six have since been measured, and it does.)
 
 This is the centerpiece result of the whole rework and the clearest
 proof the family/enchant split can produce real tactical depth, not
-just bigger numbers. Two sim results that must BOTH ship, not just one:
+just bigger numbers.
 
-- **Across a whole match**, using Break on an Obsidian die immediately
-  whenever available is a NET LOSS: ~3,471 vs ~4,425 average total match
-  bank. Permanently losing a sixth die costs more, across many future
+**THE WORKED EXAMPLE IS SILVER.** Ruled 2026-08-03, and the six-row sweep is
+why: Obsidian is the *weakest* demonstration of the lesson it was chosen to
+teach. Timing delta by family, +422 for Obsidian against +625 to +834 for
+everything else — Silver is the strongest at +834, with the second-largest
+bust drop. A tutorial example should be the clearest case, not the one that
+happened to get measured first.
+
+| Silver, base `bea`, tier 4, N=2,000 | win rate | avg bank | bust rate |
+|---|---|---|---|
+| naive (break on sight) | 13.75% | 3,186 | 28.9% |
+| informed (hold for the last turn) | 22.45% | 4,020 | 17.4% |
+| **timing delta** | **+8.70 pts** | **+834** | **−11.5 pts** |
+
+Two sim results that must BOTH ship, not just one:
+
+- **Across a whole match**, using Break immediately whenever available is a
+  NET LOSS. Permanently losing a sixth die costs more, across many future
   turns, than the guaranteed 1,000 is worth.
 - **On a single turn with no future turn to protect** (the actual last
   turn of a match, or any turn where subsequent turns won't happen),
-  the trade flips hard positive: 1,140 vs 409 average bank for that
-  turn, AND bust rate drops from 46% to 8% (removing the die also
-  removes it from that turn's bust-risk pool).
+  the trade flips hard positive — the die that stops scoring also stops
+  being able to bust you.
+
+TWO DIFFERENT MEASUREMENTS, and they must not be averaged or quoted as one.
+The Silver table above is **naive versus informed policy over a whole match**:
+both agents play the full match, one reads the timing and one does not. The
+older Obsidian figures — ~3,471 vs ~4,425 whole-match bank, and 1,140 vs 409
+with bust 46% → 8% on a single last turn — come from a **different harness**
+that compared always-break against never-break, and isolated one turn. Both
+support the same finding. Neither set converts into the other, and a number
+carried from one table into the other's framing is wrong even though it will
+look reasonable.
 
 The correct play is a TIMING READ — "do I have a future turn to lose" —
 not a build-time checkbox. **Do not balance this by averaging the two

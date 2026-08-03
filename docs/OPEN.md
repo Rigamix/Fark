@@ -51,30 +51,23 @@ I'll ship yours instead.
 
 ---
 
-## 1c. The old pixel font is still most of the UI — how far does the migration go?
+## 1c. Two card faces are drawn that no card can use
 
-You asked me to check for a third screen sharing the `--font-px` mistake after
-`.res-title`. There isn't a third screen. **There are 157 declarations.**
+`Art/Assets/Cards/Silver/card_face_ward.png` and `card_face_insurance.png` — both
+also already optimized into `assets/cards/`, so they are one card definition away
+from rendering. But:
 
-| | Uses |
-|---|---|
-| `'JMH Beda'` (the game's font) | 67 |
-| `var(--font-px)` → `'Alagard','Press Start 2P'` | **157** |
+- **`ward` is an enchant, not a card.** It's in `ENCH_GRID` alongside tithe,
+  snare and break. Nothing in the card roster has that id.
+- **`insurance` doesn't exist anywhere in the game.**
 
-**And it correspondingly includes the numbers a player reads all match** —
-`.hud-score`, `.hud-target`, `.hud-turnnum`. The migration to JMH Beda has only
-ever been applied where something was specifically pointed at: the win board,
-the status line, the toast, and now the loss title.
+Silver has 4 cards built (fair trade, reprisal, retort, steady hand) and 6 faces
+painted. **Were these two meant to be Silver cards?** If ward was drawn as a card
+before it became an enchant, the file is spent work and should be retired so the
+next person doesn't try to wire it up. If Silver is meant to be a 6-card family,
+that's two cards to design.
 
-*My rec: leave it until you've looked at a screenshot and decided.* Swapping 157
-declarations changes the look of every screen at once, which is a design call,
-not a cleanup — and Alagard may well be right for numerals even where JMH Beda
-is right for words.
-
-Worth knowing: a comment I wrote in the file justified the win-board fix with
-"56 uses against three for Press Start 2P". That counted the literal font name
-instead of the variable that applies it, so it was wrong by about 26x. Corrected
-in place.
+*No recommendation — I can't tell which of those happened from the files.*
 
 ---
 
@@ -104,28 +97,31 @@ the master brief already has an instruction on the order of those
 
 ---
 
-## 1e. Break rows — all six measured, and one is a design note for you
+## 1e. The previous game's card roster — is any of it meant to survive?
 
-`docs/BREAK_ROWS_2026-08-03.md`. Not acted on.
+You flagged old card art on screen. Chasing it down found something bigger than
+the art.
 
-**Brief §4's timing finding generalises to every family.** It was written from
-Obsidian alone; measured, all six reward holding the skull for the last turn, by
-+625 to +834 bank, confidence intervals separated on all six.
+**The live game doesn't use it.** A full played match makes **zero** requests to
+`assets/Card_ART/` and **zero** calls to the function that loads it. Family cards
+render your new art correctly. The old art I screenshotted was on the **draft
+screen, which is dead** — its only reference is the `case 'draft'` line inside
+`showScreen`; nothing calls `showScreen('draft')`. I opened it by hand.
 
-**DECISION: Obsidian is the weakest case of the effect it was chosen to teach**
-— +422 against +625 to +834. If Obsidian is the worked example anywhere
-player-facing, it walks in with the least clean version of its own story.
-*My rec: if a worked example is needed, use Silver (+8.70 pts / +834) or Amber.*
-Keeping Obsidian is fine — but it should be a choice, not an inheritance.
+**But 233 old cards are still defined**, with 147 art files, and five surfaces
+still reference them in code (the card bar, the mini-card, end-of-match draft
+slots, the pouch slot, the boss loadout). None of the five fired during a full
+match — but "didn't fire in the one run I drove" is weaker than "can't fire", and
+I can't get to "can't" without knowing your intent.
 
-**The mechanism, which the brief didn't state:** informed bust rate is lower in
-every family (e.g. 32.7% → 23.3%). **The cost of breaking early isn't the row's
-payout — it's the die you no longer have.** That may be worth saying out loud in
-the brief, since it's the actual reason the timing read exists.
+**Is the old roster retired?** If yes, this is a large, clean deletion — 233
+definitions, 147 art files, three dead screens (`draft`, `bossreward`,
+`reshuffleDraft`). If some of it is still meant to be live — the NPC/boss cards
+are the likely candidate, `her_lucky_coin` and `grogs_bump` are Grog's — then
+those need new-style art, because two of them 404 today.
 
-**Not established:** row-value *ranking*. The family die contributes its family
-trait all match, so naive bank confounds trait with payout. Isolating that needs
-a different design.
+*My rec: tell me which of the 233 (if any) survive, and I'll delete the rest.*
+Not doing it unprompted — that's a lot of authored content.
 
 ---
 
