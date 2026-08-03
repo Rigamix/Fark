@@ -53,6 +53,33 @@ Two more faults sit underneath, and they only surface once the clobber is gone:
 Adding `die` first and testing would have shown "still does not work" and sent
 the hunt to the wrong place entirely.
 
+### STRUCTURAL RISK, NOT A FIXED BUG — turn-state clearing has no owner
+
+Preserve was wrong twice for the same reason, and fixing the second instance
+did **not** remove the cause. `"after the reset"` and `"last"` look identical
+right up until something else also claims to be part of the reset and runs
+after your fix. Any future restore-into-a-fresh-turn effect hits this again.
+
+**Measured, and it is wider than two call sites:**
+
+| Wipe | Sites |
+|---|---|
+| `G.kept=[]` | 16 |
+| `G.pool=[]` | 15 |
+| `clearRow('playerDiceRow')` (also empties `#keptRow`) | 18 |
+| `G.turnPts=0` | 13 |
+
+**And some fire from `setTimeout`** (around lines 25263, 25304), so a clear can
+land *after* a restore that ran later in source order. Ordering by reading the
+file is not sufficient — which is exactly why both Preserve bugs were invisible
+to inspection and obvious to a render check.
+
+**Owner: Effect Phase 2.** "Turn state clears in one ordered operation" is the
+same lifetime machinery that phase exists to build — the enchant lane-markers
+(Snare, Snuff, Fog, Trade) need a placement/window/expiry model, and this is the
+same problem wearing different clothes. Until then, ANY new restore effect must
+be verified by measuring the rendered surface, never by reading call order.
+
 Then **Effect Phase 2** — shared conditions and queries — which is the first
 phase that builds machinery rather than mapping it.
 
