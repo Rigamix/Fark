@@ -74,41 +74,78 @@ it puts the absolute numbers in a range where noise dominates.
 **The bank deltas are the usable signal and are still thin.** −128 to +153 on
 means of 634–1,430, from 260 matches.
 
-## The blocker: this pass does not scale, and it fails as SILENCE
+## The scaling wall: DIAGNOSED
 
-I tried to fix the sample size and could not. Measured:
+Not wall-clock. **~46 KB is retained per match and never released**, so the
+limit is **cumulative matches in a page load** — which is why raising the wait
+ceiling 60s → 300s moved nothing.
 
-| N | outcome |
-|---|---|
-| 260 | completes, ~13s |
-| 800 | **never produces a result** |
-| 2,000 | **never produces a result**, even at a 300s ceiling |
+Measured in one page at increasing batch sizes: **ms/match is flat** (3.96 →
+4.42, 1.12× across 100→600) and **DOM nodes are constant** at 515, so it is not
+per-match cost growth and not a DOM leak. Heap goes 4.8 → 63.1 MB over 1,300
+cumulative matches.
 
-**N=260 finishes in 13 seconds and 3× that finishes never.** That is not a
-linear timeout, so raising the wait does not fix it — I raised it from 60s to
-300s and N=2,000 still failed. Something else caps this pass and I have not
-diagnosed it.
+Extrapolated against every run whose outcome is known, the wall sits between
+321 MB and 435 MB:
 
-**The failure mode is the dangerous part: it exits 0 with no `setup:` line.**
-A capped run, a crashed run and a run with nothing to say are indistinguishable
-from the outside. That is the same shape as the rest of this session's bugs —
-a limit that expresses itself as absence.
+| run | matches | predicted heap | outcome |
+|---|---|---|---|
+| break rows N=260 | 3,120 | ~145 MB | completed |
+| tier sweep | 7,040 | ~321 MB | completed |
+| break rows N=800 | 9,600 | ~435 MB | **failed** |
+| break rows N=2,000 | 24,000 | ~1,081 MB | **failed** |
 
-**So the sample size is the blocker, and it is not a matter of patience.**
-Diagnosing why the harness stops scaling is its own task and should come before
-anyone promises Break-row numbers.
+**Workaround, proven:** run one family per page load. Obsidian at N=2,000 —
+4,000 matches — completed in 17s at 137 MB, exactly as predicted.
+`tools/sim_break_one.js` does this; the six-family pass is six invocations, not
+one.
+
+**The retention itself is still unfixed.** Something holds ~46 KB per match.
+Finding and releasing it would remove the ceiling entirely and is worth doing
+before any large study, not just this one.
+
+## AND THE INSTRUMENT FAILS ITS OWN CONTROL — do not run the other five
+
+Obsidian is the one row with a published result, so it was run first to test the
+instrument rather than the row. **It does not reproduce the finding.**
+
+| agent | win | bank | bust/turn |
+|---|---|---|---|
+| naive (break early) | 1.05% [0.69, 1.60] | 1,436 [1,400, 1,472] | 89.0% |
+| informed (hold to last turn) | 1.00% [0.65, 1.54] | 1,325 [1,289, 1,362] | 91.7% |
+
+Brief §4 says breaking immediately is a **net loss** across a match. This says
+holding it is worse by 111 bank — and the bank confidence intervals **do not
+overlap**, so that is a real difference in the **opposite direction** to the
+published result.
+
+**And the bust rate is 89–92% per turn**, which is not a plausible number for
+any build. A silver hand busts ~26% of turns and an all-bone hand ~49%. An agent
+busting nine turns in ten is not playing the game the finding was measured on.
+
+So the instrument is measuring *something*, cleanly and repeatably, and it is
+not the thing it claims. The likely cause is the agent: both sides are Gambler
+Greg at threshold 1,000, and a Break brand that banks zero while removing a die
+pushes an already-greedy policy into rolling dead hands. That is a setup fault,
+not a finding.
+
+**The five unvalidated rows should NOT be run through this instrument until it
+reproduces Obsidian.** Running them would produce six well-formed tables of
+numbers measuring the wrong thing — which is precisely the failure the void
+first run already demonstrated once.
 
 ## What a real pass needs, once it can run
 
-- **N in the low thousands** — currently impossible, see above.
+- **N in the low thousands** — now possible, one family per page load.
 - **A mid-table agent as well as Greg**, so the result is not read off the
   policy least able to win.
 - **Explicit last-turn isolation.** The Obsidian finding quoted a single-turn
   comparison (1,140 vs 409). Naive-vs-informed approximates it across a whole
   match; it is not the same measurement.
 
-**Nothing in this document should be used to tune a Break row.** The instrument
-is right now; the run is not big enough.
+**Nothing in this document should be used to tune a Break row.** The sample
+size is solved; the instrument is not — it fails its own control, in the
+opposite direction, with an implausible bust rate underneath it.
 
 ## Reproduce
 
