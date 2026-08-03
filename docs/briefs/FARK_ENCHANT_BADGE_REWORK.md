@@ -456,8 +456,37 @@ it tested well (it remains untestable pre-night-8 in any sim, same as
 before this rework).
 
 ## 4. THE BREAK TIMING FINDING — READ THIS BEFORE IMPLEMENTING BREAK
-(Obsidian is the only row with numbers; the shape of the finding — not
-the specific figures — applies to every family in the table above.)
+
+> **MEASURED FOR ALL SIX FAMILIES, 2026-08-03** (`docs/BREAK_ROWS_2026-08-03.md`,
+> N=2,000 per arm, bank confidence intervals separated on every row). The
+> parenthetical below said Obsidian was the only row with numbers. That is no
+> longer true, and two things follow.
+>
+> **THE FINDING GENERALISES — and Obsidian is its WEAKEST case.** Holding the
+> skull for the last turn is worth +625 to +834 bank in the other five families
+> and only **+422** in Obsidian. The row chosen to teach the mechanic
+> demonstrates it less clearly than any row it was generalised to. If Obsidian
+> is ever the worked example in player-facing teaching, it walks in with the
+> least clean version of its own story.
+>
+> **AND THE MECHANISM IS BUST RATE, ACROSS THE WHOLE MATCH — not just on the
+> last turn.** The text below already has the right cause ("losing a sixth die
+> costs more … than the guaranteed 1,000 is worth") but reads bust as a
+> LATE-TURN BENEFIT: removing the die takes it out of *that turn's* bust pool.
+> Measured, hand size drives bust rate continuously. Every family's informed arm
+> busts less all match long — 32.7%→23.3% Obsidian, 30.8%→19.3% Amber,
+> 33.4%→19.5% Starstone, 28.9%→17.4% Silver, 26.6%→15.7% Jade, 29.0%→18.6%
+> Vagabond.
+>
+> So the cost of breaking early is not that the row pays badly early, and not
+> only that you score less later. **It is that a smaller hand busts more, for
+> every remaining turn.** Whoever prices Break next should price against hand
+> size, not against the row's payout — those are different levers and only one
+> of them is what the data moves.
+
+(Historical: Obsidian was the only row with numbers when this was written; the
+shape of the finding — not the specific figures — was said to apply to every
+family in the table above. It does.)
 
 This is the centerpiece result of the whole rework and the clearest
 proof the family/enchant split can produce real tactical depth, not

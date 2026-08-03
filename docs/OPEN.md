@@ -112,10 +112,11 @@ the master brief already has an instruction on the order of those
 Obsidian alone; measured, all six reward holding the skull for the last turn, by
 +625 to +834 bank, confidence intervals separated on all six.
 
-**And Obsidian is the weakest case of it** — +422 against +625 to +834. The row
-picked to teach the mechanic demonstrates it *less* clearly than any row it was
-generalised to. That's only a problem if Obsidian is the tutorial example, which
-is your call.
+**DECISION: Obsidian is the weakest case of the effect it was chosen to teach**
+— +422 against +625 to +834. If Obsidian is the worked example anywhere
+player-facing, it walks in with the least clean version of its own story.
+*My rec: if a worked example is needed, use Silver (+8.70 pts / +834) or Amber.*
+Keeping Obsidian is fine — but it should be a choice, not an inheritance.
 
 **The mechanism, which the brief didn't state:** informed bust rate is lower in
 every family (e.g. 32.7% → 23.3%). **The cost of breaking early isn't the row's
