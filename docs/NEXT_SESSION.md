@@ -7,99 +7,41 @@ Written before a context compaction. Everything needed to pick up cleanly.
 
 ---
 
-## 1. THE NEXT TASK — build queue, nothing blocked
+## 1. THE NEXT TASK — Effect Phase 3
 
-Every OPEN.md item was answered. The effect re-plan was **ruled: all three
-changes taken**, and `EFFECT_SYSTEM_PLAN.md` is rewritten (superseded text kept
-under each banner). Remaining queue, in order:
+**The whole queue cleared.** famLog, rules audit, props brief, Preserve,
+cap-endings, the sim re-run, the Break rows, and Effect Phase 2 in both halves.
+Reports in `docs/PHASE_REPORTS.md`; the measurement docs are
+`SIM_RERUN_2026-08-03.md`, `BREAK_ROWS_2026-08-03.md`,
+`EFFECT_PHASE2_GUARDS.md`, `TURNSTATE_CLEARING.md`.
 
-| # | Task | Size |
-|---|---|---|
-| 17 | `famLog` message queue — one line holds one message, so two effects firing together means one is never announced, and anything firing in the shop is announced into a hidden div | medium |
-| 16 | Rules-screen audit — the only teaching surface, and it teaches six things the code does not do | medium |
-| 20 | Update the props brief to match what shipped (ruled: don't move the art) | doc |
-| 3 | **Preserve** — see the note below before writing a line of it | large |
-| 4 | Difficulty flat tier 3–7 — raise NPC aggression with tier, make cap-endings legible | large |
-| 18 | Harness passes on the five unvalidated Break rows (Amber, Starstone, Silver, Jade, Vagabond) | large |
-| 19 | Re-run the sim — every archived figure predates the sweep removal, the Trade fix and the 2026-08-02 rulings | large |
+**Phase 3 is the resolver and the ordering rule** — re-scoped by Phase 1's
+ruling, so read `EFFECT_SYSTEM_PLAN.md`'s banner before starting:
 
-### Before starting Preserve — measured, and it changes the build order
+- **It does NOT settle a multiplier rule.** Nothing multiplies. Kindred is five
+  hand-authored alternate definitions sharing a name.
+- **It settles EFFECT LIFETIME instead** — Ward's armed window, and Snare /
+  Snuff / Fog / Trade, which are lane markers with a placement, a window and an
+  expiry rather than effects with a moment.
+- **Two constraints are already discovered and must survive it:** guards may
+  have side effects (`powder_keg.use` spends a bust save, so nothing may be
+  evaluated speculatively or shared), and a restore into a fresh turn belongs
+  after `_turnTableClear()` — a boundary found twice, independently.
 
-**The structure is free to extend.** `G._famPreserve` is `{val,pts,crack}` and
-has exactly two readers. `_breakPreserved` **already reads `p.die` and
-`p.lane`** — written defensively for this, with a comment saying so, so adding
-them arms a guard that has been waiting. `startPTurn` reads only
-`val/pts/crack`; extra fields are inert to it. Nothing collides.
+### What Phase 2 actually delivered, including what it declined to build
 
-**But the consumer is dead, and it lies.** `startPTurn` sets
-`G.kept=[{...}]` and `G.numDice=5` — and then **four lines later, in the same
-function with no early return between, `G.kept=[]` and
-`G.numDice=G.matchDice.length` overwrite both.**
+`_fxMine(ev)` across 9 sites — and **three inline `ev.owner==='p'` checks left
+alone**, because that form omits `ev.mine` and therefore also fires when the
+RIVAL is the actor. Whether that is intended is an open BEHAVIOUR question,
+named at the site rather than resolved by tidying.
 
-Verified on a live match by setting the exact state `CFX.preserve.use` writes
-and calling the consumer: `kept` came back `[]`, `numDice` 6, stash consumed.
+**No `_fxFreeDice()`, deliberately.** `!free.length` looked like a shared query;
+the sets are four different things, and folding them would have taken Powder
+Keg's "kept dice included" away from it.
 
-So Preserve today **spends its charge, prints "THE AMBER CRACKS — A 1 ALREADY
-KEPT", and delivers nothing.** The player is told it worked.
-
-Two more faults sit underneath, and they only surface once the clobber is gone:
-
-- **`mat:'bone'` is hardcoded** — a preserved amber or jade die returns as
-  bone, losing its material and any enchant it carried.
-- **`G.numDice=5` is hardcoded** — assumes a six-die loadout, so it is wrong
-  whenever Break has already taken one.
-
-**Build order, therefore: fix the consumer FIRST, then extend the structure.**
-Adding `die` first and testing would have shown "still does not work" and sent
-the hunt to the wrong place entirely.
-
-### FINDING, carried forward on its own — the game had no memory of how a match ended
-
-Filed as "make cap-endings legible", which undersold it. It was not that the
-presentation was missing: **nothing anywhere recorded the cause.** VICTORY and
-DEFEAT rendered identically whether the player crossed the target or the clock
-ran out with them ahead — so every player who hit that case (85.5% of tier-7
-matches in the sim) left a match not knowing it had ended differently from a
-clean win or loss.
-
-Fixed in P436 — stamped at each cap decision, stated on the result screen. Kept
-here as its own finding rather than folded into "cap presentation, done",
-because the shape recurs: **a result surface that cannot distinguish two causes
-teaches the player there is only one.**
-
-### STRUCTURAL RISK, NOT A FIXED BUG — turn-state clearing has no owner
-
-Preserve was wrong twice for the same reason, and fixing the second instance
-did **not** remove the cause. `"after the reset"` and `"last"` look identical
-right up until something else also claims to be part of the reset and runs
-after your fix. Any future restore-into-a-fresh-turn effect hits this again.
-
-**Measured, and it is wider than two call sites:**
-
-| Wipe | Sites |
-|---|---|
-| `G.kept=[]` | 16 |
-| `G.pool=[]` | 15 |
-| `clearRow('playerDiceRow')` (also empties `#keptRow`) | 18 |
-| `G.turnPts=0` | 13 |
-
-**And some fire from `setTimeout`** (around lines 25263, 25304), so a clear can
-land *after* a restore that ran later in source order. Ordering by reading the
-file is not sufficient — which is exactly why both Preserve bugs were invisible
-to inspection and obvious to a render check.
-
-**Owner: Effect Phase 2.** "Turn state clears in one ordered operation" is the
-same lifetime machinery that phase exists to build — the enchant lane-markers
-(Snare, Snuff, Fog, Trade) need a placement/window/expiry model, and this is the
-same problem wearing different clothes. Until then, ANY new restore effect must
-be verified by measuring the rendered surface, never by reading call order.
-
-Then **Effect Phase 2** — shared conditions and queries — which is the first
-phase that builds machinery rather than mapping it.
-
-**Write the Phase report after each phase**, `docs/PHASE_REPORTS.md`, fixed
-format. That file is for the team to circulate, **not for Denis** — he reads
-`OPEN.md` only.
+**Two named clear phases**, not the single `endTurnState(reason)` that was
+proposed before the branch trace. Nine paths clear in two stages with the path's
+own work in the gap, so a single wrapper could not express it.
 
 ---
 
@@ -109,18 +51,19 @@ Two strands, two different questions. **Do not blend them and do not put two
 percentages next to each other** — a table of percentages is what produced a
 blended "70%" that matched none of its own rows.
 
-> **85% of the behaviour is built. 0% of the shared machinery that behaviour
-> runs on.**
+> **85% of the behaviour is built. The shared machinery it runs on is two
+> phases into five, with one condition lifted and no effect application yet.**
 
 - **Behaviour** — the enchant/badge rework's own §6 checklist: Silver reworked,
   Ward/Insurance retired, three enchants cut, seven icon enchants firing through
   one rule, Break's death rows, four badge remaps, the face restriction, the
   feat roster. Enumerable, mostly shipped, **~20% validated** — only Obsidian's
   Break row has sim numbers and almost nothing has been played.
-- **Machinery** — the effect system. 1 of 5 phases (inventory only). `CFX`
-  routes 20 of 29 cards, but routing is not the problem: there is **no shared
-  condition layer and no shared effect application**, and that is where every
-  bug this rework exists to stop actually happened.
+- **Machinery** — the effect system. **2 of 5 phases.** Phase 1 mapped it;
+  Phase 2 built the one condition the content actually asks for (`_fxMine`) and
+  named the two clear phases. Still no shared EFFECT APPLICATION, and Phase 3
+  (lifetime) is where the lane-markers get a model. Say "2 of 5 phases, one
+  shared condition, no shared application" rather than a percentage.
 
 **Denominators:** 69 items exist, ~65 are player-reachable. Totality assertions
 use 69; migration progress uses 65. See `EFFECT_INVENTORY.md` §1.
