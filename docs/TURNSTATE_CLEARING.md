@@ -60,13 +60,53 @@ load-bearing.
 That is a smaller and safer change than "one operation for all 62", and it is
 the change the measurement supports rather than the one the phase title implies.
 
-## Not established
+## Now established: traced by control flow, not position
 
-**Whether each of doBust's seven paths clears all four, or different threes.**
-A three-line adjacency window found only 4 co-located full clears, which means
-the clears inside a path are not contiguous — so the per-path subsets need
-reading path by path before the consolidation is written. That is step one of
-the implementation, not an assumption it can proceed on.
+Position had failed twice in this investigation — nearest-preceding-name is not
+lexical scope, and a three-line window undercounted co-located clears. So the
+paths were walked by **branch nesting**: which condition is in force at each
+clear.
+
+**doBust — six branch paths, every one clears all four:**
+
+| path | |
+|---|---|
+| `(plain bust)` | all four |
+| `G._wardArmed` | all four |
+| `secondWindActive` | all four |
+| `thick_skin` | all four |
+| `_lsCid` (last stand) | all four |
+| `stitchActive` | all four |
+
+**handleBank — three paths, every one clears all four** (`steal_low_bank`,
+`block_low_bank`, and the main body).
+
+**Nine paths, no exceptions.** The aggregate was uniform *and* the paths confirm
+it — which is the answer the aggregate alone could not give, and the reason it
+was worth tracing rather than assuming either way.
+
+### And the shape it should take, which the trace revealed
+
+Every doBust path and handleBank's main body clear in **two stages**:
+
+```
+kept + turnPts      ← the SCORE goes
+   …path-specific save / animation work…
+pool + row          ← the TABLE goes
+```
+
+That gap is why the adjacency window undercounted, and it is not incidental —
+it is where each save path does its work. So the ordered operation is **two
+phased steps, not one call**: a score clear and a table clear, with the path's
+own work between them.
+
+**And the restore belongs after the second stage.** That is exactly what P435b
+found by measurement when Preserve's die was wiped by `clearRow` — the same
+boundary, arrived at from the opposite direction.
+
+(Two handleBank card paths clear all four in one statement rather than two
+stages. `secondWindActive` clears `pool+row` **twice**. Both are noise to tidy
+during the consolidation, not evidence against it.)
 
 ## Reproduce
 
