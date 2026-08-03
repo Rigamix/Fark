@@ -3,7 +3,39 @@
 The only file you need to read. Everything has my recommendation, so **"yours"
 is a valid answer.** Answered items are deleted, not marked — this stays short.
 
-**Nothing is blocking.**
+**One thing is blocking: §0.**
+
+---
+
+## 0. BLOCKING — an uncommitted edit to a card image, intent unknown
+
+**Someone edited `assets/Card_ART/Pyre09.png` on 11 July and never committed it.**
+It's been sitting in the main checkout ever since. The saved file is 18,522
+bytes; the version in git is 18,718. Same image, slightly different file.
+
+**Why it matters now.** `Pyre09.png` is one of 149 card-face images belonging to
+the previous game's 133-card deck. That deck is retired — turned off
+deliberately back in P1b — so today those 149 files were archived: moved from
+`assets/Card_ART/` to `assets/_archive/Card_ART/`. Moved, not deleted, so it's
+reversible.
+
+Git won't move a file that has uncommitted changes without being told what to do
+with them. So the archive is finished and committed, but **not deployed** — it's
+waiting on this one file. Nothing is lost and nothing is broken; the live game is
+unaffected either way, since it stopped using this art before today.
+
+**The question for whoever made that edit: was it deliberate?**
+
+- If it was a real change → I'll carry it over to the new location so it isn't
+  lost. *(This is what I'd recommend by default — it costs nothing.)*
+- If it should be permanent → I'll commit it first, then archive.
+- If it was an accidental re-save → I'll drop it and archive the committed
+  version.
+- If nobody knows → say so and I'll carry it over. Keeping it is free; the
+  only thing I won't do unasked is throw away someone's unsaved work.
+
+I've deliberately not touched the file. **No backup was taken and nothing was
+moved** — the whole operation stopped before its first step.
 
 ---
 
