@@ -37,6 +37,16 @@ function snap(){return {turnNum:G.turnNum,pTurns:G.pTurns||0,
 
 /* ── ARM: one pending Starstone turn, and Quicksilver marked used on THIS
    turn number. If turnNum does not advance the flag follows us in. ── */
+/* KEEP THE MATCH UNDECIDED. endPTurn's extra-turn branch is guarded by
+   `G.pPts<G.target && G.oPts<G.target` - the decided-match guard, which exists
+   so a bonus turn cannot be granted after the match is already won. This probe
+   plays a REAL match with random dice, so whether either side had reached the
+   target by this point varied run to run, and the branch was correctly skipped
+   about one time in three. That looked like a race - an intermittent rate
+   usually is - but it is a DETERMINISTIC branch on a RANDOM state, which
+   produces the same shape. apv_amber_oneshot already pins the target for the
+   same reason. */
+G.target=999999;
 G._extraTurn=1;
 G._qsTurn=G.turnNum;
 out.before=snap();
