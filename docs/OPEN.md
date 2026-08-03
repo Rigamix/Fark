@@ -3,7 +3,7 @@
 The only file you need to read. Everything has my recommendation, so **"yours"
 is a valid answer.** Answered items are deleted, not marked — this stays short.
 
-**One decision is needed before Phase 4 builds: §0.**
+**One decision (§0) and one thing worth a look (§0b).**
 
 ---
 
@@ -46,6 +46,36 @@ I need your read on what these six are supposed to do across a run before I
 pick — this is a design question about the cards, not a code-shape question.
 **Nothing else is waiting on you**, and nothing needs approving: everything
 else in Phase 4 either resolved by reading or is built and verified.
+
+---
+
+## 0b. A granted extra turn sometimes doesn't happen — is that a bug?
+
+Chasing an intermittent test failure found this and I can't close it alone.
+
+`apv_p405_extraturn` arms one pending Starstone extra turn and ends the player's
+turn. **Roughly one run in three, the extra turn never begins — the rival's turn
+starts instead.** The other two runs it works exactly as specced.
+
+The test was reporting this as "the extra turn yielded to the rival," which was a
+confidently wrong claim: it read the phase *live* at assertion time while its
+three other checks read a snapshot, so it was describing a later moment. It now
+declines honestly instead — but declining is not the same as the behaviour being
+fine.
+
+**Two possibilities and I can't tell them apart from outside:**
+
+- The test's setup races something — it sets the pending-turn flag directly
+  rather than earning it from Falling Star, so it may be arming at a moment the
+  real card never would.
+- **A granted extra turn is genuinely lost sometimes**, in which case Falling
+  Star occasionally does nothing and no one would notice — it just looks like
+  the rival's turn came around.
+
+*My rec: worth ten minutes of someone playing Starstone with Falling Star and
+watching whether the extra turn always arrives.* If it always does, the test's
+arming is the problem and I'll fix that. If it sometimes doesn't, that's a live
+card doing nothing a third of the time.
 
 ---
 

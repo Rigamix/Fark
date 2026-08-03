@@ -27,8 +27,13 @@ if(typeof G==='undefined'||!G){return {err:'no match'};}
 /* keep the match from ending underneath the probe */
 G.target=999999;
 
+/* PHASE IS PART OF THE SNAPSHOT NOW. It was the one value the verdict read
+   LIVE while the other three read this snapshot - so `stayedOurs` was asking
+   about a later moment than `capCounted`, `turnAdvanced` and `qsRefreshed`,
+   and the rival's turn beginning in that gap failed the check with nothing
+   actually wrong. Measured flapping 1 run in 3. */
 function snap(){return {turnNum:G.turnNum,pTurns:G.pTurns||0,
-  qsSpent:(G._qsTurn===G.turnNum),extra:G._extraTurn||0};}
+  qsSpent:(G._qsTurn===G.turnNum),extra:G._extraTurn||0,phase:G.phase};}
 
 /* ── ARM: one pending Starstone turn, and Quicksilver marked used on THIS
    turn number. If turnNum does not advance the flag follows us in. ── */
@@ -43,8 +48,14 @@ await until(()=>(G._extraTurn||0)===0,4000);
 /* the branch decrements the counter IMMEDIATELY and schedules startPTurn 900ms
    out, so waiting on the counter says nothing about whether the turn began.
    Wait for the turn itself. */
-await until(()=>G.phase==='idle'||G.phase==='choosing',6000);
+/* AND until() RETURNS FALSE ON TIMEOUT rather than throwing. Ignoring that
+   return value is what let a timed-out wait fall straight through to an
+   assertion about a state that never arrived - the same bug apv_preserve had.
+   If the extra turn did not begin, this probe has nothing to say about it. */
+const _extraBegan=await until(()=>G.phase==='idle'||G.phase==='choosing',6000);
 out.afterExtra=snap();
+if(!_extraBegan)return {skip:'the extra turn never began (phase='+G.phase
+  +') - not an extra-turn result either way'};
 
 out.verdict={
   /* the extra turn costs a capped turn, like Falling Star's */
@@ -54,7 +65,7 @@ out.verdict={
   /* ... which is exactly what frees Quicksilver again */
   qsRefreshed: out.before.qsSpent===true&&out.afterExtra.qsSpent===false,
   /* and it really was the extra turn, not a yield to the rival */
-  stayedOurs:  G.phase!=='opp'
+  stayedOurs:  out.afterExtra.phase!=='opp'
 };
 
 /* ── the decided-match guard: no bonus turn once it is already won ── */

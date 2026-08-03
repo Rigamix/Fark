@@ -13027,6 +13027,32 @@ function _hotdToll(){
   try{save();}catch(e){}
   if(gone)try{famLog('THE HANGOVER BITES — A CIRCLE RUBBED OUT');}catch(e){}
 }
+/* == RUN-SCOPED ARM ===================================================
+   Double Stakes and For Keeps are the same card mechanically: the player arms
+   it in the Room before choosing a seat, it rides on S.run so it survives
+   leaving the screen, and it is spent when the match actually starts.
+
+   TWO CARDS, NOT FOUR, and that was measured. The Tab carries a QUANTITY with
+   two settlement paths and a night deadline; Hair of the Dog is armed by an
+   OUTCOME rather than by the player and resolves mid-match. Folding four
+   things this different into one arm/resolve would need a "maybe the player
+   armed it" concept and a resolve that might be a seat, a bank or a night -
+   a switch with three arms wearing one name. Same call as Trade staying out
+   of the lane markers.
+
+   WHY _rsTake IS ONE VERB. The read and the clear are a pair:
+   `var x=!!S.run.k; S.run.k=false;` was written out at both seat-launch sites,
+   and the failure mode of copying it is reading without clearing - which
+   leaves the card armed forever, spending a one-shot on every match, with
+   nothing to show that it happened. */
+function _rsToggle(key){_getS();S.run[key]=!S.run[key];save();}
+function _rsArmed(key){_getS();return !!S.run[key];}
+/* spend it: returns whether it was armed, and disarms in the same breath */
+function _rsTake(key){
+  _getS();var was=!!S.run[key];
+  if(was){S.run[key]=false;try{save();}catch(e){}}
+  return was;
+}
 function _tabSettle(){
   if(!S.run||!S.run._tabOwed)return;
   var owed=S.run._tabOwed;S.run._tabOwed=0;
@@ -14359,10 +14385,10 @@ function _gbRenderRoom(tier,bossReady){
   if(S.run._tabOwed)chips+='<div class="gbx-box sub" onclick="famTabPay()" style="height:30px;padding:0 10px;font-size:12px;cursor:pointer">ledger: tab '
     +S.run._tabOwed+'g'+((S.run.gold||0)>=S.run._tabOwed?' · PAY IT':'')+'</div>';
   if(famOwnTier('the_tab')>0&&!S.run._tabOwed)chips+='<div class="gbx-box sub" onclick="famTabTake()" style="height:30px;padding:0 10px;font-size:12px;cursor:pointer">THE TAB — borrow 250g</div>';
-  if(famOwnTier('double_stakes')>0)chips+='<div class="gbx-box'+(S.run._dsArmed?'':' sub')+'" onclick="_getS();S.run._dsArmed=!S.run._dsArmed;save();showScreen(&quot;gauntlet&quot;)" '
+  if(famOwnTier('double_stakes')>0)chips+='<div class="gbx-box'+(S.run._dsArmed?'':' sub')+'" onclick="_rsToggle(&quot;_dsArmed&quot;);showScreen(&quot;gauntlet&quot;)" '
     +'style="height:30px;padding:0 10px;font-size:12px;cursor:pointer'+(S.run._dsArmed?';border:2px solid #a58a3c':'')+'">'
     +(S.run._dsArmed?'DOUBLE STAKES ARMED':'double stakes')+'</div>';
-  if(famOwnTier('for_keeps')>0)chips+='<div class="gbx-box'+(S.run._fkArmed?'':' sub')+'" onclick="_getS();S.run._fkArmed=!S.run._fkArmed;save();showScreen(&quot;gauntlet&quot;)" '
+  if(famOwnTier('for_keeps')>0)chips+='<div class="gbx-box'+(S.run._fkArmed?'':' sub')+'" onclick="_rsToggle(&quot;_fkArmed&quot;);showScreen(&quot;gauntlet&quot;)" '
     +'style="height:30px;padding:0 10px;font-size:12px;cursor:pointer'+(S.run._fkArmed?';border:2px solid #8a2d2d':'')+'">'
     +(S.run._fkArmed?'FOR KEEPS ARMED — this match is for dice':'for keeps')+'</div>';
   if(chips)h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px">'+chips+'</div>';
@@ -15638,10 +15664,10 @@ function _ptRoom(host,tier,bossReady){
   if(S.run._tabOwed)chips+='<div onclick="famTabPay()">ledger: tab '+S.run._tabOwed+'g'+((S.run.gold||0)>=S.run._tabOwed?' · PAY IT':'')+'</div>';
   if(famOwnTier('the_tab')>0&&!S.run._tabOwed)chips+='<div onclick="famTabTake()">the tab — borrow 250g</div>';
   if(famOwnTier('double_stakes')>0)chips+='<div '+(S.run._dsArmed?'style="border-color:#a58a3c;color:#f3dfa6"':'')
-    +' onclick="_getS();S.run._dsArmed=!S.run._dsArmed;save();showScreen(&quot;gauntlet&quot;)">'
+    +' onclick="_rsToggle(&quot;_dsArmed&quot;);showScreen(&quot;gauntlet&quot;)">'
     +(S.run._dsArmed?'DOUBLE STAKES ARMED':'double stakes')+'</div>';
   if(famOwnTier('for_keeps')>0)chips+='<div '+(S.run._fkArmed?'style="border-color:#c4404f;color:#f8a"':'')
-    +' onclick="_getS();S.run._fkArmed=!S.run._fkArmed;save();showScreen(&quot;gauntlet&quot;)">'
+    +' onclick="_rsToggle(&quot;_fkArmed&quot;);showScreen(&quot;gauntlet&quot;)">'
     +(S.run._fkArmed?'FOR KEEPS ARMED':'for keeps')+'</div>';
   host.innerHTML=
     '<div id="ptStage">'
@@ -34783,10 +34809,10 @@ function launchSeat(seatIdx){
      neither refund the stake nor un-spend the seat. Result is pessimistic
      'lost' until the settle flips it — abandoning keeps the loss. */
   var buy=Math.min((S.run.gold||0),(NIGHT_BUYINS[S.run.tier]||0));
-  var _dsPlay=!!S.run._dsArmed;S.run._dsArmed=false;
+  var _dsPlay=_rsTake('_dsArmed');
   if(_dsPlay)buy=Math.min((S.run.gold||0),(NIGHT_BUYINS[S.run.tier]||0)*2);
   S.run.gold=(S.run.gold||0)-buy;
-  var _fkPlay=!!S.run._fkArmed;S.run._fkArmed=false;
+  var _fkPlay=_rsTake('_fkArmed');
   if(_fkPlay)famBurn('for_keeps');/* consumable: burns on use, win or lose */
   night.seatsPlayed[seatIdx]=true;
   night.results[seatIdx]='lost';
