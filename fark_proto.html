@@ -23414,25 +23414,6 @@ function startPTurn(){
   if(!G||G._endMatchFired)return;
   if(typeof _checkDeadAir==='function')_checkDeadAir();
   G.phase='idle';G.turnPts=0;G.kept=[];G.numDice=G.matchDice?G.matchDice.length:6;G.pool=[];G.turnRollCount=0;G._encorePending=false;G._slowHandUsedThisTurn=false;G._warmHandsActive=false;G._lastHotDice=false;G._firstRollCommitted=0;G._bustSavedThisTurn=false;
-  /* PRESERVE PAYS OUT HERE, AFTER THE RESET, AND THE ORDER IS THE WHOLE FIX.
-     This block used to sit four lines UPSTREAM of the reset above, so it wrote
-     G.kept and G.numDice and then had both overwritten before the turn began -
-     Preserve spent its charge, announced "THE AMBER CRACKS", and delivered
-     nothing. Anything restored into a fresh turn has to land after the turn is
-     cleared, not before. If the reset ever moves, this moves with it. */
-  if(G&&G._famPreserve){
-    var _fp=G._famPreserve;G._famPreserve=null;
-    /* the die's own material, not bone - see CFX.preserve.use */
-    G.kept=[{vals:[_fp.val],mat:_fp.mat||'bone',pts:_fp.pts+(_fp.crack||0),
-             dice:[{val:_fp.val,mat:_fp.mat||'bone'}]}];
-    G.turnPts=G.kept[0].pts;
-    /* ONE FEWER THAN THE LOADOUT, not a hardcoded five. A player whose loadout
-       is already down a die to Break has five, and would have been handed five
-       back - paying nothing for the preserve. */
-    G.numDice=Math.max(1,(G.matchDice?G.matchDice.length:6)-1);
-    famLog('THE AMBER CRACKS — A '+_fp.val+' ALREADY KEPT'+(_fp.crack?' (+'+_fp.crack+')':''));
-    try{refreshKeptTray();updHUD();}catch(e){}
-  }
   /* per-turn icon state. Ward lasts one turn by definition. AMBER IS A
      ONE-SHOT NOW, not a turn-long immunity - doBust spends it on the single
      bust it eats, so this line only reaches a save that was never called on,
@@ -23547,6 +23528,45 @@ function startPTurn(){
      turn boundary; the held die was just a normal pool die that skipped
      rerolls last turn and is cleared when the pool resets below. */
   clearRow('playerDiceRow');clearRow('oppDiceRow');refreshKeptTray();
+  /* PRESERVE PAYS OUT HERE, LAST, AND THE POSITION IS THE WHOLE FIX.
+     It has been wrong twice, upstream of a different wipe each time.
+       First: four lines above `G.kept=[];G.numDice=matchDice.length`, so the
+       data was overwritten before the turn began and Preserve announced
+       "THE AMBER CRACKS" having delivered nothing.
+       Then: above `clearRow('playerDiceRow')`, which empties #keptRow too -
+       deliberately, see its comment - so the DATA survived and the minted die
+       was wiped off the table. Right numbers, empty board.
+     A RESTORE INTO A FRESH TURN MUST RUN AFTER EVERYTHING THAT CLEARS, not
+     merely after the first thing that clears. "After the reset" was not the
+     same as "last", and only checking the rendered row told them apart.
+     Anything added below that clears the row belongs ABOVE this block. */
+  if(G&&G._famPreserve){
+    var _fp=G._famPreserve;G._famPreserve=null;
+    /* the die's own material, not bone - see CFX.preserve.use */
+    G.kept=[{vals:[_fp.val],mat:_fp.mat||'bone',pts:_fp.pts+(_fp.crack||0),
+             dice:[{val:_fp.val,mat:_fp.mat||'bone'}]}];
+    G.turnPts=G.kept[0].pts;
+    /* ONE FEWER THAN THE LOADOUT, not a hardcoded five. A player whose loadout
+       is already down a die to Break has five, and would have been handed five
+       back - paying nothing for the preserve. */
+    G.numDice=Math.max(1,(G.matchDice?G.matchDice.length:6)-1);
+    /* AND PUT IT ON THE TABLE. The data above is invisible on its own: the
+       player would start the turn a die short with points already banked and
+       nothing to explain either. mkDie is the same factory the normal roll uses
+       - it covers the 2D fallback too - and D3X needs no telling, because its
+       sync ADOPTS any chip in the host carrying data-mat/data-val. still=true
+       because a preserved die is at rest in its casing, not mid-throw. */
+    try{
+      var _kr=document.getElementById('keptRow');
+      if(_kr&&typeof mkDie==='function'){
+        var _pd=mkDie(_fp.val,_fp.mat||'bone',null,true,null);
+        _pd.classList.add('in-tray');
+        _kr.appendChild(typeof _wrapDie==='function'?_wrapDie(_pd):_pd);
+      }
+    }catch(e){}
+    famLog('THE AMBER CRACKS — A '+_fp.val+' ALREADY KEPT'+(_fp.crack?' (+'+_fp.crack+')':''));
+    try{refreshKeptTray();updHUD();}catch(e){}
+  }
   setBtns(true,false);setTurnMode(false);
   G.npcCardState.playerTurnCount++;
   setStatusMsg('','');

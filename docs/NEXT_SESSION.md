@@ -193,6 +193,28 @@ that produced the flat rule (font, coin, diamond) were about *art*, not the
 folder. `--font-px` is still the old pixel font and still the wrong reach —
 `FK_ART.font` is the right one.
 
+**EVERY PROBE MUST JUSTIFY WHICH DOM SURFACE IS AUTHORITATIVE** before it
+asserts anything — not that a plausible selector exists, but that the one it
+reads is the one the live build actually paints. FIVE instances in one session
+of a check verifying against the wrong surface, each of which reported success
+having tested nothing real:
+
+- `apv_bust_settle` scored a STRING verdict with `=== false` and passed.
+- `apv_css_live` failed rules whose specificity was raised on purpose, by
+  matching selector text exactly instead of by token.
+- `apv_prop_overlap` reported zero overlaps having found two buttons and no
+  dice, because the roll had not landed.
+- The same probe then computed prop boxes from template data with the wrong
+  origin (`left:x%` means x is the LEFT EDGE) and no rotation.
+- `apv_preserve` asserted `G.kept` only — green while the table stayed empty —
+  then measured `#keptTray`, which is the **2D fallback**: `refreshKeptTray`
+  returns early on a `.fk3d` build and `#keptRow` is live.
+
+**Queued item: audit every probe in the suite for this once, deliberately.**
+For each, name the surface it asserts on and confirm it is the one the shipped
+build renders. Cheaper as a single pass than rediscovered one accident at a
+time.
+
 **CHECK A SURFACE IS REACHABLE BEFORE AUDITING WHAT IT SAYS.** Three-for-three
 this session, and in every case reading the code would have confirmed the wrong
 thing: `#rulesOverlay` (six false claims, no visible entry point),
