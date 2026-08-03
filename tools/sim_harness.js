@@ -214,14 +214,25 @@ F.GEAR={
           ench:['tithe',null,'ward',null,null,null],badge:null,
           fcards:[{id:'slow_cook',tier:1}]},
   night8:{key:'night8',dice:['jade','jade2','amber','amber','silver','starstone'],
-          ench:['tithe','ward','snare','break','trade','fog'],badge:'counterfeit',
+          ench:['tithe','ward','snare','break','trade','fog'],badge:'kindred',
           fcards:[{id:'slow_cook',tier:3},{id:'falling_star',tier:3},{id:'pickpocket',tier:3}]}
 };
-/* Badge ids are the RULE ids the engine still keys on, not the new names:
-   last_call = ZERO HOUR, counterfeit = KINDRED, confession = STILL WATERS,
-   in_arrears = FIRST STRIKE. Named here once so no agent has to re-derive it. */
-F.BADGE={zero_hour:'last_call',kindred:'counterfeit',still_waters:'confession',
-         first_strike:'in_arrears',steeped:'steeped',pickpocket:'pickpocket',
+/* THE IDS AND THE RULES MATCH NOW (P427/P428), so this map is an identity -
+   and that is the point. It existed only to paper over a divergence where a
+   badge showed one rule name and keyed on another, which is what got removed.
+   Kept as a table, not deleted, so an agent still has one place to name a rule.
+
+   IT WAS WRONG IN TWO WAYS BEFORE THIS, both silent:
+     kindred/still_waters/first_strike pointed at counterfeit/confession/
+     in_arrears, none of which resolves any more - _tellById returns null and
+     the badge is simply not applied. GEAR.night8 asks for Kindred, so every
+     night-8 batch would have run BARE while reporting itself as a Kindred build.
+     zero_hour pointed at 'last_call', which is worse than a no-op: after P427
+     that is a LIVE rule again (Grog's LAST CALL, voids a bank under 800). The
+     harness would have measured a bank-void rule and labelled it Zero Hour. */
+F.BADGE={zero_hour:'zero_hour',kindred:'kindred',still_waters:'still_waters',
+         first_strike:'first_strike',last_call:'last_call',
+         steeped:'steeped',pickpocket:'pickpocket',
          drill_order:'drill_order',reckoning:'reckoning'};
 
 /* Build a brand the way the SHOP builds one: the face is drawn by the real
