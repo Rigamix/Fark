@@ -22190,6 +22190,33 @@ function newG(rung,pCards,oCards,pStake,oStake){
 }
 
 /* ═══════ UI HELPERS ═══════ */
+/* ══ THE TURN-STATE CLEAR, IN TWO PHASES ══════════════════════════════
+   Nine branch paths end a player's turn - six in doBust (plain, ward, second
+   wind, thick skin, last stand, stitch) and three in handleBank - and every
+   one of them clears the same four things in the same two stages, with its own
+   save and animation work in between:
+
+       _turnScoreClear()    the SCORE goes
+           ...this path's work: ward halves the bank, thick skin pays out...
+       _turnTableClear()    the TABLE goes
+
+   THE GAP IS NOT INCIDENTAL - it is what each path IS, which is why a single
+   endTurnState() call cannot express this and was not built.
+
+   THESE DO THE CORE AND NOTHING ELSE. Every call site keeps its own
+   companions: safeTurnStreak=0 on five of them but not ward and not
+   handleBank, _turnBonusPot=0 on ward alone, numDice on handleBank alone.
+   Those are not noise to absorb; they are each a statement about what that
+   particular exit also owes.
+
+   AND PHASE B IS A BOUNDARY WITH A NAME NOW. A restore into the next turn must
+   land AFTER _turnTableClear - Preserve found that by having its die wiped by
+   clearRow (P435b), and the branch trace arrived at the same line from the
+   opposite direction. Two routes, no shared assumption. Anything restoring
+   turn state belongs after this call, and can now be documented against it
+   rather than against a comment. */
+function _turnScoreClear(){if(!G)return;G.turnPts=0;G.kept=[];}
+function _turnTableClear(){clearRow('playerDiceRow');if(G)G.pool=[];}
 function clearRow(id){
   const el=document.getElementById(id);if(el)el.innerHTML='';
   /* same for yours: the tags outlive the dice otherwise */
@@ -25182,7 +25209,7 @@ function doBust(){
        G.pPts and one of them reads G.kept, so this is the only point in the
        branch where either can be paid honestly. */
     _bustTolls();
-    G.turnPts=0;G.kept=[];G._turnBonusPot=0;
+    _turnScoreClear();G._turnBonusPot=0;
     try{updHUD();refreshKeptTray();}catch(e){}
     G.safeTurnStreak=0;
     /* it is still a bust: the chain breaks and the feat counter ticks, which
@@ -25190,7 +25217,7 @@ function doBust(){
     G._hotHandChain=0;
     setTimeout(function(){
       try{
-        clearRow('playerDiceRow');G.pool=[];
+        _turnTableClear();
         /* half a turn can be enough to win - check before handing over */
         if(G.pPts>=G.target){endMatch(true);return;}
         endPTurn();
@@ -25223,9 +25250,9 @@ function doBust(){
     /* Apply bust to all visible dice in the row (not just G.pool — see comment in main bust path) */
     (function(){var _r=document.getElementById('playerDiceRow');if(_r)Array.prototype.forEach.call(_r.querySelectorAll('.die'),function(el){el.style.opacity='';el.style.filter='';el.classList.add('bust');if(el._d3)D3.draw(el._d3);});})();
     setStatusMsg('SECOND WIND — 3-DICE RESCUE!','gold');triggerCard('second_wind','RESCUE ROLL!',true);
-    G.safeTurnStreak=0;G.turnPts=0;G.kept=[];updHUD();refreshKeptTray();setBtns(false,false);
+    G.safeTurnStreak=0;_turnScoreClear();updHUD();refreshKeptTray();setBtns(false,false);
     setTimeout(function(){
-      clearRow('playerDiceRow');G.pool=[];
+      _turnTableClear();
       var _swRow=document.getElementById('playerDiceRow');
       var _swMats=[],_swVals=[];
       for(var _swi=0;_swi<3;_swi++){
@@ -25249,7 +25276,7 @@ function doBust(){
           setStatusMsg('SECOND WIND — NOTHING SCORED','red');
         }
         setTimeout(function(){
-          clearRow('playerDiceRow');G.pool=[];G.numDice=G.matchDice?G.matchDice.length:6;
+          _turnTableClear();G.numDice=G.matchDice?G.matchDice.length:6;
           if(G.pPts>=G.target){endMatch(true);return;}
           endPTurn();
         },1100);
@@ -25270,7 +25297,7 @@ function doBust(){
     G._turnBonusPot=0;
     /* Apply bust class to all visible dice in the row */
     (function(){var _r=document.getElementById('playerDiceRow');if(_r)Array.prototype.forEach.call(_r.querySelectorAll('.die'),function(el){el.style.opacity='';el.style.filter='';el.classList.add('bust');if(el._d3)D3.draw(el._d3);});})();
-    G.safeTurnStreak=0;G.turnPts=0;G.kept=[];updHUD();refreshKeptTray();setBtns(false,false);
+    G.safeTurnStreak=0;_turnScoreClear();updHUD();refreshKeptTray();setBtns(false,false);
     /* Full bust feedback: red overlay word, screen shake, vignette, SFX */
     var _tsBov=document.getElementById('bust-ov');
     if(_tsBov){_alignOverlayWord(_tsBov.querySelector('.bust-word'));_tsBov.classList.add('flash');setTimeout(function(){_tsBov.classList.remove('flash');},1100);}
@@ -25298,7 +25325,7 @@ function doBust(){
     },1000);
     /* Then end the turn after the save flash — unless the saved half just
        won the match (Thick Skin can push pPts past the target). */
-    setTimeout(function(){clearRow('playerDiceRow');G.pool=[];
+    setTimeout(function(){_turnTableClear();
       if(G.pPts>=G.target){endMatch(true);return;}
       endPTurn();},2200);
     return;
@@ -25315,7 +25342,7 @@ function doBust(){
     var _lsSaved=Math.floor(_lsTurnPts/2);
     G._turnBonusPot=0;
     (function(){var _r=document.getElementById('playerDiceRow');if(_r)Array.prototype.forEach.call(_r.querySelectorAll('.die'),function(el){el.style.opacity='';el.style.filter='';el.classList.add('bust');if(el._d3)D3.draw(el._d3);});})();
-    G.safeTurnStreak=0;G.turnPts=0;G.kept=[];updHUD();refreshKeptTray();setBtns(false,false);
+    G.safeTurnStreak=0;_turnScoreClear();updHUD();refreshKeptTray();setBtns(false,false);
     var _lsBov=document.getElementById('bust-ov');
     if(_lsBov){_alignOverlayWord(_lsBov.querySelector('.bust-word'));_lsBov.classList.add('flash');setTimeout(function(){_lsBov.classList.remove('flash');},1100);}
     try{SFX.bust&&SFX.bust();}catch(e){}
@@ -25339,7 +25366,7 @@ function doBust(){
       setStatusMsg('THE LAST STITCH SAVED '+_lsSaved+'!','gold');
       updHUD();
     },1000);
-    setTimeout(function(){clearRow('playerDiceRow');G.pool=[];
+    setTimeout(function(){_turnTableClear();
       if(G.pPts>=G.target){endMatch(true);return;}
       endPTurn();},2200);
     return;
@@ -25363,7 +25390,7 @@ function doBust(){
     triggerCard('mabels_stitch','STITCH +'+saved+' • REROLL!',true);
     setStatusMsg('BUST → STITCH SAVED '+saved+' • ROLLING FRESH','gold');
     /* Reset turn state to a clean slate before the fresh roll. */
-    G.safeTurnStreak=0;G.turnPts=0;G.kept=[];updHUD();refreshKeptTray();setBtns(false,false);
+    G.safeTurnStreak=0;_turnScoreClear();updHUD();refreshKeptTray();setBtns(false,false);
     G._bustSavedThisTurn=true;/* suppress hot-dice fanfare if the fresh roll happens to clear all 6 */
     /* The stitched bank can itself complete the win — don't hand out a
        pointless fresh reroll when the match is already over. */
@@ -25371,7 +25398,7 @@ function doBust(){
     setTimeout(function(){
       /* Hot-dice-style fresh roll. Mirrors the block at the top of the
          hot-dice handler (search "Hot dice check"). */
-      clearRow('playerDiceRow');G.pool=[];G.numDice=G.matchDice?G.matchDice.length:6;G.phase='rolling';
+      _turnTableClear();G.numDice=G.matchDice?G.matchDice.length:6;G.phase='rolling';
       setStatusMsg('ROLLING...','active');
       const row=document.getElementById('playerDiceRow');
       var hotN=G.numDice||6;
@@ -25468,7 +25495,7 @@ function doBust(){
       spawnPop('−'+recklessPenalty+' BRASS');
     }
   }
-  G.safeTurnStreak=0;G.turnPts=0;G.kept=[];
+  G.safeTurnStreak=0;_turnScoreClear();
   /* Stakes Rising bonus is also lost on bust (it was "on the table" turn pts) */
   G._turnBonusPot=0;
   /* TELL: Steeped — bust loses accumulated bonus, refresh HUD immediately */
@@ -25526,7 +25553,7 @@ function doBust(){
     /* Extended to 1100ms so the bustPop keyframe (1s) gets to complete its
        full scale+fade arc instead of being cut off mid-animation. */
     setTimeout(()=>document.getElementById('bust-ov').classList.remove('flash'),1100);
-    setTimeout(()=>{clearRow('playerDiceRow');G.pool=[];
+    setTimeout(()=>{_turnTableClear();
       /* Bust-save credits (Loose Thread, Safety Net, Aegis) can push the
          player to/past the target. Check the win HERE — after every bust
          mutation (incl. NPC penalties / Brass) — instead of handing the NPC
@@ -26081,7 +26108,7 @@ function handleBank(){
       triggerCard(cid,npc.name+' STOLE '+total+'!',false);
       spawnPop('STOLEN!');
       (function(_cid){setTimeout(function(){if(window.DLG)DLG.triggerCard(_cid,false);},800);})(cid);
-      G.turnPts=0;G.kept=[];G.numDice=6;updHUD();refreshKeptTray();clearRow('playerDiceRow');G.pool=[];setBtns(false,false);try{_renderSelTags([],0,true);}catch(e){}
+      _turnScoreClear();G.numDice=6;updHUD();refreshKeptTray();_turnTableClear();setBtns(false,false);try{_renderSelTags([],0,true);}catch(e){}
       _bankAborted=true;
       if(G.oPts>=G.target){setTimeout(function(){endMatch(false)},700);return;}
       G.npcCardState.firstBankDone=true;
@@ -26094,7 +26121,7 @@ function handleBank(){
       triggerCard(cid,npc.name+' BLOCKED!',false);
       spawnPop('⛓️ BLOCKED');
       (function(_cid){setTimeout(function(){if(window.DLG)DLG.triggerCard(_cid,false);},800);})(cid);
-      G.turnPts=0;G.kept=[];G.numDice=6;updHUD();refreshKeptTray();clearRow('playerDiceRow');G.pool=[];setBtns(false,false);try{_renderSelTags([],0,true);}catch(e){}
+      _turnScoreClear();G.numDice=6;updHUD();refreshKeptTray();_turnTableClear();setBtns(false,false);try{_renderSelTags([],0,true);}catch(e){}
       _bankAborted=true;
       G.npcCardState.firstBankDone=true;
       setTimeout(endPTurn,1200);return;
@@ -26282,7 +26309,7 @@ function handleBank(){
     }
     famFire('bank',{actor:'p',amt:total});try{famRenderRow();}catch(e){}
   }
-  G.turnPts=0;G.kept=[];G.numDice=6;
+  _turnScoreClear();G.numDice=6;
   /* THE GRUDGE NPC mirror: increment opp's grudge stack when player banks
      (max 750). Consumed in finOpp at NPC's next bank. Mirrors the
      player-side increment in finOpp at line ~13141. */
@@ -26306,7 +26333,7 @@ function handleBank(){
   if(G._featShatterPend)G._featShatterBanked=true;
   G._featJadePend=false;G._featShatterPend=false;
   if((G.turnRollCount||0)>(G._featMaxRolls||0))G._featMaxRolls=G.turnRollCount||0;
-  updHUD();refreshKeptTray();clearRow('playerDiceRow');G.pool=[];setBtns(false,false);
+  updHUD();refreshKeptTray();_turnTableClear();setBtns(false,false);
   try{_renderSelTags([],0,true);}catch(e){}
   if(G.pPts>=G.target){setTimeout(()=>endMatch(true),700);return;}
   if(G.oPts>=G.target){setTimeout(()=>endMatch(false),700);return;}
