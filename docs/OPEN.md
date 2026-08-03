@@ -51,6 +51,33 @@ I'll ship yours instead.
 
 ---
 
+## 1c. The old pixel font is still most of the UI — how far does the migration go?
+
+You asked me to check for a third screen sharing the `--font-px` mistake after
+`.res-title`. There isn't a third screen. **There are 157 declarations.**
+
+| | Uses |
+|---|---|
+| `'JMH Beda'` (the game's font) | 67 |
+| `var(--font-px)` → `'Alagard','Press Start 2P'` | **157** |
+
+**And it correspondingly includes the numbers a player reads all match** —
+`.hud-score`, `.hud-target`, `.hud-turnnum`. The migration to JMH Beda has only
+ever been applied where something was specifically pointed at: the win board,
+the status line, the toast, and now the loss title.
+
+*My rec: leave it until you've looked at a screenshot and decided.* Swapping 157
+declarations changes the look of every screen at once, which is a design call,
+not a cleanup — and Alagard may well be right for numerals even where JMH Beda
+is right for words.
+
+Worth knowing: a comment I wrote in the file justified the win-board fix with
+"56 uses against three for Press Start 2P". That counted the literal font name
+instead of the variable that applies it, so it was wrong by about 26x. Corrected
+in place.
+
+---
+
 ## 2. Early-game signal — waiting on a playtest, not on reasoning
 
 Restoring the brief's 24 feats removed every feat that fired in a new player's

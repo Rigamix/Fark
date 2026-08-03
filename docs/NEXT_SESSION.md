@@ -53,6 +53,20 @@ Two more faults sit underneath, and they only surface once the clobber is gone:
 Adding `die` first and testing would have shown "still does not work" and sent
 the hunt to the wrong place entirely.
 
+### FINDING, carried forward on its own — the game had no memory of how a match ended
+
+Filed as "make cap-endings legible", which undersold it. It was not that the
+presentation was missing: **nothing anywhere recorded the cause.** VICTORY and
+DEFEAT rendered identically whether the player crossed the target or the clock
+ran out with them ahead — so every player who hit that case (85.5% of tier-7
+matches in the sim) left a match not knowing it had ended differently from a
+clean win or loss.
+
+Fixed in P436 — stamped at each cap decision, stated on the result screen. Kept
+here as its own finding rather than folded into "cap presentation, done",
+because the shape recurs: **a result surface that cannot distinguish two causes
+teaches the player there is only one.**
+
 ### STRUCTURAL RISK, NOT A FIXED BUG — turn-state clearing has no owner
 
 Preserve was wrong twice for the same reason, and fixing the second instance
