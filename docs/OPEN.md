@@ -39,8 +39,6 @@ pick — this is a design question about the cards, not a code-shape question.
 
 ---
 
----
-
 ## 1. The rules screen — two calls, and the premise was wrong
 
 The backlog said the rules screen teaches six things the code doesn't do.
@@ -139,9 +137,8 @@ still greps as a `return []`) and fails if any starts dealing again.
 *family* cards, so the authored boss pools are the design record of what each
 boss's cards mean. `tamper` is already blocked on the same phase.
 
-**Left for you:** whether to also archive the 147 art files in
-`assets/Card_ART/`. Tagging covers this pass; the art move is a bigger diff and
-nothing forces it now.
+**Archived too**, on your call: 157 files now at `assets/_archive/Card_ART/`,
+moved with `git mv` so it reverses in one command. Nothing open here.
 
 ---
 
