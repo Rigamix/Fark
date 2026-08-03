@@ -51,6 +51,27 @@ I'll ship yours instead.
 
 ---
 
+## 1c. Props vs dice — overlap, or occlusion?
+
+I corrected the props brief's exclusion zone (it banned a vertical band; the
+dice are a near-full-width horizontal strip). Then I ran the new rule against
+the shipped templates, and **they fail it**: 9 bounding-box overlaps across 4
+props — `spoon`, `bottle`, `plateMetal`, `bag` — all against dice.
+
+**But dice paint above props.** So an overlap reads as a die resting on the
+table clutter, not a die hidden behind a bottle. The screenshot reads fine.
+
+So: is the invariant **overlap** (no prop box may touch a die box) or
+**occlusion** (no prop may obscure a die)? *My rec: occlusion.* Overlap is the
+stricter reading and the composition is already good under it — but it's your
+table, and I've been wrong once today claiming the art was fine before I'd
+checked.
+
+`apv_prop_overlap.js` is in the suite and red against the strict reading until
+you rule.
+
+---
+
 ## 2. Early-game signal — waiting on a playtest, not on reasoning
 
 Restoring the brief's 24 feats removed every feat that fired in a new player's
