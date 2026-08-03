@@ -13576,10 +13576,19 @@ CFX.preserve={
     return (G.kept||[]).some(function(k){return (k.vals||[]).some(function(v){return v===1||v===5;});});
   },
   use:function(inst){
-    var found=null;
-    (G.kept||[]).some(function(k){return (k.vals||[]).some(function(v){if(v===1||v===5){found=v;return true;}return false;});});
+    /* CAPTURE THE MATERIAL, NOT JUST THE NUMBER. The old version stored a bare
+       value and the consumer rebuilt it as bone, so preserving an amber or jade
+       die quietly downgraded it - the player paid for a family trait and got a
+       plain die back. The kept entry it came from already carries `mat`. */
+    var found=null,foundMat=null;
+    (G.kept||[]).some(function(k){
+      return (k.vals||[]).some(function(v){
+        if(v===1||v===5){found=v;foundMat=k.mat||'bone';return true;}
+        return false;
+      });
+    });
     if(!found)return false;
-    G._famPreserve={val:found,pts:found===1?100:50,crack:(inst.tier===3?100:0)};
+    G._famPreserve={val:found,mat:foundMat,pts:found===1?100:50,crack:(inst.tier===3?100:0)};
     famLog('PRESERVED — A '+found+' WAITS IN AMBER FOR NEXT TURN');
     return true;
   }
@@ -23399,18 +23408,31 @@ function startPTurn(){
     G._oTarPit--;G.numDice=Math.min(G.numDice||6,5);
     famLog('TAR PIT — YOU ROLL '+G.numDice);
   }
-  if(G&&G._famPreserve){
-    var _fp=G._famPreserve;G._famPreserve=null;
-    G.kept=[{vals:[_fp.val],mat:'bone',pts:_fp.pts+(_fp.crack||0)}];
-    G.numDice=5;
-    famLog('THE AMBER CRACKS — A '+_fp.val+' ALREADY KEPT'+(_fp.crack?' (+'+_fp.crack+')':''));
-  }
   /* Ghost-timer guard: a scheduled callback from a fled/finished match must
      not start a player turn (it used to re-create S.pendingMatch after
      endMatch deleted it, resurrecting a RESUME for a match already lost). */
   if(!G||G._endMatchFired)return;
   if(typeof _checkDeadAir==='function')_checkDeadAir();
   G.phase='idle';G.turnPts=0;G.kept=[];G.numDice=G.matchDice?G.matchDice.length:6;G.pool=[];G.turnRollCount=0;G._encorePending=false;G._slowHandUsedThisTurn=false;G._warmHandsActive=false;G._lastHotDice=false;G._firstRollCommitted=0;G._bustSavedThisTurn=false;
+  /* PRESERVE PAYS OUT HERE, AFTER THE RESET, AND THE ORDER IS THE WHOLE FIX.
+     This block used to sit four lines UPSTREAM of the reset above, so it wrote
+     G.kept and G.numDice and then had both overwritten before the turn began -
+     Preserve spent its charge, announced "THE AMBER CRACKS", and delivered
+     nothing. Anything restored into a fresh turn has to land after the turn is
+     cleared, not before. If the reset ever moves, this moves with it. */
+  if(G&&G._famPreserve){
+    var _fp=G._famPreserve;G._famPreserve=null;
+    /* the die's own material, not bone - see CFX.preserve.use */
+    G.kept=[{vals:[_fp.val],mat:_fp.mat||'bone',pts:_fp.pts+(_fp.crack||0),
+             dice:[{val:_fp.val,mat:_fp.mat||'bone'}]}];
+    G.turnPts=G.kept[0].pts;
+    /* ONE FEWER THAN THE LOADOUT, not a hardcoded five. A player whose loadout
+       is already down a die to Break has five, and would have been handed five
+       back - paying nothing for the preserve. */
+    G.numDice=Math.max(1,(G.matchDice?G.matchDice.length:6)-1);
+    famLog('THE AMBER CRACKS — A '+_fp.val+' ALREADY KEPT'+(_fp.crack?' (+'+_fp.crack+')':''));
+    try{refreshKeptTray();updHUD();}catch(e){}
+  }
   /* per-turn icon state. Ward lasts one turn by definition. AMBER IS A
      ONE-SHOT NOW, not a turn-long immunity - doBust spends it on the single
      bust it eats, so this line only reaches a save that was never called on,
