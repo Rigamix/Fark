@@ -7,7 +7,35 @@ Written before a context compaction. Everything needed to pick up cleanly.
 
 ---
 
-## 1. THE NEXT TASK — Effect Phase 3 (lane markers BUILT; see EFFECT_LIFETIME.md)
+## 1. THE NEXT TASK — Phase 4: read the nine by hand
+
+**Start here, and read them one at a time.** `docs/PHASE4_MIGRATION.md` carries
+a retraction: the "group 1 is clean" result was wrong, `short_fuse` is half-on,
+and two automated passes in a row produced numbers that did not hold.
+
+**The nine cards with unexplained sites** (after `_npcFamCard` opponent-side and
+`_SEAL_POOL` name-collision sites were separated, both eye-verified):
+`fools_gold_f`, `slow_cook`, `retort`, `double_or_nothing`, `short_fuse`,
+`encore`, `ill_omen`, `sleight`, `pickpocket`.
+
+**Do NOT reach for a third classifier pass.** The instrument has been wrong in
+both directions on this exact question; the sites are few enough to read.
+`tools/cfx_bespoke.py` locates them, and that is all it should be trusted for.
+
+**Then the five-card build**, which is confirmed and unstarted: `bloom`,
+`cultivate` and `vanguard_f` all live in `famCommitBonus` and need a `commit`
+hook — which `short_fuse`'s x2 wants too, so resolving the retraction and
+designing that hook are the same job. `for_keeps` is a seat-launch wager with no
+match-scoped effect, and `tar_pit` has no implementation and is off `FAM_LIVE`;
+both need reading before they are assumed migratable.
+
+**And name the five tavern cards off-bus IN CODE, with the reason** — run-scoped,
+not match-scoped — so a later pass does not read "not migrated yet" and try to
+finish the job. Ruled 2026-08-03.
+
+---
+
+## 1a. DONE — Effect Phase 3 (lane markers BUILT; see EFFECT_LIFETIME.md)
 
 **BUILT (`P444`):** the lane-marker lifetime — `_lmArm` / `_lmDue` / `_lmSpend`
 / `_lmRetire`, with the window gate inside `_lmDue` so it cannot be skipped.
@@ -215,6 +243,41 @@ The true rule is narrower: **new art goes in `Art/Assets/`.** The three mistakes
 that produced the flat rule (font, coin, diamond) were about *art*, not the
 folder. `--font-px` is still the old pixel font and still the wrong reach —
 `FK_ART.font` is the right one.
+
+**SCRUTINISE CLEAN RESULTS HARDER THAN DIRTY ONES.** Six instrument artifacts
+in one day invented findings; the seventh HID one, and it was by far the most
+expensive. `cfx_bespoke` reported all 20 cards fully migrated. `short_fuse` was
+not — its x2 is hardcoded in `famCommitBonus` while it sits on `CFX`.
+
+**The two failure directions need opposite habits and only one of them prompts
+you.** A surprising finding gets checked because it is surprising. A clean
+result is precisely where checking stops — there is nothing on the page asking
+to be verified, and the work appears finished.
+
+**Worse: that zero had been NARROWED to, from 18, through four corrections.**
+Every one of those corrections was real, which made the process look rigorous
+and made the final answer the most trusted number of the whole phase. Visible
+refinement earns trust that the endpoint has not separately earned. Looking
+corrected is not being correct.
+
+**So: when a check comes back clean, go and find one instance by hand.** Not to
+confirm the answer — to confirm the instrument can still SEE. This one was
+caught only because building on the result ran into code that contradicted it,
+which is luck, and late.
+
+**A STANDING RULE IS WEAKEST EXACTLY WHERE IT MATTERS MOST.** Separately from
+the above, and not a footnote to it: a `str.replace` inside a bash heredoc
+silently no-op'd while the replacement next to it applied, and I read the
+resulting numbers before checking the edit had landed. There is a standing rule
+in this file about asserting on every replacement, written after this exact
+failure. It got skipped.
+
+The conditions are the point: late in a long session, mid-correction, moving
+fast to reach a clean answer after a retraction. That is when a rule is most
+needed and least likely to be honoured, because the pressure that makes it
+necessary is the same pressure that makes it feel skippable. It was caught by
+grepping for the inserted text — a five-second check that only happens if you
+do it every time, including the times it seems unnecessary.
 
 **A NAMING CONVENTION IS NOT A SHARED-STRUCTURE CLAIM.** The Ward withdrawal
 was not a measurement error inside a correct question - it was the wrong
