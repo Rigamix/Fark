@@ -26,7 +26,7 @@ var seed=(window.__FSIM_SEED!==undefined)?window.__FSIM_SEED:20260803;
    MATCHES - a single result moves the rate .38 points and no timing sign can
    be read off it. Raise this to the low thousands for anything quotable;
    docs/BREAK_ROWS_2026-08-03.md has the full caveat. */
-var N=(window.__FSIM_N!==undefined)?window.__FSIM_N:260;
+var N=(window.__FSIM_N!==undefined)?window.__FSIM_N:800;
 var TIER=(window.__FSIM_TIER!==undefined)?window.__FSIM_TIER:4;
 var FAMS=['obsidian','amber','starstone','silver','jade','vagabond'];
 var out={seed:seed,n:N,tier:TIER,rows:{},notes:[],
