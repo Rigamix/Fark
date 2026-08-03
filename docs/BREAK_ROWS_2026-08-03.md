@@ -74,10 +74,33 @@ it puts the absolute numbers in a range where noise dominates.
 **The bank deltas are the usable signal and are still thin.** −128 to +153 on
 means of 634–1,430, from 260 matches.
 
-## What a real pass needs
+## The blocker: this pass does not scale, and it fails as SILENCE
 
-- **N in the low thousands**, not 260. The tier sweep cost 37 seconds at N=220 ×
-  4 agents × 8 tiers; this is 6 families × 2 agents, so N=2,000 is affordable.
+I tried to fix the sample size and could not. Measured:
+
+| N | outcome |
+|---|---|
+| 260 | completes, ~13s |
+| 800 | **never produces a result** |
+| 2,000 | **never produces a result**, even at a 300s ceiling |
+
+**N=260 finishes in 13 seconds and 3× that finishes never.** That is not a
+linear timeout, so raising the wait does not fix it — I raised it from 60s to
+300s and N=2,000 still failed. Something else caps this pass and I have not
+diagnosed it.
+
+**The failure mode is the dangerous part: it exits 0 with no `setup:` line.**
+A capped run, a crashed run and a run with nothing to say are indistinguishable
+from the outside. That is the same shape as the rest of this session's bugs —
+a limit that expresses itself as absence.
+
+**So the sample size is the blocker, and it is not a matter of patience.**
+Diagnosing why the harness stops scaling is its own task and should come before
+anyone promises Break-row numbers.
+
+## What a real pass needs, once it can run
+
+- **N in the low thousands** — currently impossible, see above.
 - **A mid-table agent as well as Greg**, so the result is not read off the
   policy least able to win.
 - **Explicit last-turn isolation.** The Obsidian finding quoted a single-turn
