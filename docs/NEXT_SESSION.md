@@ -2,7 +2,7 @@
 
 Written before a context compaction. Everything needed to pick up cleanly.
 
-**Deployed HEAD: `03ca7d4` on branch `fark`. Backup tag: `pre-effect-system`
+**Deployed HEAD: `12cc902` on branch `fark`. Backup tag: `pre-effect-system`
 (`a0aed7d`) — the last commit before the plan work began.**
 
 ---
@@ -271,6 +271,18 @@ would have thrown. A cleanup that introduces a crash is worse than what it
 removed. *(Worth building: a probe that enumerates `showScreen` cases with no
 caller, and overlays with no visible entry point. Three found by hand is enough
 to justify automating the fourth.)*
+
+**ASSERT EXACT, NEVER A FLOOR** — unless you can say why a floor is right. `>=`
+is satisfied by less than it was meant to verify. `assert n >= 7` passed a run
+where a replacement had silently failed and left two sites half-converted;
+`assert n == 8` caught it. Same family as a probe passing having tested nothing.
+
+**CONTROL FLOW BEFORE POSITION.** In one pass over `doBust`, position misled
+three times at three granularities: nearest-preceding-`function NAME` is not
+lexical scope (26 sites misattributed), a three-line adjacency window
+undercounted clears that were deliberately two stages apart, and a search
+anchored from position zero hit the wrong function twice. Walk the branches
+first; check position against them, never the reverse.
 
 **Patches with backslashes go through a Write-tool `.py` file, never a bash
 heredoc.** Heredocs mangled a regex twice.
