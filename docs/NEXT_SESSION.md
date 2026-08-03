@@ -2,12 +2,32 @@
 
 Written before a context compaction. Everything needed to pick up cleanly.
 
-**Deployed HEAD: `12cc902` on branch `fark`. Backup tag: `pre-effect-system`
+**Deployed HEAD: `181610a` on branch `fark`. Backup tag: `pre-effect-system`
 (`a0aed7d`) — the last commit before the plan work began.**
 
 ---
 
-## 1. THE NEXT TASK — Effect Phase 3
+## 1. THE NEXT TASK — Effect Phase 3 (groundwork DONE, see EFFECT_LIFETIME.md)
+
+**The measurement is done and it corrected the plan.** `docs/EFFECT_LIFETIME.md`
++ `tools/effect_lifetime.py`. Three findings that change what Phase 3 builds:
+
+- **Trade is NOT a lane marker.** The plan groups it with Snare/Snuff/Fog; it is
+  an array of swap records with an undo, no `live`, no `turn`, no window, and it
+  snapshots across a save. A primitive built from the lane markers and applied
+  to it would impose a window on something designed not to have one.
+- **Snuff writes a window field it never reads.** All three lane markers arm
+  `{lane, live, turn}`; snare and fog gate on `turn===oppTurnCount`, snuff gates
+  on `live` alone. Not a demonstrable live bug — `oppTurnCount` increments
+  before the check, so the paths coincide today. Left unfixed ON PURPOSE: it is
+  a behaviour change on Kindred's two-turn hold and belongs with the primitive.
+- **Ward retires in two functions** (`doBust` ×2, `startPTurn`); every other
+  marker retires in one. That distributed definition is exactly what Phase 3 is
+  asked to name, so Ward is the worked example.
+
+---
+
+## 1a. Effect Phase 3 — the original framing
 
 **The whole queue cleared.** famLog, rules audit, props brief, Preserve,
 cap-endings, the sim re-run, the Break rows, and Effect Phase 2 in both halves.
