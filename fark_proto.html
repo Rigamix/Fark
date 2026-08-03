@@ -3846,7 +3846,16 @@ body:has(#mLoadout-ov.show) #dbgButtons{display:flex !important}
 }
 #end-ov>*{position:relative;z-index:1}
 #end-ov.show{display:flex}
-.res-title{font-family:var(--font-px);font-size:clamp(36px,11vw,60px);letter-spacing:8px}
+/* 'JMH Beda', not --font-px. --font-px is 'Alagard','Press Start 2P' - the
+   PREVIOUS game's pixel font - and this rule put it on the single word the
+   loss screen shows. Same mistake already fixed on the win board. */
+.res-title{font-family:'JMH Beda',serif;font-size:clamp(36px,11vw,60px);letter-spacing:8px}
+/* the cap line: small, under the title, same voice as the in-match status */
+.res-how{position:absolute;top:44%;left:50%;transform:translateX(-50%);
+  font-family:'JMH Beda',serif;font-size:clamp(13px,3.6vw,18px);letter-spacing:.08em;
+  color:#d8b878;text-shadow:0 2px 0 rgba(20,12,4,.8);white-space:nowrap;
+  opacity:0;transition:opacity .4s ease;z-index:4;pointer-events:none}
+.res-how.on{opacity:1}
 .res-title.win{color:var(--gold);text-shadow:3px 3px 0 #000,0 0 28px rgba(200,160,80,.55)}
 .res-title.lose{color:var(--red);text-shadow:3px 3px 0 #000,0 0 28px rgba(160,80,80,.45)}
 .res-scores{display:flex;gap:36px;align-items:center}
@@ -26326,6 +26335,10 @@ function _handBackOrCap(){
   var cap=G.turnCap||TURN_CAP_PATRON;
   if((G.pTurns||0)>=cap&&(G.oTurns||0)>=cap&&G.pPts<G.target&&G.oPts<G.target){
     if(G.pPts>G.oPts){
+      /* WHAT ENDED THE MATCH, recorded because nothing did. The result screen
+         cannot tell a target win from a clock win without it, and in the late
+         game the clock is the common one. */
+      G._endReason='cap';
       setStatusMsg('THE CAP — YOU HOLD THE HIGHER TALLY!','gold');
       setTimeout(function(){endMatch(true);},_oppDelay(900));
       return;
@@ -26434,6 +26447,7 @@ function endPTurn(){
   var _fCap=G.turnCap||TURN_CAP_PATRON;
   if(G._finalAnswerUsed&&(G.pTurns||0)>=_fCap&&(G.oTurns||0)>=_fCap
      &&G.pPts<G.target&&G.oPts<G.target&&G.pPts!==G.oPts){
+    G._endReason='cap';
     setStatusMsg('THE CAP — '+(G.pPts>G.oPts?'THE LAST WORD LANDS':'NOT ENOUGH')+'!','gold');
     setTimeout(function(){endMatch(G.pPts>G.oPts);},900);
     return;
@@ -28209,6 +28223,21 @@ function endMatch(win){
      same word twice - the title steps aside on a win and keeps its job on a
      loss, where there is no art to say it */
   resTitle.textContent=win?'':'DEFEAT';
+  /* A CAP ENDING NAMES ITSELF. Without this the most common late-game result
+     is indistinguishable from crossing the target, so the player never learns
+     that the clock is what they are racing. Wording reused from the in-match
+     line for the same event rather than invented here. */
+  (function(){
+    var _how=document.getElementById('resHow');
+    if(!_how){
+      _how=document.createElement('div');_how.id='resHow';_how.className='res-how';
+      (resTitle.parentElement||document.getElementById('end-ov')).appendChild(_how);
+    }
+    var _capped=!!(typeof G!=='undefined'&&G&&G._endReason==='cap');
+    _how.textContent=_capped?(win?'THE CAP — YOU HELD THE HIGHER TALLY'
+                                 :'THE CAP — NOT ENOUGH'):'';
+    _how.classList.toggle('on',_capped);
+  })();
   resTitle.style.animation='none';resTitle.style.opacity='0';
   /* Reset scores visibility and position for animation */
   var resScores=ov.querySelector('.res-scores');if(resScores){resScores.classList.remove('fade-in','lifted');resScores.style.opacity='0';}
