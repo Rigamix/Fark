@@ -7,11 +7,14 @@ is a valid answer.** Answered items are deleted, not marked — this stays short
 
 ---
 
-## 0. Do the five tavern cards belong on the match bus at all?
+## 0. Six run-scoped cards on a match-scoped bus — what should they be?
 
-Phase 4's next chunk is ten family cards that have no effect-table entry, so
-they need one written. **Five of the ten are the tavern cards** — `double_stakes`,
-`the_tab`, `hair_of_the_dog`, `marked_table`, `high_table`.
+**This is now six cards, not five.** The five tavern cards — `double_stakes`,
+`the_tab`, `hair_of_the_dog`, `marked_table`, `high_table` — plus **`for_keeps`**,
+which reading it showed has exactly the same shape: it is armed in the Room on
+`S.run._fkArmed`, burns at seat launch, and its payoff **moves a die between
+loadouts at match end**. It is armed outside a match and paid in the run's dice;
+the match is only when it is observed.
 
 The effect plan flags the problem and never resolves it: **they act on the RUN,
 not the match.** The bus they'd go onto is match-scoped — it fires on rolls,
@@ -19,6 +22,11 @@ banks and busts, and it is thrown away when the match ends.
 
 So writing them onto it means either giving them a lifetime the bus can't
 express, or quietly changing what they do to fit.
+
+**The other two of the ten are settled, no input needed:** `tar_pit` is
+**retired** — the code says so outright, its `_famTarPit`/`_oTarPit` consumers
+have no writer and are left for a dead-code sweep — and the remaining three
+(`bloom`, `cultivate`, `vanguard_f`) are **migrated**, on the new `commit` hook.
 
 **Three ways this can go:**
 
@@ -29,13 +37,15 @@ express, or quietly changing what they do to fit.
 - **Confirm they really are match-scoped** and I've read them wrong, in which
   case they go on the bus with everything else.
 
-*My rec: the middle one, with the five named in code as deliberately off the
+*My rec: the middle one, with the six named in code as deliberately off the
 bus.* Half a group is bad, but a run-scoped card faking a match lifetime is
 worse, and the seam isn't worth building for five cards until something else
 wants it.
 
-I need your read on what these five are supposed to do across a run before I
+I need your read on what these six are supposed to do across a run before I
 pick — this is a design question about the cards, not a code-shape question.
+**Nothing else is waiting on you**, and nothing needs approving: everything
+else in Phase 4 either resolved by reading or is built and verified.
 
 ---
 
