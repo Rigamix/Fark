@@ -9206,6 +9206,20 @@ var FK_ART={
      not exist, so all four 404'd and the labels fell onto the background. The
      bg and banner on the same screen were already on the current tree. */
   gameOver:     'Art/Assets/GameOver/optimized/',
+  /* ── ARCHIVED. Retired art, listed so it is findable, NOT so it is used ──
+     assets/_archive/Card_ART/ holds the previous game's 149 card-face files.
+     The 133-card roster they belong to is retired (see the block above
+     const CARDS) and _cardArtImg returns '' rather than pointing here - a
+     surface without final art gets a new-style placeholder, never a fallback
+     to an old file, and that rule does not stop applying because the old file
+     moved. This entry exists so P5 can FIND the reference art when it rebuilds
+     NPC cards. Nothing should load from it.
+     IT IS A REAL KEY, NOT JUST THIS COMMENT, so apv_asset_registry checks it
+     still resolves - an archive that has quietly been deleted or moved is
+     exactly the thing a comment cannot catch. Underscore-prefixed because the
+     name has to say "not for use" at every call site that might autocomplete
+     it. */
+  _archivedCardArt: 'assets/_archive/Card_ART/',
   /* ── directories, OLD tree — deliberate, measured, not stale ── */
   mockups:      'assets/_mockups/new_main/',  /* hearts + the game's font live here */
   enchIcons:    'assets/ench_icons/',
@@ -11571,8 +11585,15 @@ function generateDiceLoadout(tierIndex){
    MEASURED, 2026-08-03, so the next person does not re-derive it: zero
    definitions added, removed or edited here since the family engine landed
    (FAM_CARDS moved 12 times over the same span), and a fully played match
-   makes zero requests to assets/Card_ART and zero calls to _cardArtImg.
+   made zero requests to the old art folder and zero calls to _cardArtImg.
    tools/legacy_roster_probe.py and tools/legacy_pool_reach.py rerun both.
+
+   THE ART WENT WITH IT. All 149 files are archived at
+   assets/_archive/Card_ART/ - `git mv`, so history follows them and the move
+   reverses with one command. Code and art retired in the same pass on purpose:
+   they are two halves of one retirement, and leaving orphaned art pointing at
+   retired code means the Phase 5 registry work has to solve the same problem
+   twice, once for code paths and once for asset paths.
 
    DO NOT ADD TO THIS ARRAY. New cards are family cards. */
 const CARDS=[
@@ -21816,9 +21837,26 @@ document.addEventListener('click',function(e){
   if(!e.target.closest('.mcard,.shop-card,.lo-mini-card,.lo-hand-slot,.res-card,.lo-wager-slot,.cchip,.dice-expand-popup,.pouch-slot-wrap'))closeAllChips();
 });
 
-/* Card face art: assets/Card_ART/<id>.png drawn over the colour swatch; the onerror
-   fallback removes it so cards without an art file keep their emoji. */
-function _cardArtImg(id){return (id===undefined||id===null)?'':'<img class="gcard-art" src="assets/Card_ART/'+id+'.png?v=art1" onerror="this.remove()" style="display:block;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1;image-rendering:pixelated;pointer-events:none">';}
+/* THE OLD DECK'S FACE LOADER, NOW DRAWING NOTHING ON PURPOSE.
+   This built an <img> over the colour swatch from the previous game's 147 card
+   faces. Those files are archived (assets/_archive/Card_ART/, moved with
+   git mv so the history follows them and the move reverses cleanly) and the
+   133-card roster they belong to is retired - see the block above const CARDS.
+
+   IT RETURNS '' RATHER THAN POINTING AT THE ARCHIVE. Repointing would keep the
+   dead code rendering and re-link the game to old art, which is the one thing
+   the placeholder ruling forbids: where final art is not ready a surface gets a
+   new-style placeholder, never a fallback to the previous game's file. Every
+   call site already draws .gcard-cover - the family colour plus the card's icon
+   - underneath this, so returning nothing leaves a neutral face rather than a
+   hole. That is the placeholder.
+
+   AND IT IS NOT REACHED ANYWAY. A fully played match calls this zero times;
+   the five call sites that survive static reachability sit on surfaces the
+   family engine replaced. Kept as a stub rather than deleted for the same
+   reason the roster is kept: P5 rebuilds NPC cards and these are the call
+   sites it will need to find. */
+function _cardArtImg(id){return '';}
 function buildCBar(barId,cardIds,isOpp,label){
   const bar=document.getElementById(barId);bar.querySelectorAll('.mcard,.cchip').forEach(e=>e.remove());
   /* Also sweep any stale .card-trig-label elements — the per-label 3s

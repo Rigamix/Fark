@@ -65,20 +65,21 @@ return {
   checked: out.checked,
   leaked: out.leaked,
   artSrc: artSrc.slice(0, 90),
-  /* RECORDED, NOT ASSERTED. _cardArtImg still builds an assets/Card_ART/ src,
-     so this is true today. It is not in the verdict because it is not a
-     regression and a probe that ships permanently red teaches people to ignore
-     it - the same reason the five known 2px overflows came out of
-     apv_font_metrics' verdict. It belongs in the verdict the day the 147 art
-     files are archived, and not before.
-     Naming it "onOldTree" rather than "offOldTree" on purpose: a verdict key
-     whose TRUE value means the bad state passes the suite while describing a
-     problem, which is how a check ends up asserting the opposite of what it
-     reads like it asserts. */
-  artLoaderOnOldTree: oldTree,
   verdict: {
     playerStubHolds: Array.isArray(eff) && eff.length === 0,
     opponentStubHolds: Array.isArray(opp) && opp.length === 0,
-    nothingOldHeld: out.leaked.length === 0
+    nothingOldHeld: out.leaked.length === 0,
+    /* PROMOTED INTO THE VERDICT NOW THE ART IS ARCHIVED. This was recorded and
+       deliberately NOT asserted while _cardArtImg still built an
+       assets/Card_ART/ src, because a probe that ships permanently red teaches
+       people to ignore it - the same reason the five known 2px overflows came
+       out of apv_font_metrics' verdict. The 149 files have moved to
+       assets/_archive/Card_ART/ and the loader returns '', so the condition is
+       now true and failing it would mean a real regression.
+       Phrased "off" rather than "on" deliberately: a key whose TRUE value
+       describes the BAD state passes the suite while reading like a complaint,
+       which is how a check ends up asserting the opposite of what it looks
+       like it asserts. */
+    artLoaderOffOldTree: !oldTree
   }
 };

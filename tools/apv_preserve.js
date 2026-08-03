@@ -39,7 +39,14 @@ const sit = [...document.querySelectorAll('span,div,button')].filter(e => vis(e)
   && /^SIT\s*DOWN$/i.test((e.textContent || '').trim()))[0];
 if (sit) { tap(sit); if (sit.parentElement) tap(sit.parentElement); }
 const _atMatch = await until(() => vis(document.getElementById('screen-match')), 9000);
-const _idle    = await until(() => typeof G !== 'undefined' && G && G.phase === 'idle', 14000);
+/* 30s, RAISED FROM 14s BECAUSE THE SKIP GATE PROVED IT WAS NEEDED. On the first
+   full-suite run after the gate went in, this probe declined with
+   atMatch=true idle=false - it reached the match and the phase had not settled
+   in 14 seconds. Under the suite the page renders through SwiftShader with
+   other work in flight, and match init is slower than it is standalone.
+   The skip is the safety net, not the goal: a probe that habitually declines
+   has stopped checking anything, it just stopped lying about it. */
+const _idle    = await until(() => typeof G !== 'undefined' && G && G.phase === 'idle', 30000);
 
 /* THE PRECONDITION HAS TO HOLD, AND UNTIL() RETURNS FALSE RATHER THAN THROWING.
    Ignoring that return value made this probe flap: standalone it passes every
