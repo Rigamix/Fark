@@ -12510,6 +12510,18 @@ var _famQ=[],_famQTimer=null;
    see the note at slow_cook. That form omits ev.mine and therefore also fires
    when the RIVAL is the actor. Different question, deliberately left alone. */
 function _fxMine(ev){return !!(ev&&ev.mine&&ev.owner==='p');}
+/* THERE IS NO _fxFreeDice(), AND THAT IS THE FINDING, not an omission.
+   `!free.length` reads like one shared condition across five handlers. The sets
+   are four different things:
+     encore / stargazer / steady_hand   !committed && !_frozen
+     sacrifice                          !committed && !_shattered
+     transmute                          !committed
+     powder_keg                         the WHOLE pool, kept dice included -
+                                        which is the card's entire identity
+   _frozen is a within-turn hold; _shattered is a destroyed die. Folding these
+   together would let a card touch a die it must not, and would quietly take
+   Powder Keg's "blow up your whole roll, kept ones included" away from it.
+   (tamper's `live` is not dice at all - it is the opponent's unbroken CARDS.) */
 function famLog(msg,color){
   if(msg===undefined||msg===null||msg==='')return;
   _famQ.push({m:String(msg),c:color||'gold'});
@@ -13539,10 +13551,6 @@ CFX.sacrifice={
   }
 };
 /* RETIRED with the card - bust mitigation is the Ward ENCHANT's job now. */
-CFX._ward_retired={
-  canUse:function(){return false;},
-  use:function(inst){return false;}
-};
 CFX.stargazer={
   canUse:function(){return G&&G.phase==='choosing';},
   use:function(inst){
@@ -13597,14 +13605,6 @@ CFX.sleight={
   use:function(inst){
     G._famSleight=true;
     famLog('SLEIGHT READY — THEIR NEXT ROLL COMES BACK');
-    return true;
-  }
-};
-CFX.tar_pit={
-  canUse:function(){return G&&G.phase!=='opp'&&!G._famTarPit;},
-  use:function(inst){
-    G._famTarPit={turns:(inst.tier===2?2:1),dice:(inst.tier===3?2:1)};
-    famLog('TAR PIT LAID — THEY ROLL SHORT NEXT TURN');
     return true;
   }
 };
