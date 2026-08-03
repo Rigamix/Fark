@@ -2,7 +2,77 @@
 
 `tools/cfx_coverage.js` (live) and `tools/cfx_bespoke.py` (static) rerun this.
 
-## CORRECTION (same day): group 1 is NOT clean
+## RESOLVED — the nine read by hand, and the answer is neither earlier one
+
+**No card on the bus is duplicated.** Not one has the same behaviour in two
+places. My "clean" claim was wrong and so was the retraction's framing of
+`short_fuse` as drift.
+
+**What is actually true: three cards have halves that live off the bus because
+the bus has no hook for the moment they fire.**
+
+| card | on the bus | off the bus | the missing moment |
+|---|---|---|---|
+| `short_fuse` | `turnStart`, `bust` | its x2, in `famCommitBonus` | **commit** — between roll and bank |
+| `fools_gold_f` | `bust` (the double-fail burn) | the reroll, in `famFoolsGold` | **dead roll**, before the bust resolves |
+| `ill_omen` | `canUse`, `use` (declaring it) | resolution, on the rival's turn | **rival turn** |
+
+Each is one card doing two things at two times, with the bus reaching only one
+of them. `fools_gold_f` is the clearest: *"Rolled nothing? Reroll everything.
+But if the second roll fails too, the bust burns your turn AND the same amount
+from your banked points."* Two moments, by design. `CFX.fools_gold_f.bust`
+handles the burn; `famFoolsGold`, called from the no-scoring branch, handles the
+reroll. Complementary, not duplicated.
+
+### BUILT: the `commit` hook (P445)
+
+First of the three seams. `famFire` gained `ev.mul()` beside `ev.add()`, and
+`famCommitBonus` now fires `commit` and applies `pts*mul + add`. Four cards
+moved onto it: `short_fuse`'s x2 plus `bloom`, `cultivate` and `vanguard_f` —
+so **the retraction and three of the five group-2 cards closed in one patch.**
+
+**Verified by fixture, 96 cases** — every subset of the four cards x three roll
+shapes x two roll counts. Digest `300798530` before and after, zero differing
+cases.
+
+**And one claim I made about it was wrong.** The patch notes said the migration
+*removes* an order dependence latent in the hand-written version. It does not.
+Testing both orders against the pre-patch file — `[short_fuse,bloom]` and
+`[bloom,short_fuse]`, 2300 either way — showed the old function called each card
+in a **fixed written order**, held in the function body rather than the loadout,
+so it was already order-independent.
+
+The accurate claim is narrower and still justifies `ev.mul`: the dependence
+would have been **introduced** by migrating onto an add-only bus, since
+`famFire` iterates `G.pF` in equip order. It prevents a regression; it does not
+fix a bug. Overstating it would have been the Ward mistake again — naming a
+defect in code that was already correct.
+
+**Still missing: the `deadRoll` and `rivalTurn` seams** for `fools_gold_f` and
+`ill_omen`.
+
+**So Phase 4's blocker is not migration, it is missing seams.** Three moments
+the seven hooks do not expose. And `bloom`, `cultivate` and `vanguard_f` — three
+of the five cards waiting to be migrated — all live in `famCommitBonus` too, so
+**`commit` alone unblocks four cards.**
+
+### The other six resolved as already-known categories
+
+- **`pickpocket`** — 4 sites are `_ruleActive('pickpocket',…)` and `G._tell.id`:
+  the sealed-seat **table rule**, unrelated to the vagabond card. 1 is
+  opponent-side.
+- **`slow_cook`, `retort`, `double_or_nothing`, `encore`** — continuation lines
+  of the `_npcFamCard` opponent blocks. The filter caught the first line of each
+  block and not the lines below using `c`.
+- **`sleight`** — UI targeting in `famRenderRow`/`famOppTap`, reading `G._oSleight`.
+- **`ill_omen`'s other 4** — two UI targeting, two opponent-side.
+
+**Reading nine sites by hand took less time than the two classifier passes that
+got it wrong**, and produced a category neither of them had: *"off-bus for want
+of a hook"* is not a value `CODE`/`string`/`opponent` could ever have returned.
+A classifier can only sort into the buckets you thought of first.
+
+## Superseded: CORRECTION (same day): group 1 is NOT clean
 
 **The section below was published saying all 20 on-bus cards are clean. That is
 wrong and it is retracted.** At least one card is genuinely half-on:
