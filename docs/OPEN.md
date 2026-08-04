@@ -207,6 +207,25 @@ different things — that difference *is* the question.
 
 ---
 
+## 5a. `bust_immune_turns` is off by one between the player and the boss
+
+Player: `G.turnNum <= (eff.turns||2)`. Boss: `G.npcCardState.oppTurnCount < eff.turns`.
+
+**`<=` against `<`.** With `turns:2` the player is immune on turns 1 **and 2**;
+the boss only on turn 1. Same card, same stated duration, one extra turn of
+protection for whoever holds it on the player's side. There is also a `||2`
+default on the player's side and none on the boss's.
+
+**Which is right?** If `turns` means "how many turns of immunity", the player's
+`<=` is correct and the boss is short-changed. If it means "immune before turn
+N", the boss's `<` is correct and the player gets a free turn.
+
+Small, but it is two copies of one card disagreeing, which is exactly the class
+that produced the `challenge` double-charge. **Not shipped** — it needs the
+intent, not a merge. Detail in `BUST_MIRRORS.md`.
+
+---
+
 ## 5b. STOP TUNING DIFFICULTY AGAINST THE SIM — it cannot see half the patron
 
 Not "wait for more data". **This tool cannot currently answer this question.**
