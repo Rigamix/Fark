@@ -207,6 +207,34 @@ different things — that difference *is* the question.
 
 ---
 
+## 5b. STOP TUNING DIFFICULTY AGAINST THE SIM — it cannot see half the patron
+
+Not "wait for more data". **This tool cannot currently answer this question.**
+
+| path | how the sim runs it | patron card effects |
+|---|---|---|
+| player banks | **the real `handleBank`** | **all 10 branches fire** |
+| patron banks | `F.oppTurn`, a reimplementation | **0 of 9 fire** |
+
+`F.oppTurn` deals `oCards` and passes them to `scoreRoll`, but has no
+`getNpcCard`, no `mechanic` dispatch, no `effect` reads. Its own comment says it
+reproduces the **loop** — and that is all it does.
+
+**So the sim models a patron whose cards punish the player but structurally
+cannot benefit itself.** `flat_bonus`, `double_first_bank`, `gain_when_ahead`,
+`steal_pct` on the patron's own bank: none of them happen. That is not a
+difficulty model with error bars, it is a different game measured under the same
+name — and every tier number this instrument has produced was generated against
+that gap, including tonight's own five-seed rerun. **The rerun did not merely
+fail to resolve the delta; it was never able to.**
+
+**What it needs:** `F.oppTurn` applying real card effects — the same `oCards`
+loop `finOpp` runs. Until then the narrowing-plateau finding stands (it does not
+depend on the missing branches) and nothing else from this sim should move a
+difficulty number.
+
+---
+
 ## 6. Boss difficulty moved TWICE tonight — is the aggression pass still measured?
 
 Two separate changes landed on the same axis in one session, and only one was
