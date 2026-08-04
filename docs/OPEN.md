@@ -48,53 +48,6 @@ not exist on the opponent's side at all.
 
 ---
 
----
-
-## 1. The rules screen — two calls, and the premise was wrong
-
-The backlog said the rules screen teaches six things the code doesn't do.
-Measured, it's the opposite of that.
-
-**The sheet a player can actually reach is correct.** The book icon on the home
-screen opens a scoring sheet making 14 claims. I checked all 14 by *running the
-scorer* against the hands they describe — 14 of 14 match, including every
-doubling step.
-
-**The six wrong claims are in a screen nobody can open.** A four-tab overlay
-(Play / Scoring / Dice / Gauntlet) whose only entry point is a RULES button the
-home screen renders over — measured not visible. Same shape as the boss reward
-screen. So **nothing player-facing is wrong.**
-
-**1a. What happens to the dead overlay?** Eight tabs of authored copy, at least
-six claims now false, one `onclick` away from being live. I've marked it in the
-code with each false claim named so nobody revives it blind.
-*My rec: delete it.* The master brief already rules against reviving it — *"the
-pause menu is the ONLY rules-reference surface … there is no innkeep's book
-screen; do not rebuild one."* But it's authored content, so deleting is yours.
-
-**1b. The real gap: the sheet teaches scoring and nothing else.** The brief asks
-for a *"scoring & your dice"* sheet. The dice half doesn't exist — nothing
-teaches materials, enchants, lanes, or why loadout order matters.
-
-Draft below, **not shipped** — this is the entire teaching layer, so it wants
-your voice, not mine.
-
-> **Your dice**
-> Six dice, yours to change. Materials lean the odds — silver rolls 1s and 5s
-> more often, jade turns wild, obsidian shatters for points.
->
-> **Marks** A branded face banks nothing and does something instead. Keep it and
-> the mark fires: coin pays gold, shield softens a bust, skull breaks a die.
->
-> **Order matters** Dice sit in fixed places at the table. Some cards read the
-> ends of the row, and some marks reach across to the seat opposite.
-
-Three sections because three is what fits without scrolling. Say the word and
-I'll ship yours instead.
-
----
-
-
 ## 1d. The sim re-run — deltas are in, and they are large
 
 `docs/SIM_RERUN_2026-08-03.md`. Not acted on, per your ruling. The three that
