@@ -44,33 +44,51 @@ variables (`_sbN`, `_dgI`, `_ofx`) as outside dependencies, because JS `var`
 hoisting puts them in the function scope and the check could not tell them from
 real ones. Subtracting the body's own declarations is the corrected measure.
 
-## What the corrected column actually shows: three dispatcher shapes
+## The "owner signature" was my instrument's artifact — retracted
 
-| shape | signature | mechanics |
+I reported that `npc` was the only local eight of the branches needed, called it
+the same owner parameter the 16 mirrors need, and said two independent
+investigations had converged on it. **That was wrong, and it was the headline.**
+
+`npc` is not "which side". Every one of its fifteen binding sites is
+`var npc=getNpcCard(cid)` — **the card object**, the loop binder over the boss's
+card ids, exactly what `effect` is. My portability tool did not have `npc` or
+`cid` in its given-set, so it counted **each row's own subject as an outside
+dependency**. Eight unrelated branches then looked like they shared a parameter.
+
+With `npc`/`cid` where they belong: **5 portable as-is** — `hidden_cards`,
+`reduce_first_roll`, `reroll_all_kept`, `steal_die`, `swap_die`.
+
+## What convergence is actually left, stated at its real strength
+
+| cluster | shared locals | mechanics |
 |---|---|---|
-| **owner** | `(effect, npc)` + optional flag | `reroll_all_kept`, `steal_die`, `swap_die`, `block_activations`, `limit_activations`, `reroll_scoring`, `swap_best_to_3`, `halve_big_bank` |
-| **scoring** | `(effect, eVals, i, wildLevel)` | `wild_triple`, `wild_quad`, `wild_straight`, `triple_bonus` |
-| **one-offs** | private | `immune_modifiers`, `reckless`, `shatter_bonus`, `starstone_bonus` |
+| `scoreRoll` | `eVals`, `i`, `wildLevel` | `wild_triple`, `wild_quad`, `wild_straight` |
+| `_afterRollImpl` | `free` | `reroll_scoring`, `swap_best_to_3` |
+| `canActivateCard` | `blocked` | `block_activations`, `limit_activations` |
+| one-offs | private | `halve_big_bank`, `immune_modifiers`, `reckless`, `starstone_bonus`, `shatter_bonus`, `triple_bonus` |
 
-**`npc` — which side — is the only local eight of them need.** That is the same
-owner parameter the 14 mirrors need, arriving from a second, independent
-direction. The three `wild_*` mechanics need an *identical* trio, which is a
-signature rather than a coincidence.
+**Each cluster is branches sharing their own enclosing function's locals** —
+which is what you would expect by default, not evidence of a cross-cutting
+concept. The `wild_*` trio is three variants of one scoring rule sitting
+together. Real, but unremarkable. **There is no owner parameter.**
 
 ## So the honest answer to "can one table replace the branches"
 
-**Not one. About three — and that is still the right move.** `BREAK_TRIGGERS`
-gets one table and two dispatch sites; this gets three, against fourteen
-functions today. What it buys is the same thing: no branch reads a mechanic
-name, and each player/opponent pair stops being two copies free to drift.
+**Five rows move cleanly. The rest are per-function clusters that each want a
+small local dispatcher, not one shared table.** That is a smaller and duller
+result than the three-shape version I reported, and it is what the evidence
+supports once the tool stops counting subjects as dependencies.
+
+The 16 player/opponent mirrors are still a real and separate finding —
+unaffected by this, since it rests on which functions a mechanic appears in, not
+on what its body reads.
 
 ## Order
 
-1. **The owner-shaped group**, because `npc` is already the parameter the
-   mirrors need — the two halves of this refactor share a signature.
-2. **The scoring group**, self-contained inside `scoreRoll`.
-3. **The one-offs last**, or never — four branches in four functions is not
-   obviously worth a row each.
+1. **The 5 portable rows**, which are genuinely just data.
+2. **The `scoreRoll` cluster**, self-contained and the largest real one.
+3. **The mirrors**, on their own evidence, separately from any of this.
 
 **Not started.** This is the scoping pass.
 

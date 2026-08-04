@@ -61,7 +61,15 @@ def enclosing(pos):
     return best
 
 # what a dispatcher would hand a row anyway - not a threading cost
-GIVEN = {'effect', 'e', 'eff', 'r', 'rel', 'mat', 'm', 'd', 'def', 'card', 'c'}
+# WHAT A DISPATCHER HANDS THE ROW ANYWAY - not a threading cost.
+# `npc` AND `cid` BELONG HERE AND I ORIGINALLY LEFT THEM OUT, which produced the
+# whole "owner signature" finding and it was wrong. Every binding site is
+# `var npc=getNpcCard(cid)` - npc is the CARD OBJECT, the loop binder over the
+# boss's card ids, exactly what `effect` is. It is not "which side". Counting a
+# row's own subject as an outside dependency is what made eight unrelated
+# branches look like they shared a parameter.
+GIVEN = {'effect', 'e', 'eff', 'r', 'rel', 'mat', 'm', 'd', 'def', 'card', 'c',
+         'npc', 'cid'}
 KEYWORDS = set('''var let const function return if else for while do break continue
 new typeof instanceof this true false null undefined in of try catch throw
 switch case default delete void yield await async class extends super'''.split())
