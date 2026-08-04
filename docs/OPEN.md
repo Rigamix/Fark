@@ -168,31 +168,6 @@ pass covering both seams.
 
 ---
 
-## 6. Does `ill_omen` read "busted", or "scored nothing"?
-
-They are not the same set, and **the two sides of the card already disagree**.
-
-The player's copy (`CFX.ill_omen`) branches on `ev.pts <= 0` — *scored nothing*.
-The boss's copy pays from `_bustTolls` — *busted*. P462's measurement is what
-separates them: seven paths reach `endPTurn` with the score cleared, and two of
-them are `steal_low_bank` / `block_low_bank`, where the player **banked nothing
-but did not bust**.
-
-So on a blocked or stolen bank, the player's omen lands and the boss's does not.
-
-**Migrating the boss onto the seam forces the choice** — reusing `pts<=0` would
-silently change the boss's card. Either answer is buildable:
-
-- **"Busted"** — needs a bust marker the seam does not carry yet.
-- **"Scored nothing"** — no new machinery, and arguably the better card, since
-  a bank blocked to zero is still a turn that produced nothing. But it is a
-  design change to the boss's behaviour, not a refactor.
-
-Baseline and invariants written up in `ILL_OMEN_MIGRATION.md`. **Nothing is
-blocked on this except the migration itself** — the seam is live and verified.
-
----
-
 ## Everything else you answered is now work, not a question
 
 Tracked in `NEXT_SESSION.md` and being built. Nothing there needs you.
