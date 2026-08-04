@@ -17223,6 +17223,14 @@ if(/hsdebug/.test(location.search))try{localStorage.setItem('fk_dbg','1');}catch
 })();
 /* ═══════════════ end family engine ═══════════════ */
 
+/* WILD_LEVEL - the first row of the mechanic table, and the smallest honest
+   one. mechanic -> how many of a kind the wild can stand in for. Three
+   if-arms that differed only by this number; nothing else about them varied,
+   which is what makes it data rather than a refactor of behaviour.
+   A mechanic absent from this table reads undefined, which is falsy, so the
+   chain falls through exactly as an unmatched else-if did. */
+var WILD_LEVEL={wild_triple:1,wild_quad:2,wild_straight:3};
+
 function scoreRoll(vals,cards,locked,context,dieMats,dieEnchs){
   cards=cards||[];locked=locked||0;context=context||{};dieMats=dieMats||null;
   /* Multi-pass scoring flag — when set, ladder/ascending blocks run AFTER
@@ -17289,9 +17297,11 @@ function scoreRoll(vals,cards,locked,context,dieMats,dieEnchs){
        6 had been replaced. scoreSelection now runs both ways and keeps the
        better, so the wild is an OPTION rather than a replacement. */
     if(context&&context._noWild){/* natural face: leave eVals[i] alone */}
-    else if(eff.mechanic==='wild_triple'){eVals[i]=-1;wildLevel[i]=1;}
-    else if(eff.mechanic==='wild_quad'){eVals[i]=-1;wildLevel[i]=2;}
-    else if(eff.mechanic==='wild_straight'){eVals[i]=-1;wildLevel[i]=3;}
+    /* P464: three arms that differed only by a number, now one lookup.
+       STILL AFTER the _noWild arm above - that arm deliberately does nothing so
+       a natural face is left alone, and moving this ahead of it would wild a
+       die that asked not to be. */
+    else if(WILD_LEVEL[eff.mechanic]){eVals[i]=-1;wildLevel[i]=WILD_LEVEL[eff.mechanic];}
   }
 
   const cnt=f=>{let c=0;for(let i=0;i<n;i++)if(!used[i]&&eVals[i]===f)c++;return c};
