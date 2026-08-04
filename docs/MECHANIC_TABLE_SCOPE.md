@@ -84,13 +84,51 @@ The 16 player/opponent mirrors are still a real and separate finding —
 unaffected by this, since it rests on which functions a mechanic appears in, not
 on what its body reads.
 
-## Order
+## Fourth correction: three of the five "clean rows" are lookups, not dispatch
 
-1. **The 5 portable rows**, which are genuinely just data.
-2. **The `scoreRoll` cluster**, self-contained and the largest real one.
-3. **The mirrors**, on their own evidence, separately from any of this.
+`hidden_cards` is `G.oCards.some(cid => ...mechanic==='hidden_cards')`.
+`reduce_first_roll` is a `.find()`. **They are queries, not dispatch** — "does
+the opponent hold a card with this mechanic". The body inside the callback is
+just a comparison, so they score as *maximally* portable while being the least
+tabulatable sites in the file: **a table row needs a behaviour to carry, and a
+predicate has none.**
 
-**Not started.** This is the scoping pass.
+Same category as the other three corrections — the tool measured one property
+(what locals a body reads) and I reported it as another (can this be a row).
+
+Whole file: **45 dispatch, 6 query.** Of my five, **three** are real rows:
+`reroll_all_kept`, `steal_die`, `swap_die`. The queries want a one-line
+`_oppHas(mech)` helper, which is worth doing and is *not* this refactor.
+
+## Where a table actually pays — the question that should have come first
+
+| function | dispatch branches |
+|---|---|
+| **`handleBank`** | **10** |
+| **`finOpp`** | **9** |
+| **`scoreRoll`** | **6** |
+| `startPTurn`, `_afterRollImpl`, `doBust`, `step` | 3 each |
+| `_tryBustSave`, `_oppBustOut`, `canActivateCard` | 2 each |
+| `_starstonePay`, `initMatchScreen` | 1 each |
+
+**25 of 45 branches sit in three functions.** And `handleBank` + `finOpp` are
+**the same nine mechanics twice** — the player/opponent mirror pair, the one
+finding that survived every retraction in this document.
+
+That is where one keyed table removes something real: **19 branches, two
+dispatch sites, and the two sides can no longer drift.**
+
+My three "clean rows" live in 3-branch functions — the low-value end. Easiest to
+move is not the same as most removed by moving, and I had ordered by the former.
+
+## Order, corrected
+
+1. **`scoreRoll` (6)** — one function, no mirror, self-contained. The safest
+   place to prove the table shape before betting the mirror pair on it.
+2. **`handleBank` + `finOpp` (19)** — the real prize, with the shape established.
+3. **The 3-branch functions**, or never — three branches is not obviously worth
+   a table.
+4. **`_oppHas(mech)`** for the 6 queries, separately.
 
 ---
 
