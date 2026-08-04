@@ -3,7 +3,37 @@
 The only file you need to read. Everything has my recommendation, so **"yours"
 is a valid answer.** Answered items are deleted, not marked — this stays short.
 
-**Nothing is blocking.**
+**One decision: §0.**
+
+---
+
+## 0. The boss holds family cards that do nothing — what should they do?
+
+`_famInitOpp` already deals a boss **1–3 family cards** from its family. They
+are shown to the player. **Not one of them has any effect.**
+
+Every passive hook is gated player-only (`_fxMine`) — 15 of 15. Details and
+the full list in `docs/P5_NPC_CARDS.md`.
+
+**Why this needs you rather than a sweep:** each card needs a decision about
+what the opponent's version *means*, and two of them have traps.
+
+- **Four cards already have a SECOND opponent implementation** in the
+  `_npcFamCard` block — `slow_cook`, `retort`, `double_or_nothing`,
+  `pickpocket`. Migrating those onto the bus without removing them there makes
+  the boss fire them **twice**.
+- **`ill_omen`** is declared on your turn and pays on the rival's. Opponent-held,
+  "the rival" is *you*. Which side it fires on is a rule, not an implementation.
+- **`fools_gold_f`** cancels a bust by claiming a dead roll. A boss doing that
+  changes NPC turn pacing, which the sim is tuned against.
+
+*My rec: do the symmetric ones first — `pickpocket`, `reprisal`, `retort`,
+`short_fuse`, `slow_cook`, `vanguard_f`, `bloom`, `cultivate` — each removed
+from `_npcFamCard` in the same patch where it goes owner-aware. Leave
+`ill_omen`, `fools_gold_f` and `double_or_nothing` until the pacing question is
+answered.* But which cards a boss should meaningfully hold is yours.
+
+---
 
 ---
 
