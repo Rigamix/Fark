@@ -127,8 +127,10 @@ working — and that earned trust the final answer had not separately earned.
 
 - `short_fuse` is genuinely half-on. Real.
 - `_npcFamCard(...)` sites are the **opponent-side** implementation, separate by
-  design — `PROTO_NOTES` has NPC usage landing in P5 with `G.oF` empty until
-  then. Not drift.
+  design — the claim "NPC usage lands in P5 (G.oF stays [])" is a comment in
+  `fark_proto.html` at the FAM_CARDS engine, **not** in `PROTO_NOTES` as this
+  line originally said, and it is stale either way: `_famInitOpp` populates
+  `G.oF`. Not drift.
 - `pickpocket` in `_SEAL_POOL` is a **name collision**: the sealed-seat table
   rule and the vagabond card share a string and are unrelated. The same trap as
   Ward's shared prefix, one level down.

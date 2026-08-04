@@ -16,8 +16,10 @@ Phase 4 is done: the nine read by hand, three seams built (`commit`,
 including three findings that were argued DOWN by reading the actual lines.
 
 **Phase 5 — Observers** is next in `EFFECT_SYSTEM_PLAN.md`, and it is also
-where NPC family cards land (`G.oF` is deliberately empty until then; `tamper`
-and the boss card pools are both waiting on it).
+where NPC family cards land. **Not** because `G.oF` is empty — an older comment
+said so and it is wrong; `_famInitOpp` already deals a boss 1–3 cards. The gap
+is that the opponent's turn raises only three of eight CFX seams, so most of
+those cards have no moment to fire at. `docs/P5_NPC_CARDS.md`.
 
 **Before starting it, read `docs/PHASE4_MIGRATION.md`'s instrument notes.**
 Phase 4 spent more time correcting its own tools than writing game code, and
@@ -92,7 +94,7 @@ turn — the exact wager its own comment says it must not have.
 
 ---
 
-## 1a. Effect Phase 3 — the original framing
+## 1y. SUPERSEDED — Effect Phase 3, the original framing
 
 **The whole queue cleared.** famLog, rules audit, props brief, Preserve,
 cap-endings, the sim re-run, the Break rows, and Effect Phase 2 in both halves.
