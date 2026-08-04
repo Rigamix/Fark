@@ -26155,6 +26155,22 @@ function _applyCommitBonuses(selDice,pts,cards){
    differ per seat on purpose and stay at the call sites.
    The defaults live HERE so both seats inherit them: the player had
    (eff.amount||500) for gain_when_ahead and the rival had none. */
+/* BANK_TAKE / SCORE_DRAIN - the second shape. These do not fit BANK_FX because
+   they are not amount-in/amount-out: one computes how much MOVES between pools,
+   the other rewrites a score pool and never touches the bank.
+   Only the two mechanics with a real shared formula are here. steal_low_bank and
+   block_low_bank take all of it or none of it - a row returning `a` or `0` is
+   ceremony - and the player expresses zeroing by aborting the whole bank while
+   the rival zeroes a running local, which is not the same expression. */
+var BANK_TAKE={
+  steal_pct: function(a,e){return Math.ceil(a*(e.pct||0));}
+};
+var SCORE_DRAIN={
+  /* the Math.max(0,...) clamp is the point: lose it on one side only and just
+     that side's score can go negative. */
+  periodic_drain: function(pool,e){return Math.max(0,pool-(e.amount||0));}
+};
+
 var BANK_FX={
   flat_bonus:        function(a,e){return a+(e.amount||0);},
   double_first_bank: function(a,e){return a*2;},
@@ -26606,7 +26622,7 @@ function handleBank(){
     var eff=npc.effect;
     /* Percentage steal (the_skim, the_quiet_decree, the_oath_npc) */
     if(eff.type==='on_player_bank'&&eff.mechanic==='steal_pct'){
-      var steal=Math.ceil(total*eff.pct);total-=steal;G.oPts+=steal;
+      var steal=BANK_TAKE.steal_pct(total,eff);total-=steal;G.oPts+=steal;
       bonusMsg+=' -'+steal+' '+npc.name;
       triggerCard(cid,npc.name+' −'+steal,false);
       (function(_cid){setTimeout(function(){if(window.DLG)DLG.triggerCard(_cid,false);},800);})(cid);
@@ -26674,7 +26690,7 @@ function handleBank(){
   G.oCards.forEach(function(cid){
     var npc=getNpcCard(cid);if(!npc)return;
     if(npc.effect.mechanic==='periodic_drain'&&G.npcCardState.playerTurnCount>0&&G.npcCardState.playerTurnCount%npc.effect.interval===0){
-      G.pPts=Math.max(0,G.pPts-npc.effect.amount);
+      G.pPts=SCORE_DRAIN.periodic_drain(G.pPts,npc.effect);
       bonusMsg+=' -'+npc.effect.amount+' '+npc.name;
       triggerCard(cid,npc.name+' −'+npc.effect.amount,false);
       setTimeout(function(){if(window.DLG)DLG.triggerCard(cid,false);},600);
@@ -28367,7 +28383,7 @@ function runOppTurn(){
         var npc=getNpcCard(cid);if(!npc)return;var eff=npc.effect;
         /* Percentage steal from opp's bank */
         if(eff.type==='on_player_bank'&&eff.mechanic==='steal_pct'&&pts>0){
-          var steal=Math.ceil(pts*eff.pct);pts-=steal;G.pPts+=steal;
+          var steal=BANK_TAKE.steal_pct(pts,eff);pts-=steal;G.pPts+=steal;
           triggerCard(cid,npc.name+' +'+steal,true);
         }
         /* Steal opp's low bank entirely (the_lords_seal) */
@@ -28386,7 +28402,16 @@ function runOppTurn(){
           G.npcCardState.playerOnce[cid]=true;
           if(pts<eff.threshold){
             var penalty=Math.min(eff.penalty,G.oPts+pts);
-            pts=Math.max(0,pts-penalty);G.oPts=Math.max(0,G.oPts-Math.max(0,penalty-(eff.penalty-penalty)));
+            /* THE BANK PAYS FIRST, THEN THE POOL, AND THE TOTAL IS EXACTLY `penalty`.
+               What was here computed the pool's share as penalty-(eff.penalty-penalty),
+               i.e. 2*penalty-eff.penalty, which collapses to the FULL penalty
+               whenever they could afford it - so the pool paid it again after
+               the bank already had. pool 1000 / bank 600 / penalty 500 cost
+               them 1000. The player's mirror loses exactly 500, and this
+               branch's own message says LOST 500 while taking twice that. */
+            var _chFromBank=Math.min(pts,penalty);
+            pts=Math.max(0,pts-_chFromBank);
+            G.oPts=Math.max(0,G.oPts-(penalty-_chFromBank));
             triggerCard(cid,npc.name+' −'+eff.penalty,true);
             setStatusMsg(npc.name+' — '+G.rung.name+' LOST '+eff.penalty+'!','gold');
           }else{triggerCard(cid,npc.name+' MET',true);}
@@ -28678,7 +28703,7 @@ function runOppTurn(){
     G.pCards.forEach(function(cid){
       var npc=getNpcCard(cid);if(!npc)return;
       if(npc.effect.mechanic==='periodic_drain'&&G.npcCardState.oppTurnCount>0&&G.npcCardState.oppTurnCount%npc.effect.interval===0){
-        G.oPts=Math.max(0,G.oPts-npc.effect.amount);
+        G.oPts=SCORE_DRAIN.periodic_drain(G.oPts,npc.effect);
         triggerCard(cid,npc.name+' −'+npc.effect.amount,true);
       }
     });
