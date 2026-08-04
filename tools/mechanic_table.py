@@ -57,7 +57,11 @@ def enclosing(pos):
     return best
 
 hits = collections.defaultdict(list)
-for m in re.finditer(r"mechanic\s*===\s*'([a-z_]+)'", s):
+# DIGITS BELONG IN THE CLASS. Without them this read 46 branches / 31 mechanics
+# and silently dropped single1_bonus, single5_bonus and swap_best_to_3 - a
+# character class narrower than the names it was matching, which is a false
+# NEGATIVE, the kind that ends an investigation instead of prompting one.
+for m in re.finditer(r"mechanic\s*===\s*'([a-z_0-9]+)'", s):
     mech = m.group(1)
     fn = enclosing(m.start()) or '(top)'
     ls = s.rfind('\n', 0, m.start()) + 1
@@ -73,7 +77,12 @@ for mech in sorted(hits, key=lambda k: -len(hits[k])):
     (one_place if len(fns) == 1 else several).append(mech)
 
 print('\n' + '=' * 76)
-print('MECHANICS IN ONE FUNCTION ONLY (%d) - straight table rows:' % len(one_place))
+# NOT "straight table rows" - that was this file's original claim and it was
+# wrong. One function is where a mechanic APPEARS; it says nothing about whether
+# the branch BODY can leave that function, which is what decides if a row is
+# possible. mechanic_portable.py measures that and finds 2 of 18 portable as-is.
+print('MECHANICS IN ONE FUNCTION ONLY (%d) - see mechanic_portable.py for' % len(one_place))
+print('whether their bodies can actually move:')
 print('   ' + ', '.join(one_place))
 print('\nMECHANICS SPANNING SEVERAL FUNCTIONS (%d) - each needs reading before' % len(several))
 print('it becomes one row, because the same name in two places may be two')
