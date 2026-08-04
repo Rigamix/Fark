@@ -9665,6 +9665,52 @@ const FEAT_ART={
   the_collector:'TheCollector',    own_the_night:'OwnTheNight'};
 /* HisOwnMedecine is spelled that way ON DISK. The filename is the contract
    here, not the English — renaming it is Denis's call, not a typo fix. */
+/* == THE FEAT VIEW (Phase 5) ==========================================
+   Feats OBSERVE. They must never grant power - and until now that was a rule
+   someone had to remember, not one the code enforced. Measured before
+   building: across all 23 checks, not one writes game state, so this makes a
+   true invariant hard to break rather than repairing a broken one.
+
+   WHAT A CHECK GETS is exactly the fields the 23 were measured to read, behind
+   a proxy that THROWS on assignment. Two properties, both deliberate:
+     - narrow VOCABULARY: a check cannot name what it was not given, so a new
+       feat reaching for G.pPts fails at authoring time, not review time
+     - LOUD on write: a sloppy-mode `view.x = 1` would silently no-op against a
+       frozen object; this throws, so a violation cannot pass quietly
+
+   NOT Object.freeze(G): freeze is shallow, so G.matchDice - an array, and the
+   one field most worth protecting - would stay mutable.
+
+   THE HOLE, NAMED: `S` is a module global. Seven checks read S.run directly
+   rather than through their argument, and a facade over the argument cannot
+   stop that. `run` is provided here as a frozen copy for them, but a check
+   CAN still reach the real S.run and write it. Closing that needs the checks
+   moved to a scope without S, which is a restructure, not this patch.
+   apv_feat_view asserts the gap is exactly this size and no larger. */
+function _featView(G){
+  if(!G)return G;
+  var v={};
+  ['_isBoss','_famBankCount','_famMinBank','_featBloom','_featBusts',
+   '_featJade','_featMaxBank','_featMaxDeficit','_featMaxRolls','_featOmenTrue',
+   '_featShatterBanked','_featStarChain','_featSticky','_featWardSaves',
+   '_forKeeps','_handicap','_sleeve','matchDice','rung'].forEach(function(k){
+     var x=G[k];
+     /* arrays and objects are copied AND frozen - handing the live one over
+        would make the proxy decorative */
+     if(Array.isArray(x))x=Object.freeze(x.slice());
+     else if(x&&typeof x==='object')x=Object.freeze(Object.assign({},x));
+     v[k]=x;
+   });
+  try{
+    v.run=(typeof S!=='undefined'&&S&&S.run)?Object.freeze(Object.assign({},S.run)):null;
+  }catch(e){v.run=null;}
+  if(typeof Proxy!=='function')return Object.freeze(v);
+  return new Proxy(v,{
+    set:function(t,k){throw new Error('a feat tried to write '+String(k)+
+      ' - feats observe, they do not grant power');},
+    deleteProperty:function(t,k){throw new Error('a feat tried to delete '+String(k));}
+  });
+}
 const FEATS=[
   /* ── JADE ── */
   {id:'green_thumb',     label:'Green Thumb',      desc:'Bank a straight completed by a jade wild', renown:10,
@@ -9969,7 +10015,7 @@ function evaluateFeats(){
   FEATS.forEach(function(f){
     if(S.run.feats[f.id])return;
     try{
-      if(f.check(G)){
+      if(f.check(_featView(G))){
         S.run.feats[f.id]=true;
         /* lifetime record: the feats wall + the ceremony recovery net
            (shelf entry) read this - per-run dedup stays in S.run.feats */
