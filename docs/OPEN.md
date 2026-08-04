@@ -168,6 +168,33 @@ pass covering both seams.
 
 ---
 
+## 6. Boss difficulty moved TWICE tonight — is the aggression pass still measured?
+
+Two separate changes landed on the same axis in one session, and only one was
+chosen as a difficulty lever:
+
+| change | kind | evidence |
+|---|---|---|
+| **Aggression tuning** | deliberate | **unproven** — ran on noisy, unresolved data |
+| **`challenge` double-charge fix** (P466) | accidental | **definitely real** — arithmetic, measured |
+
+The second was a boss losing up to **double** its stated penalty. A boss on 1000
+points banking 600 lost 1000 for a 500 penalty. Fixing it makes bosses
+**measurably tougher than they were an hour ago**, and nobody picked that.
+
+**The question:** the aggression pass was tuned against a baseline that has now
+shifted underneath it. Do you want it re-measured against the corrected one
+before it's judged?
+
+**The reason to answer rather than leave it:** in a week these are two
+indistinguishable "bosses got harder" changes from the same night. If the
+aggression numbers later look wrong, the wrong one gets blamed. Recorded now so
+neither is misread as explaining the other.
+
+**Not blocking anything.** No code waits on this.
+
+---
+
 ## Everything else you answered is now work, not a question
 
 Tracked in `NEXT_SESSION.md` and being built. Nothing there needs you.
