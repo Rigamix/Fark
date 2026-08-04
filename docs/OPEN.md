@@ -67,10 +67,20 @@ Also: **agent spread narrows as tiers rise** (60.9 → 23.6), so how well you pl
 matters *less* the higher you climb — the strongest support yet for "longer, not
 harder".
 
-**No recommendation attached on purpose.** Raising aggression, lowering late
-targets and letting player scoring grow are all consistent with this table, and
-the master brief already has an instruction on the order of those
-(*"tune TARGETS down before inflating player scoring"*). Which lever is yours.
+**Aggression was ruled and shipped** (`8f04cc1`, +0.06 across all eight tiers,
+capped at .95). Result **inconclusive** — see `docs/AGGRESSION_2026-08-03.md`.
+
+**And the table above needs a caveat it did not have.** Every figure in it is
+**one seed**. Measured since: `spread` carries ±3–6 of seed-to-seed noise per
+tier and ~10 on the t0→t7 trend. The narrowing claim survives — a ~30-point
+fall clears that comfortably — but the specific numbers were never a range.
+Win rates and bank figures in the same table come from the same single run and
+deserve the same caution.
+
+**What is still yours:** whether to spend 5–6 seeds per side confirming the
+aggression bump, and whether to pull either of the other two levers (lower late
+targets, let player scoring grow). The brief's ordering instruction still
+stands — *"tune TARGETS down before inflating player scoring"*.
 
 ---
 

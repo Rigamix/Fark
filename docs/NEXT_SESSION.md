@@ -315,6 +315,27 @@ a sim agent cannot currently express a persona the live game already can. When
 sim numbers and live behaviour disagree about how an opponent plays, that gap is
 a candidate cause before either side is called wrong.
 
+**A ONE-SEED SIM RUN IS A ONE-SAMPLE MEASUREMENT.** Measured 2026-08-03 while
+raising aggression: `spread` in the tier sweep is `max(win%) - min(win%)` over
+four agents - a max-minus-min on four samples - and it carries **+/-3 to 6 of
+seed-to-seed noise per tier**, with about **10 points** on the t0->t7 trend
+statistic.
+
+That is a fact about the INSTRUMENT, not the game, and it is retrospective: the
+published headline "agent spread narrows 60.9 -> 23.6" is ONE SEED presented as
+the finding. The underlying claim survives - a ~30 point fall clears a +/-10
+band comfortably - but the numbers in it were never a range and were read as
+one.
+
+**So: run at least two seeds before believing any sim delta, and say how many
+when quoting one.** Tonight's +0.06 aggression bump moved the trend by 6.2,
+which is inside a band the same statistic wanders by 10.5 on its own. Nothing
+about the change is knowable from a single before/after pair.
+
+**The fix for that is more seeds, not a bigger change.** More seeds narrows the
+band; a bigger bump commits to a magnitude that has to be walked back if the
+mechanism turns out wrong.
+
 **SCRUTINISE CLEAN RESULTS HARDER THAN DIRTY ONES.** Six instrument artifacts
 in one day invented findings; the seventh HID one, and it was by far the most
 expensive. `cfx_bespoke` reported all 20 cards fully migrated. `short_fuse` was
