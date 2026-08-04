@@ -26947,7 +26947,26 @@ function endPTurn(){
   if(!G||G._endMatchFired)return;
   restoreRollButton();
   try{_renderSelTags([],0,true);}catch(e){}
+  /* THE PLAYER'S TURN VALUE, captured before the very next statement destroys
+     it. A bust is a turn worth ZERO, not no turn - it happened and it produced
+     a value. So this is a real number, never a flag that suppresses the seam,
+     and "they scored nothing" stays readable as information.
+     Measured (tools/endpturn_value.py): of ten endPTurn call sites, the seven
+     that clear turnPts first are the five bust paths plus steal_low_bank and
+     block_low_bank - all cases where the player banked nothing, so 0 is the
+     right answer. The normal bank routes via handleYield, which never touches
+     turnPts, so it arrives carrying its real total. */
+  var _pTurnPts=(G.turnPts||0);
+  G._pTurnPts=_pTurnPts;
   G.phase='opp';G.turnPts=0;G.kept=[];G.numDice=6;G.turnNum++;
+  /* THE rivalTurn SEAM, MIRRORED. finOpp fires {actor:'p', pts:<rival scored>}
+     so the PLAYER's cards see the rival's turn resolve. This is the inverse:
+     {actor:'o', pts:<player scored>}, so a BOSS-held card sees ITS rival's
+     turn resolve. Trigger and payoff flip together rather than half.
+     Ungates nothing - CFX.ill_omen still tests _fxMine and returns early for
+     an opponent owner. This raises the moment; which cards fire for a boss is
+     the separate question. */
+  try{famFire('rivalTurn',{actor:'o',pts:_pTurnPts});}catch(e){}
   G.pTurns=(G.pTurns||0)+1;/* P3: a completed player turn (bank or bust) */
   G._pLastRolls=G.turnRollCount||0;
   if(G._oIllOmen){/* they called it and you did NOT bust: you gain */
