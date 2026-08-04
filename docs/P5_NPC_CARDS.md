@@ -192,3 +192,49 @@ need the opponent's turn to raise the moments those decisions attach to.
 No size attached, deliberately: this area has had two wrong size estimates from
 me today, so a third carries no more weight than the first two. The **shape** is
 what is established — the ordering above does not depend on the number.
+
+
+---
+
+# DIRECTION (ruled) and the first two seams (P459)
+
+**Give bosses the same seven turn hooks the player has**, so they act through
+the same structure — not full player complexity, just the same levers a player
+pulls, set differently per boss.
+
+**Build the seams first, confirmed working generically, before any personality
+attaches to them.** Designing both at once means writing boss-specific
+behaviour into the seam code, which is the bespoke-per-card trap this project
+has been removing everywhere else. Once seams exist, differentiation is **data
+on each boss's existing persona record** — `patronStats`, `dieBias`, and
+whatever card-play dials get added — **not new logic per boss**.
+
+## Built: `turnStart` and `roll`
+
+The two POINT seams, at the single site each where the opponent's counters
+advance:
+
+| seam | site | raised |
+|---|---|---|
+| `turnStart` | `G.oppTurnCount=(G.oppTurnCount||0)+1;` | immediately after |
+| `roll` | `_oppHoldKept();oppRollNum++;` | immediately after |
+
+**After the increment, both times** — a hook asking "which turn is this" must
+see the turn it is about. Firing before would hand every opponent hook the
+previous index, which is the off-by-one that made Snuff's window meaningless
+until Phase 3 gave it a gate.
+
+**Neither call carries anything boss-specific.** They raise the moment and
+nothing else, per the direction.
+
+**And no card was ungated.** Every CFX hook still tests `_fxMine` and still
+returns early for an opponent. Verified: on a real rival turn both seams raise,
+the player's own seams are untouched, and **zero cards changed behaviour**.
+That last check is the one that matters — the correct outcome here *is* no
+effect, so the probe counts seam raises by wrapping `famFire` rather than by
+watching for consequences.
+
+**Remaining five, unchanged:** `commit`, `bust`, `bankBonus` are SPREAD (7, 7
+and 12 sites across 425, 229 and 885 lines) and need the "which moment is the
+seam" decision; `deadRoll` has no counterpart at all; `rivalTurn` means the
+player's turn when a boss holds the card.
