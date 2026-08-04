@@ -26147,6 +26147,21 @@ function _applyCommitBonuses(selDice,pts,cards){
   return pts;
 }
 
+/* BANK_FX - the arithmetic shared by handleBank (the player's bank) and finOpp
+   (the rival's). Measured as the same rule on both sides before this was
+   written; see docs/MIRROR_DIFF.md.
+   Each row takes the amount being banked and the effect def, and returns the
+   new amount. Nothing here touches score pools, messages or guards - those
+   differ per seat on purpose and stay at the call sites.
+   The defaults live HERE so both seats inherit them: the player had
+   (eff.amount||500) for gain_when_ahead and the rival had none. */
+var BANK_FX={
+  flat_bonus:        function(a,e){return a+(e.amount||0);},
+  double_first_bank: function(a,e){return a*2;},
+  halve_first_bank:  function(a,e){return a-Math.floor(a/2);},
+  gain_when_ahead:   function(a,e){return a+(e.amount||500);}
+};
+
 function handleBank(){
   /* Phase guard, mirroring handleRoll. Banking is only legal during the
      player's decision phases — without this, a tap during an auto-roll
@@ -26451,7 +26466,7 @@ function handleBank(){
     var npc=getNpcCard(cid);if(!npc)return;var eff=npc.effect;
     if(eff&&eff.type==='on_opp_bank'&&eff.mechanic==='double_first_bank'&&!G.npcCardState.playerOnce[cid]){
       G.npcCardState.playerOnce[cid]=true;
-      var _mtBefore=total;total*=2;
+      var _mtBefore=total;total=BANK_FX.double_first_bank(total,eff);
       var _mtGain=total-_mtBefore;
       bonusMsg+=' +'+_mtGain+' '+npc.name;
       triggerCard(cid,npc.name+' ×2!',true);
@@ -26460,14 +26475,14 @@ function handleBank(){
        the boss-reward draft offered the card to the player with a playerDesc
        promising the effect, but no player-side handler existed. */
     if(eff&&eff.mechanic==='flat_bonus'&&(eff.amount||0)>0){
-      total+=eff.amount;
+      total=BANK_FX.flat_bonus(total,eff);
       bonusMsg+=' +'+eff.amount+' '+npc.name;
       triggerCard(cid,npc.name+' +'+eff.amount,true);
     }
     /* Player-owned The Audit: banking while AHEAD pays +500. Same dead-card
        gap as the badge above. */
     if(eff&&eff.mechanic==='gain_when_ahead'&&G.pPts>G.oPts){
-      total+=(eff.amount||500);
+      total=BANK_FX.gain_when_ahead(total,eff);
       bonusMsg+=' +'+(eff.amount||500)+' '+npc.name;
       triggerCard(cid,npc.name+' +'+(eff.amount||500),true);
     }
@@ -26598,7 +26613,7 @@ function handleBank(){
     }
     /* Halve first bank (fine_print) */
     if(eff.type==='on_player_bank'&&eff.mechanic==='halve_first_bank'&&!G.npcCardState.firstBankDone){
-      var half=Math.floor(total/2);total-=half;
+      var half=total-BANK_FX.halve_first_bank(total,eff);total-=half;
       bonusMsg+=' -'+half+' '+npc.name;
       triggerCard(cid,npc.name+' −'+half+'!',false);
       (function(_cid){setTimeout(function(){if(window.DLG)DLG.triggerCard(_cid,false);},800);})(cid);
@@ -28306,7 +28321,7 @@ function runOppTurn(){
       G.oCards.forEach(function(cid){
         var npc=getNpcCard(cid);if(!npc)return;var eff=npc.effect;
         /* old_partners_badge: +100 flat per bank */
-        if(eff.type==='on_opp_bank'&&eff.mechanic==='flat_bonus'){pts+=eff.amount;triggerCard(cid,npc.name+' +'+eff.amount,false);
+        if(eff.type==='on_opp_bank'&&eff.mechanic==='flat_bonus'){pts=BANK_FX.flat_bonus(pts,eff);triggerCard(cid,npc.name+' +'+eff.amount,false);
           (function(_cid){setTimeout(function(){if(window.DLG)DLG.triggerCard(_cid,false);},_oppDelay(700));})(cid);}
         /* measure_twice: double first bank (was tripled — too strong).
            Show the actual delta in the trigger label so the doubling reads
@@ -28317,7 +28332,7 @@ function runOppTurn(){
         if(eff.type==='on_opp_bank'&&eff.mechanic==='double_first_bank'&&!G.npcCardState.usedOnce[cid]){
           G.npcCardState.usedOnce[cid]=true;
           var _mtBonus=pts;/* doubling pts adds another 1× of the original */
-          pts*=2;
+          pts=BANK_FX.double_first_bank(pts,eff);
           triggerCard(cid,'×2 → +'+_mtBonus,false);
           spawnPop('×2! +'+_mtBonus.toLocaleString());
           (function(_cid){setTimeout(function(){if(window.DLG)DLG.triggerCard(_cid,false);},_oppDelay(700));})(cid);
@@ -28326,7 +28341,7 @@ function runOppTurn(){
       /* the_audit: gain when NPC is ahead */
       G.oCards.forEach(function(cid){
         var npc=getNpcCard(cid);if(!npc)return;
-        if(npc.effect.mechanic==='gain_when_ahead'&&(G.oPts+pts)>G.pPts){pts+=npc.effect.amount;triggerCard(cid,npc.name+' +'+npc.effect.amount,false);
+        if(npc.effect.mechanic==='gain_when_ahead'&&(G.oPts+pts)>G.pPts){pts=BANK_FX.gain_when_ahead(pts,npc.effect);triggerCard(cid,npc.name+' +'+npc.effect.amount,false);
           (function(_cid){setTimeout(function(){if(window.DLG)DLG.triggerCard(_cid,false);},_oppDelay(700));})(cid);}
       });
       /* Short Pour: opponent banks are worth 10% less (fence: 12.5%) */
@@ -28379,7 +28394,7 @@ function runOppTurn(){
         /* Halve first bank (fine_print) */
         if(eff.type==='on_player_bank'&&eff.mechanic==='halve_first_bank'&&!G.npcCardState.playerOnce[cid]&&pts>0){
           G.npcCardState.playerOnce[cid]=true;
-          var half=Math.floor(pts/2);pts-=half;
+          var half=pts-BANK_FX.halve_first_bank(pts,eff);pts-=half;
           triggerCard(cid,npc.name+' −'+half,true);
         }
       });
