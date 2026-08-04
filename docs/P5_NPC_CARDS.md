@@ -154,3 +154,41 @@ both hang off once it exists.
 
 **Not built. Not shipped.** The authorisation was for gate changes, and gate
 changes turn out not to be the thing.
+
+
+---
+
+# Two things worth keeping, independent of the seam question
+
+## The live game is MORE levers-ready than the sim that measures it
+
+Asked whether NPC decision-making is tunable or hardcoded per-agent. Measured,
+it is layered:
+
+| layer | shape |
+|---|---|
+| loadout & targets | **levers** — `patronStats{targetMin/Max, aggMin/Max, dicePool, minBank, diceStop}`, per tier |
+| persona | **levers** — six of them, each `{tags, dieBias, behavior}` |
+| turn AI | **one lever, three settings** — `behavior` is read once (line ~27028) and moves one number: `safe` −0.10 agg, `chase` +0.10, +0.12 more if a pair is showing |
+| card play | **no levers** — `_npcArmActives` is hardcoded `if` chains |
+
+**And the sim roster is the more hardcoded of the two.** `F.POLICIES.carl =
+mkPolicy({name, thresh, keep:function(f,c){…}})` — each agent's personality is a
+**hand-written `keep` function**, not parameters. The live game's personas carry
+more structure than the agents measuring them.
+
+**Worth remembering the next time the sim roster is touched:** it is not a
+neutral measuring stick against a less-structured game. On this axis it is the
+less-structured of the two systems, and a sim agent cannot currently express a
+persona the live game already can.
+
+## The ordering, which holds whatever the size turns out to be
+
+**Seam coverage is upstream of both boss card-play and persona levers.**
+Neither can be built on top of one seam. `_npcArmActives` gaining an AI, or
+`behavior` widening past three values into real card-play personality, both
+need the opponent's turn to raise the moments those decisions attach to.
+
+No size attached, deliberately: this area has had two wrong size estimates from
+me today, so a third carries no more weight than the first two. The **shape** is
+what is established — the ordering above does not depend on the number.

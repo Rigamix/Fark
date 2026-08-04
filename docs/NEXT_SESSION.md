@@ -304,6 +304,17 @@ real dependency. The failure mode was "wrong answer", not "wrong grouping".
 Same as the two-stage turn clear, where the gap between phases is where each
 path does its own work.
 
+**THE SIM ROSTER IS NOT A NEUTRAL MEASURING STICK.** Measured 2026-08-03: the
+live game's NPC personas are `{tags, dieBias, behavior}` records driving
+parameterised `patronStats`, while `F.POLICIES.*` in the sim harness are
+`mkPolicy({name, thresh, keep:function(){...}})` - each agent's personality is a
+HAND-WRITTEN function.
+
+So on the tunability axis the sim is the LESS structured of the two systems, and
+a sim agent cannot currently express a persona the live game already can. When
+sim numbers and live behaviour disagree about how an opponent plays, that gap is
+a candidate cause before either side is called wrong.
+
 **SCRUTINISE CLEAN RESULTS HARDER THAN DIRTY ONES.** Six instrument artifacts
 in one day invented findings; the seventh HID one, and it was by far the most
 expensive. `cfx_bespoke` reported all 20 cards fully migrated. `short_fuse` was
