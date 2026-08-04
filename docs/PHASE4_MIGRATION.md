@@ -295,3 +295,45 @@ control to hang a chip on, which is a different build.
 Worth knowing before it starts: the existing chip row is **hand-written twice**,
 in `_gbRenderRoom` and `_ptRoom`, for all three cards. A marker step should
 absorb that rather than add a third copy.
+
+
+---
+
+## The Room's chip row is not duplicated — one copy is dead
+
+Reported earlier as "hand-written twice, in `_gbRenderRoom` and `_ptRoom`".
+Measured, that is wrong in a way that matters: **`_gbRenderRoom` delegates to
+`_ptRoom` on its eighth line and returns.**
+
+```js
+if(typeof _ptRoom==='function'){_ptRoom(host,tier,bossReady);return;}
+```
+
+`_ptRoom` is a top-level function, so it is always defined and the gate always
+takes the early exit. **81 of `_gbRenderRoom`'s 89 lines are unreachable**,
+including 5 of the `chips+=` sites.
+
+So absorbing the duplication is not the job — deleting the dead copy is. Left
+for a ruling, since it is 81 lines of authored layout and this project does not
+delete authored content unprompted.
+
+*Found by patching both copies and watching only one of them render.*
+
+## Verifying the marker took five wrong measurements first
+
+Worth recording, because each was a different wrong surface and only the last
+was the code's fault rather than the probe's:
+
+1. **The dev server was down.** `shoot.js` evaluated happily against
+   `chrome-error://chromewebdata/` and reported every game global as
+   `undefined`. Nothing announced it — the probe just described an error page.
+2. **`document.body.textContent` includes inline `<script>` source**, so the
+   marker's own string literal matched whether it rendered or not. That
+   reported it *visible when unarmed* — a false positive about my own patch.
+3. `_gbRenderRoom` renders the **dead** copy; the live one is `_ptRoom`.
+4. The gauntlet screen was not active, so nothing rendered at all.
+5. **`_ptRoom` calls `_getS()`**, which re-reads the run from storage — an
+   in-memory flag set without `save()` is discarded before it renders.
+
+The first one is the one worth a guard: a suite can pass against a dead server
+for any probe whose verdict is satisfied by absence.

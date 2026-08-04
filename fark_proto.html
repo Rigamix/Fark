@@ -13053,6 +13053,29 @@ function _rsTake(key){
   if(was){S.run[key]=false;try{save();}catch(e){}}
   return was;
 }
+/* THE TARGET A SEAT WILL ACTUALLY BE PLAYED AT, for display.
+   Three surfaces show this number - the seat sheet, the patron table's
+   #ptvTarget, and the pk-meta preview - and High Table's +500 is applied by
+   launchSeat AFTER all three are gone. So every one of them was showing a
+   target the player would not be playing against, and fixing only the sheet
+   (P449) left it disagreeing with the other two.
+
+   READS, NEVER WRITES. launchSeat still does the real `patron.target += 500`;
+   if this mutated as well the target would rise by 1000. That is the same
+   two-writers-to-one-value shape as Preserve's clobber and the chalk board's
+   dual structure, so it is worth being explicit: this function is a view.
+
+   NOT MODELLED, on purpose: the handicap multipliers launchSeat applies just
+   below High Table (last_call x1.5, rising_stakes x1.8, sudden_death). Those
+   are properties of the SEAT, already announced by other means; High Table is
+   the player's own card quietly changing the number they are choosing
+   against, which is why it is the one that belongs here. */
+function _seatTargetRaised(){
+  return typeof famOwnTier==='function'&&famOwnTier('high_table')>0;
+}
+function _seatTarget(pat){
+  return (pat&&pat.target||0)+(_seatTargetRaised()?500:0);
+}
 function _tabSettle(){
   if(!S.run||!S.run._tabOwed)return;
   var owed=S.run._tabOwed;S.run._tabOwed=0;
@@ -14384,6 +14407,17 @@ function _gbRenderRoom(tier,bossReady){
   var chips='';
   if(S.run._tabOwed)chips+='<div class="gbx-box sub" onclick="famTabPay()" style="height:30px;padding:0 10px;font-size:12px;cursor:pointer">ledger: tab '
     +S.run._tabOwed+'g'+((S.run.gold||0)>=S.run._tabOwed?' · PAY IT':'')+'</div>';
+  /* HAIR OF THE DOG: a STATUS, not a control. No onclick and no pointer -
+     the player armed nothing and can do nothing about it; it fired when they
+     lost and pays at their next first bank. It sits in the chip row because
+     that is where run-scoped state is read, but it must not look tappable in a
+     row where everything else is.
+     BOTH SIDES, because P447 gave this card a downside: showing only the
+     doubled bank would advertise the pure-upside version that no longer
+     exists. */
+  if(S.run._hotdNext)chips+='<div class="gbx-box sub" style="height:30px;padding:0 10px;'
+    +'font-size:12px;cursor:default;border:2px solid #6b4a7a;opacity:.92">'
+    +'HUNGOVER \u2014 first bank doubled, bust before it and a circle goes</div>';
   if(famOwnTier('the_tab')>0&&!S.run._tabOwed)chips+='<div class="gbx-box sub" onclick="famTabTake()" style="height:30px;padding:0 10px;font-size:12px;cursor:pointer">THE TAB — borrow 250g</div>';
   if(famOwnTier('double_stakes')>0)chips+='<div class="gbx-box'+(S.run._dsArmed?'':' sub')+'" onclick="_rsToggle(&quot;_dsArmed&quot;);showScreen(&quot;gauntlet&quot;)" '
     +'style="height:30px;padding:0 10px;font-size:12px;cursor:pointer'+(S.run._dsArmed?';border:2px solid #a58a3c':'')+'">'
@@ -14521,8 +14555,8 @@ function _gbPeek(i){
        Shown, not applied: the roster object stays untouched because launchSeat
        still mutates it, and doing both would raise the target by 1000. */
     +'<div class="gbx-box sub" style="flex:1;height:40px">target '
-      +((pat.target||0)+((famOwnTier('high_table')>0)?500:0)).toLocaleString()
-      +((famOwnTier('high_table')>0)?' <span style="opacity:.7">+500 high table</span>':'')
+      +_seatTarget(pat).toLocaleString()
+      +(_seatTargetRaised()?' <span style="opacity:.7">+500 high table</span>':'')
       +'</div>'
     +'<div class="gbx-box sub" style="flex:1;height:40px">buy-in '+buy+'g</div>'
     +'<div class="gbx-box sub" style="flex:1;height:40px">pot '+(reward+buy)+'g</div></div>';
@@ -15664,7 +15698,7 @@ function _ptRoom(host,tier,bossReady){
         :['green','blue','red'][(i-((typeof n.handicapSeat==='number'&&n.sealTell&&i>n.handicapSeat)?1:0))%3]),/* purple = handicap only */
       trait:PT_TRAIT[pat.persona]||'steady',
       word:(_PERSONA_WORDS[pat.persona]||'PATRON'),
-      price:buy,target:pat.target||0,
+      price:buy,target:_seatTarget(pat),
       pot:(20+(S.run.tier||0)*12)*(sealed?2:1)+buy,
       sealed:sealed,sealTell:sealed?_tellById(n.sealTell):null,
       grudge:!!pat.grudge,lucky:pat.lucky?pat.lucky.name:'',
@@ -15674,6 +15708,11 @@ function _ptRoom(host,tier,bossReady){
   for(var hi=0;hi<3;hi++)hearts+='<img src="'+PT_A+(hi<(S.run.coins||0)?'heart_full':'heart_empty')+'.png" alt="">';
   var chips='';
   if(S.run._tabOwed)chips+='<div onclick="famTabPay()">ledger: tab '+S.run._tabOwed+'g'+((S.run.gold||0)>=S.run._tabOwed?' · PAY IT':'')+'</div>';
+  /* same status, same rules, second view - see the note in _gbRenderRoom.
+     Rendered in both because this row is written out twice; adding it to one
+     would make the marker depend on which screen the player arrived through. */
+  if(S.run._hotdNext)chips+='<div style="cursor:default;border-color:#6b4a7a">'
+    +'hungover \u2014 first bank doubled, bust first and a circle goes</div>';
   if(famOwnTier('the_tab')>0&&!S.run._tabOwed)chips+='<div onclick="famTabTake()">the tab — borrow 250g</div>';
   if(famOwnTier('double_stakes')>0)chips+='<div '+(S.run._dsArmed?'style="border-color:#a58a3c;color:#f3dfa6"':'')
     +' onclick="_rsToggle(&quot;_dsArmed&quot;);showScreen(&quot;gauntlet&quot;)">'
@@ -34786,7 +34825,7 @@ function openPeek(i){
     +'<span class="pk-port-wrap"><img class="pk-port" src="assets/Night_Art/char_patron_'+(pat.persona||'aggro')+'.png" alt="" onerror="this.style.display=\'none\'"></span>'
     +'<div class="pk-head"><span class="pk-trait">'+(_PERSONA_WORDS[pat.persona]||'PATRON')+'</span></div>'
     +'<div class="pk-dice">'+(pat.dice||[]).map(function(m){return '<span class="seat-die dtype-'+m+'"></span>';}).join('')+'</div>'
-    +'<div class="pk-meta"><span>TARGET<b>'+(pat.target||0).toLocaleString()+'</b></span>'
+    +'<div class="pk-meta"><span>TARGET<b>'+_seatTarget(pat).toLocaleString()+'</b></span>'
     +'<span>STAKE<b>'+buy+'g</b></span>'
     +'<span>POT<b>+'+(reward+buy)+'g</b></span></div>'
     +(offer?'<div class="pk-hc" style="--hc-color:'+(offer.color||'#c08ae0')+'">'+offer.icon+' '+offer.name+' \u2014 worth double on the board</div>':'')
