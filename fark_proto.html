@@ -25678,20 +25678,11 @@ function doBust(){
      bust happened at all. */
   function _bustTolls(){
   try{_hotdToll();}catch(e){}
-    if(G._oIllOmen){/* they called your bust: pay them */
-      /* famDef returns null for an id it does not carry. That could never
-         bite while this sat in a branch nothing could reach; it is on the
-         live bust path now, and a throw here would leave the turn with no
-         route to endPTurn. */
-      var _ioD=famDef('ill_omen');
-      if(_ioD&&_ioD.p){
-        var _ioP3=_ioD.p[(G._oIllOmen.tier||1)-1]||[0,0];
-        var _ioTake=Math.min(_ioP3[0]||0,G.pPts||0);
-        G.pPts=(G.pPts||0)-_ioTake;G.oPts=(G.oPts||0)+_ioTake;
-        try{famLog('THEIR OMEN LANDS - THEY TAKE '+_ioTake);}catch(e){}
-      }
-      G._oIllOmen=null;try{updHUD();}catch(e){}
-    }
+    /* P463: the omen's payout left here. It reads SCORED NOTHING, not BUSTED,
+       and a bust already flows through endPTurn carrying 0 - so both outcomes
+       resolve at the single site there, off the same value the rivalTurn seam
+       carries. Keeping a copy here would have re-created the disagreement the
+       migration exists to remove. */
     /* k.dice, not just k.mat: a kept group stores only its FIRST die's
        material on k.mat, so a Fang kept second in a selection was invisible
        to the old test. The pool half still matters on its own - it catches a
@@ -26969,9 +26960,30 @@ function endPTurn(){
   try{famFire('rivalTurn',{actor:'o',pts:_pTurnPts});}catch(e){}
   G.pTurns=(G.pTurns||0)+1;/* P3: a completed player turn (bank or bust) */
   G._pLastRolls=G.turnRollCount||0;
-  if(G._oIllOmen){/* they called it and you did NOT bust: you gain */
-    var _ioP2=famDef('ill_omen').p[(G._oIllOmen.tier||1)-1];
-    G.pPts+=_ioP2[1];famLog('THEIR OMEN MISSES — YOU GAIN '+_ioP2[1]);
+  if(G._oIllOmen){
+    /* P463: BOTH outcomes, off _pTurnPts - the same value the rivalTurn seam
+       carries and the same test CFX.ill_omen uses for the player (pts<=0).
+       RULED "SCORED NOTHING", NOT "BUSTED": a bank blocked or stolen to zero
+       is a turn that produced nothing, and the omen was always a bet on the
+       outcome rather than on the dramatic version of it. This DOES change the
+       boss's behaviour - it now pays out on those two cases - and that is the
+       correction, not a side effect.
+       The famDef null guard comes from the deleted _bustTolls copy: this site
+       is on the live path for both outcomes now, and the guard must not be
+       lost along with the branch that carried it. */
+    var _ioD2=famDef('ill_omen');
+    if(_ioD2&&_ioD2.p){
+      var _ioP2=_ioD2.p[(G._oIllOmen.tier||1)-1]||[0,0];
+      if((_pTurnPts||0)<=0){
+        /* they called it and you scored nothing: they take, capped at what you have */
+        var _ioTake2=Math.min(_ioP2[0]||0,G.pPts||0);
+        G.pPts=(G.pPts||0)-_ioTake2;G.oPts=(G.oPts||0)+_ioTake2;
+        try{famLog('THEIR OMEN LANDS — THEY TAKE '+_ioTake2);}catch(e){}
+      }else{
+        G.pPts=(G.pPts||0)+(_ioP2[1]||0);
+        try{famLog('THEIR OMEN MISSES — YOU GAIN '+(_ioP2[1]||0));}catch(e){}
+      }
+    }
     G._oIllOmen=null;try{updHUD();}catch(e){}
   }
   /* Reset per-turn flags so they re-trigger on the next player turn */
