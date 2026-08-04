@@ -7,32 +7,30 @@ is a valid answer.** Answered items are deleted, not marked — this stays short
 
 ---
 
-## 0. Thirteen boss cards do nothing — six need a gate, seven need an AI
+## 0. The opponent turn raises ONE of eight effect seams
 
-**Correcting what I put here earlier.** I said the boss's cards all do nothing.
-Wrong: `_npcFamCard` wires **ten** of them and they work. Full retraction in
-`docs/P5_NPC_CARDS.md`.
+**Correcting myself twice over.** I said the boss's cards all do nothing (wrong
+— ten work via `_npcFamCard`), then that six of them needed only a gate change.
+Writing that patch disqualified it. Full trail in `docs/P5_NPC_CARDS.md`.
 
-**The real gap is 13 cards a boss can be dealt that have no opponent path at
-all, and it splits in two:**
+**The actual structural fact:** of the eight CFX seams, the opponent's turn
+raises exactly one — `bank`. The other seven fire only with `actor:'p'`.
+`famFire` visits both rosters regardless, so an opponent card's `turnStart` hook
+is already reached — **on the player's turn**. Ungating it makes it fire at the
+wrong moment, not the right one.
 
-- **6 passive** — `bloom`, `cultivate`, `reprisal`, `falling_star`,
-  `vanguard_f`, `fools_gold_f`. The hook exists and is gated player-only.
-  These just need to fire. *Small, and I can do it.*
-- **7 active** — `transmute`, `powder_keg`, `sacrifice`, `steady_hand`,
-  `fair_trade`, `tamper`, `for_keeps`. An NPC never *taps* a card, so these
-  need `_npcArmActives` taught when a boss should choose to play each one.
-  **That is AI behaviour design, not wiring, and nobody has scoped it.**
+**That is why `_npcFamCard` exists.** With no seams on the opponent's side, the
+only way to give a boss card behaviour was to hand-write it into `runOppTurn` —
+which someone did, for ten cards.
 
-**The trap still stands** for anything migrated from the ten that already work:
-remove it from `_npcFamCard` in the same patch or it fires twice.
+**So the work is seam coverage, not migration:** raise the other seven from the
+opponent's turn at the corresponding moments. That is infrastructure, and both
+boss card-play and any "personality via levers" would hang off it.
 
-*My rec: ship the 6 passive ones — they are pure gate changes, none is in
-`_npcFamCard`, so there is no double-fire risk. Leave the 7 actives until you
-want to design boss card-play, which is its own piece of work.*
+*No recommendation on scope — this is bigger than the thing I was about to ship
+and I have been wrong about its size twice today. Worth you sizing it rather
+than me.*
 
-**Still deferred on your ruling:** `ill_omen` (whose "rival's turn" flips
-meaning by holder), `fools_gold_f`'s pacing effect, and `double_or_nothing`.
 
 ---
 

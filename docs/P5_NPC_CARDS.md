@@ -104,3 +104,53 @@ The bus split is real: the opponent's working cards work through a parallel
 hand-written path, not through `CFX`, and migrating any of the ten means
 removing it from `_npcFamCard` in the same move or it fires twice. That part
 was right. The size and the headline were not.
+
+
+---
+
+# SECOND CORRECTION — the six-passive ship is not viable, and why
+
+Authorised: ship the six passive cards as gate changes (`_fxMine` -> fires for
+the owner). **Writing it disqualified it**, which is the third time today that
+step has changed the answer.
+
+## Seven of the eight seams are never raised for the opponent
+
+Every `famFire` call site, with its actor:
+
+| seam | actor |
+|---|---|
+| `bank` | **`'o'`** (28552) and `'p'` (26791) |
+| `bankBonus`, `bust`, `commit`, `deadRoll`, `rivalTurn`, `roll`, `turnStart` | `'p'` only |
+
+`famFire` iterates **both** rosters regardless of actor, and sets
+`ev.mine = (ev.actor === owner)`. So an opponent card's `turnStart` hook *is*
+visited — on the **player's** turn start, with `mine=false`. Ungating it would
+not make it fire at the right moment; it would make it fire at the **wrong**
+one.
+
+**So four of the six are no-ops and two are the wrong shape:**
+
+- `bloom.commit`, `cultivate.commit`, `vanguard_f.commit` — `commit` is raised
+  only from `famCommitBonus`, which is the player's scoring path. Ungating
+  changes nothing.
+- `fools_gold_f.bust` / `.deadRoll` — same, `'p'` only.
+- `reprisal.bank`, `falling_star.bank` — these two DO sit on the one seam the
+  opponent raises. Ungating them would fire something, and what it should do
+  when a boss banks is a design question, not a gate flip.
+
+## The real gap is seam coverage, not gating
+
+The opponent turn machinery raises **one** of eight CFX seams. That is why
+`_npcFamCard` exists at all: with no seams, the only way to give a boss card
+behaviour was to hand-write it in `runOppTurn`, which is exactly what someone
+did for ten cards.
+
+**So "make the opponent's cards work" is not a card-by-card migration. It is
+raising the other seven seams from the opponent's turn at the moments that
+correspond** — an opponent `turnStart`, `roll`, `bust`, `commit`. That is
+infrastructure, and it is the thing `_npcArmActives` and boss personality would
+both hang off once it exists.
+
+**Not built. Not shipped.** The authorisation was for gate changes, and gate
+changes turn out not to be the thing.
