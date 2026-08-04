@@ -26676,9 +26676,17 @@ function handleBank(){
     if(eff.type==='once'&&eff.mechanic==='challenge'&&G.npcCardState.challengeActive){
       G.npcCardState.challengeActive=false;
       if(total<G.npcCardState.challengeThreshold){
-        G.pPts=Math.max(0,G.pPts-G.npcCardState.challengePenalty);
-        bonusMsg+=' -'+G.npcCardState.challengePenalty+' '+npc.name;
-        setStatusMsg(npc.name+' — LOST '+G.npcCardState.challengePenalty+'!','red');
+        /* THE BANK PAYS FIRST, THEN THE POOL - the same rule the rival's side
+           uses. `total` is added to G.pPts further down, so clamping against
+           the pool alone ignored the bank about to arrive: pool 0 with a 1000
+           bank lost NOTHING while printing LOST 500. The bust path keeps the
+           pool-only form on purpose - a busted turn has no bank to take. */
+        var _chPenP=Math.min(G.npcCardState.challengePenalty,(G.pPts||0)+total);
+        var _chFromBankP=Math.min(total,_chPenP);
+        total-=_chFromBankP;
+        G.pPts=Math.max(0,(G.pPts||0)-(_chPenP-_chFromBankP));
+        bonusMsg+=' -'+_chPenP+' '+npc.name;
+        setStatusMsg(npc.name+' — LOST '+_chPenP+'!','red');
       }else{bonusMsg+=' CHALLENGE MET!';}
     }
   });
@@ -28412,8 +28420,8 @@ function runOppTurn(){
             var _chFromBank=Math.min(pts,penalty);
             pts=Math.max(0,pts-_chFromBank);
             G.oPts=Math.max(0,G.oPts-(penalty-_chFromBank));
-            triggerCard(cid,npc.name+' −'+eff.penalty,true);
-            setStatusMsg(npc.name+' — '+G.rung.name+' LOST '+eff.penalty+'!','gold');
+            triggerCard(cid,npc.name+' −'+penalty,true);
+            setStatusMsg(npc.name+' — '+G.rung.name+' LOST '+penalty+'!','gold');
           }else{triggerCard(cid,npc.name+' MET',true);}
         }
         /* Halve first bank (fine_print) */
