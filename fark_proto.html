@@ -14437,88 +14437,14 @@ function _gbRenderRoom(tier,bossReady){
   if(!host){host=document.createElement('div');host.id='gbRoom';scr.appendChild(host);}
   _gbSheetInfra();
   /* P22: the Room wears the painted mockup now */
-  if(typeof _ptRoom==='function'){_ptRoom(host,tier,bossReady);return;}
-  var n=S.run.night||{roster:[],seatsPlayed:[],results:[]};
-  var buy=Math.min(S.run.gold||0,NIGHT_BUYINS[S.run.tier]||0);
-  var pts=S.run.points||0,need=tier.pointsNeeded||0;
-  var bossName=(tier.boss?tier.boss.name:'BOSS').toUpperCase();
-  var openSeats=[];n.roster.forEach(function(pat,i){if(!n.seatsPlayed[i])openSeats.push(i);});
-
-  var hearts='';for(var i=0;i<3;i++)hearts+='<span class="gbx-heart'+(i<(S.run.coins||0)?'':' lost')+'"></span>';
-  var pips='';for(var c=0;c<need;c++)pips+=(c<pts?'●':'○');
-
-  var h='<div class="gbx" style="min-height:100%;display:flex;flex-direction:column;padding:10px 14px 14px">'
-    /* top strip: status only */
-    +'<div style="display:flex;justify-content:space-between;align-items:center;height:44px">'
-    +'<span>'+hearts+'</span>'
-    +'<div class="gbx-goldchip">'+(S.run.gold||0)+'g</div></div>'
-    /* chalk chip → the book */
-    +'<div style="display:flex;justify-content:center;margin-top:-38px;pointer-events:none">'
-    +'<div class="gbx-chalk" style="pointer-events:auto" onclick="_gbRules()">NIGHT '+((S.run.tier||0)+1)+' / 8'
-    +(playerTitle()!=='nobody'?' · '+playerTitle():'')+'<br><span class="gbx-label" style="color:#aaa">tap = innkeep&#39;s book</span></div></div>';
-
-  /* ledger + tavern chips — only rendered when they exist */
-  var chips='';
-  if(S.run._tabOwed)chips+='<div class="gbx-box sub" onclick="famTabPay()" style="height:30px;padding:0 10px;font-size:12px;cursor:pointer">ledger: tab '
-    +S.run._tabOwed+'g'+((S.run.gold||0)>=S.run._tabOwed?' · PAY IT':'')+'</div>';
-  /* HAIR OF THE DOG: a STATUS, not a control. No onclick and no pointer -
-     the player armed nothing and can do nothing about it; it fired when they
-     lost and pays at their next first bank. It sits in the chip row because
-     that is where run-scoped state is read, but it must not look tappable in a
-     row where everything else is.
-     BOTH SIDES, because P447 gave this card a downside: showing only the
-     doubled bank would advertise the pure-upside version that no longer
-     exists. */
-  if(S.run._hotdNext)chips+='<div class="gbx-box sub" style="height:30px;padding:0 10px;'
-    +'font-size:12px;cursor:default;border:2px solid #6b4a7a;opacity:.92">'
-    +'HUNGOVER \u2014 first bank doubled, bust before it and a circle goes</div>';
-  if(famOwnTier('the_tab')>0&&!S.run._tabOwed)chips+='<div class="gbx-box sub" onclick="famTabTake()" style="height:30px;padding:0 10px;font-size:12px;cursor:pointer">THE TAB — borrow 250g</div>';
-  if(famOwnTier('double_stakes')>0)chips+='<div class="gbx-box'+(S.run._dsArmed?'':' sub')+'" onclick="_rsToggle(&quot;_dsArmed&quot;);showScreen(&quot;gauntlet&quot;)" '
-    +'style="height:30px;padding:0 10px;font-size:12px;cursor:pointer'+(S.run._dsArmed?';border:2px solid #a58a3c':'')+'">'
-    +(S.run._dsArmed?'DOUBLE STAKES ARMED':'double stakes')+'</div>';
-  if(famOwnTier('for_keeps')>0)chips+='<div class="gbx-box'+(S.run._fkArmed?'':' sub')+'" onclick="_rsToggle(&quot;_fkArmed&quot;);showScreen(&quot;gauntlet&quot;)" '
-    +'style="height:30px;padding:0 10px;font-size:12px;cursor:pointer'+(S.run._fkArmed?';border:2px solid #8a2d2d':'')+'">'
-    +(S.run._fkArmed?'FOR KEEPS ARMED — this match is for dice':'for keeps')+'</div>';
-  if(chips)h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px">'+chips+'</div>';
-
-  /* tavern scene spacer */
-  h+='<div style="flex:1;display:flex;align-items:center;justify-content:center;min-height:40px">'
-    +'<span class="gbx-label">tavern scene · innkeep at the bar</span></div>';
-
-  if(!bossReady){
-    /* EARNING STATE — boss door above the tiles, tiles own the thumb band */
-    h+='<div class="gbx-btn danger" style="height:72px;gap:4px" onclick="_gbBossPeek()">'
-      +'<div>BOSS — '+bossName+'</div>'
-      +'<div style="font-size:15px;letter-spacing:4px">'+pips+' <span class="gbx-label" style="letter-spacing:0">'
-      +(need-pts)+' more win'+((need-pts)===1?'':'s')+' to challenge</span></div></div>';
-    h+='<div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;align-content:flex-end;padding:12px 0 8px">';
-    n.roster.forEach(function(pat,i){
-      h+=_gbSeatTile(pat,i,n,buy,false);
-    });
-    h+='</div>';
-  }else{
-    /* BOSS READY — remaining seats demote to a compact greed row, the door goes big */
-    if(openSeats.length){
-      h+='<div style="font-size:12px;opacity:.75;margin:4px 0 2px">still drinking — gold runs (no more circles needed)</div>'
-        +'<div style="display:flex;gap:8px;flex-wrap:wrap">';
-      openSeats.forEach(function(i){h+=_gbSeatTile(n.roster[i],i,n,buy,true);});
-      h+='</div>';
-    }
-    h+='<div style="padding:10px 0 8px">'
-      +'<div class="gbx-btn danger" style="height:150px;gap:8px" onclick="_gbBossPeek()">'
-      +'<div style="font-size:22px">'+bossName+' IS WAITING</div>'
-      +'<div style="font-size:13px;letter-spacing:6px">'+pips+'&nbsp;READY</div>'
-      +'<div class="gbx-label">challenge — a heart is at stake · relic on his table</div></div></div>';
-  }
-
-  /* bottom nav */
-  h+='<div style="display:flex;justify-content:space-between;gap:8px;padding-top:6px">'
-    +'<div class="gbx-btn" style="height:52px;flex:1" onclick="SFX.nav();showScreen(\'menu\')">menu</div>'
-    +'<div class="gbx-btn" style="height:52px;flex:1" onclick="famLoadoutShow()">loadout</div>'
-    +'<div class="gbx-btn" style="height:52px;flex:1" onclick="SFX.nav();showScreen(\'shop\')">shop</div>'
-    +'</div></div>';
-  host.innerHTML=h;
-}
+  /* THE PAINTED ROOM IS THE ROOM. This used to be a gate with 81 lines of
+     fallback layout below it - the pre-P22 Room, kept after _ptRoom replaced
+     it. _ptRoom is a top-level declaration so the gate could never fall
+     through, and the copy below never ran: P451 patched the chip row in BOTH
+     and only _ptRoom's rendered.
+     Deleted 2026-08-03. Unconditional now on purpose - if _ptRoom ever goes
+     missing this should throw rather than silently render an empty Room. */
+  _ptRoom(host,tier,bossReady);}
 /* one seat tile; compact=true for the boss-ready greed row */
 function _gbSeatTile(pat,i,n,buy,compact){
   var spent=n.seatsPlayed[i];

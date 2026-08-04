@@ -29,7 +29,12 @@ await until(()=>vis(document.getElementById('screen-match')),9000);
    ran against a state that may never have arrived - and reported the
    result as a verdict about the game. Three probes were fixed one at a
    time for exactly this before it was swept for. */
-const _pre = await until(()=>typeof G!=='undefined'&&G&&G.phase==='idle',14000);
+/* 30s, NOT 14s. Under the full suite the page renders through SwiftShader
+   with other work in flight and match init is slower than standalone -
+   apv_preserve needed exactly this raise for exactly this gate. A probe
+   that habitually declines has stopped checking anything; the decline is
+   the safety net, not the goal. */
+const _pre = await until(()=>typeof G!=='undefined'&&G&&G.phase==='idle',30000);
 if (!_pre) return { skip: 'precondition never arrived: apv_bust_settle_player had nothing to measure' };
 await sleep(600);
 
