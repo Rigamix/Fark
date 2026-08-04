@@ -82,4 +82,12 @@ v.oneSiteOnly = (function () {
 
 /* the player's own card must be untouched */
 v.playerCardIntact = !!(CFX && CFX.ill_omen && typeof CFX.ill_omen.rivalTurn === 'function');
-return { verdict: v };
+/* DIAGNOSTICS OUT OF THE VERDICT. run_probes marks a probe INDET if ANY verdict
+   key is non-boolean, so the _-prefixed values I was returning for debugging
+   made every one of these probes indeterminate in the suite - passing when run
+   by hand, invisible as a regression guard where it counts. Underscore keys
+   move to notes; a genuine null stays in the verdict, because "did not run"
+   SHOULD read as indeterminate. */
+const notes = {};
+for (const k of Object.keys(v)) { if (k[0] === '_') { notes[k] = v[k]; delete v[k]; } }
+return { verdict: v, notes: notes };

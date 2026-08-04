@@ -140,4 +140,11 @@ verdict._live = live;
 verdict.playerSideIntact = raises.some(x => x.actor === 'p') || raises.length > 0;
 
 famFire = _real;
-return { verdict };
+/* DIAGNOSTICS OUT OF THE VERDICT. run_probes marks a probe INDET if ANY verdict
+   key is non-boolean, so the _-prefixed debugging values made this probe
+   indeterminate in the suite - passing by hand, invisible as a regression guard
+   where it counts. A genuine null STAYS in the verdict: "did not run" should
+   read as indeterminate, which is exactly what it meant here for a while. */
+const notes = {};
+for (const k of Object.keys(verdict)) { if (k[0] === '_') { notes[k] = verdict[k]; delete verdict[k]; } }
+return { verdict, notes };
