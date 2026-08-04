@@ -244,6 +244,36 @@ that produced the flat rule (font, coin, diamond) were about *art*, not the
 folder. `--font-px` is still the old pixel font and still the wrong reach —
 `FK_ART.font` is the right one.
 
+**WRITE THE PATCH AS THE VERIFICATION STEP.** Three findings on 2026-08-03
+were disqualified at exactly one moment, and it was the same moment each time:
+
+  endMatch      ranked first as a seam by touch-count (4 cards). Writing the
+                patch meant reading the positions - 6% to 98% across 619 lines.
+                A shared FUNCTION, not a shared moment.
+  the classifier `` through a heredoc became a backspace byte. Fixing the
+                file meant looking at the bytes.
+  seatCommit    3 cards, tight by percentage. Writing the patch meant reading
+                the lines between them, which turned out to be load-bearing.
+
+**This is not "patch-writing is a lucky place to catch bugs."** It is the one
+step where a description gets tested against the literal text instead of a
+summary of it. Everything upstream - the ranking, the percentages, the counts,
+the seam-count assumption - is reasoning ABOUT the code. Writing the patch is
+reading it.
+
+So: **do not treat a measurement as settled until a patch has been written
+against it.** If the patch is not going to be written yet, the finding is
+provisional and says so. Percentages and counts are a way of deciding WHERE to
+read, never a substitute for reading.
+
+**AND seatCommit's dependency chain is why the stakes are not just tidiness.**
+`S.run.gold -= buy` must run after Double Stakes doubles the buy-in because it
+READS a value that instruction produces. A hook firing all three cards at one
+point would not have been merely imprecise - it would have silently broken a
+real dependency. The failure mode was "wrong answer", not "wrong grouping".
+Same as the two-stage turn clear, where the gap between phases is where each
+path does its own work.
+
 **SCRUTINISE CLEAN RESULTS HARDER THAN DIRTY ONES.** Six instrument artifacts
 in one day invented findings; the seventh HID one, and it was by far the most
 expensive. `cfx_bespoke` reported all 20 cards fully migrated. `short_fuse` was
