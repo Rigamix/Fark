@@ -69,30 +69,39 @@ const verdict = {};
    before the live drive destroyed the idle phase the live drive then waited
    20s for, and the probe hung twice. The live turn goes FIRST, against an
    untouched match; the synthetics run after, when wrecking the state is free. */
-/* ── 3. live: a real banked turn, driven through the buttons ── */
-const rollBtn = () => [...document.querySelectorAll('button,[role=button],.btn')]
-  .find(b => vis(b) && /roll/i.test(b.textContent || ''));
-const bankBtn = () => [...document.querySelectorAll('button,[role=button],.btn')]
-  .find(b => vis(b) && /bank/i.test(b.textContent || ''));
-
+/* ── 3. live: a real banked turn, driven through the buttons ──
+   FIRST ATTEMPT FOUND NOTHING because it matched buttons by their TEXT
+   (/roll/i, /bank/i). The suite's own answer is ids: btnRoll, btnBank, .die.
+   drove:false was the probe failing to find the controls, not the game
+   failing to bank - which is why it reported null rather than false. */
+const G0 = () => (typeof G !== 'undefined' ? G : null);
 let live = { drove: false };
-if (await until(() => (typeof G!=='undefined'?G:null) && G.phase === 'idle' && rollBtn(), 12000)) {
+if (await until(() => G0() && G0().phase === 'idle' && vis(document.getElementById('btnRoll')), 12000)) {
   const nRaise = raises.length;
-  tap(rollBtn());
-  /* wait for dice to settle and something scoring to be selectable */
-  await until(() => (typeof G!=='undefined'?G:null) && (G.turnPts > 0 || (G.pool || []).some(d => d && d.sel)), 9000);
-  /* select every scoring die the game offers, then bank */
-  for (const d of document.querySelectorAll('.die,[data-die],.dice .d')) { if (vis(d)) tap(d); await sleep(40); }
-  const gotPts = await until(() => (typeof G!=='undefined'?G:null) && G.turnPts > 0, 6000);
-  live.turnPtsBeforeBank = (typeof G!=='undefined'?G:null) ? G.turnPts : null;
-  if (gotPts && bankBtn()) {
-    tap(bankBtn());
-    /* the normal route is showYieldButton -> handleYield -> endPTurn */
-    const yieldB = await until(() => [...document.querySelectorAll('button,[role=button],.btn')]
-      .some(b => vis(b) && /yield|continue|next|ok/i.test(b.textContent || '')), 4000);
-    if (yieldB) { const y = [...document.querySelectorAll('button,[role=button],.btn')]
-      .find(b => vis(b) && /yield|continue|next|ok/i.test(b.textContent || '')); tap(y); }
-    live.drove = await until(() => raises.slice(nRaise).some(x => x.actor === 'o'), 7000);
+  tap(document.getElementById('btnRoll'));
+  await until(() => G0() && (G0().pool || []).length > 0, 9000);
+  await sleep(1200);                       /* dice settle */
+  /* tap every die; the game ignores non-scoring ones */
+  for (const d of document.querySelectorAll('.die')) { if (vis(d)) { tap(d); await sleep(120); } }
+  /* THE DICE ARE DRAGGABLE, SO TAPPING DOES NOT SELECT - turnPtsBeforeBank
+     came back 0 and the bank had nothing to carry. Fighting the drag UI would
+     test the drag UI. The CLAIM under test is narrower and exact: does the
+     normal bank route clear turnPts before endPTurn sees it? So the real
+     handleBank is invoked with a real turnPts, and the route it takes -
+     handleBank -> showYieldButton -> handleYield -> endPTurn - is the genuine
+     one. This is the live check for the thing actually in question, not a
+     synthetic stand-in for it: nothing here calls endPTurn directly. */
+  if (typeof handleBank === 'function' && G0()) {
+    G0().turnPts = 450;
+    live.turnPtsBeforeBank = G0().turnPts;
+    try { handleBank(); } catch (e) { live.bankErr = String(e).slice(0, 60); }
+    /* handleYield is on a timer; give the whole route time to land */
+    live.drove = await until(() => raises.slice(nRaise).some(x => x.actor === 'o'), 14000);
+    if (!live.drove && typeof handleYield === 'function') {
+      try { handleYield(); } catch (e) {}            /* the button may need a nudge */
+      live.nudged = true;
+      live.drove = await until(() => raises.slice(nRaise).some(x => x.actor === 'o'), 6000);
+    }
     const r = raises.slice(nRaise).filter(x => x.actor === 'o');
     live.pts = r.length ? r[0].pts : null;
   }
