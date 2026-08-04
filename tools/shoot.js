@@ -163,6 +163,40 @@ async function evaluate(cdp, expr, awaitPromise) {
   }
   await sleep(300);
 
+  /* ══ DID THE PAGE ACTUALLY LOAD? ═════════════════════════════════════════
+     A dead server does not produce an error here. Chrome serves its own error
+     document, readyState goes to 'complete', and every eval runs against it
+     perfectly happily - reporting whatever a page with none of the game in it
+     reports. On 2026-08-03 that cost five wrong measurements in a row: every
+     game global came back `undefined` and the honest reading of that is "the
+     patch broke everything", which is not what happened.
+
+     THIS IS A DIFFERENT FAILURE FROM EVERY OTHER INSTRUMENT BUG THIS PROJECT
+     HAS HAD. The string verdict, the prose-counting assert, the mangled regex,
+     the zero-overlap check - each RAN AGAINST THE REAL GAME and misjudged what
+     it saw. There was signal underneath the mistake. This one runs against
+     NOTHING and returns a verdict anyway, and no probe can tell "verified
+     absent" from "never actually looked".
+
+     run_probes has had a pre-flight for this and it works - it refuses the
+     whole suite. But every ad-hoc `shoot.js --eval-file` bypassed it, which is
+     how all five happened. The check belongs HERE, where the eval is, so it
+     covers the suite, the one-off, and a server that dies mid-run.
+
+     URL-based, not game-based, on purpose: shoot.js is aimed at the live Pages
+     build and at scratch files too, so "is this the game" is the wrong
+     question. "Did the browser end up somewhere other than where it was sent"
+     is right, and chrome-error:// is exactly that. */
+  const landed = await evaluate(cdp, 'location.href').catch(() => null);
+  if (!landed || /^chrome-error:/.test(landed)) {
+    console.error('PAGE DID NOT LOAD: ' + URL_);
+    console.error('the browser is on ' + (landed || '(unknown)') + ' — almost');
+    console.error('always a dead dev server. Nothing was evaluated: a result');
+    console.error('from an error page is not a result, it is a description of');
+    console.error('the error page.');
+    process.exit(3);
+  }
+
   /* is WebGL real here, or did it silently fall back to nothing? */
   const gl = await evaluate(cdp, `(()=>{try{
     const c=document.createElement('canvas');

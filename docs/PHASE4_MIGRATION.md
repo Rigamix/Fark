@@ -335,5 +335,32 @@ was the code's fault rather than the probe's:
 5. **`_ptRoom` calls `_getS()`**, which re-reads the run from storage — an
    in-memory flag set without `save()` is discarded before it renders.
 
-The first one is the one worth a guard: a suite can pass against a dead server
-for any probe whose verdict is satisfied by absence.
+### The dead-server guard — and a correction to what I said about it
+
+**I said the suite could pass against a dead server. It could not.**
+`run_probes` has had a pre-flight since it was written — it evaluates
+`document.getElementById("end-ov")` and refuses the whole run if that is
+missing. Verified against a dead port: it exits 2 and runs nothing.
+
+**The real gap was narrower and it was mine.** Every ad-hoc
+`shoot.js --eval-file` bypasses that pre-flight, and all five of the wrong
+measurements above were ad-hoc runs, not suite runs.
+
+**Fixed at the right level: the guard is now in `shoot.js`.** After navigation
+it reads `location.href`, and if the browser ended up somewhere other than
+where it was sent — `chrome-error://` being exactly that — it prints what
+happened and exits 3 without evaluating anything. That covers the suite, the
+one-off, and the case the pre-flight structurally cannot: a server that dies
+*mid-run*, after the pre-flight has already passed.
+
+URL-based rather than game-based on purpose: `shoot.js` is also aimed at the
+live Pages build and at scratch files, so "is this the game" is the wrong
+question and would false-positive. "Did the browser end up where it was sent"
+is right.
+
+**Why this failure is a different category** from every other instrument bug
+this project has had: the string verdict, the prose-counting assert, the
+mangled ``, the zero-overlap check — each ran against the real game and
+misjudged what it saw. There was signal underneath the mistake. This one runs
+against **nothing** and returns a verdict anyway, and no probe can tell
+"verified absent" from "never actually looked".
