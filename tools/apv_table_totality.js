@@ -46,7 +46,20 @@ function check(label, have, want, via){
 /* ── 1. MATCOL over every die the game can put on the table ── */
 let matcolOK = null;
 try{
-  const ids = DICE_TYPES.map(d => d.id);
+  /* DEPRECATED DICE ARE NOT PART OF THE DOMAIN, and `dep` is the game's own
+     flag rather than my judgement: the one place DICE_TYPES is iterated for
+     gameplay - the strategy-tag builder - does `if(d.dep)return`, and neither
+     jade3 nor ruby is referenced by id anywhere else in the file. A tint for a
+     die nothing can deal is a tint nothing can ask for.
+     This was the suite's last red for a whole session and it was two-thirds
+     right: brass and crystal WERE missing and ARE reachable (patron dieBias
+     hands them out), and got added. jade3 and ruby were the domain being
+     wrong. Reported below either way, so narrowing the assertion does not
+     hide them. */
+  const live = DICE_TYPES.filter(d => !d.dep);
+  const ids = live.map(d => d.id);
+  out.notes.push('MATCOL domain excludes dep:true dice: '
+    + DICE_TYPES.filter(d => d.dep).map(d => d.id).join(', '));
   matcolOK = check('MATCOL', Object.keys(D3X.MATCOL), ids);
 }catch(e){ out.notes.push('MATCOL: ' + e.message); }
 
