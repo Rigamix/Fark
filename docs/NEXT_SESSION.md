@@ -2,12 +2,30 @@
 
 Written before a context compaction. Everything needed to pick up cleanly.
 
-**Deployed HEAD: `181610a` on branch `fark`. Backup tag: `pre-effect-system`
+**Deployed HEAD: `f431bb9` on branch `fark`. Backup tag: `pre-effect-system`
 (`a0aed7d`) — the last commit before the plan work began.**
 
 ---
 
-## 1. THE NEXT TASK — Phase 4: read the nine by hand
+## 1. THE NEXT TASK — Phase 5, and nothing is blocking
+
+Phase 4 is done: the nine read by hand, three seams built (`commit`,
+`deadRoll`, `rivalTurn`), the run-scoped domain measured and built
+(`matchArmed` + `_rs*`), and the suite is fully green for the first time.
+`docs/PHASE4_MIGRATION.md` and `docs/RUNSCOPE_SEAMS.md` carry the reasoning,
+including three findings that were argued DOWN by reading the actual lines.
+
+**Phase 5 — Observers** is next in `EFFECT_SYSTEM_PLAN.md`, and it is also
+where NPC family cards land (`G.oF` is deliberately empty until then; `tamper`
+and the boss card pools are both waiting on it).
+
+**Before starting it, read `docs/PHASE4_MIGRATION.md`'s instrument notes.**
+Phase 4 spent more time correcting its own tools than writing game code, and
+every one of those corrections is a trap Phase 5 can walk into unchanged.
+
+---
+
+## 1z. SUPERSEDED — Phase 4: read the nine by hand
 
 **Start here, and read them one at a time.** `docs/PHASE4_MIGRATION.md` carries
 a retraction: the "group 1 is clean" result was wrong, `short_fuse` is half-on,
@@ -139,9 +157,21 @@ use 69; migration progress uses 65. See `EFFECT_INVENTORY.md` §1.
 
 ## 2. AFTER THAT
 
-- Fix the two remaining Phase 2 reds: relic `.dtype-` blocks (8), and `MATCOL`'s
-  4 missing materials. **Still not reachable — but not for the reason I first
-  gave.** I said migration converts them on load before any render. The real
+- ~~Fix the two remaining Phase 2 reds~~ **DONE, and this entry was right in a
+  way I then contradicted.** The 8 relic `.dtype-` blocks are added (derived
+  from each relic's MATCOL tint). `MATCOL` gained brass and crystal, and the
+  probe's domain now excludes `dep:true` dice (jade3, ruby) by the game's own
+  retirement flag.
+  **But I claimed brass/crystal were reachable via patron `dieBias` and they
+  are not** — `dieBias` filters `ps.dicePool`, and no patron pool contains
+  either. This file said "still not reachable" and was correct; I contradicted
+  it without reconciling first. The entries stay (a tint costs nothing, and is
+  right the moment either enters a pool), but they are not a live-bug fix.
+  **Still open:** whether the SHOP can sell them. Unverified either way.
+  **And a real find in passing:** the `ones` persona's `dieBias` names brass
+  and crystal and the `hoard` persona names crystal — none of which is in any
+  `dicePool`, so those bias entries select nothing.
+- ~~superseded~~ The original note read: I said migration converts them on load before any render. The real
   reason, measured: `brass` and `crystal` are handed out only by
   `generateDiceLoadout`, which is called only by `initBossRewardScreen`, and
   **nothing calls `showScreen('bossreward')`** — that screen has no entry point.
@@ -405,13 +435,17 @@ question alone before counting the folder.
 
 ## 5. STATE
 
-- **Suite:** 17 probes — 16 pass, 1 fail carrying two known reds (`MATCOL`'s
-  retired materials, relic `.dtype-`). Baseline in `tools/probe_baseline.json`,
-  re-recorded at `31adddd`. Full run ≈ 12–18 min.
+- **Suite: 29 probes, FULLY GREEN** — 28 pass, 0 fail, 0 error (one probe,
+  `apv_break_borrowed`, skips by design when the roll gives it nothing).
+  Baseline re-recorded at `f431bb9`. Full run ≈ 12–18 min.
+  Every run appends to `tools/probe_history.jsonl`, so an intermittent failure
+  arrives with its own evidence instead of dying with the scrollback.
 - **Phases done:** 1 (runner), 2 (totality), 3 (CSS live), 4 (feat roster),
   4b (badge remap), 5 (asset registry). Reports in `docs/PHASE_REPORTS.md`.
-- **Deployed HEAD is `31adddd` on `fark`** — the header at the top of this file
-  names the older one; this line is the current truth.
+- **Deployed HEAD is `f431bb9` on `fark`.** This file used to carry TWO
+  different HEADs — the header said one, this line said another — which is the
+  contradiction-is-a-stop case sitting inside the handover itself. One value,
+  here and at the top, and they are updated together or not at all.
 - **Plans:** `docs/EFFECT_SYSTEM_PLAN.md`, `docs/VISUAL_INTEGRITY_PLAN.md`.
 - **Sim numbers are stale** — every figure in `archive/SIM_RESULTS_2026-07-31.md`
   predates the sweep removal, the Trade harness fix and today's five rulings.
