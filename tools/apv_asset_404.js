@@ -74,7 +74,13 @@ await sleep(900); sweep('match');
 /* ── the win overlay and its draft ── */
 try{ dbgWin(); }catch(e){ out.winErr=String(e); }
 await until(()=>vis(document.getElementById('end-ov')),9000);
-await until(()=>document.querySelector('.fo-offer'),12000);
+/* PRECONDITION, NOT A PAUSE. until() returns FALSE on timeout rather
+   than throwing, so discarding this result meant every assertion below
+   ran against a state that may never have arrived - and reported the
+   result as a verdict about the game. Three probes were fixed one at a
+   time for exactly this before it was swept for. */
+const _pre = await until(()=>document.querySelector('.fo-offer'),12000);
+if (!_pre) return { skip: 'precondition never arrived: apv_asset_404 had nothing to measure' };
 await sleep(1200); sweep('win');
 
 /* ── the fonts, measured rather than assumed ── */

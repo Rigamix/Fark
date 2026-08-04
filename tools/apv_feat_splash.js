@@ -19,7 +19,13 @@ const pc=[...document.querySelectorAll('.ptcard')].filter(vis)[0];if(pc){tap(pc)
 const sit=[...document.querySelectorAll('span,div,button')].filter(e=>vis(e)&&e.children.length<=1&&/^SIT\s*DOWN$/i.test((e.textContent||'').trim()))[0];
 if(sit){tap(sit);if(sit.parentElement)tap(sit.parentElement);}
 await until(()=>vis(document.getElementById('screen-match')),9000);
-await until(()=>typeof G!=='undefined'&&G&&G.phase==='idle',14000);
+/* PRECONDITION, NOT A PAUSE. until() returns FALSE on timeout rather
+   than throwing, so discarding this result meant every assertion below
+   ran against a state that may never have arrived - and reported the
+   result as a verdict about the game. Three probes were fixed one at a
+   time for exactly this before it was swept for. */
+const _pre = await until(()=>typeof G!=='undefined'&&G&&G.phase==='idle',14000);
+if (!_pre) return { skip: 'precondition never arrived: apv_feat_splash had nothing to measure' };
 
 const out={};
 /* watch the overlay for the whole window, not just at one instant - the

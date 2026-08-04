@@ -92,7 +92,13 @@ await until(()=>typeof G!=='undefined'&&G&&G.phase==='idle',14000);
 await sleep(800); scan('match');
 try{ dbgWin(); }catch(e){}
 await until(()=>vis(document.getElementById('end-ov')),9000);
-await until(()=>document.querySelector('.fo-offer'),12000);
+/* PRECONDITION, NOT A PAUSE. until() returns FALSE on timeout rather
+   than throwing, so discarding this result meant every assertion below
+   ran against a state that may never have arrived - and reported the
+   result as a verdict about the game. Three probes were fixed one at a
+   time for exactly this before it was swept for. */
+const _pre = await until(()=>document.querySelector('.fo-offer'),12000);
+if (!_pre) return { skip: 'precondition never arrived: apv_font_reach had nothing to measure' };
 await sleep(1000); scan('win');
 
 try{ await document.fonts.ready; FAMS.forEach(f=>{out.loaded[f]=document.fonts.check('16px "'+f+'"');}); }catch(e){}

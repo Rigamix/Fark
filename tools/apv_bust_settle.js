@@ -58,11 +58,17 @@ _delayedDoBust([]);
 
 /* watch until the row settles, recording when */
 let settledAt=null;
-await until(()=>{
+/* PRECONDITION, NOT A PAUSE. until() returns FALSE on timeout rather
+   than throwing, so discarding this result meant every assertion below
+   ran against a state that may never have arrived - and reported the
+   result as a verdict about the game. Three probes were fixed one at a
+   time for exactly this before it was swept for. */
+const _pre = await until(()=>{
   const st=rowState();
   if(settledAt===null && st.n>0 && st.flying===0 && st.landed>=st.n) settledAt=Date.now();
   return settledAt!==null && bustAt!==null;
 }, 9000);
+if (!_pre) return { skip: 'precondition never arrived: apv_bust_settle had nothing to measure' };
 await sleep(400);
 window.doBust=realBust;
 

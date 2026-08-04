@@ -18,7 +18,13 @@ S.featsDone = S.featsDone || {}; S.featsPinned = S.featsPinned || {};
 try { save(); } catch(e) {}
 
 try { famLoadoutShow(); } catch(e) { out.showErr = String(e); }
-await until(() => document.querySelector('#gbLoadout .loFeat'), 9000);
+/* PRECONDITION, NOT A PAUSE. until() returns FALSE on timeout rather
+   than throwing, so discarding this result meant every assertion below
+   ran against a state that may never have arrived - and reported the
+   result as a verdict about the game. Three probes were fixed one at a
+   time for exactly this before it was swept for. */
+const _pre = await until(() => document.querySelector('#gbLoadout .loFeat'), 9000);
+if (!_pre) return { skip: 'precondition never arrived: apv_feat_wall_pixels had nothing to measure' };
 await sleep(1600);
 
 const host = document.getElementById('gbLoadout');

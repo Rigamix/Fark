@@ -77,7 +77,22 @@ for f in files:
     # failure this session and the first QUIET one: the other two were a syntax
     # error and an unterminated string, which announce themselves. This one just
     # produced a confident wrong list.
-    can_decline = bool(re.search(r'return\s*\{\s*(skip|err)', src))
+    # THREE STATES, NOT TWO. The first version asked only "does this return a
+    # skip", which flagged apv_css_live and apv_prop_overlap as unable to
+    # decline. Both CAPTURE their final wait and handle the timeout their own
+    # way - css_live records out.note, prop_overlap sleeps and carries on. That
+    # is a probe that knows its wait can fail; it just answers differently.
+    # Reading the binary as "has no decline path" is what made the fix patch
+    # rename a variable both probes went on to read.
+    declines = bool(re.search(r'return\s*\{\s*(skip|err)', src))
+    _st = [m.start() for m in re.finditer(r'await\s+until\s*\(', src)]
+    handles_last = False
+    if _st:
+        _i = _st[-1] - 1
+        while _i >= 0 and src[_i] in ' \t':
+            _i -= 1
+        handles_last = _i >= 0 and src[_i] not in ('\n', ';', '{', '}')
+    can_decline = declines or handles_last
     n = len(per.get(name, []))
     (ok if (can_decline or not n) else risky).append((name, n, can_decline))
 

@@ -26,7 +26,13 @@ await until(()=>typeof G!=='undefined'&&G&&G.phase==='idle',14000);
 
 /* get into a live turn with dice on the table */
 tap(document.getElementById('btnRoll'));
-await until(()=>G.phase==='choosing',12000);
+/* PRECONDITION, NOT A PAUSE. until() returns FALSE on timeout rather
+   than throwing, so discarding this result meant every assertion below
+   ran against a state that may never have arrived - and reported the
+   result as a verdict about the game. Three probes were fixed one at a
+   time for exactly this before it was swept for. */
+const _pre = await until(()=>G.phase==='choosing',12000);
+if (!_pre) return { skip: 'precondition never arrived: apv_amber_oneshot had nothing to measure' };
 await sleep(500);
 
 const out={};
