@@ -149,6 +149,25 @@ and render, but only HIGH ROLLER has fired through a live match.
 
 ---
 
+## 5. The `ill_omen` mirror needs a value that doesn't exist yet
+
+You ruled: mirror it, trigger and payoff flipping together. **The moment is
+there; the payload isn't**, and that is a design call, not a build detail.
+
+A boss-held `ill_omen` has to pay when the *player's* turn resolves. That is
+`endPTurn` - which zeroes `G.turnPts` on its first working line, has an earlier
+bust path that clears it sooner still, and **records nothing about whether the
+turn ended in a bank or a bust**. Six call sites, both endings.
+
+So the seam needs one new thing: **what the player's turn was worth, and how it
+ended**, available at the moment it ends. Same missing value `commit` needs.
+
+**The question is only whether a bust counts as a turn worth zero, or as no
+turn at all.** They give different cards. Once that's settled it's one scoping
+pass covering both seams.
+
+---
+
 ## Everything else you answered is now work, not a question
 
 Tracked in `NEXT_SESSION.md` and being built. Nothing there needs you.
