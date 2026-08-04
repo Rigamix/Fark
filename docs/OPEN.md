@@ -7,43 +7,41 @@ is a valid answer.** Answered items are deleted, not marked — this stays short
 
 ---
 
-## 0. Seam coverage — measured, so you can size it without either of us guessing
+## 0. What does a rival-turn card mean when a BOSS holds it?
 
-The opponent's turn raises **one** of eight CFX seams (`bank`). Making boss
-cards work means raising the other seven. I declined to estimate that after two
-wrong sizes today, so I measured `runOppTurn` instead — same test that settled
-`matchArmed` and disqualified `endMatch`/`seatCommit`.
+Four of eight opponent seams now raise (`turnStart`, `roll`, `bust`,
+`bankBonus`, plus `bank` which already did). Sized per seam in
+`docs/REWORK_MEASURED_2026-08-03.md`. What is left splits three ways, and only
+one of them is a question for you.
 
-**`runOppTurn` is 1,438 lines.** Per seam:
+**`commit` — needs its own scoping pass, not a decision.** Ten genuinely
+different sites: the rival re-scores under fog, encore and reprisal variants.
+Guessing at how to unify them would repeat the `seatCommit` mistake at a new
+site. I can do that pass; it just is not a gate flip.
 
-| seam | shape | what it costs |
-|---|---|---|
-| `roll` | **POINT** — 1 site | an added call |
-| `turnStart` | near-point — 2 sites, 24 lines apart | probably one call |
-| `bank` | POINT | **already done** |
-| `commit` | **SPREAD** — 7 sites across 425 lines | a decision about *which* moment is the seam |
-| `bust` | **SPREAD** — 7 sites across 229 lines | same |
-| `bankBonus` | **SPREAD** — 12 sites across 885 lines | same |
-| `deadRoll` | **ABSENT** | the opponent turn has no dead-roll concept at all |
+**`deadRoll` — needs new opponent behaviour.** The rival's turn never asks "did
+this roll score nothing". Nothing to wire until the NPC can have that concept.
 
-**So it is three different jobs, not one:**
+**`rivalTurn` — this one needs your answer, and it is genuinely ambiguous.**
 
-1. **Two seams are additions** (`roll`, `turnStart`) — small, and they'd let
-   `slow_cook` and `short_fuse` work for a boss through the bus.
-2. **Three are the `seatCommit` decision**, three times over, inside a
-   1,438-line function: *which* of 7/7/12 sites is the moment. That is the
-   decision that disqualified `seatCommit` at 30 lines; here it is at 425, 229
-   and 885.
-3. **One is impossible as things stand.** `deadRoll` has no counterpart — the
-   opponent turn never asks "did this roll score nothing" the way the player's
-   does. A card depending on it cannot work for a boss however it is gated.
+The card is declared on your turn and pays on the rival's. **Held by a boss,
+"the rival" is you** — so its moment is `endPTurn`, not `runOppTurn`, and its
+meaning inverts with the holder.
 
-**And that last row retro-justifies a deferral I made for the wrong reason.** I
-held `fools_gold_f` back over sim pacing. The real blocker is that its seam does
-not exist on the opponent's side at all.
+`ill_omen` is the live example: *"declare they will bust this turn. Right: take
+800 from them. Wrong: they gain 400."*
 
-*Still no time estimate from me — but the shape says this splits cleanly, and
-(1) is separable from (2) and (3) if you want the small part first.*
+- **Mirror it** — the boss declares you will bust, and takes from you if you do.
+  Symmetric, and it makes the boss's turn a thing you play *around*.
+- **Boss-side only on its own turn** — the boss predicts its own outcome. Reads
+  oddly: a prediction about yourself is a bet with no read.
+- **Never give bosses this shape at all** — some cards are player-only by
+  nature, and this may be one.
+
+*My rec: mirror it.* The card's tension is "can I read the other player", and
+that works in both directions. But "the rival" flipping meaning by holder is a
+rules question, and picking whichever interpretation compiles is exactly what
+this should not be.
 
 
 ---

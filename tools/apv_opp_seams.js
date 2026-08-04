@@ -78,19 +78,34 @@ if (!atMatch || !idle) return { skip: 'setup did not reach an idle match' };
 G.phase = 'opp';
 try { runOppTurn(); } catch (e) { /* it schedules and returns */ }
 const oppRan = await until(() => (G && (G.oppTurnCount || 0) > 0), 20000);
-await sleep(4000);
+/* WAIT FOR THE TURN TO END, NOT A FIXED SLEEP. bust and bankBonus fire at the
+   CONCLUSION of the rival's turn, and a 4s sleep caught turnStart and roll but
+   ended before either terminal seam - which reads as "those two seams do not
+   fire" when the turn simply had not got there. runOppTurn sets
+   G._oppTurnActive true at entry and false when it finishes; that flag is the
+   real end, so wait on it. */
+const oppFinished = await until(() => G && G._oppTurnActive === false, 30000);
+await sleep(1200);
 
 const oppSeams = seen.filter(x => x.endsWith(":'o'") || x.endsWith(':o'));
 return {
-  oppRan, oppTurnCount: G && G.oppTurnCount,
+  oppRan, oppFinished, oppTurnCount: G && G.oppTurnCount,
   oppTurnStart: seen.filter(x => x === 'turnStart:o').length,
   oppRoll:      seen.filter(x => x === 'roll:o').length,
+  oppBust:      seen.filter(x => x === 'bust:o').length,
+  oppBankBonus: seen.filter(x => x === 'bankBonus:o').length,
+  allOppSeams:  [...new Set(seen.filter(x => x.endsWith(':o')))].sort(),
   playerStill:  seen.filter(x => x === 'turnStart:p').length,
   cardsThatFiredForOpponent: fired,
   verdict: {
     /* the seams exist and were raised on a real rival turn */
     turnStartRaised: seen.filter(x => x === 'turnStart:o').length >= 1,
     rollRaised:      seen.filter(x => x === 'roll:o').length >= 1,
+    /* P461: the rival's turn either busts or banks, so at least ONE of these
+       must raise on any completed turn - asserting both would flap on the
+       roll. Which one fired is reported above. */
+    bustOrBankRaised: (seen.filter(x => x === 'bust:o').length
+                     + seen.filter(x => x === 'bankBonus:o').length) >= 1,
     /* the player's own seams are untouched */
     playerSeamsIntact: seen.filter(x => x === 'turnStart:p').length >= 1,
     /* and NOTHING started firing for the boss - the patch ungates nobody */
