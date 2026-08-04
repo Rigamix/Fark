@@ -7,31 +7,32 @@ is a valid answer.** Answered items are deleted, not marked — this stays short
 
 ---
 
-## 0. The boss holds family cards that do nothing — what should they do?
+## 0. Thirteen boss cards do nothing — six need a gate, seven need an AI
 
-`_famInitOpp` already deals a boss **1–3 family cards** from its family. They
-are shown to the player. **Not one of them has any effect.**
+**Correcting what I put here earlier.** I said the boss's cards all do nothing.
+Wrong: `_npcFamCard` wires **ten** of them and they work. Full retraction in
+`docs/P5_NPC_CARDS.md`.
 
-Every passive hook is gated player-only (`_fxMine`) — 15 of 15. Details and
-the full list in `docs/P5_NPC_CARDS.md`.
+**The real gap is 13 cards a boss can be dealt that have no opponent path at
+all, and it splits in two:**
 
-**Why this needs you rather than a sweep:** each card needs a decision about
-what the opponent's version *means*, and two of them have traps.
+- **6 passive** — `bloom`, `cultivate`, `reprisal`, `falling_star`,
+  `vanguard_f`, `fools_gold_f`. The hook exists and is gated player-only.
+  These just need to fire. *Small, and I can do it.*
+- **7 active** — `transmute`, `powder_keg`, `sacrifice`, `steady_hand`,
+  `fair_trade`, `tamper`, `for_keeps`. An NPC never *taps* a card, so these
+  need `_npcArmActives` taught when a boss should choose to play each one.
+  **That is AI behaviour design, not wiring, and nobody has scoped it.**
 
-- **Four cards already have a SECOND opponent implementation** in the
-  `_npcFamCard` block — `slow_cook`, `retort`, `double_or_nothing`,
-  `pickpocket`. Migrating those onto the bus without removing them there makes
-  the boss fire them **twice**.
-- **`ill_omen`** is declared on your turn and pays on the rival's. Opponent-held,
-  "the rival" is *you*. Which side it fires on is a rule, not an implementation.
-- **`fools_gold_f`** cancels a bust by claiming a dead roll. A boss doing that
-  changes NPC turn pacing, which the sim is tuned against.
+**The trap still stands** for anything migrated from the ten that already work:
+remove it from `_npcFamCard` in the same patch or it fires twice.
 
-*My rec: do the symmetric ones first — `pickpocket`, `reprisal`, `retort`,
-`short_fuse`, `slow_cook`, `vanguard_f`, `bloom`, `cultivate` — each removed
-from `_npcFamCard` in the same patch where it goes owner-aware. Leave
-`ill_omen`, `fools_gold_f` and `double_or_nothing` until the pacing question is
-answered.* But which cards a boss should meaningfully hold is yours.
+*My rec: ship the 6 passive ones — they are pure gate changes, none is in
+`_npcFamCard`, so there is no double-fire risk. Leave the 7 actives until you
+want to design boss card-play, which is its own piece of work.*
+
+**Still deferred on your ruling:** `ill_omen` (whose "rival's turn" flips
+meaning by holder), `fools_gold_f`'s pacing effect, and `double_or_nothing`.
 
 ---
 

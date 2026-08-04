@@ -57,3 +57,50 @@ already-live opponent implementation** for `slow_cook`, `retort`,
 opponent has to be removed from there in the same move, or it fires twice.
 
 **Needs a ruling before building.** In `OPEN.md`.
+
+
+---
+
+# CORRECTION — "none of them work" was wrong, twice over
+
+Published above: *"the boss holds cards and none of them work"*, resting on
+"four cards already have a second opponent implementation". **Both numbers were
+wrong, and the headline with them.**
+
+## `_npcFamCard` covers TEN cards, not four
+
+`stargazer, slow_cook, sleight, retort, preserve, pickpocket, ill_omen,
+honeytrap, encore, double_or_nothing`. It reads `G.oF` — the opponent's own
+family cards — so those ten **do** have opponent behaviour. It lives in a
+hand-written NPC path rather than in `CFX`, which is exactly the split P5 exists
+to close, but **"not on the bus" is not "does nothing"** and I conflated them.
+
+Where "four" came from: an earlier pass (`cfx_bespoke`) surfaced the
+`_npcFamCard` sites that appeared among nine unexplained hits. That was a subset
+produced by a *different question*, and I carried its count into a claim about
+the whole population without re-deriving it — the same shape as reading
+`missing[:6]` as the data.
+
+## The real gap is 13 cards, and it splits by kind
+
+Of the cards a boss can actually be dealt (live, in a boss family), these have
+no NPC path and no opponent-firing hook:
+
+| kind | cards | what they need |
+|---|---|---|
+| **passive** (6) | `bloom`, `cultivate`, `reprisal`, `falling_star`, `vanguard_f`, `fools_gold_f`\* | just to **fire** — the hook exists and is gated player-only |
+| **active** (7) | `transmute`, `powder_keg`, `sacrifice`, `steady_hand`, `fair_trade`, `tamper`, `for_keeps` | an **AI decision to use them** — an NPC never taps a card |
+
+\* `fools_gold_f` is `kind:'active'` but its effect is on `deadRoll`/`bust`,
+which fire automatically — so it behaves like a passive here.
+
+**That distinction is the actionable one and I did not have it before.** Six
+cards need a gate changed. Seven need `_npcArmActives` taught when a boss should
+*choose* to play them — a genuinely larger job, and one nobody has scoped.
+
+## What stands from the original finding
+
+The bus split is real: the opponent's working cards work through a parallel
+hand-written path, not through `CFX`, and migrating any of the ten means
+removing it from `_npcFamCard` in the same move or it fires twice. That part
+was right. The size and the headline were not.
