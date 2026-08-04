@@ -168,6 +168,45 @@ pass covering both seams.
 
 ---
 
+## 7. `challenge` has the same bug on the PLAYER side — and fixing it is a third difficulty change
+
+P466 fixed the rival being over-charged. Measuring the other side to tabulate it
+found the mirror image: **the player can be under-charged to nothing.**
+
+The bank is added to `G.pPts` *after* the challenge branch runs, so the player's
+`Math.max(0, G.pPts - penalty)` clamps against the **pool alone** and ignores the
+bank about to arrive.
+
+| pool / bank / penalty | player loses | rival loses |
+|---|---|---|
+| 1000 / 200 / 500 | 500 | 500 |
+| 100 / 1000 / 500 | **100** | 500 |
+| 0 / 1000 / 500 | **0** | 500 |
+
+**With an empty pool the challenge does nothing at all**, while printing
+`LOST 500`. Same shape as the boss bug — the message vouches for the error —
+pointing the other way. And it bites hardest early in a match, which is exactly
+when a low pool plus a big bank is normal.
+
+**Why this is not shipped already.** The boss fix was unambiguous: the code took
+*more* than it announced. Here it takes *less*, which could be read as
+deliberate mercy. And fixing it makes **the player** harsher — a third
+difficulty change in one session, on top of the two in §6, which is precisely
+the accumulation you just asked not to let blur.
+
+**The ruling:** does the penalty apply against pool + bank, like the rival's, or
+is the player's leniency intended?
+
+- **Apply against both** — mirrors the rival, matches the announced number, and
+  the card starts working when the pool is empty. Player gets harsher.
+- **Leave it** — then the message should stop claiming a number it will not take.
+
+**This blocks the `challenge` table row**, and only that. The row cannot express
+"the same rule from two seats" while the two seats genuinely clamp against
+different things — that difference *is* the question.
+
+---
+
 ## 6. Boss difficulty moved TWICE tonight — is the aggression pass still measured?
 
 Two separate changes landed on the same axis in one session, and only one was
