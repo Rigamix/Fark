@@ -2,8 +2,57 @@
 
 Written before a context compaction. Everything needed to pick up cleanly.
 
-**Deployed HEAD: `f431bb9` on branch `fark`. Backup tag: `pre-effect-system`
+**Deployed HEAD: `ec6d569` on branch `fark`. Backup tag: `pre-effect-system`
 (`a0aed7d`) — the last commit before the plan work began.**
+
+---
+
+## 0. READ THIS FIRST — one fact changes how the rest of this doc reads
+
+**`generateOppCards` begins `return [];`** (P1-cutover stub, comment says *"NPC
+family cards land in P5"*). So **`G.oCards` is always empty in the live game.**
+Verified in a real match: `G.oCards.length === 0`, `G.oF.length === 1`.
+
+**Two different systems, and the doc below blurs them:**
+
+| layer | state |
+|---|---|
+| **family cards** — `G.oF`, CFX, `_famInitOpp` | **works.** A boss really does hold 1–3 |
+| **NPC cards** — `G.oCards`, `mechanic===` branches | **off.** The list is never populated |
+
+So every `mechanic===` branch inside a `G.oCards` loop is unreachable today.
+`G.pCards` branches are live once the player holds cards. **Before calling any
+`mechanic` branch a live bug, check which list gates it** —
+`tools/reach_audit.py` answers it per site.
+
+### What last session built
+
+**Live now:** Law 6 (symmetry by default) in the brief with its two named
+exceptions; five mechanic tables (`WILD_LEVEL`, `BANK_FX`, `BANK_TAKE`/
+`SCORE_DRAIN`, `BUST_FX`); the `challenge` double-charge fixed on both seats;
+`ill_omen` migrated to one site reading "scored nothing"; the `rivalTurn` seam
+mirrored with a real turn value.
+
+**Built, waiting on the stub:** `_oppFxOwnA/B/Player/Drain` extracted from
+`finOpp` and wired into `tools/sim_harness.js`, plus a real latent fix — the
+harness read `rung.cards`, a field **no rung has**. All correct; none of it
+moves a number until the `return [];` lifts.
+
+### Three docs that save re-deriving anything
+
+- **`REACH_AUDIT.md`** — which of last session's fixes change a match today (8 of 10), per site
+- **`OCARDS_STUBBED.md`** — the stub, and what it means for the mirror-pair work
+- **`SPREAD_AUDIT.md`** — where the `spread` statistic holds and where it structurally cannot
+
+### The one habit worth carrying in
+
+Eight instruments were wrong last session and **every one measured something
+adjacent to the question** — timing delays read as rule parameters, field names
+as behaviour, lines as statements, a captured block missing the condition that
+gated it. Standing check on any new tool: *does what it measures share a name
+with the real thing, or is it the real thing?* And **a unanimous result or a
+zero delta is a tell, not a finding** — three identical sim runs are what
+uncovered the stub above.
 
 ---
 
