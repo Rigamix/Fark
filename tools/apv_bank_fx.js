@@ -51,8 +51,21 @@ v._rivalHost = (typeof runOppTurn === 'function') ? 'runOppTurn' : null;
 v.bothSeatsWired = (function(){
   try {
     const ROWS = ['flat_bonus','double_first_bank','halve_first_bank','gain_when_ahead'];
+/* THE RIVAL'S BANK CODE NO LONGER LIVES IN runOppTurn. P470 extracted its four
+   card-effect loops into named functions so the sim could call them, and this
+   probe went red by searching the old location - the code moved, nothing
+   vanished (verified: every marker is in the extracted set, none in
+   runOppTurn). A structural refactor SHOULD break a probe that hard-codes
+   structure; the fix is to name the new structure, not to loosen the check. */
+const _rivalSrc = (function(){
+  var out = (typeof runOppTurn === 'function') ? runOppTurn.toString() : '';
+  ['_oppFxOwnA','_oppFxOwnB','_oppFxPlayer','_oppFxDrain'].forEach(function(n){
+    if (typeof window[n] === 'function') out += window[n].toString();
+  });
+  return out;
+})();
     const hb = handleBank.toString();
-    const ro = (typeof runOppTurn === 'function') ? runOppTurn.toString() : '';
+    const ro = _rivalSrc;
     v._playerRows = ROWS.filter(k => hb.indexOf('BANK_FX.'+k) >= 0);
     v._rivalRows  = ROWS.filter(k => ro.indexOf('BANK_FX.'+k) >= 0);
     return v._playerRows.length === 4 && v._rivalRows.length === 4;

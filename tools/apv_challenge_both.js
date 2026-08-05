@@ -19,8 +19,21 @@ const strip = t => t.replace(/\/\*[\s\S]*?\*\//g, '');
 /* ── the player's shipped lines ── */
 const pSrc = strip(handleBank.toString());
 const pGrab = /var _chPenP=[\s\S]{0,300}?G\.pPts=Math\.max\(0,\(G\.pPts\|\|0\)-\(_chPenP-_chFromBankP\)\);/.exec(pSrc);
+/* THE RIVAL'S BANK CODE NO LONGER LIVES IN runOppTurn. P470 extracted its four
+   card-effect loops into named functions so the sim could call them, and this
+   probe went red by searching the old location - the code moved, nothing
+   vanished (verified: every marker is in the extracted set, none in
+   runOppTurn). A structural refactor SHOULD break a probe that hard-codes
+   structure; the fix is to name the new structure, not to loosen the check. */
+const _rivalSrc = (function(){
+  var out = (typeof runOppTurn === 'function') ? runOppTurn.toString() : '';
+  ['_oppFxOwnA','_oppFxOwnB','_oppFxPlayer','_oppFxDrain'].forEach(function(n){
+    if (typeof window[n] === 'function') out += window[n].toString();
+  });
+  return out;
+})();
 /* ── the rival's shipped lines ── */
-const rSrc = strip(runOppTurn.toString());
+const rSrc = strip(_rivalSrc);
 const rGrab = /var _chFromBank=[\s\S]{0,240}?G\.oPts=Math\.max\(0,G\.oPts-\(penalty-_chFromBank\)\);/.exec(rSrc);
 v._pFound = !!pGrab; v._rFound = !!rGrab;
 

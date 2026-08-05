@@ -22,8 +22,21 @@ v.drainClamps = SCORE_DRAIN.periodic_drain(300, {amount:500}) === 0   /* never n
              && SCORE_DRAIN.periodic_drain(1000,{amount:400}) === 600;
 v.drainNoAmount = SCORE_DRAIN.periodic_drain(700, {}) === 700;
 
+/* THE RIVAL'S BANK CODE NO LONGER LIVES IN runOppTurn. P470 extracted its four
+   card-effect loops into named functions so the sim could call them, and this
+   probe went red by searching the old location - the code moved, nothing
+   vanished (verified: every marker is in the extracted set, none in
+   runOppTurn). A structural refactor SHOULD break a probe that hard-codes
+   structure; the fix is to name the new structure, not to loosen the check. */
+const _rivalSrc = (function(){
+  var out = (typeof runOppTurn === 'function') ? runOppTurn.toString() : '';
+  ['_oppFxOwnA','_oppFxOwnB','_oppFxPlayer','_oppFxDrain'].forEach(function(n){
+    if (typeof window[n] === 'function') out += window[n].toString();
+  });
+  return out;
+})();
 /* ── the challenge fix, run from the SHIPPED source ── */
-const src = runOppTurn.toString();
+const src = _rivalSrc;
 /* STRIP COMMENTS BEFORE ASSERTING ABSENCE. The patch's own comment QUOTES the
    expression it removed, and toString() returns comments - so this tripped on
    the note explaining the fix rather than on live code. Same trap as every
