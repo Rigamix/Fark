@@ -25987,14 +25987,14 @@ function doBust(){
     var npc=getNpcCard(cid);if(!npc)return;var eff=npc.effect;
     /* the_nightshift: Mabel gains pts when player busts */
     if(eff.type==='on_player_bust'&&eff.mechanic==='gain_pts'){
-      G.oPts+=eff.amount;
+      G.oPts+=BUST_FX.gain_pts.amount(eff);
       _pendingBustTriggers.push({cid:cid,msg:npc.name+' +'+eff.amount});
     }
     /* judgment_npc: if player busts N times, penalty */
-    if(eff.type==='on_player_bust'&&eff.mechanic==='punish_busts'&&G.npcCardState.playerBustCount>=eff.threshold&&!G.npcCardState.usedOnce[cid]){
+    if(eff.type==='on_player_bust'&&eff.mechanic==='punish_busts'&&G.npcCardState.playerBustCount>=BUST_FX.punish_busts.threshold(eff)&&!G.npcCardState.usedOnce[cid]){
       G.npcCardState.usedOnce[cid]=true;
-      G.pPts=Math.max(0,G.pPts-eff.penalty);
-      _pendingBustTriggers.push({cid:cid,msg:npc.name+' −'+eff.penalty+'!'});
+      G.pPts=Math.max(0,G.pPts-BUST_FX.punish_busts.penalty(eff));
+      _pendingBustTriggers.push({cid:cid,msg:npc.name+' −'+BUST_FX.punish_busts.penalty(eff)+'!'});
     }
   });
   /* Reckless die penalty (Brass): each brass die in loadout adds penalty on bust */
@@ -26162,6 +26162,16 @@ function _applyCommitBonuses(selDice,pts,cards){
    block_low_bank take all of it or none of it - a row returning `a` or `0` is
    ceremony - and the player expresses zeroing by aborting the whole bank while
    the rival zeroes a running local, which is not the same expression. */
+/* BUST_FX - the bust path's two real mirrors. Each mechanic has exactly one
+   card, and the boss side used to repeat that card's numbers as `||` fallbacks
+   while the player side had none. The defaults live here now, so both seats
+   read the same source and the card stays the only other place they appear. */
+var BUST_FX={
+  gain_pts:{amount:function(e){return (e&&e.amount)||500;}},
+  punish_busts:{threshold:function(e){return (e&&e.threshold)||2;},
+                penalty:function(e){return (e&&e.penalty)||1500;}}
+};
+
 var BANK_TAKE={
   steal_pct: function(a,e){return Math.ceil(a*(e.pct||0));}
 };
@@ -27880,16 +27890,16 @@ function runOppTurn(){
         G.pCards.forEach(function(cid){
           var _obNpc=getNpcCard(cid);if(!_obNpc||!_obNpc.effect)return;
           if(_obNpc.effect.type==='on_player_bust'&&_obNpc.effect.mechanic==='gain_pts'){
-            G.pPts+=(_obNpc.effect.amount||500);updHUD();
-            triggerCard(cid,_obNpc.name+' +'+(_obNpc.effect.amount||500),true);
+            G.pPts+=BUST_FX.gain_pts.amount(_obNpc.effect);updHUD();
+            triggerCard(cid,_obNpc.name+' +'+BUST_FX.gain_pts.amount(_obNpc.effect),true);
           }
           if(_obNpc.effect.type==='on_player_bust'&&_obNpc.effect.mechanic==='punish_busts'&&
-             G.npcCardState.oppBustCount>=(_obNpc.effect.threshold||2)){
+             G.npcCardState.oppBustCount>=BUST_FX.punish_busts.threshold(_obNpc.effect)){
             G.npcCardState.playerOnce=G.npcCardState.playerOnce||{};
             if(!G.npcCardState.playerOnce[cid]){
               G.npcCardState.playerOnce[cid]=true;
-              G.oPts=Math.max(0,G.oPts-(_obNpc.effect.penalty||1500));updHUD();
-              triggerCard(cid,_obNpc.name+' −'+(_obNpc.effect.penalty||1500),true);
+              G.oPts=Math.max(0,G.oPts-BUST_FX.punish_busts.penalty(_obNpc.effect));updHUD();
+              triggerCard(cid,_obNpc.name+' −'+BUST_FX.punish_busts.penalty(_obNpc.effect),true);
             }
           }
         });

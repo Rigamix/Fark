@@ -42,6 +42,19 @@ while the boss is immune only on turn 1. That is an off-by-one between two copie
 of one card, and it is a question about intent, not a merge — it goes to
 `OPEN.md` rather than into a table.
 
-**`bust_survive` should not be tabulated at all.** A probabilistic save that
-costs half the bank and an unconditional one are different cards wearing one
-mechanic name.
+**`bust_survive` should not be tabulated at all** — ruled. A probabilistic save
+that costs half the bank and an unconditional one are different cards wearing one
+mechanic name, and the chance-based half-save was already proposed as a real
+boss-personality lever. **Kept apart on purpose, not unfinished work** — so
+nobody reconciles them later thinking they found a loose end.
+
+## Shipped (P468)
+
+`gain_pts` and `punish_busts` as `BUST_FX`, both seats plus both messages. The
+duplication was literal: each mechanic has exactly one card
+(`the_nightshift` 500; `judgment_npc` 2/1500) and the boss side repeated those
+numbers as `||` fallbacks while the player side had none.
+
+The boss's `gain_pts` **message** repeated the expression a third time, caught by
+the patch's own old-form assert — a message computing its number from a second
+copy is the `challenge` pattern in miniature, so both messages now read the row.
