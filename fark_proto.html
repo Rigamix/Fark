@@ -11971,7 +11971,7 @@ const NPC_CARDS=[
    type:'active',maxUses:2,timing:'yielding',
    eff:'YOUR 2 SCORING DICE → 3 (twice)',desc:"Twice per match, Grog stumbles into the table and knocks TWO of your scoring dice (1s/5s) down to 3s. Four dice ruined over a match.",
    playerDesc:"Activate while yielding: knock two of the opponent's scoring dice (1s/5s) down to 3s. Two uses per match.",
-   effect:{type:'twice',mechanic:'swap_best_to_3',swapN:2,uses:2}},
+   effect:{type:'twice',mechanic:'swap_best_to_3',swapN:2}},
 
   /* ── MABEL ── */
   {id:'the_last_stitch_npc',name:'THE LAST STITCH',icon:'🧵',rarity:'npc',npcOnly:true,owner:'mabel',
@@ -12167,6 +12167,20 @@ function _archCountIn(cards,arch){
 }
 function _archCount(arch){return G&&G.pCards?_archCountIn(G.pCards,arch):0;}
 function _hasArchSet(arch){return _archCount(arch)>=3;}
+/* _useCap - THE ONLY PLACE A CARD'S USE LIMIT COMES FROM (Law 7).
+   The label on the card IS the mechanic; it is not a decoration beside a second
+   field that does the real work. `type` was previously read by two mechanics out
+   of fourteen and ignored everywhere else.
+   Takes the CARD ID rather than an effect object on purpose: the call sites sit
+   in four different scopes and only `cid` is in all of them, and looking the
+   card up means the limit is read from the card definition rather than from
+   whichever local was nearest. */
+function _useCap(cidOrEff){
+  var e=cidOrEff;
+  if(typeof cidOrEff==='string'){ var c=getNpcCard(cidOrEff); e=c&&c.effect; }
+  var t=e&&e.type;
+  return t==='thrice'?3:(t==='twice'?2:1);
+}
 function getNpcCard(id){return NPC_CARDS_MAP[id]||null;}
 
 /* Build CARD_COVERS from CARD_BG+CARDS for gauntlet compatibility */
@@ -23372,7 +23386,7 @@ function _updateNpcCardVisuals(){
     var isExhausted=false;
     if(eff.type==='start_bonus')isExhausted=true;
     else if(typeof usedVal==='boolean')isExhausted=usedVal;
-    else if(typeof usedVal==='number'&&typeof eff.uses==='number')isExhausted=usedVal>=eff.uses;
+    else if(typeof usedVal==='number')isExhausted=usedVal>=_useCap(eff);
     mc.classList.toggle('used',isExhausted);
   });
 }
@@ -24157,8 +24171,8 @@ function startPTurn(){
   /* NPC card challenges (steady_hands, the_verdict_npc) — fire once mid-match */
   G.oCards.forEach(function(cid){
     var npc=getNpcCard(cid);if(!npc)return;
-    if(npc.effect.type==='once'&&npc.effect.mechanic==='challenge'&&!G.npcCardState.usedOnce[cid]&&G.turnNum>=3&&G.pPts>=npc.effect.threshold&&Math.random()<0.4){
-      G.npcCardState.usedOnce[cid]=true;G.npcCardState.challengeActive=true;
+    if(npc.effect.type==='once'&&npc.effect.mechanic==='challenge'&&(G.npcCardState.usedOnce[cid]||0)<_useCap(cid)&&G.turnNum>=3&&G.pPts>=npc.effect.threshold&&Math.random()<0.4){
+      G.npcCardState.usedOnce[cid]=(G.npcCardState.usedOnce[cid]||0)+1;G.npcCardState.challengeActive=true;
       G.npcCardState.challengeThreshold=npc.effect.threshold;G.npcCardState.challengePenalty=npc.effect.penalty;
       setStatusMsg(npc.name+'! BANK '+npc.effect.threshold+'+ OR LOSE '+npc.effect.penalty,'red');
       _updateNpcCardVisuals();_updatePlayerCardVisuals();
@@ -24175,7 +24189,7 @@ function startPTurn(){
 
     /* swap_die: swap player's best die for NPC's worst */
     if(eff.mechanic==='swap_die'&&!_ironGrip){
-      G.npcCardState.usedOnce[cid]=true;
+      G.npcCardState.usedOnce[cid]=(G.npcCardState.usedOnce[cid]||0)+1;
       /* dieRank defined globally */
       if(eff.mode==='best_for_worst'){
         var pBestIdx=0;G.matchDice.forEach(function(d,i){if(dieRank(d)>dieRank(G.matchDice[pBestIdx]))pBestIdx=i;});
@@ -24210,7 +24224,7 @@ function startPTurn(){
     }
     /* steal_die: NPC takes player's best die */
     if(eff.mechanic==='steal_die'&&!_ironGrip){
-      G.npcCardState.usedOnce[cid]=true;
+      G.npcCardState.usedOnce[cid]=(G.npcCardState.usedOnce[cid]||0)+1;
       /* dieRank reuse */
       var dieRank2=dieRank;
       var pBestIdx3=0;G.matchDice.forEach(function(d,i){if(dieRank2(d)>dieRank2(G.matchDice[pBestIdx3]))pBestIdx3=i;});
@@ -24977,7 +24991,7 @@ function _afterRollImpl(){
        swapN = how many dice to swap (default 1; quick_hands swaps 2).
        swapTo = the value to swap to (default 3; quick_hands uses 2).
        grogs_bump keeps the legacy 1-die-to-3 behaviour. */
-    var _sb3MaxUses=eff.uses||1;
+    var _sb3MaxUses=_useCap(cid);/* P477: from `type`, not a second field */
     if(eff.mechanic==='swap_best_to_3'&&(G.npcCardState.usedOnce[cid]||0)<_sb3MaxUses&&G.turnNum>=(2+_csDelayRoll)){
       var scoring=free.filter(function(d){return (d.val===1||d.val===5)&&!d._frozen;});
       if(scoring.length>0){
@@ -25017,7 +25031,7 @@ function _afterRollImpl(){
     /* reroll_scoring: reroll one scoring die, up to eff.uses times.
        NOT iron_gate_npc - that card carries steal_on_bust. Naming the
        mechanic keeps this checkable against the branch below it. */
-    if(eff.mechanic==='reroll_scoring'&&(G.npcCardState.usedOnce[cid]||0)<eff.uses&&free.length>1){
+    if(eff.mechanic==='reroll_scoring'&&(G.npcCardState.usedOnce[cid]||0)<_useCap(cid)&&free.length>1){
       var scoring2=free.filter(function(d){return (d.val===1||d.val===5)&&!d._frozen;});
       if(scoring2.length>0){
         G.npcCardState.usedOnce[cid]=(G.npcCardState.usedOnce[cid]||0)+1;
@@ -25044,8 +25058,8 @@ function _afterRollImpl(){
       }
     }
     /* crown_authority / blessed_dice / corvus_writ: reroll ALL kept dice (once) */
-    if(eff.mechanic==='reroll_all_kept'&&!G.npcCardState.usedOnce[cid]&&G.kept.length>0&&G.turnNum>=2){
-      G.npcCardState.usedOnce[cid]=true;
+    if(eff.mechanic==='reroll_all_kept'&&(G.npcCardState.usedOnce[cid]||0)<_useCap(cid)&&G.kept.length>0&&G.turnNum>=2){
+      G.npcCardState.usedOnce[cid]=(G.npcCardState.usedOnce[cid]||0)+1;
       /* Flash every kept die red + spark before wiping */
       try{
         document.querySelectorAll('#keptTray .die').forEach(function(el){
@@ -25053,10 +25067,29 @@ function _afterRollImpl(){
           spawnPixelSparks(el,6);
         });
       }catch(e){}
-      G.kept=[];G.turnPts=0;
-      /* Pulse the NPC card so it's obvious which card fired */
+      /* P475 - A REAL REROLL (Law 7: the card says reroll, so it rerolls).
+         This used to be `G.kept=[];G.turnPts=0;` - a wipe, which is not what
+         any of the card's three text fields promise. Every selected die now
+         takes a fresh face from the game's own roller and each group is
+         RESCORED, so points follow the new faces: worse, better, or nothing.
+         That also makes it a wager rather than a punishment, which the wipe
+         never was.
+         GROUPS WITH NO DICE ARE LEFT ALONE - shatter payouts and steals are
+         kept rows that were never selected dice, and a card about rerolling
+         selected dice must not quietly delete them. */
+      var _rrTotal=0;
+      (G.kept||[]).forEach(function(k){
+        if(!k||!k.dice||!k.dice.length){ _rrTotal+=(k&&k.pts)||0; return; }
+        k.dice.forEach(function(dd){ try{ dd.val=rollFace(dd.mat); }catch(e){} });
+        k.vals=k.dice.map(function(dd){ return dd.val; });
+        var _rrR=null;
+        try{ _rrR=scoreRoll(k.vals,G.pCards||[],0,{},k.dice.map(function(dd){return dd.mat;})); }catch(e){}
+        k.pts=(_rrR&&_rrR.total)||0;
+        _rrTotal+=k.pts;
+      });
+      G.turnPts=_rrTotal+(G._turnBonusPot||0);
       triggerCard(cid,npc.name+'!',false);
-      setStatusMsg(npc.name+' — KEPT DICE WIPED!','red');
+      setStatusMsg(npc.name+' — KEPT DICE REROLLED!','red');
       try{SFX.bust&&SFX.bust();}catch(e){}
       try{Haptic.bust&&Haptic.bust();}catch(e){}
       /* Brief table-shake to sell the brutality of losing all kept */
@@ -25545,8 +25578,8 @@ function _tryBustSave(free){
      so it's tried LAST after every free save. */
   for(var _omrI=0;_omrI<G.pCards.length;_omrI++){
     var _omrC=getNpcCard(G.pCards[_omrI]);
-    if(_omrC&&_omrC.effect&&_omrC.effect.mechanic==='bust_survive'&&!G.npcCardState.playerOnce[G.pCards[_omrI]]){
-      G.npcCardState.playerOnce[G.pCards[_omrI]]=true;
+    if(_omrC&&_omrC.effect&&_omrC.effect.mechanic==='bust_survive'&&(G.npcCardState.playerOnce[G.pCards[_omrI]]||0)<_useCap(G.pCards[_omrI])){
+      G.npcCardState.playerOnce[G.pCards[_omrI]]=(G.npcCardState.playerOnce[G.pCards[_omrI]]||0)+1;
       G.kept.forEach(function(k){k.pts=Math.floor(k.pts/2);});
       G.turnPts=G.kept.reduce(function(a,k){return a+k.pts;},0)+(G._turnBonusPot||0);
       refreshKeptTray();updHUD();
@@ -25854,7 +25887,7 @@ function doBust(){
   var _lsCid=G.pCards.find(function(cid){var c=getNpcCard(cid);return c&&c.effect&&c.effect.mechanic==='bust_bank_half';});
   if(_lsCid&&!(G.npcCardState.playerOnce&&G.npcCardState.playerOnce[_lsCid])){
     G.npcCardState.playerOnce=G.npcCardState.playerOnce||{};
-    G.npcCardState.playerOnce[_lsCid]=true;
+    G.npcCardState.playerOnce[_lsCid]=(G.npcCardState.playerOnce[_lsCid]||0)+1;
     var _lsTurnPts=G.kept.reduce((a,k)=>a+k.pts,0)+(G._turnBonusPot||0);
     var _lsSaved=Math.floor(_lsTurnPts/2);
     G._turnBonusPot=0;
@@ -25953,7 +25986,7 @@ function doBust(){
     var _igLost=G.kept.reduce(function(a,k){return a+k.pts;},0)+(G._turnBonusPot||0);
     if(_igLost>0){
       if(!G.npcCardState.usedOnce)G.npcCardState.usedOnce={};
-      G.npcCardState.usedOnce['iron_gate_npc']=true;
+      G.npcCardState.usedOnce['iron_gate_npc']=(G.npcCardState.usedOnce['iron_gate_npc']||0)+1;
       G.oPts+=_igLost;updHUD();
       triggerCard('iron_gate_npc','IRON GATE +'+_igLost,false);
       setStatusMsg('IRON GATE — '+(G.rung?G.rung.name:'RIVAL')+' SEIZED '+_igLost+'!','red');
@@ -25993,8 +26026,8 @@ function doBust(){
       _pendingBustTriggers.push({cid:cid,msg:npc.name+' +'+eff.amount});
     }
     /* judgment_npc: if player busts N times, penalty */
-    if(eff.type==='on_player_bust'&&eff.mechanic==='punish_busts'&&G.npcCardState.playerBustCount>=BUST_FX.punish_busts.threshold(eff)&&!G.npcCardState.usedOnce[cid]){
-      G.npcCardState.usedOnce[cid]=true;
+    if(eff.type==='on_player_bust'&&eff.mechanic==='punish_busts'&&G.npcCardState.playerBustCount>=BUST_FX.punish_busts.threshold(eff)&&(G.npcCardState.usedOnce[cid]||0)<_useCap(cid)){
+      G.npcCardState.usedOnce[cid]=(G.npcCardState.usedOnce[cid]||0)+1;
       G.pPts=Math.max(0,G.pPts-BUST_FX.punish_busts.penalty(eff));
       _pendingBustTriggers.push({cid:cid,msg:npc.name+' −'+BUST_FX.punish_busts.penalty(eff)+'!'});
     }
@@ -26205,8 +26238,8 @@ function _oppFxOwnA(pts){
            (image showed +700 with no doubling)" — likely a perception bug
            because the only feedback was a generic "×2!" pop with no number.
            Now we show the bonus added (was 350, doubled = +350 added). */
-        if(eff.type==='on_opp_bank'&&eff.mechanic==='double_first_bank'&&!G.npcCardState.usedOnce[cid]){
-          G.npcCardState.usedOnce[cid]=true;
+        if(eff.type==='on_opp_bank'&&eff.mechanic==='double_first_bank'&&(G.npcCardState.usedOnce[cid]||0)<_useCap(cid)){
+          G.npcCardState.usedOnce[cid]=(G.npcCardState.usedOnce[cid]||0)+1;
           var _mtBonus=pts;/* doubling pts adds another 1× of the original */
           pts=BANK_FX.double_first_bank(pts,eff);
           triggerCard(cid,'×2 → +'+_mtBonus,false);
@@ -26229,7 +26262,8 @@ function _oppFxOwnB(pts){
   return pts;
 }
 
-/* _oppFxPlayer - steal_pct, steal_low_bank, block_low_bank, challenge, halve_first_bank.
+/* _oppFxPlayer - steal_pct, steal_low_bank, challenge, halve_first_bank.
+   (block_low_bank was here until P476 deleted it - no card declared it.)
    Lifted UNCHANGED out of finOpp so tools/sim_harness.js can call the same code
    instead of a reimplementation that ran none of it. */
 function _oppFxPlayer(pts){
@@ -26241,20 +26275,14 @@ function _oppFxPlayer(pts){
           triggerCard(cid,npc.name+' +'+steal,true);
         }
         /* Steal opp's low bank entirely (the_lords_seal) */
-        if(eff.type==='once'&&eff.mechanic==='steal_low_bank'&&!G.npcCardState.playerOnce[cid]&&pts>0&&pts<eff.threshold){
-          G.npcCardState.playerOnce[cid]=true;
+        if(eff.type==='once'&&eff.mechanic==='steal_low_bank'&&(G.npcCardState.playerOnce[cid]||0)<_useCap(cid)&&pts>0&&pts<eff.threshold){
+          G.npcCardState.playerOnce[cid]=(G.npcCardState.playerOnce[cid]||0)+1;
           G.pPts+=pts;pts=0;
           triggerCard(cid,npc.name+' STOLE!',true);spawnPop('STOLEN!');
         }
-        /* block_low_bank, opponent side. NO CARD currently declares this
-           mechanic - it is implemented on both seats and never dealt. */
-        if(eff.type==='on_player_bank'&&eff.mechanic==='block_low_bank'&&!G.npcCardState.playerOnce[cid]&&pts>0&&pts<eff.threshold){
-          G.npcCardState.playerOnce[cid]=true;pts=0;
-          triggerCard(cid,npc.name+' BLOCKED!',true);spawnPop('⛓️ BLOCKED');
-        }
-        /* Challenge opp: if their bank is below threshold, they lose penalty (steady_hands / the_verdict_npc) */
-        if(eff.type==='once'&&eff.mechanic==='challenge'&&!G.npcCardState.playerOnce[cid]&&G.oppTurnCount>=2&&pts>0&&Math.random()<0.4){
-          G.npcCardState.playerOnce[cid]=true;
+                /* Challenge opp: if their bank is below threshold, they lose penalty (steady_hands / the_verdict_npc) */
+        if(eff.type==='once'&&eff.mechanic==='challenge'&&(G.npcCardState.playerOnce[cid]||0)<_useCap(cid)&&G.oppTurnCount>=2&&pts>0&&Math.random()<0.4){
+          G.npcCardState.playerOnce[cid]=(G.npcCardState.playerOnce[cid]||0)+1;
           if(pts<eff.threshold){
             var penalty=Math.min(eff.penalty,G.oPts+pts);
             /* THE BANK PAYS FIRST, THEN THE POOL, AND THE TOTAL IS EXACTLY `penalty`.
@@ -26272,8 +26300,8 @@ function _oppFxPlayer(pts){
           }else{triggerCard(cid,npc.name+' MET',true);}
         }
         /* Halve first bank (fine_print) */
-        if(eff.type==='on_player_bank'&&eff.mechanic==='halve_first_bank'&&!G.npcCardState.playerOnce[cid]&&pts>0){
-          G.npcCardState.playerOnce[cid]=true;
+        if(eff.type==='on_player_bank'&&eff.mechanic==='halve_first_bank'&&(G.npcCardState.playerOnce[cid]||0)<_useCap(cid)&&pts>0){
+          G.npcCardState.playerOnce[cid]=(G.npcCardState.playerOnce[cid]||0)+1;
           var half=pts-BANK_FX.halve_first_bank(pts,eff);pts-=half;
           triggerCard(cid,npc.name+' −'+half,true);
         }
@@ -26596,8 +26624,8 @@ function handleBank(){
   G.npcCardState.playerOnce=G.npcCardState.playerOnce||{};
   G.pCards.forEach(function(cid){
     var npc=getNpcCard(cid);if(!npc)return;var eff=npc.effect;
-    if(eff&&eff.type==='on_opp_bank'&&eff.mechanic==='double_first_bank'&&!G.npcCardState.playerOnce[cid]){
-      G.npcCardState.playerOnce[cid]=true;
+    if(eff&&eff.type==='on_opp_bank'&&eff.mechanic==='double_first_bank'&&(G.npcCardState.playerOnce[cid]||0)<_useCap(cid)){
+      G.npcCardState.playerOnce[cid]=(G.npcCardState.playerOnce[cid]||0)+1;
       var _mtBefore=total;total=BANK_FX.double_first_bank(total,eff);
       var _mtGain=total-_mtBefore;
       bonusMsg+=' +'+_mtGain+' '+npc.name;
@@ -26756,16 +26784,16 @@ function handleBank(){
        to commit dice mid-turn AND roll again, AND for opp turn to
        interleave at the right moment. This straight bank-halve is far
        more reliable and meaningful. */
-    if(eff.type==='on_player_bank'&&eff.mechanic==='halve_big_bank'&&!G.npcCardState.usedOnce[cid]&&total>=(eff.threshold||500)){
-      G.npcCardState.usedOnce[cid]=true;
+    if(eff.type==='on_player_bank'&&eff.mechanic==='halve_big_bank'&&(G.npcCardState.usedOnce[cid]||0)<_useCap(cid)&&total>=(eff.threshold||500)){
+      G.npcCardState.usedOnce[cid]=(G.npcCardState.usedOnce[cid]||0)+1;
       var _cwHalf=Math.floor(total/2);total-=_cwHalf;
       bonusMsg+=' -'+_cwHalf+' '+npc.name;
       triggerCard(cid,npc.name+' −'+_cwHalf+'!',false);
       (function(_cid){setTimeout(function(){if(window.DLG)DLG.triggerCard(_cid,false);},800);})(cid);
     }
     /* Steal low bank (the_lords_seal) */
-    if(eff.type==='once'&&eff.mechanic==='steal_low_bank'&&!G.npcCardState.usedOnce[cid]&&total<eff.threshold){
-      G.npcCardState.usedOnce[cid]=true;G.oPts+=total;
+    if(eff.type==='once'&&eff.mechanic==='steal_low_bank'&&(G.npcCardState.usedOnce[cid]||0)<_useCap(cid)&&total<eff.threshold){
+      G.npcCardState.usedOnce[cid]=(G.npcCardState.usedOnce[cid]||0)+1;G.oPts+=total;
       bonusMsg+=' STOLEN! '+npc.name;setStatusMsg(npc.name+' — '+G.rung.name+' STOLE '+total+'!','red');
       triggerCard(cid,npc.name+' STOLE '+total+'!',false);
       spawnPop('STOLEN!');
@@ -26776,20 +26804,7 @@ function handleBank(){
       G.npcCardState.firstBankDone=true;
       setTimeout(endPTurn,1200);return;
     }
-    /* block_low_bank, player side. NO CARD currently declares this
-       mechanic - implemented on both seats and never dealt. */
-    if(eff.type==='on_player_bank'&&eff.mechanic==='block_low_bank'&&!G.npcCardState.usedOnce[cid]&&total<eff.threshold){
-      G.npcCardState.usedOnce[cid]=true;
-      setStatusMsg(npc.name+' — BANK BLOCKED! UNDER '+eff.threshold,'red');
-      triggerCard(cid,npc.name+' BLOCKED!',false);
-      spawnPop('⛓️ BLOCKED');
-      (function(_cid){setTimeout(function(){if(window.DLG)DLG.triggerCard(_cid,false);},800);})(cid);
-      _turnScoreClear();G.numDice=6;updHUD();refreshKeptTray();_turnTableClear();setBtns(false,false);try{_renderSelTags([],0,true);}catch(e){}
-      _bankAborted=true;
-      G.npcCardState.firstBankDone=true;
-      setTimeout(endPTurn,1200);return;
-    }
-    /* NPC challenge resolution (steady_hands, the_verdict_npc) */
+        /* NPC challenge resolution (steady_hands, the_verdict_npc) */
     if(eff.type==='once'&&eff.mechanic==='challenge'&&G.npcCardState.challengeActive){
       G.npcCardState.challengeActive=false;
       if(total<G.npcCardState.challengeThreshold){
@@ -27913,8 +27928,8 @@ function runOppTurn(){
              START), so `<` really did give the boss one turn against the
              player's two. */
             if(eff.mechanic==='bust_immune_turns'&&G.npcCardState.oppTurnCount<=(eff.turns||2)){bustSaved=true;bustSavedCid=cid;}
-          if(eff.mechanic==='bust_survive'&&!G.npcCardState.usedOnce[cid]&&Math.random()<eff.chance){
-            G.npcCardState.usedOnce[cid]=true;bustSaved=true;bustSavedCid=cid;
+          if(eff.mechanic==='bust_survive'&&(G.npcCardState.usedOnce[cid]||0)<_useCap(cid)&&Math.random()<eff.chance){
+            G.npcCardState.usedOnce[cid]=(G.npcCardState.usedOnce[cid]||0)+1;bustSaved=true;bustSavedCid=cid;
             /* Halve NPC's accumulated turn points as cost of survival.
                Was incorrectly halving G.turnPts (the PLAYER's turn points)
                instead of oppBank (the NPC's). Card description: "Grog
@@ -27927,8 +27942,8 @@ function runOppTurn(){
         G.oCards.forEach(function(cid){
           if(bustSaved||bustBankHalf)return;
           var npc=getNpcCard(cid);if(!npc)return;
-          if(npc.effect.mechanic==='bust_bank_half'&&!G.npcCardState.usedOnce[cid]&&oppBank>0){
-            G.npcCardState.usedOnce[cid]=true;bustBankHalf=true;
+          if(npc.effect.mechanic==='bust_bank_half'&&(G.npcCardState.usedOnce[cid]||0)<_useCap(cid)&&oppBank>0){
+            G.npcCardState.usedOnce[cid]=(G.npcCardState.usedOnce[cid]||0)+1;bustBankHalf=true;
             var halfBank=Math.floor(oppBank/2);
             setStatusMsg(npc.name+'! '+G.rung.name+' SAVES '+halfBank,'red');
             setTimeout(function(){clearRow('oppDiceRow');finOpp(halfBank);},_oppDelay(900));
@@ -27937,8 +27952,8 @@ function runOppTurn(){
         if(bustBankHalf)return;
         /* Player active cards ending up in NPC hand (via mirror_match) — auto-trigger
            the ones that don't need timing choices. Mabel's Stitch: banks turn pts on bust. */
-        if(!bustSaved&&G.oCards.includes('mabels_stitch')&&!G.npcCardState.usedOnce['mabels_stitch']&&oppBank>0){
-          G.npcCardState.usedOnce['mabels_stitch']=true;bustBankHalf=true;
+        if(!bustSaved&&G.oCards.includes('mabels_stitch')&&(G.npcCardState.usedOnce['mabels_stitch']||0)<_useCap('mabels_stitch')&&oppBank>0){
+          G.npcCardState.usedOnce['mabels_stitch']=(G.npcCardState.usedOnce['mabels_stitch']||0)+1;bustBankHalf=true;
           setStatusMsg("MABEL'S STITCH — "+G.rung.name+' SAVES '+oppBank,'red');
           triggerCard('mabels_stitch','STITCH +'+oppBank,false);
           setTimeout(function(){clearRow('oppDiceRow');finOpp(oppBank);},_oppDelay(900));
@@ -28001,8 +28016,8 @@ function runOppTurn(){
            the player seizes the turn points the NPC just lost (oppBank). */
         if(G.pCards.includes('iron_gate_npc')){
           if(!G.npcCardState.playerOnce)G.npcCardState.playerOnce={};
-          if(!G.npcCardState.playerOnce['iron_gate_npc']&&oppBank>0){
-            G.npcCardState.playerOnce['iron_gate_npc']=true;
+          if((G.npcCardState.playerOnce['iron_gate_npc']||0)<_useCap('iron_gate_npc')&&oppBank>0){
+            G.npcCardState.playerOnce['iron_gate_npc']=(G.npcCardState.playerOnce['iron_gate_npc']||0)+1;
             G.pPts+=oppBank;updHUD();
             triggerCard('iron_gate_npc','IRON GATE +'+oppBank,true);
             setStatusMsg('IRON GATE — YOU SEIZED '+oppBank+'!','gold');
@@ -28023,8 +28038,8 @@ function runOppTurn(){
           if(_obNpc.effect.type==='on_player_bust'&&_obNpc.effect.mechanic==='punish_busts'&&
              G.npcCardState.oppBustCount>=BUST_FX.punish_busts.threshold(_obNpc.effect)){
             G.npcCardState.playerOnce=G.npcCardState.playerOnce||{};
-            if(!G.npcCardState.playerOnce[cid]){
-              G.npcCardState.playerOnce[cid]=true;
+            if((G.npcCardState.playerOnce[cid]||0)<_useCap(cid)){
+              G.npcCardState.playerOnce[cid]=(G.npcCardState.playerOnce[cid]||0)+1;
               G.oPts=Math.max(0,G.oPts-BUST_FX.punish_busts.penalty(_obNpc.effect));updHUD();
               triggerCard(cid,_obNpc.name+' −'+BUST_FX.punish_busts.penalty(_obNpc.effect),true);
             }
