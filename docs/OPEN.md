@@ -207,30 +207,29 @@ different things — that difference *is* the question.
 
 ---
 
-## 5b. The sim's opponent turn — RULED: build it, sized
+## 5b. CLOSED — but read why, because it is not a clean bill of health
 
-**Confirmed as real work and now sized** (`SIM_OPPTURN_SIZE.md`): it is a
-shared-function extraction, not a rewrite. All nine card branches separate
-cleanly at statement level; the turn *loop* stays reimplemented because it
-genuinely is an animation chain. Only the effects move, into an
-`_oppBankEffects` both `finOpp` and `F.oppTurn` call.
+The stated reason was: the sim runs no patron card effects, so its difficulty
+numbers cannot be trusted. **That reason is disproven.** `generateOppCards`
+begins `return [];` — a P1-cutover stub — so `G.oCards` is empty **in the game
+too**. The sim ran no patron card effects because there are none to run.
 
-**Still a stop until that lands** — but **the reason I first gave was wrong and
-is corrected in that doc.** `finOpp` iterates *both* card lists. Of the nine
-missing branches, three are the patron's own and **six are the player's**, all
-six taking from the patron's bank or score. So the sim omits more
-player-favouring effects than patron-favouring ones; it does **not** bias
-difficulty toward the patron as I reported.
+**The precise closure: the sim was faithful on this specific axis because
+nothing exists on either side for it to be unfaithful to.** That is not the same
+sentence as "the sim was fine".
 
-What stands: no bank-triggered card effect fires during the patron's turn for
-either seat, so no difficulty number from this sim should move a design decision
-until it does.
+**Still real, and untouched by this:**
 
-**Three things to settle during the build, not before:** whether `FSIM.quiet()`
-already suppresses `triggerCard`/`spawnPop`; where in `finOpp`'s order the
-extracted call belongs (it must match in both, or the sim measures a different
-game again); and a same-seed before/after, since patron strength will rise and
-that must stay attributable.
+- `F.oppTurn` reimplements the turn loop rather than calling it. P470–P472 moved
+  the *card effects* to shared code, which is a prerequisite for P5, not a fix
+  to a live gap.
+- `spread` is `max − min` over four agents. Sound for "these are equal" and for
+  a landslide; **unsound for a mid-sized delta**, which is the regime the
+  aggression pass used it in. See `SPREAD_AUDIT.md`.
+- Four agents, and a 4-agent spread is not comparable with an 8-agent one.
+
+**So: no longer a stop on the grounds given. Not a warrant to trust a
+mid-sized difficulty delta from it either.**
 
 ---
 
