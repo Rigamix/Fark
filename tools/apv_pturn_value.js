@@ -95,12 +95,18 @@ if (await until(() => G0() && G0().phase === 'idle' && vis(document.getElementBy
     G0().turnPts = 450;
     live.turnPtsBeforeBank = G0().turnPts;
     try { handleBank(); } catch (e) { live.bankErr = String(e).slice(0, 60); }
-    /* handleYield is on a timer; give the whole route time to land */
-    live.drove = await until(() => raises.slice(nRaise).some(x => x.actor === 'o'), 14000);
+    /* NUDGE EARLY, THEN WAIT LONG. handleYield sits behind a setTimeout, and
+       browsers throttle timers in a backgrounded tab - so waiting 14s for it
+       and only then nudging made this the one probe that failed under full
+       suite load while passing every time in isolation. A probe that flakes
+       one run in N teaches people to ignore red, which is worse than the gap
+       it was covering. The natural route still gets a fair chance first; the
+       nudge just stops a throttled timer deciding the verdict. */
+    live.drove = await until(() => raises.slice(nRaise).some(x => x.actor === 'o'), 3000);
     if (!live.drove && typeof handleYield === 'function') {
-      try { handleYield(); } catch (e) {}            /* the button may need a nudge */
+      try { handleYield(); } catch (e) {}
       live.nudged = true;
-      live.drove = await until(() => raises.slice(nRaise).some(x => x.actor === 'o'), 6000);
+      live.drove = await until(() => raises.slice(nRaise).some(x => x.actor === 'o'), 15000);
     }
     const r = raises.slice(nRaise).filter(x => x.actor === 'o');
     live.pts = r.length ? r[0].pts : null;
