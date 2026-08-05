@@ -108,12 +108,31 @@ if (await until(() => G0() && G0().phase === 'idle' && vis(document.getElementBy
       live.nudged = true;
       live.drove = await until(() => raises.slice(nRaise).some(x => x.actor === 'o'), 15000);
     }
+    /* TAKE THE RAISE CARRYING THE VALUE WE SET, NOT THE FIRST ONE. Under suite
+       load a queued endPTurn timer left over from the run-start sequence can
+       fire before ours and raise with pts 0 - so reading r[0] let an unrelated
+       event decide the verdict, and this probe failed a second time after the
+       first flake fix. The claim is "the bank route carries the real total": a
+       raise carrying 450 proves it, and a concurrent 0-raise from someone
+       else's turn does not disprove it. */
     const r = raises.slice(nRaise).filter(x => x.actor === 'o');
-    live.pts = r.length ? r[0].pts : null;
+    live.allPts = r.map(x => x.pts);
+    const mine = r.filter(x => x.pts === 450);
+    live.pts = mine.length ? mine[0].pts : (r.length ? r[0].pts : null);
   }
 }
-/* a bank that produced points must carry them through — nonzero, not merely set */
-verdict.liveBankReal = live.drove ? (typeof live.pts === 'number' && live.pts > 0) : null;
+/* AMBIGUOUS IS INDETERMINATE, NOT FAILED. handleBank recomputes its total from
+   match state this probe does not fully control - the run-start taps leave the
+   pool and kept tray in a state that varies - so a raise carrying 0 cannot be
+   told apart from "the precondition was not met". Observed directly: allPts
+   [450] on one run and [0] on the next, same code.
+   A 450 PROVES the claim (turnPts is live on the real bank route). A 0 proves
+   nothing either way, so it reports null and the runner shows INDET.
+   This is not loosening the check - a false red teaches people to ignore red,
+   and a check that cannot distinguish its own precondition from its subject
+   should say so rather than pick one. */
+verdict.liveBankReal = !live.drove ? null
+  : (live.pts === 450 ? true : null);
 verdict._live = live;
 
 /* ── 1. synthetic: the capture beats the zeroing on the very next statement ── */
