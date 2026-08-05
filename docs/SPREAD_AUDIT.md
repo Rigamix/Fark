@@ -41,3 +41,49 @@ So the aggression document's per-tier spreads and the archived roster spreads
 must never be read on the same axis, and any future run that changes the agent
 count breaks comparability with everything before it. That is not a flaw in the
 old numbers; it is a trap for the next person who puts them in one table.
+
+---
+
+# Tested: a better estimator gains nothing. The sample is the limit.
+
+This document argued `spread` (max − min) is unsound for mid-sized deltas
+**because it discards all but two of the four agents**, and implied a
+fuller-information estimator would resolve smaller changes. **That was reasoned,
+not measured. It is wrong.**
+
+Measured with `tools/spread_alternatives.py`: five seeds, per-agent win rates
+kept, three estimators computed from **the same run** - `spread`, population
+`sd`, and mean absolute deviation.
+
+| estimator | t0 → t7 fall | seed-noise | **signal-to-noise** | smallest resolvable change |
+|---|---|---|---|---|
+| `spread` | 35.33 | 3.35 | **10.6** | 19% of its range |
+| `sd` | 14.95 | 1.41 | **10.6** | 19% of its range |
+| `mad` | 12.92 | 1.22 | **10.6** | 19% of its range |
+
+**Identical, to one decimal, for all three.** Because `sd / spread = 0.424 ±
+0.006` across every tier and every seed - the four agents' dispersion has a
+stable *shape*, so `sd` is `spread` on another scale, and **rescaling cannot
+change a signal-to-noise ratio.**
+
+## What this changes
+
+**The conclusion stands; the reason and the fix do not.**
+
+- **Still true:** `spread` cannot resolve a mid-sized delta. The aggression
+  pass's 6.2 and the oppCards lift's spread column remain unreportable.
+- **Wrong:** that max−min throwing away data was the cause. It is mechanically
+  true and empirically irrelevant here.
+- **Wrong:** that switching estimator would help. It is busywork - all three
+  resolve the same 19% of their own range.
+- **The actual limit is the FOUR-AGENT SAMPLE** (and N per agent). To resolve
+  smaller moves the sweep needs more agents or more matches, not a better
+  formula.
+
+## Worth keeping as a method note
+
+A plausible mechanism ("it discards data, so it must be noisier") was stated
+confidently, repeated several times, and used to justify declining results. One
+run falsified it. **The estimator question was cheap to test and was not tested
+until it was about to drive work** - which is the same shape as everything else
+this project keeps finding, applied to a claim of mine rather than to the code.
