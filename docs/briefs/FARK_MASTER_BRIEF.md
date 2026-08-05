@@ -54,6 +54,19 @@ marked yet.
 5. Colour belongs to FAMILIES exclusively. Trait seals are single-colour
    wax (dark red), distinguished by symbol only. Tier is border metal
    (tin/silver/gold) plus a roman numeral.
+6. SYMMETRY BY DEFAULT. Whatever applies to the player applies to the NPC,
+   and whatever applies to the NPC applies to the player. A rule that reads
+   differently from the two seats needs a STATED reason — in the code and
+   here. **Asymmetry is a design choice, never a silence.**
+   THE NAMED EXCEPTION IS `challenge`: the player's terms are frozen when it
+   is declared, because it spans a turn; the rival resolves immediately and
+   reads them live. That is deliberate and documented. `bust_survive` is the
+   second: an unconditional save for the player, a chance-based half-save for
+   the boss, kept apart as a personality lever.
+   Anything else that diverges is a bug until ruled otherwise. Five were
+   found in one night — `challenge`, `ill_omen`, `gain_when_ahead`,
+   `gain_pts`/`punish_busts`, `bust_immune_turns` — and not one was a
+   decision.
 
 ## 1. RUN STRUCTURE
 
