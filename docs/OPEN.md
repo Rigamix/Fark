@@ -260,6 +260,29 @@ they are very different cards. Detail in `CARD_AUDIT.md` pass 6.
 
 ---
 
+## 9. Enchants land on the wrong die after a seizure — live, two pooled cards
+
+`_enchArr` is indexed by lane. **Exactly one place** splices it alongside
+`G.matchDice` (Break, L18782). Three others remove a die and leave it alone:
+
+- **`royal_seizure`** (Whisper) — `steal_die` / take_best
+- **`blessed_confiscation`** (Ambrose) — `steal_die` / take_and_use
+- Sacrifice — obsidian shatter
+
+Splicing `matchDice` shifts every lane above the removed one, so after any of
+these **every enchant above that lane applies to a different die**. No error, no
+message; the brand moves to a neighbour.
+
+**Not a design question** — this is wrong under any reading. The only reason it
+is filed rather than fixed is that the two `steal_die` sites record the enchant
+in `G._diceOut` for restore at match end, so the fix must splice the live array
+without breaking that restore, and **that restore path has not been read yet.**
+
+**The ask is only: fix now, or after the opponent-enchant work?** Either is fine;
+it is live either way. Detail in `OPP_ENCHANTS_SIZE.md`.
+
+---
+
 ## Everything else you answered is now work, not a question
 
 Tracked in `NEXT_SESSION.md` and being built. Nothing there needs you.
