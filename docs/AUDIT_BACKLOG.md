@@ -3,6 +3,15 @@
 Written 2026-07-30 so a fresh session loses nothing. Companion to
 `archive/AUDIT_FINDINGS_RAW.md` (all 72 soak findings verbatim, with repro lines).
 
+## Open, low-stakes
+
+- **`block_low_bank` is implemented on both seats and no card declares it.**
+  The mechanic has branches in `handleBank` and `finOpp` — tabulated during the
+  mechanic-table work — but nothing in `NPC_CARDS` carries
+  `mechanic:'block_low_bank'`. Dead in the opposite direction from most findings:
+  built, never dealt. Either a card lost the mechanic or never got one. Not
+  urgent; needs a design call, not a fix. See `docs/OPPCARDS_LIFT_SIZE.md`.
+
 ## Read this first
 
 **You can see the game.** `tools/shoot.js` drives headless Edge over CDP and
