@@ -26188,6 +26188,109 @@ var BANK_FX={
   gain_when_ahead:   function(a,e){return a+(e.amount||500);}
 };
 
+/* _oppFxOwnA - flat_bonus, double_first_bank.
+   Lifted UNCHANGED out of finOpp so tools/sim_harness.js can call the same code
+   instead of a reimplementation that ran none of it. */
+function _oppFxOwnA(pts){
+  G.oCards.forEach(function(cid){
+        var npc=getNpcCard(cid);if(!npc)return;var eff=npc.effect;
+        /* old_partners_badge: +100 flat per bank */
+        if(eff.type==='on_opp_bank'&&eff.mechanic==='flat_bonus'){pts=BANK_FX.flat_bonus(pts,eff);triggerCard(cid,npc.name+' +'+eff.amount,false);
+          (function(_cid){setTimeout(function(){if(window.DLG)DLG.triggerCard(_cid,false);},_oppDelay(700));})(cid);}
+        /* measure_twice: double first bank (was tripled — too strong).
+           Show the actual delta in the trigger label so the doubling reads
+           clearly. Player feedback B6: "Measure Twice didn't double bank
+           (image showed +700 with no doubling)" — likely a perception bug
+           because the only feedback was a generic "×2!" pop with no number.
+           Now we show the bonus added (was 350, doubled = +350 added). */
+        if(eff.type==='on_opp_bank'&&eff.mechanic==='double_first_bank'&&!G.npcCardState.usedOnce[cid]){
+          G.npcCardState.usedOnce[cid]=true;
+          var _mtBonus=pts;/* doubling pts adds another 1× of the original */
+          pts=BANK_FX.double_first_bank(pts,eff);
+          triggerCard(cid,'×2 → +'+_mtBonus,false);
+          spawnPop('×2! +'+_mtBonus.toLocaleString());
+          (function(_cid){setTimeout(function(){if(window.DLG)DLG.triggerCard(_cid,false);},_oppDelay(700));})(cid);
+        }
+      });
+  return pts;
+}
+
+/* _oppFxOwnB - gain_when_ahead.
+   Lifted UNCHANGED out of finOpp so tools/sim_harness.js can call the same code
+   instead of a reimplementation that ran none of it. */
+function _oppFxOwnB(pts){
+  G.oCards.forEach(function(cid){
+        var npc=getNpcCard(cid);if(!npc)return;
+        if(npc.effect.mechanic==='gain_when_ahead'&&(G.oPts+pts)>G.pPts){pts=BANK_FX.gain_when_ahead(pts,npc.effect);triggerCard(cid,npc.name+' +'+npc.effect.amount,false);
+          (function(_cid){setTimeout(function(){if(window.DLG)DLG.triggerCard(_cid,false);},_oppDelay(700));})(cid);}
+      });
+  return pts;
+}
+
+/* _oppFxPlayer - steal_pct, steal_low_bank, block_low_bank, challenge, halve_first_bank.
+   Lifted UNCHANGED out of finOpp so tools/sim_harness.js can call the same code
+   instead of a reimplementation that ran none of it. */
+function _oppFxPlayer(pts){
+  G.pCards.forEach(function(cid){
+        var npc=getNpcCard(cid);if(!npc)return;var eff=npc.effect;
+        /* Percentage steal from opp's bank */
+        if(eff.type==='on_player_bank'&&eff.mechanic==='steal_pct'&&pts>0){
+          var steal=BANK_TAKE.steal_pct(pts,eff);pts-=steal;G.pPts+=steal;
+          triggerCard(cid,npc.name+' +'+steal,true);
+        }
+        /* Steal opp's low bank entirely (the_lords_seal) */
+        if(eff.type==='once'&&eff.mechanic==='steal_low_bank'&&!G.npcCardState.playerOnce[cid]&&pts>0&&pts<eff.threshold){
+          G.npcCardState.playerOnce[cid]=true;
+          G.pPts+=pts;pts=0;
+          triggerCard(cid,npc.name+' STOLE!',true);spawnPop('STOLEN!');
+        }
+        /* Block opp's low bank (iron_gate_npc) */
+        if(eff.type==='on_player_bank'&&eff.mechanic==='block_low_bank'&&!G.npcCardState.playerOnce[cid]&&pts>0&&pts<eff.threshold){
+          G.npcCardState.playerOnce[cid]=true;pts=0;
+          triggerCard(cid,npc.name+' BLOCKED!',true);spawnPop('⛓️ BLOCKED');
+        }
+        /* Challenge opp: if their bank is below threshold, they lose penalty (steady_hands / the_verdict_npc) */
+        if(eff.type==='once'&&eff.mechanic==='challenge'&&!G.npcCardState.playerOnce[cid]&&G.oppTurnCount>=2&&pts>0&&Math.random()<0.4){
+          G.npcCardState.playerOnce[cid]=true;
+          if(pts<eff.threshold){
+            var penalty=Math.min(eff.penalty,G.oPts+pts);
+            /* THE BANK PAYS FIRST, THEN THE POOL, AND THE TOTAL IS EXACTLY `penalty`.
+               What was here computed the pool's share as penalty-(eff.penalty-penalty),
+               i.e. 2*penalty-eff.penalty, which collapses to the FULL penalty
+               whenever they could afford it - so the pool paid it again after
+               the bank already had. pool 1000 / bank 600 / penalty 500 cost
+               them 1000. The player's mirror loses exactly 500, and this
+               branch's own message says LOST 500 while taking twice that. */
+            var _chFromBank=Math.min(pts,penalty);
+            pts=Math.max(0,pts-_chFromBank);
+            G.oPts=Math.max(0,G.oPts-(penalty-_chFromBank));
+            triggerCard(cid,npc.name+' −'+penalty,true);
+            setStatusMsg(npc.name+' — '+G.rung.name+' LOST '+penalty+'!','gold');
+          }else{triggerCard(cid,npc.name+' MET',true);}
+        }
+        /* Halve first bank (fine_print) */
+        if(eff.type==='on_player_bank'&&eff.mechanic==='halve_first_bank'&&!G.npcCardState.playerOnce[cid]&&pts>0){
+          G.npcCardState.playerOnce[cid]=true;
+          var half=pts-BANK_FX.halve_first_bank(pts,eff);pts-=half;
+          triggerCard(cid,npc.name+' −'+half,true);
+        }
+      });
+  return pts;
+}
+
+/* _oppFxDrain - periodic_drain - runs AFTER the bank lands.
+   Lifted UNCHANGED out of finOpp so tools/sim_harness.js can call the same code
+   instead of a reimplementation that ran none of it. */
+function _oppFxDrain(){
+  G.pCards.forEach(function(cid){
+      var npc=getNpcCard(cid);if(!npc)return;
+      if(npc.effect.mechanic==='periodic_drain'&&G.npcCardState.oppTurnCount>0&&G.npcCardState.oppTurnCount%npc.effect.interval===0){
+        G.oPts=SCORE_DRAIN.periodic_drain(G.oPts,npc.effect);
+        triggerCard(cid,npc.name+' −'+npc.effect.amount,true);
+      }
+    });
+  }
+
 function handleBank(){
   /* Phase guard, mirroring handleRoll. Banking is only legal during the
      player's decision phases — without this, a tap during an auto-roll
@@ -28357,32 +28460,11 @@ function runOppTurn(){
         setStatusMsg(G.rung.name+": CORVUS'S LEDGER +"+_npcLedgerBonus,'red');
       }
       /* NPC on-bank bonuses */
-      G.oCards.forEach(function(cid){
-        var npc=getNpcCard(cid);if(!npc)return;var eff=npc.effect;
-        /* old_partners_badge: +100 flat per bank */
-        if(eff.type==='on_opp_bank'&&eff.mechanic==='flat_bonus'){pts=BANK_FX.flat_bonus(pts,eff);triggerCard(cid,npc.name+' +'+eff.amount,false);
-          (function(_cid){setTimeout(function(){if(window.DLG)DLG.triggerCard(_cid,false);},_oppDelay(700));})(cid);}
-        /* measure_twice: double first bank (was tripled — too strong).
-           Show the actual delta in the trigger label so the doubling reads
-           clearly. Player feedback B6: "Measure Twice didn't double bank
-           (image showed +700 with no doubling)" — likely a perception bug
-           because the only feedback was a generic "×2!" pop with no number.
-           Now we show the bonus added (was 350, doubled = +350 added). */
-        if(eff.type==='on_opp_bank'&&eff.mechanic==='double_first_bank'&&!G.npcCardState.usedOnce[cid]){
-          G.npcCardState.usedOnce[cid]=true;
-          var _mtBonus=pts;/* doubling pts adds another 1× of the original */
-          pts=BANK_FX.double_first_bank(pts,eff);
-          triggerCard(cid,'×2 → +'+_mtBonus,false);
-          spawnPop('×2! +'+_mtBonus.toLocaleString());
-          (function(_cid){setTimeout(function(){if(window.DLG)DLG.triggerCard(_cid,false);},_oppDelay(700));})(cid);
-        }
-      });
+      /* _oppFxOwnA - extracted verbatim so the sim can run it too (P470) */
+      pts=_oppFxOwnA(pts);
       /* the_audit: gain when NPC is ahead */
-      G.oCards.forEach(function(cid){
-        var npc=getNpcCard(cid);if(!npc)return;
-        if(npc.effect.mechanic==='gain_when_ahead'&&(G.oPts+pts)>G.pPts){pts=BANK_FX.gain_when_ahead(pts,npc.effect);triggerCard(cid,npc.name+' +'+npc.effect.amount,false);
-          (function(_cid){setTimeout(function(){if(window.DLG)DLG.triggerCard(_cid,false);},_oppDelay(700));})(cid);}
-      });
+      /* _oppFxOwnB - extracted verbatim so the sim can run it too (P470) */
+      pts=_oppFxOwnB(pts);
       /* Short Pour: opponent banks are worth 10% less (fence: 12.5%) */
       if(G.rung._shortPour){var _spPct=G._fenceActive?0.25:0.20;var _spCut=Math.ceil(pts*_spPct);pts-=_spCut;triggerCard('short_pour','-'+_spCut+' SHORT POUR',true);}
       /* Bad Reputation: 3+ Saboteur → opp's first bank halved */
@@ -28402,50 +28484,8 @@ function runOppTurn(){
       }
       /* ── Player-owned NPC cards that trigger on opp bank (Group A mirror) ── */
       G.npcCardState.playerOnce=G.npcCardState.playerOnce||{};
-      G.pCards.forEach(function(cid){
-        var npc=getNpcCard(cid);if(!npc)return;var eff=npc.effect;
-        /* Percentage steal from opp's bank */
-        if(eff.type==='on_player_bank'&&eff.mechanic==='steal_pct'&&pts>0){
-          var steal=BANK_TAKE.steal_pct(pts,eff);pts-=steal;G.pPts+=steal;
-          triggerCard(cid,npc.name+' +'+steal,true);
-        }
-        /* Steal opp's low bank entirely (the_lords_seal) */
-        if(eff.type==='once'&&eff.mechanic==='steal_low_bank'&&!G.npcCardState.playerOnce[cid]&&pts>0&&pts<eff.threshold){
-          G.npcCardState.playerOnce[cid]=true;
-          G.pPts+=pts;pts=0;
-          triggerCard(cid,npc.name+' STOLE!',true);spawnPop('STOLEN!');
-        }
-        /* Block opp's low bank (iron_gate_npc) */
-        if(eff.type==='on_player_bank'&&eff.mechanic==='block_low_bank'&&!G.npcCardState.playerOnce[cid]&&pts>0&&pts<eff.threshold){
-          G.npcCardState.playerOnce[cid]=true;pts=0;
-          triggerCard(cid,npc.name+' BLOCKED!',true);spawnPop('⛓️ BLOCKED');
-        }
-        /* Challenge opp: if their bank is below threshold, they lose penalty (steady_hands / the_verdict_npc) */
-        if(eff.type==='once'&&eff.mechanic==='challenge'&&!G.npcCardState.playerOnce[cid]&&G.oppTurnCount>=2&&pts>0&&Math.random()<0.4){
-          G.npcCardState.playerOnce[cid]=true;
-          if(pts<eff.threshold){
-            var penalty=Math.min(eff.penalty,G.oPts+pts);
-            /* THE BANK PAYS FIRST, THEN THE POOL, AND THE TOTAL IS EXACTLY `penalty`.
-               What was here computed the pool's share as penalty-(eff.penalty-penalty),
-               i.e. 2*penalty-eff.penalty, which collapses to the FULL penalty
-               whenever they could afford it - so the pool paid it again after
-               the bank already had. pool 1000 / bank 600 / penalty 500 cost
-               them 1000. The player's mirror loses exactly 500, and this
-               branch's own message says LOST 500 while taking twice that. */
-            var _chFromBank=Math.min(pts,penalty);
-            pts=Math.max(0,pts-_chFromBank);
-            G.oPts=Math.max(0,G.oPts-(penalty-_chFromBank));
-            triggerCard(cid,npc.name+' −'+penalty,true);
-            setStatusMsg(npc.name+' — '+G.rung.name+' LOST '+penalty+'!','gold');
-          }else{triggerCard(cid,npc.name+' MET',true);}
-        }
-        /* Halve first bank (fine_print) */
-        if(eff.type==='on_player_bank'&&eff.mechanic==='halve_first_bank'&&!G.npcCardState.playerOnce[cid]&&pts>0){
-          G.npcCardState.playerOnce[cid]=true;
-          var half=pts-BANK_FX.halve_first_bank(pts,eff);pts-=half;
-          triggerCard(cid,npc.name+' −'+half,true);
-        }
-      });
+      /* _oppFxPlayer - extracted verbatim so the sim can run it too (P470) */
+      pts=_oppFxPlayer(pts);
       /* Symmetric bank-bonus cards — fire for whoever owns them.
          These can end up in NPC's deck via Mirror Match handicap OR
          via S.npcWonCards (cards the NPC seized from the player after
@@ -28723,13 +28763,8 @@ function runOppTurn(){
       }
     }
     /* Player-owned periodic_drain (interest_due mirror) — drains opp every Nth opp turn */
-    G.pCards.forEach(function(cid){
-      var npc=getNpcCard(cid);if(!npc)return;
-      if(npc.effect.mechanic==='periodic_drain'&&G.npcCardState.oppTurnCount>0&&G.npcCardState.oppTurnCount%npc.effect.interval===0){
-        G.oPts=SCORE_DRAIN.periodic_drain(G.oPts,npc.effect);
-        triggerCard(cid,npc.name+' −'+npc.effect.amount,true);
-      }
-    });
+    /* _oppFxDrain - extracted verbatim so the sim can run it too (P470) */
+      _oppFxDrain();
     updHUD();
     /* Broken Lantern: reveal dice faces with flip animation before clearing */
     if(G._lanternActive){
