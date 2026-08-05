@@ -5,6 +5,15 @@ Written 2026-07-30 so a fresh session loses nothing. Companion to
 
 ## Open, low-stakes
 
+- **`type:'once'` is decorative on 11 of 14 pooled cards.** Only `challenge`
+  and `steal_low_bank` gate on `effect.type`; everywhere else the use-count is
+  enforced by `eff.uses||1` or a boolean flag, and `type` is never read.
+  Nothing is wrong today - all 14 agree - but `grogs_bump` carries
+  `type:'twice'` **and** `uses:2`, so rebalancing it via the obvious field would
+  silently do nothing. Either enforce `type` or drop it from the mechanics that
+  ignore it. Same latent-drift class as the `||500` defaults. See
+  `docs/CARD_AUDIT.md`.
+
 - **`block_low_bank` is implemented on both seats and no card declares it.**
   The mechanic has branches in `handleBank` and `finOpp` — tabulated during the
   mechanic-table work — but nothing in `NPC_CARDS` carries
