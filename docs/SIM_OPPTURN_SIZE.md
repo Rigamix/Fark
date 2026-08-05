@@ -1,8 +1,34 @@
 # Sizing the sim's opponent-turn fix — smaller than it looked
 
 Ruled: build it. The sim's `F.oppTurn` reimplements the opponent's turn loop and
-never runs `finOpp`'s nine card branches, so it models a patron that punishes the
-player but structurally cannot help itself.
+never runs `finOpp`'s nine card branches.
+
+## First, a correction to how I described the gap
+
+I reported this as *"a patron that punishes the player but structurally cannot
+help itself"*, and escalated it on that basis. **The direction is wrong.**
+
+`finOpp` iterates **both** card lists — every bank fires the banker's own cards
+*and* the opponent's, symmetric with `handleBank`. The nine split:
+
+| list | mechanics | favours |
+|---|---|---|
+| `G.oCards` — the patron's own | `flat_bonus`, `double_first_bank`, `gain_when_ahead` | **the patron** |
+| `G.pCards` — the player's | `steal_pct`, `steal_low_bank`, `block_low_bank`, `challenge`, `halve_first_bank`, `periodic_drain` | **the player** |
+
+All six player-held ones take from the patron's bank or score. So the sim omits
+**three patron-favouring effects and six player-favouring ones** — by count it
+understates **the player** more than the patron.
+
+**The stop stands; my reason for it did not.** No bank-triggered card effect
+fires during the patron's turn, for either seat, so the sim measures a game
+where that whole layer is absent. What cannot be claimed is that this biases
+difficulty in the patron's favour — the omitted effects lean the other way.
+
+I got this wrong by reading `finOpp` as "the patron's function" and assuming the
+cards it iterates are the patron's. That is the same
+nearest-thing-in-the-window mistake as the card-id attribution, on ownership
+this time.
 
 Rerun with `tools/sim_oppturn_size.py`.
 
@@ -33,10 +59,29 @@ sim does not need `finOpp`, it needs the card-effect portion of it.**
 
 So the shape is the one already used five times tonight, one level up:
 
-> **Extract the nine branches into a shared `_oppBankEffects(pts, …)` that both
-> `finOpp` and `F.oppTurn` call.** The rule moves; the presentation stays at the
-> call site, suppressed in the sim by the `FSIM.quiet()` flag that already
-> exists.
+> **Extract the branches into shared functions that both `finOpp` and
+> `F.oppTurn` call**, one per existing call site. The rule moves; the
+> presentation stays at the call site.
+
+**Four call sites, not one** — the branches are not contiguous. They span 24% to
+94% of a 30,000-character function, interleaved with short-pour and
+taxing-breath logic, and `periodic_drain` runs *after* `G.oPts += pts`:
+
+| construct | mechanics |
+|---|---|
+| `G.oCards.forEach` [7049..8433] | `flat_bonus`, `double_first_bank` |
+| `G.oCards.forEach` [8489..8866] | `gain_when_ahead` |
+| `G.pCards.forEach` [10159..12842] | `steal_pct`, `steal_low_bank`, `block_low_bank`, `challenge`, `halve_first_bank` |
+| `G.pCards.forEach` [28233..28582] | `periodic_drain` — **after the bank lands** |
+
+**Mirror the existing structure rather than reorganising it.** Making the nine
+contiguous would mean moving code across the point where the bank lands, which
+is real behavioural risk for no gain.
+
+**And `FSIM.quiet()` needs extending.** It stubs 11 functions but not
+`triggerCard`, `setStatusMsg`, `famLog` or `updHUD` — the four the branches call
+most. `setTimeout` is stubbed, so deferred `DLG` work already cannot fire, but
+those four would do real DOM work in every simulated match.
 
 That is meaningfully smaller than "route the sim through real game logic". The
 turn *loop* stays reimplemented — it is genuinely an animation chain with timers,

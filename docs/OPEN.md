@@ -215,9 +215,16 @@ cleanly at statement level; the turn *loop* stays reimplemented because it
 genuinely is an animation chain. Only the effects move, into an
 `_oppBankEffects` both `finOpp` and `F.oppTurn` call.
 
-**Still a stop until that lands:** no difficulty number from this sim should move
-a design decision, because the patron cannot currently benefit from its own
-cards.
+**Still a stop until that lands** — but **the reason I first gave was wrong and
+is corrected in that doc.** `finOpp` iterates *both* card lists. Of the nine
+missing branches, three are the patron's own and **six are the player's**, all
+six taking from the patron's bank or score. So the sim omits more
+player-favouring effects than patron-favouring ones; it does **not** bias
+difficulty toward the patron as I reported.
+
+What stands: no bank-triggered card effect fires during the patron's turn for
+either seat, so no difficulty number from this sim should move a design decision
+until it does.
 
 **Three things to settle during the build, not before:** whether `FSIM.quiet()`
 already suppresses `triggerCard`/`spawnPop`; where in `finOpp`'s order the
