@@ -157,7 +157,11 @@ F.median=function(arr){
 var _saved=null;
 var _QUIET_FN=['spawnPop','spawnBankPop','spawnPixelSparks','spawnObsidianBurst',
   'spawnSawdust','showCritFlash','flashYourTurn','_bustImpact','save','saveMatchState',
-  '_alignOverlayWord'];
+  '_alignOverlayWord',
+  /* P471: side-effect-only - no return value, no caller consuming one, no
+     writes to G or S. updHUD is NOT here on purpose: it writes
+     G._featMaxDeficit, which a feat condition reads. */
+  'triggerCard','setStatusMsg','famLog'];
 F.quiet=function(){
   if(_saved)return;
   _saved={setTimeout:window.setTimeout,setInterval:window.setInterval,
@@ -295,7 +299,17 @@ F.setupMatch=function(o){
   var lo=F.buildLoadout(o);
   var rung=o.rung||(o.boss?RUNGS[tier]:generatePatron(tier));
   if(o.boss)rung=Object.assign({},RUNGS[tier]);/* per-match copy: newG keeps a ref */
-  var oCards=(rung.cards||[]).slice();
+  /* P472 - THE PATRON'S CARDS, dealt the way the game deals them.
+     This read `rung.cards`, AND NO RUNG HAS THAT FIELD - not one boss, not one
+     generated patron. They carry cardPool / cardCount / cardChance, which
+     generateOppCards turns into an actual list. So oCards was ALWAYS [] and
+     the sim has never modelled a patron holding cards at all, on any run.
+     That is why wiring the card effects in P471 changed nothing: the effects
+     were correct and there was simply nothing to fire them on. Two independent
+     causes of the same silence, and only fixing both makes a difference. */
+  var oCards=(typeof generateOppCards==='function')
+    ? (generateOppCards(rung,(lo&&lo.cards?lo.cards.length:0))||[]).slice()
+    : (rung.cards||[]).slice();
   var g=newG(rung,[],oCards,0,0);
   setG(g);
   /* DID THE BUILD SURVIVE newG? newG runs _enchInit(), which is where the save
@@ -621,7 +635,18 @@ F.oppTurn=function(){
     if(oppShouldBank(G.rung,bank,live.length,G.oPts,G.pPts,G.target))break;
   }
   out.rolls=rolls;
-  if(!out.busted){G.oPts=(G.oPts||0)+bank;out.banked=bank;}
+  /* P471 - THE PATRON'S CARD EFFECTS, in finOpp's exact order. Without these
+     the sim modelled a game where no bank-triggered card fired for either seat:
+     three of the nine are the patron's own, six are the PLAYER's taking from
+     the patron's bank. Guarded on !busted because finOpp is only called when
+     the patron banks. Guarded on typeof so an older page still runs. */
+  if(!out.busted){
+    if(typeof _oppFxOwnA==='function')  bank=_oppFxOwnA(bank);
+    if(typeof _oppFxOwnB==='function')  bank=_oppFxOwnB(bank);
+    if(typeof _oppFxPlayer==='function')bank=_oppFxPlayer(bank);
+    G.oPts=(G.oPts||0)+bank;out.banked=bank;
+    if(typeof _oppFxDrain==='function') _oppFxDrain();
+  }
   /* the field Break's Vagabond row reads; finOpp writes it at exactly this
      moment on the real path */
   G._oLastBank=out.busted?0:bank;
