@@ -233,6 +233,33 @@ mid-sized difficulty delta from it either.**
 
 ---
 
+## 8. `blessed_dice` / `crown_authority` say "reroll", the code wipes
+
+Found by reading, in the card audit's last pass. Two top-tier cards (Ambrose,
+Whisper) whose every text field promises a **reroll**:
+
+> "forces you to **reroll** every die you selected — scoring or not"
+
+The whole implementation is `G.kept=[]; G.turnPts=0;` plus the **bust** sound,
+the **bust** haptic and the bust shake, with the message "KEPT DICE WIPED!".
+**No reroll happens.**
+
+A reroll returns new values and a chance to keep scoring. A wipe takes the dice
+*and* the accumulated turn score — mid-turn on 800 kept points, the difference
+between a gamble and a guaranteed loss.
+
+**The unusual part:** the code, the sound and the in-game message all agree with
+each other. The card's own description is the outlier — and it is the one thing
+a player reads before deciding whether to fear the card.
+
+**The ruling:** does the text change to "wipes your kept dice and turn points",
+or does the implementation start actually rerolling? Both are defensible and
+they are very different cards. Detail in `CARD_AUDIT.md` pass 6.
+
+**Not blocking anything.**
+
+---
+
 ## Everything else you answered is now work, not a question
 
 Tracked in `NEXT_SESSION.md` and being built. Nothing there needs you.
