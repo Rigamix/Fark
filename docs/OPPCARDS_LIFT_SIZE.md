@@ -61,3 +61,23 @@ patron holds a card that can use them.
 patron-favouring mirror mechanics plus every `start_bonus` (up to +3500 for
 Whisper). That is a third difficulty change on an axis that already has two
 this session, per `OPEN.md` §6. It should land with a same-seed before/after.
+
+---
+
+## The step this sizing was missing
+
+Everything above measures what the dead code **references**. It never asked
+**what references the stub** — and `apv_legacy_retired` asserted the stub must
+hold, with a written rationale, in the suite being run all session. It went red
+on the next run.
+
+**Standing step for any future stub / guard / early-return removal:** grep the
+name across `tools/` and `docs/` before touching the body. *"What does this
+depend on"* and *"what depends on this"* are different questions, and the second
+is where deliberate decisions are recorded — guards, asserts, probes, and
+comments explaining why something is the way it is.
+
+Ruled after the fact: `NPC_CARDS` and `CARDS` are different rosters, current and
+retired; the two delivery mechanisms are not exclusive; and the invariant is
+**`nothingOldHeld`**, not `opponentStubHolds`. The stub was one disposable
+enforcement of a rule that had a more durable form once named directly.

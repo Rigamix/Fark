@@ -16,11 +16,23 @@
  * CALLING the functions rather than reading the source: a `return []` that has
  * been commented out still looks like a `return []` to a grep of the file.
  *
- * WHAT IT DOES NOT CLAIM. The opponent's cards are not merely retired - they
- * are PARKED. P5 brings NPC cards back as FAMILY cards, and the authored boss
- * pools (Grog's her_lucky_coin, Mabel's mabels_pinch) stay as the design record
- * of each boss's card identity. This probe going green means the old roster is
- * not being dealt. It does not mean the roster is safe to delete.
+ * WHAT IT DOES NOT CLAIM. This going green means the old roster is not being
+ * dealt. It does not mean the roster is safe to delete.
+ *
+ * UPDATED WHEN THE OPPONENT STUB WAS LIFTED (P473). This used to assert
+ * `opponentStubHolds` - that generateOppCards returns []. THE STUB WAS NEVER
+ * THE INVARIANT; it was one disposable way of enforcing one. The invariant is
+ * that NO RETIRED ID IS EVER DEALT, and that is now asserted directly, so it
+ * holds whichever mechanism patron cards arrive by.
+ *
+ * The header used to say the opponent's cards were "PARKED - P5 brings NPC
+ * cards back as FAMILY cards". That read the stub's own "NPC family cards land
+ * in P5" as meaning generateOppCards stays dead forever. Ruled otherwise: the
+ * two mechanisms are not exclusive - oCards/mechanic dispatch and
+ * _famInitOpp/CFX run alongside each other, as the family layer already does.
+ * CARDS is the retired 133-card roster; NPC_CARDS is the current one. Dealing
+ * from the second is not resurrecting the first, and this probe now says so in
+ * those terms instead of guarding a mechanism.
  */
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 await sleep(400);
@@ -43,6 +55,11 @@ try {
   opp = generateOppCards({ key: 'grog', cardPool: ['her_lucky_coin', 'grogs_bump'],
                            cardCount: 2, cardChance: 1 }, 2);
 } catch (e) { opp = 'threw: ' + e; }
+/* the current roster, to tell "dealt something" apart from "dealt something OLD" */
+const curIds = new Set((typeof NPC_CARDS !== 'undefined' ? NPC_CARDS : []).map(c => c.id));
+const oppOld = Array.isArray(opp) ? opp.filter(id => oldIds.has(id)) : [];
+const oppUnknown = Array.isArray(opp) ? opp.filter(id => !curIds.has(id)) : [];
+const effOld = Array.isArray(eff) ? eff.filter(id => oldIds.has(id && id.id ? id.id : id)) : [];
 out.checked.push({ fn: 'generateOppCards', got: Array.isArray(opp) ? opp.length : opp });
 
 /* ── 3. nothing old is actually being held ── */
@@ -65,9 +82,18 @@ return {
   checked: out.checked,
   leaked: out.leaked,
   artSrc: artSrc.slice(0, 90),
+  oppDealt: Array.isArray(opp) ? opp : String(opp),
+  oppOld: oppOld, oppUnknown: oppUnknown,
   verdict: {
-    playerStubHolds: Array.isArray(eff) && eff.length === 0,
-    opponentStubHolds: Array.isArray(opp) && opp.length === 0,
+    /* THE INVARIANT, three ways. Not "the stub holds" - the stub was one
+       disposable enforcement of this, and P473 replaced it with a real deal.
+       What must never be true is that a RETIRED id reaches a hand. */
+    playerDealsNoOld: Array.isArray(eff) && effOld.length === 0,
+    oppDealsNoOld: Array.isArray(opp) && oppOld.length === 0,
+    /* and everything dealt is a card that actually exists in the CURRENT
+       roster - an unknown id is a card that resolves to null and silently does
+       nothing, which looks identical to a boss playing badly */
+    oppDealsOnlyKnown: Array.isArray(opp) && oppUnknown.length === 0,
     nothingOldHeld: out.leaked.length === 0,
     /* PROMOTED INTO THE VERDICT NOW THE ART IS ARCHIVED. This was recorded and
        deliberately NOT asserted while _cardArtImg still built an
