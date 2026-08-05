@@ -207,77 +207,23 @@ different things — that difference *is* the question.
 
 ---
 
-## 5a. `bust_immune_turns` is off by one between the player and the boss
+## 5b. The sim's opponent turn — RULED: build it, sized
 
-Player: `G.turnNum <= (eff.turns||2)`. Boss: `G.npcCardState.oppTurnCount < eff.turns`.
+**Confirmed as real work and now sized** (`SIM_OPPTURN_SIZE.md`): it is a
+shared-function extraction, not a rewrite. All nine card branches separate
+cleanly at statement level; the turn *loop* stays reimplemented because it
+genuinely is an animation chain. Only the effects move, into an
+`_oppBankEffects` both `finOpp` and `F.oppTurn` call.
 
-**`<=` against `<`.** With `turns:2` the player is immune on turns 1 **and 2**;
-the boss only on turn 1. Same card, same stated duration, one extra turn of
-protection for whoever holds it on the player's side. There is also a `||2`
-default on the player's side and none on the boss's.
+**Still a stop until that lands:** no difficulty number from this sim should move
+a design decision, because the patron cannot currently benefit from its own
+cards.
 
-**Which is right?** If `turns` means "how many turns of immunity", the player's
-`<=` is correct and the boss is short-changed. If it means "immune before turn
-N", the boss's `<` is correct and the player gets a free turn.
-
-Small, but it is two copies of one card disagreeing, which is exactly the class
-that produced the `challenge` double-charge. **Not shipped** — it needs the
-intent, not a merge. Detail in `BUST_MIRRORS.md`.
-
----
-
-## 5b. STOP TUNING DIFFICULTY AGAINST THE SIM — it cannot see half the patron
-
-Not "wait for more data". **This tool cannot currently answer this question.**
-
-| path | how the sim runs it | patron card effects |
-|---|---|---|
-| player banks | **the real `handleBank`** | **all 10 branches fire** |
-| patron banks | `F.oppTurn`, a reimplementation | **0 of 9 fire** |
-
-`F.oppTurn` deals `oCards` and passes them to `scoreRoll`, but has no
-`getNpcCard`, no `mechanic` dispatch, no `effect` reads. Its own comment says it
-reproduces the **loop** — and that is all it does.
-
-**So the sim models a patron whose cards punish the player but structurally
-cannot benefit itself.** `flat_bonus`, `double_first_bank`, `gain_when_ahead`,
-`steal_pct` on the patron's own bank: none of them happen. That is not a
-difficulty model with error bars, it is a different game measured under the same
-name — and every tier number this instrument has produced was generated against
-that gap, including tonight's own five-seed rerun. **The rerun did not merely
-fail to resolve the delta; it was never able to.**
-
-**What it needs:** `F.oppTurn` applying real card effects — the same `oCards`
-loop `finOpp` runs. Until then the narrowing-plateau finding stands (it does not
-depend on the missing branches) and nothing else from this sim should move a
-difficulty number.
-
----
-
-## 6. Boss difficulty moved TWICE tonight — is the aggression pass still measured?
-
-Two separate changes landed on the same axis in one session, and only one was
-chosen as a difficulty lever:
-
-| change | kind | evidence |
-|---|---|---|
-| **Aggression tuning** | deliberate | **unproven** — ran on noisy, unresolved data |
-| **`challenge` double-charge fix** (P466) | accidental | **definitely real** — arithmetic, measured |
-
-The second was a boss losing up to **double** its stated penalty. A boss on 1000
-points banking 600 lost 1000 for a 500 penalty. Fixing it makes bosses
-**measurably tougher than they were an hour ago**, and nobody picked that.
-
-**The question:** the aggression pass was tuned against a baseline that has now
-shifted underneath it. Do you want it re-measured against the corrected one
-before it's judged?
-
-**The reason to answer rather than leave it:** in a week these are two
-indistinguishable "bosses got harder" changes from the same night. If the
-aggression numbers later look wrong, the wrong one gets blamed. Recorded now so
-neither is misread as explaining the other.
-
-**Not blocking anything.** No code waits on this.
+**Three things to settle during the build, not before:** whether `FSIM.quiet()`
+already suppresses `triggerCard`/`spawnPop`; where in `finOpp`'s order the
+extracted call belongs (it must match in both, or the sim measures a different
+game again); and a same-seed before/after, since patron strength will rise and
+that must stay attributable.
 
 ---
 
