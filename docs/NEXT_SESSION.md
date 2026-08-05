@@ -25,6 +25,14 @@ So every `mechanic===` branch inside a `G.oCards` loop is unreachable today.
 `mechanic` branch a live bug, check which list gates it** —
 `tools/reach_audit.py` answers it per site.
 
+### Phase 5 (Observers) is DONE
+
+Measured, not assumed: 23 feat checks all invoked through `_featView`, none
+reading a field it does not carry; `DLG` reads two fields, writes `G` zero
+times, and is push-based. Both halves already held — what was missing was that
+**nothing asserted them**. `apv_observers` now pins six properties including a
+real runtime write test. See `P5_OBSERVERS.md`.
+
 ### What last session built
 
 **Live now:** Law 6 (symmetry by default) in the brief with its two named
