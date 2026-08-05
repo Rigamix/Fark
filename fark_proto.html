@@ -13767,8 +13767,14 @@ function famPanelSell(where,idx){
 /* ── remaining effects ── */
 function famInst(id){return (G&&G.pF||[]).filter(function(i){return i.id===id;})[0]||null;}
 /* commit-time scoring hooks: short fuse, bloom, positional trio */
-function famCommitBonus(selD,pts){
-  if(!G||!G.pF||!G.pF.length||pts<=0)return pts;
+function famCommitBonus(selD,pts,actor){
+  /* P479 - SEAT-AWARE. Both sides derive the commit payload here rather than
+     each writing its own copy; two derivations of "is this a straight" would be
+     free to drift, which is what five of tonight's findings turned out to be. */
+  var _cAct=(actor==='o')?'o':'p', _cIsO=(_cAct==='o');
+  var _cFam=_cIsO?G.oF:G.pF;
+  var _cRow=(_cIsO?G.oppDice:G.pool)||[];
+  if(!G||!_cFam||!_cFam.length||pts<=0)return pts;
   var inst;
   var _counts={};selD.forEach(function(d){_counts[d.val]=(_counts[d.val]||0)+1;});
   var _isTriple=Object.keys(_counts).some(function(v){return _counts[v]>=3;});
@@ -13778,24 +13784,24 @@ function famCommitBonus(selD,pts){
   var _jadeDice=selD.filter(function(d){return (d.mat||'').indexOf('jade')===0;});
   /* GREEN THUMB - a straight a jade wild completed. Pending until banked:
      the feat is about a straight that PAID, and a bust takes it back. */
-  if(_isStraight&&_jadeDice.length)G._featJadePend=true;
+  if(_isStraight&&_jadeDice.length&&!_cIsO)G._featJadePend=true;/* player feat only */
   /* the Tempering remnant is gone too - it built an always-empty array and then
      tested it, every commit, forever */
-  var first=G.pool[0],last=G.pool[G.pool.length-1];
+  var first=_cRow[0],last=_cRow[_cRow.length-1];
   var hitFirst=first&&selD.indexOf(first)>=0,hitLast=last&&selD.indexOf(last)>=0;
   /* THE COMMIT HOOK. pts*mul + delta, in that order, which is what the four
      hand-written blocks above used to compute - short_fuse doubled before the
      others added. Applying it here instead of inside the loop is what makes
      the result independent of equip order. */
-  var _cev={actor:'p',sel:selD,isTriple:_isTriple,isStraight:_isStraight,
+  var _cev={actor:_cAct,sel:selD,isTriple:_isTriple,isStraight:_isStraight,
             jade:_jadeDice,hitFirst:hitFirst,hitLast:hitLast};
   var _cadd=famFire('commit',_cev);
   pts=Math.round(pts*(_cev._mul||1))+_cadd;
   /* relic commit effects */
-  var _palm=G.pool.filter(function(d){return d.mat==='finnicks_palm';})[0];
+  var _palm=_cRow.filter(function(d){return d.mat==='finnicks_palm';})[0];
   if(_palm){
-    var pi=G.pool.indexOf(_palm),adj=0;
-    selD.forEach(function(d){var di=G.pool.indexOf(d);if(Math.abs(di-pi)===1)adj+=100;});
+    var pi=_cRow.indexOf(_palm),adj=0;
+    selD.forEach(function(d){var di=_cRow.indexOf(d);if(Math.abs(di-pi)===1)adj+=100;});
     if(adj>0){pts+=adj;_famPop('+'+adj+' THE PALM');}
   }
   if(selD.some(function(d){return d.mat==='whispers_fang';})){pts+=200;_famPop('+200 THE FANG');}
@@ -28077,7 +28083,7 @@ function runOppTurn(){
          the NPC neither busted nor lost oppBank and freely rerolled — the
          player's own disruption cards actively backfired. */
       if(total===0){_oppBustOut();return;}
-      G.oppDice.filter(d=>!d.kept).forEach((d,i)=>{if(used[i]){d.kept=true;if(d.el){d.el.classList.add('selected','oppkeep');if(d.el._d3)D3.draw(d.el._d3);}}});
+      var _oSel=[];G.oppDice.filter(d=>!d.kept).forEach((d,i)=>{if(used[i]){_oSel.push(d);d.kept=true;if(d.el){d.el.classList.add('selected','oppkeep');if(d.el._d3)D3.draw(d.el._d3);}}});
       /* Player-armed Crown Authority / Blessed Dice: force NPC reroll of all kept dice */
       if(G._playerRerollKeptArmed){
         var _rkCardId=G._playerRerollKeptArmed;G._playerRerollKeptArmed=null;
@@ -28091,6 +28097,13 @@ function runOppTurn(){
           setStatusMsg((_rkCardId==='crown_authority'?'CROWN AUTHORITY':'BLESSED DICE')+' — '+G.rung.name+"'S KEPT DICE REROLLED!",'gold');
         }
       }
+      /* THE OPPONENT'S commit SEAM - eight of eight. The rival's selection is
+         final here and not one line earlier: the player-armed reroll above can
+         un-keep every die and zero `total`, so committing before it would raise
+         a selection the player then destroyed.
+         Same function the player commits through, with actor 'o' - the payload
+         is derived once rather than twice. */
+      if(_oSel.length&&total>0){ try{ total=famCommitBonus(_oSel,total,'o'); }catch(e){} }
       /* ── NPC strategic dice keeping ──
          Like a human player, the NPC sometimes keeps fewer scoring dice
          to reroll more for better combos (triples, straights).
