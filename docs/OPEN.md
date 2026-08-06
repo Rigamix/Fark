@@ -3,8 +3,9 @@
 The only file you need to read. Everything has my recommendation, so **"yours"
 is a valid answer.** Answered items are deleted, not marked — this stays short.
 
-**Nothing blocks me right now.** §1 is a batch you have already ruled on and I
-can start; §2–§4 need you or a playtest; §5 is a small cleanup question.
+**§1 is now blocked and needs you.** The ladder table it rests on was measured
+with the real player engine on one side and a *harness model* on the other —
+see §1a. §2–§4 need you or a playtest; §5 is a small cleanup question.
 
 Rebuilt 2026-08-06 — it had reached 960 lines with four `CLOSED` sections still
 in it, which defeated the point of the file. Deleted items live in git history.
@@ -48,6 +49,65 @@ uncertainty — measured by re-running the whole table under the opposite spoils
 assumption, not guessed. Nights 6–8 and 1–2 barely move between assumptions, so
 their shape is safe to tune against. Do not tune a mid-ladder cell to a point
 value.
+
+#### STOP — the table above is not safe to tune against. One question for you.
+
+Trying to build the ruled reduction turned up four dead levers in a row, and the
+fifth thing checked explains all four. **The two seats in the sim do not run the
+same code.**
+
+- `F.simTurn` — the player — drives the **real game**: `startPTurn`,
+  `rollPool`, `afterRollLite`, `handleBank`.
+- `F.oppTurn` — the boss — is a **separate implementation inside the harness**,
+  with its own roll loop. Its own comment says so: *"the SIM has its own copy of
+  the rival's scoring."*
+
+So every win rate in the table is the real player engine measured against a
+*model* of the opponent, and the boss's whole advantage is per-turn scoring:
+
+| night | boss | player pts/turn | boss pts/turn | turns each |
+|---|---|---|---|---|
+| 6 | ALDRIC | 368 | **688** | 10 v 10 |
+| 7 | WHISPER | 523 | **1096** | 9.5 v 9.1 |
+| 8 | AMBROSE | 594 | **1424** | 9.3 v 8.6 |
+
+The boss does not get more turns — it gets **fewer**. And four candidate causes
+are now measured and dead, each with a control:
+
+1. **Targets** — inert at 6–8. Those matches end at the turn cap 92 / 54 / 27%
+   of the time, so a finish line most matches never reach cannot matter.
+2. **Boss aggression / minBank** — inert, and `agg` is **backwards**: it gates
+   *"don't bank yet"*, so lowering it makes the boss bank sooner and keep
+   *more* (Aldric 6860 → 7259). Ratio never left 1.8–2.2.
+3. **Dice** — not the cause. The design comment claims boss dice sit *"one step
+   above the player's typical loadout"*; at nights 7–8 the player is **ahead**
+   (boss carries flint and amber). Handing the player Aldric's own dice made
+   them slightly *worse*.
+4. **Player skill** — not the cause. Every shipped policy banks at a **fixed
+   threshold that never scales** (carl 300, bea 500, ned 400, rita 200) while
+   late bosses bank at 700–900 — but raising it 300 → 1400 is **flat**, because
+   bust rate climbs 0.14 → 0.54 and cancels the gain exactly. Best of the whole
+   roster is otto at 14.7%.
+
+**The question: is the opponent model faithful to the real opponent turn?** I
+cannot answer it from inside the sim — that is the one thing it cannot check
+about itself. It matters either way:
+
+- **If it is faithful**, the ladder really is this hard and the fix has to be
+  player-side scoring, not targets — the three levers already ruled would all
+  have shipped as no-ops.
+- **If it is not**, the whole table is fiction and the retune would have been
+  tuned against an artifact.
+
+**My rec: settle it before building any of §1.** Measure the *real* opponent
+turn in the live game at night-6 gear and compare its points-per-turn against
+the model's 688. One number decides it. Roughly half a day; everything in §1
+waits on the answer, and the honest reason to wait is that four consecutive
+ruled levers already turned out inert against this instrument.
+
+One known gap in the model regardless: it has **no hot-dice rule** (`hot`
+appears zero times in it), while the player's real engine does. The keep
+policies *are* exercised — via `_oppChooseFrom` — so P495 is genuinely measured.
 
 ### 1b. `challenge` is broken on the PLAYER side too
 
