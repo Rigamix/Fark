@@ -389,6 +389,50 @@ waiting.
 
 ---
 
+## 11. A jade 6 is worth 50 to the rival and 750 to you — and it blocks the wiring
+
+Not a design question in itself; the *fix* is a difficulty change, which is why
+it is here rather than done.
+
+**The player's scoring path runs a second pass that the rival's does not.**
+Player keeps go through `scoreSelection`, which scores the wild both ways and
+takes the better — its comment: *"a Jade 6 could only ever be spent as a wild
+and never as a 6… a 1-2-3-4-5-6 straight could not complete because its 6 had
+been replaced."* The rival calls `scoreRoll` directly and gets one pass.
+
+That fix reached the player and never reached the rival. Measured over all 462
+rolls containing a jade 6:
+
+| | |
+|---|---|
+| rolls where jade vs bone changes the score | **308** |
+| best candidate ≠ the rival's maximal keep | **38 points, 7 dice** |
+| worst case | **`23456`: rival takes 50, the dice are worth 750** |
+
+`jade`/`jade2` are both wild and both in `dieBias` (`triples:jade`,
+`straights:jade/jade2`) → Brutus and Aldric. Live, not theoretical.
+
+**Why it blocks the keep wiring.** The plan was to route all three keep sites
+through one chooser, land it **inert**, and make the persona policy a separate
+change with its own before/after. `_legalKeeps` scores via `scoreSelection` — so
+routing the rival through it *silently fixes this*, and the rival gets sharply
+stronger whenever it holds a jade. A difficulty change hidden inside a patch
+whose whole purpose was to change nothing, and the next before/after would have
+credited it to the persona choice. §6 exists because that already happened once.
+
+**The ask: does the rival get the wild-as-option treatment the player has?**
+
+- **Yes** → fix it first as its own measured change; the wiring is then inert
+  against the corrected baseline and everything proceeds as planned.
+- **No** → then `_legalKeeps` must score the rival's candidates single-pass to
+  match, so the wiring stays genuinely inert. More work, but it preserves "a
+  jade behaves differently in a rival's hands" as a deliberate rule.
+
+Either answer unblocks it. Detail and how the blind spot was caught in
+`WILD_SEAT_ASYMMETRY.md`.
+
+---
+
 ## Everything else you answered is now work, not a question
 
 Tracked in `NEXT_SESSION.md` and being built. Nothing there needs you.

@@ -69,8 +69,15 @@ inertness actually needs. The assertion is now
 A tautology asserted nothing; the real assertion found my model of the data was
 slightly wrong within a minute of being written.
 
-**Stated limit:** the sweep is all-bone. Equal values of *different material*
-would read as value-identical here but are not interchangeable in play.
+**Stated limit — and it turned out to be the load-bearing one.** The sweep is
+all-bone, with `cards=[]`. Closing it found that routing is **NOT inert** when
+the rival holds a wild: 38 point-divergences and 7 dice-divergences across the
+462 rolls containing a jade 6, worst case `23456` scoring 50 against 750.
+
+So the conclusion below holds **for bone only**. See `WILD_SEAT_ASYMMETRY.md`
+and `OPEN.md` 11 - the wiring is blocked on that ruling, not on the persona
+policy. A limit written down is not the same as a limit checked; this one sat
+in the doc for exactly one commit before it mattered.
 
 ## What this hands to the persona work
 
