@@ -79,7 +79,11 @@ v.sameDerivation = !!(P && O && P.ev && O.ev
 v.tripleDetected = !!(P && P.ev && P.ev.isTriple === true);
 
 /* the rival's call site is wired, and after the reroll block that can void it */
-v.wiredAfterReroll = (function(){
+/* SOURCE-ORDER check, and the ordering genuinely matters: the player-armed
+   reroll can un-keep every die and zero `total`, so committing before it
+   would raise a selection the player then destroyed. bothSeatsRaise and
+   actorsAreRight prove the behaviour; this pins the position. */
+v.commitCallSitsAfterTheRerollBlock = (function(){
   try {
     const t = runOppTurn.toString();
     const sel = t.indexOf('var _oSel=[]');

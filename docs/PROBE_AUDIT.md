@@ -44,7 +44,45 @@ ever compare two computed values).
   rather than left overclaiming. Closing the gap by narrowing the claim is a
   real fix; leaving a name that promises more is not.
 
-## Still suspect — not yet repaired
+## Repaired in the second pass (P503) — and the fix was renaming, on evidence
+
+Filed rather than patched under pressure, and resolving them properly needed one
+fact that had not been established: **is the structural check the only guard, or
+a second one?** Counted:
+
+| probe | behavioural checks alongside |
+|---|---|
+| `apv_bank_fx` | **8** — flatBonus, doubleBank, halveEven/Odd, gain*, rowsArePure, defaults |
+| `apv_bust_fx` | **6** — gainPtsCard, punishCard, defaults, survivesUndefined, noStaleFallbacks, earlierTablesIntact |
+| `apv_commit_seam` | **4** — bothSeatsRaise, actorsAreRight, sameDerivation, tripleDetected |
+| `apv_fog_index` | **5**, including a 4,746-case sweep |
+| `apv_deadroll_opp` | 2 — raisesWithArray, ungatedNothing |
+
+**So none of them was a weak substitute for a behavioural test.** They are
+refactor guards: they catch wiring being moved or deleted even when the
+behavioural checks happen to still pass. That is a real job, and adding a
+duplicate behavioural assertion beside an existing one would have been noise.
+
+What was actually wrong is that a source-position check reported a verdict
+sounding like proven behaviour. So the **names** moved to the checks:
+
+| was | now |
+|---|---|
+| `placedCorrectly` | `raiseSitsAfterEncoreAndBeforeBustSave` |
+| `bothSeatsWired` (bank_fx) | `bothSeatsReferenceTheTable` |
+| `bothSeatsWired` (bust_fx) | `bothSeatsReferenceTheTable` |
+| `wiredAfterReroll` | `commitCallSitsAfterTheRerollBlock` |
+| `reExpansionIsWired` | `reExpansionPresentInSource` |
+
+`placedCorrectly` was the one that motivated the audit: it inferred
+**correctness of placement** from substring offsets — the identical inference
+that let `straightsProtectsAFive` stay green while a complete six-run was traded
+away. Each now carries a comment naming the sibling that covers the behaviour,
+so the structural check is visibly not meant to stand alone.
+
+All five green after renaming; baseline re-recorded.
+
+## Previously suspect — now resolved above
 
 Structural `toString()` checks that read a source substring and report a
 behavioural-sounding verdict:

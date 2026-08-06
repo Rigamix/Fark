@@ -48,7 +48,11 @@ v.rowsArePure = probe.amount === 50 && Object.keys(probe).length === 1;
    reachability and I read it as wiring. The rival's code is looked for where
    it actually lives. */
 v._rivalHost = (typeof runOppTurn === 'function') ? 'runOppTurn' : null;
-v.bothSeatsWired = (function(){
+/* SOURCE check: both seats mention the BANK_FX rows. "Wired" claimed more
+   than that. The eight behavioural checks above (flatBonus, doubleBank,
+   halveEven/Odd, gain*, rowsArePure) are what prove it works; this catches
+   a seat losing its reference in a refactor. */
+v.bothSeatsReferenceTheTable = (function(){
   try {
     const ROWS = ['flat_bonus','double_first_bank','halve_first_bank','gain_when_ahead'];
 /* THE RIVAL'S BANK CODE NO LONGER LIVES IN runOppTurn. P470 extracted its four

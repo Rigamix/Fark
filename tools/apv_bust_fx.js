@@ -41,7 +41,10 @@ v._cards = (function(){
 
 /* BOTH SEATS AND BOTH MESSAGES wired. doBust is the player's, _oppBustOut is
    nested inside runOppTurn - the same not-a-global trap as finOpp. */
-v.bothSeatsWired = (function(){
+/* SOURCE check: doBust and runOppTurn both mention BUST_FX. "Wired" claimed
+   more. gainPtsCard, punishCard, defaults and survivesUndefined are the
+   behavioural proof; this catches a seat losing its reference. */
+v.bothSeatsReferenceTheTable = (function(){
   try {
     const p = doBust.toString();
     const o = (typeof runOppTurn === 'function') ? runOppTurn.toString() : '';

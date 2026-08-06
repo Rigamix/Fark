@@ -110,7 +110,10 @@ notes._controlDiffs = ctlDiff;
 v.noFogUnchanged = ctlDiff === 0;
 
 /* ── structural: the re-expansion is actually in the shipped turn ── */
-v.reExpansionIsWired = (function () {
+/* SOURCE check. The 4,746-case sweep above is the behavioural proof that
+   the keep now matches; this only confirms the re-expansion line is still
+   in runOppTurn, so a refactor cannot silently drop it. */
+v.reExpansionPresentInSource = (function () {
   try {
     const src = runOppTurn.toString();
     const has = src.indexOf('_fogCut') >= 0 && /used\.splice\(_fogCut,0,false\)/.test(src);

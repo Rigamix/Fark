@@ -50,7 +50,14 @@ v.wiredInStep = (function(){
   catch (e) { return false; }
 })();
 /* placed after the Encore rescue and before the bust-save cascade */
-v.placedCorrectly = (function(){
+/* SOURCE-ORDER check, not a behavioural one. It compares indexOf offsets
+   inside runOppTurn to confirm the raise sits between the encore branch and
+   the bust-save. Named `placedCorrectly` until P503, which inferred
+   CORRECTNESS from a substring offset - the same inference that let
+   straightsProtectsAFive stay green through a real bug.
+   The behaviour is covered by raisesWithArray and ungatedNothing below;
+   this exists to catch the raise being MOVED by a refactor. */
+v.raiseSitsAfterEncoreAndBeforeBustSave = (function(){
   try {
     const t = runOppTurn.toString();
     const r = t.indexOf("deadRoll',{actor:'o'");
