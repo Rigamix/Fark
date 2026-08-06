@@ -740,7 +740,52 @@ caught it.
 
 ---
 
-## 14. CORVUS is harder than the final boss. One number worth acting on now.
+## 14. CLOSED - Corvus fixed. `interest_due` 500 -> 150.
+
+Ruled and shipped. He now reads **11.3 / 13.3** against Ambrose's 14.7 / 12.7 -
+parity with the night-8 climax, which was the target. Grog unchanged at
+21.3 / 22 as a control, so the change did not leak.
+
+**The cause took three wrong answers to find, and each was killed the same way.**
+
+| I said | why it was wrong |
+|---|---|
+| `severance_npc` (1200 start) | equal-LOWEST on a designed curve - Finnick has the same 1200 at 66.7%, Ambrose 4500 at 14.7% |
+| `fine_print` (halved opening) | noise - `carl` and `rita` moved in OPPOSITE directions when it was removed |
+| "his cards as a whole" (27 pts) | unremarkable - Ambrose 42.3, Whisper 34.7, Finnick 31.7 |
+
+Each time a real mechanism was present and I stopped. What killed each one was
+the same move: **a control against the peers who do not have the symptom.** A
+mechanism being present is not the same as it being the difference.
+
+**The actual cause:** `interest_due` - *"every 2nd turn, drain 500 from your
+score"* - draining `G.pPts`, the player's **banked** score, so banking gives no
+protection. Three drains over a ~7-turn match = 1500 against a player who banks
+~3354 total: **~45% of everything earned.** Isolated, that one card took the
+player from ~31% to ~5%, worse alone than his whole three-card draw.
+
+Properly mirrored (`G.pCards` drains `G.oPts`), so Law 6 was intact - the
+magnitude was the problem, not the symmetry.
+
+**Dose-response, which is why 150 is a choice and not a guess** (full pool, as
+shipped):
+
+| amount | carl | rita |
+|---|---|---|
+| 500 (was) | 4.7 | 5.3 |
+| 250 | 8.7 | 10.0 |
+| **150 (now)** | **11.3** | **13.3** |
+
+Monotonic, ~zero contribution at 0, clean scaling - a dial, not a mis-set
+threshold.
+
+**Deliberately NOT chased further.** This closes the backwards thing only. It
+does not reach Grog's 21% or the 45-55% band; `interest_due` was roughly half
+his gap and the rest sits in cards that have not been isolated the same way.
+
+<details><summary>original entry</summary>
+
+### CORVUS is harder than the final boss
 
 **Everything else measured tonight about the ladder should be ignored** - see the
 retraction below. This one cell survives it, confirmed at exact gear by two
