@@ -331,6 +331,31 @@ the axis the file already has.
 
 Which sharpens the question considerably.
 
+### Measured since filing: the lever is much stronger than a threshold
+
+Worth knowing before choosing a policy. The control sweep (`KEEP_CONTROL.md`,
+every roll of 1–6 dice) established that **the maximal keep is always the full
+set of scoring dice, and it is unique** — the scorer rejects any keep holding a
+non-scoring die, so every option is an all-scoring subset and every non-maximal
+one scores strictly less.
+
+**So choosing is necessarily choosing to score less now for more dice live.**
+There is no free variation between equally-good options; a persona either takes
+the maximum or trades points for rerolls. `[1,1,1,5]` is the shape of it:
+
+| keep | points | dice left to reroll |
+|---|---|---|
+| all four | **1050** | 0 |
+| the three 1s | 1000 | 1 |
+| two 1s + the 5 | 250 | 1 |
+| one 1 | 100 | 3 |
+| **just the 5** | **50** | **3** |
+
+A "keep the fewest dice that still score" persona takes **50 and rerolls three**
+where a maximal one takes **1050 and rerolls none**. That is not a dial, it is a
+cliff — which argues for picking the first policy deliberately, since it sets
+the template.
+
 ### The question
 
 **Does keep-choice hang off the risk axis, the category axis, or both?**
