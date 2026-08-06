@@ -356,7 +356,47 @@ where a maximal one takes **1050 and rerolls none**. That is not a dial, it is a
 cliff — which argues for picking the first policy deliberately, since it sets
 the template.
 
-### The question
+### ANSWERED — the six policies are specified. Two things to check before they are built.
+
+Policies received: `hoard` maximal; `aggro` most-dice-live; `straights` hardest
+gamble for completion; `triples` combo-aware; `ones` maximal but never empties
+the hand; `combo` calculates points plus value-per-live-die.
+
+**1. Hand type is NOT exposed — confirmed, and it is a small addition.**
+`_legalKeeps` returns `{sel, pts, icons, left}`. No type. But the derivation
+already exists in `famCommitBonus`:
+
+```js
+var _isTriple=Object.keys(_counts).some(v=>_counts[v]>=3);
+var _run=1,_best=1; ... var _isStraight=_best>=5;
+```
+
+So it is a data addition that must **reuse that derivation**, not write a second
+one — two derivations of "is this a straight" drifting apart was five of the
+findings in this stretch.
+
+**2. The `straights` rationale rests on a premise the code contradicts.**
+The spec says *"a partial straight is worth exactly nothing until it's
+six-for-six — there's no partial credit"*. Measured:
+
+| | |
+|---|---|
+| `123456` six-run | **1500** |
+| `12345` five-run | **500** |
+| `23456` five-run | **750** |
+| `2345` four-run | 50 (just the lone 5) |
+
+**Five-for-six pays 500–750**, and `_isStraight` is `_best >= 5`, matching. So
+"gamble hardest because there is no partial credit" does not hold — a straights
+persona already banks substantially at five dice. **Worth your re-read**: the
+policy may still be right, but its stated reason is not.
+
+`combo`'s value-per-live-die is correctly flagged as needing its own measured
+pass; that one is not guessable.
+
+---
+
+### The original question, for the record
 
 **Does keep-choice hang off the risk axis, the category axis, or both?**
 

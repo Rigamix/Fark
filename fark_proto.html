@@ -27793,11 +27793,14 @@ function runOppTurn(){
          physically there and still rolls - the AI's maths simply cannot see
          its value, so that seat resolves to whatever the rest implies. */
       var _fogV=fV.slice(),_fogM=fMats.slice();
+      /* P491: which seat got spliced out, so `used` can be put back to full
+         length below. -1 means no fog this roll. */
+      var _fogCut=-1;
       if(_lmDue('_fog')){
         var _fi=-1;
         for(var _fj=0;_fj<_oFree.length;_fj++)if(_oFree[_fj].lane===G._fog.lane){_fi=_fj;break;}
         if(_fi>=0&&_fogV.length>1){
-          _fogV.splice(_fi,1);_fogM.splice(_fi,1);
+          _fogV.splice(_fi,1);_fogM.splice(_fi,1);_fogCut=_fi;
           try{famLog('FOG — THEY MISREAD A SEAT');}catch(e){}
         }
         /* KINDRED holds it for a second opponent turn (#32) */
@@ -27805,6 +27808,17 @@ function runOppTurn(){
       }
       crowsCtx.crowsLuckFiredThisRoll=false;
       var{total,used,context:newCtx}=_scoreRollBest(_fogV,G.oCards,oppBank,crowsCtx,_fogM);crowsCtx=newCtx||crowsCtx;
+      /* P491 - PUT THE HIDDEN SEAT BACK. `used` came from the spliced array,
+         so it was one short, while the snare check and the keep loop both
+         index it with positions from the FULL free list - every index at or
+         above the fogged seat was off by one and the rival kept the wrong
+         dice. Measured: free [1,2,5,1,3,5] with seat 2 fogged kept [1,5,3]
+         instead of [1,1,5], holding a die that scored nothing.
+         Re-expanding here rather than compensating at each read site, because
+         `used` is REASSIGNED five times below from full-length arrays and
+         shifting those would recreate the bug. false is correct, not a
+         filler: the rival cannot see that seat, so it never keeps it. */
+      if(_fogCut>=0&&used&&used.length<fV.length)used.splice(_fogCut,0,false);
       if(crowsCtx.crowsLuckFiredThisRoll)triggerCard('crows_luck',"CROW'S LUCK — STRAIGHT DOWNGRADED",true);
       /* SNARE: their die in the marked seat is halved once if it scores
          during this turn. The mark then clears whether it fired or not -
