@@ -122,7 +122,20 @@ for (const p of probes) {
   } else { console.log('pass    ' + Object.keys(v).length + ' checks'); pass++; }
 }
 
-console.log('\n' + pass + ' pass, ' + fail + ' fail, ' + err + ' error');
+/* EVERY state, not just the flattering three. "44 pass, 0 fail, 0 error" was
+   true while two probes had silently skipped and overwritten real verdicts -
+   a headline that cannot express a state is read as evidence that state did
+   not happen. `ind` in particular was counted and never printed, and an
+   indeterminate check reported as nothing is what this runner's header calls
+   the lying suite. */
+console.log('\n' + pass + ' pass, ' + fail + ' fail, ' + err + ' error, ' +
+            skip + ' skip, ' + ind + ' indet');
+var _accounted = pass + fail + err + skip + ind;
+if (_accounted !== probes.length) {
+  console.log('!! ' + probes.length + ' probes ran but only ' + _accounted +
+              ' are accounted for - ' + (probes.length - _accounted) + ' unreported');
+}
+if (skip) console.log('   a skip measured NOTHING - it is not a pass');
 
 /* ── EVERY RUN IS RECORDED, because an intermittent failure that is only ever
    printed to a terminal is unfindable by construction ──────────────────────
