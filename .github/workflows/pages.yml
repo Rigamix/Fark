@@ -1,23 +1,11 @@
 # Deploy Fark to GitHub Pages via Actions, replacing the legacy branch builder.
 #
-# WHY: the legacy "pages build and deployment" builder failed 8 times running on
-# 2026-08-06, always instantly (duration 0) with a generic "Page build failed",
-# leaving the live site 8 commits stale. It was not content - the same tree built
-# at 11:01 and 11:54 and failed at 11:17 and 11:37 - and GitHub reported all
-# systems operational. Failures clustered whenever pushes came close together and
-# successes always followed a gap, so it reads as contention on that builder.
-#
-# This path does not use that builder at all. It also fixes the underlying
-# behaviour rather than working around it:
-#
-#   concurrency + cancel-in-progress  a rapid second push CANCELS the first run
-#                                     instead of queueing behind it until the
-#                                     deploy step times out after 10 minutes
-#   staged _site                      publishes only what the game actually
-#                                     serves. tools/, docs/, _old/ and .claude/
-#                                     were all being published and none is
-#                                     referenced - .claude/settings.local.json
-#                                     especially had no business being public.
+# WHY: the legacy "pages build and deployment" builder failed repeatedly on
+# 2026-08-06, leaving the live site 8 commits stale. Routing through Actions
+# identified the real cause - the deployment reaches `deployment_in_progress`
+# and burns the full 600s. deploy-pages CAPS `timeout` at 600000 ms ("timeout
+# value is greater than the allowed maximum"), so 10 minutes is a hard limit and
+# the only cure is a smaller published site.
 name: Deploy Pages
 
 on:
@@ -30,7 +18,8 @@ permissions:
   pages: write
   id-token: write
 
-# One deploy at a time, and a newer push wins rather than waiting.
+# One deploy at a time, and a newer push wins rather than queueing behind an
+# older one until it times out.
 concurrency:
   group: pages
   cancel-in-progress: true
@@ -45,62 +34,76 @@ jobs:
         run: |
           set -e
           mkdir -p _site
-          # the two the game actually references - 65 and 32 refs respectively
+          # the only two trees the game references - 65 and 32 refs
           cp -r Art _site/Art
           cp -r assets _site/assets
-          # root entry points
           for f in index.html fark_proto.html throw_lab.html manifest.json sw.js .nojekyll; do
-            [ -f "$f" ] && cp "$f" _site/ || echo "skip missing $f"
+            if [ -f "$f" ]; then cp "$f" _site/; else echo "skip missing $f"; fi
           done
-          # 16.0 MB of formats no browser can render. Zero reference risk -
-          # nothing can be <img src="x.psd">. NOT touching assets/_mockups/
-          # despite its 35.8 MB: .nojekyll exists precisely because Jekyll once
-          # excluded it and 404'd the JMH Beda font, hearts and gold plate on a
-          # real phone test. It is live content, not mockups.
-          find _site \( -iname '*.psd' -o -iname '*.zip' -o -iname '*.ai' \) -delete
-          # The 9 standalone design pages in _mockups: 16.1 MB, and every one
-          # measured at refs=0 from fark_proto.html / index.html / sw.js. They
-          # are pages you navigate to, not assets the game loads - so removing
-          # them cannot break the game. Their IMAGES stay (see above).
+
+          # Source formats no browser can render. Zero reference risk.
+          find _site -type f \( -iname '*.psd' -o -iname '*.zip' -o -iname '*.ai' \) -delete
+
+          # The 9 standalone design pages in _mockups: every one measured refs=0
+          # from fark_proto.html / index.html / sw.js. Pages you navigate to, not
+          # assets the game loads.
           rm -f _site/assets/_mockups/*.html
+
+          # props/: 1.1 MB, measured refs=0, confirmed old.
+          rm -rf _site/assets/_mockups/props
+
+          # NOT new_main, despite the directory it lives in. It holds
+          # JMH Beda.ttf, loaded by a live @font-face, and the game's
+          # `mockups:'assets/_mockups/new_main/'` prefix appends names to it at
+          # runtime - so which of its 65 files load cannot be enumerated
+          # statically. Misnamed, not redundant. Deleting it kills a font.
+
           echo "staged $(find _site -type f | wc -l) files, $(du -sm _site | cut -f1) MB"
 
       - name: Compress the staged images
         run: |
           set -e
-          # RULED: "optimize whatever hasnt been optimized and work with those".
-          # Done HERE, on the staged copy, not in Art/ - the source art is
-          # never modified, and every filename is preserved byte-for-byte in
-          # name, so the runtime-assembled paths keep resolving. That matters:
-          # Backgrounds/MAIN/<NAME>/<Name>_env_BG.png is built at runtime and
-          # a static audit could not see it - dropping or renaming masters
-          # would have 404d live art.
+          # RULED: "optimize whatever hasn't been optimized and work with those".
           #
-          # Measured on the branch: 254 optimized webp (15.2 MB) already exist
-          # beside 242 masters (102.1 MB), and 39 masters (16.8 MB) have no
-          # twin at all. Compressing in place covers both cases in one pass
-          # instead of maintaining a second set of names.
+          # Done on the STAGED COPY, never in Art/ - the source art is untouched
+          # and every filename is preserved, so the runtime-assembled paths keep
+          # resolving. Backgrounds/MAIN/<NAME>/<Name>_env_BG.png is built from
+          # the boss key at runtime; a static reachability audit could not see it
+          # and came within one sanity check of deleting live art. Compressing in
+          # place sidesteps that class entirely: nothing renamed, nothing removed.
           #
-          # pngquant is palette quantisation - the right tool for this art
-          # style - and --skip-if-larger keeps the original whenever it does
-          # not actually help.
-          sudo apt-get update -qq >/dev/null 2>&1
-          sudo apt-get install -y pngquant >/dev/null 2>&1
+          # Measured on the branch: 254 optimized webp (15.2 MB) already sit
+          # beside 242 masters (102.1 MB), and 39 masters (16.8 MB) have no twin.
+          # One in-place pass covers both instead of maintaining a second set of
+          # names plus a rewrite layer to reach them.
+          #
+          # THE FIRST VERSION OF THIS STEP SILENTLY DID NOTHING. It logged
+          # "200 MB -> 200 MB", which reads as "ran, nothing to do" and actually
+          # meant "never ran": a mangled line continuation left a literal \n in
+          # the command, and `2>/dev/null || true` swallowed the error. Errors
+          # are no longer hidden, and an unchanged size now warns.
+          sudo apt-get update -qq
+          sudo apt-get install -y pngquant
+          pngquant --version
+          echo "PNG files to process: $(find _site -type f -iname '*.png' | wc -l)"
           BEFORE=$(du -sm _site | cut -f1)
-          find _site -iname "*.png" -print0 \n            | xargs -0 -P 4 -n 25 pngquant --force --skip-if-larger \n                --ext .png --quality 50-88 2>/dev/null || true
+          find _site -type f -iname '*.png' -print0 | xargs -0 -r -P 4 -n 25 pngquant --force --skip-if-larger --ext .png --quality 50-88 || echo "pngquant returned $? (per-file skips are expected)"
           AFTER=$(du -sm _site | cut -f1)
           echo "IMAGE COMPRESSION: ${BEFORE} MB -> ${AFTER} MB"
-          # a deploy over ~150 MB has never finished inside the 10-minute cap
+          if [ "$BEFORE" = "$AFTER" ]; then
+            echo "::warning::compression changed nothing - this step is not working"
+          fi
           if [ "$AFTER" -gt 150 ]; then
             echo "::warning::staged site is ${AFTER} MB - deploy may still time out"
           fi
 
       - name: Fail if the game itself did not make it
         run: |
-          test -f _site/fark_proto.html || { echo "fark_proto.html missing from _site"; exit 1; }
-          test -f _site/index.html      || { echo "index.html missing from _site"; exit 1; }
-          test -d _site/Art             || { echo "Art/ missing from _site"; exit 1; }
-          test -d _site/assets          || { echo "assets/ missing from _site"; exit 1; }
+          test -f _site/fark_proto.html || { echo "fark_proto.html missing"; exit 1; }
+          test -f _site/index.html      || { echo "index.html missing"; exit 1; }
+          test -d _site/Art             || { echo "Art/ missing"; exit 1; }
+          test -d _site/assets          || { echo "assets/ missing"; exit 1; }
+          test -f "_site/assets/_mockups/new_main/JMH Beda.ttf" || { echo "the live font was deleted"; exit 1; }
 
       - uses: actions/upload-pages-artifact@v3
         with:
@@ -115,10 +118,6 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
-        # NO TIMEOUT SETTING - it is capped and cannot help. Raising it to
-        # 1800000 produced:
-        #   "timeout value is greater than the allowed maximum - timeout set to
-        #    the maximum of 600000 milliseconds"
-        # 10 minutes is a HARD limit on deploy-pages. The deployment reaches
-        # `deployment_in_progress` and simply does not finish in that window, so
-        # the only cure is a smaller site - see the staging step above.
+        # No timeout setting: it is capped at 600000 ms and raising it only logs
+        # "timeout value is greater than the allowed maximum". A smaller site is
+        # the only lever.
