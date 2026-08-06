@@ -181,11 +181,19 @@ decision rather than a silent edit.
 
 ## Not blocking, for your awareness
 
-- **Pages deploy is stuck behind a GitHub outage.** Actions and Pages both at
-  `major_outage`, failing on `Invalid actions OIDC token`. Nothing fixable at
-  our end. **Six commits are undeployed**, so the live site lacks combo, the
-  hot-dice fix, the lane-integrity fix and Corvus's nerf. It will go out on the
-  next push once they recover — verify with a marker grep, never a green build.
+- **Pages deploy is stuck behind a GitHub outage.** Actions and Pages both still
+  at `major_outage`, failing on `Invalid actions OIDC token`. Nothing fixable at
+  our end — the newest push did not even queue a run.
+  **Last successful deploy: 15:32Z. Four runs since have failed.**
+  Everything is safely on `origin/fark`; only the publish step is stuck.
+  Measured, not assumed: the live `fark_proto.html` is **2,073,103** bytes
+  against **2,076,799** in `origin/fark`, and the marker
+  `numDice=Math.max(1,G.numDice-1)` is **absent live** while `_laneOf` and
+  `noble:'combo'` are present — so the live build predates P504. The player
+  therefore still has the hot-dice lane bug.
+  It will go out on the first push after recovery. **Verify with that marker
+  grep against `fark_proto.html`, never a green build** — and note `index.html`
+  is only a redirect stub, so grepping the site root always looks empty.
 - **Four model assumptions remain untested** — 65% patron win rate, boss beaten
   first try, buys the dearest die in stock, no enchant/tavern gold. None *looks*
   load-bearing, but that is an impression rather than a measurement; the same
