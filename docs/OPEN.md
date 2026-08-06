@@ -851,6 +851,72 @@ earlier gear, nights 3, 6 and 7 flattered with later.
 
 ---
 
+## 15. The ladder, measured on night-appropriate gear at last. Nothing is in spec.
+
+All eight cells now measure the same thing. Two policies, 200 matches each, and
+**a fresh loadout drawn per match** from a modelled population.
+
+| boss | night | carl | rita |
+|---|---|---|---|
+| GROG | 1 | 22.5 | 20.0 |
+| MABEL | 2 | 32.5 | 32.0 |
+| **FINNICK** | 3 | **65.0** | 64.0 |
+| CORVUS | 4 | 23.0 | 23.0 |
+| BRUTUS | 5 | 36.0 | 33.0 |
+| **ALDRIC** | 6 | **11.0** | 12.0 |
+| **WHISPER** | 7 | **9.5** | 7.5 |
+| **AMBROSE** | 8 | **7.5** | 7.0 |
+
+**Seven below the 45% floor, one above the 55% ceiling, none inside.**
+
+### The shape is not uniform, which matters for how it gets fixed
+
+- **Nights 1-2 (20-32%)** - too hard, but the gentlest part of the curve
+- **Night 3, Finnick (65%)** - the only boss above target, and by 10 points
+- **Nights 4-5 (23-36%)** - middling
+- **Nights 6-8 (7-12%)** - a genuine collapse; the finale is at 7.5%
+
+### Every approximated cell moved, in both directions
+
+The old nearest-of-three gear table was wrong exactly as suspected. **Aldric read
+43.3 and is actually 11.0** - he was the cell flagged as "not evidence we are
+nearly there", and he was flattered by a whole night-band of borrowed gear.
+Brutus 17.3 -> 36, Corvus 11.3 -> 23, Whisper 18.7 -> 9.5.
+
+### "Night N gear" does not exist, and that shaped the method
+
+The shop sells each family out with p=0.55 per night, independently
+(`_shopRollNight`), so loadouts diverge hard: **1 distinct loadout at night 1,
+53 at night 4, 162 at night 7.** The modal loadout covers 100% of runs at night
+1 and **2.5%** at night 7; even the top EIGHT cover only 13-18% at nights 6-8.
+
+Picking one representative loadout per night would have measured ~3% of real
+runs and called it the ladder - the same error as the uniform night-8 table,
+better disguised. Hence a fresh draw per match.
+
+### The model's assumptions - the only unmeasured inputs
+
+Everything else is read from the code (buy-ins, boss gold, patron payout
+`20+t*12`, spoils purse `500+t*60`, the seven shop families and their prices,
+the pity rule, six-bone start). These are not:
+
+1. patron win rate **65%** (brief targets 60-70%)
+2. beats each boss first try
+3. **spoils = purse every night** - the gear-maximising choice, and the
+   assumption doing the most work, since the purse dwarfs patron income early.
+   Taking a relic trades gold for a die and is not modelled.
+4. buys the most expensive die in stock each night, never sells
+5. no enchant spending, no tavern-card gold
+
+**If any of those is wrong the whole table shifts**, so they are worth a read
+before anything gets tuned against it. Model kept at `tools/gear_model.py` so
+the numbers can be re-derived rather than re-invented.
+
+**Still the standing instruction:** tune TARGETS down before inflating player
+scoring.
+
+---
+
 ## Everything else you answered is now work, not a question
 
 Tracked in `NEXT_SESSION.md` and being built. Nothing there needs you.
