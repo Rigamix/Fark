@@ -507,6 +507,45 @@ roll counts identical - the wiring changes only what it should.
 | triples | 555 -> 431.7 | -123 | 0.259 -> 0.347 | 2.15 -> 2.36 |
 | **aggro** | 549.7 -> 202.9 | **-347** | 0.249 -> **0.491** | 2.1 -> **3.58** |
 
+### 12c. `triples` - my rec: SHIP IT, and here is why the delta moved
+
+Asked for numbers before a read, and reading the TRADES rather than the delta
+was what mattered - the aggregate was hiding two separate bugs.
+
+**As first built it gave up 7000 points on `111111`**: "most dice live among
+triple candidates" keeps the MINIMUM triple, so six 1s became a bare 1000 with
+three rerolled. The -123 aggregate said nothing.
+
+Two fixes, because the first guard was too narrow:
+- **P499** - a keep must not leave behind a die of a face it is already
+  holding. Killed the six-of-a-kind case.
+- **P500** - but `222333` still kept one triple and rerolled the other, because
+  the dropped face was simply absent from the selection and nothing compared
+  it. The test has to run over the FREE dice: any face the roll holds three or
+  more of is a made set and none of it is left behind. A pair is not a set, so
+  stray 1s and 5s can still be dropped, which is the trade the persona is for.
+
+| | before fixes | after |
+|---|---|---|
+| worst trade | **-7000** (`111111`) | **-800** (`112225`) |
+| median trade | -400 | **-200** |
+| play delta | -123 | **-68.3** |
+| bust | 0.259 -> 0.347 | 0.259 -> **0.329** |
+
+**Ship it.** -68 a turn for a legible habit - drop stray singles, keep every
+made set, chase another - is a personality with a price, not a broken rule.
+
+**Final table, all six, after every fix:**
+
+| persona | delta | bust | rolls |
+|---|---|---|---|
+| hoard / combo / **ones** | **0** | unchanged | unchanged |
+| straights | -11.7 | 0.259 -> 0.261 | 2.15 -> 2.11 |
+| triples | -68.3 | 0.259 -> 0.329 | 2.15 -> 2.29 |
+| aggro | -346.8 | 0.249 -> 0.491 | 2.1 -> 3.58 |
+
+Control holds throughout: maximal personas on bone move by exactly 0.
+
 ### 12a. `aggro` - my rec: SHIP AS SPECIFIED, but know where it lands
 
 The rule does exactly what it says and doing exactly what it says is expensive:

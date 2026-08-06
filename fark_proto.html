@@ -13872,23 +13872,31 @@ function _npcChooseKeep(keeps,rung){
   }else if(key==='triples'){
     /* leaves dice live specifically where that keeps a triple alive, rather
        than in general. No triple available - take the maximal. */
-    var _trip=c.filter(function(k){return k.isTriple;});
+    /* P499 - MUST NOT BREAK UP THE SET IT IS CHASING. "Most dice live among
+       triple candidates" picked the MINIMUM triple, so six 1s were kept as a
+       bare 1000 and the other three rerolled - giving up 7000. Measured across
+       359 trades: median give-up 400, worst 7000. The -123 aggregate hid it
+       entirely, the same way -40 hid the six-run bug.
+       A keep that leaves behind a die of a face it is already holding is
+       splitting the group, which is the opposite of preserving or extending a
+       triple. Those are excluded; among the rest, most dice live. */
+    var _trip=c.filter(function(k){return k.isTriple&&!k.splitsGroup;});
     pick=_trip.length
       ? _trip.sort(function(a,b){return (b.left-a.left)||(b.pts-a.pts);})[0]
       : c[0];
 
-  }else if(key==='ones'){
-    /* reliable, but never all-in: if the maximal keep empties the hand, drop to
-       the best keep that still leaves a die to roll. */
-    pick=c[0];
-    if(pick&&pick.left===0){
-      var _live=c.filter(function(k){return k.left>=1;});
-      if(_live.length)pick=_live[0];/* already points-sorted */
-    }
-
   }else{
     /* hoard takes everything scoring and protects it - which is what used[]
        already did.
+       ONES LANDS HERE TOO, ruled after measurement. It used to refuse a keep
+       that emptied the hand - "reliable, never all-in". That cost 121 points a
+       turn and bought NOTHING: rolls went DOWN (2.04 -> 1.89) and the bust rate
+       barely moved, so it was giving up value to preserve an extra roll it then
+       did not take. And it already had that identity where it belongs -
+       PERSONAS.ones.behavior is 'safe', which oppShouldBank reads as
+       `agg=Math.max(0.10,agg-0.10)`, banking earlier than everyone else. The
+       keep-side restriction was a second lever on a personality that already
+       had one, and the second lever only subtracted.
        combo lands here TOO, deliberately: it is meant to weigh points against
        an estimated value per die left live, and that number has not been
        measured. A placeholder would only have to be re-derived properly later,
@@ -13937,8 +13945,24 @@ function _legalKeeps(free,actor,locked){
     /* P492: shape travels with the candidate so a persona can ask what KIND of
        hand it is, not just what it scores. Same derivation famCommitBonus uses. */
     var _sh=_handShape(sel);
+    /* P499/P500: does this keep DROP part of a set? Any face the roll holds
+       three or more of is a made set, and leaving any of it behind is the
+       opposite of chasing triples.
+       P499 checked only faces the candidate was already keeping, which caught
+       six 1s kept as a bare 1000 (-7000) but let 222333 keep one triple and
+       reroll the other (-2200) - the dropped face was simply absent from the
+       selection, so nothing compared it. The test is over the FREE dice, not
+       the selection. A pair is not a set, so stray 1s and 5s can still be left
+       live, which is the trade the persona is actually for. */
+    var _fc={},_sc={};
+    free.forEach(function(d){_fc[d.val]=(_fc[d.val]||0)+1;});
+    sel.forEach(function(d){_sc[d.val]=(_sc[d.val]||0)+1;});
+    var _splits=Object.keys(_fc).some(function(v){
+      return _fc[v]>=3&&(_sc[v]||0)<_fc[v];
+    });
     out.push({sel:sel,pts:pts,icons:(sp.icons||[]).length,left:n-sel.length,
-              isTriple:_sh.isTriple,isStraight:_sh.isStraight,runLen:_sh.runLen});
+              isTriple:_sh.isTriple,isStraight:_sh.isStraight,runLen:_sh.runLen,
+              splitsGroup:_splits});
   }
   out.sort(function(a,b){return b.pts-a.pts;});
   return out;
