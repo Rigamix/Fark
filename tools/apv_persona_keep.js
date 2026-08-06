@@ -70,9 +70,26 @@ for (let n = 2; n <= 6; n++) for (const vals of multisets(n)) {
     let ok = true;
     if (p === 'hoard' || p === 'combo') ok = pick.pts === maxPts;
     else if (p === 'aggro') ok = pick.left === maxLeft;
-    else if (p === 'straights') ok = anyFive ? pick.runLen >= 5 : pick.pts === maxPts;
-    else if (p === 'triples')  ok = anyTrip ? pick.isTriple === true : pick.pts === maxPts;
-    else if (p === 'ones')     ok = anyLive ? pick.left >= 1 : true;
+    else if (p === 'straights') {
+      /* a COMPLETE run is the prize, not a gamble: with a six-run available it
+         must take the points. With exactly five it keeps the run. */
+      const anySix = K.some(k => k.runLen >= 6);
+      ok = anySix ? (pick.runLen >= 6 && pick.pts === Math.max.apply(null, K.filter(k=>k.runLen>=6).map(k=>k.pts)))
+         : (anyFive ? pick.runLen >= 5 : pick.pts === maxPts);
+    }
+    else if (p === 'triples') {
+      /* it must never DROP a made set - keeping six 1s as a bare triple gave up
+         7000, and keeping one of 222333 gave up 2200. Both passed a check that
+         only asked "is it a triple". */
+      const usable = K.filter(k => k.isTriple && !k.splitsGroup);
+      ok = usable.length ? (pick.isTriple === true && !pick.splitsGroup) : pick.pts === maxPts;
+    }
+    /* RULED: ones dropped its keep rule. It paid 121 points a turn for "never
+       all-in" and bought nothing - rolls went DOWN and busts barely moved - and
+       PERSONAS.ones.behavior is already 'safe', which oppShouldBank reads to
+       bank earlier. Its identity lives on the banking axis; this asserts the
+       ruling rather than the rule it replaced. */
+    else if (p === 'ones')     ok = pick.pts === maxPts;
     if (!ok) fail[p]++;
   }
 }
@@ -88,7 +105,7 @@ v.hoardTakesMaximal      = fail.hoard === 0;
 v.aggroLeavesMostDiceLive= fail.aggro === 0;
 v.straightsProtectsAFive = fail.straights === 0;
 v.triplesPrefersATriple  = fail.triples === 0;
-v.onesNeverEmptiesTheHand= fail.ones === 0;
+v.onesTakesMaximal       = fail.ones === 0;
 v.comboHoldsAtMaximal    = fail.combo === 0;
 
 /* THE POLICIES MUST ACTUALLY DIFFER. If every persona picked the same keep the
