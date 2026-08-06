@@ -908,9 +908,47 @@ the pity rule, six-bone start). These are not:
 4. buys the most expensive die in stock each night, never sells
 5. no enchant spending, no tavern-card gold
 
-**If any of those is wrong the whole table shifts**, so they are worth a read
-before anything gets tuned against it. Model kept at `tools/gear_model.py` so
-the numbers can be re-derived rather than re-invented.
+### A3 was the load-bearing one, so it was MEASURED rather than left as a caveat
+
+"Spoils = purse every night" was the assumption doing the most work. Rather than
+leave the table flagged as untrustworthy, the alternative was modelled and run:
+a build-focused player taking the boss's **relic die** every night instead of
+gold. Both branches, all eight bosses, two policies, 200 matches per cell.
+
+| boss | night | purse | relic | swing |
+|---|---|---|---|---|
+| GROG | 1 | 22.5 | 22.5 | 0 |
+| MABEL | 2 | 35.0 | 35.5 | +0.5 |
+| **FINNICK** | 3 | 67.5 | 78.5 | **+11** |
+| CORVUS | 4 | 23.5 | 29.5 | +6 |
+| **BRUTUS** | 5 | 37.5 | 29.0 | **-8.5** |
+| ALDRIC | 6 | 11.0 | 13.5 | +2.5 |
+| WHISPER | 7 | 8.5 | 8.5 | 0 |
+| AMBROSE | 8 | 8.0 | 5.0 | -3 |
+
+Mean absolute swing **3.9**, max **11**, concentrated at nights 3-5 where the two
+gear curves diverge most (a relic-taker is fully kitted by night 5, a purse-taker
+not until night 8).
+
+**THE CONCLUSION IS ROBUST TO IT.** Under *both* assumptions: no boss in spec,
+Finnick the lone boss above, nights 6-8 collapsed, nights 1-2 too hard. So the
+ladder's SHAPE can be tuned against; individual mid-ladder cells carry about
++/-10 of assumption uncertainty and should not be tuned to a point value.
+
+**And the swing goes BOTH ways, which validates the model independently.**
+Relics help at nights 3-4 and *hurt* at 5 and 8 - because the brief's own
+SIDE-GRADE RULE tunes relics *below* same-band shop dice, so taking free relics
+means not buying jade. The model reproduced a stated design rule that was never
+encoded into it.
+
+Relics were confirmed as real scoring materials first (bone averages 452 a roll,
+Grog's Tooth 607, Aldric's Square 570). Had they been inert or unknown to the
+scorer, this branch would have produced a confidently wrong answer rather than
+an error - the failure mode that voided the first half of the session.
+
+**Remaining assumptions, now the only untested ones:** 65% patron win rate,
+boss beaten first try, buys the dearest die in stock, never sells, no enchant or
+tavern-card gold. Model at `tools/gear_model.py`, re-derivable.
 
 **Still the standing instruction:** tune TARGETS down before inflating player
 scoring.
