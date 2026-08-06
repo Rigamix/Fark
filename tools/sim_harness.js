@@ -298,7 +298,13 @@ F.setupMatch=function(o){
   S.run._hotdNext=false;
   var lo=F.buildLoadout(o);
   var rung=o.rung||(o.boss?RUNGS[tier]:generatePatron(tier));
-  if(o.boss)rung=Object.assign({},RUNGS[tier]);/* per-match copy: newG keeps a ref */
+  /* per-match copy: newG keeps a ref, so the shared RUNGS entry must not be
+     handed to it directly. It used to copy from RUNGS[tier] unconditionally,
+     which DISCARDED o.rung one line after honouring it - so
+     simMatch({boss:true,rung:X}) silently measured the shipped rung instead
+     of X. Found when a card-isolation run returned bit-identical numbers for
+     five variants including "no cards at all". Copy the CHOSEN rung. */
+  if(o.boss)rung=Object.assign({},rung);
   /* P472 - THE PATRON'S CARDS, dealt the way the game deals them.
      This read `rung.cards`, AND NO RUNG HAS THAT FIELD - not one boss, not one
      generated patron. They carry cardPool / cardCount / cardChance, which
