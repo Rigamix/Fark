@@ -153,8 +153,40 @@ try {
 
 /* ── compare to the baseline, so only NEW breakage is alarming ── */
 if (RECORD) {
-  fs.writeFileSync(BASELINE, JSON.stringify(results, null, 1));
-  console.log('\nbaseline recorded — ' + Object.keys(results).length + ' probes');
+  /* A SKIP IS NOT A MEASUREMENT, SO IT MUST NOT OVERWRITE ONE.
+     Recording used to be a wholesale overwrite. A setup-dependent probe that
+     happened to skip on the recording run therefore replaced its real verdict
+     with {skipped:true} - measured: apv_amber_oneshot (4 checks) and
+     apv_break_doublepush (1) were erased exactly that way. After that the diff
+     expects "skipped", and a genuine later break has nothing to register
+     against. Every unlucky --record eroded the file a little further.
+
+     A real verdict from this run always wins, including a FAILING one - the
+     baseline should track the latest actual measurement. It is only the
+     absence of one that is not allowed to overwrite. */
+  var _rec = results, _kept = [];
+  if (fs.existsSync(BASELINE)) {
+    try {
+      var _prev = JSON.parse(fs.readFileSync(BASELINE, 'utf8'));
+      /* START FROM THE BASELINE, not from this run. `results` holds only the
+         probes that actually RAN, so with --only a record used to truncate the
+         file to the filter - `--record --only amber` would have written a
+         two-probe baseline and dropped the other 44. A probe that did not run
+         keeps what the baseline already knew. */
+      _rec = Object.assign({}, _prev);
+      Object.keys(results).forEach(function (k) {
+        var now = results[k], was = _prev[k];
+        var nowIsNothing = !now || now.skipped || now.error;
+        var wasReal = was && !was.skipped && !was.error;
+        if (nowIsNothing && wasReal) { _rec[k] = was; _kept.push(k); }
+        else _rec[k] = now;
+      });
+    } catch (e) { _rec = results; }
+  }
+  fs.writeFileSync(BASELINE, JSON.stringify(_rec, null, 1));
+  if (_kept.length) console.log('\nkept prior verdicts for ' + _kept.length +
+    ' probe(s) that did not measure this run:\n  ' + _kept.join('\n  '));
+  console.log('\nbaseline recorded — ' + Object.keys(_rec).length + ' probes');
   console.log('Red entries in here are KNOWN failures. The point of the file is');
   console.log('that a suite which is red on day one gets ignored by day two.');
   process.exit(0);
