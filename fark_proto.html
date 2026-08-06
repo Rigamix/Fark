@@ -13950,17 +13950,25 @@ function _npcChooseKeep(keeps,rung){
        take the points, add what the remaining dice are expected to bring, and
        discount that by the chance they bring nothing.
 
-       L===0 is deliberately scored as 0 rather than as a hot-dice reroll. The
-       rival's all-kept path exists but its exact rule was not read, and
-       assuming a full six-dice reroll would hand this branch the single
-       largest EV in the table on an assumption. Conservative here means combo
-       needs a real reason to empty its hand, which is the safe direction. */
+       L===0 IS HOT DICE, now read rather than assumed. runOppTurn:
+         if(left===0){G._oLastHotDice=true;G._oppSweep=true;left=6;
+                      setTimeout(step,...);return;}
+       A fresh six is dealt - and that `return` fires BEFORE oppShouldBank, so
+       hot dice also skips the bank decision entirely and the rival is
+       GUARANTEED to roll again. It is the best outcome on the board.
+       Scoring it 0, as the first version did, had combo treating its strongest
+       result as its weakest. Conservative was the safe direction to be wrong
+       in, but it was still wrong, and leaving it would have been a permanent
+       approximation rather than a measurement. Now scored as six dice. The
+       guaranteed continuation is worth more still, but pricing that needs
+       oppShouldBank modelled, so six is the honest floor. */
     var _evT=_npcEvTable((G&&G.matchOppDice)||(G&&G.oppDice||[]).map(function(d){return d.mat;}));
     var _best=null,_bestV=-Infinity;
     for(var _ci=0;_ci<c.length;_ci++){
       var _k=c[_ci],_L=_k.left|0;
       var _v=_k.pts;
-      if(_L>=1&&_L<=6)_v+=(1-(_evT.bust[_L]||0))*(_evT.gain[_L]||0);
+      var _hotL=(_L===0)?6:_L;/* hot dice: all six scored, a fresh row is dealt */
+      if(_hotL>=1&&_hotL<=6)_v+=(1-(_evT.bust[_hotL]||0))*(_evT.gain[_hotL]||0);
       if(_v>_bestV){_bestV=_v;_best=_k;}
     }
     pick=_best||c[0];

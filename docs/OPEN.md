@@ -537,12 +537,45 @@ Differs from hoard on **298 of 763** rolls, so it is genuinely active. Lower
 bust AND higher bank on bone - it is not buying points with risk, it is
 choosing better.
 
-**Worth your eye on Whisper specifically.** You moved her off aggro because
-aggro's cost lands badly on a night-7 boss. combo is not a softer landing - it
-is **+66 against hoard** on her dice. Safer than aggro by a mile, stronger than
-the maximal keep she would otherwise have had. If night 7 wanted easier rather
-than merely different, this is the wrong direction and the fix is her mapping
-again, not combo's rule.
+**Hot dice was an approximation and is now read, not assumed.** The first
+version scored `L===0` as zero. `runOppTurn` actually does
+`if(left===0){...left=6;setTimeout(step,...);return;}` - a fresh six is dealt,
+and that `return` fires **before `oppShouldBank`**, so hot dice also skips the
+bank decision and the rival is *guaranteed* to roll again. It is the best
+outcome on the board and combo was treating it as the worst. Corrected: **no
+change on bone** (gain[6]=454, rarely worth it) and **+26.7 on Whisper**
+(gain[6]=629, where a free full reroll is worth a lot). The approximation was
+costing precisely the boss who uses it.
+
+---
+
+## 13. Whisper's power level - a SEPARATE question from her persona
+
+Splitting this deliberately, because conflating the two makes both harder to
+reason about later.
+
+**Q1 - which persona fits her? Answered: combo.** Coy, a step ahead, Kindred
+rewarding calculated density. That reasoning stands on its own and nothing here
+disturbs it.
+
+**Q2 - what power level should night 7 be? NOT answered, and combo moved it.**
+You took her off `aggro` because recklessness *costs* too much on a night-7
+boss. But combo is not a neutral landing:
+
+| Whisper's own dice | mean bank |
+|---|---|
+| aggro (what she had) | would have been ~-347 vs maximal |
+| hoard / the old maximal keep | 846.1 |
+| **combo (now)** | **939.2** |
+
+So she is **+93 against hoard** - stronger than before any of this started. The
+fix for "aggro was too costly" has quietly become "and now she is meaningfully
+harder", which is not what the move intended.
+
+**The ask: is night 7 at the right power level?** If yes, nothing to do. If it
+should be flatter, the lever is *hers* - `agg`, `minBank`, `target` - not
+combo's rule, which is correct on its own terms and is the only persona that
+plays well rather than merely differently.
 
 ---
 
