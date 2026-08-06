@@ -67,10 +67,27 @@ v.bestMatchesMaximal = !!(K.length && r && K[0].pts === r.total);
 /* a dead roll yields no candidates - the caller must be able to tell */
 v.deadRollEmpty = _legalKeeps(mk([2,3,4,6,6,2]), 'p').length === 0;
 
-/* seat-aware: asking as the rival must not throw and must still enumerate */
-v.rivalSeatWorks = (function(){
-  try { const O = _legalKeeps(mk([1,1,1,2,3,4]), 'o'); v._rivalN = O.length; return O.length > 0; }
-  catch(e) { v._rivalErr = String(e).slice(0,70); return false; }
+/* WAS `rivalSeatWorks`, and it proved "returns a non-empty array" while its
+   name claimed the seat worked - it would have passed on candidates with wrong
+   points, wrong dice, anything. Named as the archetype of a check verifying
+   less than it says, so it is the first one repaired.
+   Now asserts what the rival seat actually has to get right: every candidate
+   scores, every candidate is a real subset of the dice handed in, and the best
+   one equals the scorer's own maximal answer for that seat. */
+v.rivalSeatEnumeratesCorrectly = (function(){
+  try {
+    const free = mk([1,1,1,2,3,4]);
+    const O = _legalKeeps(free, 'o', 0);
+    v._rivalN = O.length;
+    if (!O.length) return false;
+    const allScore  = O.every(k => k.pts > 0 || k.icons > 0);
+    const allSubset = O.every(k => k.sel.every(d => free.indexOf(d) >= 0));
+    const sizesOk   = O.every(k => k.left === free.length - k.sel.length);
+    const r = _scoreRollBest(free.map(d=>d.val), G.oCards||[], 0, {}, free.map(d=>d.mat));
+    const bestMatches = O[0].pts === r.total;
+    v._rivalDetail = {allScore, allSubset, sizesOk, bestMatches, best:O[0].pts, maximal:r.total};
+    return allScore && allSubset && sizesOk && bestMatches;
+  } catch(e) { v._rivalErr = String(e).slice(0,70); return false; }
 })();
 
 /* and nothing calls it yet - the machinery is landed, not wired */

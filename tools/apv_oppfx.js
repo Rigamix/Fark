@@ -64,7 +64,12 @@ v.returnsPts = (function(){
     return r.every(x => x === 900);
   } catch(e) { v._err = String(e).slice(0,80); return false; }
 })();
-v.drainSafe = (function(){
+/* RENAMED from drainSafe. The check is "it did not throw", which is not
+   safety - it would pass on a drain that silently did nothing, or drained
+   the wrong seat. Strengthening it needs facts about what drain should DO
+   that have not been measured, so the NAME is narrowed to what is actually
+   verified rather than left overclaiming. Tracked in PROBE_AUDIT.md. */
+v.drainDoesNotThrow = (function(){
   try { _oppFxDrain(); return true; } catch(e) { v._drainErr = String(e).slice(0,70); return false; }
 })();
 G.pCards = _po; G.oCards = _oo;
