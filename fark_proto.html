@@ -13779,11 +13779,44 @@ function famInst(id){return (G&&G.pF||[]).filter(function(i){return i.id===id;})
    Returns [{sel,pts,icons,left}] sorted by points, highest first, so a caller
    that just wants "the best" takes [0] and a caller that wants to CHOOSE has
    the alternatives in hand. */
-function _legalKeeps(free,actor){
+/* _handShape - what KIND of hand a set of dice is. ONE derivation.
+   Lifted verbatim out of famCommitBonus rather than written again beside it:
+   that function's own comment is "two derivations of 'is this a straight'
+   would be free to drift, which is what five of tonight's findings turned out
+   to be", and adding a second here would have been that exact mistake made
+   knowingly. famCommitBonus now calls this, so there is one copy in the file.
+
+   runLen is returned as well as the boolean, because the straights persona
+   protects a SECURED five-run and gambles only the sixth die - a measured
+   correction: 12345 pays 500 and 23456 pays 750 against 1500 for the full six,
+   so a partial straight is not worthless and should not be thrown at. */
+function _handShape(selD){
+  var counts={};(selD||[]).forEach(function(d){counts[d.val]=(counts[d.val]||0)+1;});
+  var isTriple=Object.keys(counts).some(function(v){return counts[v]>=3;});
+  var uv=Object.keys(counts).map(Number).sort(function(a,b){return a-b;});
+  var run=1,best=uv.length?1:0;
+  for(var i=1;i<uv.length;i++){run=(uv[i]===uv[i-1]+1)?run+1:1;if(run>best)best=run;}
+  return{counts:counts,isTriple:isTriple,runLen:best,isStraight:best>=5};
+}
+
+function _legalKeeps(free,actor,locked){
   var out=[];
   var n=(free||[]).length; if(!n) return out;
   var _lkO=(actor==='o');
-  var locked=(G&&G.kept)?G.kept.reduce(function(a,k){return a+(k.pts||0);},0):0;
+  /* P492 - tidiness, NOT the bug I twice called it. This read G.kept, the
+     PLAYER's tray, for both seats, and I described it as a seat bug that would
+     bite the moment the rival called it. MEASURED BEFORE SHIPPING THE CLAIM:
+     `locked` occurs exactly twice in scoreRoll's 28,270-char body, both on
+     `locked=locked||0`, and is NEVER READ. It is a dead parameter threaded
+     through _legalKeeps -> scoreSelection -> scoreRoll and consumed by nothing,
+     so the wrong value could not affect a score.
+
+     Passing the rival's own bank is still the honest thing to do and costs
+     nothing, and it stops the next reader inferring - as I did - that the value
+     means something. But it fixes no behaviour, and the P481 probe's
+     rivalSeatWorks:true was not hiding a defect here. If `locked` is ever
+     given a consumer, this is already correct rather than quietly wrong. */
+  if(locked==null)locked=_lkO?0:((G&&G.kept)?G.kept.reduce(function(a,k){return a+(k.pts||0);},0):0);
   var cards=_lkO?(G.oCards||[]):(typeof effectiveCards==='function'?effectiveCards():(G.pCards||[]));
   var row=(_lkO?(G.oppDice||[]):(G.pool||[]));
   for(var m=1;m<(1<<n);m++){
@@ -13802,7 +13835,11 @@ function _legalKeeps(free,actor){
     }
     if(rest.length===0&&(sp.icons||[]).length) pts=0;
     if(pts<0||(pts===0&&!(sp.icons||[]).length)) continue;
-    out.push({sel:sel,pts:pts,icons:(sp.icons||[]).length,left:n-sel.length});
+    /* P492: shape travels with the candidate so a persona can ask what KIND of
+       hand it is, not just what it scores. Same derivation famCommitBonus uses. */
+    var _sh=_handShape(sel);
+    out.push({sel:sel,pts:pts,icons:(sp.icons||[]).length,left:n-sel.length,
+              isTriple:_sh.isTriple,isStraight:_sh.isStraight,runLen:_sh.runLen});
   }
   out.sort(function(a,b){return b.pts-a.pts;});
   return out;
@@ -13817,11 +13854,11 @@ function famCommitBonus(selD,pts,actor){
   var _cRow=(_cIsO?G.oppDice:G.pool)||[];
   if(!G||!_cFam||!_cFam.length||pts<=0)return pts;
   var inst;
-  var _counts={};selD.forEach(function(d){_counts[d.val]=(_counts[d.val]||0)+1;});
-  var _isTriple=Object.keys(_counts).some(function(v){return _counts[v]>=3;});
-  var _uv=Object.keys(_counts).map(Number).sort(function(a,b){return a-b;});
-  var _run=1,_best=1;for(var _i=1;_i<_uv.length;_i++){_run=(_uv[_i]===_uv[_i-1]+1)?_run+1:1;if(_run>_best)_best=_run;}
-  var _isStraight=_best>=5;
+  /* P492: one derivation, shared with _legalKeeps. This block used to compute
+     it inline; the candidates the NPC chooses among need the same answer, and
+     two copies of it is the drift this function's own comment warns about. */
+  var _shape=_handShape(selD);
+  var _counts=_shape.counts,_isTriple=_shape.isTriple,_isStraight=_shape.isStraight;
   var _jadeDice=selD.filter(function(d){return (d.mat||'').indexOf('jade')===0;});
   /* GREEN THUMB - a straight a jade wild completed. Pending until banked:
      the feat is about a straight that PAID, and a bust takes it back. */
