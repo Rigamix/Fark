@@ -65,6 +65,36 @@ jobs:
           rm -f _site/assets/_mockups/*.html
           echo "staged $(find _site -type f | wc -l) files, $(du -sm _site | cut -f1) MB"
 
+      - name: Compress the staged images
+        run: |
+          set -e
+          # RULED: "optimize whatever hasnt been optimized and work with those".
+          # Done HERE, on the staged copy, not in Art/ - the source art is
+          # never modified, and every filename is preserved byte-for-byte in
+          # name, so the runtime-assembled paths keep resolving. That matters:
+          # Backgrounds/MAIN/<NAME>/<Name>_env_BG.png is built at runtime and
+          # a static audit could not see it - dropping or renaming masters
+          # would have 404d live art.
+          #
+          # Measured on the branch: 254 optimized webp (15.2 MB) already exist
+          # beside 242 masters (102.1 MB), and 39 masters (16.8 MB) have no
+          # twin at all. Compressing in place covers both cases in one pass
+          # instead of maintaining a second set of names.
+          #
+          # pngquant is palette quantisation - the right tool for this art
+          # style - and --skip-if-larger keeps the original whenever it does
+          # not actually help.
+          sudo apt-get update -qq >/dev/null 2>&1
+          sudo apt-get install -y pngquant >/dev/null 2>&1
+          BEFORE=$(du -sm _site | cut -f1)
+          find _site -iname "*.png" -print0 \n            | xargs -0 -P 4 -n 25 pngquant --force --skip-if-larger \n                --ext .png --quality 50-88 2>/dev/null || true
+          AFTER=$(du -sm _site | cut -f1)
+          echo "IMAGE COMPRESSION: ${BEFORE} MB -> ${AFTER} MB"
+          # a deploy over ~150 MB has never finished inside the 10-minute cap
+          if [ "$AFTER" -gt 150 ]; then
+            echo "::warning::staged site is ${AFTER} MB - deploy may still time out"
+          fi
+
       - name: Fail if the game itself did not make it
         run: |
           test -f _site/fark_proto.html || { echo "fark_proto.html missing from _site"; exit 1; }
