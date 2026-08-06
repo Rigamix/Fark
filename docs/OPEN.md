@@ -507,6 +507,45 @@ roll counts identical - the wiring changes only what it should.
 | triples | 555 -> 431.7 | -123 | 0.259 -> 0.347 | 2.15 -> 2.36 |
 | **aggro** | 549.7 -> 202.9 | **-347** | 0.249 -> **0.491** | 2.1 -> **3.58** |
 
+### 12d. CLOSED - `combo` has its number, and it is the one persona that HELPS
+
+Held unguessed all through the persona work. Measured now, and it matters more
+than when it was parked: Whisper carries combo since P501.
+
+The number already existed - `evTable` in the harness samples 900 rolls per
+dice-count against the real scorer. Ported into the game (N=300, cached by
+material list). Two things it settled that a guess would have got wrong:
+
+| | |
+|---|---|
+| marginal value of a live die, bone | **21 / 38 / 52 / 110 / 207** for the 2nd-6th - **convex**, so a flat per-die constant is wrong at both ends |
+| Whisper's own dice vs bone at k=6 | gain **629 vs 454**, bust **.003 vs .018** - strongly **material-dependent**, so a static table is wrong for the boss who uses it |
+
+Rule: maximise `pts + (1 - bust[L]) * gain[L]`. `L===0` scored as 0 rather than
+as a hot-dice reroll, deliberately - the rival's all-kept path exists but its
+exact rule was not read, and assuming a six-dice reroll would hand this branch
+the largest EV in the table on an assumption.
+
+**Result - the only persona that makes the rival stronger:**
+
+| | maximal baseline | combo | delta | bust |
+|---|---|---|---|---|
+| bone | 549.7 | **602.3** | **+52.6** | 0.249 -> **0.223** |
+| Whisper's loadout | 821.4 | **912.5** | **+91.1** | 0.171 -> 0.172 |
+
+Differs from hoard on **298 of 763** rolls, so it is genuinely active. Lower
+bust AND higher bank on bone - it is not buying points with risk, it is
+choosing better.
+
+**Worth your eye on Whisper specifically.** You moved her off aggro because
+aggro's cost lands badly on a night-7 boss. combo is not a softer landing - it
+is **+66 against hoard** on her dice. Safer than aggro by a mile, stronger than
+the maximal keep she would otherwise have had. If night 7 wanted easier rather
+than merely different, this is the wrong direction and the fix is her mapping
+again, not combo's rule.
+
+---
+
 ### 12c. `triples` - my rec: SHIP IT, and here is why the delta moved
 
 Asked for numbers before a read, and reading the TRADES rather than the delta

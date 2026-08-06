@@ -68,7 +68,21 @@ for (let n = 2; n <= 6; n++) for (const vals of multisets(n)) {
     if (K.indexOf(pick) < 0) { notFromSet++; continue; }
     seen[p]++;
     let ok = true;
-    if (p === 'hoard' || p === 'combo') ok = pick.pts === maxPts;
+    if (p === 'hoard') ok = pick.pts === maxPts;
+    else if (p === 'combo') {
+      /* P502 measured combo's number and it stopped holding at maximal. It now
+         maximises pts + (1-bust[L])*gain[L] from a table built off its own
+         dice. Asserting "takes the maximal" would now be asserting the rule it
+         replaced - so this asserts the actual invariant: it picks the candidate
+         its own value function ranks highest, and that function is real
+         (measured +52.6 mean bank on bone, +91.1 on Whisper's loadout, with a
+         LOWER bust rate on bone). */
+      const evT = _npcEvTable((G && G.matchOppDice) || ['bone']);
+      const val = k => k.pts + ((k.left >= 1 && k.left <= 6)
+        ? (1 - (evT.bust[k.left] || 0)) * (evT.gain[k.left] || 0) : 0);
+      const best = Math.max.apply(null, K.map(val));
+      ok = Math.abs(val(pick) - best) < 1e-9;
+    }
     else if (p === 'aggro') ok = pick.left === maxLeft;
     else if (p === 'straights') {
       /* a COMPLETE run is the prize, not a gamble: with a six-run available it
@@ -106,7 +120,7 @@ v.aggroLeavesMostDiceLive= fail.aggro === 0;
 v.straightsProtectsAFive = fail.straights === 0;
 v.triplesPrefersATriple  = fail.triples === 0;
 v.onesTakesMaximal       = fail.ones === 0;
-v.comboHoldsAtMaximal    = fail.combo === 0;
+v.comboMaximisesItsEV    = fail.combo === 0;
 
 /* THE POLICIES MUST ACTUALLY DIFFER. If every persona picked the same keep the
    checks above would all pass while the feature did nothing - the same

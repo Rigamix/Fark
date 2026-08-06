@@ -13840,6 +13840,47 @@ function _oppChooseFrom(freeD,total,bank){
   return (pick&&pick.sel&&pick.sel.length)?pick:null;
 }
 
+/* _npcEvTable - what is a live die actually worth, for THESE dice?
+   Ported from tools/sim_harness.js evTable, which has been measuring it for the
+   sim all along. For k = 1..6 it rolls k dice N times through the real scorer
+   and returns the bust rate and the mean points.
+
+   Measured and it decided the design twice over:
+     - the marginal value of a die is CONVEX (bone: 21/38/52/110/207 for the 2nd
+       through the 6th), so a flat per-die constant is wrong at both ends
+     - it is strongly MATERIAL-dependent (Whisper's loadout gains 629 at six
+       dice against bone's 454), so a static table is wrong for the one boss
+       that uses it
+
+   Cached by material list: built once per loadout, not per roll. */
+var _npcEvCache=null,_npcEvKey=null;
+function _npcEvTable(mats){
+  mats=(mats&&mats.length)?mats:['bone'];
+  var key=mats.join(',');
+  if(_npcEvKey===key&&_npcEvCache)return _npcEvCache;
+  var N=300,cards=(G&&G.oCards)||[];
+  var tab={bust:[0,0,0,0,0,0,0],gain:[0,0,0,0,0,0,0]};
+  for(var k=1;k<=6;k++){
+    var bust=0,gain=0;
+    for(var t=0;t<N;t++){
+      var vals=[],ms=[];
+      for(var i=0;i<k;i++){
+        var mat=mats[i%mats.length];
+        ms.push(mat);
+        vals.push((typeof rollFace==='function')?rollFace(mat):(1+Math.floor(Math.random()*6)));
+      }
+      var r;
+      try{ r=scoreRoll(vals,cards,0,{},ms); }catch(e){ continue; }
+      if(!r||!r.total||r.total<=0){bust++;continue;}
+      gain+=r.total;
+    }
+    tab.bust[k]=bust/N;
+    tab.gain[k]=gain/N;
+  }
+  _npcEvCache=tab;_npcEvKey=key;
+  return tab;
+}
+
 function _npcChooseKeep(keeps,rung){
   if(!keeps||!keeps.length)return null;
   var key=(typeof _npcPersonaKey==='function')
@@ -13899,6 +13940,31 @@ function _npcChooseKeep(keeps,rung){
       ? _trip.sort(function(a,b){return (b.left-a.left)||(b.pts-a.pts);})[0]
       : c[0];
 
+  }else if(key==='combo'){
+    /* THE ONLY PERSONA THAT CALCULATES. Everything else follows a fixed rule;
+       combo weighs the points in hand against what the dice it leaves live are
+       actually worth, using a table measured off its own dice rather than a
+       constant someone picked.
+
+       value = pts + (1 - bust[L]) * gain[L]
+       take the points, add what the remaining dice are expected to bring, and
+       discount that by the chance they bring nothing.
+
+       L===0 is deliberately scored as 0 rather than as a hot-dice reroll. The
+       rival's all-kept path exists but its exact rule was not read, and
+       assuming a full six-dice reroll would hand this branch the single
+       largest EV in the table on an assumption. Conservative here means combo
+       needs a real reason to empty its hand, which is the safe direction. */
+    var _evT=_npcEvTable((G&&G.matchOppDice)||(G&&G.oppDice||[]).map(function(d){return d.mat;}));
+    var _best=null,_bestV=-Infinity;
+    for(var _ci=0;_ci<c.length;_ci++){
+      var _k=c[_ci],_L=_k.left|0;
+      var _v=_k.pts;
+      if(_L>=1&&_L<=6)_v+=(1-(_evT.bust[_L]||0))*(_evT.gain[_L]||0);
+      if(_v>_bestV){_bestV=_v;_best=_k;}
+    }
+    pick=_best||c[0];
+
   }else{
     /* hoard takes everything scoring and protects it - which is what used[]
        already did.
@@ -13911,10 +13977,8 @@ function _npcChooseKeep(keeps,rung){
        `agg=Math.max(0.10,agg-0.10)`, banking earlier than everyone else. The
        keep-side restriction was a second lever on a personality that already
        had one, and the second lever only subtracted.
-       combo lands here TOO, deliberately: it is meant to weigh points against
-       an estimated value per die left live, and that number has not been
-       measured. A placeholder would only have to be re-derived properly later,
-       so it holds at maximal until the measurement exists. */
+       combo no longer lands here - P502 measured its number and gave it the
+       branch above. This is hoard's alone now. */
     pick=c[0];
   }
   return pick||keeps[0];
