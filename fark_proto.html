@@ -13808,6 +13808,24 @@ function _handShape(selD){
    and it is unique, so choosing is always choosing to SCORE LESS NOW for more
    dice left live. Nothing here can pick a worthless keep - scoreSelection
    rejects any selection holding a non-scoring die, so every candidate scores. */
+/* _oppChooseFrom - enumerate this roll's legal keeps and let the persona pick.
+   Returns the CANDIDATE, not a mask: the caller knows which list its `used`
+   array is indexed against, and only the caller can know that at the fogged
+   site the rival must choose from the seats it can actually SEE. Handing back a
+   mask here would have quietly let the chooser use the die fog hides.
+   Null means "nothing to choose" - a bust, or no legal keep - and every caller
+   leaves total and used exactly as they were. */
+function _oppChooseFrom(freeD,total,bank){
+  if(!freeD||!freeD.length)return null;
+  if(!total||total<=0)return null;/* bust: there is nothing to keep */
+  var cands;
+  try{ cands=_legalKeeps(freeD,'o',bank||0); }catch(e){ return null; }
+  if(!cands||!cands.length)return null;
+  var pick;
+  try{ pick=_npcChooseKeep(cands,(typeof G!=='undefined'&&G)?G.rung:null); }catch(e){ return null; }
+  return (pick&&pick.sel&&pick.sel.length)?pick:null;
+}
+
 function _npcChooseKeep(keeps,rung){
   if(!keeps||!keeps.length)return null;
   var key=(typeof _npcPersonaKey==='function')
@@ -27915,6 +27933,21 @@ function runOppTurn(){
          shifting those would recreate the bug. false is correct, not a
          filler: the rival cannot see that seat, so it never keeps it. */
       if(_fogCut>=0&&used&&used.length<fV.length)used.splice(_fogCut,0,false);
+      /* P494 - THE PERSONA CHOOSES, from the seats it can SEE.
+         Fog hides one seat from the rival's reckoning, so the candidates are
+         enumerated over the VISIBLE dice only. Choosing over the full list
+         would hand the chooser the very die the tell exists to hide, which
+         would cancel FOG without anything announcing it.
+         The hidden die is simply absent from pick.sel, so its entry in the mask
+         is false with no special case - and `used` is built against _oFree, the
+         full list, which is what the keep loop indexes. Placed after the
+         re-expansion above so both are talking about the same indices. */
+      var _oVis=(_fogCut>=0)?_oFree.filter(function(d,i){return i!==_fogCut;}):_oFree;
+      var _oPick=_oppChooseFrom(_oVis,total,oppBank);
+      if(_oPick){
+        total=_oPick.pts;
+        used=_oFree.map(function(d){return _oPick.sel.indexOf(d)>=0;});
+      }
       if(crowsCtx.crowsLuckFiredThisRoll)triggerCard('crows_luck',"CROW'S LUCK — STRAIGHT DOWNGRADED",true);
       /* SNARE: their die in the marked seat is halved once if it scores
          during this turn. The mark then clears whether it fired or not -
@@ -27970,6 +28003,11 @@ function runOppTurn(){
           var _encV=_encFree.map(function(d){return d.val;}),_encM=_encFree.map(function(d){return d.mat;});
           var _encRs=_scoreRollBest(_encV,G.oCards,oppBank,crowsCtx,_encM);
           total=_encRs.total;used=_encRs.used;
+          /* P494: the persona chooses. Fog only clouds the FIRST reckoning of a
+             turn, so here the rival sees every free seat. */
+          var _pk_encRs=G.oppDice.filter(function(d){return !d.kept;});
+          var _pc_encRs=_oppChooseFrom(_pk_encRs,total,oppBank);
+          if(_pc_encRs){total=_pc_encRs.pts;used=_pk_encRs.map(function(d){return _pc_encRs.sel.indexOf(d)>=0;});}
           try{famRenderRow();}catch(e){}
         }
       }
@@ -28046,6 +28084,11 @@ function runOppTurn(){
             var _resFM=G.oppDice.filter(function(d){return !d.kept;}).map(function(d){return d.mat;});
             var _resR=_scoreRollBest(_resFV,G.oCards,oppBank,crowsCtx,_resFM);
             total=_resR.total;used=_resR.used;
+          /* P494: the persona chooses. Fog only clouds the FIRST reckoning of a
+             turn, so here the rival sees every free seat. */
+          var _pk_resR=G.oppDice.filter(function(d){return !d.kept;});
+          var _pc_resR=_oppChooseFrom(_pk_resR,total,oppBank);
+          if(_pc_resR){total=_pc_resR.pts;used=_pk_resR.map(function(d){return _pc_resR.sel.indexOf(d)>=0;});}
           }
         }
       }
@@ -28242,6 +28285,11 @@ function runOppTurn(){
           var _qhFM=G.oppDice.filter(function(d){return !d.kept;}).map(function(d){return d.mat;});
           var _qhR=_scoreRollBest(_qhFV,G.oCards,oppBank,crowsCtx,_qhFM);
           total=_qhR.total;used=_qhR.used;
+          /* P494: the persona chooses. Fog only clouds the FIRST reckoning of a
+             turn, so here the rival sees every free seat. */
+          var _pk_qhR=G.oppDice.filter(function(d){return !d.kept;});
+          var _pc_qhR=_oppChooseFrom(_pk_qhR,total,oppBank);
+          if(_pc_qhR){total=_pc_qhR.pts;used=_pk_qhR.map(function(d){return _pc_qhR.sel.indexOf(d)>=0;});}
         }
       }
       /* Player-armed Grog's Bump: knock the opp's TWO scoring dice (1s/5s) → 3s.
@@ -28259,6 +28307,11 @@ function runOppTurn(){
           var _gbFM=G.oppDice.filter(function(d){return !d.kept;}).map(function(d){return d.mat;});
           var _gbR=_scoreRollBest(_gbFV,G.oCards,oppBank,crowsCtx,_gbFM);
           total=_gbR.total;used=_gbR.used;
+          /* P494: the persona chooses. Fog only clouds the FIRST reckoning of a
+             turn, so here the rival sees every free seat. */
+          var _pk_gbR=G.oppDice.filter(function(d){return !d.kept;});
+          var _pc_gbR=_oppChooseFrom(_pk_gbR,total,oppBank);
+          if(_pc_gbR){total=_pc_gbR.pts;used=_pk_gbR.map(function(d){return _pc_gbR.sel.indexOf(d)>=0;});}
         }
       }
       /* Player disruption (Quick Hands / Grog's Bump) zeroed the roll → it's
@@ -28375,6 +28428,11 @@ function runOppTurn(){
           var _stFM=G.oppDice.map(function(d){return d.mat;});
           var _stR=_scoreRollBest(_stFV,G.oCards,oppBank,crowsCtx,_stFM);
           total=_stR.total;used=_stR.used;
+          /* P494: the persona chooses. Fog only clouds the FIRST reckoning of a
+             turn, so here the rival sees every free seat. */
+          var _pk_stR=G.oppDice.filter(function(d){return !d.kept;});
+          var _pc_stR=_oppChooseFrom(_pk_stR,total,oppBank);
+          if(_pc_stR){total=_pc_stR.pts;used=_pk_stR.map(function(d){return _pc_stR.sel.indexOf(d)>=0;});}
           /* Re-keep based on new scoring */
           G.oppDice.forEach(function(d,i){if(_stR.used[i]){d.kept=true;if(d.el){d.el.classList.add('selected','oppkeep');if(d.el._d3)D3.draw(d.el._d3);}}});
           triggerCard('slippery_table','SLIPPED!',true);

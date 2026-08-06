@@ -622,6 +622,24 @@ F.oppTurn=function(){
       }
     }
     if(!total||total<=0){out.busted=true;out.rolls=rolls;bank=0;break;}
+    /* P495 - THE PERSONA CHOOSES, in the sim as well as the game. This harness
+       has its own keep step, so leaving it on the maximal keep would make every
+       persona measurement a guaranteed zero - the instrument reporting that the
+       change does nothing because it never ran it.
+       Before bank+=total: the sim banks first and builds keptIdx after, so
+       choosing later would bank the maximal points while keeping the chosen
+       dice. _vis is `live` minus the fogged seat IN ORDER, which is how fV was
+       built, so this mask is already fV-indexed and the fi/fogIdx walk below is
+       untouched. */
+    if(typeof _oppChooseFrom==='function'){
+      var _vis=[];
+      for(var _vq=0;_vq<live.length;_vq++)if(_vq!==fogIdx)_vis.push(live[_vq]);
+      var _vpick=_oppChooseFrom(_vis,total,bank);
+      if(_vpick){
+        total=_vpick.pts;
+        used=_vis.map(function(d){return _vpick.sel.indexOf(d)>=0;});
+      }
+    }
     bank+=total;
     var keptIdx={};
     for(var q=0;q<fV.length;q++)if(used&&used[q])keptIdx[q]=1;
