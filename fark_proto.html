@@ -13842,10 +13842,32 @@ function _npcChooseKeep(keeps,rung){
        second, and push only the remainder. When no five-run is available this
        takes the MAXIMAL keep rather than aggro's: protecting what is already
        worth something is the rule, and blanket risk is aggro's identity. */
-    var _fiveish=c.filter(function(k){return k.runLen>=5;});
-    pick=_fiveish.length
-      ? _fiveish.sort(function(a,b){return (b.pts-a.pts)||(b.left-a.left);})[0]
-      : c[0];
+    /* P496 - THIS WAS A NO-OP. Sorting the run candidates by POINTS always
+       picked the one that also swept up every other scoring die, which is the
+       maximal keep - measured, straights differed from hoard on 0 of the 13
+       rolls in 692 that contain a five-run, because on all 13 the maximal
+       already contained the run. No dice set could have fixed that; the rule
+       simply had nothing to do.
+       The intent was "gamble the last die once the five is secured": keep the
+       RUN and reroll the rest. [1,2,3,4,5,5] - maximal takes all six for 550
+       with nothing live; this keeps the run for 500 and leaves a die to chase
+       1500. Dice left is therefore the primary key, points only the tiebreak. */
+    /* P497 - and a COMPLETE run is not a gamble, it is the prize. The first
+       version of this happily traded 123456 (a six-run, 1500) for 750 and one
+       live die, chasing a completion it had already made. Caught by reading the
+       examples rather than the delta: the aggregate just said "-40", which is
+       what a good trade and a terrible one average to.
+       Six or better: take the points. Exactly five: keep the run, push the
+       remainder, because the sixth die is the thing worth chasing. */
+    var _sixRun=c.filter(function(k){return k.runLen>=6;});
+    if(_sixRun.length){
+      pick=_sixRun.sort(function(a,b){return b.pts-a.pts;})[0];
+    }else{
+      var _fiveish=c.filter(function(k){return k.runLen>=5;});
+      pick=_fiveish.length
+        ? _fiveish.sort(function(a,b){return (b.left-a.left)||(b.pts-a.pts);})[0]
+        : c[0];
+    }
 
   }else if(key==='triples'){
     /* leaves dice live specifically where that keeps a triple alive, rather

@@ -493,6 +493,71 @@ Either answer unblocks it. Detail and how the blind spot was caught in
 
 ---
 
+## 12. Two persona decisions, measured. My recommendations, both ways.
+
+The six are wired and measured. Bone dice, n=3000 turns per arm, same seed,
+`oPts` reset per turn. Control: **hoard and combo delta exactly 0**, bust and
+roll counts identical - the wiring changes only what it should.
+
+| persona | mean bank | delta | bust | rolls |
+|---|---|---|---|---|
+| hoard / combo | 548.5 -> 548.5 | **0** | unchanged | unchanged |
+| **straights** | 555 -> 543.3 | **-11.7** | 0.259 -> 0.261 | 2.15 -> 2.11 |
+| **ones** | 548.5 -> 427.1 | **-121** | 0.241 -> 0.248 | 2.04 -> **1.89** |
+| triples | 555 -> 431.7 | -123 | 0.259 -> 0.347 | 2.15 -> 2.36 |
+| **aggro** | 549.7 -> 202.9 | **-347** | 0.249 -> **0.491** | 2.1 -> **3.58** |
+
+### 12a. `aggro` - my rec: SHIP AS SPECIFIED, but know where it lands
+
+The rule does exactly what it says and doing exactly what it says is expensive:
+reroll volume genuinely rises (2.1 -> 3.58) and the bust rate **doubles to 49%**,
+costing 63% of mean bank. That is not a bug - it is what "keep the fewest dice
+that still score" means in a game where busting takes the turn.
+
+**Ship it.** A persona that is genuinely weaker for playing recklessly is a real
+design choice, and a roster where every personality is equally strong is a
+roster where personality does not matter.
+
+**But it lands on Whisper.** `_BOSS_PERSONAS` maps commoner->aggro (Finnick,
+night 3) and **noble->aggro (Whisper, night 7)**. A night-7 boss losing ~63% of
+its per-turn scoring is a much larger difficulty change than a patron doing so.
+If that is unwanted, the cheapest fix is to keep the rule and let Whisper carry a
+different persona, rather than to soften the rule for everyone.
+
+### 12b. `ones` - my rec: DROP THE KEEP RULE ENTIRELY
+
+This one is not costly for a stated reason, which is what makes it different
+from aggro. "Never go all-in" pays **121 points** and the data shows it buys
+nothing back: rolls go **down** (2.04 -> 1.89) and the bust rate barely moves.
+It is giving up value to preserve an extra roll it then does not take.
+
+**And `ones` already has a distinct identity that costs nothing.**
+`PERSONAS.ones.behavior` is `'safe'`, and `oppShouldBank` reads it:
+`if(_pBeh==='safe')agg=Math.max(0.10,agg-0.10)` - it already banks earlier than
+everyone else. That is exactly "reliable, low-drama", implemented on the banking
+axis where it belongs.
+
+So the keep-side restriction was a second lever for a personality that already
+had one, and the second lever only subtracts. **Recommend `ones` takes the
+maximal keep** and keeps its identity in `behavior`.
+
+### Also fixed while measuring these
+
+`straights` was a **no-op** - it differed from hoard on 0 of the 13 rolls (in
+692) containing a five-run, because on all 13 the maximal keep already contained
+the run. No dice set could have fixed that. Sorting run candidates by POINTS
+always picked the one that also swept up every other scoring die. Now sorted by
+dice LEFT, so it keeps the run and pushes the remainder as intended -
+`112345` takes 500 with a die live instead of 600 with none.
+
+Then the first version of that fix traded `123456` - a complete six-run worth
+1500 - for 750 and one live die, chasing a completion it had already made. A
+complete run is now taken, not gambled. **The aggregate would not have caught
+it**: -40 is what one good trade and one terrible one average to. The examples
+caught it.
+
+---
+
 ## Everything else you answered is now work, not a question
 
 Tracked in `NEXT_SESSION.md` and being built. Nothing there needs you.
