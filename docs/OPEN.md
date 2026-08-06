@@ -546,7 +546,34 @@ made set, chase another - is a personality with a price, not a broken rule.
 
 Control holds throughout: maximal personas on bone move by exactly 0.
 
-### 12a. `aggro` - my rec: SHIP AS SPECIFIED, but know where it lands
+### 12a. CLOSED - `aggro` ships as specified; Whisper moved off it (P501)
+
+Ruled: `_BOSS_PERSONAS.noble` goes `aggro` -> `combo`. aggro's rule is untouched
+and Finnick still carries it - the cost was correct for the persona, only the
+placement was wrong for a night-7 boss.
+
+Verified the change is scoped to behaviour and nothing else:
+
+| | |
+|---|---|
+| Whisper's rung has its own `persona`? | **no** - so the map is what resolves her |
+| resolves to | **combo** (was aggro) |
+| Finnick still resolves to | **aggro** |
+| her `dice` | unchanged - explicit on the rung, not from `dieBias` |
+| her `behavior` | `normal` under both, so banking is unchanged |
+| keep on `115234` | aggro 100pts/5live -> **combo 600pts/0live** |
+
+All eight bosses still resolve: ones / hoard / aggro / hoard / triples /
+straights / **combo** / combo.
+
+**Left open deliberately:** combo holds at the maximal keep until its
+value-per-live-die is measured, so Whisper's real difficulty is tied to that
+number once it exists. Re-check this placement after combo's sim pass - the
+mapping changing today does not close the question.
+
+<details><summary>the original recommendation</summary>
+
+### `aggro` - my rec: SHIP AS SPECIFIED, but know where it lands
 
 The rule does exactly what it says and doing exactly what it says is expensive:
 reroll volume genuinely rises (2.1 -> 3.58) and the bust rate **doubles to 49%**,
@@ -563,7 +590,11 @@ its per-turn scoring is a much larger difficulty change than a patron doing so.
 If that is unwanted, the cheapest fix is to keep the rule and let Whisper carry a
 different persona, rather than to soften the rule for everyone.
 
-### 12b. `ones` - my rec: DROP THE KEEP RULE ENTIRELY
+</details>
+
+### 12b. CLOSED - `ones` dropped its keep rule (P498)
+
+2b. `ones` - my rec: DROP THE KEEP RULE ENTIRELY
 
 This one is not costly for a stated reason, which is what makes it different
 from aggro. "Never go all-in" pays **121 points** and the data shows it buys
