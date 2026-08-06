@@ -13799,6 +13799,65 @@ function _handShape(selD){
   return{counts:counts,isTriple:isTriple,runLen:best,isStraight:best>=5};
 }
 
+/* _npcChooseKeep - which legal keep does this persona take?
+   `keeps` arrives from _legalKeeps sorted by points, highest first, so the
+   maximal keep is always keeps[0].
+
+   Every policy is an answer to one question, because the candidate set makes it
+   the only question: the maximal keep is always the full set of scoring dice
+   and it is unique, so choosing is always choosing to SCORE LESS NOW for more
+   dice left live. Nothing here can pick a worthless keep - scoreSelection
+   rejects any selection holding a non-scoring die, so every candidate scores. */
+function _npcChooseKeep(keeps,rung){
+  if(!keeps||!keeps.length)return null;
+  var key=(typeof _npcPersonaKey==='function')
+    ? _npcPersonaKey(rung||(typeof G!=='undefined'&&G?G.rung:null)) : 'ones';
+  var c=keeps.slice(),pick;
+
+  if(key==='aggro'){
+    /* minimise what is locked in, maximise reroll volume. Points break ties. */
+    pick=c.sort(function(a,b){return (b.left-a.left)||(b.pts-a.pts);})[0];
+
+  }else if(key==='straights'){
+    /* CORRECTED. A five-run is NOT worthless - 12345 pays 500, 23456 pays 750
+       against 1500 for the full six. So secure the run first, take points
+       second, and push only the remainder. When no five-run is available this
+       takes the MAXIMAL keep rather than aggro's: protecting what is already
+       worth something is the rule, and blanket risk is aggro's identity. */
+    var _fiveish=c.filter(function(k){return k.runLen>=5;});
+    pick=_fiveish.length
+      ? _fiveish.sort(function(a,b){return (b.pts-a.pts)||(b.left-a.left);})[0]
+      : c[0];
+
+  }else if(key==='triples'){
+    /* leaves dice live specifically where that keeps a triple alive, rather
+       than in general. No triple available - take the maximal. */
+    var _trip=c.filter(function(k){return k.isTriple;});
+    pick=_trip.length
+      ? _trip.sort(function(a,b){return (b.left-a.left)||(b.pts-a.pts);})[0]
+      : c[0];
+
+  }else if(key==='ones'){
+    /* reliable, but never all-in: if the maximal keep empties the hand, drop to
+       the best keep that still leaves a die to roll. */
+    pick=c[0];
+    if(pick&&pick.left===0){
+      var _live=c.filter(function(k){return k.left>=1;});
+      if(_live.length)pick=_live[0];/* already points-sorted */
+    }
+
+  }else{
+    /* hoard takes everything scoring and protects it - which is what used[]
+       already did.
+       combo lands here TOO, deliberately: it is meant to weigh points against
+       an estimated value per die left live, and that number has not been
+       measured. A placeholder would only have to be re-derived properly later,
+       so it holds at maximal until the measurement exists. */
+    pick=c[0];
+  }
+  return pick||keeps[0];
+}
+
 function _legalKeeps(free,actor,locked){
   var out=[];
   var n=(free||[]).length; if(!n) return out;
