@@ -389,7 +389,25 @@ waiting.
 
 ---
 
-## 11. A jade 6 is worth 50 to the rival and 750 to you — and it blocks the wiring
+## 11. CLOSED — ruled yes, fixed and measured in P489. Nothing needed from you.
+
+Rival now scores wilds the way the player does, all seven call sites plus the
+sim. Control: 923 bone rolls, **0** difference from before. Parity: `23456` went
+50 → 750, the player's exact number, and 0 of 462 jade rolls took anything other
+than the better pass. Difficulty, three seeds: **+1.68–41.86%** mean bank for a
+jade-holding rival, control pinned at **0** on every seed.
+
+One thing worth knowing for the wiring that follows: the scoring gap is closed
+(`scoreSelectionBeatsScoreRoll` 3 → 0), but 32 of the original 38 keep
+divergences remain and they are **choice, not scoring** — verified on `11226`,
+where both seats now score the whole roll at 400 and the better subset at 1000.
+So the keep wiring will still show a jade delta, and that is correct: the wiring
+*is* the fix for the choice gap. What P489 bought is that the delta is now
+attributable to choice alone. Detail in `WILD_PARITY_FIX.md`.
+
+<details><summary>original entry</summary>
+
+### A jade 6 is worth 50 to the rival and 750 to you
 
 Not a design question in itself; the *fix* is a difficulty change, which is why
 it is here rather than done.
@@ -430,6 +448,8 @@ credited it to the persona choice. §6 exists because that already happened once
 
 Either answer unblocks it. Detail and how the blind spot was caught in
 `WILD_SEAT_ASYMMETRY.md`.
+
+</details>
 
 ---
 

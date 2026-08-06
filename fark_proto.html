@@ -17822,6 +17822,36 @@ function scoreRoll(vals,cards,locked,context,dieMats,dieEnchs){
   }
   return{total:pts,used,context,effects,_triplesFired,_bonusFired:_bonusFiredFlag};
 }
+/* _scoreRollBest - scoreRoll, but a wild is an OPTION rather than a
+   replacement. LAW 6: whatever the player can do, an NPC can do.
+
+   scoreRoll substitutes a wild unconditionally, so a Jade 6 can only ever be
+   spent as a wild and never as a 6. The player has never had that problem
+   because every player keep goes through scoreSelection, which scores both
+   ways and keeps the better. The rival calls scoreRoll directly and so was
+   stuck with the substitution - measured, 23456 with a jade 6 scored 50 for
+   the rival and 750 for the player off identical dice.
+
+   Returns the WHOLE result of whichever pass scored higher, not just its
+   total: `used` decides which dice the rival keeps, so it has to come from
+   the pass that won. No validity gate here - scoreSelection needs one because
+   a SELECTION must be entirely scoring dice, but a ROLL's `used` is partial by
+   nature and that is the point of it. */
+function _scoreRollBest(vals,cards,locked,context,dieMats,dieEnchs){
+  var r=scoreRoll(vals,cards,locked,context,dieMats,dieEnchs);
+  var _hasWild=false;
+  try{
+    (dieMats||[]).forEach(function(m){
+      var dt=getDie(m);
+      if(dt&&dt.effect&&/^wild_/.test(dt.effect.mechanic||''))_hasWild=true;
+    });
+  }catch(e){}
+  if(!_hasWild)return r;/* control arm: with no wild this is scoreRoll exactly */
+  var _ctxN=Object.assign({},context||{},{_noWild:true});
+  var _rN=scoreRoll(vals,cards,locked,_ctxN,dieMats,dieEnchs);
+  return (_rN&&_rN.total>r.total)?_rN:r;
+}
+
 function scoreSelection(selVals,cards,locked,context,dieMats,dieEnchs){
   if(!selVals.length)return 0;
   cards=cards||[];
@@ -27774,7 +27804,7 @@ function runOppTurn(){
         _lmSpend('_fog');
       }
       crowsCtx.crowsLuckFiredThisRoll=false;
-      var{total,used,context:newCtx}=scoreRoll(_fogV,G.oCards,oppBank,crowsCtx,_fogM);crowsCtx=newCtx||crowsCtx;
+      var{total,used,context:newCtx}=_scoreRollBest(_fogV,G.oCards,oppBank,crowsCtx,_fogM);crowsCtx=newCtx||crowsCtx;
       if(crowsCtx.crowsLuckFiredThisRoll)triggerCard('crows_luck',"CROW'S LUCK — STRAIGHT DOWNGRADED",true);
       /* SNARE: their die in the marked seat is halved once if it scores
          during this turn. The mark then clears whether it fired or not -
@@ -27828,7 +27858,7 @@ function runOppTurn(){
           _encFree.forEach(function(d){d.val=rollFace(d.mat);try{reDrawDieFace(d);}catch(e){}});
           setStatusMsg(G.rung.name+': '+(_oEnc.id==='encore'?'ENCORE':'THE OMEN')+' — THEY ROLL AGAIN','red');
           var _encV=_encFree.map(function(d){return d.val;}),_encM=_encFree.map(function(d){return d.mat;});
-          var _encRs=scoreRoll(_encV,G.oCards,oppBank,crowsCtx,_encM);
+          var _encRs=_scoreRollBest(_encV,G.oCards,oppBank,crowsCtx,_encM);
           total=_encRs.total;used=_encRs.used;
           try{famRenderRow();}catch(e){}
         }
@@ -27904,7 +27934,7 @@ function runOppTurn(){
             /* Rescore with mutated dice */
             var _resFV=G.oppDice.filter(function(d){return !d.kept;}).map(function(d){return d.val;});
             var _resFM=G.oppDice.filter(function(d){return !d.kept;}).map(function(d){return d.mat;});
-            var _resR=scoreRoll(_resFV,G.oCards,oppBank,crowsCtx,_resFM);
+            var _resR=_scoreRollBest(_resFV,G.oCards,oppBank,crowsCtx,_resFM);
             total=_resR.total;used=_resR.used;
           }
         }
@@ -27992,7 +28022,7 @@ function runOppTurn(){
           setStatusMsg(G.rung.name+' — SECOND WIND! ROLLING 3 DICE','red');
           var _swRoll=[],_swMats=[];
           for(var _swi=0;_swi<3;_swi++){var _swM=(G.matchOppDice&&G.matchOppDice[_swi])||'bone';_swRoll.push(rollFace(_swM));_swMats.push(_swM);}
-          var _swR=scoreRoll(_swRoll,G.oCards,0,{crowsLuck:false,crowsLuckRemaining:0},_swMats);
+          var _swR=_scoreRollBest(_swRoll,G.oCards,0,{crowsLuck:false,crowsLuckRemaining:0},_swMats);
           var _swPts=_swR.total||0;
           setTimeout(function(){clearRow('oppDiceRow');finOpp(_swPts);},_oppDelay(900));return;
         }
@@ -28100,7 +28130,7 @@ function runOppTurn(){
           /* Recompute scoring after swap */
           var _qhFV=G.oppDice.filter(function(d){return !d.kept;}).map(function(d){return d.val;});
           var _qhFM=G.oppDice.filter(function(d){return !d.kept;}).map(function(d){return d.mat;});
-          var _qhR=scoreRoll(_qhFV,G.oCards,oppBank,crowsCtx,_qhFM);
+          var _qhR=_scoreRollBest(_qhFV,G.oCards,oppBank,crowsCtx,_qhFM);
           total=_qhR.total;used=_qhR.used;
         }
       }
@@ -28117,7 +28147,7 @@ function runOppTurn(){
           setStatusMsg("GROG'S BUMP — "+G.rung.name+"'S "+(_gbVics.length>1?_gbVics.length+" DICE → 3":"DIE → 3"),'gold');
           var _gbFV=G.oppDice.filter(function(d){return !d.kept;}).map(function(d){return d.val;});
           var _gbFM=G.oppDice.filter(function(d){return !d.kept;}).map(function(d){return d.mat;});
-          var _gbR=scoreRoll(_gbFV,G.oCards,oppBank,crowsCtx,_gbFM);
+          var _gbR=_scoreRollBest(_gbFV,G.oCards,oppBank,crowsCtx,_gbFM);
           total=_gbR.total;used=_gbR.used;
         }
       }
@@ -28233,7 +28263,7 @@ function runOppTurn(){
           G.oppDice.forEach(function(d){d.kept=false;if(d.el){d.el.classList.remove('selected','oppkeep');if(d.el._d3)D3.draw(d.el._d3);}});
           var _stFV=G.oppDice.map(function(d){return d.val;});
           var _stFM=G.oppDice.map(function(d){return d.mat;});
-          var _stR=scoreRoll(_stFV,G.oCards,oppBank,crowsCtx,_stFM);
+          var _stR=_scoreRollBest(_stFV,G.oCards,oppBank,crowsCtx,_stFM);
           total=_stR.total;used=_stR.used;
           /* Re-keep based on new scoring */
           G.oppDice.forEach(function(d,i){if(_stR.used[i]){d.kept=true;if(d.el){d.el.classList.add('selected','oppkeep');if(d.el._d3)D3.draw(d.el._d3);}}});

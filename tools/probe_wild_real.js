@@ -1,4 +1,11 @@
-/* The wild measurement, redone so the wild can actually fire.
+/* RE-RUN AFTER P489. Now compares _legalKeeps' best against the CORRECTED
+   rival maximal (_scoreRollBest). If the divergences are gone, the keep
+   wiring is inert against the fixed baseline - which is the whole reason
+   Denis ruled 'fix it first'.
+
+   Original header follows.
+
+   The wild measurement, redone so the wild can actually fire.
    SUITE: exclude — investigates.
 
    probe_wild_divergence reported 0 divergences over 394 rolls with a jade.
@@ -80,7 +87,7 @@ for (let n = 1; n <= 6; n++) for (const vals of multisets(n)) {
   const jm = jadeOnSix(vals); if (!jm) continue;
   let r, K, se;
   try {
-    r = scoreRoll(vals, [], 0, {}, jm);
+    r = _scoreRollBest(vals, [], 0, {}, jm);/* P489: the rival's maximal is now this */
     se = scoreSelection(vals, [], 0, {}, jm);
     K = _legalKeeps(vals.map((v, i) => ({ val: v, mat: jm[i] })), 'o');
   } catch (e) { continue; }

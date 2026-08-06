@@ -605,7 +605,10 @@ F.oppTurn=function(){
       if(G._fog.turns>0)G._fog.turn=(G.oppTurnCount||0)+1;
       else G._fog.live=false;
     }
-    var r=scoreRoll(fV,G.oCards||[],bank,G.crowsLuckCtx||{},fM);
+    /* P489: the SIM has its own copy of the rival's scoring, so leaving it on
+       raw scoreRoll would make this harness blind to the very change it is
+       being used to measure. */
+    var r=(typeof _scoreRollBest==='function'?_scoreRollBest:scoreRoll)(fV,G.oCards||[],bank,G.crowsLuckCtx||{},fM);
     var total=r.total,used=r.used;
     /* SNARE: their die in the marked seat is halved once if it scores */
     if(G._snare&&G._snare.live&&G._snare.turn===G.oppTurnCount){

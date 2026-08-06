@@ -27,7 +27,51 @@ const harness=fs.readFileSync(path.join(root,'tools','sim_harness.js'),'utf8');
 const body=fs.readFileSync(path.resolve(tail),'utf8');
 const preamble=seed!==null?`\n/* seed injected by sim_run */\nwindow.__FSIM_SEED=${Number(seed)};\n`:'\n';
 
+/* ── startup sweep, then claim our own ────────────────────────────
+   This file had the same defect shoot.js did: mkdtempSync and no rm on any
+   path. Sweep first so a run that was hard-killed does not leave its dir
+   forever - a terminate is not a catchable signal on Windows, so handlers
+   alone are not a bound. Owner-marked, dead owner collected immediately,
+   age gate only as a fallback. Same rule as shoot.js, not a lookalike. */
+(function sweepStale(){
+  var STALE_MS=30*60*1000,n=0;
+  try{
+    var tmp=os.tmpdir(),names=fs.readdirSync(tmp);
+    for(var i=0;i<names.length;i++){
+      if(!/^fsim-/.test(names[i]))continue;
+      var p=path.join(tmp,names[i]);
+      try{
+        var st=fs.statSync(p); if(!st.isDirectory())continue;
+        var owner=null;
+        try{owner=parseInt(fs.readFileSync(path.join(p,'.fsim-owner'),'utf8').trim(),10);}catch(e){owner=null;}
+        if(owner){
+          var alive=true;
+          try{process.kill(owner,0);}catch(e){alive=false;}
+          if(alive)continue;
+        }else if(Date.now()-st.mtimeMs<STALE_MS)continue;
+        fs.rmSync(p,{recursive:true,force:true});n++;
+      }catch(e){}
+    }
+  }catch(e){}
+  if(n)console.error('swept '+n+' stale fsim-* dir(s)');
+})();
+
 const dir=fs.mkdtempSync(path.join(os.tmpdir(),'fsim-'));
+try{fs.writeFileSync(path.join(dir,'.fsim-owner'),String(process.pid));}catch(e){}
+
+/* removed on EVERY exit path, including the early process.exit below */
+var _fsimCleaned=false;
+function _fsimCleanup(){
+  if(_fsimCleaned)return; _fsimCleaned=true;
+  try{fs.rmSync(dir,{recursive:true,force:true});}catch(e){}
+}
+process.on('exit',_fsimCleanup);
+['SIGINT','SIGTERM','SIGHUP','SIGBREAK'].forEach(function(sig){
+  try{process.on(sig,function(){_fsimCleanup();process.exit(130);});}catch(e){}
+});
+process.on('uncaughtException',function(e){
+  console.error('sim_run failed:',e&&e.message);_fsimCleanup();process.exit(1);
+});
 const combined=path.join(dir,'sim_combined.js');
 fs.writeFileSync(combined,harness+preamble+body,'utf8');
 
