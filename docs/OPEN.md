@@ -572,14 +572,54 @@ So she is **+93 against hoard** - stronger than before any of this started. The
 fix for "aggro was too costly" has quietly become "and now she is meaningfully
 harder", which is not what the move intended.
 
-**The ask: is night 7 at the right power level?** If yes, nothing to do. If it
-should be flatter, the lever is *hers* - `agg`, `minBank`, `target` - not
-combo's rule, which is correct on its own terms and is the only persona that
-plays well rather than merely differently.
+### ANSWERED, and the answer is not about Whisper
+
+Asked for a read on whether +93 is fine. Measured the thing the brief actually
+specifies - **boss win rate 45-55%** - rather than tuning against mean bank,
+which is a proxy.
+
+| Whisper, tier 6, n=400 | player win % |
+|---|---|
+| before any persona work | **18.3%** |
+| with combo | **8.8%** |
+| brief target | **45-55%** |
+
+So combo cost 9.5 points - but she was already **27 points below the floor**
+before tonight touched her. Reverting combo entirely still leaves her at 18.3%.
+
+**And the control says it is not her.** Same policy, same gear, all eight:
+
+| | win % | | win % |
+|---|---|---|---|
+| FINNICK | **69.2** | BRUTUS | 31.7 |
+| GROG | **59.2** | CORVUS | 27.5 |
+| MABEL | **56.7** | ALDRIC | 18.3 |
+| | | **WHISPER** | **9.2** |
+| | | AMBROSE | **5.8** |
+
+The early ladder is **at or above target**, so the sim's player is not weak -
+which is the check that had to pass before any of this could be read as a
+balance problem. The back half then collapses: Corvus 27.5 down to Ambrose 5.8.
+
+**Recommendation: do not compensate Whisper individually.** Her numbers coming
+down would fix one point on a curve that is out of spec from Corvus onward, and
+it would also disguise the shape of the real problem. This is the ladder-scaling
+finding already recorded in 1d - *"the ladder scales; a held-still player does
+not"* - and the brief's own instruction applies: **tune TARGETS down before
+inflating player scoring.**
+
+combo's contribution is inside that, not separate from it.
+
+**One limit, stated:** these are all at `GEAR.night8`. At `GEAR.night1` even
+GROG reads 3.3% and Whisper 0%, so gear-versus-night dominates, and I have not
+measured each boss at the gear a player would actually hold on that night. That
+pairing is the right next measurement if the late ladder gets retuned - the
+numbers above are directionally sound for comparing bosses to each other, not
+for setting an absolute target.
 
 ---
 
-### 12c. `triples` - my rec: SHIP IT, and here is why the delta moved
+### 12c. CLOSED - `triples` ships. Here is why the delta moved
 
 Asked for numbers before a read, and reading the TRADES rather than the delta
 was what mattered - the aggregate was hiding two separate bugs.
