@@ -74,3 +74,13 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          # THE ACTUAL ROOT CAUSE, found by the failure mode CHANGING. On the
+          # legacy builder the deploy sat in `deployment_queued` and timed out,
+          # which read as contention. Through Actions it reaches
+          # `deployment_in_progress` and STILL runs the full 10 minutes before
+          # aborting - so the deployment genuinely starts and simply does not
+          # finish. ~230 MB of art does not publish inside the 600000 ms default.
+          # That also explains why it was intermittent rather than constant: it
+          # has been marginal for a while and sometimes squeaked in.
+          timeout: 1800000
