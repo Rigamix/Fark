@@ -26,7 +26,7 @@
  * --keep       leave the browser running (for poking at by hand)
  */
 'use strict';
-const { spawn } = require('child_process');
+const { spawn, execFileSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -60,7 +60,54 @@ const EDGE = [
 ].find(p => fs.existsSync(p));
 if (!EDGE) { console.error('no Edge/Chrome found'); process.exit(2); }
 
+/* ── startup sweep — the backstop ──────────────────────────────────
+   Signal handlers cannot run on SIGKILL or Task Manager "End task", so a
+   sweep at launch is the only thing that ever collects those. Age-gated at
+   30 minutes so a concurrently running shoot is never deleted out from
+   under itself, and fully guarded: a failure to sweep must never stop a
+   run from starting. */
+(function sweepStaleProfiles(){
+  var STALE_MS = 30 * 60 * 1000, n = 0;
+  try {
+    var tmp = os.tmpdir();
+    for (var _i = 0, names = fs.readdirSync(tmp); _i < names.length; _i++) {
+      var name = names[_i];
+      if (!/^shoot-/.test(name)) continue;
+      var p = path.join(tmp, name);
+      try {
+        var st = fs.statSync(p);
+        if (!st.isDirectory()) continue;
+
+        /* WHO OWNS THIS? A dir whose owner process is gone is an orphan and
+           can go immediately - waiting on an age gate is what let a week of
+           runs pile up. Measured: a terminate on Windows is not catchable,
+           so cleanup() does not always get to run and this is the real bound. */
+        var owner = null;
+        try { owner = parseInt(fs.readFileSync(path.join(p, '.shoot-owner'), 'utf8').trim(), 10); }
+        catch (e) { owner = null; }
+
+        if (owner) {
+          var alive = true;
+          /* sends no signal - throws ESRCH if the process is gone. PID reuse
+             reads as "alive", which fails SAFE: the age gate gets it later. */
+          try { process.kill(owner, 0); } catch (e) { alive = false; }
+          if (alive) continue;                                 /* in use */
+        } else if (Date.now() - st.mtimeMs < STALE_MS) {
+          continue;                        /* no marker - fall back to age */
+        }
+
+        fs.rmSync(p, { recursive: true, force: true });
+        n++;
+      } catch (e) { /* locked or vanished - the next run will get it */ }
+    }
+  } catch (e) {}
+  if (n) console.log('swept ' + n + ' stale shoot-* profile(s)');
+})();
+
 const PROFILE = fs.mkdtempSync(path.join(os.tmpdir(), 'shoot-'));
+/* claim it, so a later run can tell "still running" from "abandoned" without
+   guessing from a timestamp */
+try { fs.writeFileSync(path.join(PROFILE, '.shoot-owner'), String(process.pid)); } catch (e) {}
 const FLAGS = [
   '--headless=new',
   '--remote-debugging-port=' + PORT,
@@ -77,6 +124,65 @@ const FLAGS = [
 const proc = spawn(EDGE, FLAGS, { stdio: ['ignore', 'pipe', 'pipe'] });
 let browserErr = '';
 proc.stderr.on('data', d => { browserErr += d.toString(); });
+
+/* ── cleanup — EVERY exit path, not just the happy one ─────────────
+   This file leaked ~270GB of Edge profiles because nothing here ever
+   removed PROFILE, on any path, and because proc.kill() on Windows reaches
+   only the top msedge.exe while its renderer/GPU children keep running and
+   keep the directory locked.
+
+   Registered on 'exit', so process.exit(0) and the exit(3) dead-server path
+   are both covered without either having to remember to call it. */
+var _cleanedUp = false;
+function cleanup(){
+  if (_cleanedUp) return;
+  _cleanedUp = true;
+  /* --keep exists so a browser can be inspected after the run; killing it
+     here would defeat the flag. */
+  if (KEEP) {
+    /* HAND THE CLAIM TO THE BROWSER. The marker currently names this node
+       process, which is about to exit - so the next sweep would read "owner
+       dead", call the profile an orphan and delete it while the kept browser
+       is still using it. The browser is the process that still needs the
+       directory, so it becomes the owner. When it is finally closed, its pid
+       dies and the profile is collected normally. */
+    try {
+      if (proc && proc.pid) fs.writeFileSync(path.join(PROFILE, '.shoot-owner'), String(proc.pid));
+    } catch (e) {}
+    return;
+  }
+  try {
+    if (proc && proc.pid) {
+      if (process.platform === 'win32') {
+        /* /T = whole tree. Without it the children outlive the run - which
+           is exactly what showed up as runaway Edge processes. */
+        try { execFileSync('taskkill', ['/F', '/T', '/PID', String(proc.pid)], { stdio: 'ignore' }); }
+        catch (e) { try { proc.kill('SIGKILL'); } catch (e2) {} }
+      } else {
+        try { proc.kill('SIGKILL'); } catch (e) {}
+      }
+    }
+  } catch (e) {}
+  /* The directory only unlocks once those children are actually gone, so
+     retry. process.on('exit') must be synchronous - Atomics.wait is a real
+     blocking sleep, not a busy-wait that would burn the CPU this patch is
+     here to stop. */
+  var _sab = new Int32Array(new SharedArrayBuffer(4));
+  for (var i = 0; i < 12; i++) {
+    try { fs.rmSync(PROFILE, { recursive: true, force: true }); break; }
+    catch (e) { try { Atomics.wait(_sab, 0, 0, 150); } catch (e2) {} }
+  }
+}
+process.on('exit', cleanup);
+['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGBREAK'].forEach(function(sig){
+  try { process.on(sig, function(){ cleanup(); process.exit(130); }); } catch (e) {}
+});
+process.on('uncaughtException', function(e){
+  console.error('FAILED:', e && e.message); cleanup(); process.exit(1);
+});
+process.on('unhandledRejection', function(e){
+  console.error('FAILED:', e && (e.message || e)); cleanup(); process.exit(1);
+});
 
 /* ── CDP, hand-rolled ─────────────────────────────────────────────── */
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -247,7 +353,13 @@ async function evaluate(cdp, expr, awaitPromise) {
   console.log('wrote:\n' + shots.join('\n'));
 
   if (!KEEP) { cdp.close(); proc.kill(); }
-  else console.log('browser left running on port ' + PORT);
+  else console.log('browser asked to stay on port ' + PORT +
+                   '\n  profile at ' + PROFILE +
+                   '\n  NOTE: measured - the browser is spawned as a child of this' +
+                   '\n  process and does NOT reliably outlive it, so this port may' +
+                   '\n  already be dead. Pre-existing --keep behaviour, not the' +
+                   '\n  cleanup. If it did exit, the profile is collected on the' +
+                   '\n  next run (dead owner), not on a timer.');
   process.exit(0);
 })().catch(err => {
   console.error('FAILED:', err.message);
