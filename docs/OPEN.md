@@ -740,6 +740,72 @@ caught it.
 
 ---
 
+## 14. CORVUS is harder than the final boss. One number worth acting on now.
+
+**Everything else measured tonight about the ladder should be ignored** - see the
+retraction below. This one cell survives it, confirmed at exact gear by two
+independent policies.
+
+| boss | night | gear | carl | rita |
+|---|---|---|---|---|
+| GROG | 1 | night1 exact | 21.3% | 22.0% |
+| **CORVUS** | **4** | **night4 exact** | **4.7%** | **5.3%** |
+| AMBROSE | 8 | night8 exact | 14.7% | 12.7% |
+
+A **night-4** boss is **10 points harder than night-8's climax**. That is
+backwards regardless of what the rest of the ladder turns out to look like, and
+it does not need the five approximated cells resolved to be worth a look.
+
+**And it is not that he plays well.** His `agg` is **.60**, the *lowest* of his
+neighbours (Finnick .62, Brutus .75), same `minBank`, unremarkable dice. He
+holds the player to **3354** where Brutus allows **5411** on identical gear.
+
+**The cause is in his card pool:**
+
+- **`severance_npc`** - *"Corvus starts the match with 1200 bonus points."*
+  A flat head start worth **13% of his 9000 target**, before a die is rolled.
+- **`fine_print`** - *"Opp's first bank halved."*
+
+He starts ahead and suppresses the player's opening. Both are structural
+advantages that no amount of player skill interacts with, which is why the win
+rate is flat at ~5% across two very different policies.
+
+**The ask:** is a 1200-point start intended at night 4? If it is, his `target`
+should probably absorb it. If it is not, `severance_npc` is the lever, not his
+aggression or his dice.
+
+---
+
+## RETRACTION - every other ladder number from 2026-08-06 is void
+
+They were all measured with `FSIM.POLICIES.greg_informed`, chosen because the
+name read as "competent, informed player". Measured afterwards: it banks
+**111.9 per turn** on six bone dice against `carl`'s **516.8** - the
+second-weakest of eight - and it is **byte-identical to `greg_naive`** (same
+mean, same bust rate), so whatever "informed" was meant to add does nothing.
+
+The brief targets **45-55% for a competent build-focused player**. The
+instrument was running at a fifth of competent play.
+
+**What that voided:** "the back half degrades", "the whole ladder is too hard at
+realistic gear" (Grog 2.5 / Corvus 4.5 / Ambrose 6.0), and **Mabel's 0/200**,
+which was the weak policy and not structural - she reads **40%** with `carl`,
+the closest to spec of any boss.
+
+**How it was caught, because no assertion could have:** the player banked 718
+per *match* on six bone dice while a *rival* on the same dice banks ~548 per
+*turn*. A full match scoring less than a single turn is not a subtle
+discrepancy. Nothing in the suite was watching for it - it only surfaced because
+the number got compared against something already known rather than read on its
+own terms.
+
+**Still owed before the other seven cells mean anything:** per-night gear built
+from the economy curve. Five of eight still use a nearest-of-three
+approximation, and it errs in *both* directions - nights 2 and 5 punished with
+earlier gear, nights 3, 6 and 7 flattered with later.
+
+---
+
 ## Everything else you answered is now work, not a question
 
 Tracked in `NEXT_SESSION.md` and being built. Nothing there needs you.
