@@ -174,12 +174,27 @@ Different look, layout and scale, exactly as you described — and it is why one
 card read as current and the others as foreign. It is a live art gap, not a
 data regression.
 
-**Your call, because it is art scope:** either give the rival's cards painted
-faces in the new direction (needs art from you — 41 pooled NPC ids), or restyle
-the `gcard` chrome to match the painted frame without new art (cheap, code
-only, and it would at least stop the two looks fighting). My rec is the restyle
-now and painted faces later, so the mismatch stops shipping while the art
-question stays open.
+**RULED: no card gets a CSS style, every card gets art.** The list is
+**`docs/CARD_ART_NEEDED.md` — 132 cards**, and the loader is now built, so a
+PNG dropped into `assets/cards/` renders on its own with no code change per
+card.
+
+- **42 rival/boss cards** — the visible ones; every boss leads with a signature
+  card the player stares at while deciding what to do about it.
+- **90 patron cards** — reachable only through `_generatePatronInner`, which
+  the reach probe confirms LIVE.
+- **43 further `CARDS` entries are unreachable** and deliberately excluded —
+  asking for art that can never render would have been the easy mistake here.
+- The player holds no un-arted card: `S.run.cards` is `[null,null,null,null]`
+  in normal play and only the debug URL fills it.
+
+Reference art for the rival cards sits at `assets/_archive/Card_ART/` — the
+previous game's 149 faces, kept findable for exactly this and never loaded.
+
+The palette work (P505) is now a **stopgap that retires itself**: each PNG that
+lands strips that card's border, ground, glow and emoji automatically, so the
+CSS skin survives only on cards still waiting for a face. It should be deleted
+outright once the list is filled.
 
 ---
 
