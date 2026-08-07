@@ -170,10 +170,36 @@ This is the real game's release-singles subsystem (`_canRelease` /
 `_minUsefulReroll`), which hands low-value 1s and 5s back to keep dice in play.
 The model has no equivalent.
 
-**Magnitude is NOT established.** The Corvus ratio rests on **4 released dice
-across 19 turns**. Existence is confirmed by the control returning exactly zero;
-whether 0.21 releases per turn can account for a bust-rate gap of 0.12 per turn
-is a separate question and is not yet answered.
+### Identified: it is release-singles, confirmed at a larger sample
+
+Predictions registered before the run, all three held:
+
+| | CORVUS | FINNICK (control) |
+|---|---|---|
+| turns | 64 | 85 |
+| dice chosen | 313 | 322 |
+| dice released | **11** | **0** |
+| unknown (self-check) | 0 | 0 |
+| released faces | **5s 91%, 1s 9%** | none |
+| released 2/3/4/6 | **zero** | none |
+
+- Releases are **exclusively 5s and 1s**, and 5s go first — matching the
+  source's own "sacrifice cheapest first" sort of `_optionalSingles`.
+- **No 2/3/4/6 released at all**, which is the release path protecting the
+  components of triples and straights.
+- The control released **exactly zero across 322 chosen dice** — not small,
+  zero.
+- `unknown` is 0 on both sides, so no die was misclassified.
+
+**Magnitude: dominant, probably not sole.** Corvus releases 0.17 dice per turn
+against a bust-rate gap of 0.12 per turn (real 0.02, model 0.14). Each release
+would have to prevent about 0.7 busts to close the gap alone. A release taken at
+one die remaining swaps roughly 67% bust odds for 10-20%, so ~0.5 busts
+prevented per release is the realistic figure — covering perhaps 70% of the gap.
+
+So release-singles is the main mechanism and is very unlikely to be the whole
+of it. Porting it should move Corvus most of the way and leave a residue; if it
+closes the gap *exactly*, that is a reason to look harder, not to celebrate.
 
 ---
 
