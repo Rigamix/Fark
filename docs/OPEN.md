@@ -215,11 +215,39 @@ Boss hands are correct — they draw from `NPC_CARDS`.
 no place in the current design, firing real effects at the player on six of
 eight nights. They are also inside every difficulty number measured tonight.
 
-**Your call:** should patrons carry cards at all? My rec is yes, but drawn from
-a current pool — point `_generatePatronInner` at the rival roster (or a patron
-subset of it) instead of `CARDS`, which is a small change once you have ruled
-on which cards a patron may hold. The alternative, giving patrons no cards, is
-one line and makes nights 3–8 materially easier.
+**RULED and FIXED — P507.** No patron cards at all, rather than repointing at a
+current pool: a fresh patron card layer is unscoped design work, and cutting
+the dead roster out matches what was already supposed to be true.
+
+Root cause: **P473** lifted a `return []` stub in `generateOppCards` that had
+been keeping every hand empty. That was right for bosses, who draw from the
+current `NPC_CARDS`. It switched the patron branch on as a side effect. P507
+undoes only that side effect — `pCardCount` 3/2/0 → 0 — and leaves the boss
+path alone.
+
+Verified by re-running the probe that found it: all eight tiers now report
+`patronCount: 0` and no legacy id in any hand. Nights 1–2 had already been
+shipping the no-cards path, so nothing untested was introduced.
+
+**This makes nights 3–8 easier** — patrons lose 3 cards each. It is a
+correctness fix, not a balance decision, and it lands inside a ladder whose
+numbers are already known to be untrustworthy. Do not read it as tuning.
+
+---
+
+## 1f. The win screen art is finished, optimized, and never loaded
+
+`Art/Assets/Win/Standard` holds four finished pieces — banner, bg, hands,
+panel — dated 1 Aug, already optimized. **The game references none of them:**
+`win_standard`, `Assets/Win` and `winStandard` all return zero hits in
+`fark_proto.html`.
+
+Checked while confirming the optimization pass, which is complete everywhere —
+Cards 32/32 (to `assets/cards/`, not a sibling folder), GameOver 6/6,
+LastOrders 2/2, Win 4/4. Nothing is waiting on optimization.
+
+**Is there a win screen these belong to that has not been built, or were they
+superseded?** Cheap to wire once you say which surface they are for.
 
 ---
 
