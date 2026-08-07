@@ -141,6 +141,40 @@ scoring *more*.
 It matches at exactly one night, Finnick — which is the one night the model
 overstates. So that exception has a different cause, cleanly separated.
 
+### Located: post-choice dice release
+
+Three shared-function comparisons, each with Finnick live as a control because
+its bust rates already match:
+
+- **Banking decision — ruled out.** Both sides call the same `oppShouldBank` at
+  the same rate, in the same states, and get the same answers, at the diverging
+  night *and* the control.
+- **Keep chooser — ruled out.** `_oppChooseFrom` returns the same dice counts on
+  both sides at both tiers.
+- **Post-choice handling — CONFIRMED.** Interpretation registered before the
+  run: a gap between what the chooser picks and what is actually committed.
+
+| | chosen | committed | ratio |
+|---|---|---|---|
+| CORVUS model | 1890 | 1890 | 1.000 |
+| CORVUS real | 134 | 130 | **0.97** |
+| FINNICK model | 1357 | 1357 | 1.000 |
+| FINNICK real | 125 | 125 | **1.000** |
+
+The model is exactly 1.000 everywhere — structurally it cannot differ, since
+`used` derives straight from the chooser's selection — and that was measured
+rather than assumed. The real side releases dice after choosing at Corvus and
+not at Finnick, which is the null the hypothesis predicted for the control.
+
+This is the real game's release-singles subsystem (`_canRelease` /
+`_minUsefulReroll`), which hands low-value 1s and 5s back to keep dice in play.
+The model has no equivalent.
+
+**Magnitude is NOT established.** The Corvus ratio rests on **4 released dice
+across 19 turns**. Existence is confirmed by the control returning exactly zero;
+whether 0.21 releases per turn can account for a bust-rate gap of 0.12 per turn
+is a separate question and is not yet answered.
+
 ---
 
 ## 6. What is NOT known, and should not be quoted
