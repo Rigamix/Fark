@@ -656,7 +656,7 @@ F.oppTurn=function(){
       if(!keptIdx[fi])nextLive.push(live[w]);
       fi++;
     }
-    if(!nextLive.length){live=seats.slice();if(bank<3000)continue;}
+    if(!nextLive.length){live=seats.slice();/* HOT DICE. The cap is the model's invention: the real runOppTurn resets to a fresh six on left===0 with no bank ceiling at all - `bank<3000` appears nowhere in fark_proto.html. Made configurable so the divergence can be measured rather than argued; MEASURED INERT: capped vs uncapped moved the mean error across all eight nights from 0.28 to 0.27, so this was NOT the divergence - it is set to the real rule because that is correct, not because it fixed anything. */if(bank<(F.HOT_CAP==null?Infinity:F.HOT_CAP))continue;}
     else live=nextLive;
     if((G.oPts+bank)>=G.target)break;
     if(oppShouldBank(G.rung,bank,live.length,G.oPts,G.pPts,G.target))break;
