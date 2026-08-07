@@ -577,7 +577,7 @@ F.simTurn=function(policy,state){
    scoreRoll for every decision and every point. */
 F.oppTurn=function(){
   var G=getG();
-  var out={banked:0,busted:false,rolls:0,snuffed:false,fogged:false,snared:false};
+  var out={banked:0,busted:false,rolls:0,snuffed:false,fogged:false,snared:false,/* BEHAVIOURAL DIFF counters. The real turn already tracks the same three things (oppRollNum, G._oTurnDiceCommitted, G._oLastHotDice), so these are directly comparable - which is the point: identifier-matching across two independent implementations cannot establish parity, only measured output can. */hots:0,kept:0};
   G.oppTurnCount=(G.oppTurnCount||0)+1;
   ['_snare','_fog','_snuff'].forEach(function(k){
     if(G[k]&&G[k].live&&G.oppTurnCount>(G[k].turn||0)+1)G[k]=null;
@@ -648,7 +648,7 @@ F.oppTurn=function(){
     }
     bank+=total;
     var keptIdx={};
-    for(var q=0;q<fV.length;q++)if(used&&used[q])keptIdx[q]=1;
+    for(var q=0;q<fV.length;q++)if(used&&used[q])keptIdx[q]=1;for(var _kq in keptIdx)out.kept++;
     var nextLive=[];
     var fi=0;
     for(var w=0;w<live.length;w++){
@@ -656,7 +656,7 @@ F.oppTurn=function(){
       if(!keptIdx[fi])nextLive.push(live[w]);
       fi++;
     }
-    if(!nextLive.length){live=seats.slice();/* HOT DICE. The cap is the model's invention: the real runOppTurn resets to a fresh six on left===0 with no bank ceiling at all - `bank<3000` appears nowhere in fark_proto.html. Made configurable so the divergence can be measured rather than argued; MEASURED INERT: capped vs uncapped moved the mean error across all eight nights from 0.28 to 0.27, so this was NOT the divergence - it is set to the real rule because that is correct, not because it fixed anything. */if(bank<(F.HOT_CAP==null?Infinity:F.HOT_CAP))continue;}
+    if(!nextLive.length){out.hots++;live=seats.slice();/* HOT DICE. The cap is the model's invention: the real runOppTurn resets to a fresh six on left===0 with no bank ceiling at all - `bank<3000` appears nowhere in fark_proto.html. Made configurable so the divergence can be measured rather than argued; MEASURED INERT: capped vs uncapped moved the mean error across all eight nights from 0.28 to 0.27, so this was NOT the divergence - it is set to the real rule because that is correct, not because it fixed anything. */if(bank<(F.HOT_CAP==null?Infinity:F.HOT_CAP))continue;}
     else live=nextLive;
     if((G.oPts+bank)>=G.target)break;
     if(oppShouldBank(G.rung,bank,live.length,G.oPts,G.pPts,G.target))break;
@@ -716,7 +716,7 @@ F.simMatch=function(policy,opts){
   var playerFirst=(opts.playerFirst===undefined)?true:!!opts.playerFirst;
   var pTurns=0,oTurns=0,busts=0,rolls=0,icons=0,hots=0,zh=0,saves=0;
   var pBanks=[],turnGold0=(S.run.gold||0);
-  var guard=0,decided=null,capEnd=false;
+  var guard=0,decided=null,capEnd=false;var oHots=0,oKept=0,oRolls=0,oBusts=0;
   var order=playerFirst?['p','o']:['o','p'];
   while(guard++<80&&decided===null){
     for(var k=0;k<2;k++){
@@ -741,7 +741,7 @@ F.simMatch=function(policy,opts){
         if(decided!==null)break;
       }else{
         if(G.oPts>=G.target){decided=false;break;}
-        F.oppTurn();oTurns++;
+        var _ot=F.oppTurn();oTurns++;oHots+=(_ot&&_ot.hots)||0;oKept+=(_ot&&_ot.kept)||0;oRolls+=(_ot&&_ot.rolls)||0;if(_ot&&_ot.busted)oBusts++;
         G=getG();
         if(G.oPts>=G.target){
           /* the player's answering turn, exactly as the real match grants it */
@@ -768,7 +768,7 @@ F.simMatch=function(policy,opts){
   try{if(typeof _tradeRestore==='function')restored=_tradeRestore()||0;}catch(e){}
   return{won:!!decided,playerBank:G.pPts,oppBank:G.oPts,turns:pTurns,oppTurns:oTurns,
          busts:busts,rolls:rolls,icons:icons,hots:hots,zeroHour:zh,bustSaves:saves,
-         capEnd:capEnd,target:G.target,banks:pBanks,
+         capEnd:capEnd,target:G.target,banks:pBanks,oHots:oHots,oKept:oKept,oRolls:oRolls,oBusts:oBusts,
          goldGained:(S.run.gold||0)-turnGold0,tradesRestored:restored,
          lanePlan:planned,
          rung:(set.rung.gname||set.rung.name||'?'),loadoutRefused:set.loadout.refused};
