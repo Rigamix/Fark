@@ -175,26 +175,51 @@ card read as current and the others as foreign. It is a live art gap, not a
 data regression.
 
 **RULED: no card gets a CSS style, every card gets art.** The list is
-**`docs/CARD_ART_NEEDED.md` — 132 cards**, and the loader is now built, so a
-PNG dropped into `assets/cards/` renders on its own with no code change per
-card.
+**`docs/CARD_ART_NEEDED.md` — 41 cards**, and the loader is built, so a PNG
+dropped into `assets/cards/` renders on its own with no code change per card.
 
-- **42 rival/boss cards** — the visible ones; every boss leads with a signature
-  card the player stares at while deciding what to do about it.
-- **90 patron cards** — reachable only through `_generatePatronInner`, which
-  the reach probe confirms LIVE.
-- **43 further `CARDS` entries are unreachable** and deliberately excluded —
-  asking for art that can never render would have been the easy mistake here.
-- The player holds no un-arted card: `S.run.cards` is `[null,null,null,null]`
-  in normal play and only the debug URL fills it.
+- **41 rival/boss cards** — every `NPC_CARDS` id reachable through a rung's
+  `cardPool`. `pocket_sand` is defined but pooled nowhere, so it is excluded.
+- **The 30 family cards are complete** — all 30 already have art.
 
-Reference art for the rival cards sits at `assets/_archive/Card_ART/` — the
-previous game's 149 faces, kept findable for exactly this and never loaded.
+I first sent this as **132** by including 90 entries from the previous game's
+`CARDS` roster. Denis caught it. See §1e — those cards are real and still being
+dealt, but that is a bug to remove, not 90 pictures to draw.
 
-The palette work (P505) is now a **stopgap that retires itself**: each PNG that
+The palette work (P505) is a **stopgap that retires itself**: each PNG that
 lands strips that card's border, ground, glow and emoji automatically, so the
-CSS skin survives only on cards still waiting for a face. It should be deleted
-outright once the list is filled.
+CSS skin survives only on cards still waiting for a face. Delete it outright
+once the list is filled.
+
+---
+
+## 1e. The previous game's card roster is still being dealt
+
+Found while checking the art list, and confirmed by launching real patron
+matches rather than by reading the code — `tools/probe_patron_cards.js`.
+
+`_generatePatronInner` builds every patron's hand from the **legacy 133-card
+`CARDS` array**, the one the asset registry describes as retired. It is not
+retired in practice: `pCardCount = tierIndex>=2 ? 3 : tierIndex>=1 ? 2 : 0`
+with `cardChance:1`, so **every patron from night 2 onward always draws 3**.
+
+Seventeen distinct legacy ids came out in one sweep of tiers 2–7 —
+`chain_lightning`, `the_hearth`, `honor_guard`, `the_fence`, `slippery_table`,
+`even_row`, `the_whetstone`, `anchor`, `last_stand`, `finnicks_trick`,
+`the_heir`, `snake_oil`, `brutus_grit`, `whispers_veil`, `tavern_cheer`,
+`the_ledger`, `prompt_hand`.
+
+Boss hands are correct — they draw from `NPC_CARDS`.
+
+**Why it matters beyond tidiness:** these are unapproved cards with no art and
+no place in the current design, firing real effects at the player on six of
+eight nights. They are also inside every difficulty number measured tonight.
+
+**Your call:** should patrons carry cards at all? My rec is yes, but drawn from
+a current pool — point `_generatePatronInner` at the rival roster (or a patron
+subset of it) instead of `CARDS`, which is a small change once you have ruled
+on which cards a patron may hold. The alternative, giving patrons no cards, is
+one line and makes nights 3–8 materially easier.
 
 ---
 

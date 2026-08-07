@@ -1,191 +1,129 @@
 # Card art needed
 
-Every card below renders with **no picture** - an emoji on a frame - because no
-file exists for it. Drop a PNG named `<id>.png` and it gets picked up, the same way the
-family cards already load from `assets/cards/<id>.webp`.
+**41 cards.** Every one renders as an emoji on a frame today because no file
+exists for it.
 
-**132 cards: 42 rival/boss, 90 patron.** The 30 family cards already painted are not
-listed. A further 43 `CARDS` entries are unreachable in play and need nothing.
+Drop a PNG named `<id>.png` into `assets/cards/` and it renders on its own -
+no code change per card. The face replaces the emoji, the coloured ground, the
+border and the glow, so your artwork carries its own frame exactly as the
+family cards do.
 
-Reference art for the rival cards: the previous game's 149 faces are kept at
-`assets/_archive/Card_ART/` for exactly this purpose - reference only,
-never loaded.
+## What is NOT on this list, and why
 
-Priority, if it helps: the rival/boss cards are the visible ones - every boss
-leads with their signature card, and those are the cards a player stares at
-while deciding what to do about them.
+- **The 30 family cards are done** - all 30 have art in `Art/Assets/Cards/`.
+- **The previous game's 133-card roster is excluded.** It is still being dealt
+  to patrons, which is a bug to remove rather than 90 pictures to draw. Logged
+  separately.
+- **`pocket_sand` is excluded** - defined but in no boss pool, so art for it
+  would never appear.
 
----
-
-## Rival and boss cards - 42
-
-### GROG - 3
-
-- `her_lucky_coin.png` - HER LUCKY COIN
-- `one_more_round.png` - ONE MORE ROUND
-- `grogs_bump.png` - GROG'S BUMP
-
-### MABEL - 5
-
-- `the_last_stitch_npc.png` - THE LAST STITCH
-- `measure_twice.png` - MEASURE TWICE
-- `worn_thimble.png` - WORN THIMBLE
-- `the_nightshift.png` - THE NIGHTSHIFT
-- `mabels_pinch.png` - MABEL'S PINCH
-
-### FINNICK - 6
-
-- `quick_hands.png` - QUICK HANDS
-- `pocket_sand.png` - PICKPOCKET
-- `the_skim.png` - THE SKIM
-- `beginners_luck.png` - BEGINNER'S LUCK
-- `the_lords_seal.png` - THE LORD'S SEAL
-- `sticky_fingers_die.png` - STICKY FINGERS
-
-### CORVUS - 6
-
-- `interest_due.png` - INTEREST DUE
-- `fine_print.png` - FINE PRINT
-- `severance_npc.png` - SEVERANCE
-- `the_audit.png` - THE AUDIT
-- `corvus_writ.png` - CORVUS'S WRIT
-- `collateral_die.png` - COLLATERAL
-
-### BRUTUS - 5
-
-- `hold_the_line.png` - HOLD THE LINE
-- `iron_gate_npc.png` - IRON GATE
-- `campaign_veteran.png` - CAMPAIGN VETERAN
-- `steady_hands.png` - STEADY HANDS
-- `old_partners_badge.png` - OLD PARTNER'S BADGE
-
-### ALDRIC - 5
-
-- `the_verdict_npc.png` - THE VERDICT
-- `point_of_order.png` - POINT OF ORDER
-- `fathers_die.png` - FATHER'S DIE
-- `the_oath_npc.png` - THE OATH
-- `family_crest.png` - FAMILY CREST
-
-### WHISPER - 6
-
-- `the_royal_purse.png` - THE ROYAL PURSE
-- `crown_authority.png` - CROWN AUTHORITY
-- `the_quiet_decree.png` - THE QUIET DECREE
-- `sundays_rest.png` - SUNDAY'S REST
-- `old_roads.png` - OLD ROADS
-- `royal_seizure.png` - ROYAL SEIZURE
-
-### AMBROSE - 6
-
-- `communion_wine.png` - COMMUNION WINE
-- `blessed_dice.png` - BLESSED DICE
-- `the_sermon.png` - THE SERMON
-- `judgment_npc.png` - JUDGMENT
-- `never_saw_a_robe.png` - NEVER SAW A ROBE
-- `blessed_confiscation.png` - BLESSED CONFISCATION
+Reference art for these is at `assets/_archive/Card_ART/` - the previous
+game's faces, kept findable for exactly this and never loaded.
 
 ---
 
-## Patron cards - 90
+## GROG - 3 cards   *(night 1)*
 
-Held by the ordinary rivals played on the way to each boss.
+- `her_lucky_coin.png` - **HER LUCKY COIN**  
+  Grog starts the match with 600 bonus points.
+- `one_more_round.png` - **ONE MORE ROUND**  
+  Once per match, Grog survives a bust and keeps rolling. His turn points are halved but not lost.
+- `grogs_bump.png` - **GROG'S BUMP**  
+  Twice per match, Grog stumbles into the table and knocks TWO of your scoring dice (1s/5s) down to 3s. Four dice ruined over a match.
 
-### TIN - 25
+## MABEL - 5 cards   *(night 2)*
 
-- `half_measure.png` - HALF MEASURE
-- `the_hearth.png` - THE HEARTH
-- `slow_burn.png` - SLOW BURN
-- `stakes_rising.png` - STAKES RISING
-- `beggars_bowl.png` - BEGGAR'S BOWL
-- `greedy_hands.png` - GREEDY HANDS
-- `the_grudge.png` - THE GRUDGE
-- `cold_shoulder.png` - COLD SHOULDER
-- `chain_lightning.png` - CHAIN LIGHTNING
-- `thick_skin.png` - THICK SKIN
-- `blood_tithe.png` - BLOOD TITHE
-- `sevens_gift.png` - SEVEN'S GIFT
-- `vanguard.png` - VANGUARD
-- `hot_hand.png` - HOT HAND
-- `the_underdog.png` - THE UNDERDOG
-- `perfect_storm.png` - PERFECT STORM
-- `turncoat.png` - TURNCOAT
-- `flanks.png` - FLANKS
-- `odd_row.png` - ODD ROW
-- `boxcars.png` - BOXCARS
-- `triple_threat.png` - TRIPLE THREAT
-- `heavy_set.png` - HEAVY SET
-- `lucky_threes.png` - LUCKY FIVES
-- `the_climb.png` - THE CLIMB
-- `the_troupe.png` - THE TROUPE
+- `the_last_stitch_npc.png` - **THE LAST STITCH**  
+  Once per match, when Mabel busts she banks half her turn points instead of losing them.
+- `measure_twice.png` - **MEASURE TWICE**  
+  Mabel's first bank of the match is worth double points.
+- `worn_thimble.png` - **WORN THIMBLE**  
+  Mabel starts the match with 800 bonus points.
+- `the_nightshift.png` - **THE NIGHTSHIFT**  
+  Every time you bust, Mabel gains 500 points.
+- `mabels_pinch.png` - **MABEL'S PINCH**  
+  Fifty percent chance each turn — Mabel pinches a die from your first roll, leaving you with five instead of six.
 
-### SILVER - 33
+## FINNICK - 5 cards   *(night 3)*
 
-- `flintlock.png` - THE FLINTLOCK
-- `copper_pincher.png` - COPPER PINCHER
-- `last_stand.png` - THE LAST STAND
-- `martyr.png` - THE MARTYR
-- `the_heir.png` - THE HEIR
-- `rats_in_cellar.png` - RATS IN THE CELLAR
-- `coin_jar.png` - COIN JAR
-- `the_estate.png` - THE ESTATE
-- `the_whetstone.png` - THE WHETSTONE
-- `snake_oil.png` - SNAKE OIL
-- `lucky_seven.png` - LUCKY SEVEN
-- `warm_hands.png` - WARM HANDS
-- `gamblers_thumb.png` - GAMBLER'S THUMB
-- `hot_streak.png` - HOT STREAK
-- `twin_dice.png` - TWIN DICE
-- `sawdust.png` - SAWDUST IN THE CUP
-- `short_pour.png` - SHORT POUR
-- `the_echo.png` - THE ECHO
-- `twin_fury.png` - TWIN FURY
-- `ascending.png` - ASCENDING
-- `bookends.png` - BOOKENDS
-- `anchor.png` - ANCHOR
-- `even_row.png` - EVEN ROW
-- `triple_hunter.png` - TRIPLE HUNTER
-- `false_triple.png` - FALSE TRIPLE
-- `forge_night.png` - FORGE NIGHT
-- `honor_guard.png` - HONOR GUARD
-- `opening_shot.png` - OPENING SHOT
-- `aegis.png` - AEGIS
-- `slippery_table.png` - SLIPPERY TABLE
-- `high_roller.png` - HIGH ROLLER
-- `the_fence.png` - THE FENCE
-- `twin_flames.png` - TWIN FLAMES
+- `quick_hands.png` - **QUICK HANDS**  
+  Once per match, Finnick swaps your two highest-value scoring dice down to 2s.
+- `the_skim.png` - **THE SKIM**  
+  Every time you bank, Finnick takes 30% of your banked points for himself.
+- `beginners_luck.png` - **BEGINNER'S LUCK**  
+  Finnick starts the match with 1,200 bonus points.
+- `the_lords_seal.png` - **THE LORD'S SEAL**  
+  Once per match, if you bank fewer than 600 points, Finnick steals that entire bank for himself.
+- `sticky_fingers_die.png` - **STICKY FINGERS**  
+  Once per match, Finnick swaps your highest-quality die with his lowest-quality one.
 
-### GOLD - 32
+## CORVUS - 6 cards   *(night 4)*
 
-- `leaky_cup.png` - LEAKY CUP
-- `crows_luck.png` - CROW'S LUCK
-- `taxing_breath.png` - TAXING BREATH
-- `kings_ransom.png` - KING'S RANSOM
-- `sooty_table.png` - SOOTY TABLE
-- `iron_crown.png` - THE IRON CROWN
-- `mabels_ward.png` - MABEL'S WARD
-- `corvus_book.png` - CORVUS'S BOOK
-- `aldrics_banner.png` - ALDRIC'S BANNER
-- `finnicks_trick.png` - FINNICK'S TRICK
-- `bakers_dozen.png` - BAKER'S DOZEN
-- `brutus_grit.png` - BRUTUS'S GRIT
-- `whispers_veil.png` - WHISPER'S VEIL
-- `bar_brawl.png` - BAR BRAWL
-- `compound_interest.png` - COMPOUND INTEREST
-- `the_ledger.png` - RUNNING TAB
-- `the_ladder.png` - THE LADDER
-- `fortunes_wheel.png` - FORTUNE'S WHEEL
-- `loaded_die.png` - LOADED DIE
-- `the_collector.png` - THE COLLECTOR
-- `tavern_cheer.png` - TAVERN CHEER
-- `closing_bell.png` - CLOSING BELL
-- `six_serpents.png` - SIX SERPENTS
-- `sequence.png` - SEQUENCE
-- `full_house.png` - FULL HOUSE
-- `standard_bearer.png` - STANDARD BEARER
-- `prompt_hand.png` - PROMPT HAND
-- `blockade.png` - BLOCKADE
-- `the_harmony.png` - THE HARMONY
-- `warded.png` - WARDED
-- `the_brewer.png` - THE BREWER
-- `dead_mans_hand.png` - DEAD MAN'S HAND
+- `interest_due.png` - **INTEREST DUE**  
+  Every 2nd turn you take, Corvus drains 150 points from your score.
+- `fine_print.png` - **FINE PRINT**  
+  The opponent's very first bank of the match is worth only half its normal value.
+- `severance_npc.png` - **SEVERANCE**  
+  Corvus starts the match with 1200 bonus points.
+- `the_audit.png` - **THE AUDIT**  
+  Each time Corvus banks while his total score is higher than yours, he gains an extra 500 points on top.
+- `corvus_writ.png` - **CORVUS'S WRIT**  
+  Once per match, Corvus invokes a writ — your next bank of 400+ is halved.
+- `collateral_die.png` - **COLLATERAL**  
+  Once per match, Corvus downgrades your two highest-quality dice to bone for the rest of the match.
+
+## BRUTUS - 5 cards   *(night 5)*
+
+- `hold_the_line.png` - **HOLD THE LINE**  
+  Brutus cannot bust during his first two turns of the match.
+- `iron_gate_npc.png` - **IRON GATE**  
+  Once per match, the next time you bust, Brutus seizes every turn point you lost — straight onto his own score.
+- `campaign_veteran.png` - **CAMPAIGN VETERAN**  
+  Brutus starts the match with 2,000 bonus points.
+- `steady_hands.png` - **STEADY HANDS**  
+  Once per match, if your turn score is under 600 when you bank, you lose 600 points instead.
+- `old_partners_badge.png` - **OLD PARTNER'S BADGE**  
+  Every time you bank, Brutus gains 250 bonus points.
+
+## ALDRIC - 5 cards   *(night 6)*
+
+- `the_verdict_npc.png` - **THE VERDICT**  
+  Once per match, if your turn score is under 800 when you bank, you lose 800 points instead.
+- `point_of_order.png` - **POINT OF ORDER**  
+  Your equipped cards only activate on every other turn.
+- `fathers_die.png` - **FATHER'S DIE**  
+  Aldric starts the match with 2,500 bonus points.
+- `the_oath_npc.png` - **THE OATH**  
+  Every time you bank, Aldric takes 35% of your banked points.
+- `family_crest.png` - **FAMILY CREST**  
+  Aldric ignores all your cards that modify opponent rules — they have no effect this match.
+
+## WHISPER - 6 cards   *(night 7)*
+
+- `the_royal_purse.png` - **THE ROYAL PURSE**  
+  Whisper starts the match with 3,500 bonus points.
+- `crown_authority.png` - **CROWN AUTHORITY**  
+  Once per match, Whisper forces you to reroll every die you selected — scoring or not.
+- `the_quiet_decree.png` - **THE QUIET DECREE**  
+  Every time you bank, Whisper takes 45% of your banked points.
+- `sundays_rest.png` - **SUNDAY'S REST**  
+  Whisper cannot bust during the first three turns of the match.
+- `old_roads.png` - **OLD ROADS**  
+  Whisper's cards are hidden until they activate — you won't know what's coming.
+- `royal_seizure.png` - **ROYAL SEIZURE**  
+  Once per match, Whisper confiscates your best die — you play the rest of the match with only five dice.
+
+## AMBROSE - 6 cards   *(night 8)*
+
+- `communion_wine.png` - **COMMUNION WINE**  
+  Ambrose starts the match with 4,500 bonus points.
+- `blessed_dice.png` - **BLESSED DICE**  
+  Once per match, Ambrose forces you to reroll every die you selected — scoring or not.
+- `the_sermon.png` - **THE SERMON**  
+  Every 4th turn you take, all your equipped cards are blocked and cannot activate.
+- `judgment_npc.png` - **JUDGMENT**  
+  If you bust twice in the same match, Ambrose deducts 1,500 points from your score.
+- `never_saw_a_robe.png` - **NEVER SAW A ROBE**  
+  Ambrose ignores all your cards that modify opponent rules — they have no effect this match.
+- `blessed_confiscation.png` - **BLESSED CONFISCATION**  
+  Once per match, Ambrose confiscates your best die and adds it to his own dice pool.
