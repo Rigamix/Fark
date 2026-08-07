@@ -119,27 +119,42 @@ independently written implementations share no vocabulary — the real game and
 the model express identical hot-dice logic with **zero words in common**. A
 search for a name can only tell you whether that name appears.
 
-So both sides were instrumented and their output compared directly. The stable
-result is **bust rate**:
+So both sides were instrumented and their output compared directly.
 
-| night | boss | real | model | |
-|---|---|---|---|---|
-| 1 | GROG | 0.03 | 0.13 | model busts 4× more |
-| 2 | MABEL | 0.00 | 0.13 | real never busts at all |
-| 3 | FINNICK | 0.40 | 0.39 | matches |
-| 4 | CORVUS | 0.02 | 0.14 | model busts 6.7× more |
-| 5 | BRUTUS | 0.10 | 0.30 | model busts 2.9× more |
-| 6 | ALDRIC | 0.15 | 0.23 | model busts 1.6× more |
-| 7 | WHISPER | 0.05 | 0.22 | model busts 4.8× more |
-| 8 | AMBROSE | 0.12 | 0.20 | model busts 1.7× more |
+### The bust table, corrected — RETRACTION
 
-**The modelled rival throws away turns the real one keeps.** The real rival
-takes its points and stops; the model rolls on and busts. The dice counts agree
-— at nights 4, 6, 7 and 8 the real rival commits *fewer* dice per turn while
-scoring *more*.
+An earlier version of this section reported "the model busts 1.6–6.7× more at
+seven of eight nights" off samples of 22–48 turns. **That did not survive.**
+With Wilson 95% intervals the model rate sits INSIDE the real interval at five
+of eight nights, and CORVUS and WHISPER each rested on a single bust event.
 
-It matches at exactly one night, Finnick — which is the one night the model
-overstates. So that exception has a different cause, cleanly separated.
+The error was mine and specific: in the same breath as retracting a different
+claim as small-sample noise, I called bust rate "a per-turn Bernoulli statistic,
+far more stable than mean points". At n≈20–50 with p≈0.1 you expect 2–5 events.
+That is not stable.
+
+Three nights were then re-measured deeply, ~200–300 real turns each:
+
+| night | real | 95% interval | model | verdict | small-sample said |
+|---|---|---|---|---|---|
+| 4 CORVUS | 0.037 (296t) | [0.021, 0.065] | 0.140 | **outside, 3.8×** | 6.7× |
+| 5 BRUTUS | 0.160 (300t) | [0.123, 0.206] | 0.300 | **outside, 1.9×** | 2.9× |
+| 7 WHISPER | 0.085 (188t) | [0.053, 0.134] | 0.220 | **outside, 2.6×** | 4.8× |
+
+**The divergence is real at these three, and every one had its magnitude
+overstated by the small sample — three for three, same direction.** That
+consistency is itself evidence the deep samples behave like real data.
+
+The other five nights (GROG, MABEL, FINNICK, ALDRIC, AMBROSE) are
+**unestablished**: the model sits inside the real interval and no deep sample
+was taken. FINNICK is the firmest of them at 58/149 = 0.389 vs 0.390 and serves
+as the control throughout.
+
+**Do not quote a per-night bust gap for any night other than 4, 5 and 7.**
+
+Outstanding hole: 7–15% of attempted turns were dropped as stalls across every
+run, and what they were is unmeasured. Both plausible mechanisms widen the gaps
+rather than narrow them, but that is reasoning, not measurement.
 
 ### Located: post-choice dice release
 
