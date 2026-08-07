@@ -89,21 +89,43 @@ are now measured and dead, each with a control:
    bust rate climbs 0.14 → 0.54 and cancels the gain exactly. Best of the whole
    roster is otto at 14.7%.
 
-**The question: is the opponent model faithful to the real opponent turn?** I
-cannot answer it from inside the sim — that is the one thing it cannot check
-about itself. It matters either way:
+#### ANSWERED — the model is not faithful, and it errs toward flattery
 
-- **If it is faithful**, the ladder really is this hard and the fix has to be
-  player-side scoring, not targets — the three levers already ruled would all
-  have shipped as no-ops.
-- **If it is not**, the whole table is fiction and the retune would have been
-  tuned against an artifact.
+Measured, not argued. `tools/probe_oppturn_real.js` drives the **real** engine
+at night-6 gear and reads what the rival actually banks per turn. It reuses no
+scoring code of its own — a third copy could not settle an argument between the
+first two — so it observes `G.oTurns` / `G.oPts`, which the game itself moves.
 
-**My rec: settle it before building any of §1.** Measure the *real* opponent
-turn in the live game at night-6 gear and compare its points-per-turn against
-the model's 688. One number decides it. Roughly half a day; everything in §1
-waits on the answer, and the honest reason to wait is that four consecutive
-ruled levers already turned out inert against this instrument.
+| rival points per turn, ALDRIC | value |
+|---|---|
+| what the sim model says | **688** |
+| real engine, opening turn only *(no assumptions)* | **843** — n=7 |
+| real engine, running match | **1041** — n=45, median 950, busts 7 |
+
+**The model understates the real rival by 23–51%.** So the ladder at nights 6–8
+is not softer than the table claimed — it is **harder**. The real ratio at
+Aldric is about **2.8×**, not the 1.86× the sim reported, against a player rate
+of 368 that *is* trustworthy because the sim runs the real engine for the
+player.
+
+**What this settles, and what it does not:**
+
+- The four dead levers stay dead — targets, `agg`/`minBank`, dice and player
+  threshold were all measured against a model that, if anything, was too kind.
+  Fixing the model makes them *more* inert, not less.
+- The direction of §1a survives: nights 6–8 need help. The **magnitude was
+  understated**, so tuning to the old table would have under-corrected.
+- The absolute win rates in the table are **not** safe to tune to a point
+  value. They need re-measuring against the real rival before any target is
+  written down.
+
+Caveat kept honest: 4 of 49 turns did not complete within the probe's window
+and were dropped rather than counted as busts. If long turns are the ones that
+stall, the true figure is **above** 1041, not below.
+
+**My rec: rebuild the ladder table against the real rival before touching §1.**
+That is now a measurement with a working instrument rather than an open
+question, so it is hours, not half a day.
 
 One known gap in the model regardless: it has **no hot-dice rule** (`hot`
 appears zero times in it), while the player's real engine does. The keep
@@ -129,6 +151,35 @@ which arm it against the *rival*. So it is a **player weapon**, the wipe is
 *stronger* than an honest reroll, and fixing it makes the game slightly
 **harder** — which is exactly why it must be batched rather than shipped as
 relief.
+
+---
+
+## 1d. The rival's cards are still wearing the old game's skin
+
+You saw this in a live Grog match and asked whether we have been shipping old
+cards. **The card logic is entirely current** — Grog's three (`her_lucky_coin`,
+`one_more_round`, `grogs_bump`) are present-day `NPC_CARDS`, and the previous
+game's 149 card faces are archived and genuinely unreachable: `_cardArtImg`
+returns `''` at all 9 of its call sites, so none of them are drawn.
+
+**What is old is the presentation.** Two card looks ship side by side:
+
+- **player cards** — `famCardArt`, a painted `.webp` face, the pixel-tarot
+  direction. This is the current look.
+- **rival cards** — `gcard`, an emoji on a flat colour swatch inside a red
+  frame with corner brackets. This is the previous game's card chrome with the
+  art removed and never reskinned.
+
+Different look, layout and scale, exactly as you described — and it is why one
+card read as current and the others as foreign. It is a live art gap, not a
+data regression.
+
+**Your call, because it is art scope:** either give the rival's cards painted
+faces in the new direction (needs art from you — 41 pooled NPC ids), or restyle
+the `gcard` chrome to match the painted frame without new art (cheap, code
+only, and it would at least stop the two looks fighting). My rec is the restyle
+now and painted faces later, so the mismatch stops shipping while the art
+question stays open.
 
 ---
 
