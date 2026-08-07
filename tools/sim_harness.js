@@ -577,7 +577,7 @@ F.simTurn=function(policy,state){
    scoreRoll for every decision and every point. */
 F.oppTurn=function(){
   var G=getG();
-  var out={banked:0,busted:false,rolls:0,snuffed:false,fogged:false,snared:false,/* BEHAVIOURAL DIFF counters. The real turn already tracks the same three things (oppRollNum, G._oTurnDiceCommitted, G._oLastHotDice), so these are directly comparable - which is the point: identifier-matching across two independent implementations cannot establish parity, only measured output can. */hots:0,kept:0};
+  var out={banked:0,busted:false,rolls:0,snuffed:false,fogged:false,snared:false,/* BEHAVIOURAL DIFF counters. The real turn already tracks the same three things (oppRollNum, G._oTurnDiceCommitted, G._oLastHotDice), so these are directly comparable - which is the point: identifier-matching across two independent implementations cannot establish parity, only measured output can. */hots:0,kept:0,released:0};
   G.oppTurnCount=(G.oppTurnCount||0)+1;
   ['_snare','_fog','_snuff'].forEach(function(k){
     if(G[k]&&G[k].live&&G.oppTurnCount>(G[k].turn||0)+1)G[k]=null;
@@ -646,7 +646,73 @@ F.oppTurn=function(){
         used=_vis.map(function(d){return _vpick.sel.indexOf(d)>=0;});
       }
     }
-    bank+=total;
+    /* P508 - RELEASE SINGLES, transcribed from runOppTurn rather than reinvented.
+   The model had NO post-choice release: chosen/committed measured exactly
+   1.000 at both tiers because `used` derives straight from the chooser. The
+   real rival released 11 of 313 chosen dice at CORVUS and 0 of 322 at
+   FINNICK, faces 5s 91% / 1s 9%, zero 2/3/4/6. Every gate and constant below
+   is carried across unchanged. Runs BEFORE bank+=total because it reduces
+   `total`.
+
+   IT DID NOT FIX THE BUST GAP, and is kept on correctness grounds only.
+   Three-part test: the chosen/committed gap opened at CORVUS to 0.959
+   against the real 0.97 (releases/turn 0.215 vs 0.17), and FINNICK held
+   at EXACTLY zero releases across 4,390 chosen dice - so the port is
+   faithful. But CORVUS bust rate went 0.14 -> 0.163, UP, against a real
+   0.02. Releasing trades guaranteed points for more dice, which lengthens
+   the turn and adds roll opportunities; in the model that costs slightly
+   more busts than it saves.
+   So this is a real mechanism the model was genuinely missing and NOT the
+   cause of the divergence - the same shape as the bank<3000 cap. The bust
+   gap at CORVUS remains ~8x and unexplained. */
+if(used&&_vis&&_vis.length){
+  var _rkept=[],_runkept=[];
+  for(var _rq=0;_rq<_vis.length;_rq++){ if(used[_rq])_rkept.push(_rq); else _runkept.push(_rq); }
+  if(_rkept.length>1){
+    var _rvc={};
+    _rkept.forEach(function(ix){var v=_vis[ix].val;_rvc[v]=(_rvc[v]||0)+1;});
+    var _opt=_rkept.filter(function(ix){var v=_vis[ix].val;return (v===1||v===5)&&_rvc[v]<3;});
+    /* flat 100/50 refund is only safe at base single values */
+    if(_opt.length>0){
+      var _relMods=['copper_pincher','blood_tithe','millers_toll','scavenger','odd_row',
+                    'bookends','full_house','sevens_gift','twin_fury'];
+      var _oc=(G.oCards||[]);
+      var _unsafe=_relMods.some(function(c){return _oc.indexOf(c)>=0;})||
+        _rkept.some(function(ix){
+          try{ var dt=(typeof getDie==='function')?getDie(_vis[ix].mat):null;
+               return dt&&dt.effect&&(dt.effect.mechanic==='single1_bonus'||dt.effect.mechanic==='single5_bonus'); }
+          catch(e){ return false; }
+        });
+      if(_unsafe)_opt=[];
+    }
+    if(_opt.length>0){
+      var _wantUnkept=4,_minUsefulReroll=4;
+      var _curUnkept=_runkept.length;
+      var _deficit=_wantUnkept-_curUnkept;
+      if(_deficit>0){
+        _opt.sort(function(a,b){return _vis[a].val===5?-1:_vis[b].val===5?1:0;});
+        var _canRel=Math.min(_opt.length,_rkept.length-1,_deficit);
+        if(_curUnkept+_canRel<_minUsefulReroll)_canRel=0;
+        if(_runkept.length===0)_canRel=0;/* all scored: hot dice is the stronger play */
+        var _ds=(G.rung&&G.rung.diceStop)||2;
+        var _relBase=0.50+((G.rung&&G.rung.agg)||0.5)*0.2;
+        _relBase-=(_ds-2)*0.20;
+        if(bank>400)_relBase-=0.15; else if(bank>200)_relBase-=0.08;
+        if(_relBase>0&&_canRel>0){
+          for(var _ri=0;_ri<_canRel;_ri++){
+            if(Math.random()<_relBase){
+              var _ix=_opt[_ri];
+              used[_ix]=false;
+              total-=(_vis[_ix].val===1?100:50);
+              out.released=(out.released||0)+1;
+            }
+          }
+        }
+      }
+    }
+  }
+}
+bank+=total;
     var keptIdx={};
     for(var q=0;q<fV.length;q++)if(used&&used[q])keptIdx[q]=1;for(var _kq in keptIdx)out.kept++;
     var nextLive=[];
@@ -716,7 +782,7 @@ F.simMatch=function(policy,opts){
   var playerFirst=(opts.playerFirst===undefined)?true:!!opts.playerFirst;
   var pTurns=0,oTurns=0,busts=0,rolls=0,icons=0,hots=0,zh=0,saves=0;
   var pBanks=[],turnGold0=(S.run.gold||0);
-  var guard=0,decided=null,capEnd=false;var oHots=0,oKept=0,oRolls=0,oBusts=0;
+  var guard=0,decided=null,capEnd=false;var oHots=0,oKept=0,oRolls=0,oBusts=0,oReleased=0;
   var order=playerFirst?['p','o']:['o','p'];
   while(guard++<80&&decided===null){
     for(var k=0;k<2;k++){
@@ -741,7 +807,7 @@ F.simMatch=function(policy,opts){
         if(decided!==null)break;
       }else{
         if(G.oPts>=G.target){decided=false;break;}
-        var _ot=F.oppTurn();oTurns++;oHots+=(_ot&&_ot.hots)||0;oKept+=(_ot&&_ot.kept)||0;oRolls+=(_ot&&_ot.rolls)||0;if(_ot&&_ot.busted)oBusts++;
+        var _ot=F.oppTurn();oTurns++;oHots+=(_ot&&_ot.hots)||0;oKept+=(_ot&&_ot.kept)||0;oReleased+=(_ot&&_ot.released)||0;oRolls+=(_ot&&_ot.rolls)||0;if(_ot&&_ot.busted)oBusts++;
         G=getG();
         if(G.oPts>=G.target){
           /* the player's answering turn, exactly as the real match grants it */
@@ -768,7 +834,7 @@ F.simMatch=function(policy,opts){
   try{if(typeof _tradeRestore==='function')restored=_tradeRestore()||0;}catch(e){}
   return{won:!!decided,playerBank:G.pPts,oppBank:G.oPts,turns:pTurns,oppTurns:oTurns,
          busts:busts,rolls:rolls,icons:icons,hots:hots,zeroHour:zh,bustSaves:saves,
-         capEnd:capEnd,target:G.target,banks:pBanks,oHots:oHots,oKept:oKept,oRolls:oRolls,oBusts:oBusts,
+         capEnd:capEnd,target:G.target,banks:pBanks,oHots:oHots,oKept:oKept,oRolls:oRolls,oBusts:oBusts,oReleased:oReleased,
          goldGained:(S.run.gold||0)-turnGold0,tradesRestored:restored,
          lanePlan:planned,
          rung:(set.rung.gname||set.rung.name||'?'),loadoutRefused:set.loadout.refused};
