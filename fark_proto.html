@@ -11535,7 +11535,7 @@ function _maybeFireCutpurse(){
     var _vIdx=G.pool.indexOf(victim);
     if(_vIdx>=0)G.pool.splice(_vIdx,1);
     /* P510: lower the lane count with the die. Without this, needNew at 24980 stays 1 and the refill at 25028 computes (G.pool.length+i)%matchDice.length = 5%6 = 5, stamping a SECOND die onto lane 5 - the player loses their die and its enchant and gets a duplicate of lane 5's. Same shape as the P480/P504 desync, missed because that sweep keyed on matchDice.splice and this splices G.pool directly. Mirrors activateVanishingAct at 31055. */
-    if(G.numDice>1)G.numDice--;
+    _dropLanes(1);/* P516 */
     if(victim.el&&victim.el.parentNode)victim.el.parentNode.removeChild(victim.el);
     G._palmAnimating=false;
     /* Recheck scoring on remaining FREE dice — if nothing scoreable, bust.
@@ -14311,7 +14311,7 @@ CFX.sacrifice={
         ench:(G._enchArr&&_sacL<G._enchArr.length)?(G._enchArr[_sacL]||null):null}]);
     }catch(e){}
     if(Array.isArray(G.matchDice)){var mi=_sacL;/* P513: was indexOf(d.mat) */if(mi>=0&&mi<G.matchDice.length)G.matchDice.splice(mi,1);if(mi>=0&&G._enchArr&&mi<G._enchArr.length)G._enchArr.splice(mi,1);
-        if(G.numDice)G.numDice=Math.max(1,G.numDice-1);/* P504: numDice must shrink with matchDice or the pool build's i%matchDice.length wraps and duplicates lane 0 */}/* P480: keep the lane array in step */
+        _dropLanes(1);/* P516 *//* P504: numDice must shrink with matchDice or the pool build's i%matchDice.length wraps and duplicates lane 0 */}/* P480: keep the lane array in step */
     G.pool=G.pool.filter(function(x){return x!==d;});
     /* P513: relane the survivors, exactly as _removeDieAt does at 19144. Without
        it every pool die above the removed lane points one lane too high and
@@ -19092,6 +19092,26 @@ function _breakBegin(src){
    is restored, so the die walks back in there. That path never respected the
    snapshot's loadout in the first place and belongs to whoever owns mirror
    matches. */
+/* P516 - THE LANE-COUNT RULE, IN ONE PLACE.
+   Removing a die DECREMENTS G.numDice. It is never assigned from
+   G.matchDice.length: startPTurn already set numDice from that length at the
+   top of the turn, so a per-turn modifier armed since then (Whisper's Hex,
+   Tar Pit, Pocket Sand) lives ONLY in numDice - recomputing silently refunds
+   it, and eats Seven Dice's bonus the same way.
+   This rule has been broken three times: once recorded in _removeDieAt's own
+   comment, once by P513 (sacrifice decremented twice), once by P514 (the
+   preserve payout refunded the Hex). It lived in a comment five thousand
+   lines from where it was needed. Now it lives here.
+   floor defaults to 1. Whisper's Hex clamps at 3 and is a PENALTY, not a
+   removal - it does not call this. */
+function _dropLanes(n,floor){
+  if(!G)return 0;
+  var base=(typeof G.numDice==='number'&&G.numDice>0)
+    ? G.numDice
+    : (G.matchDice?G.matchDice.length:6);
+  G.numDice=Math.max((floor===undefined?1:floor),base-(n===undefined?1:n));
+  return G.numDice;
+}
 function _removeDieAt(lane,opts){
   opts=opts||{};
   if(!G||lane===undefined||lane===null||lane<0)return false;
@@ -19162,7 +19182,7 @@ function _removeDieAt(lane,opts){
   if(G._enchArr&&lane<G._enchArr.length)G._enchArr.splice(lane,1);
   /* DECREMENT. Assigning matchDice.length here refunded every per-turn dice
      penalty (Tar Pit, Pocket Sand) and ate Seven Dice's bonus. */
-  G.numDice=Math.max(1,(G.numDice||6)-1);
+  _dropLanes(1);/* P516 */
   G.pool=(G.pool||[]).filter(function(q){return q.lane!==lane;});
   G.pool.forEach(function(q){if(q.lane>lane)q.lane--;});
   /* FAIR TRADE. If the destroyed seat held the BORROWED die the loan dies
@@ -24548,7 +24568,7 @@ function startPTurn(){
        too (5 -> 4), while also respecting per-turn penalties.
        Same lesson _removeDieAt records at 19140: "Assigning matchDice.length
        here refunded every per-turn dice penalty and ate Seven Dice's bonus." */
-    G.numDice=Math.max(1,(G.numDice||(G.matchDice?G.matchDice.length:6))-1);
+    _dropLanes(1);/* P516 */
     /* AND PUT IT ON THE TABLE. The data above is invisible on its own: the
        player would start the turn a die short with points already banked and
        nothing to explain either. mkDie is the same factory the normal roll uses
@@ -24648,7 +24668,7 @@ function startPTurn(){
       if(eff.mode==='take_best'){
         /* Remove die — player plays with 5 */
         G.matchDice.splice(pBestIdx3,1);
-        if(G.numDice)G.numDice=Math.max(1,G.numDice-1);/* P504: numDice must shrink with matchDice or the pool build's i%matchDice.length wraps and duplicates lane 0 */
+        _dropLanes(1);/* P516 *//* P504: numDice must shrink with matchDice or the pool build's i%matchDice.length wraps and duplicates lane 0 */
         if(G._enchArr&&pBestIdx3<G._enchArr.length)G._enchArr.splice(pBestIdx3,1);/* P480: the lane array must shrink with the dice */
         triggerCard(cid,npc.name+': TOOK YOUR '+stolen.toUpperCase()+'!',false);
         setStatusMsg(G.rung.name+' SEIZED YOUR '+stolen.toUpperCase()+'!','red');
@@ -24657,7 +24677,7 @@ function startPTurn(){
       }else if(eff.mode==='take_and_use'){
         /* Remove from player, add to NPC */
         G.matchDice.splice(pBestIdx3,1);
-        if(G.numDice)G.numDice=Math.max(1,G.numDice-1);/* P504: numDice must shrink with matchDice or the pool build's i%matchDice.length wraps and duplicates lane 0 */
+        _dropLanes(1);/* P516 *//* P504: numDice must shrink with matchDice or the pool build's i%matchDice.length wraps and duplicates lane 0 */
         if(G._enchArr&&pBestIdx3<G._enchArr.length)G._enchArr.splice(pBestIdx3,1);/* P480: the lane array must shrink with the dice */
         G.matchOppDice.push(stolen);
         triggerCard(cid,npc.name+': TOOK YOUR '+stolen.toUpperCase()+' AND USES IT!',false);
@@ -31125,7 +31145,7 @@ function activateVanishingAct(){
     setTimeout(function(){if(_ve&&_ve.parentNode)_ve.remove();},360);
   }
   G.pool=G.pool.filter(function(x){return x!==d;});
-  if(G.numDice>1)G.numDice--;
+  _dropLanes(1);/* P516 */
   _haptic(20);
   try{if(SFX.posCard)SFX.posCard();else SFX.commit();}catch(e){}
   setStatusMsg('VANISHED A '+d.val+' — ONE FEWER DIE THIS TURN','gold');
