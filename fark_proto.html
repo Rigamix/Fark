@@ -14287,9 +14287,30 @@ CFX.powder_keg={
   }
 };
 CFX.sacrifice={
-  canUse:function(){return G&&(G.phase==='choosing'||G.phase==='idle')&&G.pool.filter(function(d){return !d.committed&&!d._shattered;}).length>0;},
+  /* P519: eligibility in ONE place, read by canUse and use alike, so the
+     button can never offer a sacrifice that use() then refuses. Two tests the
+     old guard lacked: the last die on the table is not sacrificeable (Break's
+     floor, now shared), and a die held on LOAN is not a legal target - the
+     brief already banned it for Break rather than pricing it, and under
+     _removeDieAt the Fair-Trade branch returns early and costs no lane, so
+     allowing it would be points for free. */
+  _targets:function(){
+    if(!G||!G.pool)return [];
+    var ftLane=(G._fairTrade&&typeof G._fairTrade.lane==='number')?G._fairTrade.lane:-1;
+    return G.pool.filter(function(d){
+      return !d.committed&&!d._shattered&&d.lane!==ftLane;
+    });
+  },
+  canUse:function(){return G&&(G.phase==='choosing'||G.phase==='idle')&&
+    !!(G.matchDice&&G.matchDice.length>1)&&
+    CFX.sacrifice._targets().length>0;},
   use:function(inst){
-    var free=G.pool.filter(function(d){return !d.committed&&!d._shattered;});
+    /* P519: LEGALITY BEFORE DESTRUCTION. This used to mark the die shattered
+       and start the shard animation before anything could fail. Now that the
+       removal has a floor and can refuse, testing afterwards would leave a
+       visually destroyed die still sitting in the pool. */
+    var free=CFX.sacrifice._targets();
+    if(!free.length||!(G.matchDice&&G.matchDice.length>1))return false;
     var d=free[free.length-1];
     d._shattered=true;
     if(d.el){try{spawnShards(d.el,'#3a3a52');}catch(e){}
@@ -14315,17 +14336,21 @@ CFX.sacrifice={
          _laneOf returns. */
       var _sacL=(d&&typeof d.lane==='number')?d.lane
                 :(Array.isArray(G.matchDice)?G.matchDice.indexOf(d.mat):-1);
-      if(_sacL>=0)G._diceOut=(G._diceOut||[]).concat([{
-        lane:_sacL,mat:d.mat,
-        ench:(G._enchArr&&_sacL<G._enchArr.length)?(G._enchArr[_sacL]||null):null}]);
+      /* P519: the _diceOut record is written by _removeDieAt now. Keeping a
+         copy here double-recorded the die in the loadout panel. */
     }catch(e){}
-    if(Array.isArray(G.matchDice)){var mi=_sacL;/* P513: was indexOf(d.mat) */if(mi>=0&&mi<G.matchDice.length)G.matchDice.splice(mi,1);if(mi>=0&&G._enchArr&&mi<G._enchArr.length)G._enchArr.splice(mi,1);
-        _dropLanes(1);/* P516 *//* P504: numDice must shrink with matchDice or the pool build's i%matchDice.length wraps and duplicates lane 0 */}/* P480: keep the lane array in step */
-    G.pool=G.pool.filter(function(x){return x!==d;});
-    /* P513: relane the survivors, exactly as _removeDieAt does at 19144. Without
-       it every pool die above the removed lane points one lane too high and
-       draws its material and enchant from its neighbour. */
-    if(_sacL>=0)G.pool.forEach(function(q){if(q.lane>_sacL)q.lane--;});
+    /* P519: ONE EXIT PATH. This was a hand-rolled copy of _removeDieAt - its
+       own splice of matchDice and _enchArr, its own _dropLanes, its own pool
+       filter, its own relane below. Every one of those was correct. What it
+       did NOT have was the two things _removeDieAt does after them, and that
+       omission is why routing here closes three defects instead of one:
+         it shifts G._fairTrade.lane, which sacrifice never did - a loan left
+           pointing at the wrong seat is an exploit, not a loss;
+         it re-snapshots matchDice mid-turn, which sacrifice never did - so a
+           quit and resume rewound a match-permanent decision for free.
+       A patched call site is where the next undiscovered bug lives. */
+    if(_sacL>=0)_removeDieAt(_sacL);
+    /* P519: the relane moved into _removeDieAt with the rest of the removal. */
     var P=famDef('sacrifice').p[inst.tier-1];
     G.pPts+=P;famLog('SACRIFICE — THE DIE SHATTERS FOR '+P);_famPop('+'+P);
     try{updHUD();refreshSelUI();}catch(e){}
@@ -19123,7 +19148,20 @@ function _dropLanes(n,floor){
 }
 function _removeDieAt(lane,opts){
   opts=opts||{};
-  if(!G||lane===undefined||lane===null||lane<0)return false;
+  /* P519: `lane<0` CANNOT REJECT NaN - NaN<0 is false - and a NaN lane is how
+     the worst defect in the sweep worked. Sacrifice had no floor, matchDice
+     emptied, and the refill's (pool.length+i)%matchDice.length became %0=NaN.
+     This function then ACCEPTED the removal and the filter below kept the die
+     anyway, because NaN!==NaN is true. Nothing could remove it and every later
+     turn dealt zero dice: a match that looks live and cannot be won, with
+     nothing on screen ever saying so. Reject a malformed lane at the door. */
+  if(!G||typeof lane!=='number'||!isFinite(lane)||lane<0)return false;
+  /* P519: AND A FLOOR OF ONE LANE, which is the floor Break has always had -
+     _breakBegin requires a live target other than the committed source. There
+     was no reason for the other removers to be allowed past it. If Obsidian
+     shatters the last die it now cracks and holds; startPTurn rebuilds the
+     pool next turn. Strictly better than an unwinnable match. */
+  if(G.matchDice&&G.matchDice.length<=1)return false;
   /* THE LANE SURVIVES, ONLY THE DIE DIES - AND NATURAL DEATH IS THE ONLY WAY
      IN HERE NOW. The single caller that still reaches this branch is the
      Obsidian shatter sweep in afterRoll, which removes each shattered die by
@@ -25138,7 +25176,16 @@ G.numDice=Math.min((G.matchDice?G.matchDice.length:6),(G.numDice||(G.matchDice?G
            unreachable today and only the retired Seven Dice could cause.
            Holding the old expression there keeps that case byte-identical
            rather than inventing behaviour for it. */
-        const _lane=(_freeLanes[i]!==undefined)?_freeLanes[i]:((G.pool.length+i)%G.matchDice.length);
+        /* P519: the modulo fallback is where the NaN came from. With the floor
+           in _removeDieAt matchDice can no longer reach length 0, so this is
+           defence in depth rather than the fix - and it is worth having,
+           because the failure it prevents is silent and permanent. A lane that
+           is not a real index is not stamped at all. */
+        const _mdLen=(G.matchDice&&G.matchDice.length)?G.matchDice.length:0;
+        const _laneRaw=(_freeLanes[i]!==undefined)?_freeLanes[i]
+          :(_mdLen?((G.pool.length+i)%_mdLen):-1);
+        const _lane=(typeof _laneRaw==='number'&&isFinite(_laneRaw)&&_laneRaw>=0)?_laneRaw:-1;
+        if(_lane<0)continue;
     const mat=G.matchDice[_lane]||'bone';
     const _en=(G._enchArr||[])[_lane]||null;
     var val;

@@ -830,6 +830,44 @@ no code, and `use(inst)` never reads `inst.tier`. Tiers differ only in charges.
 
 ### D8 — Sacrifice has no floor; below it the refill mints a `lane: NaN` die that nothing can remove, and the match becomes unwinnable
 
+> **CLOSED — P519, shipped and verified. D9 and D14 closed with it.**
+> Ruled first by Denis, on the ground that the failure mode is silence.
+>
+> `_removeDieAt` is now the only way a die leaves the table. Four changes:
+> a non-finite guard (`lane<0` cannot reject NaN), a floor of one lane
+> (the floor Break always had), Sacrifice routed through it instead of
+> hand-rolling its own splice, and a refill that will not stamp a lane
+> that is not a real index.
+>
+> Driven, five arms:
+>
+> | arm | result |
+> |---|---|
+> | last die, every route | remove refused, sacrifice not offered, forcing it returns false, matchDice holds at 1, **zero non-finite lanes** |
+> | ordinary sacrifice | md 6→5 and numDice 6→5 **at the call** — the card still works |
+> | D9, loan lane | held at 1 when a die above went, shifted to 0 when one below went |
+> | D9, loan ban | loan on lane 5 excluded from targets `[0,1,2,3,4]` |
+> | D14, snapshot | live 6→5, snapshot 6→5, followed |
+>
+> **Two of those arms first reported FAIL, and both were the probe.** Arm 2
+> sampled after a sleep and read the *next turn's* state as the sacrifice's
+> effect. Arm 4 captured the target list before the call and compared it against
+> a lane number the removal's relane had already shifted — the relane doing its
+> job is what made a working ban look broken. Both now sample at the call.
+>
+> **One loose end, recorded rather than dropped:** the first arm-2 run showed
+> `matchDice 5` with `numDice 6` after a turn boundary, where `startPTurn`
+> should have set 5. Not reproduced in the immediate-sample runs and not caused
+> by P519. It wants its own probe — what writes `numDice` at a turn boundary
+> when the loadout has shrunk mid-turn.
+>
+> **A borrowed die is no longer a legal sacrifice target,** and that is a
+> judgement, flagged as one. Routing through `_removeDieAt` sends a loaned die
+> to the Fair-Trade branch, which returns early and costs no lane — so paying
+> points for one would be points for free. The brief already answered this
+> question for Break by banning the target rather than pricing it, after
+> measuring the price at nothing. Sacrifice now follows the same rule.
+
 **This is the most severe defect in the sweep and it was single-sourced, so it
 was re-driven here on an independent arrangement**
 (`tools/apv_xref_sac_empty.js`).
