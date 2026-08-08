@@ -2133,6 +2133,45 @@ untouched by P519.
 
 ### S8. "no exceptions, no residue" and "the index does not have to be right for the repair to be" — the two halves of the restore are not gated together
 
+> **CLOSED — P527. Denis asked the framing question before any code was written:
+> a new check alongside the count, or "count of what died" becoming "identity of
+> what is in each seat now"? It is the second, and the codebase already proved
+> it — for the other record.**
+>
+> ```
+> _removeDieAt shifts G._fairTrade.lane   TRUE   (ft.lane--)
+> _removeDieAt shifts G._tradeSwaps.lane  FALSE
+> anything else shifts it                 FALSE
+> ```
+>
+> One lane record was maintained across removals and its sibling was not. The
+> `have===t.cnt` comparison was never a safety check — it was an attempt to
+> **guess back an index that was never kept**. Tightening it would have improved
+> a reconstruction of information the code could simply have retained. Same
+> counting-to-identity shift as P512.
+>
+> **A flaw in the first version of this fix, caught before driving it.** `t.lane`
+> indexes **both** boards, but a player-side removal renumbers only the player's
+> seats. Shifting the one lane fixed the player's repair and would have broken
+> the rival's — the fix for one side breaking the other. The ledger now records
+> `oLane` as well, shifted only on the side that actually renumbers, with a
+> fallback to `lane` for records written before it existed.
+>
+> Three further changes: the two halves are **gated together** (the rival-side
+> repair was a separate `if` and could fire alone — D11's measured
+> `restoredCount:0, playerGotJadeBack:false, rivalGotStarstoneBack:true`); the
+> count fallback must now resolve to a **unique** candidate rather than taking
+> `indexOf` among several; and `var md=G.matchDice||[]` no longer aliases a
+> throwaway array and reports repairs it did not make.
+>
+> **Driven, four arms:**
+>
+> | arm | result |
+> |---|---|
+> | remove a seat **below** the trade | ledger lane 4→3, jade home at seat 3, **brand followed**, rival repaired at its own unshifted seat 4 |
+> | no removal | unchanged, still correct |
+> | the traded seat itself destroyed | `seatGone`, restored 0, **neither** side repaired — no half-repair |
+
 `pinned_e5b7705.html:18555-18578` (extract) and `18591-18599`
 ```js
 /* BOTH SIDES BACK THE INSTANT THE MATCH ENDS - win, loss, flee, or the end of

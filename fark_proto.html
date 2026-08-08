@@ -18488,7 +18488,12 @@ var ENCH_ICONS={
          two want opposite handling, and the array holds only materials, so
          nothing else in the ledger can distinguish them. */
       var _tc=0;for(var _i=0;_i<G.matchDice.length;_i++)if(G.matchDice[_i]===theirs)_tc++;
-      (G._tradeSwaps=G._tradeSwaps||[]).push({lane:L,mine:mine,theirs:theirs,myEn:myEn,cnt:_tc});
+      /* P527b: TWO SEATS, NOT ONE. `lane` indexes the PLAYER's board and is
+         shifted by _removeDieAt when a seat below it goes. The rival's board
+         does not renumber when the player loses a die, so the rival-side
+         repair needs the seat as it was - oLane. They are equal here and stop
+         being equal the moment the player's loadout shrinks. */
+      (G._tradeSwaps=G._tradeSwaps||[]).push({lane:L,oLane:L,mine:mine,theirs:theirs,myEn:myEn,cnt:_tc});
       /* THE SWAP HAS TO SHOW. This used to reassign c.die.mat and leave the
          element alone - reDrawDieFace only redraws pips - so the dtype- class,
          the host's _trueMat and the 3D layer's mesh all still said bone while
@@ -18617,14 +18622,27 @@ function _tradeSnap(){
 function _tradeRestore(){
   if(!G||!G._tradeSwaps||!G._tradeSwaps.length)return 0;
   var sw=G._tradeSwaps;G._tradeSwaps=null;var n=0;
-  var md=G.matchDice||[];
+  /* P527: `var md=G.matchDice||[]` aliased a THROWAWAY array when matchDice
+     was falsy, so every md[k]= below wrote into nothing while the function
+     went on to report repairs. Refuse rather than pretend. */
+  if(!Array.isArray(G.matchDice))return 0;
+  var md=G.matchDice;
   /* newest first, so two swaps in one lane unwind in the order they were made */
   for(var i=sw.length-1;i>=0;i--){
     var t=sw[i],L=t.lane,k=-1;
-    if(L>=0&&L<md.length&&md[L]===t.theirs)k=L;
+    /* P527: the lane is MAINTAINED now - _removeDieAt shifts it exactly as it
+       shifts the loan - so the seat is right without inference in every case
+       the count used to be asked about. */
+    if(t.seatGone){k=-1;}
+    else if(L>=0&&L<md.length&&md[L]===t.theirs)k=L;
     else if(typeof t.cnt==='number'){
-      var have=0;for(var j=0;j<md.length;j++)if(md[j]===t.theirs)have++;
-      if(have===t.cnt)k=md.indexOf(t.theirs);
+      /* Last resort, and it must not pick ARBITRARILY. Taking indexOf when
+         several dice share the material repaired a random seat and left the
+         brand on the wrong one - residue, under a comment promising none. A
+         missed repair is recoverable; a wrong one silently is not. */
+      var have=0,uniq=-1;
+      for(var j=0;j<md.length;j++)if(md[j]===t.theirs){have++;uniq=(have===1)?j:-1;}
+      if(have===t.cnt&&have===1&&uniq>=0)k=uniq;
     }
     if(k>=0){
       md[k]=t.mine;
@@ -18634,7 +18652,18 @@ function _tradeRestore(){
       if(G._enchArr&&k===L)G._enchArr[L]=t.myEn;
       n++;
     }
-    if(G.matchOppDice&&L>=0&&L<G.matchOppDice.length&&G.matchOppDice[L]===t.mine)G.matchOppDice[L]=t.theirs;
+    /* P527: GATED ON THE PLAYER'S SIDE HAVING BEEN REPAIRED. This was a
+       separate `if` with its own condition, so it could fire while the
+       player's did not - measured as restoredCount:0, playerGotJadeBack:false,
+       rivalGotStarstoneBack:true, which duplicates one material on the rival's
+       board and destroys one on the player's. Both sides move together or
+       neither does, which is what "no exceptions, no residue" always claimed. */
+    /* P527b: the RIVAL's seat, which never renumbered. Using the shifted
+       player lane here would have repaired the wrong die on their board -
+       the fix for one side breaking the other. Falls back to `lane` for
+       records written before oLane existed (a resumed match). */
+    var _oL=(typeof t.oLane==='number')?t.oLane:L;
+    if(k>=0&&G.matchOppDice&&_oL>=0&&_oL<G.matchOppDice.length&&G.matchOppDice[_oL]===t.mine)G.matchOppDice[_oL]=t.theirs;
   }
   if(n){try{famLog('THE MATCH ENDS - EVERY TRADED DIE GOES HOME');}catch(e){}}
   return n;
@@ -19293,6 +19322,21 @@ function _removeDieAt(lane,opts){
       /* the ft.lane===lane case is handled above, where the lane is kept */
       if(ft.lane>lane)ft.lane--;
     }
+  }catch(e){}
+  /* P527: AND THE TRADE LEDGER'S SEATS, which are seats in the same sense and
+     were the only lane record here NOT being maintained. _tradeRestore had to
+     guess its index back afterwards by counting materials - a reconstruction of
+     something this line can simply keep. Denis's framing: the fix is identity,
+     not a better count.
+     A record whose OWN seat is destroyed is marked rather than left to fail to
+     resolve later, because the two failures need different handling and the
+     count test could not tell them apart. */
+  try{
+    (G._tradeSwaps||[]).forEach(function(t){
+      if(!t||typeof t.lane!=='number')return;
+      if(t.lane>lane)t.lane--;
+      else if(t.lane===lane)t.seatGone=true;
+    });
   }catch(e){}
   /* RE-SNAPSHOT THE DICE, AND ONLY THE DICE. The mid-match snapshot was
      written at turn boundaries only, so a quit between a Break and the next
