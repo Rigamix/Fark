@@ -131,6 +131,30 @@ One known gap in the model regardless: it has **no hot-dice rule** (`hot`
 appears zero times in it), while the player's real engine does. The keep
 policies *are* exercised — via `_oppChooseFrom` — so P495 is genuinely measured.
 
+### 1e-bis. LOGGED, not actioned — two bosses hold a card they cannot use
+
+Found while dropping the `npcOnly`/`owner` tags (§5). `blessed_dice` is in
+**AMBROSE's** cardPool and `crown_authority` is in **WHISPER's**, and
+`generateOppCards` deals them — but the only activations that exist are
+`activateBlessedDicePlayer` / `activateCrownAuthorityPlayer`, both player-side.
+
+So each of those two bosses can draw **a dead slot**: a card it can never fire,
+occupying one of its hand positions.
+
+**This is a real, if small, difficulty item and it belongs in the retune
+conversation, not in a tidy-up.** Removing the ids from those pools would make
+Ambrose and Whisper *stronger*, because every remaining draw becomes functional.
+Ambrose draws 3 of 6 and Whisper 4 of 6, so the wasted-draw chance is material
+rather than rounding.
+
+Both are tiers already flagged as needing help — Whisper is one of the three
+with a confirmed bust-rate gap; Ambrose is in the unestablished five.
+
+**No urgency:** the retune is parked and nothing is being tuned against live
+numbers. Logged so it is not missed, and kept **separable** from the aggression
+change and the `challenge` fix, for the same reason those two had to stay apart
+— three difficulty changes on one axis cannot be attributed afterwards.
+
 ### 1b. `challenge` is broken on the PLAYER side too
 
 Law 6 has no stated exception here — a bug, to be closed on correctness grounds.
