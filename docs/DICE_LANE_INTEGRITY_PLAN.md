@@ -514,6 +514,41 @@ and the arrangement that exposes it.
 
 ### D1 — The rival's hot-dice reset is a literal `6`; under Snuff it deals a duplicate lane and refuses to empty the snuffed seat, for **every remaining roll of the turn**
 
+> **CLOSED — P521, driven. D2 is NOT closed; see below.**
+>
+> `_oSeats(ignoreHeld)` is now the single source for the rival's free seats.
+> The deal count is taken **from** that list (`Math.min(rollDice, seats.length)`)
+> rather than computed alongside it, the `:i` index guess is deleted, and the
+> hot-dice reset reads the hand size instead of the literal `6`.
+>
+> | arm | seats dealt, every roll of the turn |
+> |---|---|
+> | snuff on lane 2 | `[0,1,3,4,5]` — was `[0,1,3,4,5,5]` from roll 2 onward |
+> | no snuff | `[0,1,2,3,4,5]` |
+>
+> Zero duplicate seats, zero material mismatches, no over-count, in both arms.
+> The probe refuses a verdict unless the snuff provably fired — its first run
+> reported "the snuffed seat was dealt" when the snuff had simply **never
+> armed**: `runOppTurn` increments `G.oppTurnCount` at 28036, *before*
+> `_lmDue('_snuff')` tests `turn===oppTurnCount`, so arming with the current
+> count guarantees a miss. A red from an un-armed hook is the same class of
+> worthless as a green from one.
+>
+> **D2 REMAINS OPEN, and the root-cause framing needs a correction.** The sweep
+> called D1 and D2 duals of one cause. Half of that holds: both are the count
+> and the seats disagreeing. But P521 only makes the two agree — it does not fix
+> *what they agree on*. D2's mechanism is a separate write:
+> `clearRow('oppDiceRow')` wipes `G._oppHeld` at 23227, and several mid-turn
+> paths call it and then re-enter `step()` — **28457, 28521, 28935**. The seats
+> are then re-derived from an empty held record, so the rival re-rolls dice it
+> is still sitting on. `_oSeats()` reads that record faithfully; the record is
+> what is wrong.
+>
+> Which of those call sites should preserve the held dice and which are
+> legitimate whole-hand re-deals (28935 is Double Down, which explicitly rerolls
+> everything) is not yet established, and is the next discrete piece rather than
+> something to guess at now.
+
 `fark_proto.html:28827`
 ```js
 if(left===0){G._oLastHotDice=true;G._oppSweep=true;left=6;setTimeout(step,_oppDelay(1500));return;}

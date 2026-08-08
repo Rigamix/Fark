@@ -28064,6 +28064,33 @@ function runOppTurn(){
     }
   }
   clearRow('oppDiceRow');G.oppDice=[];
+  /* P521: THE SEATS AND THE COUNT, FROM ONE PLACE.
+     `left` and the free-seat list used to be derived independently, and D1 and
+     D2 are the two directions of the same disagreement - once the count ran
+     past the seats, once the seats ran past the count. Everything that deals a
+     rival die now asks this, and the count is taken FROM the list rather than
+     computed alongside it.
+     The hand size is read, never assumed to be six: matchOppDice is the live
+     loadout and the rung's dice are the fallback. That is the same defect the
+     player's hot-dice reset had before P517, on the other side of the table.
+     ignoreHeld has exactly one caller - the hot-dice reset. A sweep deals the
+     whole row again and _oppHoldKept clears the held record via
+     clearRow('oppDiceRow'), but that has not run yet at the moment the reset
+     needs a number, so it must ask what the seats will be AFTER the sweep. */
+  function _oSeats(ignoreHeld){
+    var _all=(G.matchOppDice&&G.matchOppDice.length)?G.matchOppDice.length
+            :((((G.rung||{}).dice)||[]).length||6);
+    var _held={};
+    if(!ignoreHeld)(G._oppHeld||[]).forEach(function(d){
+      if(d&&d.lane!==undefined)_held[d.lane]=1;});
+    var _s=[];
+    for(var _i=0;_i<_all;_i++){
+      if(_held[_i])continue;
+      if(_i===_snuffLane)continue;
+      _s.push(_i);
+    }
+    return _s;
+  }
   function step(){
     if(G!==_matchG||!G||G._endMatchFired)return;/* ghost-timer guard */
     if(_ruleActive('drill_order','o')&&oppRollNum>=3){finOpp(oppBank);return;}
@@ -28110,20 +28137,24 @@ function runOppTurn(){
        the loop below used to index materials and lanes by ITS OWN counter, which
        is the position of a die within this roll and has nothing to do with the
        seat it lives in. */
-    var _heldSeats={};
-    (G._oppHeld||[]).forEach(function(d){if(d&&d.lane!==undefined)_heldSeats[d.lane]=1;});
-    var _freeSeats=[];
-    for(var _fs=0;_fs<_rungAll.length;_fs++){
-      if(_heldSeats[_fs])continue;
-      if(_fs===_snuffLane)continue;
-      _freeSeats.push(_fs);
-    }
+    /* P521: was an inline copy of this, computed from _rungAll while `left`
+       came from somewhere else entirely. */
+    var _freeSeats=_oSeats();
     var _sawdustCount=0;
-    for(let i=0;i<rollDice;i++){
+    /* P521: never deal more dice than there are seats to deal them into.
+       This is the join that was missing: rollDice came from `left`, the
+       seats came from the row, and nothing reconciled them. */
+    const _dealCount=Math.min(rollDice,_freeSeats.length);
+    for(let i=0;i<_dealCount;i++){
       /* the seat this die is going into, and therefore WHICH DIE IT IS - the
          material comes from the seat too. Indexing the material by `i` let a
          rival's die change what it was made of between two rolls of one turn. */
-      const _seat=(_freeSeats[i]!==undefined)?_freeSeats[i]:i;
+      /* P521: the fallback is GONE. `:i` guessed a seat index whenever the
+         count outran the list, and the guess landed on a seat already dealt
+         (a duplicate die) or on the snuffed one (the enchant undone
+         mid-turn) - measured at fourteen consecutive corrupted rolls in a
+         single turn. The loop bound above makes this always defined. */
+      const _seat=_freeSeats[i];
       const dieMat=_rungAll[_seat]||rungDice[i]||'bone';let val=rollFace(dieMat);var _wasDampened=false;
       if(sootyActive){while(val===1)val=rollFace(dieMat);}
       /* Sawdust: on opponent's first roll, dampen 2 dice (can't be 1 or 5) */
@@ -28882,7 +28913,14 @@ function runOppTurn(){
       left=G.oppDice.filter(d=>!d.kept).length;
       /* all six scored: the next step deals a whole new row, so the held
          dice go with the old one */
-      if(left===0){G._oLastHotDice=true;G._oppSweep=true;left=6;setTimeout(step,_oppDelay(1500));return;}
+      /* P521: was `left=6`. The rival's hand is not always six, and after a
+         sweep the snuffed seat is STILL snuffed - _snuffLane is set once and
+         never cleared for the turn - so six against five open seats is what
+         drove the index guess above. ignoreHeld:true because the sweep is
+         about to clear the held record and this needs the post-sweep answer.
+         Matches what P517 did for the player: a reset restores the hand, it
+         does not invent seats that are not there. */
+      if(left===0){G._oLastHotDice=true;G._oppSweep=true;left=_oSeats(true).length;setTimeout(step,_oppDelay(1500));return;}
       /* DOUBLE DOWN NPC AI: when oppBank is solid (≥400) and reroll dice are
          scarce (≤2 left), double oppBank and force a fresh reroll of the
          opponent's whole hand. Mirrors player activateDoubleDown. */
