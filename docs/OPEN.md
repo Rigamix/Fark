@@ -235,19 +235,27 @@ numbers are already known to be untrustworthy. Do not read it as tuning.
 
 ---
 
-## 1f. The win screen art is finished, optimized, and never loaded
+## 1f. CLOSED - false alarm, the win art is live
 
-`Art/Assets/Win/Standard` holds four finished pieces — banner, bg, hands,
-panel — dated 1 Aug, already optimized. **The game references none of them:**
-`win_standard`, `Assets/Win` and `winStandard` all return zero hits in
-`fark_proto.html`.
+I reported four finished pieces in `Art/Assets/Win/Standard` that the game
+"references nowhere", on the strength of three grep strings returning zero.
+Denis ruled: don't take either side's word for it, check what the win screen
+actually loads.
 
-Checked while confirming the optimization pass, which is complete everywhere —
-Cards 32/32 (to `assets/cards/`, not a sibling folder), GameOver 6/6,
-LastOrders 2/2, Win 4/4. Nothing is waiting on optimization.
+Checked by forcing a real win through the game's own `dbgWin` and reading two
+independent channels - the network log and the rendered DOM. The win screen
+loads `assets/win/bg.webp`, `banner.webp`, `panel.webp` and `hands.webp`.
 
-**Is there a win screen these belong to that has not been built, or were they
-superseded?** Cheap to wire once you say which surface they are for.
+They are the same art: identical file sizes to the four `_opt.webp` copies
+(0.11 / 0.13 / 0.20 / 0.07 MB), optimized 1 Aug 15:24 and deployed 15:38 the
+same day, renamed on the way in.
+
+Nothing is orphaned. Nothing needs deleting or re-optimizing.
+
+**Why the greps missed it:** I searched `win_standard`, `Assets/Win` and
+`winStandard`. The live path is `assets/win/bg.webp` - lowercase folder, and
+the filenames dropped the `win_standard_` prefix. None of the three could have
+matched. Seventh time this session a zero from a name search became a claim.
 
 ---
 
