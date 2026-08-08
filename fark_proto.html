@@ -14287,7 +14287,9 @@ CFX.sacrifice={
       try{if(window.D3X&&D3X.shatter)D3X.shatter(d.el);}catch(e){}
       d.el.classList.add('die-shatter');
       (function(el){setTimeout(function(){if(el&&el.parentNode)el.remove();},360);})(d.el);}
-    if(G.numDice>1)G.numDice--;
+    /* P513: the decrement that used to sit here is gone - the one below does
+       it too, so a single sacrificed die was costing TWO lanes. P504 added
+       that one without noticing this one. */
     /* THE SAME RECORD A BREAK LEAVES - this splice is match-scoped too
        (S.run.dice is untouched and newG rebuilds matchDice from the run), so
        the sacrificed die is back at the next match and the loadout panel must
@@ -14297,14 +14299,24 @@ CFX.sacrifice={
        and not this record's to fix; the material is right either way, which is
        all the seat and the note draw. */
     try{
-      var _sacL=Array.isArray(G.matchDice)?G.matchDice.indexOf(d.mat):-1;
+      /* P513: the die's OWN lane. indexOf(d.mat) returns the first die of that
+         material - on a fresh six-bone run that is lane 0 whichever die
+         shattered - and the same index drove the splice below, destroying the
+         wrong lane's enchant. d.lane is stamped by the refill and is what
+         _laneOf returns. */
+      var _sacL=(d&&typeof d.lane==='number')?d.lane
+                :(Array.isArray(G.matchDice)?G.matchDice.indexOf(d.mat):-1);
       if(_sacL>=0)G._diceOut=(G._diceOut||[]).concat([{
         lane:_sacL,mat:d.mat,
         ench:(G._enchArr&&_sacL<G._enchArr.length)?(G._enchArr[_sacL]||null):null}]);
     }catch(e){}
-    if(Array.isArray(G.matchDice)){var mi=G.matchDice.indexOf(d.mat);if(mi>=0)G.matchDice.splice(mi,1);if(mi>=0&&G._enchArr&&mi<G._enchArr.length)G._enchArr.splice(mi,1);
+    if(Array.isArray(G.matchDice)){var mi=_sacL;/* P513: was indexOf(d.mat) */if(mi>=0&&mi<G.matchDice.length)G.matchDice.splice(mi,1);if(mi>=0&&G._enchArr&&mi<G._enchArr.length)G._enchArr.splice(mi,1);
         if(G.numDice)G.numDice=Math.max(1,G.numDice-1);/* P504: numDice must shrink with matchDice or the pool build's i%matchDice.length wraps and duplicates lane 0 */}/* P480: keep the lane array in step */
     G.pool=G.pool.filter(function(x){return x!==d;});
+    /* P513: relane the survivors, exactly as _removeDieAt does at 19144. Without
+       it every pool die above the removed lane points one lane too high and
+       draws its material and enchant from its neighbour. */
+    if(_sacL>=0)G.pool.forEach(function(q){if(q.lane>_sacL)q.lane--;});
     var P=famDef('sacrifice').p[inst.tier-1];
     G.pPts+=P;famLog('SACRIFICE — THE DIE SHATTERS FOR '+P);_famPop('+'+P);
     try{updHUD();refreshSelUI();}catch(e){}
