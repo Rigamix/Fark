@@ -10311,7 +10311,18 @@ function saveMatchState(){
     dlgFlags:{pLead:G._dlgPLead,oLead:G._dlgOLead,pNear:G._dlgPNear,
               oNear:G._dlgONear,close:G._dlgClose,loseBad:G._dlgLoseBad,winBad:G._dlgWinBad},
     /* Tell mid-match accumulated state */
-    tellState:G._tellState?JSON.parse(JSON.stringify(G._tellState)):null
+    tellState:G._tellState?JSON.parse(JSON.stringify(G._tellState)):null,
+/* P511: the family-card layer. Without these four, newG rebuilds pF via
+   _famInit and oF via _famInitOpp on every resume - refunding every spent
+   charge (measured: 4 -> 2 -> 4 across a real save/resume) and RE-DRAWING
+   the rival's hand at random, which is savescummable. Same reason the
+   _fairTrade / _tradeSwaps records below are carried. */
+famState:{
+  pF:G.pF?JSON.parse(JSON.stringify(G.pF)):null,
+  oF:G.oF?JSON.parse(JSON.stringify(G.oF)):null,
+  famPreserve:G._famPreserve?JSON.parse(JSON.stringify(G._famPreserve)):null,
+  ftDead:G._ftDead?JSON.parse(JSON.stringify(G._ftDead)):null
+}
   };
   save();
 }
@@ -32014,7 +32025,19 @@ function initMatchScreen(data){
     /* and the Trade ledger. matchDice and _enchArr above already carry the swap
        itself; this is the record of what to hand back, without which a match
        resumed mid-swap would end with the two loadouts still crossed. */
-    var _rdTs=params._resumeData._tradeSwaps;
+    /* P511: put the family-card layer back before anything reads it. newG has
+   already rebuilt pF/oF at full charge by this point, so this OVERWRITES
+   that rebuild rather than merging with it - a merge would keep the
+   regenerated charges. Guarded on the field existing so snapshots written
+   before this patch still resume, just without the restore. */
+var _rdFam=params._resumeData.famState;
+if(_rdFam){
+  if(Array.isArray(_rdFam.pF))G.pF=JSON.parse(JSON.stringify(_rdFam.pF));
+  if(Array.isArray(_rdFam.oF))G.oF=JSON.parse(JSON.stringify(_rdFam.oF));
+  G._famPreserve=_rdFam.famPreserve?JSON.parse(JSON.stringify(_rdFam.famPreserve)):null;
+  G._ftDead=Array.isArray(_rdFam.ftDead)?JSON.parse(JSON.stringify(_rdFam.ftDead)):null;
+}
+var _rdTs=params._resumeData._tradeSwaps;
     G._tradeSwaps=(Array.isArray(_rdTs)&&_rdTs.length)
       ?_rdTs.map(function(t){return{lane:t.lane,mine:t.mine,theirs:t.theirs,myEn:t.myEn||null,cnt:t.cnt};})
       :null;
