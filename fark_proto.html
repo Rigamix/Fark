@@ -13989,16 +13989,21 @@ function _npcChooseKeep(keeps,rung){
        take the points, add what the remaining dice are expected to bring, and
        discount that by the chance they bring nothing.
 
-       L===0 IS HOT DICE, now read rather than assumed. runOppTurn:
-         if(left===0){G._oLastHotDice=true;G._oppSweep=true;left=6;
-                      setTimeout(step,...);return;}
-       A fresh six is dealt - and that `return` fires BEFORE oppShouldBank, so
-       hot dice also skips the bank decision entirely and the rival is
-       GUARANTEED to roll again. It is the best outcome on the board.
+       L===0 IS HOT DICE. runOppTurn's line now reads
+         left=_oSeats(true).length
+       P525: this used to transcribe the old `left=6` and conclude "a fresh
+       six is dealt". That half is FALSE since P521 - a sweep clears the held
+       dice but not the snuff, so the rival can be dealt five - and the table
+       below was reading bust[6]/gain[6] for a five-die roll. It calls
+       _oHandAfterSweep() now instead of transcribing anything.
+       The other half STILL HOLDS: that `return` fires BEFORE oppShouldBank,
+       so hot dice skips the bank decision and the rival is GUARANTEED to roll
+       again. It is the best outcome on the board.
        Scoring it 0, as the first version did, had combo treating its strongest
        result as its weakest. Conservative was the safe direction to be wrong
        in, but it was still wrong, and leaving it would have been a permanent
-       approximation rather than a measurement. Now scored as six dice. The
+       approximation rather than a measurement. Now scored as the hand the rival
+       will actually receive, which is six unless a seat is snuffed. The
        guaranteed continuation is worth more still, but pricing that needs
        oppShouldBank modelled, so six is the honest floor. */
     var _evT=_npcEvTable((G&&G.matchOppDice)||(G&&G.oppDice||[]).map(function(d){return d.mat;}));
@@ -14006,7 +14011,11 @@ function _npcChooseKeep(keeps,rung){
     for(var _ci=0;_ci<c.length;_ci++){
       var _k=c[_ci],_L=_k.left|0;
       var _v=_k.pts;
-      var _hotL=(_L===0)?6:_L;/* hot dice: all six scored, a fresh row is dealt */
+      /* P525: was `?6:`, from the transcript above. A sweep does NOT clear the
+         snuff, so the rival can get five - and pricing a five-die roll off
+         bust[6]/gain[6] reads the wrong row of a measured table, in the one
+         persona that actually calculates. */
+      var _hotL=(_L===0)?_oHandAfterSweep():_L;
       if(_hotL>=1&&_hotL<=6)_v+=(1-(_evT.bust[_hotL]||0))*(_evT.gain[_hotL]||0);
       if(_v>_bestV){_bestV=_v;_best=_k;}
     }
@@ -27940,6 +27949,21 @@ function _npcArmActives(){
   }
   try{famRenderRow();}catch(e){}
 }
+/* P525: HOW MANY DICE THE RIVAL GETS WHEN THE TABLE IS SWEPT.
+   Needed outside runOppTurn - the combo persona's EV table used to hard-code
+   six here, from a hand-copied transcript of a line P521 has since changed.
+   A sweep clears the held dice but NOT the snuff: _snuffLane is set once and
+   never cleared for the turn, which is the whole reason P521 stopped assigning
+   the literal 6. G._oSnuffLane is published by runOppTurn so this and _oSeats
+   read the same source rather than two copies of the same idea. */
+function _oHandAfterSweep(){
+  if(typeof G==='undefined'||!G)return 6;
+  var _all=(G.matchOppDice&&G.matchOppDice.length)?G.matchOppDice.length
+          :((((G.rung||{}).dice)||[]).length||6);
+  var _sn=G._oSnuffLane;
+  if(typeof _sn==='number'&&_sn>=0&&_sn<_all)_all-=1;
+  return Math.max(1,_all);
+}
 function runOppTurn(){
   if(typeof _npcArmActives==='function')_npcArmActives();
   if(G&&G._famTarPit&&G._famTarPit.turns>0){
@@ -28120,6 +28144,10 @@ function runOppTurn(){
      whole row again and _oppHoldKept clears the held record via
      clearRow('oppDiceRow'), but that has not run yet at the moment the reset
      needs a number, so it must ask what the seats will be AFTER the sweep. */
+  /* P525: publish the turn's snuffed seat so readers outside this function
+     get the same answer instead of assuming one. The combo persona's EV
+     table was the reader that had assumed. */
+  G._oSnuffLane=_snuffLane;
   function _oSeats(ignoreHeld){
     var _all=(G.matchOppDice&&G.matchOppDice.length)?G.matchOppDice.length
             :((((G.rung||{}).dice)||[]).length||6);
@@ -28129,7 +28157,7 @@ function runOppTurn(){
     var _s=[];
     for(var _i=0;_i<_all;_i++){
       if(_held[_i])continue;
-      if(_i===_snuffLane)continue;
+      if(_i===G._oSnuffLane)continue;/* P525: the published value, not the local */
       _s.push(_i);
     }
     return _s;
