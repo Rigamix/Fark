@@ -18428,7 +18428,11 @@ var ENCH_ICONS={
        carries on and re-throws the row, wiping the tap handlers in the same
        call that set them. handleRoll/handleBank pick this up once the commit
        has settled. */
-    fire:function(c){G._breakPending={src:c.die};}},
+    /* P526: PUSH, not assign. This was G._breakPending={src:c.die}, a single
+       slot - so a second branded face committed in the same selection
+       overwrote the first and one Break never happened. */
+    fire:function(c){G._breakPending=(Array.isArray(G._breakPending)?G._breakPending:[])
+      .concat([{src:c.die}]);}},
 
   /* MATCH-SCOPED, and the WHOLE die crosses: material AND the brand it wears.
      The lane never moves - only what stands in it - so this writes the two
@@ -19094,6 +19098,36 @@ function _breakBorrowed(d){
 /* Enter targeting: the next die tapped is the one that breaks. Mundane dice
    (bone, iron, flint, lead) have no trigger - confirmed the worst target,
    matching mundane dice being baseline-weak everywhere else. */
+/* P526: BREAK IS A QUEUE, NOT A SLOT.
+   G._breakPending was assigned, not pushed, and _iconFire runs once per
+   committed die with the consume a single `if` AFTER the loop - so two branded
+   faces in one selection overwrote each other and one Break was silently lost,
+   which is exactly the half the consume site's comment denied. Measured: two
+   fires, one Break started.
+   Two Break brands on one loadout is legal - 33727 caps only ward - and brands
+   sit on faces 1 and 5, both scoring, commonly committed together.
+   A queue alone is not enough: _breakBegin opens a targeting UI and its
+   callers return, so the next Break has nowhere to run until the first
+   resolves. _breakDie drains it. */
+function _shiftBreak(){
+  if(!G)return null;
+  var q=G._breakPending;
+  if(!q)return null;
+  if(!Array.isArray(q))q=[q];/* tolerate a single record from an older save */
+  var next=q.shift()||null;
+  G._breakPending=q;
+  return next;
+}
+/* Start the next armed Break that actually has a target. One with nothing left
+   to break is a no-op and must not stall the ones behind it. */
+function _drainBreakQueue(){
+  if(!G)return false;
+  var guard=0,next;
+  while((next=_shiftBreak())&&guard++<8){
+    if(next.src&&_breakBegin(next.src))return true;
+  }
+  return false;
+}
 function _breakBegin(src){
   var live=G.pool.filter(function(d){return !d.committed&&d!==src&&!_breakPreserved(d)&&!_breakBorrowed(d);});
   /* false = nothing to break, so the caller must carry on rather than wait
@@ -19370,6 +19404,14 @@ function _breakDie(d){
      gone or the bank would count a die that no longer exists. */
   var _bankNow=G._breakBankNow||G._breakThenBank;
   G._breakBankNow=false;G._breakThenBank=false;
+  /* P526: THE DRAIN POINT. A second Break armed by the same commit has had
+     nowhere to run until now - _breakBegin opens a targeting UI and its
+     caller returns. Skipped when this Break ended in a bank: Silver's row
+     cashes out on a timer below, and opening a new targeting prompt under a
+     bank that is already ending the turn would have the player choosing a
+     target for a turn that is over. The turn reset clears the queue, which
+     is what has always happened to a brand that did not fire. */
+  if(!_bankNow&&_drainBreakQueue())return;
   if(_bankNow){var _bkG=G;setTimeout(function(){try{
     /* A CASH-OUT OF NOTHING IS STILL AN END. handleBank refuses a total of 0
        and returns without ending anything, so breaking a Silver die before
@@ -24488,7 +24530,7 @@ function startPTurn(){
      here - they are armed on the player's turn to resolve on the rival's,
      and clear themselves when they fire. */
   G._wardArmed=false;G._bustImmuneTurn=false;G._zeroHourEnds=false;G._breakArmed=false;
-  G._breakPending=null;
+  G._breakPending=[];/* P526: a queue now */
   /* FAIR TRADE: the loan ends. Two ways it can end, and they are not the same.
 
      This used to write `was` back into the lane UNCONDITIONALLY, without
@@ -25029,10 +25071,9 @@ function handleRoll(){
      is duplicated and nothing is skipped, and BEFORE the row is rethrown, so
      the tap handlers survive. _breakBegin returns false when there is nothing
      left to break, and the turn simply carries on. */
-  if(G._breakPending){
-    var _bp=G._breakPending;G._breakPending=null;
-    if(_breakBegin(_bp.src))return;
-  }
+  /* P526: drains the queue rather than taking the one slot - and skips any
+     armed Break with no legal target so it cannot stall the rest. */
+  if(_drainBreakQueue())return;
   /* Checked BEFORE the hot-dice branch below, which returns early: a brand
      that completed the row skipped Zero Hour entirely and then cut a later,
      unrelated roll instead. It sat after that branch until P341, under a
@@ -26936,8 +26977,9 @@ function handleBank(){
          Only handleRoll read _breakPending, so banking a skull armed it and
          then startPTurn wiped it - 300g for nothing - or worse left it live
          to fire out of nowhere several rolls later. */
-      if(G._breakPending){
-        var _bkBp=G._breakPending;G._breakPending=null;
+      if(G._breakPending&&G._breakPending.length){/* P526 */
+        var _bkBp=_shiftBreak();/* P526: leaves the rest queued */
+        if(!_bkBp)_bkBp={src:null};
         selD.forEach(function(d){d.committed=true;d.sel=false;
           if(d.el){d.el.classList.remove('selected');d.el.classList.add('committed');d.el.onclick=null;}});
         G._breakThenBank=true;/* _breakDie finishes the bank once a die is tapped */

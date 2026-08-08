@@ -1926,6 +1926,40 @@ roll, and `G.matchOppDice.length`.
 
 ### S4. "nothing is duplicated and nothing is skipped" — over a single-slot field, with two consumers
 
+> **CONFIRMED then CLOSED — P526.** The audit's top priority, and the only
+> nomination whose mechanism no shipped patch touched. Driven **before** the fix,
+> which is the order that matters:
+>
+> ```
+> first fire     pending points at: die0
+> second fire    pending points at: die1
+> brand fires 2 | breaks started 1 | first overwritten TRUE
+> ```
+>
+> "Nothing is skipped" was false. `fire` **assigned** a single slot while
+> `_iconFire` runs once per committed die and the consume is a single `if`
+> after the loop.
+>
+> **A queue alone would not have been enough**, and that is the interesting part.
+> `_breakBegin` opens a targeting UI and its callers `return`, so a second Break
+> has nowhere to run until the first resolves. The fix needed a **drain point**:
+> `_breakDie`, after the table is rebound.
+>
+> The drain is **skipped when the Break ended in a bank**, deliberately —
+> Silver's row cashes out on a timer, and opening a new targeting prompt under a
+> bank that is already ending the turn would have the player choosing a target
+> for a turn that is over. The turn reset clears the queue, which is what has
+> always happened to a brand that did not fire.
+>
+> A queued Break with **no legal target is skipped rather than stalling** the
+> ones behind it — `_breakBegin` returning false means "nothing left to break",
+> which must not block a Break that does have a target.
+>
+> **After:** queue length 1 then 2, both brands seen, **two** `_breakBegin` calls.
+>
+> *Scope, stated:* the probe calls `_iconFire` directly — the same call the commit
+> loop makes per die. A real two-skull commit through the UI was not driven.
+
 `pinned_e5b7705.html:24949-24956`
 ```js
   /* BREAK takes its target here - AFTER the commit has fully run, so nothing
