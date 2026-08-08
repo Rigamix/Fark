@@ -25232,7 +25232,23 @@ G.numDice=Math.min((G.matchDice?G.matchDice.length:6),(G.numDice||(G.matchDice?G
   /* the scored dice leave the throwing row before anything is thrown into
      it - see _dropKeptToTray */
   _dropKeptToTray();
-  const freeDice=G.pool.filter(d=>!d.committed);const needNew=G.numDice-G.pool.length;
+  const freeDice=G.pool.filter(d=>!d.committed);
+  /* P529: COUNT SEATS, NOT ENTRIES. This was G.numDice-G.pool.length, a raw
+     count, while the lanes it feeds are chosen from a SET keyed by lane. Two
+     measurements of one array: duplicates collapse in the set and undefined or
+     NaN become the string keys "undefined"/"NaN", marking no seat at all. The
+     moment they diverge needNew is too small for the number of genuinely free
+     seats and a real seat is never refilled - the die sits out the turn, which
+     looks exactly like D6's Preserve symptom from a completely different cause.
+     An entry with a duplicate, missing, non-finite or out-of-range lane
+     occupies no seat, so it no longer suppresses a refill it was never
+     entitled to suppress. needNew and _freeLanes are now two views of ONE set. */
+  const _mdLenNow=(G.matchDice&&G.matchDice.length)?G.matchDice.length:0;
+  const _occNow={};(G.pool||[]).forEach(function(_d){
+    var _L=_d&&_d.lane;
+    if(typeof _L==='number'&&isFinite(_L)&&_L>=0&&_L<_mdLenNow)_occNow[_L]=1;
+  });
+  const needNew=G.numDice-Object.keys(_occNow).length;
   SFX.roll(freeDice.filter(d=>!d._frozen).length+Math.max(0,needNew));
   // Reuse existing free dice: start spin, crossfade face at 90° (edge-on)
   freeDice.forEach(d=>{
@@ -25296,7 +25312,12 @@ G.numDice=Math.min((G.matchDice?G.matchDice.length:6),(G.numDice||(G.matchDice?G
          Mirrors _removeDieAt (19143-19144), the reference on the remove side. */
       var _occLane={};(G.pool||[]).forEach(function(_d){_occLane[_d.lane]=1;});
       var _freeLanes=[];for(var _fl=0;_fl<G.matchDice.length;_fl++){if(!_occLane[_fl])_freeLanes.push(_fl);}
-      for(let i=0;i<needNew;i++){
+      /* P529: never ask for more dice than there are seats to put them in. The
+         same clamp P521 put on the rival's deal, on the player's side - and it
+         is what makes the overflow modulo below unreachable rather than merely
+         guarded, which is what P523's corrected comment says it should be. */
+      const _dealN=Math.min(needNew,_freeLanes.length);
+      for(let i=0;i<_dealN;i++){
         /* P523: THIS COMMENT WAS FALSE, AND IT SAT ON THE GUARD THAT EXISTS
            BECAUSE IT WAS FALSE. It read: "needNew beyond the free-lane count
            means numDice > matchDice.length, which startPTurn's baseline makes

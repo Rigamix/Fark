@@ -2077,6 +2077,42 @@ scores in the next `anyScoring`.
 
 ### S6. "G.pool cannot drift from G.pool" — the code does not compare G.pool with G.pool
 
+> **CLOSED — P529, driven.** The tautology was about `G.pool`; the code compared
+> a **set** with a **count**. `needNew` was `G.numDice - G.pool.length`, raw
+> entries, while the lanes it feeds come from `_occLane`, keyed by lane — so
+> duplicates collapse and `undefined`/`NaN` become string keys marking no seat.
+> An entry occupying no seat still suppressed a refill, and a genuinely empty
+> seat went undealt.
+>
+> **Fixed as the shape P521 used on the rival, applied to the player:** `needNew`
+> counts **distinct valid seats**, and the deal loop is clamped to
+> `min(needNew, _freeLanes.length)`. The two are now views of one set, and the
+> clamp makes the overflow modulo unreachable rather than merely guarded — which
+> is what P523's corrected comment says it should be.
+>
+> | arm | seeded | after the deal | seats |
+> |---|---|---|---|
+> | clean control | `[0]` | `[0,1,2,3,4,5]` | 6/6 |
+> | lane out of range | `[99]` | `[99,0,1,2,3,4,5]` | 6/6 |
+> | lane undefined | `[undefined]` | `[undefined,0,1,2,3,4,5]` | 6/6 |
+>
+> **NEW, found by this probe and NOT fixed — recorded rather than folded in.**
+> The phantom entry survives the deal, and something later trims the pool back
+> to `numDice` and evicts a **real** die: measured `[99,0,1,2,3,4,5]` at 430ms,
+> `[99,0,1,2,3,4]` at 1300ms — seat 5's die gone while the lane-99 phantom
+> stayed. Two questions this raises, neither answered: what performs that trim,
+> and what (if anything) is supposed to sweep a pool entry whose lane is not a
+> real seat. P528 now sweeps *shattered* laneless dice; nothing sweeps
+> un-shattered ones. Not fixed blind — a pool entry may legitimately lack a lane
+> on a flow I have not traced.
+>
+> **Two instrument faults, both mine, both recorded.** The first probe ran three
+> arms in one browser session and the later two measured a pool of 0 — a shared
+> fixture that degrades between arms reports the fixture, not the code. Fresh
+> launches per arm did not fix it either; only **one arm per browser session**
+> did. And it sampled 1100ms after the deal, which would have scored the
+> separate late-trim defect as this fix failing.
+
 `pinned_e5b7705.html:25130-25134`
 ```js
          Occupancy is read from G.pool itself because the whole defect is
