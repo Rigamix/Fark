@@ -214,3 +214,1270 @@ enumerated by recall. Add whatever it finds to this document, not to chat —
 the original version of this plan lived only in conversation for several
 hours and was invisible to every doc-based accounting as a result; don't
 repeat that.
+
+---
+
+## The card-by-card sweep — FAM_CARDS × CFX (done)
+
+Method: the inventory is read off the **loaded page**, not grepped —
+`tools/apv_famsweep_inventory.js` walks the live `FAM_CARDS`, `CFX` and
+`FAM_LIVE` objects and scans each handler's real `.toString()`. Every
+behavioural claim below was then confirmed by driving a real match
+(`tools/shoot.js --eval-file`), never by absence of a name.
+
+**Reachability.** 30 cards. 29 are on FAM_LIVE; only `tar_pit` is off, and it
+has no CFX handler either — dead on both sides (the rival's picker filters on
+FAM_LIVE too, 12723). `anchor_f`/`bookends_f` are FAM_LIVE keys with no card
+(aliases to `vanguard_f`). No CFX handler is orphaned. Seven live cards have
+no handler by design: for_keeps (RSX + endMatch), double_stakes, high_table
+(RSX), the_tab, hair_of_the_dog, marked_table (hardcoded at their sites).
+
+**Handlers that touch dice: 12, not the 8 an identifier scan finds.** Four
+reach the dice through a *callee* or a *consumer* and name nothing:
+fools_gold_f (`famFoolsGold`, 14183), preserve (startPTurn 24553), honeytrap
+and stargazer (`famApplyRollForces`, 14166).
+
+### Six defects, each confirmed on an executed path
+
+1. **Fair Trade swaps the material and leaves the brand on the seat** —
+   `CFX.fair_trade.use` writes `G.matchDice[worst]` (12992) and never
+   `G._enchArr[worst]`. Measured: lane 0 warded, jade borrowed from the stash
+   with its own Tithe; the die dealt into lane 0 came back
+   `{mat:'jade', ench:'ward'}`. The lender's brand never travels; the benched
+   die's brand is worn by the visitor for the length of the loan.
+   (`tools/apv_famsweep_ft_ench.js`)
+
+2. **Sacrifice does not shift `G._fairTrade.lane`** — `_removeDieAt` carries
+   two pieces of loan bookkeeping (19144 hand-back, 19204 `ft.lane--`);
+   `CFX.sacrifice` splices matchDice/_enchArr itself (14313) and mentions
+   `_fairTrade` nowhere. Measured on a loadout whose weakest seat is lane 2
+   (an all-bone loadout hides this — `worst` is 0 and no target is ever
+   *below* the loan): sacrifice lane 1, matchDice shifts, the loan record
+   still says lane 2, and startPTurn's expiry test reads
+   `matchDice[2]!=='starstone'` → it declares the borrowed die dead, banks it
+   in `_ftDead`, and the player's own die never comes home.
+   (`tools/apv_famsweep_sac_loan.js`)
+
+3. **Stargazer never fires on the roll it was played for, and fires a turn
+   later on the wrong dice** — `famApplyRollForces` gates on
+   `G._famPeekVals.length === free.length` (14169). Playing during 'choosing'
+   then rolling means committing first, so the counts always differ, and the
+   miss does **not** clear the peek. Measured across a full turn boundary:
+   peeked `[2,2,6,3,1]`, next roll had 4 free → no apply, still armed; banked,
+   rival played, and turn 2's opening roll of `[3,3,4,3,3]` — a bust — was
+   overwritten with the stale `[2,2,6,3,1]`, which scores.
+   (`tools/apv_famsweep_stargazer.js`)
+
+4. **Steady Hand's bust check runs against a captured pool** — `use()` closes
+   over `free` and the tap handler scores that array (12949-12950), never
+   `G.pool`. Sacrifice is the reachable remover: both are FAM_LIVE actives
+   usable in 'choosing'. Measured: armed with the only scoring face on lane 5,
+   sacrificed lane 5, rerolled lane 0 to a 3 — live table `[3,2,3,2,3]`, no
+   scorer anywhere, **no bust fired** and the turn continued on a die that had
+   already shattered. (`tools/apv_famsweep_steady_stale.js`)
+
+5. **Powder Keg recomputes numDice from pool length** — `G.numDice=G.pool.length`
+   (14263), the mirror of the pattern P516 exists to kill. Normally a no-op.
+   The one window where they legitimately disagree is written on purpose:
+   `_removeDieAt`'s Fair-Trade branch (19152) drops the borrowed die from the
+   pool, keeps the lane and deliberately skips `_dropLanes`. Measured: after
+   that branch, numDice 6 / pool 5; Powder Keg then set numDice to 5, turning
+   "one die short for this roll" into a lost lane for the turn.
+   (`tools/apv_famsweep_keg_numdice.js`)
+
+6. **Preserve benches the last seat, not the preserved one** — nothing records
+   which lane the preserved die came from; `_dropLanes(1)` (24571) moves the
+   count and the refill's free-lane walk simply runs out of budget on the
+   highest lane. Measured on six distinct materials with a Ward on lane 5:
+   preserved the **iron** on lane 1, and next turn lanes 0-4 rolled while
+   **lane 5 (the warded starstone) sat out** — lane 1's iron appeared twice
+   (once in the tray, once freshly rolled) and the Ward could not arm.
+   (`tools/apv_famsweep_preserve_lane.js`)
+
+### Three more, confirmed by reading the loaded code
+
+- **Sleight is inert.** `CFX.sleight.use` sets `G._famSleight` (14387) and the
+  only other reference in the entire loaded corpus is its own `canUse` guard —
+  measured over every global function's source plus every inline `on*`
+  attribute (1.07M chars). The rival's Sleight is a *different* flag,
+  `G._oSleight`, and is implemented (25184).
+- **Cultivate's growth dies with the turn.** `d._cult` (14223) lives only on
+  the pool die object, and `G.pool=[]` at startPTurn (24426) and
+  `_turnTableClear` (23164) replaces those objects. "For the rest of the
+  match. Stacks." is at most one turn, and only pays on a second fire inside
+  the same turn.
+- **Honeytrap reads no tier.** `pairVal` is the last value with count ≥ 2
+  (14347), not a tap and not the player's pick; tier III's four-of-a-kind
+  clause has no code. `famApplyRollForces` then stamps it on `free[0]` — the
+  lowest-lane free die.
+
+### Divergences worth a ruling rather than a patch
+
+- `CFX.sacrifice` never calls `_removeDieAt`. It reimplements five of its
+  responsibilities and skips three: the loan hand-back, the `ft.lane` shift
+  (defect 2), and the mid-turn re-snapshot (19232-19244). Measured: after a
+  live sacrifice paying +800, `S.pendingMatch` still held six matchDice and
+  numDice 6 with an empty `_diceOut`, so a resume rewinds the sacrifice
+  entirely — die and charge back, points lost. A Break in the same spot is
+  preserved across the resume by design. Not a points exploit; an
+  inconsistency. It also skips `_firstStrikeRender()` (P515).
+  (`tools/apv_famsweep_sac_snapshot.js`)
+- `CFX.sacrifice` filters neither `_breakPreserved` nor `_breakBorrowed`,
+  both of which Break honours (19055, 19273). Brief §1 says a borrowed die is
+  an illegal Break target "full stop"; Sacrifice can still shatter one.
+- `CFX.transmute` is the only card whose free set is
+  `G.pool.filter(d=>!d.committed)` (14241) — every other card also excludes
+  `_frozen`. A held die is a legal Transmute target and an illegal Steady
+  Hand / Encore / Stargazer one.
+- `CFX.powder_keg` sets `G.kept=[]` (14257). On a turn a Preserve resolved,
+  that discards the preserved entry startPTurn wrote at 24556 while its chip
+  stays in `#keptRow` — read, not driven.
+
+---
+
+# THE CARD-BY-CARD SWEEP — cross-reference, all five layers (done)
+
+The previous sweep went site-by-site: it grepped the invariant identifiers and
+audited what came back. That cannot see a card whose handler never names those
+identifiers — one that calls a helper, mutates a die object, or relocates a die
+by gesture. This one goes **card-by-card**: start from the inventory of every
+effect that can touch dice, and for each ask what it actually mutates.
+
+**Five layers were inventoried and each independently audited by a second
+pass**: FAM_CARDS×CFX, NPC_CARDS, enchants+materials, tells/handicaps/rung
+rules, and gestures. Where inventory and audit disagreed the audit is taken
+unless noted; every reversal is called out at its row. Everything below marked
+*measured* came off an executed path in a real headless browser
+(`node tools/shoot.js --url http://localhost:8084/fark_proto.html --eval-file …`).
+
+**Standing rule applied throughout: a grep returning zero is never sufficient.**
+Reachability is stated with evidence at every row, because an entire legacy
+player-card layer turned out to be dead (`initMatchScreen` line 31875 —
+`const pCards=[];` — measured `G.pCards === []`, `#playerCards .mcard` count 0),
+and a naive sweep would have filed a dozen findings against code no player can
+reach.
+
+Six facts, abbreviated in the tables:
+**MD** `G.matchDice` · **EN** `G._enchArr` · **ND** `G.numDice` ·
+**PL** `G.pool` membership · **DOM** the row · **LN** `d.lane`/`_laneOf`.
+
+---
+
+## 1. THE CROSS-REFERENCE TABLE
+
+### 1a. FAM_CARDS × CFX — the player's familiar cards
+
+30 cards, 23 CFX handlers. Read off the **loaded objects**, not grepped
+(`tools/apv_famsweep_inventory.js` walks live `FAM_CARDS`/`CFX`/`FAM_LIVE` and
+scans each handler's real `.toString()`).
+
+**Reachability for the whole layer:** 29 of 30 are on `FAM_LIVE`; only `tar_pit`
+is off (measured `FAM_LIVE.tar_pit === false`) and it has no CFX handler either
+— dead on both sides. `anchor_f`/`bookends_f` are FAM_LIVE keys with no card
+(aliases → `vanguard_f`). No orphaned CFX handler. **Correction to an earlier
+reading in this thread: line 14436 is an ENABLE list, not a retirement list** —
+measured `Object.keys(FAM_LIVE)` = 31 ids at runtime, and the draft filter
+returns `draftablePowderKeg: true`. The UI chain was verified by reading and is
+reachable: chip → `onclick="famCardTap(i)"` (13084) → sheet button →
+`onclick="_gbSheetClose();(function(){famUse(i);})()"` (13468).
+
+**12 handlers touch dice, not the 8 an identifier scan finds.** Four reach dice
+through a callee or a consumer and name nothing: `fools_gold_f`
+(→`famFoolsGold` 14183), `preserve` (→`startPTurn` 24553), `honeytrap` and
+`stargazer` (→`famApplyRollForces` 14166).
+
+| effect | reachable | mutates | omits | verdict |
+|---|---|---|---|---|
+| **sacrifice** | LIVE (FAM_LIVE measured; `use` driven) | all six: `d._shattered` 14285, DOM remove 14289, `MD.splice`+`EN.splice` 14313, `_dropLanes(1)` 14314, `PL` filter 14315, relane 14319, `_diceOut` | **the floor** (nothing stops `MD` reaching length 0); `_fairTrade.lane` shift; `_breakBorrowed`/`_breakPreserved` filters; the mid-turn re-snapshot 19232-19244; `_firstStrikeRender()`; `_steadyDisarm` | **BROKEN** — five separate defects, D1/D8/D9/D14 below |
+| **preserve** | LIVE (driven) | consumer-side at startPTurn 24553: `G.kept`, `_dropLanes(1)` → **ND**, appends to `#keptRow` → **DOM** | **which lane** the die came from; the die's **enchant** (`_famPreserve` keys measured: `val, mat, pts, crack` — no `ench`; the tray die is minted `mkDie(...,null,true,null)`) | **BROKEN** — D6 |
+| **powder_keg** | LIVE (draftable, measured) | die objects (`committed`,`_frozen`,`sel`,`val`) 14259-60, DOM classes, `G.kept=[]` 14257, **`G.numDice=G.pool.length` 14263** | a resolve guard (no phase change, no pending flag — encore's own comment at 13019 documents the fix and it never travelled); re-deriving `free` from `G.pool` inside the timeout | **BROKEN** — D5 |
+| **steady_hand** | LIVE (driven) | `d.val=_rollD(d)`, `d.sel` 12945; `.break-target`, `d.el.onclick` | its bust check re-reading `G.pool` — it scores a **captured** `free` (12949-12950) | **BROKEN** — D4 |
+| **stargazer** | LIVE (driven) | `use()` reads only; `famApplyRollForces` writes `d.val` positionally 14170 | clearing `G._famPeekVals` on a miss, and at the turn boundary | **BROKEN** — D7 |
+| **honeytrap** | LIVE (driven) | `free[0].val` 14174 | clearing `G._famHoneyVal` at the turn boundary (measured surviving: `afterTurnBoundary.famHoneyVal = 4`); reading `inst.tier`; not clobbering the Stargazer peek | **BROKEN** — D7 (same defect class) |
+| **fair_trade** | LIVE (driven) | **MD only** — `G.matchDice[worst]=inv[best]` 12992 | **EN** (the lender's brand never travels); a per-die identity (`_ftDead` and the loan record both store a *material* string) | **BROKEN** — D10 |
+| **fools_gold_f** | LIVE (driven) | via `famFoolsGold` 14183: `d.val=_rollD(d)` for all free 14188, DOM face, onclick rebind | — | **CORRECT** — calls `_steadyDisarm` (14191); no lane/count/array contact |
+| **transmute** | LIVE (driven) | `d.val` 14247 + face repaint | excludes `_frozen` from its free set (`G.pool.filter(d=>!d.committed)` 14241) — the only card that does | **CORRECT** on the six facts; the `_frozen` divergence is a ruling, D18 |
+| **cultivate** | LIVE (driven) | `d._cult` 14223, on the pool die object | nothing — but nothing persists it either | **CORRECT** mechanically, **card text false** — D16 |
+| **encore** | LIVE (driven) | `d.val=_rollD(d)`, `d.sel` 13031; classes, onclick; `turnRollCount`, `phase` | — | **CORRECT** — the only reroll card with a resolve guard (`G._encorePending`, `phase='rolling'`, 13019) and it calls `_steadyDisarm` 13038 |
+| **sleight** | LIVE (draftable) | `G._famSleight` 14387 — nothing reads it | the entire advertised effect | **BROKEN (inert)** — D17 |
+| **for_keeps** | LIVE (RSX 13253) | run-scoped only: win → `famFkTake` 13603 pushes `S.run.diceInv`; loss → 30238-30251 splices `S.run.dice`+`dieEnch` together | nothing G-side | **CORRECT** — see §3 for the brand-value asymmetry |
+| bloom · slow_cook · retort · reprisal · double_or_nothing · short_fuse · ill_omen · falling_star · pickpocket(fam) · tamper · vanguard_f · double_stakes · the_tab · hair_of_the_dog · marked_table · high_table | LIVE | points, multipliers, gold, targets, opponent card instances — **no dice contact on any of the six facts** | — | **CORRECT** (16 cards) |
+| tar_pit | **DEAD** (`FAM_LIVE.tar_pit === false`, measured; no CFX handler) | — | — | DEAD PATH |
+
+### 1b. NPC_CARDS — the rival's cards
+
+**Reachability for the whole layer:** NPC cards reach a match only through
+`generateOppCards` (32361), whose three callers are 34075 gauntlet, 35695
+patron, 35740 boss. **Patron matches deal zero NPC cards** — `pCardCount=0`
+(11643) → `cardPool:[]` (11682) → `generateOppCards` returns at 32368. NPC
+cards exist only in the **8 boss matches** and gauntlet rematches.
+`S.npcWonCards` has **no writer anywhere in the file**, so the "cards the NPC
+seized" branch at 32372 can never add anything.
+
+| effect | reachable | mutates | omits | verdict |
+|---|---|---|---|---|
+| **`bust_survive`** (one_more_round) | LIVE — Grog's pool | `clearRow('oppDiceRow')` → **wipes `G._oppHeld`** at 23180; `G.oppDice=[]`; `step()` 28432 | resetting `left`, which still counts only the *unheld* dice | **BROKEN** — D2. Reverses the first inventory's "verified safe" |
+| **`bust_immune_turns`** (hold_the_line, sundays_rest) | LIVE and **guaranteed** — `hold_the_line` is Brutus's `cardPool[0]` (10884) and 32384-32388 force-substitutes `cardPool[0]`; no random gate | reaches the same 28432 line | same | **BROKEN** — D2, and this is the carrier that fires in *every* Brutus match |
+| **`brutus_grit`** | LIVE | same shape at 28368 | same | **BROKEN** — D2, third carrier; named by neither inventory |
+| **`reroll_all_kept`** (crown_authority, blessed_dice) | LIVE — measured firing at Whisper, `usedOnce:{crown_authority:1}` | `k.dice[].val` 25510, **`k.vals=k.dice.map(...)` 25511**, `k.pts`, `G.turnPts` | that `k.vals` (post-`_splitIcons`) and `k.dice` (pre-split, 24926) are **not index-parallel** — P514 already established this; and `_enchRollM`, which every other reroll uses | **BROKEN** — D3 |
+| **`swap_die`** best_for_worst (sticky_fingers_die) | LIVE — Finnick's `cardPool[0]`, so guaranteed | `G.matchDice[pBestIdx]` ↔ `G.matchOppDice[oWorstIdx]` 24620 | **EN** — and the comment directly above at 24618 says *"a swap, not a splice - lanes and brands stay aligned"*, which is false for brands | **BROKEN** — D11 |
+| **`swap_die`** downgrade_best (collateral_die) | LIVE — Corvus | `G.matchDice[pBestIdx2]='bone'` 24634, twice | **EN**; and it defeats `_tradeRestore`'s material test *and* its `cnt` fallback | **BROKEN** — D11 |
+| **`steal_die`** take_best (royal_seizure) | LIVE — Whisper | `MD.splice`, `_dropLanes(1)`, `EN.splice` 24670-24672, `_diceOut` | pool relane, `_fairTrade.lane` shift, mid-turn re-snapshot — **all three no-ops only because of where the block sits** (startPTurn empties `G.pool` at 24426, expires the loan at 24450-24469, and ends with `saveMatchState()` at 24692) | **CORRECT in place.** Move this block anywhere else and all three become live bugs. The `_tradeSwaps` ledger is match-long and therefore *not* protected by position |
+| **`steal_die`** take_and_use (blessed_confiscation) | LIVE — Ambrose | as above **+ `G.matchOppDice.push` 24682** | that the rival's count is a local `let left=6` (27870) and its seats come from `_freeSeats[i]` for `i<rollDice` | **BROKEN** — D13. Seat 6 is *unconditionally* unreachable: the only two producers of `rollDice===7` (`left=7` at 27939, Seven Dice; `left=_oFullHand` at 28839, Double Down) are both dead — measured `npcHasActive_seven_dice:false`, `npcHasActive_double_down:false` |
+| **`reduce_first_roll`** (mabels_pinch) | LIVE — Mabel's pool 10842. (`pocket_sand`: **NEVER DEALT** — in no cardPool, and `npcWonCards` has no writer) | `G.numDice=Math.min(G.numDice,5)` 24804 | decrementing rather than clamping | **BROKEN** — D15 |
+| **`swap_best_to_3`** (grogs_bump, quick_hands) | LIVE — `quick_hands` is Finnick's `cardPool[0]`, guaranteed | `d.val` on live pool dice only 25451-25472 | nothing it should do | **CORRECT** — driven at Grog: pool `0:bone:1 … 5:starstone:1` → `0:bone:3 1:iron:3 2:lead:1 …`; lanes, materials, MD, ND all unchanged. Victims are picked by object, not index. (Minor: the non-D3 branch at 25469-25472 never sets `el._trueVal`) |
+| `bust_bank_half`, `mabels_stitch`(npc), `second_wind`(npc) | LIVE | points only | — | **CORRECT** on the six facts; `bust_bank_half` and `mabels_stitch` end the turn rather than re-stepping, so they do not carry D2 |
+| `sleight_of_hand` (29343), `whispers_hex` npc-armed (29328→24531), `blockade` (25105), `seven_dice` (27939) | **DEAD** — all gated on `G.oCards.includes(...)` with ids that appear in **no** boss `cardPool`; measured `npcActiveUses:{blessed_confiscation:1,blessed_dice:1}` in a real Ambrose match | `sleight_of_hand` would write `G.matchDice[pBestIdx]`/`G.matchOppDice[oBestIdx]` with no EN handling — D11's exact shape | EN | DEAD PATH (would be BROKEN if fed) |
+| `honor_guard` (29025), `standard_bearer` (29031) | **DEAD** — gated on `G.oCards.includes` with legacy ids, measured `false` in a live Ambrose match | — | — | DEAD PATH |
+
+### 1c. Enchants and die materials
+
+**Reachability:** `ENCH_GRID` (33421) lists all eight and every entry resolves
+through `_enchDef` — verified live. `_iconFaces` (33378-33386) restricts brands
+to faces 1 and 5 and every material carries both.
+
+| effect | reachable | mutates | omits | verdict |
+|---|---|---|---|---|
+| **break** | LIVE | removes a die via `_breakBegin` 19054 → `_breakDie` 19259 → `_removeDieAt`: MD, EN, ND (`_dropLanes(1)` 19185), PL, DOM, relane | — | **CORRECT.** Floor holds — measured `_breakBegin(lastDie) === false` at one die. Honours `_breakBorrowed` (19040) and `_breakPreserved` (19055) |
+| **trade** | LIVE | `matchDice[L]` ↔ `matchOppDice[L]` 18407-18455, `_enchArr[L]=null`, the `_tradeSwaps` ledger with `cnt`, `_tradePaint` 18495 (`replaceChild`, so layout position and `dataset.seat` survive) | shifting `_tradeSwaps[].lane` when a player-side removal splices below it — recovers via the `cnt` fallback 18578-18581, measured `restored:1` | **CORRECT.** Adversarially re-verified: middle lane, brand on the neighbour above, `_enchArr[4]` untouched, `d.lane` and lane count unchanged, `S.run.dice` never saw the visitor. Closes the brief's standing "Trade never re-verified" item |
+| **quicksilver** | LIVE | `d.val`, `d.sel` (19550-19558) | — | **CORRECT.** Lane/material/ench map measured byte-identical before and after |
+| **ward** (the enchant) | LIVE | `G._wardArmed` 18337, `G._wardBoost` 18342; consumed at 26173-26183 (points only: `G.pPts += _half`), expired at 24434 | — | **CORRECT.** Armed→consumed is purely a flag plus a points computation — **no die is relocated or removed on either transition.** The source itself distinguishes the two systems at 18328-18329 |
+| **snare** | LIVE | `_lmArm('_snare', c.lane, …)` 18357; consumed at 28219 against `_oFree[i].lane`, halving a number | — | **CORRECT** — no player-side mutation |
+| **fog** | LIVE | splices `_fogV`/`_fogM`, which are `.slice()` copies (28172-28180) | — | **CORRECT** — real arrays untouched |
+| **snuff** | LIVE | rival-side only: `left--` (28003) + the `_freeSeats` skip (28060) | keeping `left` and `_freeSeats` in agreement across a hot-dice reset | **BROKEN in combination** — D1. Snuff itself is correct; `left=6` at 28827 is what breaks it |
+| **tithe** | LIVE | gold | — | **CORRECT** |
+| **`shatter_bonus`** (obsidian, grogs_tooth) | LIVE | the sweep at 25272-25284 stamps `_shatterLane`, sorts **descending** and removes through `_removeDieAt` | a floor on `MD.length`; and the `else` branch at 25284 splices `PL` alone | **MOSTLY CORRECT.** Adversarially verified across four arrangements (middle lane with a brand above; two non-adjacent shatters with brands between and above; last lane; under an armed penalty) — all clean, with a working `chance:0` negative control. **One real hole:** if some shattered dice have lanes and one does not, `_shLanes` is non-empty so the `else` never runs and the laneless shattered die **stays in `G.pool` as a live scorer with its element deleted** — measured, `poolShattered:1`, lanes `[0,1,undefined,3,4]`, and its seat is never refilled because `needNew` is 0 |
+| **`drag_reorder`** (vagabond) | LIVE — acquisition confirmed: `DICE_STORE` carries `{mat:'vagabond',price:700,stock:2}` at 10948, `_shopRollNight` 10958-10961 offers it 45%/night with a pity rule, and the drop handler at 33251 → `_stTrade` 33279 is a live pointer handler (driven: `_stTrade('vagabond',3)` → `dice[3]='vagabond'`, `dieEnch[3]=null`, gold −700) | `G.pool` order 36673, DOM order 36680-36683, mesh `phys.x` 36663 | `d.lane`, MD, EN, ND — **and `d.hx`**, the cached chip layout centre | **BROKEN** — D12 (tap desync) plus a ruling (D19, seat≠lane) |
+| `palm_adjacent` (14129) · `fang` (14133, 26164) · `weight_bank` (27406) | LIVE | read positions / membership only | — | **CORRECT.** All three are implemented **by material id, never by mechanic string** — a grep on the mechanic would have been a false clear |
+| `triple_bonus` · `wild_quad` · `wild_straight` · `wild_triple` · `single1_bonus` · `starstone_bonus` · `reckless` | LIVE | scoring only | — | **CORRECT.** `reckless` walks `G.matchDice` as bare ids (26465-26467), so it correctly stops charging for a shattered brass and correctly starts charging if Trade parks a rival brass in your loadout |
+| `brutus_shield` | LIVE | carries no `effect`; works through `bornEnch:{t:'ward',face:5}` (12252) stamped by `_enchInit` 19463-19477 | — | **CORRECT** — the only material that *creates* an enchant |
+
+### 1d. Tells, handicaps and rung rules
+
+**Reachability:** `_SEAL_POOL` (11234) is live — measured a sealed seat giving
+`G._sealRule='zero_hour'` with the badge rendered and `_ruleActive` true on both
+sides. Sleeve is live (boss spoils 13634 → `famSleeveSet` → `_gbBossPeek`, wired
+to `#ptBossName`/`#ptBossGo` at 16208/16260).
+**All five handicaps are unreachable** — sole writer is
+`var handicap=null;` at 35679; measured `G._handicap === null` in a live match.
+**Every `rung._flag` rule and every player-card table rule is dead** — all gated
+on `G.pCards`, measured `[]`.
+
+| effect | reachable | mutates | omits | verdict |
+|---|---|---|---|---|
+| **rival hot dice** `left=6` 28827 | LIVE | resets the rival's dice count to a literal | that `_freeSeats` was built from `_rungAll.length` minus held minus **`_snuffLane`**, and `_snuffLane` (set once at 27998) is never cleared for the rest of the turn | **BROKEN** — D1 |
+| `pickpocket` tell | LIVE | player: `G.pool.splice` + `_dropLanes(1)` (P510, correct). rival: `left--` 28016 | the callee `_maybeFireCutpurse` re-asks `G._tell.id` (11505) instead of `_ruleActive` | **BROKEN** — D20 |
+| `zero_hour` | LIVE | `G.pool=[]` at the end of `_zeroHourClose` 18702 | — | **CORRECT** — the turn is ending and startPTurn re-derives from `matchDice.length` at 24426 |
+| `drill_order` | LIVE | roll cap only | derivation on the rival side — 23541 derives via `_tellById`, 28011 is a literal `oppRollNum>=3`, 13114 a third copy | **CORRECT today** (measured `_tellById('drill_order').maxRolls === 3`), **latent divergence** — D22 |
+| `last_call` · `reckoning` | LIVE | bank total / bank floor | — | **CORRECT** |
+| `first_strike` | LIVE | renders MD/`matchOppDice` 18820 | being called on the NPC swap/steal route (24604-24689) and by `CFX.sacrifice` | **BROKEN (display)** — D21. `_firstStrikeRender` has four callers (17519, 18801, 19251, 24426); the block at 24604 runs *after* the startPTurn call and splices inline |
+| `still_waters` | LIVE as a boss badge | pure predicate `_famHushed` 18869 | — | **CORRECT** mechanically; **cannot be sealed** — `_SEAL_POOL` substitutes the parked `steeped` for it, measured `sealPoolMissing: ["still_waters"]`. D23 |
+| `kindred` | LIVE | `mult=2`, extending Snuff/Fog to two rival turns 18466/18479 | — | **CORRECT** — but it doubles the number of turns exposed to D1 |
+| `steeped` | **PARKED** — on no boss; `S.run.tells` has exactly one writer (13634, boss spoils) and `tellGive` (11309) has no callers, so it can never be sleeved. Only route in is a sealed seat | player pays `G._tell.perRoll` 25201 (reads `G._tell`, not the rule); rival pays a hardcoded `100` 28859 | — | LATENT divergence — measured `wouldAdd === 50` against `PARKED_TELLS.steeped.perRoll === 100` |
+| `_oTarPit` (24417-24419) / `_famTarPit` (27847) | **DEAD** — no writer; `FAM_LIVE.tar_pit === false` measured | 24418 `Math.min(numDice,5)` sits **nine lines above** the unconditional reset at 24426 and is wiped by it (measured: armed, `startPTurn()`, `numDice` came back **6** with the charge spent and the log reading "YOU ROLL 5"); 27847 writes `G.numDice` — the **player's** counter — inside `runOppTurn` | — | DEAD PATH, but both blocks would ship as-is on a re-enable. The control in the same probe: Whisper's Hex at 24531 does the identical operation *below* the reset and correctly returned 5 |
+| `rung.chaotic` / `adaptive` / `minBank` / `diceStop` / `wager*` / `_highTable` | LIVE | AI aggression, banking thresholds, target — no dice | — | **CORRECT** |
+| all 5 handicaps; `_jinx` (`left=5` 27966); `_sawdust`; `_shortPour`; `_coldShoulder`; `leaky_cup`; player-side `blockade`; `whispers_veil`; `iron_grip` | **DEAD** — `G._handicap === null` / `G.pCards === []`, both measured | — | — | DEAD PATH. Two consequences worth recording: the feat **`last_man_sitting`** (9813) is unearnable, and **`iron_grip` — the only counter to Pickpocket and the die-steal cards — is permanently false** (11790 records it as removed) |
+| `mirror_match` dice swap | **DEAD** twice over | writer 35703-35708 and reader 32071-32077 have their field names inverted and the two inversions **cancel** — measured `playerChanged:false, oppChanged:false` | — | DEAD PATH. `_removeDieAt`'s comment at 19090-19094 records a live exception for it; that exception cannot fire |
+
+### 1e. Gestures and cross-match die moves
+
+| effect | reachable | mutates | omits | verdict |
+|---|---|---|---|---|
+| **Vagabond drag** `_commitVagabondDrag` 36651 | **LIVE** — die acquisition confirmed (§1c) | `G.pool` order, DOM order, mesh `phys.x` | `d.hx` (the cached chip layout centre, invalidated only on a row change at 22030 and in the no-physics branch at 22080); and `d.lane`/MD/EN/ND | **BROKEN** — D12; plus D19, a ruling |
+| **`_stTrade`** (shop stall trade rack, 33279) | LIVE — driven | `S.run.dice[slot]` 33287, `_enchInit()`, `S.run.dieEnch[slot]=null` 33288 | — | **CORRECT** — the reference implementation for the brand-moves-with-the-die rule |
+| **tier loadout drag** `_startLoadoutDieDrag` drop 34917-34919 | **DEAD (CSS)** — `#tierWrap` computes `display:none`; two independent `!important` rules kill it (1851 `#screen-gauntlet>*:not(#gbRoom)`, 1993 `.tier-loadout`); measured 6 `.tier-lo-die` present, **0 visible**. Handlers *do* attach — `_attachLoadoutDieDrag` executed 18× | swaps `S.run.dice[srcIdx]` ↔ `[tgtIdx]` | `S.run.dieEnch` entirely | **BROKEN, DEAD PATH.** Driven with the surface forced visible: `dice [bone,silver,…,obsidian,…] → [bone,obsidian,…,silver,…]`, `ench` unchanged — both brands now on the wrong die, and `_enchInit`'s illegal-face scrub is one-shot behind `if(S.run._enchV!==3)` (19369), so it neither repairs nor refunds |
+| **dice-store drag** `_buyDieAtSlot` 33942 | **DEAD** — both hosts of `#dsGrid`/`#dsLoadout` (`_legacyInitShopScreen` 33737, `_showInlineDiceSection` 33757) have **zero call sites** by execution counter; measured on the live shop screen: `.ds-slot` count 0, `.dice-store-item` count 0 | `S.run.dice[slotIdx]=mat` 33954 | `S.run.dieEnch[slotIdx]` | **BROKEN, DEAD PATH** — L1's defect on a second surface |
+| **For Keeps**, both directions | LIVE (RSX 13253) | win: `famFkTake` 13603-13620 pushes to `S.run.diceInv` then `_enchInit()` pads `dieEnchInv` and stamps born brands 19450-19476. loss: 30238-30251 splices `S.run.dice[di]` **and** `S.run.dieEnch[di]` together, refills `'bone'` at the end, pads to match | nothing structural | **CORRECT** — arrays stay parallel in both directions. See §3 for the brand-value asymmetry, which is a design question |
+| `famDieShift` 14864 (the *correct* reorder — swaps `dieEnch` alongside `dice`) · `famDieEquip` 14880 · `famDieStash` | **DEAD** — measured **zero call sites** across every global function's `.toString()`, every inline `on*` attribute and the document HTML (3.1M chars scanned; `famDieShift` occurrence count 1 = its own definition). `famLoadoutShow()` renders 21,033 visible chars with none of the three in the output; its dice carry `onclick="_loFocus(this)"` (14612), inspect-only | `famDieEquip` would push a **branded bone** to `diceInv` with its enchant and no refund, victim picked by `lastIndexOf('bone')` 14885 | — | DEAD PATH. **There is no reachable loadout *reordering* in the build** — `_stTrade` is the only reachable way a die changes seat-content, and it is correct |
+| `activateAlchemistsChisel` 31633 · `activateRoyalSeizurePlayer` 31531 · `activateBlessedConfiscationPlayer` 31541 · `activateStickyFingersPlayer` 31503 · `activateCollateralPlayer` 31516 · `activateDoubleDown` 31364 · `activateSevenDice` · `activateMabelsStitch` 31021 · `activateCoinFlip` 31589 · `activateTheNudge` 31611 | **DEAD** — `activateCard` has one caller, `_commitActivation` 23070, reachable only from an `.mcard` in `#playerCards`, fed by `buildCBar('playerCards',G.pCards,…)` 32150 with `const pCards=[]` 31875. Measured: `activateCard` executed **0** times across menu → gauntlet → shop → loadout; `canActivateCard('blessed_confiscation') === false`. The machinery is alive and only the feed is empty — calling `buildCBar('playerCards',['gamblers_eye'],…)` directly produced 1 mcard, 1 mcard-active | see §4 | — | DEAD PATH (10 sites). Catalogued in §4 because they are the inheritance if `params.pCards` is ever honoured |
+
+### 1f. The engine sites the cards route through
+
+| site | reachable | mutates | omits | verdict |
+|---|---|---|---|---|
+| `_removeDieAt` 19115 | LIVE | MD, EN, `_dropLanes(1)` 19185, PL, DOM, relane 19187, `_fairTrade.lane` 19204, re-snapshot 19232-19244, `_firstStrikeRender` 19251, `_diceOut` | a floor on `MD.length`; `_steadyDisarm`; shifting `_tradeSwaps[].lane` (recovers by the `cnt` heuristic); its `lane<0` guard **admits NaN** (19117) | **MOSTLY CORRECT** — the reference remover. The NaN admission is load-bearing for D8 |
+| the refill 25118-25156 (P512) | LIVE | mints pool entries on free lanes ascending, DOM append, `G.pool=[...G.pool,...newEntries]` | a guard on `G.matchDice.length === 0`, where the overflow fallback `(G.pool.length+i)%G.matchDice.length` at 25130 evaluates `0%0` → **NaN** | **BROKEN in one arrangement** — D8 |
+| player hot dice 24980 (P517) | LIVE | `numDice = Math.min(matchDice.length, numDice)` | — | **CORRECT** — closes the brief's "hot dice reset, player side" open item. But see D5: P517 turned Powder Keg's stale write into a live penalty that the old recompute used to mask |
+| `_dropLanes` 19107 | LIVE | `numDice` only, floored at 1 | any floor on `MD` | **CORRECT** — seven sites converted, all verified |
+| `startPTurn` 24426 `G.numDice=G.matchDice.length` | LIVE | the per-turn baseline | — | **CORRECT** — it is a recompute, but at the one moment no penalty is armed. Everything added *above* line 24426 is silently wiped (D24 hazard; `_oTarPit` is the existing casualty) |
+| `handleBank` 27228 + 27427, `endPTurn` 27560: `G.numDice=6` | LIVE | hands a five-lane player six | deriving from `matchDice.length` | **CORRECT by accident.** Nothing reads `numDice` before the next `startPTurn` — but `saveMatchState()` (24692) snapshots the 6 to disk, so it is one accident deep, not zero. **Measured incidentally** in `tools/apv_xref_sac_empty.js`: a one-die loadout busted and came back `numDice: 6` against `matchDice.length: 1` |
+| rival `left=6` initializer 27870 | LIVE | the rival's dice count | `_oFullHand` | **CORRECT today, LATENT.** All `RUNGS` and all generated patron loadouts are exactly 6 (measured `rungsDiceLens`/`rosterDiceLens` all 6; `generateDiceLoadout` hard-loops `i<6`) and the only live shrink path is on the player's MD |
+| `_oFullHand` 28839 | LIVE (dead feature) | `(G.matchOppDice&&G.matchOppDice.length)||6` | — | **CORRECT** — the one derived rival-side write, at one of ten sites |
+| the sim harness 36979 | LIVE (offline) | `var dice6=(rung.dice&&rung.dice.length===6?rung.dice:['bone'×6])` | — | **CORRECT but blinding.** A rival loadout that is not exactly six (Blessed Confiscation's push) is silently replaced with six bones before any balance number is computed off it |
+
+---
+
+## 2. CONFIRMED DEFECTS, ranked by player-visible impact
+
+Only defects that survived the adversarial audit. Each carries the exact code
+and the arrangement that exposes it.
+
+### D1 — The rival's hot-dice reset is a literal `6`; under Snuff it deals a duplicate lane and refuses to empty the snuffed seat, for **every remaining roll of the turn**
+
+`fark_proto.html:28827`
+```js
+if(left===0){G._oLastHotDice=true;G._oppSweep=true;left=6;setTimeout(step,_oppDelay(1500));return;}
+```
+The seats are computed independently, 28059-28068:
+```js
+if(_heldSeats[_fs])continue;
+if(_fs===_snuffLane)continue;      // the snuffed seat is removed from _freeSeats
+const _seat=(_freeSeats[i]!==undefined)?_freeSeats[i]:i;   // ← the fallback
+```
+`_snuffLane` is set once at 27998 and **never cleared for the rest of the turn**,
+so after the sweep `_freeSeats.length===5` while `left===6`. `i=5` misses,
+falls back to `_seat=i`, and lands on a seat that is either already dealt
+(duplicate) or the snuffed one (penalty cancelled).
+
+**Reproduced twice by two independent authors.** Rival loadout
+`['bone','iron','flint','lead','amber','jade']`, Snuff on lane 2:
+
+| | seats | materials |
+|---|---|---|
+| roll 1 | `[0,1,3,4,5]` | bone, iron, lead, amber, jade — flint correctly withheld |
+| roll 2 onward | `[0,1,3,4,5,5]` | bone, iron, lead, amber, jade, **jade** |
+
+DOM confirms (`#oppDiceRow` seats `["0","1","3","4","5","5"]`). Snuff on the
+**last** lane instead: roll 1 `[0,1,2,3,4]`, roll 2 `[0,1,2,3,4,5]` **including
+the snuffed die** — the enchant is simply undone mid-turn. Control, no snuff:
+`[0,1,2,3,4,5]` on all 51 rolls, clean.
+
+**Not a one-roll artefact** — measured 14 consecutive corrupted rolls in one
+turn, because `_snuffLane` is never reassigned inside `step()`. Kindred (18466)
+doubles the number of *turns* affected, not the severity.
+
+**Why the default state hides it:** it needs a snuffed seat *and* the rival
+sweeping its whole hand in one turn. With no snuff, `_freeSeats.length===6===left`
+and the fallback never fires. It also needs a rival whose materials differ, or
+the duplicate is invisible.
+
+**This is the lesson P517 already wrote down, on the other side of the table**
+(24980: *"hot dice restores your hand, it does not GROW it"*). Fix shape:
+`left=_freeSeats.length`, and give the `_seat` fallback a hard `break` rather
+than an index guess. `_freeSeats` is `var`-scoped inside `step()`, so 28827 does
+see the current invocation's copy.
+
+### D2 — Every rival bust-save wipes the held-dice record and then re-rolls the seats the rival is still sitting on
+
+Three carriers, two lines. `fark_proto.html:28432` (`bust_survive` **and**
+`bust_immune_turns`) and `:28368` (`brutus_grit`), both:
+```js
+setTimeout(function(){clearRow('oppDiceRow');G.oppDice=[];step();},_oppDelay(900));return;
+```
+and `clearRow`, `fark_proto.html:23180`:
+```js
+/* the held dice ARE row children - the wipe above already took them */
+if(typeof G!=='undefined'&&G)G._oppHeld=[];
+```
+`left` is **not** reassigned between the deal and the bust branch — confirmed by
+enumerating every `left` writer in `runOppTurn` (27870, 27939, 27966, 27969,
+27971, 28003, 28016, 28824, 28827, 28839; 28824 is in the scoring branch, after
+the bust branch returns). So at bust time `left` still counts only the *unheld*
+dice, while `_freeSeats` has just been rebuilt from an empty `_heldSeats` as
+`[0..5]`. `_freeSeats[i]` for `i<left` takes the **lowest** seats — exactly the
+ones the rival is holding. Materials come from the seat (`_rungAll[_seat]`,
+28069), so the rival re-rolls the wrong dice.
+
+**Measured** (Grog, `one_more_round`, `matchOppDice=[bone,iron,lead,amber,jade,starstone]`):
+
+| roll | seats stamped | materials asked for |
+|---|---|---|
+| 1 | 0,1,2,3,4,5 | bone,iron,lead,amber,jade,starstone |
+| 2 | 2,3,4,5 | lead,amber,jade,starstone |
+| **3 (after the save)** | **0,1,2,3** | **bone,iron,lead,amber** ← should be lead,amber,jade,starstone |
+
+**The default state hides it exactly as predicted:** bust on roll 1 and
+`_oppHeld` is already empty, so the wipe is a no-op and the seats come out right
+by coincidence. It needs a bust on roll 2+ with dice held.
+
+**`bust_immune_turns` is the carrier that matters most.** It has no random gate
+(`G.npcCardState.oppTurnCount<=(eff.turns||2)`), and `hold_the_line` is Brutus's
+`cardPool[0]` (10884), which 32384-32388 force-substitutes — so it is in **every
+Brutus match**, firing on the rival's first two turns. `sundays_rest` (3 turns)
+is 4-of-6 in Whisper's pool.
+
+**This reverses a "verified safe" entry.** The first inventory cleared it on the
+stated grounds that *"`left` and `G._oppHeld` are left intact"*, and separately
+recorded *"`G._oppHeld` … has no assignment site outside `newG` (23180)"*. Line
+23180 is inside **`clearRow`**, not `newG` (which closes well before
+`_turnScoreClear` at 23163). The misattributed line number is what hid the bug
+directly underneath the entry that cleared it.
+
+Note the **hot-dice case is genuinely clean** and for a real reason, not by
+luck: there all six dice were kept, so wiping `_oppHeld` and resetting `left=6`
+agree. Measured `heldLanes:[]` after every sweep. D1 and D2 are duals of one
+root cause — see §5.
+
+### D3 — `reroll_all_kept` rescores from a non-parallel array; a punishment card becomes a 4× buff and folds an unbankable face into the score
+
+`fark_proto.html:25510-25511`
+```js
+k.dice.forEach(function(dd){ try{ dd.val=rollFace(dd.mat); }catch(e){} });
+k.vals=k.dice.map(function(dd){ return dd.val; });
+```
+`k.vals` is `selVals`, derived from `_scoreDice` **post-`_splitIcons`**
+(24824-24825). `k.dice` is `selDice`, **pre-split** (24926). P514 already
+established these are not index-parallel — icon dice are in one and not the
+other.
+
+**Reproduced independently by two authors.** Whisper + `crown_authority`, tithe
+brand face 1 on lane 5 flint:
+```
+roll:   0:bone:5 1:iron:5 2:lead:5 3:amber:5 4:jade:5 5:flint:1:tithe  (isIcon[5]=true)
+keep:   vals:[5]  dice:[{5,bone},{1,flint}]  pts:50
+after:  vals:[1,1] dice:[{1,bone},{1,flint}] pts:200  turnPts:200
+```
+A branded face that banks zero **by law** is folded back into the score, and a
+card whose whole purpose is to punish becomes a 4×. `rollFace(dd.mat)` at 25510
+also bypasses `_enchRollM`, the brand roll table every other reroll in the file
+uses, and because 24926 records only `{val,mat}` the brand cannot survive the
+reroll even if it lands on its own face.
+
+**Reachability, and it closes an open source comment.** The comment at 11737
+says *"STILL OPEN: both ids remain in boss cardPools (ambrose, whisper), so
+those bosses can draw a card only the player can activate."* False — the
+dispatch at 25488 fires straight off `G.oCards` with no `type:'active'` or
+`npcActiveUses` gate. **Measured at Whisper: `usedOnce:{crown_authority:1}` —
+the boss fired it.** `blessed_dice` is 5-of-6 in Ambrose's pool.
+
+### D4 — Steady Hand's bust check runs against a captured pool; the turn continues on a die that has already shattered
+
+`fark_proto.html:12949-12950` — `use()` closes over `free` and the tap handler
+scores that array, never `G.pool`:
+```js
+var fv=free.map(function(x){return x.val;}),fm=free.map(function(x){return x.mat;});
+if(!anyScoring(fv,effectiveCards(),fm,free)){if(!_tryBustSave(free))_delayedDoBust(free);return;}
+```
+Sacrifice is the reachable remover — both are FAM_LIVE actives usable in
+`'choosing'`, and Sacrifice's `use` splices `G.pool` (14315) without telling any
+armed card.
+
+**The first inventory's evidence for this was wrong and the audit re-drove it.**
+The original probe built `[3,2,3,2,3,1]` and asserted the survivors `[3,2,3,2,3]`
+were non-scoring using a predicate that only knew about 1s and 5s — blind to
+triples. Measured: `[3,2,3,2,3]` totals 300, `anyScoring` **true**. The live
+table had a scorer, the two arrays never disagreed, and "no bust fired" was
+correct behaviour. `ghostWasTheOnlyScorer:true` in that probe was a hardcoded
+literal, not a measurement.
+
+**Re-driven with survivors `[2,3,4,2,3]` (`anyScoring:false`, measured) and the
+only scorer a 1 on lane 5:**
+```
+steadyCanUse true / sacCanUse true / phaseAtSac "choosing"   <- both through their real canUse
+steadyStillArmed true                                        <- sacrifice never calls _steadyDisarm
+poolAfterSac lanes [0,1,2,3,4]  numDice 5  matchDice 5
+afterTap liveVals [2,3,4,2,3]  phase "choosing"  busted false  bustSaved false  charges 2
+```
+Mechanism precisely: `_steadyDisarm` (12908) has five callers — encore 13038,
+fool's gold 14191, powder keg 14267, the quicksilver-shaped reroll 24767,
+handleRoll 25055. **`CFX.sacrifice` and `_removeDieAt` are the two dice-removers
+missing from that set.**
+
+The lesson is not "add two more callers": see §5.
+
+### D5 — Powder Keg, three defects, one of which P517 made live
+
+> **D5(a) FIXED — P518, shipped and verified.** The report was right and the
+> regression was mine. Driven end to end (`tools/probe_keg_p517_seam.js`) rather
+> than inferred from the two halves, because the sweep said plainly the join had
+> never been driven:
+>
+> | arm | turn start | roll-only window | after keg | at hot-dice reset | short |
+> |---|---|---|---|---|---|
+> | mismatch + keg | 6 | 6/5 | 6/5 | **6** | 0 |
+> | mismatch only | 6 | 6/5 | — | 6 | 0 |
+> | keg only | 6 | — | 6/6 | 6 | 0 |
+>
+> Before P518 the first arm read **5 at the reset against a 6-lane loadout**.
+> The fix is `Math.max((G.numDice||0),G.pool.length)` — a max mirroring P517's
+> min, for the same reason: a transient must never overwrite an authoritative
+> count downward. Deleting the write was the alternative and was rejected;
+> if anything ever puts a die in the pool without raising `numDice`, that write
+> is what corrects it.
+>
+> **P517's comment was also wrong and is replaced.** It claimed "the loadout
+> term stays so a stale-low numDice cannot strand them below their real lane
+> count". The loadout term is the ceiling of a `min` and cannot floor anything.
+> A comment vouching for a safety property the code does not have is worse than
+> none — it is the same shape as a correct-looking number beside a wrong value.
+>
+> **Three instrument faults were caught inside this one verification**, each of
+> which had already produced a green:
+> 1. sampling `numDice` a second after the sweep read whatever the NEXT roll did
+>    to it — a bust toll takes a die and lands as a phantom short-by-one. Now
+>    latched at the instant the branch sets its flag.
+> 2. "short" measured against the **loadout** counted a rival dice penalty as a
+>    defect. The denominator is what the player had at the start of *this turn*.
+> 3. an arm named "mismatch" whose `_removeDieAt` took the **normal** path had
+>    decremented legally; scoring it as a lost lane reported `_dropLanes` doing
+>    its job as a bug. Arms now prove they built the state they claim to test.
+>
+> **Flagged, not claimed:** across runs, the same `_removeDieAt(2)` call with
+> `G._fairTrade` armed on lane 2 sometimes took the Fair-Trade branch (numDice
+> untouched) and sometimes the normal one (numDice decremented). The branch
+> clears `G._fairTrade` and writes `matchDice[lane]` *before* its `return true`,
+> inside a `try` whose `catch` swallows, so a throw after those writes would
+> fall through and apply both paths. Not driven, not confirmed — an observation
+> from arm variance that deserves its own probe.
+
+**(a) `G.numDice=G.pool.length` (14263)** — the mirror image of the pattern P516
+exists to kill. Normally a no-op because the refill tops the pool up to
+`numDice`. The one window where they legitimately disagree is written on
+purpose, `_removeDieAt` 19150-19152:
+```js
+/* it is off the table for this roll like any destroyed die, but the lane
+   it stood in keeps its number, so no other lane shifts */
+G.pool=(G.pool||[]).filter(function(q){return q.lane!==lane;});
+```
+No `_dropLanes` — by design; the player is meant to stay at six, one die short
+for this roll only. Measured after that branch: `numDice 6 / pool 5`; Powder Keg
+then set `numDice` **5**, turning "one die short for this roll" into a lost lane
+for the turn.
+
+**Provenance, stated plainly:** the Fair-Trade branch is reachable and was
+driven independently (loan armed mid-turn, borrowed obsidian shattered → `pool
+lanes [0,1,3,4,5]`, `md[2]` back to `'bone'`, `numDice 6`, `_ftDead:['obsidian']`,
+then the seat refilled mid-turn), and the keg's effect on a `numDice 6 / pool 5`
+state was driven separately (`tools/apv_famsweep_keg_numdice.js`). **The join —
+a real Fair-Trade shatter followed by a real keg — was never driven by anyone.**
+Both halves are measured; the seam is not.
+
+**And P517 made this worse.** P517's `Math.min` at 24980 is only correct if
+every mid-turn `numDice` writer leaves a meaningful value. Powder Keg leaves a
+stale 5 against a 6-lane loadout, so a later hot dice computes `Math.min(6,5)=5`
+and the player stays one lane short for the rest of the turn. Pre-P517 that case
+resolved to 6 correctly. **P517 converted a dormant stale write into a live
+penalty**, at the one moment a player is most likely to reach for a keg.
+
+**(b) No resolve guard.** `CFX.encore` (13019) sets `G._encorePending=true` and
+`phase='rolling'` before its 500 ms check, with a comment naming the exact bug
+("doBust ran twice, famFire('bust') twice, two of the player's eight turns
+burned in one go"). `CFX.powder_keg.use` (14253-14278) changes no phase and sets
+no pending flag. Measured inside its window: `window.phase "choosing"`,
+`kegCanUseAgain true`, `sacCanUse true`, `transmuteCanUse true`,
+`steadyCanUse true`. Tier II/III have 2 charges, so a second Powder Keg queues a
+second `_delayedDoBust` against the same dice. **This is the encore bug,
+unfixed, in the sibling card.**
+
+**(c) The same stale-`free` bust hole as D4.** `var free=G.pool.slice()` (14268)
+scored at +500 ms while removers stay legal. Measured: keg rerolls to
+`[2,3,4,2,3,1]`, sacrifice takes lane 5 mid-window, live table `[2,3,4,2,3]`
+(`anyScoring:false`), **`busted:false, bustSaved:false`, phase `'choosing'`**.
+The correct shape already exists at **24765**, which re-derives `free2` from
+`G.pool` *inside* the timeout.
+
+**Not a defect, checked:** `G.kept=[]` (14257) does not leak points.
+`refreshSelUI` recomputes `const locked=G.kept.reduce(...)` (25836) and
+`G.turnPts=locked+…`, measured `turnPtsAfterKeg 0` from a seeded `kept` of 100.
+The Preserve chip left standing in `#keptRow` is unmeasured — §4.
+
+### D6 — Preserve benches the wrong seat, and drops the brand
+
+**(a) Wrong seat.** Nothing records the lane the preserved die came from;
+`_dropLanes(1)` (24571) moves only the count, and the refill's free-lane walk
+(25121-25124) iterates `i<needNew` over ascending free lanes, so the budget
+simply runs out on the **highest** lane. Measured on
+`['bone','iron','flint','lead','jade','starstone']` with a Ward on lane 5,
+preserving the **iron on lane 1**:
+```
+turn2: numDice 5, lanes dealt [0,1,2,3,4], lane 5 (warded starstone) sat out
+```
+Lane 1's iron appears **twice** that turn — once in the tray, once freshly
+rolled — and the Ward cannot arm.
+
+**(b) The brand is destroyed.** P514 fixed the material capture (verified:
+`record.mat === 'iron'`) but nothing captures the enchant. Measured —
+`G._famPreserve` keys after preserving a `{val:1, mat:'starstone', ench:{t:'tithe'}}`
+die: `val, mat, pts, crack`, `mat='starstone'`, **`ench=undefined`**. The restore
+at 24556-24557 builds `dice:[{val,mat}]` and mints the tray die with
+`mkDie(_fp.val,_fp.mat,null,true,null)` — enchant argument literally `null`.
+
+### D7 — The roll-forces buffer is never cleared, so Stargazer and Honeytrap fire a turn late, on the wrong dice, and clobber each other
+
+`famApplyRollForces` gates on `G._famPeekVals.length === free.length` (14169).
+Playing Stargazer during `'choosing'` then rolling means committing at least one
+die first, so the counts usually differ — **and the miss does not clear the
+peek.** Measured across a real turn boundary:
+```
+roll1 free 5 → peek stored [2,2,6,3,1]
+roll2 free 4 → peekLen 5 ≠ 4 → applied:false, peekLeftArmed:true
+bank, rival plays
+turn2 roll1 free 5 → applied:true   valsBefore [3,3,4,3,3] → valsAfter [2,2,6,3,1]
+```
+`[3,3,4,3,3]` is a bust; the stale peek contains a 1 and silently rescues it.
+`G._famPeekVals` measured surviving the real `startPTurn` (`famPeekVals: 6`).
+
+**Corrected from the first inventory:** *"the counts always differ"* is false.
+Equal counts pass and apply — measured `peekLen 6 === freeLen 6`, applied,
+`peekClearedAfterApply true`, indices 1-5 exactly the peeked values. The
+reachable equal-count case is **hot dice**: peek on roll 1 with nothing
+committed, commit all six, the rebuilt pool is six free again. The practical
+point (usually misses, never clears) stands; the absolute does not.
+
+**Honeytrap has the identical staleness.** `G._famHoneyVal` is written 14349,
+read 14173, cleared 14175, nowhere else. Measured across the real `startPTurn`:
+`afterTurnBoundary.famHoneyVal = 4`. Play Honeytrap, bank without rolling, and
+next turn's opening roll has `free[0]` forced.
+
+**And the two clobber each other.** Both write inside `famApplyRollForces`;
+honeytrap runs second and overwrites `free[0].val`. Measured: peek
+`[1,6,5,2,5,2]` applied, then honeytrap stamped lane 0 → `[5,6,5,2,5,2]`.
+
+Adjacent, confirmed by reading: Honeytrap **reads no tier**. `pairVal` is the
+highest paired face (14347 — `Object.keys` over integer-like keys iterates
+ascending, so "highest", not "arbitrary"); tier III's four-of-a-kind clause has
+no code, and `use(inst)` never reads `inst.tier`. Tiers differ only in charges.
+
+### D8 — Sacrifice has no floor; below it the refill mints a `lane: NaN` die that nothing can remove, and the match becomes unwinnable
+
+**This is the most severe defect in the sweep and it was single-sourced, so it
+was re-driven here on an independent arrangement**
+(`tools/apv_xref_sac_empty.js`).
+
+`_dropLanes` floors `numDice` at 1 (19112). Nothing floors `matchDice.length`.
+`_breakBegin` (19055) requires a live target other than the committed source, so
+Break floors at one die. `CFX.sacrifice.canUse` (14281) has no such test:
+```js
+canUse:function(){return G&&(G.phase==='choosing'||G.phase==='idle')&&
+  G.pool.filter(function(d){return !d.committed&&!d._shattered;}).length>0;},
+```
+
+Measured, six lanes walked down to one through the shipped `_removeDieAt`, then
+one Sacrifice charge:
+```
+walkDown  md ['bone','iron','flint','lead','amber'] nd 5  →  … → md ['bone'] nd 1
+breakRefusesLastDie   true                      ← Break's floor holds
+sacCanUse true / sacUsed true
+afterSac  md [] mdLen 0  numDice 1  enchLen 0  phase 'choosing'
+```
+`matchDice` is now length 0 while `numDice` is 1. The roll control is a **div**,
+not a button — `fark_proto.html:8930`:
+```html
+<div class="match-btn match-btn-roll" id="btnRoll" onclick="handleRoll()">
+```
+so the `disabled` class is cosmetic and cannot block a tap (measured
+`rollBtnTag:"DIV"`, `rollBtnClass:"match-btn match-btn-roll disabled"`,
+`rollBtnVisible:true`). Tapping the real element: `needNew = 1 − 0 = 1`,
+`_freeLanes` is empty (its loop bound is `G.matchDice.length` = 0), and the
+overflow fallback at **25130** evaluates `(0+0)%0`:
+```
+afterEmptyRoll  poolLanesAreNaN [true]  poolMats ['bone']  poolVals [5]
+                numDice 1  domDice 1
+```
+A real, rolled, scoring die on `lane: NaN`, material `'bone'` from
+`G.matchDice[NaN]||'bone'`.
+
+**It cannot be repaired.** `_removeDieAt`'s guard at 19117 is `lane<0`, and
+`NaN<0` is false, so it accepts the call; `lane<G.matchDice.length` is false so
+there is no `_diceOut` record and no splice; and `G.pool.filter(q=>q.lane!==lane)`
+**keeps** the die because `NaN!==NaN` is true. Measured:
+```
+removeNaN  returned:true  poolLenAfter:1  mdLenAfter:0  stillInPool:true
+```
+`_occLane[NaN]` blocks nothing and `_freeLanes` only walks
+`0..matchDice.length-1`, so no refill will ever restore a real lane.
+
+**The match is over but does not end.** Measured through the following turns:
+`startPTurn` re-derives `numDice = matchDice.length` = **0**; every subsequent
+roll deals zero dice, the turn instantly busts, and play cycles
+`idle → rolling → opp → idle` forever. *Not* a hard soft-lock — I sampled at
+1.5 s and saw phase `'rolling'`, waited 9 s and it had resolved to `'idle'` with
+the roll button re-enabled. **The player is dealt zero dice for the rest of the
+match and can only lose.**
+
+**Reachability of the arrangement:** one Sacrifice charge plus a loadout already
+down to one die. The earlier reading — *"only the passive shatter can empty
+`matchDice`"*, needing 3,000 g of Obsidian at two-a-night shop stock — is
+refuted; Break, obsidian shatter, Royal Seizure and Blessed Confiscation all
+walk the loadout down, and Sacrifice takes the last step.
+
+### D9 — Sacrifice does not shift `G._fairTrade.lane`, and the result is an exploit, not a loss
+
+`_removeDieAt` carries two pieces of loan bookkeeping — the hand-back at 19144
+and `if(ft.lane>lane)ft.lane--` at 19204, written because *"a seat destroyed
+BELOW a live loan shifts it down, or that same expiry check reads the wrong
+lane"*. `CFX.sacrifice` splices MD/EN itself (14313) and mentions `_fairTrade`
+nowhere.
+
+**Why the default hides it:** on an all-bone loadout `worst` is lane 0, so every
+sacrifice target is *above* the loan and `ft.lane>lane` is never true. Measured
+on `['jade','jade','bone','jade','jade','jade']` (loan at lane 2), sacrificing
+lane 1:
+```
+before: matchDice ['jade','jade','starstone','jade','jade','jade']  ft.lane 2
+after : matchDice ['jade','starstone','jade','jade','jade']         ft.lane 2  ← unmoved
+```
+
+**The first inventory framed this as a loss ("the player's own bone die never
+comes home"). Driven through the *real* `startPTurn` it is an exploit:**
+```
+after sac        matchDice ['jade','starstone','jade','jade','jade']  ftLane 2
+after startPTurn matchDice UNCHANGED  fairTrade null  ftDead ['starstone']  diceInv ['starstone']
+```
+`CFX.fair_trade.use` only fires when `dieRank(inv[best]) > dieRank(matchDice[worst])`,
+so **the retained die is always better than the seat it took**. Borrow the best
+stash die, sacrifice any lane below the loan, keep the upgrade for the match —
+and the stash die is never spliced out of `diceInv`, only match-flagged. `_enchArr`
+follows the splice, so the visitor also keeps wearing the host's brand at its new
+index.
+
+(Method note for the record: the original probe **reimplemented** startPTurn's
+expiry test at its own lines 86-92 rather than running it. The conclusion
+survived only because 24452-24455 happens to be identical. The real function has
+now been driven.)
+
+### D10 — Fair Trade: the brand never travels, and `_ftDead` retires dice by material string
+
+**(a)** `CFX.fair_trade.use` writes `G.matchDice[worst]=inv[best]` (12992) and
+never `G._enchArr[worst]`. **Independently reproduced twice.** Lane 2 bone with
+its own Ward, starstone lent from a stash where it carries a Tithe:
+`dieDealtIntoTheLoanSeat {mat:'starstone', ench:'ward'}`. The lender's Tithe
+never travels; the benched die's brand is worn by the visitor for the length of
+the loan. `S.run.dieEnchInv` exists, so the claim is not vacuous.
+
+**(b)** `canUse`/`use` filter the stash with `(G._ftDead||[]).indexOf(_d)<0`
+(12972, 12980) over `S.run.diceInv`, which holds **materials**. Measured with
+`diceInv ['jade','jade']`, `dieEnchInv [{t:'tithe'},null]`, `_ftDead ['jade']` →
+`canUse false`, live count 0. **One dead die retires every die of that
+material** — the same materials-as-identity shape as P513's `indexOf(d.mat)`.
+The loan record `{lane,was,borrowed}` also stores a material, so it cannot name
+*which* jade was lent.
+
+### D11 — `swap_die` leaves the brand on the seat, and over a traded lane it conjures a die from nothing
+
+`fark_proto.html:24618-24620`:
+```js
+/* a swap, not a splice - lanes and brands stay aligned */
+var pOld=G.matchDice[pBestIdx],oOld=G.matchOppDice[oWorstIdx];
+G.matchDice[pBestIdx]=oOld;G.matchOppDice[oWorstIdx]=pOld;
+```
+**The comment is false for brands.** `_enchArr[pBestIdx]` is untouched. Same at
+24634 (`collateral_die`: `G.matchDice[pBestIdx2]='bone'`, twice) and at 29343
+(`sleight_of_hand`, dead layer). Measured: lane 4 `jade + {tithe,face:1}` →
+`bone + {tithe,face:1}` under both cards; the jade crosses to the rival
+unbranded.
+
+Contrast Trade, which explicitly moves the brand out and ledgers it (18415
+`myEn`, 18432 `G._enchArr[L]=null`, 18444 `_tradeSwaps.push`). **Two same-seat
+swaps, opposite brand rules, no recorded ruling.**
+
+**The worse half, measured.** Over a lane that Trade already touched, the
+restore is defeated *and* duplicates a material. Trade at lane 4
+(jade ↔ starstone, ledger `{lane:4,mine:'jade',theirs:'starstone',cnt:1}`), then
+Sticky Fingers moves the borrowed starstone to the rival's seat 0:
+```
+matchOppDice final: [starstone, bone, bone, bone, starstone, bone]   ← two starstones
+matchDice   final: [bone, iron, lead, amber, bone, flint]            ← jade gone
+```
+`_tradeRestore()` returned 0, but line 18590 still fired
+(`matchOppDice[4]==='jade'===t.mine`) and wrote `'starstone'` back. Same run for
+`collateral_die`: `restoredCount:0`, `playerGotJadeBack:false`,
+`rivalGotStarstoneBack:true`, `_enchArr[4]` left `null` — the trade brand never
+goes home either.
+
+**Correction to the first inventory:** it named `endMatch`'s `naked_run` read as
+the downstream consumer. **There is no `naked_run` anywhere in the file** — only
+three comments (18436, 18555, 29410). The feat is `bare_hands` (9826), already
+hardened to read the *owned* loadout (`S.run.dice` first). The un-restore is
+real; the named consumer is not — a claim inherited from a stale comment.
+
+**And these two cards cannot be stopped.** `_consumeWard` guards
+`reduce_first_roll` (24803) and `swap_best_to_3` (25456) but is absent from
+`swap_die` (24612) and `steal_die` (24647) — **and the guard itself is inert.**
+`_consumeWard` (11490) reads `G._wardCharges`, whose only origin is
+`_wardCharges:pCards.includes('warded')?1:0` (23100) on the dead layer. Measured
+on a real Ambrose entry: `wardCharges: 0`, `_consumeWard('PROBE') === false`.
+All four disruption classes are unstoppable, not two. `_ironGrip` is permanently
+false and 11790 records `iron_grip removed`.
+
+### D12 — Vagabond's drag desyncs every tap target in the row for the rest of that roll
+
+`_commitVagabondDrag` (36651) reassigns the meshes' `phys.x` (36663) **and**
+re-appends the `.die-wrap` children of `#playerDiceRow` (36680-36683).
+`D3X._slaveHost` (20045) positions the DOM chip as
+`layoutCentre + (meshScreenX − d.hx)`, where `d.hx` is the chip's layout centre
+**cached on first bind** (20054-20059) from `_rawCentre` (21431) — which
+measures the exact node the drag re-appends. `d.hx` is invalidated in only two
+places: a **row change** (22030) and the no-physics branch (22080). A move
+*within* the same row invalidates nothing, so the DOM-slot delta is added on top
+of the mesh move and the chip lands one slot pitch away per position dragged.
+
+Measured with two independent instruments — the mesh projected the way
+`_slaveHost` does, against the chip rect:
+```
+after the drag        bone   jade   amber  obsidian starstone vagabond
+  drawn (mesh x)      39     111    175    242      330       400
+  tappable (chip x)   39     39     103    170      258       686
+  gap                 0      -72    -72    -72      -72       +287
+tap where each die is drawn → picks: bone, amber, obsidian, starstone, (none), (none)   1/6
+```
+Control before the drag: 6/6 correct. The dragged die's tap target sits at
+x≈686 on a 430 px viewport — off-screen, untappable.
+
+**Two corrections to the first write-up.** `_dieTapRouter` (23322) is *not* the
+cause: native DOM hit-testing is wrong on exactly the same five dice, so
+removing the router would change nothing — the chip box is the broken thing. And
+the reported "two dice overlapping" secondary is the same chip artefact; drawn
+gaps after the drag (72/64/67/88/70) are identical to before it and nothing
+overlaps.
+
+**Scope: exactly one roll, and this was attacked rather than assumed.**
+`_measureHomes` only fires on a row **count** change (21793), and a committed die
+keeps its element and its stale `hx` — so the adversarial case is commit one
+scorer and re-roll five, count 6 both sides. Measured: gaps all 0, tap accuracy
+6/6. The row transiently empties during the re-roll, so 21793 fires anyway. The
+damage window is exactly the selection phase of the roll in which the player
+rearranged — which is the only window the feature exists for.
+
+Fix shape: the drag must do for every moved die what 22029-22032 already does on
+a row change (`d.hx=undefined; d.tx=0; d.ty=0; d.chip.style.translate='';`), or,
+smaller, call `D3X._measureHomes()` after the DOM re-append at 36684.
+
+### D13 — Blessed Confiscation's seventh seat is unconditionally unreachable, and the die is not inert while it sits there
+
+`G.matchOppDice.push(stolen)` (24682) makes the array 7 long. `_freeSeats` is
+built ascending over `_rungAll.length` (28057-28062) and consumed as
+`_freeSeats[i]` for `i<rollDice` (28068), with `rollDice ≤ left ≤ 6`. Index 6 is
+selected only when `rollDice===7`, and **both producers of that are dead**:
+`left=7` at 27939 needs `npcHasActive('seven_dice')` and `left=_oFullHand` at
+28839 needs `double_down` — `npcActiveUses` is populated only from
+`params.oCards` (31961-31965), and `G.oCards` only ever holds NPC_CARDS ids from
+boss pools. Measured in a real Ambrose match: `npcHasActive_double_down:false`,
+`npcHasActive_seven_dice:false`.
+
+Measured after a real `startPTurn` steal:
+`matchOppDice = [amber,amber,jade,jade,jade2,starstone,jade]`; a full driven
+rival turn touched **seats 0-5 only**.
+
+**The die is not mechanically absent.** `matchOppDice` is read by the starstone
+bank bonus (29252-29254, **ungated**: `filter(m=>m==='starstone').length*500`
+per bank) and the AI's EV table (14004) — so the confiscated premium die
+silently inflates the rival's scoring. The First Strike reveal renders **7 dice
+on the THEM row** (18820) while the rival rolls 6, and the 7-long array survives
+the turn-boundary snapshot (`S.pendingMatch.matchOppDice.length = 7`).
+(`honor_guard`/`standard_bearer` were also named as consumers; both are dead —
+measured `false`.)
+
+Residual on the player's side: `_enchArr` stays 6 against a 7-long `matchDice`
+in the mirror case, failing the resume length gate at 32092-32094 and falling
+back to `S.run.dieEnch`.
+
+**This is the card the brief already scoped as blocked on the rival-side
+rework.** The sweep confirms the diagnosis and narrows it: seat 6 is
+unconditionally unreachable, not conditionally.
+
+### D14 — Sacrifice never calls `_removeDieAt`, and the resume rewinds it: a zero-cost savescum of a match-permanent decision
+
+`CFX.sacrifice` reimplements five of `_removeDieAt`'s responsibilities and skips
+four: the loan hand-back (19144), the `ft.lane` shift (D9), the mid-turn
+re-snapshot (19232-19244), and `_firstStrikeRender()` (so P515's fix does not
+cover it). Measured after a live sacrifice paying +800: live `matchDice` 5 /
+`numDice` 5 / `_diceOut` 1, while `S.pendingMatch` still held **6 matchDice,
+numDice 6, `_diceOut` 0**.
+
+**Upgraded from "an inconsistency" to a defect.** Sacrifice writes `G.pPts+=P` —
+**banked** points, bust-immune — and never re-snapshots. Quit-and-resume after a
+regretted sacrifice returns the die *and* the charge, and the 800 is simply
+re-earnable by playing the card again. The equivalent Break is explicitly
+protected against exactly this at 19232-19244.
+
+It also filters neither `_breakPreserved` nor `_breakBorrowed`, both of which
+Break honours (19055, 19273). Brief §1 makes a borrowed die an illegal Break
+target "full stop"; Sacrifice can still shatter one.
+
+### D15 — `reduce_first_roll` clamps to a literal 5, so Mabel's Pinch is free against a player already down a die
+
+`fark_proto.html:24804`
+```js
+G.numDice=Math.min(G.numDice,5);
+```
+Measured across three arrangements:
+
+| arrangement | numDice before → after | pool lanes |
+|---|---|---|
+| 6 lanes, numDice 6 | 6 → 5 | 0,1,2,3,4 |
+| 5 lanes (post-removal) | 5 → 5 (**no effect**) | 0,1,2,3,4 |
+| 6 lanes, numDice 5 (armed penalty) | 5 → 5 (**no effect**) | 0,1,2,3,4 |
+
+The card still announces "5 DICE". `mabels_pinch` is `npcOnly, owner:'mabel'`
+(12032-12035) in Mabel's `cardPool` (10842), so this is live. `pocket_sand` is
+in no cardPool and `npcWonCards` has no writer — **never dealt**.
+
+**Two corrections.** (a) The first two write-ups called this a P516 instance and
+proposed `_dropLanes(1)`. It is *not* the P516 shape — `Math.min` can only
+lower, and never refunds an armed penalty, which is the entire content of that
+rule. It is a non-stacking clamp. And `_dropLanes(1)` would be a **design
+change**: it would take an already-seized player to four dice while the card
+text says "five instead of six". (b) The proposed arrangement — a `take_best`
+seizure earlier in the match — **cannot arise in a Mabel match**; her cardPool
+holds no steal card. The clean live arrangement is an **obsidian die shattered
+earlier**: 25283 → `_removeDieAt` → 19181-19185 splices MD and EN and calls
+`_dropLanes(1)`, so `matchDice.length===5` permanently.
+
+Second-order, confirmed: the refill fills `_freeLanes` ascending (25121), so the
+pinched die is deterministically the **highest lane** — measured lanes
+`[0,1,2,3,4]`, lane 5 never rolled.
+
+### D16-D24 — lesser confirmed defects
+
+- **D16. Cultivate's growth dies with the turn.** `d._cult` (14223) is the only
+  occurrence in the file and lives solely on the pool die object; `G.pool=[]` at
+  startPTurn (24426) and `_turnTableClear` (23164) replace those objects. "For
+  the rest of the match. Stacks." is at most one turn, and only pays on a second
+  fire inside the same turn.
+- **D17. Sleight is inert *and* single-use forever.** `CFX.sleight.use` sets
+  `G._famSleight` (14387); the only other reference in the loaded corpus is its
+  own `canUse` guard (14385, `!G._famSleight`) — measured over every global
+  function's `.toString()` plus every inline `on*` attribute, 1,071,965 chars,
+  zero hits outside CFX. Nothing clears the flag: measured after `startPTurn`,
+  `famSleight true, sleightCanUseAgain false, sleightCharges 2`. A 2-charge card
+  that does nothing, once. The rival's Sleight is a *different* flag,
+  `G._oSleight`, and **is** implemented (25184-25188).
+- **D18. Transmute and Sacrifice both admit `_frozen` dice; every other card
+  excludes them.** Transmute: `G.pool.filter(d=>!d.committed)` (14241).
+  Sacrifice: `filter(d=>!d.committed && !d._shattered)` (14281/14283). Since
+  Sacrifice takes `free[free.length-1]` with **no targeting UI**, a player who
+  froze their best die can have it shattered involuntarily. (The earlier claim
+  that Transmute is "the only card" is false.)
+- **D19. Vagabond's drag moves two of the six facts, and Trade then takes the
+  wrong rival die.** The lane side stays internally consistent — no duplicate
+  lanes, `G.matchDice[d.lane]===d.mat` still true for every die. What breaks is
+  that lane is now detached from the seat the die visibly occupies. Driven
+  through the real dispatch `def.fire({die,side,lane:_laneOf(d),mult})` (18668):
+  vagabond dragged seat 2 → seat 6, `_laneOf(die)=1`, rival die in that lane
+  **silver** (what Trade took) vs the rival die facing where it sits
+  **starstone** (what the player is looking at). Trade's own text says "in the
+  same seat" (18408); so do Snuff (18461) and Fog (18475). Needs a **ruling**,
+  not a patch: either the drag permutes MD/EN/`d.lane` together so seat==lane
+  always, or lanes are declared an invisible identity and those four effects
+  stop presenting as seat-facing. *(Instrument flag: the original V2 seat
+  numbers were computed from chip rects — the very instrument D12 disowns. They
+  came out right because the whole row shifts by one uniform pitch, but re-derive
+  from mesh positions before acting.)* Related, confirmed: `_vgRowInfo` (36564)
+  has no committed-die test, so the drag reorders **committed** dice, which
+  changes `_cRow.indexOf(_palm)` adjacency for Finnick's Palm (14127-14131) — a
+  live relic commit effect.
+- **D20. A sleeved rule binds the rival and not the player.** `fark_proto.html:11505`
+  `if(!G||!G._tell||(G._tell.id!=='cutpurse'&&G._tell.id!=='pickpocket'))return;`
+  — the callee re-asks by `G._tell.id` what the file's own comments (18618,
+  18787, 18829, 11259) say must be asked via `_ruleActive`. Measured matrix:
+
+  | arrangement | `_ruleActive('pickpocket','p')` | `'o'` | palm fired |
+  |---|---|---|---|
+  | seat's tell **is** pickpocket | true | false | yes (pool 6→5, numDice 6→5) |
+  | **tell `last_call` + sleeve pickpocket** | **true** | **true** | **no** |
+  | tell + sleeve both pickpocket | true | true | yes |
+
+  Root cause is broader than "boss seats": `_applySleeve` (11298) installs into
+  `G._tell` only when it is **empty**, and `_applyTellAndSleeve` (11310) runs
+  `_applyTell(); _applySeal(); _applySleeve();` — so the bug fires whenever
+  *anything already occupies `G._tell`*, including a sealed patron seat carrying
+  any other rule. Reachable path fully verified: beat Finnick → 13634 grants the
+  tell → `_gbBossPeek` sleeve chip → `famSleeveSet('pickpocket')` → any boss
+  match. A rule the brief says binds both sides binds one, in the player's
+  favour, on a rule they had to beat Finnick to win. *(Every other `G._tell.id`
+  read was enumerated: 24303 and 24504 are the same class but cosmetic; 29659 is
+  dead behind `if(false&&…)`. 11505 is the only one with a mechanical
+  consequence.)*
+- **D21. The First Strike panel goes stale on the route P515 didn't cover.**
+  `_firstStrikeRender` is called at the *top* of `startPTurn` (24426); the NPC
+  swap/steal block runs at 24604-24689, after it, splicing inline rather than
+  through `_removeDieAt` (which does call it, 19251). Corvus owns **both** the
+  `first_strike` tell (10879) and `collateral_die` (10870), so the pairing is one
+  match. Measured: panel text byte-identical before/after
+  (`YOU BO IR LE AM JA ST`) while `matchDice` went
+  `[bone,iron,lead,amber,jade,starstone]` → `[bone,iron,lead,amber,bone,bone]`.
+  Bounded — stale for one player turn; 24426 repaints it next turn.
+  `CFX.sacrifice` is on the same uncovered route (D14).
+- **D22. Drill Order's cap is derived on the player's side and a literal on the
+  rival's.** 23541 `var def=(G._tell&&G._tell.id==='drill_order')?G._tell:(_tellById('drill_order')||{}); var cap=def.maxRolls||3` versus 28011
+  `if(_ruleActive('drill_order','o')&&oppRollNum>=3)`. Measured
+  `_tellById('drill_order').maxRolls === 3`, so they agree **today**; retune the
+  RUNGS record and the sealed/sleeved rule silently applies two different caps
+  to the two sides. 13114 carries a third copy.
+- **D23. Two tell-HUD gaps.** `still_waters` can never be sealed — `_SEAL_POOL`
+  (11234) has eight entries but substitutes the parked `steeped` for it,
+  programmatically confirmed `sealPoolMissing: ["still_waters"]`; Aldric's is the
+  only badge with no cursed-seat route, and 11244's comment ("Cursed seats
+  already draw from the full rule pool") is false of it. And a **double-rule seat
+  shows one badge and enforces two** — measured sealed `zero_hour` + sleeved
+  `drill_order`: `#tellBadge` renders ZERO HOUR only, while `_drillCap()` returns
+  `{active:true,cap:3}` and `_updateDrillLock` locks the ROLL button with no
+  counter anywhere. `_updateTellHUD` (11429-11467) opens `var t=G._tell;` and
+  keys every branch off `t.id`, so a second rule gets no HUD element by
+  construction. The comment at 23520-23526 records fixing this symptom — it fixed
+  the *enforcement* asymmetry, not the HUD.
+- **D24. A laneless shattered die survives the sweep as a live scorer with its
+  element deleted.** 25280-25284: `_shLanes` filters to numeric lanes, and the
+  `else G.pool=G.pool.filter(d=>!d._shattered)` only runs when that list is
+  **empty**. Measured on an executed path: two shattered dice, one laned and one
+  not → `_shLanes=[1]`, the `else` never runs, `poolShattered: 1`, pool lanes
+  `[0,1,undefined,3,4]`, and the seat is never refilled because `needNew` is 0.
+  Today no producer leaves `d.lane` undefined — but **D8 shows two of the three
+  producers (25031, 26392) stamp `i%G.matchDice.length`, which is NaN on an empty
+  loadout**, so the "dead today" that this was previously filed under does not
+  hold as stated. (26392 is separately on the dead card layer: it is gated on
+  `G.activeCardState.stitchActive`, written only by `activateMabelsStitch`.)
+
+---
+
+## 3. THE BRIEF'S NEWLY-FLAGGED LIST, ADJUDICATED
+
+The brief flagged these as pattern-matched from conversation rather than
+checked. Checked.
+
+| flagged item | verdict |
+|---|---|
+| **Vagabond's drag-to-reorder** | **CONFIRMED DEFECT ×1 + a ruling.** The suspicion was right and the mechanism is not the one predicted. It does **not** corrupt the lane invariant — no duplicate lanes, `matchDice[d.lane]===d.mat` holds for every die, MD/EN/ND untouched (measured). What it breaks is the **cached chip layout centre `d.hx`**, which desyncs every tap target in the row for the remainder of that roll (D12, measured 1/6 taps correct). Separately it detaches lane from visible seat, so Trade/Snare/Snuff/Fog — all of which advertise "the same seat" — target by `_laneOf` and hit a different rival die than the one the player is looking at (D19). Reachability confirmed at the *acquisition* end too, which nobody had checked: `DICE_STORE` stocks the vagabond at 700 g, `_shopRollNight` offers it 45 %/night with a pity rule, and `_stTrade` is reached from a live pointer handler at 33251. |
+| **`reduce_first_roll`** | **CONFIRMED DEFECT, but not the predicted shape.** It is not "removes dice, same shape as Break and Sacrifice" — it removes nothing and splices nothing. It is a **clamp that no-ops whenever the player is already at five** (D15, measured across three arrangements), so Mabel's Pinch is free against anyone who has lost a die, while still announcing "5 DICE". The suggested `_dropLanes(1)` remedy is a **design change**, not a restoration of intent, and needs Denis. Live via Mabel's pool; the sibling `pocket_sand` is **never dealt**. |
+| **`swap_die`** | **CONFIRMED DEFECT** (D11). Both modes write `G.matchDice[…]` and leave `G._enchArr[…]` behind, under a comment at 24618 that says the opposite. Both are guaranteed cards: `sticky_fingers_die` is Finnick's `cardPool[0]`, `collateral_die` is Corvus's. Worse than the brand loss: over a lane Trade already touched, `_tradeRestore` is defeated *and* line 18590 still fires, measured **conjuring a second starstone into the rival's loadout** while the player's jade vanishes. Neither card can be blocked — `_consumeWard` is not applied to them, and the guard itself is inert on the dead `pCards` layer. |
+| **`swap_best_to_3`** | **CLEAN.** Driven at Grog on a real roll: pool before `0:bone:1 … 5:starstone:1`, after `0:bone:3 1:iron:3 2:lead:1 …`. Only `d.val` moved; lanes, materials, `matchDice`, `numDice` all unchanged (25451-25472). Victims are picked **by object, not by index**, which is precisely the arrangement that would break it — it does not. One cosmetic note: the non-D3 branch at 25469-25472 never sets `el._trueVal`. The earlier audit's separation of this from Trade was correct as caution and wrong as suspicion. |
+| **Quicksilver's reroll** | **CLEAN.** 19550-19558 writes `d.val` and `d.sel` and nothing else. Measured: lane/material/enchant map **byte-identical** before and after, counts unchanged. |
+| **Ward's armed-to-consumed** | **CLEAN — it is purely a flag, on both transitions.** Armed at 18337 (`G._wardArmed=true`, plus `G._wardBoost` at 18342); consumed at 26173-26183, which clears the flags, computes `_half` and does `G.pPts += _half`; expired at 24434. **No die is relocated, removed, re-laned or re-materialed on any path.** The source distinguishes the two ward systems itself at 18328-18329, and the distinction matters: the *card* ward `_wardCharges` (11490, `_consumeWard`) originates only from `pCards.includes('warded')` at 23100 on the dead layer — measured `wardCharges: 0`, `_consumeWard('PROBE') === false`. So the enchant is clean and the card is dead; the flag they share a name with is what makes D11's disruptions unstoppable. |
+| **Powder Keg** | **CONFIRMED DEFECT ×3** (D5) — the "likely safe" guess was wrong on all three counts. `G.numDice=G.pool.length` (14263) is the fifth instance of the banned recompute-from-length and **P517 turned it from dormant into a live penalty**. It has no resolve guard, so a Tier II/III second charge queues a second `_delayedDoBust` — the exact bug `CFX.encore`'s own comment documents as fixed in the sibling card. And it scores a captured `free` (14268) with removers still legal, so it carries D4's stale-pool hole too. The brief's own reason for flagging it — "relevant again if the bust-save redesign ever picks a specific die by reference" — is already true: it picks `G.pool.slice()`. |
+| **For Keeps** | **CLEAN as a lane/array question; one design question.** Both directions keep the arrays parallel. Win: `famFkTake` (13603-13620) pushes to `S.run.diceInv` then `_enchInit()` pads `dieEnchInv` to length and stamps born brands (19450-19476). Loss (30238-30251, **not** 30231-30240 as first cited): splices `S.run.dice[di]` and `S.run.dieEnch[di]` at the same index, refills `'bone'` at the end, pads `dieEnch` to match — surviving dice shift lane together with their brands. The `indexOf(best)` is P513's shape but is benign because `rank()` (30240) is material-only, so any die of that material is an equivalent pick. **The design question:** with two dice of one material, the arbitrary pick decides **which brand dies**, and brands are bought with gold — a player holding a plain silver in lane 0 and a Warded silver in lane 4 always loses the plain one (favourable-arbitrary, but a live asymmetry, not merely a future hazard). It becomes a real bug the moment `rank()` learns about brands or relics-by-instance. One further imprecision: if the ranked best came from `diceInv` but the same material also sits in the loadout, `di>=0` takes the loadout copy. **Read-verified only — a For Keeps loss was never driven.** |
+
+**Scorecard for the flagged list: 4 confirmed defects, 3 clean, 0 dead — and
+two of the four had a different mechanism than the one predicted.** The
+"lower confidence, worth checking" half turned out to contain the worst card in
+it (Powder Keg) and two genuinely clean ones (Quicksilver, Ward). Confidence
+ordering was uninformative; only the checking was.
+
+---
+
+## 4. WHAT REMAINS UNCHECKED
+
+**Stated plainly, so nothing here is mistaken for cleared.**
+
+1. **The entire card-slot parallel — NOT REACHED.** The brief's fourth standing
+   item ("do card slots suffer the same index/count-desync class of bug that
+   dice lanes did?") was **not investigated by this sweep**. Every layer here
+   was indexed by *die* lane. Card slots have their own ordering
+   (`G.pF`, the familiar bar, RSX slots, `S.run.cards`, the equip/tier UIs) and
+   at least three adjacent smells were noticed in passing without being chased:
+   `CFX.tamper` mutates opponent card *instances*; `famUse(i)` indexes the
+   familiar bar by position; and P511 already found a charge-accounting bug on
+   save/resume, which is the card-side analogue of the dice-side resume bugs.
+   **Assume nothing. This is the largest single gap and should be the next
+   sweep.**
+2. **Charge accounting and UI reachability were never exercised for FAM
+   cards.** Every probe in the FAM layer calls `CFX.<id>.use(inst)` directly,
+   never `famUse(i)`. That still executes the real handler, so the behavioural
+   claims hold — but it bypasses `canUse` in some probes and the charge
+   decrement in all of them. **No measurement in this sweep proves a single
+   FAM card's charge is spent correctly, or that the sheet button reaches it.**
+   The chain was verified by *reading* (13084 → 13468 → `famUse`).
+3. **The Powder Keg × Fair Trade seam (D5a).** Both halves driven, the join
+   never. Per the project's own standard the measurement is not settled until a
+   patch is written against it.
+4. **Powder Keg over Preserve.** `G.kept=[]` (14257) discards the preserved
+   entry startPTurn wrote at 24556 while its chip stays in `#keptRow`. Points
+   are correctly forfeited (measured `turnPtsAfterKeg 0`); the orphaned chip is
+   **read, not driven**.
+5. **A completed Vagabond drag through the real gesture.** Neither pass could
+   finish one — under SwiftShader the 3D layer tracks 0 dice, `_vgRowInfo()`
+   returns `null`, and `_startVagabondDrag` returns immediately. Every V-finding
+   was driven by applying the reorder `_commitVagabondDrag` performs, not by
+   dragging. Consequently the guard at **36673**
+   (`if(poolSeq.length===G.pool.length)G.pool=poolSeq;`) is untested: `poolSeq`
+   is built by matching `G.pool[i].el === d.chip`, and `_tradePaint` (18507)
+   **replaces the die's DOM node and reassigns `d.el`** — a nameable way to
+   shorten `poolSeq` and leave the DOM reordered while `G.pool` is not, which
+   would silently desync every position card from what the player sees.
+   Reasoned, not executed.
+6. **Whether `mi` can fall out of range at 14313**, where the MD/EN splices are
+   guarded and the `_dropLanes(1)` beside them is not. `_removeDieAt` has the
+   same asymmetry at 19183-19185. No arrangement was constructed; flagged shape,
+   unproven reachability.
+7. **`S.npcWonCards`.** It has no writer *found* — three passes looked, none
+   traced what could write it. If anything can, three currently-dead literal
+   count writers (`blockade`, `seven_dice`, `whispers_hex`) become live.
+8. **The rival's obsidian never shatters.** Structurally sound — the sweep sits
+   in `afterRoll`, whose three callers (25033, 25166, 26395) are all player-side,
+   and `step()`'s rival roll has no family check — but **never executed** by
+   anybody.
+9. **A For Keeps loss.** Read-verified only (§3).
+10. **Whether Preserve's dropped enchant (D6b) has a downstream consumer that
+    would have paid.** Tithe-on-bank was not traced.
+11. **A vagabond die actually appearing in a driven night's stall roll.** Code
+    path and a driven `_stTrade('vagabond',3)` confirm obtainability; seeing one
+    offered on screen requires `#gbShop.st-focus`, which was not driven.
+12. **The dead player-card layer, catalogued but not fixed.** If
+    `params.pCards` is ever honoured, this is the inheritance, all
+    *read-verified only*: `activateAlchemistsChisel` writes
+    `G.matchDice[leftPoolIdx]` at 31657 — **a pool index used as a lane index,
+    the only such site in the file** (driven on a post-drag arrangement: it
+    wrote lane 1 instead of lane 2, silently destroying the player's Vagabond
+    die for the match and leaving its brand on an amber);
+    `activateBlessedConfiscationPlayer` (31542) pushes to `matchDice` with no EN
+    push and no ND adjustment; `activateRoyalSeizurePlayer` (31531) splices
+    `matchOppDice` to 5 while `left` stays 6, so `_freeSeats[5]` is undefined and
+    the rival rolls a phantom bone in a seat that no longer exists;
+    `activateStickyFingersPlayer` (31503) and `activateCollateralPlayer` (31516)
+    are D11's shape; `activateDoubleDown` (31364) and `activateSevenDice` are
+    recompute-from-length; the three cancel blocks in `activateCoinFlip`
+    (31589), `activateTheNudge` (31611) and `activateAlchemistsChisel` (31634)
+    null `_vgDragState` using field names (`clone`, `srcEl`) that state does not
+    have — the live shape is `{me,die,order,homes,from,to,info,target,raf,y0,onMove,onEnd}`,
+    so both `if` bodies are dead and the die keeps `.vg-drag-origin`; the tier
+    loadout drag (34917) and `_buyDieAtSlot` (33954) both move `S.run.dice`
+    without `S.run.dieEnch`; and `famDieEquip` (14889) discards a branded bone
+    with its enchant and no refund.
+13. **Two vestigial reads.** `_loDragging` is read in the tooltip gates
+    (22603-22604, 30649-30650) and **never assigned anywhere in the file**.
+14. **Line-number drift warning for whoever reads next.** In the 31800-32100
+    region the Read tool's numbering drifts by roughly 9 lines from
+    grep/`sed -n`. Every anchor in this document was taken with grep/sed.
+
+---
+
+## 5. DOES ANY OF THIS WANT THE SHARED-HELPER TREATMENT?
+
+`_dropLanes` (P516) settled the decrement rule and fixed no live bug — it gave a
+rule a home. Three of the clusters here have the same shape: the correct
+implementation already exists at one site and did not travel. **Ruled: three
+helpers and one rule, in this order of payoff.**
+
+### 5a. Make `_removeDieAt` the only way a die leaves the table — highest payoff by a distance
+
+`CFX.sacrifice` reimplements five of `_removeDieAt`'s responsibilities and skips
+four. `steal_die` (24668-24686) reimplements three and skips three more, which
+are no-ops *only because of where the block sits*. Adopting the one remover
+closes, in a single change: **D8** (add the floor there and every remover
+inherits it), **D9** (`ft.lane` shift), **D14** (re-snapshot, `_firstStrikeRender`,
+`_breakBorrowed`/`_breakPreserved`), and the `_steadyDisarm` half of **D4** —
+five confirmed defects, four of them in one card.
+
+Order by payoff, not by ease: this is not the easiest item on the list, but it
+removes the most.
+
+`_removeDieAt` needs two changes of its own first: a floor on `matchDice.length`
+(it currently has none — `_dropLanes` floors only the count), and its guard at
+19117 must reject non-finite lanes, not just `lane<0`. `NaN<0` is false, which is
+how D8's die became unremovable.
+
+### 5b. A rival-side seat/count helper — `_oDeal()` returning `{seats, count}`
+
+**D1 and D2 are duals of one root cause.** `left` and `_freeSeats` are computed
+independently and nothing keeps them in agreement:
+
+- **D1**: `left` is reset to a literal 6 while `_freeSeats` still excludes the
+  snuffed seat → count exceeds seats → the `_seat` fallback invents an index.
+- **D2**: `_freeSeats` is rebuilt from a wiped `_oppHeld` while `left` still
+  counts only unheld dice → seats exceed count → the first N seats are the
+  *held* ones.
+
+The brief already scoped the rival-side rework around the seven `left` writers
+(there are ten — 27870, 27939, 27966, 27969, 27971, 28003, 28016, 28824, 28827,
+28839; and the previously-tabled row at "28027" does not exist: 28032 assigns a
+separate local `rollDice`, and `left=Math.min(left,5)` at 27969 is Whisper's
+Veil, not a first-roll cap). This sweep says the writers are the symptom, not
+the disease. **The helper is not "derive `left` correctly" — it is "one function
+computes the seats and the count together, from `matchOppDice` + `_oppHeld` +
+`_snuffLane`, and every deal point calls it."** Then `left=6` and the
+`_freeSeats[i]!==undefined` fallback both stop existing. `_oFullHand` is the
+existing correct fragment, at one of ten sites — the same "the right shape
+exists and didn't travel" story as the decrement rule, in a second place.
+
+D13 (Blessed Confiscation's seventh seat) falls out of this too, and does not
+need it: the recommendation in the brief — swap rather than push — still stands
+as the cheaper close, and this sweep strengthens it by showing seat 6 is
+*unconditionally* unreachable.
+
+### 5c. `_setLaneMat(lane, mat, ench)` — the brand must move with the die
+
+Four live sites write a lane's material and leave `_enchArr` behind:
+`fair_trade` 12992 (**D10a**), `swap_die` best_for_worst 24620 and
+downgrade_best 24634 (**D11**), and `sleight_of_hand` 29343 (dead). Two more do
+it on the run arrays: the tier loadout drag 34917-34919 and `_buyDieAtSlot`
+33954 (both dead surfaces). **The correct implementations already exist, twice**
+— Trade (18415/18432/18444, which moves the brand out and ledgers it),
+`_stTrade` (33287-33288, `S.run.dieEnch[slot]=null`), and `famDieShift`
+(14864-14869, which swaps `dieEnch` alongside `dice` and **has zero call
+sites**). Three correct references and four wrong sites is the exact ratio that
+produced `_dropLanes`.
+
+This also wants a **ruling** alongside the helper: Trade nulls the brand on a
+swap, `swap_die` keeps it. Two same-seat swaps, opposite rules, neither written
+down.
+
+### 5d. A rule, not a helper: re-derive from `G.pool` inside the timeout; never capture `free`
+
+Steady Hand (12949-12950) and Powder Keg (14268) both score an array captured
+before a 500 ms window in which removers stay legal (**D4**, **D5c**). The
+correct shape already exists at **24765**, which re-derives `free2` from
+`G.pool` inside the timeout. Adding `CFX.sacrifice` and `_removeDieAt` to
+`_steadyDisarm`'s five callers would patch today's pair and leave the next
+remover to rediscover it — which is exactly the failure `_dropLanes` was built
+to stop. `_steadyDisarm` should shrink, not grow.
+
+### 5e. Not worth a helper
+
+- **D15 (`reduce_first_roll`)** — a single site, and its remedy is a design
+  decision, not a rule. Do not fold it into `_dropLanes`; it is not that shape.
+- **D6 (Preserve's lane)** — one site needs one new field on the record. The
+  *brand* half (D6b) belongs to 5c.
+- **D7 (the roll-forces buffer)** — two flags in one function; clear them in
+  `startPTurn` beside `G._wardArmed` at 24434, which is where every other
+  per-turn flag already dies.
+- **D12/D19 (Vagabond)** — D12 is a one-line cache invalidation the codebase
+  already performs at 22029-22032; D19 is a **ruling** first and a patch second,
+  and the patch depends on which way the ruling goes.
+- **D24 (`startPTurn`'s reset ordering)** — the general hazard that anything
+  added *above* line 24426 is silently wiped is worth a **comment at 24426**,
+  not a helper. `_oTarPit` at 24418 is the existing casualty; Whisper's Hex at
+  24531 is the working control nine lines the other side of it.
+
+---
+
+### Probes from this sweep
+
+All marked `SUITE: exclude`, so `run_probes.js` ignores them. Run pattern:
+`node tools/shoot.js --url http://localhost:8084/fark_proto.html --eval-file tools/<probe>.js --out <scratch>.png`
+
+**Cross-reference verification (this pass):**
+`tools/apv_xref_sac_empty.js` — D8, driven end to end: the walk down to one die,
+Break's floor holding, Sacrifice emptying `matchDice`, the `lane: NaN` mint, the
+un-removable die, and what the next three turns deal.
+
+**FAM layer:** `tools/apv_famsweep_inventory.js`, `apv_famsweep_ft_ench.js`,
+`apv_famsweep_sac_loan.js`, `apv_famsweep_stargazer.js`,
+`apv_famsweep_steady_stale.js` *(note: its verdict predicate is unsound — see
+D4)*, `apv_famsweep_keg_numdice.js`, `apv_famsweep_preserve_lane.js`,
+`apv_famsweep_sac_snapshot.js`, `apv_famaudit_anyscoring.js`,
+`apv_famaudit_steady_redo.js`, `apv_famaudit_keg_window.js`,
+`apv_famaudit_stale_flags.js`, `apv_famaudit_loan_upgrade.js`.
+
+**Gestures:** `tools/probe_gesture_vg_taps.js`, `probe_gesture_vg_persist.js`,
+`probe_gesture_vg_consequences.js` *(computes seat order from chip rects — the
+instrument D12 disowns; re-derive from mesh before acting on its numbers)*,
+`probe_gesture_vagabond_drag.js`, `probe_gesture_vg_committed.js`,
+`probe_gesture_vg_shot.js`, `probe_gesture_loadout_drag.js`,
+`probe_gesture_lo_reach.js`, `audit_gesture_mesh.js`, `audit_gesture_reach_a.js`,
+`audit_gesture_reach.js`, `audit_gesture_chisel.js`, `audit_gesture_vagreach.js`,
+`audit_gesture_scope.js`.
+
+**NPC, enchants and tells** were driven from probes under the session scratchpad
+rather than `tools/`; the load-bearing measurements are quoted inline above and
+the arrangements are stated well enough to rebuild them.
+
+### Instrument hazards recorded, each earned
+
+- **`afterRoll` (25169) is a 515-character wrapper**; the body is
+  `_afterRollImpl` (25183). `String(afterRoll).match(/G\.numDice\s*=/g)` returns
+  `[]` — every "read off the live function" claim aimed at `afterRoll` is a
+  false zero. Two passes hit this.
+- **A probe that reimplements the code it is testing proves nothing.**
+  `apv_famsweep_sac_loan.js:86-92` reimplemented startPTurn's expiry test; the
+  conclusion survived only because 24452-24455 happens to be identical.
+- **A verdict predicate is part of the instrument.** D4's original evidence
+  failed on the predicate, not on the path: it tested for 1s and 5s and was
+  blind to triples, so a scoring table was reported as non-scoring.
+- **Chip rects are not die positions** after a Vagabond drag (D12). Two findings
+  were computed from them; one happened to survive.
+- **`G._snuff` set by hand will not fire** — `G.oppTurnCount` increments at
+  27978, *before* the snuff check at 27997, so `_lmArm` is the only correct
+  arming API.
+- **Sampling once is not measuring.** D8's end state read as a hard soft-lock at
+  1.5 s and had resolved to a normal idle turn by 9 s. The defect is "unwinnable
+  match", not "frozen game", and only the second sample says so.

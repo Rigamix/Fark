@@ -14260,7 +14260,16 @@ CFX.powder_keg={
       d.val=_rollD(d);
       if(d.el){d.el.classList.remove('committed','selected','die-frozen');try{reDrawDieFace(d);}catch(e){}}
     });
-    G.numDice=G.pool.length;
+    /* P518: a MAX, not an assignment. This was G.numDice=G.pool.length, and
+       numDice is the LANE COUNT for the turn while pool is what is physically
+       on the table - they disagree on purpose in one window, the one
+       _removeDieAt documents where a die leaves the roll but its lane keeps
+       its number. The keg overwrote six lanes with five dice. Dormant until
+       P517, whose min() cannot repair a value that is too low, so the stale
+       write became a live lost lane. Max still lets the write CORRECT numDice
+       upward if a die ever reaches the pool without one, which is the only
+       job it was doing. */
+    G.numDice=Math.max((G.numDice||0),G.pool.length);
     G.turnRollCount++;
     try{SFX.roll();}catch(e){}
     famLog('POWDER KEG — THE WHOLE TABLE BLOWS');
@@ -24975,8 +24984,10 @@ function handleRoll(){
    penalty costs you for its stated duration, and rolling well is not the
    escape hatch. A MINIMUM rather than _dropLanes, because hot dice must be
    able to restore a hand - just never exceed what the player had this turn.
-   The loadout term stays so a stale-low numDice cannot strand them below
-   their real lane count. */
+   The loadout term is a CEILING, not a floor - it cannot rescue a numDice
+   that is already too low, and P518 is the proof: Powder Keg wrote a stale
+   five against a six-lane loadout and this min carried it. Any writer that
+   lowers numDice mid-turn is now load-bearing on this line. */
 G.numDice=Math.min((G.matchDice?G.matchDice.length:6),(G.numDice||(G.matchDice?G.matchDice.length:6)));G.phase='rolling';
     G._lastHotDice=true;
     G._featHotDiceCount=(G._featHotDiceCount||0)+1;
