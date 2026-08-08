@@ -163,6 +163,32 @@ everywhere, so it lands **in this batch, measured with the rest**.
 
 ### 1c. `blessed_dice` / `crown_authority` say "reroll", the code wipes
 
+#### RETRACTED — do not build this. The code is unreachable.
+
+Verified end to end: `initMatchScreen` declares `const pCards=[];` at **31786**
+with the comment *"P1 cutover: old cards retired"*, discarding `params.pCards`.
+That empty array is the only thing that populates `G.activeCardState.usedCards`
+(**31859**). `activateCard` (**30842**) has exactly one caller and opens with a
+`canActivateCard` gate requiring `usedCards[cardId] > 0`. `effectiveCards()`
+(**24283**) returns `[]` outright.
+
+So **`activateBlessedDicePlayer` and `activateCrownAuthorityPlayer` can never
+fire.** Building "a real reroll" here would have been building a feature into
+dead code.
+
+The same chain kills the whole legacy player-active layer: Seven Dice,
+Gambler's Eye, Vanishing Act, Double Down, Alchemist's Chisel, player-side
+Blessed Confiscation and Royal Seizure, Sticky Fingers, Mabel's Stitch and
+Second Wind are all unreachable. What is live is the **family engine** (CFX /
+`G.pF`), **NPC cards**, and **patron tells** — Pickpocket is a tell, not a card,
+which is why it fires.
+
+**This also corrects §5's reasoning.** I called these two "player weapons" and
+ruled on that basis. They are not weapons for anyone — dead on both sides.
+Dropping the tags was still right (measured inert), but the justification was
+wrong.
+
+
 The block un-keeps the rival's dice, sets `total=0`, and announces *"KEPT DICE
 REROLLED!"* without re-rolling a single value. Build the real reroll; do not
 reword the card.
