@@ -28134,6 +28134,23 @@ function runOppTurn(){
     }
     return _s;
   }
+  /* P524: RESUME AFTER A BUST-SAVE WITHOUT THROWING THE HELD DICE AWAY.
+     Both bust-save sites used to call clearRow('oppDiceRow') and empty
+     G.oppDice before handing back to step(). clearRow wipes G._oppHeld (23227)
+     and removes the rival's kept dice from the row, so a save that is supposed
+     to preserve a turn instead re-dealt seats the rival was still sitting on.
+     step() already calls _oppHoldKept first, and that does precisely what the
+     player's _runSave does - keep the committed dice, remove only what busted.
+     The clear was preventing it from running. So this clears ONLY the per-roll
+     score furniture, which _renderOppTags cannot clear on a bust because it
+     only runs when a roll scores, and lets the existing path do the rest. */
+  function _oResumeAfterBustSave(){
+    try{
+      document.querySelectorAll('.oppTag').forEach(function(t){t.remove();});
+      var _ot=document.getElementById('oppTotal');if(_ot)_ot.remove();
+    }catch(e){}
+    step();
+  }
   function step(){
     if(G!==_matchG||!G||G._endMatchFired)return;/* ghost-timer guard */
     if(_ruleActive('drill_order','o')&&oppRollNum>=3){finOpp(oppBank);return;}
@@ -28489,15 +28506,21 @@ function runOppTurn(){
       }
       if(total===0){
         /* BRUTUS'S GRIT NPC mirror: only the FIRST bust under 500 oppBank is
-           saved per match. NPC clears bust dice and re-rolls (mirrors player
-           _runSave). */
+           saved per match.
+           P524: this used to end "NPC clears bust dice and re-rolls (mirrors
+           player _runSave)" and the mirror claim was FALSE. _runSave does
+           `G.pool=G.pool.filter(d=>d.committed)` and says "the save preserves
+           the tray" - the player keeps every committed die. This cleared the
+           whole row, which wipes G._oppHeld and takes the rival's kept dice
+           with it. It genuinely mirrors _runSave now, by letting
+           _oppHoldKept do the keeping instead of clearing ahead of it. */
         if(G.oCards.includes('brutus_grit')&&oppBank<500){
           G._oGritUses=G._oGritUses||0;
           if(G._oGritUses<1){
             G._oGritUses++;
             triggerCard('brutus_grit','GRIT — STILL STANDING',false);
             setStatusMsg(G.rung.name+': BRUTUS GRIT — SURVIVES BUST!','red');
-            setTimeout(function(){clearRow('oppDiceRow');G.oppDice=[];step();},_oppDelay(900));return;
+            setTimeout(function(){_oResumeAfterBustSave();/* P524 */},_oppDelay(900));return;
           }
         }
         /* THE OPPONENT'S deadRoll SEAM. The rival's roll scored nothing and the
@@ -28561,7 +28584,7 @@ function runOppTurn(){
           setStatusMsg(G.rung.name+' SURVIVES BUST!','red');
           if(bustSavedCid){var _bsCid=bustSavedCid;triggerCard(_bsCid,getNpcCard(_bsCid).name+'!',false);
             setTimeout(function(){if(window.DLG)DLG.triggerCard(_bsCid,false);},_oppDelay(700));}
-          setTimeout(function(){clearRow('oppDiceRow');G.oppDice=[];step();},_oppDelay(900));return;
+          setTimeout(function(){_oResumeAfterBustSave();/* P524 */},_oppDelay(900));return;
         }
         /* NPC Second Wind: bust rescue — roll 3 dice, whatever scores is banked */
         if(npcHasActive('second_wind')){

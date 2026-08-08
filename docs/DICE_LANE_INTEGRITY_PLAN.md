@@ -594,6 +594,45 @@ see the current invocation's copy.
 
 ### D2 — Every rival bust-save wipes the held-dice record and then re-rolls the seats the rival is still sitting on
 
+> **CLOSED — P524, driven. Decided per site, as ruled.**
+>
+> Eleven callers of `clearRow('oppDiceRow')`; only three re-enter the deal loop.
+>
+> | site | what it is | call |
+> |---|---|---|
+> | 28500 | Brutus's Grit | **fixed** |
+> | 28564 | the bust-save cascade | **fixed** |
+> | 28978 | Double Down | **left alone** — rerolling everything is the card |
+>
+> The rest run `finOpp` and end the turn, where clearing is correct.
+>
+> **How the two were decided rather than guessed:** Grit's own comment claimed it
+> "mirrors player `_runSave`". `_runSave` does
+> `G.pool=G.pool.filter(d=>d.committed)` and says *"the save preserves the
+> tray"* — the player keeps every committed die and re-rolls only what busted.
+> The rival cleared the whole row. **The mirror claim was false**, which makes it
+> the third wrong claim found in this source in one session, after P517's and
+> P523's.
+>
+> **The fix is to stop bypassing the function that already did it right.**
+> `_oppHoldKept` — which `step()` calls first — keeps the kept dice, removes only
+> the busted ones, and empties `G.oppDice`. Both sites cleared the row *before*
+> handing back, so it never got the chance to run. Same shape as P519: the
+> canonical path existed and two call sites went around it.
+>
+> Not a bare deletion: `clearRow` was also removing `#oppTotal` and the
+> `.oppTag`s, and `_renderOppTags` only runs when a roll **scores** — so on a
+> bust nothing else clears them. The helper clears exactly that furniture and
+> nothing else. Saving and restoring `G._oppHeld` around the clear was rejected:
+> `clearRow` also removes the held dice's DOM elements, so the record would
+> survive while the dice vanished — state and display disagreeing, which is the
+> class of defect this whole cluster keeps finding.
+>
+> **Driven:** 237 samples across two live Grit saves, checking continuously that
+> a seat in `G._oppHeld` never also appears in `G.oppDice`. Zero collisions. The
+> probe injects a fake overlap at the end and requires the checker to catch it,
+> so the zero is not the instrument being blind.
+
 Three carriers, two lines. `fark_proto.html:28432` (`bust_survive` **and**
 `bust_immune_turns`) and `:28368` (`brutus_grit`), both:
 ```js
