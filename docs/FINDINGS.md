@@ -152,9 +152,56 @@ as the control throughout.
 
 **Do not quote a per-night bust gap for any night other than 4, 5 and 7.**
 
-Outstanding hole: 7–15% of attempted turns were dropped as stalls across every
-run, and what they were is unmeasured. Both plausible mechanisms widen the gaps
-rather than narrow them, but that is reasoning, not measurement.
+### The dropped turns — measured, hole closed
+
+7–15% of attempted turns were discarded as stalls in every run. Classified on
+Corvus (23 completed turns, 3 stalls):
+
+| | count |
+|---|---|
+| A — turn reached target, `_endMatchFired`, never registered | 2 |
+| B — still running at timeout | 1 |
+| resolved late when the window was widened to 34s | **0** |
+| stalled turns that had already scored | **0** |
+
+Median turn 2,760 ms, max 8,299 ms — the 20s window is ~7× the longest normal
+turn, and nothing resolved late, so the window was never the constraint.
+
+**The two zeros are what matter, not the 2:1 split** (three events is far too
+thin to lean on a ratio). They rule out the scenario that could have invalidated
+the three deep numbers: a hidden population of long, bust-heavy turns being
+silently discarded. It does not exist.
+
+Mechanism A drops **match-winning** turns — high-scoring, definitionally not
+busts — so discarding them inflates the measured bust rate. The three gaps are
+therefore understated if anything.
+
+**Correction:** I had asserted stalls skewed toward long turns (mechanism B),
+which would have pushed the other way. Measured, A dominates. That is the fourth
+or fifth directional guess this session corrected by measuring rather than
+reasoning — the checking step has earned more trust than the guessing step.
+
+### Rig instability — untriaged, not blocking
+
+The 300-turn WHISPER run **hung three times**: browser gone, node waiting
+forever, zero output, once for 178 minutes. Corvus and Brutus completed 300
+turns fine, and Whisper completed when split into ten ~20-turn chunks with a
+kill-and-clean between each. So it is **scale-dependent, not tier-specific**,
+and chunking is a reliable workaround.
+
+Two things found while chasing it, neither confirmed as the cause:
+
+- `shoot.js` spawns **Edge**, not Chrome. A liveness check looking for
+  `chrome.exe` returns 0 always — that check produced a false "the browser
+  died" diagnosis, so the hang cause is genuinely unknown.
+- The card-art loader was firing two failed requests per un-arted card **per
+  render** (42 misses in a five-match run). Fixed to remember missing ids,
+  42 → 12. Worth having regardless — players paid that cost too — but it was
+  never shown to be the hang cause.
+
+A hung process never exits, so no cleanup path runs: each hang leaked a Chrome
+profile (one was 488.7 MB). `shoot.js` wants a watchdog that fails the run when
+the browser disappears rather than blocking forever.
 
 ### Located: post-choice dice release
 
