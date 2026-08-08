@@ -1873,6 +1873,46 @@ Plus `#oppDiceRow` children's `dataset.seat`.
 
 ---
 
+## RETRACTED: THE "TRIM AND DISCARD" FINDING WAS PICKPOCKET'S PALM
+
+Recorded at the top of the open items as the most urgent thing outstanding —
+"a real, player-owned die vanishes with nothing on screen explaining why" — and
+**it is not a defect.** Traced, as ruled, before anyone touched it.
+
+**What it actually is.** `_maybeFireCutpurse` splices the victim from `G.pool`
+and calls `_dropLanes(1)`, both inside a `setTimeout` for the palm's flight
+animation. That produces exactly the fingerprint that looked alarming: one pool
+entry gone, `numDice` down one, `matchDice` unchanged, about a second after the
+deal. The rival is stealing a die. It is supposed to.
+
+**Confirmed against a control rather than from the fingerprint**, because a
+matching signature is not proof:
+
+| arm | palm fired | pool dropped | final lanes |
+|---|---|---|---|
+| pickpocket tell present | **2×** | yes, at 2311ms | — (turn ended) |
+| no tell | **0×** | **no** | `[99,0,1,2,3,4,5]` — phantom *and* all six seats intact |
+
+With the tell absent the pool does not shrink at all and the phantom sits there
+untouched. The palm is the whole effect.
+
+**Why I got it wrong.** The fixture ran a tier-2 boss, which carries the
+pickpocket tell, and I read a delayed, designed removal as a mystery. The
+phantom "surviving while a real die is discarded" was the palm choosing a real
+die — which is correct, and in real play there is no phantom to choose instead.
+
+**What this cost:** it was carried for several exchanges as the top open item
+and shaped the priority order. **What it did not cost:** a patch. The rule that
+produced that outcome — trace the mechanism before guessing at a fix — is the
+only reason a designed rival effect was not "fixed" out of the game.
+
+**One thing it leaves genuinely open**, much smaller: nothing sweeps an
+un-shattered pool entry whose lane is not a real seat. P528 sweeps shattered
+ones. No producer of such an entry is known in live play (P519 guards the mint
+site, and 143 samples in the S5 gate saw none), so this is latent and stays
+labelled latent.
+
+
 ## THE RUNNING LIST OF FALSE CLAIMS — THREE SHAPES, KEPT SEPARATE
 
 Ruled by Denis: these are different mistakes with different fixes and must not
@@ -2095,6 +2135,8 @@ scores in the next `anyScoring`.
 > | clean control | `[0]` | `[0,1,2,3,4,5]` | 6/6 |
 > | lane out of range | `[99]` | `[99,0,1,2,3,4,5]` | 6/6 |
 > | lane undefined | `[undefined]` | `[undefined,0,1,2,3,4,5]` | 6/6 |
+>
+> **RETRACTED — IT WAS NOT A DEFECT. See the correction directly below.**
 >
 > **NEW, found by this probe and NOT fixed — recorded rather than folded in.**
 > The phantom entry survives the deal, and something later trims the pool back
