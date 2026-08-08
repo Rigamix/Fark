@@ -322,40 +322,20 @@ against every card and enchant — not another list built from recall.
 
 Priority unchanged: behind card art and the playtest.
 
-## 1h. Hot dice refunds this turn's dice penalties — your ruling
+## 1h. CLOSED - hot dice no longer refunds this turn's penalties
 
-Found by auditing every `numDice` write after building the `_dropLanes` helper,
-not by another sweep.
+**Ruled:** five. A penalty costs you for its stated duration; rolling a clean
+sweep must not be the escape hatch that cancels the opponent's card.
 
-The **player's hot-dice reset** (`handleRoll`) does
-`G.numDice = G.matchDice.length`. So: Whisper's Hex takes you to five dice, you
-score all five, hot dice fires — and you get **six** back. The Hex is refunded
-mid-turn. Pocket Sand behaves the same way.
+Fixed player-side (P517) as a MINIMUM rather than a decrement - hot dice must
+still be able to restore a hand, it just cannot exceed what the player had this
+turn. Verified live: Hex armed, loadout 6, turn start 5, after hot dice **5**
+(was 6). Without the Hex, 6 to 6, unchanged.
 
-This is the fourth instance of the recompute-vs-decrement rule being broken. The
-other three are fixed (P513, P514, and the one `_removeDieAt` recorded in a
-comment years ago).
-
-**Why it is not just another fix:** hot dice is *supposed* to restore a full
-hand — that is the reward. The question is **full relative to what**:
-
-- **the loadout** (today) — a penalty lasts until you earn hot dice, then lifts.
-  Arguably a fair reward for clearing every die.
-- **the loadout minus this turn's penalties** — the Hex means five dice for the
-  whole turn, hot dice or not. Consistent with what the card says.
-
-That is a design decision about what a per-turn penalty *means*, not a defect
-with an obviously correct answer, so it is yours.
-
-**Not urgent.** The rival's hot-dice reset has the same shape and is part of the
-rival-side rework (§1g), so if you want them consistent, ruling here settles
-both.
-
-**Related sites deliberately left alone:** `_bustTolls` and `handleBank` also
-recompute from length, but `startPTurn` re-derives before the next roll, so they
-are self-healing. Hot dice rolls immediately — nothing corrects it.
-
----
+Pocket Sand is covered by the same change. **The rival's hot-dice reset must
+match and does not yet** - it is `left=6`, a local inside `runOppTurn`, one of
+seven writers of which five are literals, so it belongs to the rival-side
+rework in `docs/DICE_LANE_INTEGRITY_PLAN.md` rather than a patch here.
 
 ## 2. Early-game signal — needs a person, not more reasoning
 

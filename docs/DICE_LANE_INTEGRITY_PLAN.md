@@ -94,6 +94,25 @@ lines to where it was needed twice more.
 
 ---
 
+**P516 - `_dropLanes`.** The ruled shared helper. Encodes decrement-never-
+recompute in one place, with the floor as a parameter (Whisper's Hex clamps at
+3 and is a penalty, not a removal, so it does not call this). Seven sites
+converted; every one was already correct, so it fixed no live bug - it gives
+the rule a home instead of a comment 5,000 lines away. All four lane probes
+re-run with no behaviour change.
+
+**P517 - hot dice stops refunding per-turn penalties.** Found by the audit
+`_dropLanes` made possible, not by a report - the fourth instance of the same
+rule. The player's hot-dice reset assigned `numDice = matchDice.length`, so
+Whisper's Hex or Pocket Sand was cancelled mid-turn by a clean sweep. Ruled by
+Denis: the penalty holds for its stated duration. Fixed as a MINIMUM, not a
+decrement, since hot dice must still restore a hand. Verified: Hex armed,
+loadout 6, turn start 5, after hot dice 5 (was 6); no-Hex case 6 to 6.
+**The rival's hot-dice reset must match and does not yet** - `left=6` is one of
+the seven local writers below, so it lands with that rework.
+
+---
+
 ## The rival-side rework — scoped, not started, bigger than expected
 
 Found while sizing Blessed Confiscation (below). The rival's lane/dice-count
