@@ -19119,7 +19119,13 @@ function _breakBorrowed(d){
     var ft=G._fairTrade;
     if(!ft||ft.lane===undefined||ft.lane===null)return false;
     if(_laneOf(d)!==ft.lane)return false;
-    if(!G.matchDice||ft.lane>=G.matchDice.length)return true;
+    /* P530: was `return true`, which protected a die on the strength of a loan
+       pointing OUTSIDE the loadout - making that seat permanently unbreakable.
+       A lane past the end of matchDice is a stale record, not a stronger claim.
+       With Confiscation routed through _removeDieAt and the Vagabond reorder
+       carrying the loan, this should no longer be reachable; it is the backstop,
+       not the fix. */
+    if(!G.matchDice||ft.lane>=G.matchDice.length)return false;
     return G.matchDice[ft.lane]===ft.borrowed;
   }catch(e){}
   return false;
@@ -24802,25 +24808,35 @@ function startPTurn(){
          `stolen` so an empty loadout cannot invent a seat that never held
          anything. One write covers both modes: take_best and take_and_use are
          the only two the card data defines and both splice this same seat. */
-      try{
-        if(stolen)G._diceOut=(G._diceOut||[]).concat([{
-          lane:pBestIdx3,mat:stolen,
-          ench:(G._enchArr&&pBestIdx3<G._enchArr.length)?(G._enchArr[pBestIdx3]||null):null}]);
-      }catch(e){}
+      /* P530: the _diceOut record is _removeDieAt's now - keeping a copy here
+         double-recorded the die in the loadout panel, exactly as Sacrifice's
+         did before P519. */
       if(eff.mode==='take_best'){
         /* Remove die — player plays with 5 */
-        G.matchDice.splice(pBestIdx3,1);
-        _dropLanes(1);/* P516 *//* P504: numDice must shrink with matchDice or the pool build's i%matchDice.length wraps and duplicates lane 0 */
-        if(G._enchArr&&pBestIdx3<G._enchArr.length)G._enchArr.splice(pBestIdx3,1);/* P480: the lane array must shrink with the dice */
+        /* P530: THE ONE EXIT PATH, as Sacrifice took in P519. This was a
+           hand-rolled splice + _dropLanes + _enchArr splice, and what it
+           LACKED is why S7(b) and (c) both exist: _removeDieAt shifts
+           G._fairTrade.lane and the trade ledger's seats, writes the
+           _diceOut record, honours the one-die floor and re-snapshots
+           mid-turn. None of that happened here, so a confiscation left the
+           loan pointing at a seat that had moved - or, once matchDice was
+           shorter than the recorded lane, at no seat at all. */
+        var _seized=_removeDieAt(pBestIdx3);
         triggerCard(cid,npc.name+': TOOK YOUR '+stolen.toUpperCase()+'!',false);
         setStatusMsg(G.rung.name+' SEIZED YOUR '+stolen.toUpperCase()+'!','red');
         spawnPop('👑 SEIZED');
         setTimeout(function(){if(window.DLG)DLG.triggerCard(cid,false);},600);
       }else if(eff.mode==='take_and_use'){
         /* Remove from player, add to NPC */
-        G.matchDice.splice(pBestIdx3,1);
-        _dropLanes(1);/* P516 *//* P504: numDice must shrink with matchDice or the pool build's i%matchDice.length wraps and duplicates lane 0 */
-        if(G._enchArr&&pBestIdx3<G._enchArr.length)G._enchArr.splice(pBestIdx3,1);/* P480: the lane array must shrink with the dice */
+        /* P530: THE ONE EXIT PATH, as Sacrifice took in P519. This was a
+           hand-rolled splice + _dropLanes + _enchArr splice, and what it
+           LACKED is why S7(b) and (c) both exist: _removeDieAt shifts
+           G._fairTrade.lane and the trade ledger's seats, writes the
+           _diceOut record, honours the one-die floor and re-snapshots
+           mid-turn. None of that happened here, so a confiscation left the
+           loan pointing at a seat that had moved - or, once matchDice was
+           shorter than the recorded lane, at no seat at all. */
+        var _seized=_removeDieAt(pBestIdx3);
         /* P522: A SWAP, NOT A SEVENTH SEAT. This was matchOppDice.push(stolen),
            which made the rival's loadout seven long - and the seventh seat is
            unreachable, because seats are consumed as _freeSeats[i] for
@@ -24836,7 +24852,10 @@ function startPTurn(){
            bonus, the EV table and the reveal are all correct again.
            dieRank is the same scale used one line above to pick the player's
            BEST die, so best and worst cannot disagree about what value means. */
-        (function(){
+        /* P530: only hand over a die the player actually LOST. _removeDieAt can
+           refuse - the one-die floor - and transferring on a refusal would
+           duplicate the material rather than move it. */
+        if(_seized)(function(){
           if(!Array.isArray(G.matchOppDice)||!G.matchOppDice.length){
             G.matchOppDice=[stolen];return;
           }
@@ -37016,7 +37035,14 @@ function _commitVagabondDrag(){
                   :((G.matchDice&&q.lane<G.matchDice.length)?G.matchDice[q.lane]:undefined),
               ench:(G._enchArr&&q.lane<G._enchArr.length)?(G._enchArr[q.lane]||null):null};
           });
+          /* P530: THE LOAN'S SEAT MOVES TOO. P520 permuted matchDice, _enchArr
+             and d.lane and left G._fairTrade.lane behind, so after a reorder the
+             loan protected whichever die had moved INTO the seat it used to
+             hold - which is S7(b)'s real mechanism, the lane gate having already
+             ruled out the material test on its own. */
+          var _ftBefore=(G._fairTrade&&typeof G._fairTrade.lane==='number')?G._fairTrade.lane:-1;
           _carry.forEach(function(c,i){
+            if(_ftBefore>=0&&c.die&&c.die.lane===_ftBefore)G._fairTrade.lane=_slots[i];
             var L=_slots[i];
             if(G.matchDice&&L<G.matchDice.length&&c.mat!==undefined)G.matchDice[L]=c.mat;
             if(G._enchArr&&L<G._enchArr.length)G._enchArr[L]=c.ench;

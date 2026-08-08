@@ -2202,6 +2202,49 @@ After the turn boundary, `G._ftDead` and `S.run.diceInv`.
 `_removeDieAt`, 19205 now runs and `ft.lane` stays true. Arms (b) and (c) are
 untouched by P519.
 
+> **ARMS (b) AND (c) CLOSED — P530, driven. And the audit's mechanism for (b)
+> was wrong, which is worth recording rather than quietly correcting.**
+>
+> `_breakBorrowed` gates on the **lane first** (`if(_laneOf(d)!==ft.lane)return
+> false;`), so "any die of that material is protected" cannot happen on its own —
+> the material test is only ever reached for a die already standing in the loan's
+> seat. The real mechanism is that **nothing maintained the loan's seat**:
+>
+> | seat-shrinking writer | maintained `_fairTrade.lane`? |
+> |---|---|
+> | `_removeDieAt` | yes |
+> | Vagabond reorder | **no** — a gap P520 left when it made the reorder real |
+> | Blessed Confiscation (two direct splices) | **no** |
+>
+> Reorder the row and the loan protects whichever die moved *into* the seat it
+> used to hold. Shrink the loadout past the recorded lane and arm (c)'s
+> `return true` protects a die on the strength of a record pointing at nothing.
+> One root cause, filed as two arms.
+>
+> **Fixed as the canonical path for the sixth time.** Confiscation now routes
+> both modes through `_removeDieAt`, which hands it the loan shift, the trade
+> ledger shift, the `_diceOut` record, the one-die floor and the mid-turn
+> snapshot — none of which it had. Its hand-rolled splice, `_dropLanes` and
+> `_enchArr` splice are gone, exactly as Sacrifice's were in P519. The rival now
+> only receives a die the player actually **lost**, since `_removeDieAt` can
+> refuse and transferring on a refusal would duplicate the material rather than
+> move it. The Vagabond reorder carries the loan's seat. And an out-of-range
+> loan returns **false** — the backstop, not the fix.
+>
+> | arm | result |
+> |---|---|
+> | reorder | loan lane 2 → 1, still on its own die, seat holds obsidian |
+> | removal below the loan | lane 4 → 3, seat holds obsidian |
+> | one-die floor | held |
+> | out-of-range loan | protects nothing |
+>
+> **One fixture fault, mine.** Arm A first reported FAIL because it set
+> `matchDice[2]='obsidian'` while the die standing there still had `mat:'flint'`
+> — a state real play cannot produce, since P520 deliberately takes the material
+> from the **die** (what is painted). The fix wrote the true material back and
+> the arm scored it as a failure. An internally inconsistent fixture tests
+> nothing.
+
 ### S8. "no exceptions, no residue" and "the index does not have to be right for the repair to be" — the two halves of the restore are not gated together
 
 > **CLOSED — P527. Denis asked the framing question before any code was written:
