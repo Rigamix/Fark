@@ -36728,7 +36728,41 @@ function _commitVagabondDrag(){
         for(var i=0;i<G.pool.length;i++)if(G.pool[i].el===d.chip)return G.pool[i];
         return null;
       }).filter(Boolean);
-      if(poolSeq.length===G.pool.length)G.pool=poolSeq;
+      if(poolSeq.length===G.pool.length){
+        G.pool=poolSeq;
+        /* P520: AND NOW THE REORDER IS REAL. Reordering G.pool and the DOM
+           moved where the die is DRAWN. It left d.lane, G.matchDice and
+           G._enchArr behind in the old seat, so the die walked away from its
+           own material and its own brand - and Trade, Snuff and Fog, which all
+           say "the same seat" and all resolve through the lane, then acted on
+           a die the player was not looking at.
+           SEATS COME FROM THE DICE, not from 0..n-1. A die destroyed earlier in
+           the roll leaves a hole - pool lanes [0,1,3,4,5] - and the shuffle has
+           to happen within the seats that are actually occupied, leaving the
+           hole where it is.
+           EVERY PAIR IS CAPTURED BEFORE ANY IS WRITTEN. Writing as we go would
+           overwrite entries later dice still need to read.
+           Material comes from the die's OWN d.mat, not G.matchDice[d.lane],
+           because d.mat is what is painted on the face the player can see, and
+           where the two disagree the drawn die is the one telling the truth. */
+        var _slots=poolSeq.map(function(q){return q.lane;})
+          .filter(function(L){return typeof L==='number'&&isFinite(L)&&L>=0;})
+          .sort(function(a,b){return a-b;});
+        if(_slots.length===poolSeq.length){
+          var _carry=poolSeq.map(function(q){
+            return {die:q,
+              mat:(q.mat!==undefined&&q.mat!==null)?q.mat
+                  :((G.matchDice&&q.lane<G.matchDice.length)?G.matchDice[q.lane]:undefined),
+              ench:(G._enchArr&&q.lane<G._enchArr.length)?(G._enchArr[q.lane]||null):null};
+          });
+          _carry.forEach(function(c,i){
+            var L=_slots[i];
+            if(G.matchDice&&L<G.matchDice.length&&c.mat!==undefined)G.matchDice[L]=c.mat;
+            if(G._enchArr&&L<G._enchArr.length)G._enchArr[L]=c.ench;
+            c.die.lane=L;
+          });
+        }
+      }
     }
     /* the DOM row carries WRAPS, not dice - reordering bare dice is what
        orphaned them from their wrap and hid them behind
@@ -36740,6 +36774,24 @@ function _commitVagabondDrag(){
         if(w&&w.parentNode===row)row.appendChild(w);
       });
     }
+    /* P520: AND THE TAP TARGETS FOLLOW. d.hx is the chip's layout centre,
+       cached on first bind. _slaveHost draws the chip at
+       layoutCentre + (meshScreenX - d.hx), and hx is invalidated on a row COUNT
+       change (21840) but never on a move WITHIN the row - so the DOM-slot delta
+       landed on top of the mesh move and every chip's hit box sat one slot
+       pitch from where its die was drawn. Measured: taps correct 6/6 before a
+       drag and 1/6 after, the dragged die's box off-screen at x~686 on a 430px
+       viewport. Reported in play as "the selection was offset by one die and
+       not where I was actually clicking".
+       Clearing hx is the mechanism the code already uses - _homeOf does
+       `if(d.hx===undefined)this._measureHomes()` at 20043. tx/ty are left ALONE
+       on purpose: _rawCentre(chip,tx,ty) removes exactly the translate that is
+       currently applied, so the pair is self-consistent and zeroing one half of
+       it would double-count. */
+    try{
+      seq.forEach(function(d){d.hx=undefined;d.hy=undefined;});
+      if(window.D3X&&D3X._measureHomes&&D3X.mount)D3X._measureHomes();
+    }catch(e){}
   }catch(e){}
   try{_haptic(20);}catch(e){}
   try{SFX.commit&&SFX.commit();}catch(e){}

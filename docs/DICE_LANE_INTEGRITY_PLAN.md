@@ -1030,6 +1030,49 @@ false and 11790 records `iron_grip removed`.
 
 ### D12 — Vagabond's drag desyncs every tap target in the row for the rest of that roll
 
+> **P520 — the reorder is now real. Half verified, half explicitly not.**
+> Ruled by Denis: *"genuine reordering... A drag that moves the die's visual
+> position without moving its identity is the display lying about game state."*
+> And reported by him in live play before the patch was written: *"when I
+> selected scoring dice the selection was offset by one die and not where I was
+> actually clicking"* — D12 reproducing in the hands of a player, which is the
+> strongest confirmation any finding in this sweep has had.
+>
+> **(a) The permutation — DRIVEN.** The drag now moves `d.lane`,
+> `G.matchDice` and `G._enchArr` together with the visible order, so `seat ==
+> lane` again and Trade/Snuff/Fog act on the die the player is looking at. This
+> is also the direct answer to Denis's separate question about moving enchanted
+> dice: the brand used to stay on the seat.
+>
+> ```
+> bone  + tithe    lane 0 -> lane 2    brand travelled
+> flint + ward     lane 2 -> lane 1    brand travelled
+> ```
+> `seatMatchesLane` true, lanes a permutation of the occupied seats, no enchant
+> lost or duplicated.
+>
+> Two details that are deliberate. Seats are read **from the dice and sorted**,
+> never assumed to be `0..n-1` — a die destroyed earlier in the roll leaves a
+> hole and the shuffle has to happen within the occupied seats. And every
+> `(material, enchant)` pair is **captured before any is written**, or later
+> dice read entries the loop has already overwritten.
+>
+> **(b) The tap targets — NOT DRIVEN, and this must not be read as verified.**
+> The fix clears the cached layout centre `d.hx`, which is the mechanism
+> `_homeOf` already uses (`if(d.hx===undefined)this._measureHomes()`, 20043).
+> It cannot be tested headless: **`D3X.dice` is empty and `D3X.mount` is falsy
+> under SwiftShader** — measured, not assumed — so the meshes that carry `hx`
+> do not exist. The probe substitutes synthetic stand-ins carrying the real DOM
+> chips, which exercises the permutation exactly and the cache not at all, and
+> it reports `TAP_TARGETS_NOT_VERIFIED_HERE`.
+>
+> Denis can settle it in one drag, since he already knows the symptom. Until he
+> does, this half is reasoned, not measured.
+>
+> `tx`/`ty` are deliberately left alone: `_rawCentre(chip,tx,ty)` removes exactly
+> the translate currently applied, so the pair is self-consistent and zeroing one
+> half would double-count.
+
 `_commitVagabondDrag` (36651) reassigns the meshes' `phys.x` (36663) **and**
 re-appends the `.die-wrap` children of `#playerDiceRow` (36680-36683).
 `D3X._slaveHost` (20045) positions the DOM chip as
