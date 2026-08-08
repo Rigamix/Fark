@@ -2003,6 +2003,41 @@ finding.**
 
 ### S5. "remove each shattered die by seat" — the list drops every shattered die that has no valid lane, and the else that would catch them cannot run
 
+> **CLOSED — P528, both arms. Denis's gate was run first and it changed how one
+> arm is described, not whether it was fixed.**
+>
+> **The gate: is a duplicate-lane producer still live post-P519?** Measured over
+> **143 live pool samples** across four turns and sixteen rolls: **zero
+> duplicates.** So the duplicate arm is **latent, not live**. 143 samples is
+> absence, not impossibility — the overflow fallback still computes a modulo and
+> nothing else dedupes — so it is fixed as cheap insurance rather than as an
+> emergency, and labelled that way.
+>
+> **Arm one, the duplicate — real, and worse than "a seat removed twice".**
+> A sort protects against *shifting*, not against duplicates.
+>
+> | | before | after |
+> |---|---|---|
+> | `_shLanes` | `[2,2]` | `[2]` |
+> | matchDice | `[bone,iron,flint,lead,amber,brass]` | was `[bone,iron,amber,brass]`, now `[bone,iron,lead,amber,brass]` |
+>
+> Seat 2 held flint. Flint died — and so did **lead**, the neighbour that
+> inherited seat 2 after the first splice. One shatter destroyed two dice.
+>
+> **Arm two, D24 — still live after P519, now closed.** The `>=0` filter drops a
+> laneless shattered die from `_shLanes`, and the sweep that should catch it ran
+> only when `_shLanes` was **empty**, so a *mixed* batch stranded it in the pool
+> with its element already removed upstream — an invisible die that still counts.
+> Driven: `_shLanes [0]`, one stranded. Now unconditional: zero stranded.
+>
+> **Two instrument notes, both self-inflicted and both worth recording.** The
+> comment-stripping assertion helper introduced in P526 is a naive regex and
+> mis-pairs `/*` against strings elsewhere in a 2 MB file — the same
+> proxy-for-the-real-thing trap, one level up in the tooling. And the guard
+> assertion asserted `== 1` when P520's Vagabond code legitimately uses the
+> identical expression, so the count is 2. Neither was a defect in the patch;
+> both cost a round trip.
+
 `pinned_e5b7705.html:25289-25295`
 ```js
     /* remove each shattered die by seat, highest first so earlier seats stay

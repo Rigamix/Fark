@@ -25472,11 +25472,33 @@ function _afterRollImpl(){
     });
     /* remove each shattered die by seat, highest first so earlier seats stay
        valid while we go */
+    /* P528: A SORT CANNOT DEDUPE. Descending order protects against the seats
+       SHIFTING under us, which is what the comment above is about - it does
+       nothing about the same seat appearing twice. Two shattered dice sharing a
+       lane handed _removeDieAt the same seat twice and the second call killed
+       whatever innocent die had shifted into it. Driven: _shLanes [2,2] took
+       flint from seat 2 AND the lead that inherited seat 2 - two dice destroyed
+       by one shatter.
+       No producer of a duplicate lane was observed in 159 live pool samples, so
+       this is insurance rather than an emergency - but the overflow fallback in
+       the refill still computes a modulo and nothing else dedupes, and absence
+       over 159 samples is not impossibility.
+       The lane test also picks up the non-finite guard P519 put on the refill,
+       so both ends of the lane contract agree on what a lane is. */
     var _shLanes=G.pool.filter(function(d){return d._shattered;})
       .map(function(d){return d._shatterLane!==undefined?d._shatterLane:d.lane;})
-      .filter(function(L){return L!==undefined&&L>=0;}).sort(function(a,b){return b-a;});
+      .filter(function(L){return typeof L==='number'&&isFinite(L)&&L>=0;})
+      .sort(function(a,b){return b-a;})
+      .filter(function(L,i,a){return i===0||L!==a[i-1];});
     if(_shLanes.length)_shLanes.forEach(function(L){_removeDieAt(L,{permanent:false});});
-    else G.pool=G.pool.filter(d=>!d._shattered);
+    /* P528: UNCONDITIONAL, was an `else`. A laneless shattered die is dropped
+       from _shLanes by the test above, and the sweep that should catch it ran
+       only when _shLanes was EMPTY - so a MIXED batch stranded it in the pool
+       with its element already removed upstream: an invisible die that still
+       counts. Driven post-P519: _shLanes [0], one shattered die left in pool.
+       Safe and idempotent here - _removeDieAt already filtered the pool by lane,
+       so what reaches this line is exactly the set the `else` existed for. */
+    G.pool=G.pool.filter(function(d){return !d._shattered;});
   }
   const free=G.pool.filter(d=>!d.committed);let freeV=free.map(d=>d.val);const freeMats=free.map(d=>d.mat);const cards=effectiveCards();
   /* THE FLINTLOCK (nerfed): +200 into the TURN-bonus pool (was +300
