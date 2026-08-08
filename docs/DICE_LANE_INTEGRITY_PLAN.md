@@ -1840,6 +1840,61 @@ Plus `#oppDiceRow` children's `dataset.seat`.
 
 ### S3. The same rival hot-dice line, hand-copied 14,800 lines away, documented as "GUARANTEED" — with a numeric AI table built on the reading
 
+> **CLOSED — P525, driven.** Prioritised by Denis on the ground that this is the
+> one where something is *already standing on* the wrong reading rather than it
+> merely misleading a future reader.
+>
+> **Two claims; P521 killed one and left the other standing.**
+> - *"GUARANTEED to roll again"* — **still true.** The `return` still fires
+>   before `oppShouldBank`. Kept, and now marked in-source as the half that holds.
+> - *"A fresh six is dealt"* — **false since P521.** A sweep clears the held dice
+>   but not the snuff, so the rival can be dealt five, and the table was reading
+>   `bust[6]`/`gain[6]` for a five-die roll — the wrong row of a *measured*
+>   table, in the one persona that actually calculates.
+>
+> Fixed in the shape ruled three times tonight: not a second computation but one
+> published value. `G._oSnuffLane` carries the turn's snuffed seat,
+> `_oHandAfterSweep()` answers it for readers outside `runOppTurn`, and `_oSeats`
+> now reads the published value rather than the local it closed over — the same
+> number before, the same *source* now.
+>
+> | loadout | snuff | hand | |
+> |---|---|---|---|
+> | 6 | none | 6 | OK |
+> | 6 | lane 2 | 5 | OK |
+> | 6 | lane 5 | 5 | OK |
+> | 6 | lane 9, out of range | 6 | OK — does not subtract |
+> | 3 | lane 1 | 2 | OK |
+> | 1 | lane 0 | 1 | OK — floor |
+>
+> Plus the live path, because the arithmetic is worthless if the value is never
+> published: a **real snuffed rival turn** published lane `3` and the helper
+> returned `5` while it was live.
+
+---
+
+## THE RUNNING LIST OF FALSE CLAIMS — THREE SHAPES, KEPT SEPARATE
+
+Ruled by Denis: these are different mistakes with different fixes and must not
+collapse into "another wrong comment".
+
+1. **A bound reasoned in only one direction.** P517's "the loadout term stays so
+   a stale-low numDice cannot strand them below their real lane count" — the
+   ceiling of a `min`, which cannot floor anything. P523's "unreachable today" —
+   argued from `numDice` going up, while the route taken was `matchDice.length`
+   going down to zero.
+   **Standing check:** does this hold in the direction nobody checked?
+2. **A symmetry claim never checked against its target.** P524's "mirrors player
+   `_runSave`" — `_runSave` keeps every committed die and says so; the rival
+   cleared the whole row. Checkable in seconds *because* it names something
+   concrete, which makes it worse that nobody had.
+   **Standing check:** does this comment's claim about another function hold?
+3. **A transcript that stopped tracking its source.** P525's hand-copied
+   `left=6`, still quoted 14,800 lines away after P521 changed the line, with a
+   scoring table built on the stale half.
+   **Standing check:** does any comment quoting code still match that code?
+
+
 `pinned_e5b7705.html:13992-13997`
 ```
        L===0 IS HOT DICE, now read rather than assumed. runOppTurn:
