@@ -23,6 +23,21 @@
  * PASS  : zero duplicate lanes, numDice === pool.length, pool 6 -> 5 -> stays 5
  * FAIL  : any repeated lane, which is the bug still live
  *
+ * SEMANTICS DRIFTED AFTER P512 - READ THIS BEFORE TRUSTING THE VERDICT.
+ * P512 made the refill assign provably-free lanes, closing the middle-removal
+ * defect at source. This probe's control neutralises P510 by pushing numDice
+ * UP, which produces numDice > matchDice.length - the OVERFLOW branch P512
+ * deliberately left unchanged, because what a 7th die's lane and material
+ * should be on a 6-lane loadout is an unmade design decision, not a bug.
+ * So when the control now says "reproduces the bug" it is reproducing the
+ * overflow branch, NOT the defect P512 fixed. For that one see
+ * probe_refill_freelane.js, which removes a die from the middle and leaves
+ * numDice alone.
+ * This probe is also timing-sensitive: afterRoll can sample across a turn
+ * boundary, where startPTurn has cleared the pool and reset numDice to
+ * matchDice.length. pool 0 or pool 6 there are both normal; the invariant that
+ * matters is duplicateLanes staying empty.
+ *
  * A CONTROL RUN IS INCLUDED. The same sequence is driven with the decrement
  * neutralised at runtime (numDice put back up by 1 immediately after the palm),
  * reproducing the pre-fix behaviour. If the control does NOT show duplicates,
