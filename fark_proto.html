@@ -19223,6 +19223,12 @@ function _removeDieAt(lane,opts){
       save();
     }
   }catch(e){}
+  /* P515: repaint the First Strike reveal on the ALWAYS-EXECUTED exit. The
+     first attempt put this after the save() above, which sits inside the
+     `if(S.pendingMatch)` block - so with no saved match it never ran, and a
+     live probe caught the panel unchanged after a real removal. No-op while
+     the panel is closed. */
+  try{_firstStrikeRender();}catch(e){}
   return true;
 }
 function _breakClear(){
@@ -24397,7 +24403,7 @@ function startPTurn(){
      endMatch deleted it, resurrecting a RESUME for a match already lost). */
   if(!G||G._endMatchFired)return;
   if(typeof _checkDeadAir==='function')_checkDeadAir();
-  G.phase='idle';G.turnPts=0;G.kept=[];G.numDice=G.matchDice?G.matchDice.length:6;G.pool=[];G.turnRollCount=0;G._encorePending=false;G._slowHandUsedThisTurn=false;G._warmHandsActive=false;G._lastHotDice=false;G._firstRollCommitted=0;G._bustSavedThisTurn=false;
+  G.phase='idle';G.turnPts=0;G.kept=[];G.numDice=G.matchDice?G.matchDice.length:6;/* P515: refresh the First Strike reveal. It renders from matchDice live but had only two one-shot callers, so a Break or a steal left it showing a loadout that no longer exists - the exact lie the panel exists to prevent. No-op while the panel is closed. */try{_firstStrikeRender();}catch(e){}G.pool=[];G.turnRollCount=0;G._encorePending=false;G._slowHandUsedThisTurn=false;G._warmHandsActive=false;G._lastHotDice=false;G._firstRollCommitted=0;G._bustSavedThisTurn=false;
   /* per-turn icon state. Ward lasts one turn by definition. AMBER IS A
      ONE-SHOT NOW, not a turn-long immunity - doBust spends it on the single
      bust it eats, so this line only reaches a save that was never called on,
