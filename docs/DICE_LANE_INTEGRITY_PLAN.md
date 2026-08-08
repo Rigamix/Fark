@@ -2720,6 +2720,62 @@ running.
    measured those — but the **`combo` persona's computed value for `L===0`**
    against the actual post-sweep `_freeSeats.length`.
 
+## THE NINE, ADJUDICATED — and two defects the recent patches created
+
+The adversarial pass was re-run against the current code. **M3 is DEAD as
+stated**, and judging it surfaced two NEWLY-CREATED defects, both mine, both now
+fixed and driven.
+
+**P531 — the reorder carried the loan and left the trade ledger.** P520 made the
+reorder real, P527 gave the ledger a player-side `lane` so it could be
+maintained, P530 taught the reorder to carry `_fairTrade` — and stopped there.
+Driven before the fix: die moved seat 0 → 3, loan followed to 3, ledger stayed
+at 0. The loan was the control that proved the reorder *can* maintain a record.
+Fixed; `oLane` deliberately does **not** move, because the rival's board does
+not renumber when the player's does.
+
+**P532 — the resume silently un-shipped P527.** Both snapshot writers deep-clone
+the ledger, so `oLane` and `seatGone` reach the disk. The resume mapper
+enumerates fields by hand and never learned either, so every resume dropped
+them. That forced the rival-side repair onto its pre-P527 fallback — the very
+path P527b exists to avoid — and unmarked a destroyed seat so the count
+heuristic could repair an innocent die. Also fixed: `_removeDieAt`'s mid-turn
+snapshot never carried the ledger at all, which was harmless until P527 made the
+live copy correct and the snapshot's copy wrong.
+
+| check | result |
+|---|---|
+| reorder carries ledger `lane` | 0 → 3, follows the die |
+| reorder leaves `oLane` alone | held at 0 |
+| resume keeps `oLane` | 4 survives against `lane` 1 |
+| resume keeps `seatGone` | survives |
+| a pre-P527 record | still falls back to `lane` |
+| mid-turn snapshot vs live | both 3, agree |
+
+**M3 itself is dead.** `_lmArm` stores one number and every reader of
+`_snare`/`_snuff`/`_fog`'s `.lane` is inside `runOppTurn`, compared against the
+rival's seats. There is **no player-side reader**, and the drag touches neither
+those objects nor `matchOppDice`. Measured alongside: `_laneOf` does change
+across a reorder (0 → 3), so a marker armed *after* a drag names the die's new
+seat — which is the intended semantics of the P520 ruling, not a defect. Worth
+knowing it makes seat-targeted effects aimable by rearranging.
+
+**M5 SURVIVES and is the largest thing still open.** Preserve's `canUse` reads
+`k.vals` (post-`_splitIcons`) and its picker reads `k.dice` (pre-split, still
+holding icon dice). Brands sit on faces 1 and 5, so an icon die is by
+construction a face that banks **zero** — and Preserve can bank it next turn at
+100. Pre-existing; P514 created it by moving the picker to `k.dice` to fix the
+wrong-material bug. Not driven yet.
+
+**Dead or already-recorded:** M1 (superseded, with one latent degradation arm),
+M2 (counterfactual; and only **two** live mint sites, not four), M4 (D6
+restated — Preserve benches nothing), M6 and M7 (one dead surface, and "nine
+lines apart" is wrong: one line apart, 20,348 lines away), M8 (unreachable
+`pCards` layer; its second clause redundant), M9 (half is D10(a); the "both
+legs" framing is wrong and acting on it would introduce a bug).
+
+---
+
 ### Nine nominations never received a verdict
 
 They were raised and the adversarial pass ran out before reaching them. They are

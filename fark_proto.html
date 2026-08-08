@@ -19375,6 +19375,14 @@ function _removeDieAt(lane,opts){
       S.pendingMatch._enchArr=[...(G._enchArr||[])];
       S.pendingMatch.numDice=G.numDice;
       S.pendingMatch._fairTrade=G._fairTrade?{...G._fairTrade}:null;
+      /* P532: and the trade ledger, for the same reason _fairTrade is here.
+         This snapshot never carried it. That was harmless while the live ledger
+         was not maintained either - both copies were equally stale. P527 made
+         the live one shift with the seats, which made this one wrong: between a
+         mid-turn removal and the next turn boundary the two disagreed about
+         `lane`. Deep-cloned, like the boundary writers do, so the snapshot can
+         never alias the live records. */
+      try{S.pendingMatch._tradeSwaps=G._tradeSwaps?JSON.parse(JSON.stringify(G._tradeSwaps)):null;}catch(e){}
       /* and the out-dice record with them, for the same reason the dice fields
          are here: a resume that lost it would show a five-die loadout with
          nothing missing, which is the exact lie the record exists to stop.
@@ -32466,7 +32474,21 @@ if(_rdFam){
 }
 var _rdTs=params._resumeData._tradeSwaps;
     G._tradeSwaps=(Array.isArray(_rdTs)&&_rdTs.length)
-      ?_rdTs.map(function(t){return{lane:t.lane,mine:t.mine,theirs:t.theirs,myEn:t.myEn||null,cnt:t.cnt};})
+      /* P532: oLane and seatGone were added by P527 and this hand-written
+         mapper never learned them, so every resume silently un-shipped that
+         patch. Both snapshot writers deep-clone the record, so the fields are
+         on disk - they were being dropped on the way back in.
+         Losing oLane forced the rival-side repair onto its pre-P527 fallback,
+         which addresses the wrong seat of matchOppDice as soon as _removeDieAt
+         shifts lane. Losing seatGone unmarked a destroyed seat and let the cnt
+         heuristic repair an innocent die.
+         The oLane fallback to `lane` is KEPT: a record genuinely written before
+         P527 has no oLane, and lane is the honest answer there because the two
+         were equal when it was made. */
+      ?_rdTs.map(function(t){return{lane:t.lane,
+        oLane:(typeof t.oLane==='number')?t.oLane:t.lane,
+        mine:t.mine,theirs:t.theirs,myEn:t.myEn||null,cnt:t.cnt,
+        seatGone:!!t.seatGone};})
       :null;
   }
   /* ── Apply patron Tell (signature passive rule) ── */
@@ -37041,8 +37063,22 @@ function _commitVagabondDrag(){
              hold - which is S7(b)'s real mechanism, the lane gate having already
              ruled out the material test on its own. */
           var _ftBefore=(G._fairTrade&&typeof G._fairTrade.lane==='number')?G._fairTrade.lane:-1;
+          /* P531: AND THE TRADE LEDGER'S PLAYER-SIDE SEAT. P530 taught this loop to
+             carry the loan and left its sibling behind - measured, the die moved
+             from seat 0 to seat 3, the loan followed and the ledger stayed at 0.
+             ONLY `lane` MOVES, NEVER `oLane`: lane indexes the player's board,
+             oLane the rival's, and a player reorder renumbers only the player's
+             seats. Carrying both would repair the wrong die on the rival's board,
+             which is the error P527 caught in its own first draft.
+             Snapshotted before the loop writes anything, like the pairs beside it,
+             or an entry that has already moved gets matched a second time. */
+          var _tsBefore=(G._tradeSwaps||[]).map(function(t){
+            return (t&&typeof t.lane==='number')?t.lane:-1;});
           _carry.forEach(function(c,i){
             if(_ftBefore>=0&&c.die&&c.die.lane===_ftBefore)G._fairTrade.lane=_slots[i];
+            if(c.die&&typeof c.die.lane==='number')(G._tradeSwaps||[]).forEach(function(t,ti){
+              if(t&&_tsBefore[ti]===c.die.lane)t.lane=_slots[i];
+            });
             var L=_slots[i];
             if(G.matchDice&&L<G.matchDice.length&&c.mat!==undefined)G.matchDice[L]=c.mat;
             if(G._enchArr&&L<G._enchArr.length)G._enchArr[L]=c.ench;
