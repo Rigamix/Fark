@@ -1101,8 +1101,12 @@ false and 11790 records `iron_grip removed`.
 > chips, which exercises the permutation exactly and the cache not at all, and
 > it reports `TAP_TARGETS_NOT_VERIFIED_HERE`.
 >
-> Denis can settle it in one drag, since he already knows the symptom. Until he
-> does, this half is reasoned, not measured.
+> **CONFIRMED BY DENIS IN LIVE PLAY: "it works now yes."** He reported the
+> original symptom from a real match and then re-checked the fix the same
+> way. That is the strongest tier of evidence available here - stronger than
+> the probe that could not run, and stronger than a self-check, because the
+> person confirming it is the one who found it and was not looking at the
+> patch. Both halves of P520 are now settled.
 >
 > `tx`/`ty` are deliberately left alone: `_rawCentre(chip,tx,ty)` removes exactly
 > the translate currently applied, so the pair is self-consistent and zeroing one
@@ -1150,6 +1154,37 @@ a row change (`d.hx=undefined; d.tx=0; d.ty=0; d.chip.style.translate='';`), or,
 smaller, call `D3X._measureHomes()` after the DOM re-append at 36684.
 
 ### D13 — Blessed Confiscation's seventh seat is unconditionally unreachable, and the die is not inert while it sits there
+
+> **CLOSED — P522. Ruled by Denis: swap, not add.**
+> `matchOppDice.push(stolen)` becomes a replacement of the rival's **worst** die,
+> so the loadout stays six long and the stolen die lands in a seat that is
+> actually dealt. The starstone bank bonus, the AI's EV table and the First
+> Strike reveal all read `matchOppDice`, so all three stop counting a die that
+> was never rolled — fixed for free by the array staying the right length.
+>
+> **The unit check found the swap backwards in one case and it was guarded
+> before shipping.** `[starstone, jade, amber] + bone` replaced the amber with
+> the bone: the rival made itself *worse*. The card takes the player's BEST die,
+> but late on the player's best can sit beneath the rival's worst. The swap is
+> now conditional on being an upgrade. The confiscation is unchanged either way —
+> the player has already lost the die — so the only question was whether the
+> rival plays it, and an opponent choosing a worse die is a behaviour bug.
+>
+> | rival holds | confiscated | result |
+> |---|---|---|
+> | bone iron flint lead amber jade | starstone | bone → **starstone** |
+> | jade ×5, bone | starstone | bone → **starstone** |
+> | bone ×6 | obsidian | bone → **obsidian** |
+> | starstone jade amber | bone | **unchanged** — not an upgrade |
+>
+> **Not driven, and stated as such:** `take_and_use` needs a specific boss card
+> to fire, so the selection logic is unit-checked against constructed loadouts,
+> not exercised through the card. The integration claim that matters — that the
+> seventh seat was never dealt — was already measured by the sweep on a real
+> Ambrose match (seats 0-5 only).
+>
+> **`take_best` deliberately untouched.** It never pushed; the ruling was about
+> the add.
 
 `G.matchOppDice.push(stolen)` (24682) makes the array 7 long. `_freeSeats` is
 built ascending over `_rungAll.length` (28057-28062) and consumed as
@@ -1597,3 +1632,789 @@ the arrangements are stated well enough to rebuild them.
 - **Sampling once is not measuring.** D8's end state read as a hard soft-lock at
   1.5 s and had resolved to a normal idle turn by 9 s. The defect is "unwinnable
   match", not "frozen game", and only the second sample says so.
+
+---
+
+# THE SAFETY-COMMENT AND BRAND-TRAVEL SWEEP — static, nominations only
+
+**Nothing in this whole part was executed.** It is static reading against
+`pinned_e5b7705.html`, a copy of `fark_proto.html` taken at commit e5b7705
+because the live file was being patched concurrently. No browser, no server, no
+`tools/shoot.js`. Every item below is a **nomination**: the verbatim code, the
+lines, the arrangement that would expose it, and what a probe must read to
+settle it either way. Nothing here is a verdict, and nothing here may be cited
+as "checked". §5 lists, in priority order, which ones most need driving.
+
+**The pinned copy predates P519 and P520.** The highest patch marker in it is
+P518 (14263). `CFX.sacrifice` still hand-rolls its own splice at 14322, the
+refill still carries the overflow fallback at 25141, `CFX.sacrifice.canUse`
+(14290) still has no floor, and `_commitVagabondDrag` (36662-36699) still moves
+only `phys.x`, `G.pool` order and the DOM row — never `d.lane`, `G.matchDice`
+or `G._enchArr`. So the fixes §5a and D12 record as shipped are **not in what
+was read**. Every nomination whose mechanism one of those two patches closes is
+marked **SUPERSEDED-CHECK** and must be re-read against the live file before
+anyone acts on it. This is "check the input, not just the method" applied to a
+sweep's own source: the method was fine and the file was nine commits stale.
+
+**Line numbers.** All anchors below are `pinned_e5b7705.html`. Against this
+document's existing `fark_proto.html` anchors the offset is **0** in the
+12000s, about **+9** from 19000-24700, and about **+11** from 25100-28900. It
+is not constant. Re-anchor by grepping the quoted text; never by adding a
+number.
+
+**Counts.** 60 candidates were raised and put to an adversarial reader.
+**20 survived**, **31 were refuted** (§4), **9 were never judged** (§5).
+
+---
+
+## SAFETY CLAIMS THAT MAY NOT HOLD
+
+Denis's ruling: this class is worse than the bugs. A comment invites the next
+reader to trust it instead of re-checking, and that is the exact mechanism that
+let the decrement-vs-recompute lesson sit unapplied for 5,000 lines while it was
+needed twice more. Ranked by danger — how load-bearing the false assertion is,
+how likely a reader is to hit it, and whether anything downstream is already
+built on it.
+
+### S1. "which startPTurn's baseline makes unreachable today" — sitting on the expression this document already measured minting a `lane: NaN` die
+
+`pinned_e5b7705.html:25136-25141`
+```js
+        /* overflow fallback: needNew beyond the free-lane count means
+           numDice > matchDice.length, which startPTurn's baseline makes
+           unreachable today and only the retired Seven Dice could cause.
+           Holding the old expression there keeps that case byte-identical
+           rather than inventing behaviour for it. */
+        const _lane=(_freeLanes[i]!==undefined)?_freeLanes[i]:((G.pool.length+i)%G.matchDice.length);
+```
+
+**What it asserts.** That the `else` arm is unreachable in the shipped build,
+and that keeping the old expression there is therefore inert.
+
+**Why the expression cannot deliver it.** The unreachability argument reasons
+only about `numDice` being pushed *above* `matchDice.length`. It never considers
+`matchDice.length` being pushed *down to 0*. `_freeLanes` is built at 25134:
+```js
+      var _freeLanes=[];for(var _fl=0;_fl<G.matchDice.length;_fl++){if(!_occLane[_fl])_freeLanes.push(_fl);}
+```
+At `matchDice.length===0` that array is empty, every iteration takes the else
+arm, and `(0+0)%0` is `NaN`. **This document already measured that state** —
+D8, `poolLanesAreNaN [true]` — and the comment above the line says it cannot
+happen. That is D8's own mechanism with a comment vouching for it.
+
+**One correction to my own nomination, in the comment's favour.** I claimed
+"the retired Seven Dice" was a live line because 24800 still executes:
+```js
+  if(G._sevenDiceArmed){
+    G._sevenDiceArmed=false;
+    G.numDice=Math.min(G.numDice+1,7);
+```
+The only writer of `G._sevenDiceArmed` is **31480**, inside `activateSevenDice`
+on the dead `pCards` layer. The comment is *right* that Seven Dice is retired.
+It is wrong about unreachability for a reason it never considered.
+
+**The arrangement that would prove it.** Walk the loadout to one die through the
+shipped removers (Break / obsidian shatter / royal_seizure), confirm
+`_breakBegin` refuses the last die, then spend one Sacrifice charge so
+`G.matchDice` is length 0 with `G.numDice` 1. Tap `#btnRoll` — it is a `DIV` at
+8930, so the `disabled` class cannot block the tap — and let the refill run one
+iteration.
+
+**What a probe must read.** Immediately after the refill: `G.matchDice.length`,
+`G.numDice`, `needNew` latched before the loop, `_freeLanes.length`, and for
+every `G.pool` entry the tuple `{lane, Number.isNaN(lane), mat, val}`. Then call
+`_removeDieAt(thatLane)` and re-read `G.pool.length` and the return value.
+
+**SUPERSEDED-CHECK.** P519 is recorded as adding "a refill that will not stamp a
+lane that is not a real index". If that landed, the NaN arm is closed live and
+**the comment is the residue** — re-read 25136-25141 against the live file and
+either delete it or make it say what is actually true.
+
+### S2. "This is the whole fix" and "all six scored" — two comments in one function, and the else arm of the fix is the bug the comment names
+
+These are duals of one root cause and are merged here. This is the doc's
+existing D1/D2 seat-vs-count disease (§5b), catalogued for the first time as a
+*comment* problem.
+
+`pinned_e5b7705.html:28060-28065`
+```js
+    /* WHICH SEATS ARE ACTUALLY FREE. Everything the rival is still holding sits
+       in a seat, and the snuffed seat is empty for the turn - so the dice about
+       to be thrown go into what is left, in seat order. This is the whole fix:
+       the loop below used to index materials and lanes by ITS OWN counter, which
+       is the position of a die within this roll and has nothing to do with the
+       seat it lives in. */
+```
+`pinned_e5b7705.html:28079-28080`
+```js
+      const _seat=(_freeSeats[i]!==undefined)?_freeSeats[i]:i;
+      const dieMat=_rungAll[_seat]||rungDice[i]||'bone';
+```
+
+**What it asserts.** That indexing by seat rather than by loop counter is
+complete — that a die can no longer take its seat from its position within the
+roll.
+
+**Why the expression cannot deliver it.** The else arm is `i`: the loop counter,
+which the comment names as the defect. It is taken whenever
+`i >= _freeSeats.length`, i.e. whenever `rollDice > _freeSeats.length`. Those
+two quantities have different derivations and nothing reconciles them —
+`rollDice` descends from `left`, `_freeSeats` from `_rungAll.length` minus
+`_heldSeats` minus `_snuffLane` (28069-28073). A guard whose failure branch is
+the original bug is a fix plus a fallthrough, and the comment claims a
+completeness the ternary cannot provide. `dieMat` at 28080 falls back further to
+`rungDice[i]`, a second counter-indexed source.
+
+`pinned_e5b7705.html:28835-28838`
+```js
+      left=G.oppDice.filter(d=>!d.kept).length;
+      /* all six scored: the next step deals a whole new row, so the held
+         dice go with the old one */
+      if(left===0){G._oLastHotDice=true;G._oppSweep=true;left=6;setTimeout(step,_oppDelay(1500));return;}
+```
+
+**What it asserts.** That `left===0` means all six of the rival's dice scored,
+so resetting to the literal 6 restores the hand that was swept.
+
+**Why the expression cannot deliver it.** `left` is recomputed one line above
+from `G.oppDice`, which only ever received `rollDice` entries. `rollDice`
+descends from a `left` that snuff, jinx, Whisper's Hex, Veil, the pickpocket
+tell, Leaky Cup and Pocket Sand have all already written. So `left===0` means
+"every die *in the last roll* was kept", not "all six". The literal 6 then
+disagrees with `_freeSeats`, and in the other direction `_rungAll` is
+`G.matchOppDice`, which `blessed_confiscation` pushes to length 7 at 24691 — so
+"six" is wrong high as well as low. **A max cannot cap and a literal cannot
+derive.** Together with S2's fallback: the literal supplies the excess count and
+the fallback absorbs it into an invented seat.
+
+**The arrangement that would prove it.** A rival with six distinct materials and
+a live Snuff on a middle lane, driven until the rival keeps every die of a roll
+and sweeps; a second arm with the snuff on the last lane; a control with no
+snuff. (This is D1's measured arrangement — the new thing to read is the
+*comment*'s claim, not the seat list.)
+
+**What a probe must read.** Inside `step()` on the roll after the sweep, latched
+at the deal loop: `left`, `rollDice`, the whole `_freeSeats`, `_snuffLane`,
+`_rungAll.length`, and per iteration `i`, `_freeSeats[i]`, the resolved `_seat`,
+whether the else arm was taken, and `_rungAll[_seat]` against `rungDice[i]`.
+Plus `#oppDiceRow` children's `dataset.seat`.
+
+### S3. The same rival hot-dice line, hand-copied 14,800 lines away, documented as "GUARANTEED" — with a numeric AI table built on the reading
+
+`pinned_e5b7705.html:13992-13997`
+```
+       L===0 IS HOT DICE, now read rather than assumed. runOppTurn:
+         if(left===0){G._oLastHotDice=true;G._oppSweep=true;left=6;
+                      setTimeout(step,...);return;}
+       A fresh six is dealt - and that `return` fires BEFORE oppShouldBank, so
+       hot dice also skips the bank decision entirely and the rival is
+       GUARANTEED to roll again. It is the best outcome on the board.
+```
+
+**What it asserts.** A fresh six, a guaranteed extra roll, and the best outcome
+on the board — and it is the stated basis for scoring `L===0` at the top of the
+`combo` persona's `value = pts + (1 - bust[L]) * gain[L]` table rather than at 0.
+
+**Why it cannot deliver it.** "A fresh six is dealt" is the premise S2 refutes.
+It is also a *copy*, and therefore free to drift from the line it quotes — it
+already elides the delay argument as `...`. A comment that both asserts a
+guarantee and is the declared input to a numeric table is the worst-case shape
+of this class: the table cannot be re-derived without re-deriving the prose.
+
+**The arrangement that would prove it.** S2's snuff arrangement, but reading the
+rival's *decision* rather than its dice. Separately: a character-by-character
+diff of 13992-13994 against 28838.
+
+**What a probe must read.** The `combo` persona's computed `value` for the
+`L===0` candidate, the `bust[L]`/`gain[L]` entries it used, then
+`_freeSeats.length` and the distinct-seat count of `G.oppDice` on the post-sweep
+roll, and `G.matchOppDice.length`.
+
+### S4. "nothing is duplicated and nothing is skipped" — over a single-slot field, with two consumers
+
+`pinned_e5b7705.html:24949-24956`
+```js
+  /* BREAK takes its target here - AFTER the commit has fully run, so nothing
+     is duplicated and nothing is skipped, and BEFORE the row is rethrown, so
+     the tap handlers survive. _breakBegin returns false when there is nothing
+     left to break, and the turn simply carries on. */
+  if(G._breakPending){
+    var _bp=G._breakPending;G._breakPending=null;
+    if(_breakBegin(_bp.src))return;
+  }
+```
+against `pinned_e5b7705.html:18397`
+```js
+    fire:function(c){G._breakPending={src:c.die};}},
+```
+
+**What it asserts.** That deferring Break to after the commit makes it exact —
+no double-fire and no lost fire.
+
+**Why the expression cannot deliver it.** `G._breakPending` is a **single-value
+slot, not a queue**. Two branded faces firing during one commit means the second
+`fire` overwrites the first and one Break is silently skipped — precisely the
+half the comment denies. Break has no per-loadout ownership cap: 33727 gates
+only `if(k==='ward'&&_wardOwned(i))`, and `_wardOwned` (33417) is ward-specific,
+so a loadout may carry two Break brands. `_iconFaces` (33389) restricts brands
+to faces 1 and 5, both scoring faces, commonly committed together. The same
+single slot is consumed from **two** places — 24953 and 26840, the bank path
+whose own comment reads "Only handleRoll read _breakPending, so banking a skull
+armed it".
+
+**The arrangement that would prove it.** Break branded on two different dice,
+both on faces the same commit can carry; roll until both show their branded face
+and commit both in one selection. Variant: one skull committed on a roll, the
+second on the next roll before the first was consumed.
+
+**What a probe must read.** A counter instrumented on 18397 counting `fire`
+invocations per commit; `G._breakPending` after each; the number of
+`_breakBegin` entries; and `G.matchDice.length`, `G._diceOut.length` and
+`G.numDice` before and after. **Two fires against one `_diceOut` entry is the
+finding.**
+
+### S5. "remove each shattered die by seat" — the list drops every shattered die that has no valid lane, and the else that would catch them cannot run
+
+`pinned_e5b7705.html:25289-25295`
+```js
+    /* remove each shattered die by seat, highest first so earlier seats stay
+       valid while we go */
+    var _shLanes=G.pool.filter(function(d){return d._shattered;})
+      .map(function(d){return d._shatterLane!==undefined?d._shatterLane:d.lane;})
+      .filter(function(L){return L!==undefined&&L>=0;}).sort(function(a,b){return b-a;});
+    if(_shLanes.length)_shLanes.forEach(function(L){_removeDieAt(L,{permanent:false});});
+    else G.pool=G.pool.filter(d=>!d._shattered);
+```
+
+**What it asserts.** That every shattered die is removed, and that descending
+order keeps the remaining seat numbers valid.
+
+**Why the expression cannot deliver it.** Two gaps in the word "each".
+(1) `_shatterLane` is set to `-1` when `d.lane` is undefined (25283
+`d._shatterLane=(d.lane!==undefined?d.lane:-1);`) and the `.filter(L=>L!==undefined&&L>=0)`
+then drops it, while the `else` that would sweep it out of `G.pool` runs only
+when `_shLanes` is *empty* — so a mixed batch leaves a laneless shattered die in
+the pool with its element already removed at 25275. **This is D24, and it is
+already measured** (`poolShattered:1`, lanes `[0,1,undefined,3,4]`).
+(2) **New, and not in D24:** `.sort` descending protects against *shifting*, not
+against *duplicates*. If two pool dice share a lane — which S1's fallback
+produces — the same seat is handed to `_removeDieAt` twice and the second call
+destroys an innocent neighbour. **A sort cannot dedupe.** S1 and S5 chain: S1
+mints the duplicate, S5 spends it.
+
+**The arrangement that would prove it.** Two obsidian (or grogs_tooth) dice
+driven until both shatter on the same roll, one holding a lane and one with
+`lane` undefined. Second arm: two pool dice sharing one lane, both shattering.
+
+**What a probe must read.** Before the sweep, every pool entry's
+`{lane,_shattered,_shatterLane,mat,val}`. After: the built `_shLanes`, any
+`_shattered` entry still in `G.pool`, whether it has a live `el` in
+`#playerDiceRow`, `G.matchDice`, `G._enchArr`, `G.numDice`, and whether it still
+scores in the next `anyScoring`.
+
+### S6. "G.pool cannot drift from G.pool" — the code does not compare G.pool with G.pool
+
+`pinned_e5b7705.html:25130-25134`
+```js
+         Occupancy is read from G.pool itself because the whole defect is
+         numDice and the pool disagreeing; G.pool cannot drift from G.pool.
+         Mirrors _removeDieAt (19143-19144), the reference on the remove side. */
+      var _occLane={};(G.pool||[]).forEach(function(_d){_occLane[_d.lane]=1;});
+      var _freeLanes=[];for(var _fl=0;_fl<G.matchDice.length;_fl++){if(!_occLane[_fl])_freeLanes.push(_fl);}
+```
+
+**What it asserts.** That deriving occupancy from `G.pool` is self-consistent by
+construction and cannot desync.
+
+**Why the expression cannot deliver it.** The tautology is about `G.pool`; the
+code compares a **set** with a **count**. `_occLane` is keyed by lane —
+duplicates collapse, and `undefined`/`NaN` become the string keys `"undefined"`
+/ `"NaN"` and mark no numeric lane — while `needNew` at 25071 is
+`G.numDice - G.pool.length`, a raw count. A set and a count are two different
+measurements of the same array and they diverge the moment any entry has a
+duplicate, undefined or NaN lane, both of which this cluster is known to
+produce (S1, S5). When they diverge `needNew` is smaller than `_freeLanes.length`
+and a genuinely empty lane is never refilled — the die "sits out" the turn,
+which is the same visible symptom D6 reports for Preserve from a different
+cause. Separately, `_freeLanes`' loop bound is `G.matchDice.length`, so a pool
+die standing at or above that bound is invisible to the occupancy test entirely.
+
+**The arrangement that would prove it.** Two pool entries on one lane (via S1),
+or one entry with `lane` undefined (via S5), then roll and count the lanes
+dealt. Second arm: a pool die whose `lane` is `>= G.matchDice.length` after a
+splice, then roll.
+
+**What a probe must read.** Latched at the top of the refill: `G.numDice`,
+`G.pool.length`, `G.pool.map(d=>d.lane)`, `Object.keys(_occLane)`, `_freeLanes`,
+`needNew`, `G.matchDice.length`. Then which lane indices actually carry a die in
+`#playerDiceRow` and which `matchDice` index was dealt none.
+
+### S7. "the two can never disagree" — two readers of one expression agreeing is correlated failure, and it is stated here as a safety property
+
+`pinned_e5b7705.html:19039-19045` and `19049-19059`
+```js
+   THE SEAT TEST IS THE ONE startPTurn'S LOAN-EXPIRY BLOCK ALREADY USES -
+   matchDice[lane] still holding ft.borrowed - so the two can never disagree
+   about whether the loan is still standing in its lane.
+...
+function _breakBorrowed(d){
+  if(!d||!G)return false;
+  try{
+    var ft=G._fairTrade;
+    if(!ft||ft.lane===undefined||ft.lane===null)return false;
+    if(_laneOf(d)!==ft.lane)return false;
+    if(!G.matchDice||ft.lane>=G.matchDice.length)return true;
+    return G.matchDice[ft.lane]===ft.borrowed;
+  }catch(e){}
+  return false;
+}
+```
+
+**What it asserts.** That sharing one expression with startPTurn's expiry check
+makes the two consistent, and therefore that a borrowed die can never be an
+illegal Break target.
+
+**Why the expression cannot deliver it.** Agreement between two readers of one
+expression is not correctness; it is **correlated failure**, and both inputs are
+known-unstable. (a) `ft.lane` is shifted by `_removeDieAt` (19205
+`if(ft.lane>lane)ft.lane--;`) but not by `CFX.sacrifice`, which splices
+`matchDice` itself at 14322 and names `_fairTrade` nowhere — **D9**. After a
+sacrifice below the loan both readers point at the wrong seat *and agree with
+each other*. (b) `ft.borrowed` is a **material string**, so
+`matchDice[ft.lane]===ft.borrowed` is satisfied by any die of that material —
+**D10(b)**. (c) The `ft.lane>=G.matchDice.length` arm returns `true`, so on a
+shrunk loadout the last seat's die is permanently un-breakable. This is
+"convergence can be an artifact" written into a source comment as a guarantee.
+
+**The arrangement that would prove it.** A loadout whose weakest seat is a
+middle lane, so `worst` is not 0 — an all-bone loadout hides this entirely.
+Borrow into lane 2, sacrifice lane 1, then attempt a Break on the die now
+standing in lane 2 and on the die now standing where the borrowed die actually
+is. Second arm: a loan whose `borrowed` material duplicates a die the player
+already owns.
+
+**What a probe must read.** Per candidate die: `_laneOf(d)`, the whole
+`G._fairTrade`, the whole `G.matchDice`, what `_breakBorrowed(d)` returns, and —
+evaluated separately on the same state — startPTurn's expiry predicate. Then
+whether `_breakBegin` offered the die and whether `_breakDie` accepted the tap.
+After the turn boundary, `G._ftDead` and `S.run.diceInv`.
+
+**SUPERSEDED-CHECK on arm (a) only.** If P519 routed Sacrifice through
+`_removeDieAt`, 19205 now runs and `ft.lane` stays true. Arms (b) and (c) are
+untouched by P519.
+
+### S8. "no exceptions, no residue" and "the index does not have to be right for the repair to be" — the two halves of the restore are not gated together
+
+`pinned_e5b7705.html:18555-18578` (extract) and `18591-18599`
+```js
+/* BOTH SIDES BACK THE INSTANT THE MATCH ENDS - win, loss, flee, or the end of
+   a resumed match - no exceptions, no residue.
+...
+   The index does not have to be right for the repair to be: matchDice holds
+   MATERIALS, so every entry reading t.theirs is interchangeable and writing
+   t.mine over any one of them yields the same loadout.
+...
+    if(k>=0){
+      md[k]=t.mine;
+      /* the brand only goes home to the seat it left. If the index moved, the
+         seat now at k belongs to some other die and its brand is not ours to
+         overwrite - the material repair above already stands on its own. */
+      if(G._enchArr&&k===L)G._enchArr[L]=t.myEn;
+      n++;
+    }
+    if(G.matchOppDice&&L>=0&&L<G.matchOppDice.length&&G.matchOppDice[L]===t.mine)G.matchOppDice[L]=t.theirs;
+```
+
+**What it asserts.** (a) Both sides of every trade are restored at every match
+exit with no residue. (b) A stale lane index is harmless because materials are
+interchangeable.
+
+**Why the expression cannot deliver it.** (a) The player-side repair is inside
+`if(k>=0)`; the rival-side repair at **18599 is a separate `if` with its own
+condition**. When `k` resolves to `-1` but `matchOppDice[L]===t.mine` still
+holds, the rival's side is restored while the player's is not — one material
+duplicated on the rival's board and one destroyed on the player's. **This
+document already measured exactly that**: D11, `restoredCount:0,
+playerGotJadeBack:false, rivalGotStarstoneBack:true`. (b) Materials are
+interchangeable in `matchDice`; `_enchArr` is lane-indexed against them, and the
+code itself concedes this by refusing the brand write unless `k===L`. A repair
+landing on the wrong seat therefore leaves lane `L` with a null brand the player
+paid for and lane `k` wearing someone else's — which is residue, under a comment
+that says there is none.
+
+**A census hazard inside the same function.** `md` at 18582
+(`var md=G.matchDice||[];`) is a **local alias**. A census grepping
+`G.matchDice[` misses `md[k]=t.mine` entirely. It is not the only alias — see
+§3. And when `G.matchDice` is falsy, `md` aliases a throwaway `[]` and `md[k]=`
+writes into nothing.
+
+**The arrangement that would prove it.** Fire Trade at lane 4, then Break or
+shatter a die in a lane *below* 4 so `_removeDieAt`'s splice shifts the recorded
+lane, then end the match. 18561-18566 states this arrangement in the source
+itself. Second arm, and the one this sweep adds: fire Trade at a middle lane so
+the rival's bone sits in `matchDice[L]`, then next turn play Fair Trade so
+`worst` resolves to `L` — Fair Trade **overwrites** a seat rather than removing
+one (12992), lowering `cnt`'s count with nothing having died, a case the
+two-way `have===cnt` test cannot express.
+
+**What a probe must read.** Before `_tradeRestore()`: the whole `G._tradeSwaps`
+(`lane`, `mine`, `theirs`, `cnt`, `myEn`), `G.matchDice`, `G.matchOppDice`,
+`G._enchArr`, `G._fairTrade`. Its return `n`. Per iteration the resolved `k`
+against `L`, and whether 18599 fired independently of the `k>=0` branch. After:
+`G.matchDice[L]`, `G.matchOppDice[L]`, `G._enchArr[L]`. **The settling read is
+`G._enchArr[L] === null` while `G.matchDice[L]` holds the player's own
+material.**
+
+### S9. "a swap, not a splice - lanes and brands stay aligned" — true for lanes, false for brands, in four verbatim copies
+
+`pinned_e5b7705.html:24627-24629`
+```js
+        /* a swap, not a splice - lanes and brands stay aligned */
+        var pOld=G.matchDice[pBestIdx],oOld=G.matchOppDice[oWorstIdx];
+        G.matchDice[pBestIdx]=oOld;G.matchOppDice[oWorstIdx]=pOld;
+```
+
+**Already recorded as D11.** Listed here because the *comment* was never
+catalogued as a comment defect, and because the sweep found **three further
+copies of the same two lines** that the D11 write-up does not name:
+`29354` (`sleight_of_hand`, NPC route), `31223` (`activateSleightOfHand`) and
+`31519` (`activateStickyFingersPlayer`) — the last two byte-identical to each
+other. `downgrade_best` at 24643 (`G.matchDice[pBestIdx2]='bone';`, run twice)
+has the same hole with **no comment at all**, which is the safer failure.
+
+**Why it cannot deliver it.** The comment is true for lanes — no index shifts —
+and false for brands: `G._enchArr[pBestIdx]` is not written, so the arriving
+rival die is dressed in the player's brand at the next refill (25143
+`const _en=(G._enchArr||[])[_lane]||null;`) while the player's branded die
+crosses to `matchOppDice`, where no brand array exists. Contrast Trade at
+18424/18441/18453, which moves the brand out and ledgers it. **Two same-seat
+swaps, opposite brand rules, and only one of them has a comment — and it is the
+wrong one.**
+
+### S10. "belt-and-braces" — the guarantee is computed 650 ms before the removal it guards
+
+`pinned_e5b7705.html:11521-11523` and `11541-11544`
+```js
+  /* If every candidate would force a bust, skip the palm entirely this roll.
+     Worth firing only when at least one safe target exists. */
+  if(_safeCandidates.length===0)return;
+...
+    /* Recheck scoring on remaining FREE dice — if nothing scoreable, bust.
+       Note: the safe-candidate filter above guarantees at least one
+       scoring option remains after a single palm. This re-check is a
+       belt-and-braces guard for edge cases (e.g. weird die materials). */
+```
+
+**What it asserts.** That the `_safeCandidates` filter guarantees a scoring
+option survives the palm, making the re-check inside the timeout redundant.
+
+**Why it cannot deliver it.** `_safeCandidates` is computed synchronously at
+11516-11520 from `free` and `effectiveCards()` at that instant; the splice
+happens inside `setTimeout(..., 650)` closing at 11552. During those 650 ms the
+pool is mutable by anything the player can still reach — the same stale-capture
+shape as **D4** (Steady Hand) and **D5(c)** (Powder Keg at +500 ms).
+`G._palmAnimating=true` is set at 11529, but nothing in this reading establishes
+what consults it. **A guarantee established before a mutation window does not
+hold after it**, and calling the re-check redundant is what would license
+someone removing it.
+
+**The arrangement that would prove it.** Fire the pickpocket tell on a roll
+where exactly one scoring die exists among the free dice and it is *not* the
+palm victim, then inside the 650 ms window remove or change that die —
+`CFX.sacrifice` is usable in `'choosing'` and splices `G.pool` at 14324;
+`CFX.transmute` rewrites a face. Control: same roll, no interference.
+
+**What a probe must read.** First, whether **any** handler honours
+`G._palmAnimating` — instrument the tap path and read the flag at click time; a
+grep is not sufficient. Then, latched: `free` at filter time (vals + mats),
+`G.pool` at the top of the timeout, the `fv` array built at 11545, what
+`anyScoring(...)` returns, `_anchorRescues(...)`, and finally `G.phase`,
+`G.busted`, `G.numDice`, `G.matchDice.length`.
+
+---
+
+## DOES THE BRAND TRAVEL WITH THE DIE?
+
+Denis asked for this directly. Every site that moves a die or steals one, in one
+table. "Brand" is `G._enchArr` on the match side and `S.run.dieEnch` /
+`S.run.dieEnchInv` on the run side. **Verdicts are nominations, not clearances**
+— "PAIRED" means the two writes sit together at that site in the pinned copy,
+not that the site is correct.
+
+| site | what moves | what is left behind | verdict |
+|---|---|---|---|
+| `trade` fire **18425 / 18441 / 18453** | material both ways; `G._enchArr[L]=null`; `myEn` into the `_tradeSwaps` ledger | the brand crossing to `matchOppDice`, which has no brand array | **PAIRED.** The one-way loss is ruled and deferred in writing at 18410-18412 — "do not invent one here" |
+| `_tradeRestore` **18592 / 18596 / 18599** | `md[k]=t.mine` whenever `k>=0`; the brand **only** when `k===L`; the rival side on an independent `if` | on `k===-1`: the player's material; on `k!==L`: the brand, permanently | **NOMINATED — S8.** Two halves not gated together; measured as D11 |
+| `fair_trade` borrow **12992** | material only: `G.matchDice[worst]=inv[best]` | the **host's** brand on the seat, worn by the visitor; the **lender's** brand inert in `S.run.dieEnchInv` | **NOMINATED — D10(a), independently re-derived.** `G._enchArr` is named nowhere in the handler |
+| `fair_trade` hand-back **19155** | material back: `G.matchDice[lane]=_ftB.was` | nothing — the seat's brand is the returning owner's own | **PAIRED by accident of ownership.** A naive `_setLaneMat` here would *break* it — see §3 |
+| `fair_trade` expiry **24464** | material back: `G.matchDice[_lane]=_ft.was` | same | **PAIRED, same reason.** `G._fairTrade` has no brand field: `{lane, was, borrowed}` |
+| `swap_die` best_for_worst **24629** | material both ways | `G._enchArr[pBestIdx]` | **NOMINATED — D11 / S9** |
+| `swap_die` downgrade_best **24643** | `'bone'` written over the best, twice | `G._enchArr[pBestIdx2]` | **NOMINATED — D11 / S9**, no comment to mislead |
+| `steal_die` take_best **24679 / 24681** | `matchDice.splice` + `_enchArr.splice` + `_dropLanes(1)`; `_diceOut` record carries `ench` (24673-24675) | — | **PAIRED** |
+| `steal_die` take_and_use **24688 / 24690 / 24691** | as above, **plus** `G.matchOppDice.push(stolen)` | the stolen die's brand, destroyed at the moment of theft | **NOMINATED as a RULING, not a bug.** 18410-18412 rules the one-way loss for Trade; nothing rules it for confiscation |
+| `CFX.sacrifice` **14318-14324** | `_diceOut` record with `ench`; `matchDice.splice` + `_enchArr.splice`; `_dropLanes(1)`; pool filter; relane | — at the site | **PAIRED at the site, NOMINATED at the target filter.** 14292 excludes only `committed`/`_shattered`, so the victim may be the **borrowed** die and the brand spliced out is the **host's**, on a die that was only benched. **SUPERSEDED-CHECK (P519)** |
+| `_removeDieAt` **19186-19191** | record, `matchDice.splice`, `_enchArr.splice`, `_dropLanes(1)`, pool filter, relane | — | **PAIRED.** The reference remover |
+| Break **18397 → 24953 / 26840** | the die leaves through `_removeDieAt`, brand with it | — for the brand | **PAIRED on brand.** The single-slot `_breakPending` is a separate nomination — S4 |
+| pickpocket palm **11536-11539** | `G.pool.splice` + `_dropLanes(1)` + DOM removal | `matchDice`, `_enchArr`, `_diceOut` — deliberately: the palm is turn-scoped and 24435 hands the lane back | **NOT A FINDING** (N6, refuted). The brand does not need to travel because the die does not leave the match |
+| obsidian / grogs_tooth shatter **25291-25295** | through `_removeDieAt`, so paired | the `else` arm at 25295 filters `G.pool` alone; a laneless shattered die is in neither branch | **NOMINATED — S5 / D24** |
+| Vagabond drag **36662-36699** | `phys.x`, `G.pool` **order**, DOM row order | `d.lane`, `G.matchDice`, `G._enchArr`, `G.numDice`, `d.hx` | **NOMINATED — M1, never judged.** The brand travels *because it is a property of the pool entry* (`ench` stamped at 25160, 25042, 26403), not because anything moved it. The **seat** does not move at all. **SUPERSEDED-CHECK (P520)** |
+| `transmute` **14247** | `d.val` only | brand stays with its own die | **NOMINATED, low — N15.** `d.val` can be set to `d.ench.face` directly, bypassing `_enchRollM`, turning a wagered brand into an on-demand button; and its free set `G.pool.filter(d=>!d.committed)` (14241) admits `_frozen` dice |
+| Preserve bench → restore **24580 + `G._famPreserve`** | `val, mat, pts, crack` | the **lane** and the **brand** — the record has neither field | **NOMINATED — M4/M5, never judged; = D6(b)** |
+| `_stTrade` **33296-33299** | `S.run.dice[slot]=mat` then `S.run.dieEnch[slot]=null` | — | **PAIRED.** The reference for the run arrays |
+| `famDieShift` **14874-14877** | `var d=S.run.dice; ... var e=S.run.dieEnch,te=e[i];e[i]=e[j];e[j]=te;` | — | **PAIRED, dead.** Note it writes through **local aliases `d` and `e`** — a second census blind spot after `md` |
+| `famDieStash` **14884-14886** | `dice.splice` + `dieEnch.splice` + both padded | — | **PAIRED, dead** |
+| `famDieEquip` **14891-14898** | `diceInv`/`dieEnchInv` splices, `dice[bi]`/`dieEnch[bi]` written together | — | **PAIRED, dead** |
+| For Keeps loss **30256-30257** | `dice.splice` + `dieEnch.splice`, both refilled/padded | — | **PAIRED** |
+| `famRunDraftPick` **13770-13771** | `S.run.dice[bi]=mt` at `lastIndexOf('bone')` | `S.run.dieEnch[bi]` | **NOMINATED, new — not in this document.** If that bone carried a paid brand, the upgraded material inherits it. Reachability of the `#famRunDraft` overlay **not traced** |
+| `forge_night` **29458** | `S.run.dice[_fnPickIdx]=_fnNewMat` | `S.run.dieEnch[_fnPickIdx]` | **DEAD** — gated on `G.pCards.includes('forge_night')` and `G.pCards` is `[]` (N14). Would be a finding if the layer is ever fed |
+| tier loadout drag **34928-34930** | `S.run.dice[srcIdx] ↔ [tgtIdx]` | `S.run.dieEnch` entirely | **DEAD (CSS)** — already this document's §1e |
+| `_buyDieAtSlot` **33965** | `S.run.dice[slotIdx]=mat` | `S.run.dieEnch[slotIdx]` | **DEAD** — already this document's §1e |
+| `rewardKeepDice` **34332** | `S.run.dice=[..._rewardDice]` — the whole array | `S.run.dieEnch` entirely | **DEAD** — `showScreen('bossreward')` has no caller (N13) |
+| `activateSleightOfHand` **31223** · `activateStickyFingersPlayer` **31519** | material both ways | `G._enchArr` | **DEAD** — `G.pCards` is `[]`; already §4 item 12 |
+| `activateBlessedConfiscationPlayer` **31553** | `G.matchDice.push(stolen)` | no `_enchArr` push | **DEAD** — same; and it is the **only** site in the file that can lengthen `G.matchDice` |
+| `activateAlchemistsChisel` **31668** | `G.matchDice[leftPoolIdx]=newMat` | `G._enchArr`; and the index is a **pool** index | **DEAD** — already §4 item 12, already driven there |
+| debug `?vagatest=1` **36712** | `S.run.dice=['vagabond'×6]` | `S.run.dieEnch` entirely | **DEAD unless the URL param is set.** Flagged only because the file's own comment says "Strip if shipping prod" |
+
+**The one-line answer to the question.** On the **run** arrays the brand travels
+with the die at every live site that was read. On the **match** arrays it
+travels at every *removal* and at Trade, and it **does not travel at any
+same-seat substitution** — `fair_trade` 12992, `swap_die` 24629 and 24643. The
+brand belongs to the **seat**, and the only three live effects that change a
+seat's occupant without removing anything are exactly the three that leave it
+there.
+
+---
+
+## THE _setLaneMat CENSUS, INDEPENDENTLY DERIVED
+
+**"Four against three" half held.** The **four** is right for the scope §5c
+declared; the **three** is wrong, and the ratio it was used to justify is not
+4:3.
+
+**The four wrong sites hold.** §5c names `fair_trade` 12992, `swap_die`
+best_for_worst 24620, downgrade_best 24634 and `sleight_of_hand` 29343 (dead).
+In pinned line numbers those are **12992, 24629, 24643, 29354** and all four are
+real: a material written into a lane with `G._enchArr` untouched. Three live,
+one dead.
+
+**The full census, derived without looking at §5c first.** Two greps over the
+pinned copy — `G\.matchDice\[[^\]]*\]\s*=` and
+`G\.matchDice\.(splice|push)|G\.matchDice\s*=` — plus a manual alias pass:
+
+| kind | sites |
+|---|---|
+| element writes | **12992, 18425, 19155, 24464, 24629, 24643, 29354, 31223, 31519, 31668** (10) **+ 18592 via the alias `md`** = **11** |
+| push | **31553** (1) — the only site that can lengthen `matchDice` |
+| splice | **14322, 19190, 24679, 24688** (4) — all four paired with an `_enchArr.splice` |
+| whole-array | **23110** (the `newG` object literal), **32032**, **32085** (3) |
+
+**Four of the eleven are on the dead `pCards` layer** — 31223, 31519, 31668, and
+the push at 31553. `initMatchScreen` hard-codes `const pCards=[];` at 31886 and
+passes *that* to `newG` at 31896, `G.activeCardState.usedCards` is seeded at
+31959 by iterating it, and `canActivateCard` therefore fails at 30846-30847
+before `activateCard`'s switch is reached. **§4 item 12 already names all four**;
+they are excluded from 5c on purpose, not missed.
+
+**Two aliases, not one.** `md` at 18582 (`var md=G.matchDice||[];`) is invisible
+to a `G.matchDice[` grep, and so is `famDieShift`'s pair at 14874-14877
+(`var d=S.run.dice;` … `var e=S.run.dieEnch,te=e[i];`). Any future census must
+be run twice: once on the identifier and once on `= *(G\.matchDice|S\.run\.dice)`
+to catch the alias bindings. **This is the seventh time this session that a
+name-based search under-counted.**
+
+**The fair-trade family is three sites, not one — and a naive helper would
+break two of them.** 12992 is the borrow; **19155** and **24464** are the two
+returns:
+```js
+19155:      G.matchDice[lane]=_ftB.was;/* its owner walks back in */
+24464:      G.matchDice[_lane]=_ft.was;/* loan simply expired */
+```
+Both restore the lane's **original owner**, so the brand currently sitting in
+that seat is the one that belongs there. Passing an `ench` argument at those two
+sites would need the value the loan displaced — and `G._fairTrade` records only
+`{lane, was, borrowed}`, with **no brand field**. *`_setLaneMat` cannot be
+adopted for Fair Trade until the loan record grows a field.* This is D6's shape
+(one site needs one new field) and belongs in 5e alongside it, not in 5c.
+
+**"Three correct references" does not hold.** Of the three §5c names, only
+**Trade** operates on the arrays the helper would govern. `_stTrade`
+(33296-33299) and `famDieShift` (14874-14877) pair the **run** arrays, whose
+length invariant is enforced separately by `_enchInit` (19459-19462) — a
+different contract. And the run side has at least three more correct pairs that
+§5c does not count: `famDieStash` 14884-14886, `famDieEquip` 14896-14898, and
+the For Keeps forfeit 30256-30257.
+
+**The real ratio, stated by array:**
+
+| array | correct pairs | unpaired writes |
+|---|---|---|
+| match (`matchDice`/`_enchArr`) | **1** — Trade 18425/18441 | **3 live** (12992, 24629, 24643) + **1 dead-NPC** (29354) + **4 dead-player** (31223, 31519, 31553, 31668) + **1 conditional** (18592/18596) |
+| run (`S.run.dice`/`dieEnch`) | **5** — 33298/33299, 14876/14877, 14884/14885, 14897, 30256/30257 | **13771** (live, reachability untraced), 29458, 33965, 34332, 34929-34930, 36712 — all dead or debug except 13771 |
+
+On the match arrays it is **1 correct against 4 wrong**, not 3 against 4. The
+argument for building the helper survives — it is stronger, because the correct
+reference is rarer than §5c thought — but the *evidence* offered for it in §5c
+does not, and the two fair-trade returns must be excluded from the conversion
+list until the loan record can carry a brand.
+
+**One more ground-truth item, and it is a nomination in its own right:
+nothing re-derives brands from materials.** The only derivation of `G._enchArr`
+is 32100-32103, and it derives from `S.run.dieEnch` or the snapshot, **never
+from `G.matchDice`**:
+```js
+  var _rdEnch=params&&params._resumeData&&params._resumeData._enchArr;
+  G._enchArr=(Array.isArray(_rdEnch)&&_rdEnch.length===(G.matchDice?G.matchDice.length:0))
+    ?_rdEnch.slice()
+    :((S&&S.run&&S.run.dieEnch)?S.run.dieEnch.slice():[]);
+```
+The born-brand pass — the one place a material *implies* a brand — runs at
+19473-19486 inside `_enchInit`, on `S.run.dice`/`S.run.dieEnch`, never on the
+match arrays, and `_bornEnch` has exactly one call site (19476). So a mid-match
+swap that brings a relic material into a lane gets **no** born brand, and one
+that takes a relic out leaves `{born:true}` sitting on whatever replaced it. The
+only pass that judges a brand against the match material,
+`_scrub(G._enchArr,G.matchDice,false)` at 19418, is gated behind the one-shot
+`if(S.run._enchV!==3)` migration at 19378 — at most once per save, never after a
+swap. **Probe:** own Brutus's relic, let `downgrade_best` (24643) turn that lane
+to `'bone'`, then read `G._enchArr[lane]` (expect `{t:'ward',face:N,born:true}`
+still present) against `_bornEnch(G.matchDice[lane])` (expect null) and
+`_iconFaces(G.matchDice[lane]).indexOf(G._enchArr[lane].face)` — a `-1` is a
+brand on a face the material cannot show, which is exactly what the 19391
+migration exists to refuse.
+
+---
+
+## REFUTED
+
+31 nominations died. One line each, with the reason. A sweep that reports only
+what it found and never what it threw out is unfalsifiable — and half of every
+raw hit list this session has dissolved on contact.
+
+**Safety-comment lane (12):**
+
+1. **C4 — `_dropLanes`' rule comment says numDice "is never assigned from matchDice.length" and its own else arm does.** The comment is imprecise but the branch is unreachable: every `numDice` writer was walked (24427, 24435, 24540, 24765, 24800, 24813, 14272, 19121, 24991, 26267, 26389, 27239, 27438, 27571, 27858, 31375, 32026) and none produces NaN; the Gambler's Eye zero route is closed four lines above the write by `if(geSelected.length===0||geSelected.length>=geFree.length)return;`.
+2. **C5 — "the record and the gap can never disagree" with the record inside a swallowing try.** No demonstrated throw: every `_diceOut` writer produces an array and the resume normalises at 32114, and `_enchInit` (19459-19460) forbids `_enchArr` being shorter than `matchDice`.
+3. **C6 — the Fair-Trade early return sits in a swallowing try, so a throw applies both paths.** The only two statements that could throw are each wrapped in their own inner try (19162, 19164); the arm variance D5 flagged is explained by C16's stale `ft.lane` with no throw needed.
+4. **C7 — resume uses array-length equality as proof of lane alignment.** Scoped finding that does not transfer: `G.matchDice` was set from the *same* snapshot at 32032, so the gate can copy a misalignment but cannot create one; its real job is catching the mirror re-seed at 32085.
+5. **C8 — "the die cannot come back inside this match" omits every literal-6 numDice writer.** 24435 re-derives from `matchDice.length` at the top of every player turn and the only later writers lower it; `saveMatchState` has two call sites and neither runs between a literal 6 and the next reset.
+6. **C10 — `clearRow`'s comment vouches for the held-dice wipe then clears the record the seat maths needs.** Every caller clears `G.oppDice` in the same statement (28379, 28443), so `_oppHeld` is legitimately empty on re-entry and `_freeSeats=[0..n-1]` is correct; the real asymmetry is that `left` is not recomputed, which is D2, a different claim.
+7. **C14 — P518's max has no proof that raising numDice is always right.** Could not build the window: every penalty writer leaves the pool built to the reduced count, and the one writer that leaves numDice below `pool.length` (Gambler's Eye 24765) is followed by Powder Keg uncommitting every die, where raising is correct.
+8. **C15 — Sacrifice's `_diceOut` record and its splice share a variable declared inside a swallowing try.** Nothing between the `try{` at 14310 and the assignment at 14316 can throw (`d._shattered=true` at 14294 runs outside it), and `_dropLanes(1)` at 14323 sits outside both `mi>=0` guards, so numDice cannot hold while the pool shrinks.
+9. **C19 — the loadout panel's comment enumerates "every producer" of `_diceOut` and misses the palm and the shatter else-branch.** Ran the right test — who shrinks `matchDice` without writing a record — and the enumeration holds: exactly four `matchDice.splice` sites (14322, 19190, 24679, 24688), each preceded by its record. The palm and the else-branch touch only `G.pool`.
+10. **C20 — Preserve's heading says "ONE FEWER THAN THE LOADOUT" and the code takes one fewer than numDice.** Self-correcting in place: the P514 block directly beneath the heading states the actual rule. The load-bearing observation buried in it (the record has no lane) is D6/S6's mechanism and belongs there.
+11. **C21 — `_kindredActive` asserts `S.run.dieEnch` is stable for the match; the empty-array case is not covered.** `_enchInit` forces the array to `S.run.dice.length` (19459-19460) and 9439 pads to 6, so `[]` requires an empty loadout, in which case the fallback returns the same answer.
+12. **C22 — "never a legal Break target" implements only the Break half of a ruling stated as inertness.** `_breakPreserved`'s object tests are dead: `G._famPreserve`'s sole constructor (14430) writes `{val,mat,pts,crack}` with no `die` and no `lane`, so Sacrifice's missing preserve filter is currently vacuous. (The missing *borrowed* filter is live and is S7/N2.)
+
+**Brand-travel and steal lane (9):**
+
+13. **N3 — hot dice still uses `i % G.matchDice.length`, so a short hand re-deals the low lanes.** P517's clamp at 24991 runs 20 lines earlier and caps `numDice` at `matchDice.length`, so the modulus can never wrap; and `G.pool=[]` at 24977 makes the free-lane walk byte-identical to the modulus here.
+14. **N4 — Blessed Confiscation destroys the player's brand and hands the rival a die that cannot carry one.** Two of the three claims are conditional on a swap ruling the file does not implement; the third (no opponent-side brand array) is ruled and deferred in writing at 18410-18412.
+15. **N6 — the pickpocket palm leaves `matchDice`/`_enchArr`/`_diceOut` untouched.** Wrong scope: `_removeDieAt` is the *match*-scoped remover and the palm is turn-scoped; 24435 hands the lane back next turn, `needNew` is 0 so no die inherits the vacated brand, and `matchDice[ft.lane]` still satisfies the loan's `_stillThere` test.
+16. **N8 — Vagabond's comment claims "the enchant slots agree with what is now on the table".** The comment is loose but the outcome holds by a different mechanism: every pool entry carries its own `ench` **object**, stamped at 25160, 25042 and 26403, and `_laneOf` returns the stamp first (19357-19358), so reordering the array moves brands intact. (What the drag genuinely does not move is `d.lane` — that is M1, unjudged.)
+17. **N9 — Snuff/Fog/Snare arm with a player lane and index the rival's seat array.** `royal_seizure` shrinks the *player's* `matchDice` and the marker only ever indexes `G.matchOppDice` (28053); mirroring the lane number is the card's stated design (18466-18468), and the only two writers that could shrink `matchOppDice` under a live marker are on the dead layer.
+18. **N10 — `activateBlessedConfiscationPlayer` pushes to `matchDice` without padding `_enchArr`, tripping the resume length gate.** Unreachable: `initMatchScreen` declares `const pCards=[];` at 31886 and passes that local to `newG` at 31896; `usedCards` is seeded from it at 31959; `canActivateCard` bails at 30846-30847. This verdict kills every other player-side activator too.
+19. **N12 — Mabel's Stitch and Second Wind rebuild the table with `G.numDice=G.matchDice.length`.** Both branches are gated on flags whose only writers are inside `activateCard` (31032, 31425) — dead by N10; and Second Wind's is followed immediately by `endPTurn()`, after which 24435 reassigns anyway.
+20. **N13 — `rewardKeepDice` replaces the whole loadout array and leaves every brand behind.** The surface never opens: `showScreen` is the sole mechanism that adds `.active` (10376), every one of its ~38 call sites passes a string literal, and none passes `'bossreward'`.
+21. **N14 — Forge Night leaves a brand on the new material.** `G.pCards.includes('forge_night')` at 29452 can never be true; and the reading it contrasts against is not parallel — `_stTrade` clears the mark because the outgoing *die leaves*, whereas forge_night upgrades the die standing in the slot.
+
+**Census lane (10):**
+
+22. **C1-count — 11 element writes, not 4, and 7 of them leave `_enchArr` behind.** The raw count reproduces exactly (I re-derived the same 11), but four of the "seven live" are on the dead `pCards` layer and §4 item 12 already names all four by function; 5c's scope is live sites.
+23. **C2-31223 — `activateSleightOfHand` is missing from the four.** Dead by N10; and `sleight_of_hand` is `dep:true` (11791) and in no `cardPool`, so even the NPC route cannot draw it.
+24. **C3-31519 — `activateStickyFingersPlayer` is missing from the four.** Dead by N10; the card's *live* implementation is the NPC block at 24629, which 5c already counts.
+25. **C4-31668 — Alchemist's Chisel writes `matchDice` at a pool index.** Dead by N10, and "missing from the doc" is false — §4 item 12 names it, calls it the only such site in the file, and reports it **driven**.
+26. **C5-31553 — Blessed Confiscation grows `matchDice` without growing `_enchArr`.** Dead by N10; the live `blessed_confiscation` does the opposite (splices `matchDice`, pushes to `matchOppDice`), so `matchDice.length > _enchArr.length` has no reachable producer.
+27. **C6-groundtruth-index — the two arrays can diverge at birth, three ways.** All three close: `newG` calls `_enchInit()` before reading `S.run` and `_getS()` creates the run (9500) with six dice; the mirror re-seed is a measured no-op; and 31553's push is dead.
+28. **C7-sparse — Trade's fire can mint a genuinely sparse `_enchArr`.** Requires the runless `G._enchArr=[]`, which C6 refutes; and Trade's own guard at 18420 refuses any lane outside `matchDice`, so 18441 always overwrites an existing slot.
+29. **C8-shrink-guards — the four splice sites each use two independent guards.** Structurally true, but the failure needs `_enchArr.length < matchDice.length` and no reachable route to it was found; the 32101 fallback can only make `_enchArr` **longer**.
+30. **C13-mirror — mirror_match's length test cannot distinguish "different loadout" from "same length".** The reseed is a measured no-op: writer 35714-35719 and reader 32085-32087 have inverted field names and the inversions cancel, so both branches carry identical content. Already this document's line 480.
+31. **C14-linedrift — the 5c line numbers do not resolve in the pinned file, so the census was counted against a different revision.** The individual checks are right and the inference is wrong: 12992 lands exactly, 24620/24634 are deliberate block anchors, 33287-33288 is `_stTrade`'s header comment above the function. Only one cite (14864-14869 for `famDieShift`, which begins at 14873) is genuinely off, by four lines. The drift is this document's own §4 item 14, already recorded.
+
+---
+
+## NOT DRIVEN
+
+**Stated plainly and up front: nothing in this part of the document was
+executed.** No browser, no dev server, no `tools/shoot.js`. It is static reading
+against `pinned_e5b7705.html`, a copy of `fark_proto.html` at commit **e5b7705**,
+taken because the live file was being patched concurrently and could not be
+read. Every item above is a **nomination awaiting a probe**. Where a nomination
+coincides with an already-measured defect (D6, D8, D9, D10, D11, D24) the
+measurement is this document's, not this sweep's, and is cited as such.
+
+**And the pinned copy is stale against the live file.** Highest patch marker
+P518. P519 and P520 are recorded in §2 as shipped and are **absent from what was
+read**. The five nominations marked SUPERSEDED-CHECK — S1's NaN arm, S7's arm
+(a), the Sacrifice row of §2, N2, and M1's whole basis — must be re-read against
+the live file before a probe is written, or the probe measures a file nobody is
+running.
+
+### Priority order for driving
+
+1. **S4 — Break's single-slot `_breakPending`.** Highest, because it is the only
+   nomination here whose mechanism no shipped patch touches, whose arrangement
+   is cheap (two Break brands, one commit), and whose failure is silent. **Read:**
+   a `fire` counter instrumented at 18397, `G._breakPending` after each, the
+   number of `_breakBegin` entries, and `G.matchDice.length` / `G._diceOut.length`
+   / `G.numDice` across the commit. Two fires and one `_diceOut` entry settles it.
+2. **S8 — `_tradeRestore`'s two ungated halves, under a live Fair Trade loan.**
+   D11 already measured the `k===-1` case; the new arm is Fair Trade
+   **overwriting** a traded seat (12992), which lowers `cnt` with nothing having
+   died — a case the `have===cnt` test cannot express. **Read:** the whole
+   ledger before the call, `n`, `k` against `L` per entry, whether 18599 fired
+   independently, and `G._enchArr[L]` after.
+3. **S5's duplicate-lane arm.** D24 measured the laneless case; the *duplicate*
+   case has never been touched. **Read:** `_shLanes` as built, and whether
+   `_removeDieAt` was handed the same seat twice — the second call's victim is
+   an innocent neighbour. This one is cheap only if S1's producer still exists
+   post-P519; check that first.
+4. **S6 — the occupancy set against `needNew`.** The symptom is a die sitting
+   out a turn, which is indistinguishable by eye from D6. **Read:** latched at
+   the top of the refill, `G.numDice`, `G.pool.map(d=>d.lane)`,
+   `Object.keys(_occLane)`, `_freeLanes`, `needNew`, `G.matchDice.length`; then
+   which `matchDice` index was dealt no die.
+5. **S7 arms (b) and (c) — `_breakBorrowed` by material string, and the
+   out-of-range arm returning `true`.** P519 does not touch either. **Read:**
+   `_breakBorrowed(d)` against startPTurn's expiry predicate on the same state,
+   with a loan whose `borrowed` material duplicates a die the player already
+   owns; and separately with `ft.lane >= G.matchDice.length`.
+6. **S10 — whether anything honours `G._palmAnimating`.** This is a
+   *reachability* read before it is a defect read, and it is one line of
+   instrumentation on the tap path. If nothing consults the flag, the 650 ms
+   window is open and D4/D5(c) have a third carrier.
+7. **The `_setLaneMat` ground truth — a brand orphaned on a material that cannot
+   show its face.** **Read:** `_enchArr[lane]` against `_bornEnch(matchDice[lane])`
+   and `_iconFaces(matchDice[lane]).indexOf(_enchArr[lane].face)` after
+   `downgrade_best` takes a relic lane to bone. A `-1` is a state the 19391
+   migration exists to refuse and that nothing at runtime can reach to repair.
+8. **`famRunDraftPick` 13770-13771 — reachability first.** Trace what opens the
+   `#famRunDraft` overlay. If it is live, it is the only unpaired run-array write
+   this sweep found on a reachable surface, and the whole run side's "brand
+   travels" answer changes.
+9. **S1, S9, S2/S3 last** — S1 and S9 because P519 and D11 respectively may
+   already own them, S2/S3 because they are §5b's rework and the seat/count
+   helper subsumes them. For S2/S3 the useful probe is not the seats — D1
+   measured those — but the **`combo` persona's computed value for `L===0`**
+   against the actual post-sweep `_freeSeats.length`.
+
+### Nine nominations never received a verdict
+
+They were raised and the adversarial pass ran out before reaching them. They are
+neither survivors nor refuted, and must not be counted as either. Recorded here
+verbatim so they are not lost:
+
+| id | nomination |
+|---|---|
+| **M1** | Vagabond's drag writes zero of the six facts except pool order and DOM order — `d.lane` never moves, so the seat stays put and only the picture moves. **SUPERSEDED-CHECK (P520)** |
+| **M2** | For a genuine reorder, the naive patch (restamp `d.lane` only) is exactly the "brand stays on the seat" shape — and the only sites that would show it are the four mint sites |
+| **M3** | A genuine reorder retargets Trade, Snare, Snuff and Fog at a different rival seat — the armed markers store a number that is a player lane and a rival lane at the same time |
+| **M4** | Preserve benches a die and restores it stripped of its brand — and the bench record has no lane and no `ench` field at all |
+| **M5** | Preserve can bench an ICON die — a branded face that banks zero by law — and hand it back next turn worth 100 or 50 points, unbranded |
+| **M6** | The loadout drag swaps `S.run.dice` and never `S.run.dieEnch` — the reference-correct version of the same swap sits nine lines apart in `famDieShift` and is dead |
+| **M7** | `_enchInit`'s born-brand pass is the only code in the file that moves a brand *with* a material — so under any reorder a born Ward follows its die while a paid brand stays on the seat, and the paid one is refunded and overwritten |
+| **M8** | `activateAlchemistsChisel` uses a POOL INDEX as a `matchDice` index, and writes `matchDice` without `_enchArr` — the drag makes pool index and lane disagree |
+| **M9** | Fair Trade's loan is material-only on BOTH legs — the record has no `ench` field, and the restore never writes `_enchArr` either |
+
+M4/M5 and M9 are the two worth judging first: M4/M5 is D6(b) with a scoring
+consequence nobody has priced, and M9 is the precondition that decides whether
+`_setLaneMat` can be adopted for Fair Trade at all (§3).

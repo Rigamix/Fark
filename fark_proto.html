@@ -24726,7 +24726,39 @@ function startPTurn(){
         G.matchDice.splice(pBestIdx3,1);
         _dropLanes(1);/* P516 *//* P504: numDice must shrink with matchDice or the pool build's i%matchDice.length wraps and duplicates lane 0 */
         if(G._enchArr&&pBestIdx3<G._enchArr.length)G._enchArr.splice(pBestIdx3,1);/* P480: the lane array must shrink with the dice */
-        G.matchOppDice.push(stolen);
+        /* P522: A SWAP, NOT A SEVENTH SEAT. This was matchOppDice.push(stolen),
+           which made the rival's loadout seven long - and the seventh seat is
+           unreachable, because seats are consumed as _freeSeats[i] for
+           i < rollDice and nothing live ever makes rollDice seven. The die was
+           never rolled.
+           It was not inert, though, which is why this is a fix and not a
+           deletion: matchOppDice feeds the starstone bank bonus (ungated, 500 a
+           bank) and the AI's EV table, so a confiscated premium die inflated the
+           rival's scoring without ever appearing on the table, and the First
+           Strike reveal drew seven dice on the THEM row while six were rolled.
+           Replacing the rival's WORST die gives it the upgrade the card promises
+           in a seat that actually gets dealt, and keeps the array six long so the
+           bonus, the EV table and the reveal are all correct again.
+           dieRank is the same scale used one line above to pick the player's
+           BEST die, so best and worst cannot disagree about what value means. */
+        (function(){
+          if(!Array.isArray(G.matchOppDice)||!G.matchOppDice.length){
+            G.matchOppDice=[stolen];return;
+          }
+          var _oW=0;
+          for(var _oi=1;_oi<G.matchOppDice.length;_oi++){
+            if(dieRank(G.matchOppDice[_oi])<dieRank(G.matchOppDice[_oW]))_oW=_oi;
+          }
+          /* P522: only if it is actually an upgrade. Unit-checked and found
+             backwards without this: the rival holding [starstone,jade,amber] and
+             confiscating a bone would have swapped its amber out for the bone and
+             made itself WORSE. The card takes the player's best die, but the
+             player's best can still be beneath the rival's worst late on. The
+             confiscation itself is unchanged - the player has already lost the
+             die - so the only question is whether the rival plays it, and an
+             opponent choosing a worse die is a behaviour bug, not a design. */
+          if(dieRank(stolen)>dieRank(G.matchOppDice[_oW]))G.matchOppDice[_oW]=stolen;
+        })();
         triggerCard(cid,npc.name+': TOOK YOUR '+stolen.toUpperCase()+' AND USES IT!',false);
         setStatusMsg(G.rung.name+' CONFISCATED YOUR '+stolen.toUpperCase()+'!','red');
         spawnPop('✝️ CONFISCATED');
@@ -25171,11 +25203,22 @@ G.numDice=Math.min((G.matchDice?G.matchDice.length:6),(G.numDice||(G.matchDice?G
       var _occLane={};(G.pool||[]).forEach(function(_d){_occLane[_d.lane]=1;});
       var _freeLanes=[];for(var _fl=0;_fl<G.matchDice.length;_fl++){if(!_occLane[_fl])_freeLanes.push(_fl);}
       for(let i=0;i<needNew;i++){
-        /* overflow fallback: needNew beyond the free-lane count means
-           numDice > matchDice.length, which startPTurn's baseline makes
-           unreachable today and only the retired Seven Dice could cause.
-           Holding the old expression there keeps that case byte-identical
-           rather than inventing behaviour for it. */
+        /* P523: THIS COMMENT WAS FALSE, AND IT SAT ON THE GUARD THAT EXISTS
+           BECAUSE IT WAS FALSE. It read: "needNew beyond the free-lane count
+           means numDice > matchDice.length, which startPTurn's baseline makes
+           unreachable today and only the retired Seven Dice could cause."
+           That argument only ever considers numDice going UP. The route
+           actually taken goes the other way - matchDice.length going DOWN to
+           zero, at which point _freeLanes is empty (it is built by
+           `for(_fl=0;_fl<G.matchDice.length;_fl++)`), every iteration takes
+           the else arm, and (0+0)%0 is NaN. D8 measured exactly that: a die
+           with lane NaN that nothing can remove and a match that looks live
+           and cannot be won.
+           Left in place, this comment invited the next reader to delete the
+           guard below as dead weight. It is the second false safety claim
+           found in this cluster - P517's was the first, asserting a floor a
+           Math.min cannot provide - and both were written by reasoning about
+           only one direction of a bound. */
         /* P519: the modulo fallback is where the NaN came from. With the floor
            in _removeDieAt matchDice can no longer reach length 0, so this is
            defence in depth rather than the fix - and it is worth having,
