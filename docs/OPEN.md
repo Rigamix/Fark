@@ -283,6 +283,45 @@ matched. Seventh time this session a zero from a name search became a claim.
 
 ---
 
+## 1g. Dice-lane integrity — STILL OPEN, deprioritised, not resolved
+
+**Why this is only being written down now:** the status accounting existed in
+conversation and was never put in a doc, so it silently vanished from a
+"what's next" summary assembled from this file. That is the standing rule
+being broken — open work lives in `docs/`, not in chat. Logged here so it
+cannot happen twice.
+
+### What shipped, and is verified
+
+One bug, fixed: the array desync that caused **lane duplication**. Four
+`G.matchDice.splice` call sites are now each paired with a `_enchArr.splice`
+(4 and 4), and `numDice` is handled at all four — three by decrement, Break by
+recompute. `_laneOf` gives a die stable lane identity. Covers **Sacrifice**,
+`royal_seizure`, `blessed_confiscation` and **Break**.
+
+### What is NOT resolved by that fix
+
+- **Pickpocket's small per-roll steal chance — the ORIGINAL report.** It was
+  explicitly *cleared* as not being the desync bug. **Its actual mechanism has
+  never been investigated.** The thing that started this is still unexplained.
+- **Snuff** — untouched.
+- **Trade's swap** — untouched.
+- **Preserve's inert-state lane stability** — untouched.
+- **Hot-dice reset** lane stability — untouched.
+- **The entire card-slot half of the plan** — never started.
+
+### Priority
+
+Stays **behind the card art and the playtest**, per the existing decision.
+Nothing has changed that. Being lower priority is a reason to keep it queued,
+not a reason to leave it off the accounting.
+
+Tooling already exists to build on: `tools/apv_lane_integrity.js`,
+`apv_lane_lifetime.js`, `shoot_lane_stability.js`, `shoot_lanes.js`,
+`shoot_lanes_across_turns.js`, `shoot_npc_lanes.js`.
+
+---
+
 ## 2. Early-game signal — needs a person, not more reasoning
 
 Restoring the brief's 24 feats removed every feat that fires in a new player's
