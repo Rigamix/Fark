@@ -25038,7 +25038,29 @@ function handleRoll(){
   var _blockadeFire=(G.oCards.includes('blockade')&&G.turnRollCount===0&&G.pool.length===0&&Math.random()<0.25);
   var _blockadePattern=[2,3,4,2,3,4];
   const newEntries=[];
-  for(let i=0;i<needNew;i++){const _lane=(G.pool.length+i)%G.matchDice.length;
+      /* P512: fill the lanes that are actually FREE, never a lane inferred from
+         pool length. The old expression, (G.pool.length+i)%G.matchDice.length,
+         assumed the survivors occupied lanes 0..length-1 contiguously. Remove
+         lane 0 of six and the pool holds lanes 1..5 with length 5, so it
+         computed 5%6 = 5 and stamped a SECOND die onto lane 5 - wrong material,
+         wrong enchant, duplicate lane. G.pool is not reassigned until the
+         concat below, so the length was loop-invariant and every refilled die
+         landed on the same lane.
+         P510 fixed Pickpocket by decrementing numDice, which drives needNew to
+         0 so this loop never runs - that routed AROUND this line. Any future
+         caller that removes a die without adjusting numDice re-opens it.
+         Occupancy is read from G.pool itself because the whole defect is
+         numDice and the pool disagreeing; G.pool cannot drift from G.pool.
+         Mirrors _removeDieAt (19143-19144), the reference on the remove side. */
+      var _occLane={};(G.pool||[]).forEach(function(_d){_occLane[_d.lane]=1;});
+      var _freeLanes=[];for(var _fl=0;_fl<G.matchDice.length;_fl++){if(!_occLane[_fl])_freeLanes.push(_fl);}
+      for(let i=0;i<needNew;i++){
+        /* overflow fallback: needNew beyond the free-lane count means
+           numDice > matchDice.length, which startPTurn's baseline makes
+           unreachable today and only the retired Seven Dice could cause.
+           Holding the old expression there keeps that case byte-identical
+           rather than inventing behaviour for it. */
+        const _lane=(_freeLanes[i]!==undefined)?_freeLanes[i]:((G.pool.length+i)%G.matchDice.length);
     const mat=G.matchDice[_lane]||'bone';
     const _en=(G._enchArr||[])[_lane]||null;
     var val;
