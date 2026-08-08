@@ -14400,7 +14400,18 @@ CFX.preserve={
        die quietly downgraded it - the player paid for a family trait and got a
        plain die back. The kept entry it came from already carries `mat`. */
     var found=null,foundMat=null;
+    /* P514: take the material of the DIE that carries the 1 or the 5, not
+       k.mat - which is selDice[0].mat, the first die of the whole commit
+       (built at the G.kept.push). Keep a triple of 3s on bone/iron/flint
+       plus a 1 on lead and the old read stored the 1 as BONE.
+       k.vals and k.dice are NOT index-parallel - vals comes from
+       _scoreDice with icon faces split out by _splitIcons, dice comes from
+       selDice - so this searches k.dice BY VALUE and never by position.
+       The old vals scan stays as the fallback for entries with no dice
+       array, which is also what canUse tests against. */
     (G.kept||[]).some(function(k){
+      var _pd=(k.dice||[]).filter(function(dd){return dd&&(dd.val===1||dd.val===5);})[0];
+      if(_pd){found=_pd.val;foundMat=_pd.mat||k.mat||'bone';return true;}
       return (k.vals||[]).some(function(v){
         if(v===1||v===5){found=v;foundMat=k.mat||'bone';return true;}
         return false;
@@ -24522,7 +24533,16 @@ function startPTurn(){
     /* ONE FEWER THAN THE LOADOUT, not a hardcoded five. A player whose loadout
        is already down a die to Break has five, and would have been handed five
        back - paying nothing for the preserve. */
-    G.numDice=Math.max(1,(G.matchDice?G.matchDice.length:6)-1);
+    /* P514: DECREMENT, do not recompute. startPTurn already set numDice to
+       matchDice.length four lines into the turn, and Whisper's Hex may have
+       taken one off it since - recomputing from matchDice.length handed that
+       back, so the player was told "YOU HAVE 5 DICE" and then got five
+       instead of four. The comment below still holds: a player already down
+       a die to Break must pay for the preserve, and a decrement does that
+       too (5 -> 4), while also respecting per-turn penalties.
+       Same lesson _removeDieAt records at 19140: "Assigning matchDice.length
+       here refunded every per-turn dice penalty and ate Seven Dice's bonus." */
+    G.numDice=Math.max(1,(G.numDice||(G.matchDice?G.matchDice.length:6))-1);
     /* AND PUT IT ON THE TABLE. The data above is invisible on its own: the
        player would start the turn a die short with points already banked and
        nothing to explain either. mkDie is the same factory the normal roll uses
