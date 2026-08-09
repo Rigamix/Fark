@@ -1005,6 +1005,8 @@ walk the loadout down, and Sacrifice takes the last step.
 
 ### D9 — Sacrifice does not shift `G._fairTrade.lane`, and the result is an exploit, not a loss
 
+> **CLOSED — P519.** Sacrifice routes through `_removeDieAt`, which shifts `G._fairTrade.lane`. Driven: loan held at 1 when a die above went, shifted to 0 when one below went.
+
 `_removeDieAt` carries two pieces of loan bookkeeping — the hand-back at 19144
 and `if(ft.lane>lane)ft.lane--` at 19204, written because *"a seat destroyed
 BELOW a live loan shifts it down, or that same expiry check reads the wrong
@@ -1103,6 +1105,8 @@ All four disruption classes are unstoppable, not two. `_ironGrip` is permanently
 false and 11790 records `iron_grip removed`.
 
 ### D12 — Vagabond's drag desyncs every tap target in the row for the rest of that roll
+
+> **CLOSED — P520.** The reorder permutes lane, material and brand together, and clears the cached chip centre. Tap targets confirmed by Denis in play: *"it works now yes."*
 
 > **P520 — the reorder is now real. Half verified, half explicitly not.**
 > Ruled by Denis: *"genuine reordering... A drag that moves the die's visual
@@ -1257,6 +1261,8 @@ rework.** The sweep confirms the diagnosis and narrows it: seat 6 is
 unconditionally unreachable, not conditionally.
 
 ### D14 — Sacrifice never calls `_removeDieAt`, and the resume rewinds it: a zero-cost savescum of a match-permanent decision
+
+> **CLOSED — P519.** `_removeDieAt` re-snapshots mid-turn, so the resume no longer rewinds a match-permanent sacrifice. Driven: live 6→5, snapshot 6→5.
 
 `CFX.sacrifice` reimplements five of `_removeDieAt`'s responsibilities and skips
 four: the loan hand-back (19144), the `ft.lane` shift (D9), the mid-turn
@@ -1716,6 +1722,8 @@ how likely a reader is to hit it, and whether anything downstream is already
 built on it.
 
 ### S1. "which startPTurn's baseline makes unreachable today" — sitting on the expression this document already measured minting a `lane: NaN` die
+
+> **CLOSED — P519 (the guard) + P523 (the false comment).** The refill refuses a non-index lane and `matchDice` cannot reach length 0; the "unreachable today" claim is replaced with what is actually true.
 
 `pinned_e5b7705.html:25136-25141`
 ```js
@@ -2191,6 +2199,8 @@ splice, then roll.
 `#playerDiceRow` and which `matchDice` index was dealt none.
 
 ### S7. "the two can never disagree" — two readers of one expression agreeing is correlated failure, and it is stated here as a safety property
+
+> **Arm (a) SUPERSEDED by P519; arms (b) and (c) CLOSED by P530.** Every seat-shrinking writer now maintains the loan, and an out-of-range loan protects nothing.
 
 `pinned_e5b7705.html:19039-19045` and `19049-19059`
 ```js
@@ -2923,6 +2933,8 @@ same three reads on an icon-free illegal selection, which all three must refuse
 — otherwise the probe cannot see a refusal at all.
 
 ### PR2 — Preserve's gate reads `k.vals`, its picker reads `k.dice`, and which of three producers wrote the row decides whether those are parallel (= M5, with the producers named)
+
+> **CLOSED — P534.** `k.dice` records the brand, and `_keptScorers` filters icon faces out using the same predicate `_splitIcons` uses.
 
 ```
 14436  canUse:function(){
