@@ -18647,23 +18647,19 @@ function _tradePaint(d,mat,ench){
    the lane, so the same 350g enchant could be spent a second time. Only the
    dice fields, never a whole saveMatchState: that snapshot means "the state at
    the START of a player turn", and re-timestamping it mid-turn re-charges the
-   replayed turn for everything it has already spent. Exactly the shape
-   _removeDieAt uses, for exactly the same reason.
+   replayed turn for everything it has already spent. P538: this used to read "Exactly the shape _removeDieAt uses, for
+   exactly the same reason", and that was false - the field sets differed.
+   Both call one writer now, and the single real difference (a trade must
+   persist matchOppDice, a removal must not) is a flag on it.
    G._practice is in the guard because saveMatchState refuses a practice match
    outright, and _removeDieAt's comment states the invariant both writers lean
    on - no snapshot exists in a practice match. Two writers disagreeing about
    whether this match has one is how a practice match ends up overwriting a
    real match's. */
-function _tradeSnap(){
-  try{
-    if(!S||!S.pendingMatch||!G||G._practice)return;
-    S.pendingMatch.matchDice=[...G.matchDice];
-    S.pendingMatch.matchOppDice=[...G.matchOppDice];
-    S.pendingMatch._enchArr=[...(G._enchArr||[])];
-    S.pendingMatch._tradeSwaps=G._tradeSwaps?JSON.parse(JSON.stringify(G._tradeSwaps)):null;
-    save();
-  }catch(e){}
-}
+/* P538: was its own four-field copy. It calls the shared writer now, so it
+   additionally persists numDice, _fairTrade and _diceOut - all of which a
+   mid-turn write should carry and none of which a trade can want stale. */
+function _tradeSnap(){ _snapDiceOnly(true); }
 /* BOTH SIDES BACK THE INSTANT THE MATCH ENDS - win, loss, flee, or the end of
    a resumed match - no exceptions, no residue. This is not what keeps
    S.run.dice honest; fire never touches it any more, so the owned loadout is
@@ -19310,10 +19306,17 @@ function _dropLanes(n,floor){
    the boundary snapshot owns those, and a resume replays the turn from the
    top. G._ftDead is match-scoped and dies with G by design, so it is not
    persisted by either door. */
-function _snapDiceOnly(){
+/* P538: alsoOpp is the ONE legitimate difference between the callers. Trade
+   swaps a die with the rival and must persist matchOppDice; a removal or a
+   reorder never touches the rival's board and must not. Forcing the two sets
+   identical would be the mirror of the mistake this cluster keeps finding -
+   making two things agree instead of asking what each actually needs. The
+   difference now lives in one place instead of in three separate writers. */
+function _snapDiceOnly(alsoOpp){
   try{
-    if(!S||!S.pendingMatch||!G)return;
+    if(!S||!S.pendingMatch||!G||G._practice)return;
     S.pendingMatch.matchDice=[...G.matchDice];
+    if(alsoOpp&&G.matchOppDice)S.pendingMatch.matchOppDice=[...G.matchOppDice];/* P538 */
     S.pendingMatch._enchArr=[...(G._enchArr||[])];
     S.pendingMatch.numDice=G.numDice;
     S.pendingMatch._fairTrade=G._fairTrade?{...G._fairTrade}:null;
@@ -37232,6 +37235,11 @@ function _commitVagabondDrag(){
       if(window.D3X&&D3X._measureHomes&&D3X.mount)D3X._measureHomes();
     }catch(e){}
   }catch(e){}
+  /* P538: THE REORDER IS PERSISTED. It permutes matchDice, _enchArr and the
+     lanes inside _fairTrade and _tradeSwaps, and until now wrote none of it -
+     a quit after a drag lost the whole rearrangement and both lane carries
+     with it. It never touches the rival's board, so no alsoOpp. */
+  try{_snapDiceOnly();}catch(e){}
   try{_haptic(20);}catch(e){}
   try{SFX.commit&&SFX.commit();}catch(e){}
   setStatusMsg('REARRANGED','active');

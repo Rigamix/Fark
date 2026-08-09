@@ -3434,6 +3434,39 @@ answering turn against a no-quit control of the identical turn sequence.
 
 ### PR10 — Three mid-turn mutators of the same dice record carry three different subsets of it, and one carries none; the comment claiming they match is wrong
 
+> **CLOSED — P538, driven.** Measured rather than read off the nomination:
+> `_snapDiceOnly` wrote six fields and not `matchOppDice`; `_tradeSnap` wrote
+> four including it; **`_commitVagabondDrag` wrote nothing at all** — its body
+> filtered for `save(`, `saveMatchState`, `pendingMatch`, `_snapDiceOnly` and
+> `_tradeSnap` came back empty on every one.
+>
+> **The third one is mine.** P520 made the reorder real, P530 taught it to carry
+> the loan's seat and P531 the trade ledger's — and none of it was persisted, so
+> a quit after a drag lost the whole permutation *and* both carries. Fifth bug in
+> the resume path tonight.
+>
+> **One writer, three callers, one flagged difference.** The field-set difference
+> is legitimate — a trade swaps a die with the rival and must persist
+> `matchOppDice`; a removal or a reorder must not — so `_snapDiceOnly(alsoOpp)`
+> puts that single difference in one place instead of letting three writers each
+> hold their own idea of the record. Forcing the sets identical would have been
+> the mirror of the mistake this cluster keeps finding.
+>
+> | | |
+> |---|---|
+> | reorder, live matchDice | `[iron, flint, lead, bone, amber, brass]` |
+> | reorder, snapshot | identical — it follows now |
+> | loan lane / ledger lane | live 3 / snap 3, both |
+> | plain snapshot vs rival board | left alone |
+> | trade snapshot vs rival board | written |
+>
+> The last two are the control: a fix that made everything write `matchOppDice`
+> would have passed the first three.
+>
+> Also corrected: `_tradeSnap`'s claim to be *"exactly the shape `_removeDieAt`
+> uses, for exactly the same reason"* — false, the sets differed. Fourth
+> in-source false claim of the session.
+
 ```
 18581    replayed turn for everything it has already spent. Exactly the shape
 18582    _removeDieAt uses, for exactly the same reason.

@@ -17,8 +17,10 @@ const body = src.slice(i, j);
 const count = t => body.split(t).length - 1;
 const snapCalls = count('_snapDiceOnly();');
 const fullSaves = count('saveMatchState()');
-const helperOnce = src.split('function _snapDiceOnly(){').length - 1;
-const definedBefore = src.indexOf('function _snapDiceOnly(){') < i;
+/* P538 gave it an alsoOpp flag, so match the name rather than the exact
+   signature - a checker pinned to a signature reports a rename as a defect. */
+const helperOnce = src.split('function _snapDiceOnly(').length - 1;
+const definedBefore = src.indexOf('function _snapDiceOnly(') < i;
 
 const rows = [
   ['both exits call the shared snapshot', snapCalls === 2, snapCalls + ' call(s)'],
