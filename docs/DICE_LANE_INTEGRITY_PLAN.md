@@ -3281,6 +3281,48 @@ predicted `g, g+15, g+15, g+15, g+30`. **Control:** the same turn played to a
 bank with no quit, ending at `g+15`. Worth sweeping the rest of `ENCH_GRID`'s
 `fire` handlers for other run-scoped writes on the same pattern.
 
+### PR13 — two die renderers, two material tables, and ten materials only one of them knows
+
+**NOT DRIVEN AS A PLAYER-VISIBLE BUG YET — the divergence is measured, the
+on-screen consequence is not.**
+
+The game draws dice two ways:
+
+- **`D3`** — DOM/CSS. `d3slot > d3die > 6 x div.d3f`, one set of face art
+  (`Art/Assets/Dice/bone_1..6.png`), and a **CSS filter string** per material
+  out of `D3.TINT`. This is what the new-run offering screen shows; confirmed
+  by driving the page (`hasTHREE` false, zero canvases in the overlay).
+- **`D3X`** — three.js. Boots async, takes over only `group==='match'`. Owns
+  the GLB, `MATCOL` hex tints and the painted `SKINS`.
+
+```
+D3.TINT   12 materials
+D3X.MATCOL 22 materials
+in MATCOL and NOT in TINT:
+  brass, crystal, grogs_tooth, mabels_thimble, finnicks_palm,
+  corvus_ledger_d, brutus_shield, aldrics_square, whispers_fang,
+  ambrose_weight
+```
+
+`D3.make` reads `D3.TINT[opts.mat]||''`, so those ten get an **empty filter and
+render as plain bone** wherever D3 draws. `_RELIC_FAM` does not help: it is
+used only by `_matFam` for Break's family effects, never on a render path.
+
+**Why this is worth a look.** MATCOL's own comment says the relic tints were
+given distinct colours *specifically* so "a relic on the table was
+indistinguishable from the ordinary die it is meant to be a trophy version of"
+would stop being true. That fix was applied to one renderer. On the other, all
+eight relics are still bone.
+
+**What is NOT yet established, and must be before this is called a bug:**
+whether a relic or brass/crystal die is ever actually drawn through `D3` on a
+surface a player sees. `D3.make` has two call sites - the offering screen
+(starter materials only) and the match row - and on the match row `D3X` takes
+over once it boots. So the real question is what a player sees **before D3X is
+ready**, and in the loadout panel. Reachability first, exactly as the
+`brass`/`crystal` MATCOL entries were wrongly claimed reachable once already.
+
+
 ### PR7 — The chalkboard's count and its per-circle history: one win adds 3 to the count and 2 to the list, and the file says in writing that they must move together
 
 ```
