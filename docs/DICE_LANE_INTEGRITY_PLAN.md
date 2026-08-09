@@ -3124,6 +3124,34 @@ not by searching for the name.
 
 ### PR5 — `_removeDieAt` has two exits with opposite snapshot policies, and the Fair-Trade exit calls the full `saveMatchState()` seventy lines above a comment forbidding exactly that
 
+> **CLOSED — P536, driven.** One function, two exits, opposite policies. The
+> main exit writes only the dice fields under a comment forbidding the
+> alternative *in terms* and citing a measured exploit for it; the Fair-Trade
+> exit, seventy lines above that comment, called the full `saveMatchState()`.
+>
+> Not a comment being wrong about code — the class found three times tonight.
+> **Code violating an explicit warning** left by whoever measured the exploit,
+> in the same function.
+>
+> `_snapDiceOnly()` now holds the targeted write and both doors call it, so they
+> cannot drift and the rule lives in a named function rather than a comment
+> beside one of the two places that needed it.
+>
+> **Driven against the exploit the comment describes**, on the Fair-Trade path:
+>
+> | | |
+> |---|---|
+> | live `pPts` mid-turn | 500 |
+> | snapshot `pPts` after the break | **0** — the boundary held |
+> | `matchDice[2]` | obsidian → flint, the owner's die back |
+> | snapshot `matchDice` | followed |
+>
+> Both halves asserted deliberately: writing *nothing* would be as wrong as
+> writing everything, since a resume has to know the owner's die walked back in.
+>
+> `G._ftDead` is match-scoped and dies with `G` by design, so it is in neither
+> door's snapshot — checked, not assumed.
+
 ```
 19267  try{
 19268    var _ftB=G._fairTrade;

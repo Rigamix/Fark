@@ -19282,6 +19282,35 @@ function _dropLanes(n,floor){
   G.numDice=Math.max((floor===undefined?1:floor),base-(n===undefined?1:n));
   return G.numDice;
 }
+/* P536 - THE MID-TURN SNAPSHOT, IN ONE PLACE.
+   _removeDieAt had two exits with opposite policies. The main one wrote only
+   the dice fields, under a comment forbidding the alternative and citing a
+   measured exploit for it - a Break after a shatter bonus and a spent active
+   card moved the snapshot's pPts 0 -> 500 and recorded second_wind as used, so
+   the resumed turn charged for a card use on a turn that never happened and
+   re-banked points. The Fair-Trade exit, seventy lines above that comment,
+   called the FULL saveMatchState() anyway.
+   Not a comment being wrong about code: code violating an explicit warning
+   left by whoever measured the exploit. Both doors call this now, so they
+   cannot drift, and the rule lives in a function instead of a comment beside
+   one of the two places that needed it.
+   ONLY THE DICE. Everything here is state a mid-turn removal genuinely
+   changes. pPts, used cards and the turn counters are deliberately absent -
+   the boundary snapshot owns those, and a resume replays the turn from the
+   top. G._ftDead is match-scoped and dies with G by design, so it is not
+   persisted by either door. */
+function _snapDiceOnly(){
+  try{
+    if(!S||!S.pendingMatch||!G)return;
+    S.pendingMatch.matchDice=[...G.matchDice];
+    S.pendingMatch._enchArr=[...(G._enchArr||[])];
+    S.pendingMatch.numDice=G.numDice;
+    S.pendingMatch._fairTrade=G._fairTrade?{...G._fairTrade}:null;
+    try{S.pendingMatch._tradeSwaps=G._tradeSwaps?JSON.parse(JSON.stringify(G._tradeSwaps)):null;}catch(e){}
+    S.pendingMatch._diceOut=(G._diceOut||[]).map(function(o){return{lane:o.lane,mat:o.mat,ench:o.ench};});
+    save();
+  }catch(e){}
+}
 function _removeDieAt(lane,opts){
   opts=opts||{};
   /* P519: `lane<0` CANNOT REJECT NaN - NaN<0 is false - and a NaN lane is how
@@ -19335,7 +19364,12 @@ function _removeDieAt(lane,opts){
       G.pool=(G.pool||[]).filter(function(q){return q.lane!==lane;});
       try{famLog('THE BORROWED '+((getDie(_ftB.borrowed)||{}).name||'DIE')
         +' BREAKS - YOUR OWN RETURNS TO THE LANE');}catch(e){}
-      try{saveMatchState();}catch(e){}
+      /* P536: was saveMatchState() - the FULL snapshot, mid-turn, which the
+         comment at the other exit of this same function forbids in terms and
+         cites a measured exploit for. The dice fields are what this branch
+         actually changes (matchDice[lane] back to the owner, _fairTrade
+         cleared) and they are exactly what this writes. */
+      _snapDiceOnly();
       return true;
     }
   }catch(e){}
@@ -19427,28 +19461,7 @@ function _removeDieAt(lane,opts){
      free strict upgrade bought by force-quitting.
      No snapshot exists in a practice match, and none survives endMatch -
      both correct, and the guard is what makes them no-ops. */
-  try{
-    if(S&&S.pendingMatch){
-      S.pendingMatch.matchDice=[...G.matchDice];
-      S.pendingMatch._enchArr=[...(G._enchArr||[])];
-      S.pendingMatch.numDice=G.numDice;
-      S.pendingMatch._fairTrade=G._fairTrade?{...G._fairTrade}:null;
-      /* P532: and the trade ledger, for the same reason _fairTrade is here.
-         This snapshot never carried it. That was harmless while the live ledger
-         was not maintained either - both copies were equally stale. P527 made
-         the live one shift with the seats, which made this one wrong: between a
-         mid-turn removal and the next turn boundary the two disagreed about
-         `lane`. Deep-cloned, like the boundary writers do, so the snapshot can
-         never alias the live records. */
-      try{S.pendingMatch._tradeSwaps=G._tradeSwaps?JSON.parse(JSON.stringify(G._tradeSwaps)):null;}catch(e){}
-      /* and the out-dice record with them, for the same reason the dice fields
-         are here: a resume that lost it would show a five-die loadout with
-         nothing missing, which is the exact lie the record exists to stop.
-         Copied entry by entry so the snapshot never aliases live G. */
-      S.pendingMatch._diceOut=(G._diceOut||[]).map(function(o){return{lane:o.lane,mat:o.mat,ench:o.ench};});
-      save();
-    }
-  }catch(e){}
+  _snapDiceOnly();/* P536: the same door as the Fair-Trade exit */
   /* P515: repaint the First Strike reveal on the ALWAYS-EXECUTED exit. The
      first attempt put this after the save() above, which sits inside the
      `if(S.pendingMatch)` block - so with no saved match it never ran, and a
