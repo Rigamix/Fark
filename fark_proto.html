@@ -14452,6 +14452,20 @@ CFX.sleight={
     return true;
   }
 };
+/* P534 - WHICH DICE IN A KEPT ROW COULD ACTUALLY SCORE.
+   k.dice serves two roles: refreshKeptTray renders every entry as a die, so a
+   branded die the player committed belongs there - and Preserve reads the same
+   field looking for something worth points. Both readings are legitimate. The
+   field could not serve both because its entries were `{val,mat}` and carried
+   no brand, so NO consumer could tell an icon die from a plain one. Measured:
+   Preserve banked a branded 1 for 100 points over a legal 5 worth 50, and a
+   branded face banks zero by law.
+   Reuses _dieIsIcon, the same predicate _splitIcons itself uses, so the split
+   and this filter cannot drift apart - which is how the two lists stopped
+   agreeing in the first place. */
+function _keptScorers(k){
+  return ((k&&k.dice)||[]).filter(function(dd){return dd&&!_dieIsIcon(dd);});
+}
 CFX.preserve={
   canUse:function(){
     if(!G||G.phase==='opp')return false;
@@ -14473,7 +14487,11 @@ CFX.preserve={
        The old vals scan stays as the fallback for entries with no dice
        array, which is also what canUse tests against. */
     (G.kept||[]).some(function(k){
-      var _pd=(k.dice||[]).filter(function(dd){return dd&&(dd.val===1||dd.val===5);})[0];
+      /* P534: through _keptScorers, so a BRANDED face can never be chosen.
+         It banks zero by law - _splitIcons holds those dice out of scoring -
+         and brands live on faces 1 and 5, which are the only faces this
+         looks for, so every brand was a candidate and worth 100 or 50. */
+      var _pd=_keptScorers(k).filter(function(dd){return dd&&(dd.val===1||dd.val===5);})[0];
       if(_pd){found=_pd.val;foundMat=_pd.mat||k.mat||'bone';return true;}
       return (k.vals||[]).some(function(v){
         if(v===1||v===5){found=v;foundMat=k.mat||'bone';return true;}
@@ -25144,7 +25162,9 @@ function handleRoll(){
        banks zero. */
     if(pts>0||_scoreDice.length)G.kept.push({vals:selVals,mat:selDice[0].mat,pts,cursed:_cfHit,
       ss:_starstonePay(_scoreDice),
-      dice:selDice.map(function(dd){return{val:dd.val,mat:dd.mat};})});
+      /* P534: the brand travels with the record. Without it nothing
+         downstream can tell a branded face from a scoring one. */
+      dice:selDice.map(function(dd){return{val:dd.val,mat:dd.mat,ench:dd.ench||null};})});
     G.turnPts=G.kept.reduce((a,k)=>a+k.pts,0)+(G._turnBonusPot||0);refreshKeptTray();
     /* OPENING SHOT (opener): track scoring dice committed on roll 1 only.
        turnRollCount === 1 means this commit happened during the very first
@@ -27144,7 +27164,7 @@ function handleBank(){
                alongside the scorers. */
             G.kept.push({vals:selV,mat:(_bkScore[0]||selD[0]).mat,pts:pts,
               ss:_starstonePay(_bkScore),
-              dice:_bkScore.map(function(dd){return{val:dd.val,mat:dd.mat};})});
+              dice:_bkScore.map(function(dd){return{val:dd.val,mat:dd.mat,ench:dd.ench||null};})});/* P534 */
             G.turnPts=G.kept.reduce(function(a,k){return a+k.pts;},0)+(G._turnBonusPot||0);
             try{updHUD();refreshKeptTray();}catch(e){}
           }
@@ -27175,7 +27195,7 @@ function handleBank(){
       if(pts>0||_bkScore.length)
         G.kept.push({vals:selV,mat:selD[0].mat,pts,cursed:_cfBank,
           ss:_starstonePay(_bkScore),
-          dice:selD.map(function(dd){return{val:dd.val,mat:dd.mat};})});
+          dice:selD.map(function(dd){return{val:dd.val,mat:dd.mat,ench:dd.ench||null};})});/* P534 */
     }}
   let total=G.kept.reduce((a,k)=>a+k.pts,0);
   /* Stakes Rising: fold the +300 turn-start bonus into the bank total. The

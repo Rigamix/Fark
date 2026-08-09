@@ -3465,6 +3465,53 @@ fix is to filter the two arrays as a pair rather than equalise their lengths.
 
 ---
 
+## PRESERVE — CLOSED, P534, and the shared fix was not the obvious one
+
+Denis asked whether the siblings wanted one shared fix **before** anything was
+touched. They did, and asking first changed what got written.
+
+**Driven before fixing.** A real commit of a triple plus a branded 1:
+
+```
+k.vals   [3,3,3]                                  the split works
+k.dice   [3/bone, 3/iron, 3/flint, 1/flint]       the branded die is IN
+dice entries carry brand info:  FALSE
+```
+
+Preserve, given that row and a second row holding a real 5, **banked the
+branded 1 for 100 points** and passed over the legal 5 worth 50. A branded face
+banks **zero by law** — that is what `_splitIcons` enforces — and brands sit on
+faces 1 and 5, which are the only faces Preserve hunts.
+
+**The obvious fix was impossible.** "Make Preserve filter icons out of `k.dice`"
+cannot be written: the entries were `{val,mat}` and carried no brand, so **no
+consumer could tell an icon die from a plain one.** The reader was not the
+broken part. The record was.
+
+**Two roles, one field.** `k.dice` is the *display* record — `refreshKeptTray`
+renders every entry, and a branded die the player committed belongs there.
+Preserve reads the same field as a *scoring* record. Both readings are
+legitimate; the field could only serve both once it said which dice were which.
+
+So: every producer now records `ench`, and `_keptScorers(k)` is the canonical
+"which of these could score" accessor. It **reuses `_dieIsIcon`** — the same
+predicate `_splitIcons` itself uses — so the split and the filter cannot drift,
+which is exactly how the two lists stopped agreeing in the first place.
+
+| | result |
+|---|---|
+| branded 1 vs legal 5 | takes the **5 on amber for 50** — was the branded 1 for 100 |
+| control, a plain 1 | still preserved, 100 points, unbroken |
+
+**Flagged, not changed.** The three producers disagree about whether `k.dice`
+holds the whole selection or the post-split subset — two write the full
+selection, one writes `_bkScore`. Adding `ench` is safe and additive; making the
+odd one consistent would change what the kept tray renders on that path, and
+whether that tray is ever seen has not been established. Recorded rather than
+guessed at, on the same reasoning that stopped the trim-and-discard fix.
+
+---
+
 ## IS PRESERVE ISOLATED?
 
 **No. It is the most expensive member of a family, and the family has at least
