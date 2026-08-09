@@ -3217,7 +3217,29 @@ fields plus live `G.pPts` at the top of the replayed turn, against the identical
 arrangement resolved by a plain Break, which routes through the 19372 subset
 writer and should leave the snapshot's `pPts` unmoved.
 
-### PR6 — `S.run` is written mid-turn and cannot be rewound; the snapshot only rewinds match state, so a replayed turn pays the same brand twice
+### PR6 — `S.run` is written mid-turn and cannot be rewound; the snapshot only rewinds match state, so a replayed turn pays the same brand twice  — **FIXED P539**
+
+> **CLOSED.** Driven, then fixed, then re-driven through a real `resumeMatch()`.
+>
+> The measurement, control first: the snapshot carries 52 keys and **none** of
+> them is run-scoped, while the same reads see `matchDice` fine - so the
+> absence is real and not a blind instrument. Tithe took gold 500 -> 515 on the
+> commit, **515 on disk immediately** (its `fire` calls `save()`), and -> 530
+> when the same commit was replayed. Hair of the Dog confirmed the opposite
+> direction: armed, persisted, consumed mid-bank, and no record anywhere.
+>
+> P539 stashes both at turn start beside the P537 pair, persists them as
+> `runGoldAtTurnStart` / `runHotdAtTurnStart`, and rewinds them on resume.
+> `saveMatchState` has exactly ONE call site in code (startPTurn:24996, after
+> the stash), so a mid-turn value can never be stamped in as the turn-start one.
+>
+> **The verification's second arm is the load-bearing one.** Earn 15 in turn
+> one, cross a boundary, earn 15 in turn two, resume: 500 / 515 / 530 / **515**.
+> A fix that rewound too far gives 500; one that did not rewind gives 530. Only
+> a fix that rewinds to the CURRENT turn's start can produce the middle number,
+> so the arm separates a correct fix from two distinct wrong ones.
+>
+> Sixth resume-path bug. The base rate that put PR6 next was right again.
 
 ```
 18342  tithe:{name:'Tithe',price:150,glyph:'◉',ink:'#d8b054',doubles:true,

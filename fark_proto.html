@@ -10240,6 +10240,16 @@ function saveMatchState(){
   if(!G||!LO||G._practice||G._endMatchFired)return;
   S.pendingMatch={
     rungId:G.rung.id,rungName:G.rung.name,
+    /* P539: gold and the Hair of the Dog charge AS THEY WERE AT THE START OF
+       THIS TURN. Every other field here is match state; these two are the
+       only run-scoped ones, and they are here because a turn can move them
+       and a resume replays the turn. The fallback to the live value covers a
+       snapshot taken before the first stash - it can only ever be the same
+       value at that point. */
+    runGoldAtTurnStart:(typeof G._goldAtTurnStart==='number')?G._goldAtTurnStart
+      :((S&&S.run&&typeof S.run.gold==='number')?S.run.gold:null),
+    runHotdAtTurnStart:(G._hotdAtTurnStart!==undefined)?!!G._hotdAtTurnStart
+      :!!(S&&S.run&&S.run._hotdNext),
     /* Full opponent snapshot. Patrons are GENERATED (id:-1) — they cannot be
        reconstructed from an id, and RUNGS[-1] used to yield an empty rung
        whose undefined target crashed the resume. Bosses also carry launch-time
@@ -24845,6 +24855,18 @@ function startPTurn(){
      read this counter DURING the player's turn, and although both sit on the
      dead pCards layer today, "currently unreachable" is not a reason to change
      when a counter advances. Only what gets persisted changes. */
+  /* P539: the two RUN-scoped facts a player turn can change. S.run is saved
+     by save() the instant either moves and is NOT rewound by the boundary
+     snapshot, so an unclean exit kept both while the turn that caused them
+     replayed. Driven: gold 500 -> 515 on a tithe commit, 515 on disk at once,
+     530 when the replayed turn commits again.
+     Stashed HERE, beside the P537 pair, because this is the one point that
+     means "the turn is starting" and saveMatchState is called further down
+     this same function - its only call site in code. */
+  try{if(S&&S.run){
+    G._goldAtTurnStart=(typeof S.run.gold==='number')?S.run.gold:null;
+    G._hotdAtTurnStart=!!S.run._hotdNext;
+  }}catch(e){}
   G._ptcAtTurnStart=G.npcCardState.playerTurnCount;
   G.npcCardState.playerTurnCount++;
   setStatusMsg('','');
@@ -32477,6 +32499,15 @@ function initMatchScreen(data){
   /* ── Resume: overwrite fresh G with saved mid-match state ── */
   if(params._resumeData){
     var rd=params._resumeData;
+    /* P539: rewind the run-scoped pair before anything else, because the
+       replayed turn is about to earn them again. Guarded on the field being
+       present so a snapshot written before this patch resumes unchanged
+       rather than zeroing a player's purse. */
+    try{if(S&&S.run){
+      if(typeof rd.runGoldAtTurnStart==='number')S.run.gold=rd.runGoldAtTurnStart;
+      if(rd.runHotdAtTurnStart!==undefined)S.run._hotdNext=!!rd.runHotdAtTurnStart;
+      save();
+    }}catch(e){}
     G.pPts=rd.pPts;G.oPts=rd.oPts;G.turnNum=rd.turnNum;G.numDice=rd.numDice;
     G.pTurns=(typeof rd.pTurns==='number')?rd.pTurns:Math.max(0,(rd.turnNum||1)-1);
     G.oTurns=(typeof rd.oTurns==='number')?rd.oTurns:Math.max(0,(rd.turnNum||1)-1);
