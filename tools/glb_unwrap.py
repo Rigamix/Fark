@@ -59,9 +59,27 @@ AXIS_VEC = {'px':(1,0,0),'nx':(-1,0,0),'py':(0,1,0),'ny':(0,-1,0),'pz':(0,0,1),'
 CELL = {1:(0,0), 2:(1,0), 3:(2,0), 4:(0,1), 5:(1,1), 6:(2,1)}
 COLS, ROWS = 3, 2
 # in-plane axes per face, and sign flips so a painted square is not mirrored
-PLANE = {'px':(2,1,-1,1), 'nx':(2,1, 1,1),
-         'py':(0,2, 1,1), 'ny':(0,2, 1,-1),
-         'pz':(0,1, 1,1), 'nz':(0,1,-1,1)}
+# (u axis, v axis, u sign, v sign) with v measured UPWARD in the cell.
+# A face reads correctly from outside when U x Vdown == -N. py and ny were
+# both mirrored - the digits came out backwards on the top and bottom faces -
+# and the check below now runs on every build so it cannot regress.
+PLANE = {'px':(2,1,-1, 1), 'nx':(2,1, 1, 1),
+         'py':(0,2, 1,-1), 'ny':(0,2, 1, 1),
+         'pz':(0,1, 1, 1), 'nz':(0,1,-1, 1)}
+
+
+def _check_handedness():
+    def cross(a,b): return (a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0])
+    bad = []
+    for k,(ua,va,us,vs) in PLANE.items():
+        U=[0,0,0]; U[ua]=us
+        Vup=[0,0,0]; Vup[va]=vs
+        Vd=tuple(-c for c in Vup)
+        if cross(tuple(U),Vd) != tuple(-x for x in AXIS_VEC[k]):
+            bad.append(k)
+    if bad:
+        raise SystemExit('GATE FAILED: these faces are mirrored: %s' % ', '.join(sorted(bad)))
+    return True
 TARGET_SIZE = 0.0295           # die.glb's longest axis - the in-game scale
 
 
@@ -97,6 +115,7 @@ def dominant_axis(nx, ny, nz):
 
 
 def main(src, dst):
+    _check_handedness()   # every face reads correctly from outside, or stop
     g, binc = load(src)
     prim = g['meshes'][0]['primitives'][0]
     pos = [list(p) for p in acc(g, binc, prim['attributes']['POSITION'])]
