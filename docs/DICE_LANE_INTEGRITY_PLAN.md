@@ -2995,7 +2995,33 @@ after `use`; then advance a turn and read `G.kept[0].pts` and `G.turnPts` at
 `k.dice.length !== k.vals.length` on at least one row, or the probe never
 entered the state.
 
-### PR3 — `sealRule` is a launch-only parameter: three copies of that fact reach the disk and the fourth, the live one, does not
+### PR3 — `sealRule` is a launch-only parameter: three copies of that fact reach the disk and the fourth, the live one, does not  — **FIXED P540**
+
+> **CLOSED, and closed by accident.** PR3 sat undriven in this queue while I
+> found the same defect from the other end - checking whether PR7's 3-point win
+> was reachable led straight to `sealRule` being absent from the snapshot.
+> Worth recording as such: the queue had this one written down and ranked, and
+> what actually surfaced it was chasing a different, ultimately COSMETIC bug.
+>
+> The entry under-stated it. PR3 frames the loss as a scoring one; it is also a
+> RULES one. `_ruleActive` is `G._sealRule===id`, so a resumed match lost the
+> sealed seat's rule outright for the remainder of play, not just its points.
+>
+> P540 stores the resolved value in the snapshot and hands it back through
+> `resumeMatch`. Driven both ways - exact-id round-trip (not merely truthy,
+> which the `===` would have rejected), `_ruleActive` agreeing afterwards, and
+> an unsealed seat still resuming unsealed.
+>
+> **ONE QUESTION LEFT OPEN AND UNDER MEASUREMENT.** PR3's own framing says
+> `G._sealRule` is a *fourth derivation* of facts already on disk
+> (`night.sealTell`, `night.handicapSeat`, `seatIdx` - and `seatIdx` was already
+> a snapshot field). By that reading the right fix is to RE-DERIVE on resume,
+> and storing it adds a fourth copy - the very shape this plan exists to remove.
+> The counter-argument is that a rebuilt night would re-randomise
+> `handicapSeat`/`sealTell` and re-derivation would then silently produce a
+> DIFFERENT seal. Which of those is true depends on whether `_ensureNight` can
+> rebuild mid-match, and that is being measured rather than assumed. If it
+> cannot, re-derivation is the better fix and P540 should be replaced by it.
 
 ```
 36038  var sealRule=isSealed?night.sealTell:null;
