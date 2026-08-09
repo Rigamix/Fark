@@ -3323,7 +3323,43 @@ ready**, and in the loadout panel. Reachability first, exactly as the
 `brass`/`crystal` MATCOL entries were wrongly claimed reachable once already.
 
 
-### PR7 — The chalkboard's count and its per-circle history: one win adds 3 to the count and 2 to the list, and the file says in writing that they must move together
+### PR7 — The chalkboard's count and its per-circle history: one win adds 3 to the count and 2 to the list, and the file says in writing that they must move together  — **FIXED P541; and it turned up P540, which matters more**
+
+> **CLOSED.** Driven by extracting the real lines and evaluating them, not by
+> reading them: `pointsEarned` is 3 for win+seal+Cursed Table, and the board
+> goes 3/2, then 6/4, then 9/6. The defect is one character wide - line 30707
+> gated the second push on `route._earned>=2`, **a boolean where a count is
+> needed**. Reachability confirmed on the ordinary patron path: every night
+> gets a sealed seat, and `isHandicap` is `!!G._handicap||!!G._sealRule` while
+> `launchSeat` hard-codes handicap null, so the seal alone satisfies it.
+>
+> **THREE THINGS I WROTE HERE WERE WRONG AND ARE STRUCK:**
+> 1. *"nothing repairs it / permanently one short"* - false. `_rubOutCircles`
+>    floors points at 0 and converges the gap; three other writers zero both
+>    together. Drift is bounded to the current tier's board.
+> 2. *"the divergence widens"* - false. Flat +1 per cursed-table win.
+> 3. The implied severity - **this half is COSMETIC.** `S.run.points`, the
+>    number the boss unlock reads, was always correct; `_chalkMeta` feeds only
+>    the crown glyph and circle FILL comes from points. The visible error needs
+>    a second meta-pushing event AND a crown landing inside `tier.pointsNeeded`.
+>
+> **P541** pushes one entry per point. Identical for earned 1 and 2 - every
+> other win in the game - and driven as such; only the 3 case changes. The
+> migration PADS THE TAIL rather than re-gating the existing rebuild on length,
+> because that branch fills all-'face' and would erase every crown it touched.
+>
+> **P540 came out of checking PR7's reachability, and outranks it.** `sealRule`
+> was in no snapshot field and `resumeMatch` never passed it, so a force-close
+> and resume set `G._sealRule` null. `_ruleActive` is `G._sealRule===id`, so the
+> seat's **rule** died too; scoring followed, with `pointsEarned` 3 -> 1 and the
+> cursed-loss rub 2 -> 1 - resume **punished a win and paid for a loss**.
+> Driven both ways: the seal round-trips as its exact id (not merely truthy,
+> which `_ruleActive`'s `===` would have rejected), `_ruleActive` agrees, and an
+> unsealed seat still resumes unsealed - the arm that would have sealed every
+> ordinary seat.
+>
+> **Seventh bug in the resume path.** Found while checking something else,
+> which is the third time tonight that has been the more productive route.
 
 ```
 13169 /* RUB OUT N CIRCLES. The chalk board is TWO structures - S.run.points is the

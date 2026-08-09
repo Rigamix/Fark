@@ -9564,6 +9564,14 @@ function _getS(){
     if(S.run.night===undefined)S.run.night=null;
     /* chalkboard meta: rebuild plain faces for any points earned pre-board */
     if(!Array.isArray(S.run._chalkMeta)){S.run._chalkMeta=[];for(var _cm=0;_cm<(S.run.points||0);_cm++)S.run._chalkMeta.push('face');}
+    /* P541: an existing save can already be short - the pre-P541 3-point win
+       wrote 3 points and 2 entries. PAD THE TAIL, never rebuild: the branch
+       above fills all-'face', and re-gating IT on length would erase every
+       crown on any board it fired against. Padding only appends, so a correct
+       board is untouched and a short one stops misplacing its crowns.
+       Longer-than-points is not handled because it cannot occur: every writer
+       that lowers points pops or clears in the same breath. */
+    else{while(S.run._chalkMeta.length<(S.run.points||0))S.run._chalkMeta.push('face');}
     /* Clear any stale perk-unlock celebrations left over from a previous session.
        The perk itself is already recorded in S.renownPerks (persists); this queue
        is only the "show the splash" list, drained on the loadout screen. If the
@@ -10259,6 +10267,15 @@ function saveMatchState(){
        routed as a patron match at endMatch (no tier advance on win, no heart
        loss on defeat) and a handicap match resumed with no handicap rules. */
     isBoss:!!G._isBoss,isGauntlet:!!G._isGauntlet,handicap:G._handicap||null,
+    /* P540: THE SEALED SEAT. It sat beside handicap in every other respect and
+       was in no snapshot field, so G._sealRule=params.sealRule||null landed
+       null on every resume and the seat quietly stopped being sealed.
+       Not just scoring: _ruleActive reads `G._sealRule===id`, so the seat's
+       RULE went with it. Scoring then follows - pointsEarned 3 -> 1, because
+       isHandicap is `!!G._handicap||!!G._sealRule` and launchSeat hard-codes
+       handicap null - and the cursed-loss rub 2 -> 1, so a resume punished a
+       win and paid for a loss. */
+    sealRule:G._sealRule||null,
     pCards:[...G.pCards],oCards:[...G.oCards],
     pStake:G.pStake,oStake:G.oStake,
     buyIn:LO.buyIn||0,effectiveWager:LO.effectiveWager||false,
@@ -10353,6 +10370,7 @@ function resumeMatch(){
   setTimeout(function(){showScreen('match',{
     rungId:snap.rungId,rung:snap.rung||null,
     isBoss:!!snap.isBoss,isGauntlet:!!snap.isGauntlet,handicap:snap.handicap||null,
+    sealRule:snap.sealRule||null,/* P540 */
     pCards:snap.pCards||[],oCards:snap.oCards||[],
     pStake:snap.pStake,oStake:snap.oStake,
     buyIn:snap.buyIn||0,effectiveWager:snap.effectiveWager||false,
@@ -30703,8 +30721,18 @@ function _settleEndRoute(route){
     /* chalkboard bookkeeping: one face per win; handicap's second circle
        takes the crown */
     S.run._chalkMeta=Array.isArray(S.run._chalkMeta)?S.run._chalkMeta:[];
+    /* P541: ONE ENTRY PER POINT. This was `push('face')` plus a `>=2` gate on
+       a single crown - a boolean where a count belongs - so a 3-point win
+       (sealed seat while holding Cursed Table) added 3 to points and 2 here,
+       and every later crown rendered one circle to the left of the truth.
+       Driven: 3/2, then 6/4, then 9/6.
+       IDENTICAL FOR 1 AND 2, which is every other win in the game: 1 gives
+       ['face'] and 2 gives ['face','crown'], exactly as before. Only the
+       3-point case changes, and it gains the crown it always should have had
+       - the extra circle is a bonus circle for the same reason the second one
+       is. */
     S.run._chalkMeta.push('face');
-    if(route._earned>=2)S.run._chalkMeta.push('crown');
+    for(var _cmx=1;_cmx<route._earned;_cmx++)S.run._chalkMeta.push('crown');
     _markSeatResult(route);
     /* a WIN can still end the night short — last seat, points under */
     _checkNightFail();
