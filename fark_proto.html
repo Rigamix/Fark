@@ -11539,9 +11539,15 @@ function _maybeFireCutpurse(){
     if(victim.el&&victim.el.parentNode)victim.el.parentNode.removeChild(victim.el);
     G._palmAnimating=false;
     /* Recheck scoring on remaining FREE dice — if nothing scoreable, bust.
-       Note: the safe-candidate filter above guarantees at least one
-       scoring option remains after a single palm. This re-check is a
-       belt-and-braces guard for edge cases (e.g. weird die materials). */
+       P535: THIS RE-CHECK IS LOAD-BEARING. DO NOT REMOVE IT. The comment used
+       to call it belt-and-braces on the grounds that the safe-candidate filter
+       above guarantees a scoring option survives the palm - but that filter ran
+       650ms ago, before this timeout, and the player can commit dice and cards
+       can fire in between. The guarantee is stale by the time it is leaned on.
+       This re-check is what makes the palm correct, and it is right precisely
+       because it re-reads G.pool AFTER the splice above instead of trusting
+       anything captured earlier - which is the bug P535 fixes in Steady Hand
+       and Powder Keg, both of which do trust a stale capture. */
     var fv=G.pool.filter(function(d){return !d.committed;});
     if(fv.length===0||(!anyScoring(fv.map(function(d){return d.val;}),effectiveCards(),fv.map(function(d){return d.mat;}),fv)&&!_anchorRescues(effectiveCards()))){
       /* Offer the bust saves (Martyr/Iron Stomach/Grit) here too — every
@@ -12946,8 +12952,15 @@ CFX.steady_hand={
         if(d.el)d.el.classList.remove('selected');
         try{reDrawDieFace(d);}catch(e){}
         try{famLog('STEADY HAND — '+d.val);}catch(e){}
-        var fv=free.map(function(x){return x.val;}),fm=free.map(function(x){return x.mat;});
-        if(!anyScoring(fv,effectiveCards(),fm,free)){if(!_tryBustSave(free))_delayedDoBust(free);return;}
+        /* P535: RE-DERIVE. `free` was captured when the CARD WAS USED and this
+           runs when the player taps a die - an unbounded gap, not a timer, and
+           use() changes no phase so removers stay legal throughout. A
+           sacrifice, an obsidian shatter or the palm in between left this
+           scoring dice that were already gone. A bust means "no legal keep on
+           the table" - the table as it is now. */
+        var _sfree=(G.pool||[]).filter(function(x){return !x.committed&&!x._shattered;});
+        var fv=_sfree.map(function(x){return x.val;}),fm=_sfree.map(function(x){return x.mat;});
+        if(!anyScoring(fv,effectiveCards(),fm,_sfree)){if(!_tryBustSave(_sfree))_delayedDoBust(_sfree);return;}
         try{refreshSelUI();}catch(e){}try{famRenderRow();}catch(e){}
       };
     });
@@ -14305,11 +14318,18 @@ CFX.powder_keg={
     _steadyDisarm();/* these dice are new - the arm was about the old ones */
     var free=G.pool.slice();
     setTimeout(function(){
-      var fv=free.map(function(d){return d.val;}),fm=free.map(function(d){return d.mat;});
+      /* P535: RE-DERIVE INSIDE THE TIMEOUT. `free` was G.pool.slice() taken
+         500ms ago and removers stay legal in that window - the keg, unlike
+         Encore, sets no phase guard, and sacrifice was measured taking a die
+         mid-window while this still scored it: busted:false over a table with
+         no scorer. Encore's identical-looking line is NOT this bug; its
+         phase='rolling' blocks every remover for the length of its window. */
+      var free2=(G.pool||[]).filter(function(d){return !d.committed&&!d._shattered;});
+      var fv=free2.map(function(d){return d.val;}),fm=free2.map(function(d){return d.mat;});
       var cc={};fv.forEach(function(v){cc[v]=(cc[v]||0)+1;});
       if(Object.keys(cc).some(function(v){return cc[v]>=3;}))G._famKegTriple=true;
-      if(!anyScoring(fv,effectiveCards(),fm,free)){if(_tryBustSave(free))return;_delayedDoBust(free);return;}
-      free.forEach(function(d){if(d.el)d.el.onclick=function(){toggleDie(d);};});
+      if(!anyScoring(fv,effectiveCards(),fm,free2)){if(_tryBustSave(free2))return;_delayedDoBust(free2);return;}
+      free2.forEach(function(d){if(d.el)d.el.onclick=function(){toggleDie(d);};});/* P535 */
       G.phase='choosing';try{refreshSelUI();}catch(e){}
     },500);
     return true;
