@@ -21931,7 +21931,14 @@ var D3X={
       var bytes=new Uint8Array(b.length);
       for(var i=0;i<b.length;i++)bytes[i]=b.charCodeAt(i);
       try{ld.parse(bytes.buffer,'',onModel,onErr);}catch(e){onErr();}
-    }else ld.load('assets/models/die.glb',onModel,undefined,onErr);
+    /* P546: die_cube.glb, NOT die.glb. P545 swapped only the base64 wrapper
+       above, leaving this branch pointing at the old 298KB bevelled mesh - so
+       the game briefly had TWO geometries chosen by whether one script tag
+       had defined a global. A parallel path with a different shape at the end
+       of it, opened by the patch meant to close parallel paths.
+       Repointed rather than deleted: this is the file:// and cache-miss path,
+       and dropping it turns a missing script into a blank table. */
+    }else ld.load('assets/models/die_cube.glb',onModel,undefined,onErr);
   },
   /* value-up isometric rest pose, the painted screens' reference look */
   /* measured off the GLB (normals + UV tangents): each value's face
@@ -22188,6 +22195,20 @@ var D3X={
       var top=(ench&&ench.face)||0;
       obj.quaternion.copy(top?self._isoQ(top,undefined,true):self._isoQ(val));
       self.scene.add(obj);
+      /* P546: TELL D3 TO STOP DRAWING THIS ONE. _d3xOwned is D3.draw's bail
+         flag and it was set only in the MATCH branch, so every chip die on
+         the loadout, shop, patron and enchant surfaces was stepped and
+         repainted by D3's rAF every frame while WebGL drew the real one on
+         top and CSS hid the DOM one. Not merely wasted work - it is the
+         second live renderer still running, and invisibly, which is worse
+         than running because nothing on screen could ever show it. */
+      /* _d3 lives on the DIE div (19918), not on the placeholder. For MATCH
+         dice d.chip IS the die div - which is why _rowKey's `x.chip._d3`
+         works there - but on a chip surface the placeholder merely CONTAINS
+         it. Measured: the placeholder-only version flagged 0 of 6 while D3
+         logged 3174 repaints in a 2.2s window. Handle both shapes. */
+      var _od=ch._d3||(ch.querySelector&&(ch.querySelector('.die')||{})._d3);
+      if(_od)_od._d3xOwned=true;
       self.dice.push({chip:ch,obj:obj,mat:mat,val:val,top:top,
         uYaw:0,uPit:0,t0:performance.now()});
     });
@@ -22242,6 +22263,13 @@ var D3X={
   },
   _drop:function(d){
     if(d.match)this._shDirty=true;/* its shadow is still on the 2D canvas */
+    /* P546: hand a chip die BACK to D3. This function un-owned only match
+       dice, so once sync marked a chip die (above) a die that later left the
+       surface would stay flagged and D3 would never draw it again. Harmless
+       while WebGL is up and fatal on the path where it is not, which is the
+       one path where D3 is all there is. */
+    var _rd=d.chip&&(d.chip._d3||(d.chip.querySelector&&(d.chip.querySelector('.die')||{})._d3));
+    if(_rd)_rd._d3xOwned=false;
     /* A die on the table is parented to the TABLE group, not the scene, so
        scene.remove() was a no-op and every destroyed die left a ghost that
        kept rendering. Always detach from the actual parent. */
