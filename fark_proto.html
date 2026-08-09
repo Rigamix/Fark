@@ -14040,6 +14040,26 @@ function _npcChooseKeep(keeps,rung){
   return pick||keeps[0];
 }
 
+/* P533 - IS THIS SELECTION A LEGAL KEEP? ONE ANSWER, NOT FOUR.
+   Four separately-written predicates answered this from the same inputs and
+   two of them disagreed. Driven live: score -1, handleRoll and _legalKeeps
+   refused, the button gate and handleBank accepted - so the ROLL button lit
+   and the ROLL press then refused the same selection, with an empty status
+   line. A lit button that does nothing and says nothing.
+   The rule the disagreement was about is not a guess: 25072-25089 records the
+   forgiving reading being removed for a measured +80.5 win-rate points
+   [77.95, 82.69], and that removal reached one of the four sites.
+   anchorLegal is a PARAMETER because the sites legitimately differ: handleRoll
+   holds _anchorDie as a flag beside the bonus, while the preview folds the 600
+   into pts before testing and so must pass false. Inventing an anchor term for
+   the preview would dark the button for a keep the commit accepts - the same
+   defect mirrored. */
+function _keepIsLegal(pts,iconCount,anchorLegal){
+  if(typeof pts!=='number'||!isFinite(pts))return false;
+  if(pts<0)return false;
+  if(pts>0)return true;
+  return !!((iconCount||0)>0||anchorLegal);
+}
 function _legalKeeps(free,actor,locked){
   var out=[];
   var n=(free||[]).length; if(!n) return out;
@@ -14075,7 +14095,7 @@ function _legalKeeps(free,actor,locked){
              rest.map(function(d){return d.ench||null;})); }catch(e){ pts=0; }
     }
     if(rest.length===0&&(sp.icons||[]).length) pts=0;
-    if(pts<0||(pts===0&&!(sp.icons||[]).length)) continue;
+    if(!_keepIsLegal(pts,(sp.icons||[]).length,false)) continue;/* P533 */
     /* P492: shape travels with the candidate so a persona can ask what KIND of
        hand it is, not just what it scores. Same derivation famCommitBonus uses. */
     var _sh=_handShape(sel);
@@ -25087,7 +25107,7 @@ function handleRoll(){
        shape as old Silver and the 2/3/4/6 branding exploit.
        An icon-only keep is still legal and still banks zero. A brand dragged
        into a dead selection no longer drags six dice through with it. */
-    if(pts<0||(pts===0&&!_anchorDie&&!_iconSel.length)){SFX.err();setStatusMsg('NO SCORE — TRY AGAIN','red');return;}
+    if(!_keepIsLegal(pts,_iconSel.length,_anchorDie)){/* P533 */SFX.err();setStatusMsg('NO SCORE — TRY AGAIN','red');return;}
     pts+=_anchorPts;
     _pCrowsCommit(_cw);/* selection accepted → spend the NPC's Crow's Luck charge if a straight was downgraded */
     if(_anchorDie){triggerCard('anchor','ANCHOR +600',true);spawnPop('+600 ANCHOR');}
@@ -26134,7 +26154,10 @@ function refreshSelUI(){
   /* an icon-only selection is legal and worth zero */
   const _selHasIcon=_pvIcons.length>0;
   if(!selV.length&&_selHasIcon)pts=0;
-  const ok=pts>0||_selHasIcon;G.turnPts=locked+(pts>0?pts:0)+(G._turnBonusPot||0);updHUD();
+  /* P533: was `pts>0||_selHasIcon`, which lit the button for a negative total
+     whenever a brand was in the selection - and the press then refused it.
+     The anchor is already folded into pts above, so false is correct here. */
+  const ok=_keepIsLegal(pts,_pvIcons.length,false);G.turnPts=locked+(pts>0?pts:0)+(G._turnBonusPot||0);updHUD();
   /* Die effect visuals */
   _clearDieEffects();
   if(ok&&_sr.effects&&_sr.effects.length){_showDieEffects(selD,_sr.effects);}
@@ -27070,7 +27093,8 @@ function handleBank(){
     }
     var _bkIcons=_bkSplit.icons;
     if(_bkScore.length===0&&_bkIcons.length)pts=0;
-    if(pts>0||_bkIcons.length){
+    if(_keepIsLegal(pts,_bkIcons.length,false)){/* P533: rejects pts<0, which
+      this accepted and then laundered to zero a few lines below */
       /* NAME THE BRAND THAT FIRED (#44). A mixed keep banks its scorers AND
          spends an icon; the pop showed only the number, so the brand went off
          silently inside a total. Same "visible at the moment it happens" rule
@@ -27128,6 +27152,9 @@ function handleBank(){
         }
         G._breakThenBank=false;/* nothing to break - fall through and bank once */
       }
+      /* P533: unreachable now that the gate above rejects a negative total.
+         Kept as a backstop rather than removed - a banked negative would be
+         worse than a redundant line. If it ever fires, the gate regressed. */
       if(pts<0)pts=0;
       _pCrowsCommit(_cw);/* banked straight downgraded by NPC's Crow's Luck → spend a charge */
       if(_bkAnchorFired){triggerCard('anchor','ANCHOR +600',true);spawnPop('+600 ANCHOR');}

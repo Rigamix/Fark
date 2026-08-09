@@ -2797,3 +2797,824 @@ verbatim so they are not lost:
 M4/M5 and M9 are the two worth judging first: M4/M5 is D6(b) with a scoring
 consequence nobody has priced, and M9 is the precondition that decides whether
 `_setLaneMat` can be adopted for Fair Trade at all (§3).
+
+---
+
+# THE PARALLEL-REPRESENTATION HUNT
+
+Six confirmed defects in one session turned out to share a single shape: **the
+same fact stored, derived or enumerated twice, with the two copies maintained
+separately.** Preserve's `canUse` reading `k.vals` while its picker reads
+`k.dice`; the refill's `needNew` count against its lane set; the rival's `left`
+against `_freeSeats`; the trade ledger's one lane field indexing two boards;
+the resume's hand-written field list against a record it does not own;
+`G.matchDice` beside `G._enchArr`. None of those were found by looking for the
+shape — each was found separately, and the shape was noticed afterwards. Denis
+asked the obvious next question: **before Preserve is patched as an isolated
+bug, how many more of these are sitting unfound?** This section is the answer.
+Forty nominations were raised against the pinned copy, twenty-six died on
+contact, and what follows is the fourteen that did not — merged where two were
+the same root cause in different clothes, and one demoted where a nomination
+from the other half of the sweep had already settled it.
+
+Fourteen nominations, twelve items after merging, eleven live: **G2 is M5**, the
+survivor this document already carries, with its three producers now named;
+**SR-03 and SR-04 are one defect** seen from the count side and the tray side;
+**K2 is PA3** and PA3's producer census kills it, so it is recorded below as a
+latent hazard rather than a finding.
+
+---
+
+## SURVIVORS, RANKED
+
+### PR1 — Four derivations of "is this selection a legal keep", and the ROLL button lights for a selection the ROLL press then refuses
+
+> **CONFIRMED LIVE, then CLOSED — P533.** Driven before the fix, in a real match:
+> score **-1**; `handleRoll` and `_legalKeeps` refused; the button gate and
+> `handleBank` accepted. **The ROLL button was lit and the ROLL press refused the
+> same selection** — nothing committed, and the status line came back **empty**.
+> A lit button that does nothing and says nothing.
+>
+> One predicate now, four callers. `_keepIsLegal(pts, iconCount, anchorLegal)`:
+> a negative total is never legal, a positive one always is, and zero is legal
+> only for an icon-only or anchor keep.
+>
+> **`anchorLegal` is a parameter because the sites legitimately differ** —
+> `handleRoll` holds `_anchorDie` as a flag beside the bonus, while the preview
+> folds the 600 into `pts` before testing and must pass `false`. Inventing an
+> anchor term for the preview would have darkened the button for a keep the
+> commit accepts: the same defect mirrored.
+>
+> | arm | score | accepted | button | commits | button = press |
+> |---|---|---|---|---|---|
+> | brand + unusable die | -1 | no | dark | no | yes |
+> | an ordinary scorer | 100 | yes | lit | yes | yes |
+> | icon-only keep | 0 | yes | lit | yes | yes |
+>
+> The two controls carry the weight: a fix that simply darkened the button would
+> have passed the first arm alone.
+>
+> **Two faults in my own probe, both caught before the result was believed.** It
+> first ran three arms in one browser session and the second could not build a
+> pool — one arm per session, again. And it measured "did it commit" by kept-tray
+> growth, which **cannot see an icon-only keep**: 25117 only pushes when `pts>0`
+> or the post-split list is non-empty, so a legal icon keep never grows the tray.
+> Measured on the dice instead.
+>
+> **The provenance is the lesson.** 25072-25089 records the forgiving reading
+> being removed for a measured **+80.5 win-rate points [77.95, 82.69]**. Somebody
+> proved the fix necessary, with a number, and it reached one of four sites.
+
+The gate:
+
+```
+26108  /* Validity + total via scoreSelection — the SAME function the commit (ROLL)
+26109     and bank paths use. ... */
+26115  let pts=scoreSelection(selV,cards,locked,_selCtx,selMats,_pvEnch);
+...
+26135  const _selHasIcon=_pvIcons.length>0;
+26136  if(!selV.length&&_selHasIcon)pts=0;
+26137  const ok=pts>0||_selHasIcon;G.turnPts=locked+(pts>0?pts:0)+(G._turnBonusPot||0);updHUD();
+26143  setBtns(ok&&(rem>0||allFreeSelected),ok);
+```
+
+The three acceptance predicates:
+
+```
+25090      if(pts<0||(pts===0&&!_anchorDie&&!_iconSel.length)){SFX.err();setStatusMsg('NO SCORE — TRY AGAIN','red');return;}   /* handleRoll */
+
+27072      if(_bkScore.length===0&&_bkIcons.length)pts=0;                                                                      /* handleBank */
+27073      if(pts>0||_bkIcons.length){
+27131      if(pts<0)pts=0;
+
+14078      if(pts<0||(pts===0&&!(sp.icons||[]).length)) continue;                                                              /* _legalKeeps */
+```
+
+**The two representations.** One question — is this selection a legal keep —
+answered from the same inputs by four separately-written predicates. Two of
+them (`handleRoll` 25090, `_legalKeeps` 14078) reject `pts<0`. Two of them
+(the button gate 26137, `handleBank` 27073) do not, and `handleBank` then
+launders the negative at 27131. `scoreSelection` returns `-1` when the non-icon
+half of the selection holds a die the engine cannot use, so the term matters
+exactly when a brand is in the selection.
+
+**The write that moved one and not the other** is recorded in the file, at
+25072-25089: *"THE SWEEP LIVED HERE: `if(pts<0&&_iconSel.length)pts=0;`,
+removed"*, citing AUDIT_RESOLUTIONS #42 and a measured **+80.5 win-rate points
+[77.95, 82.69]** for the wide reading. That rule was applied to `handleRoll`
+and reached one of the four sites. The comment at 26108-26109 asserts the
+preview uses *"the SAME function the commit (ROLL) and bank paths use"* — true
+of the total and false of the validity test, which is the in-source-claim shape
+S2, S6 and S9 each turned up.
+
+**Exposing arrangement.** Any brand on the loadout (brands sit on faces 1 and 5,
+`_dieIsIcon` 18675). Roll until a branded die shows its brand face, then select
+it **together with one non-scoring plain die** — a 2, 3, 4 or 6 outside a
+triple. The default state hides it two ways: the branded die alone is legal on
+every path (25071/27072 pin it to zero), and a branded die beside dice that
+*do* score gives `pts>0`, where all four agree.
+
+**Read:** on that one selection, `pts` and `ok` inside `refreshSelUI`, plus
+`btnRoll`/`btnBank` disabled state; then `handleRoll()` and whether `G.kept`
+grew or the status line says NO SCORE; then reset to the identical selection,
+`handleBank()`, and read `G.kept`, `G.pPts`, `d.committed` on the junk die, and
+whether `_iconFire` ran (a Tithe brand pays 15g here). *Instrument check:* the
+same three reads on an icon-free illegal selection, which all three must refuse
+— otherwise the probe cannot see a refusal at all.
+
+### PR2 — Preserve's gate reads `k.vals`, its picker reads `k.dice`, and which of three producers wrote the row decides whether those are parallel (= M5, with the producers named)
+
+```
+14436  canUse:function(){
+14437    if(!G||G.phase==='opp')return false;
+14438    return (G.kept||[]).some(function(k){return (k.vals||[]).some(function(v){return v===1||v===5;});});
+14439  },
+...
+14450       k.vals and k.dice are NOT index-parallel - vals comes from
+14451       _scoreDice with icon faces split out by _splitIcons, dice comes from
+14452       selDice - so this searches k.dice BY VALUE and never by position.
+...
+14456      var _pd=(k.dice||[]).filter(function(dd){return dd&&(dd.val===1||dd.val===5);})[0];
+14457      if(_pd){found=_pd.val;foundMat=_pd.mat||k.mat||'bone';return true;}
+```
+
+This is **M5**, already recorded as the largest thing still open. What this pass
+adds is the producer census, and it changes the arrangement. `vals` is
+post-`_splitIcons` at all three producers; `dice` is not:
+
+```
+25125    if(pts>0||_scoreDice.length)G.kept.push({vals:selVals,mat:selDice[0].mat,pts,cursed:_cfHit,
+25126      ss:_starstonePay(_scoreDice),
+25127      dice:selDice.map(function(dd){return{val:dd.val,mat:dd.mat};})});          /* handleRoll — PRE-split */
+
+27121            G.kept.push({vals:selV,mat:(_bkScore[0]||selD[0]).mat,pts:pts,
+27123              dice:_bkScore.map(function(dd){return{val:dd.val,mat:dd.mat};})}); /* break-then-bank — POST-split */
+
+27149        G.kept.push({vals:selV,mat:selD[0].mat,pts,cursed:_cfBank,
+27151          dice:selD.map(function(dd){return{val:dd.val,mat:dd.mat};})});         /* handleBank — PRE-split */
+```
+
+So a row written by 27121 is index-parallel and a row written by 25125 or 27149
+is not — the same field, three writers, two shapes. The `mat` field diverges
+the same three ways, and P514's comment at 14446-14453 names `selDice[0].mat` as
+the bug it worked around. The 25125 push is the sharpest evidence in the hunt
+that this is an oversight and not a design: the comment four lines above it, at
+25122-25124, states the distinction explicitly for the *sibling* field —
+*"`_scoreDice`, not `selDice`: selDice still carries the icon-face dice this
+keep is spending, and an icon keep banks zero"* — and the very next line writes
+`dice:selDice.map(...)`.
+
+**Payload.** A brand sits only on faces 1 and 5, so an icon die *is* a 1 or a 5
+in `k.dice` and is absent from `k.vals`. `canUse` can be satisfied by a plain 5
+while `use`'s `filter(...)[0]` picks the branded 1 that stands earlier in pool
+order, and the consumer at 24712 mints `pts:_fp.pts+(_fp.crack||0)` — 100 points
+for a face that banks zero by law.
+
+**Exposing arrangement.** Commit **via the ROLL press** a selection whose first
+die in pool order shows a brand face and which also holds a plain scoring 5
+later in pool order. Committing the same selection through the break-then-bank
+branch (27121) writes the parallel form and hides it.
+
+**Read:** `G.kept.map(k=>({vals:k.vals,dice:(k.dice||[]).map(d=>d.val),mat:k.mat}))`
+before playing Preserve; then `CFX.preserve.canUse()`, then `G._famPreserve`
+after `use`; then advance a turn and read `G.kept[0].pts` and `G.turnPts` at
+24714. A finding is `_famPreserve.val` present in `k.dice` and absent from
+`k.vals`. Run all three producers. *Instrument check:* assert
+`k.dice.length !== k.vals.length` on at least one row, or the probe never
+entered the state.
+
+### PR3 — `sealRule` is a launch-only parameter: three copies of that fact reach the disk and the fourth, the live one, does not
+
+```
+36038  var sealRule=isSealed?night.sealTell:null;
+36079      sealRule:sealRule,
+32292  G._sealRule=params.sealRule||null;
+```
+
+`saveMatchState` (10241-10326) has no `sealRule` key of any kind — while
+`handicap` does, at 10251 — and `resumeMatch` hand-writes twelve params without
+it:
+
+```
+10332  setTimeout(function(){showScreen('match',{
+10333    rungId:snap.rungId,rung:snap.rung||null,
+10334    isBoss:!!snap.isBoss,isGauntlet:!!snap.isGauntlet,handicap:snap.handicap||null,
+...
+10339    _resumeData:snap
+10340  });},80);
+```
+
+**The two representations.** `G._sealRule` is a fourth derivation of a fact
+whose three sources — `S.run.night.sealTell`, `S.run.night.handicapSeat`,
+`S.pendingMatch.seatIdx` — all survive to disk. It is computed once at launch
+and never recomputed, so a resumed sealed seat runs with the seal gone while
+the night still says the seat is sealed.
+
+**What moves.** Two consumers read it. `_applySeal` (11312) binds the rule to
+both sides and substitutes it into the tell slot when the patron has none
+(11316-11320), so the badge and every `G._tell`-gated hook change with it. And
+the payout:
+
+```
+29777  var isHandicap=!!G._handicap||!!G._sealRule;
+29778  var pointsEarned=win?(isHandicap?((G._sealRule&&famOwnTier('marked_table')>0)?3:2):1):0;
+30580          _rubOutCircles((G&&G._sealRule&&famOwnTier('marked_table')>0)?2:1);
+```
+
+`G._handicap` is the other disjunct and is measured `null` everywhere in this
+document, so after a resume a won sealed seat pays **1 circle instead of 2 or
+3**, and a lost one rubs 1 instead of 2. It cuts both ways, which makes it an
+exploit as well as a loss: quit and resume to play the sealed seat without its
+curse.
+
+The contrast case is in the same machinery: a **sleeved** rule survives the
+resume, because `_applySleeve` re-derives it from `S.run.sleeve` at 11291. Same
+mechanism, different source, only one of the two persisted.
+
+**Read:** before quit vs after resume — `G._sealRule`;
+`_ruleActive(S.run.night.sealTell,'p')`; `G._tell&&G._tell.id`; the presence of
+a `.tell-badge` node; and at settle, `pointsEarned` at 29778. Also read
+`S.run.night.sealTell`, `S.run.night.handicapSeat` and `S.pendingMatch.seatIdx`
+off disk to confirm the fix has everything it needs to re-derive. Take at least
+one turn before quitting so 24893 runs.
+
+### PR4 — Preserve's payout is match state that no snapshot carries, while the charge that bought it is deep-cloned; and the one field that *is* carried is guaranteed null (SR-03 + SR-04 merged)
+
+These were nominated separately, from the count side and the tray side. They are
+one defect: `startPTurn` pays Preserve out and then, 180 lines later, snapshots
+a turn boundary that records none of the payout.
+
+```
+24709  if(G&&G._famPreserve){
+24710    var _fp=G._famPreserve;G._famPreserve=null;
+24712    G.kept=[{vals:[_fp.val],mat:_fp.mat||'bone',pts:_fp.pts+(_fp.crack||0),
+24713             dice:[{val:_fp.val,mat:_fp.mat||'bone'}]}];
+24714    G.turnPts=G.kept[0].pts;
+24727    _dropLanes(1);/* P516 */
+...
+24893  saveMatchState();
+```
+
+against the snapshot and its restore:
+
+```
+10256    pPts:G.pPts,oPts:G.oPts,target:G.target,turnNum:G.turnNum,numDice:G.numDice,
+10323    famPreserve:G._famPreserve?JSON.parse(JSON.stringify(G._famPreserve)):null,
+32361    G.pPts=rd.pPts;G.oPts=rd.oPts;G.turnNum=rd.turnNum;G.numDice=rd.numDice;
+24582  G.phase='idle';G.turnPts=0;G.kept=[];G.numDice=G.matchDice?G.matchDice.length:6;
+```
+
+**Two representations, two failures, one cause.**
+
+(a) `famPreserve` is cloned at 10323 by a writer that runs 183 lines after
+24710 has already nulled it, on the same unconditional path — so the field can
+never carry a live value from the turn-boundary writer. The comment at
+10272-10277 makes exactly this observation about `_fairTrade` (*"Always null
+HERE"*) and justifies keeping the field because `_removeDieAt` writes the same
+dice mid-turn; no mid-turn writer carries `famState` at all except the
+Fair-Trade branch at 19280, which is PR5.
+
+(b) `numDice` is saved (10256), mapped back (32361) and then overwritten
+unconditionally by 24582 two hundred milliseconds later — `_matchStartDelay` is
+200 on a resume (32571) and `startPTurn` is on that timer (32635). The
+snapshot's `numDice` is legitimately lower than `matchDice.length`, because it
+is written at the *end* of `startPTurn`, after `_dropLanes(1)` at 24727. The
+restore line is decoration: the penalty existed only in the derived count, and
+the derived count is recomputed away. This is the P514/P516/P517
+recompute-versus-decrement rule, reappearing across the save boundary instead of
+inside one turn — the fifth instance.
+
+Meanwhile the **cost** is in `famState.pF`, deep-cloned and restored (32470).
+Charge spent, tray empty, `turnPts` 0, lane handed back.
+
+**Exposing arrangement.** Play `preserve` on turn N, bank, let the rival answer,
+let turn N+1 begin so 24709-24743 pays out and the die is minted into `#keptRow`
+at 24734-24741. **Do not roll.** Force-quit; resume. The complementary arm —
+quit *before* turn N+1 starts — must also be run: there the snapshot pre-dates
+the play, so charge and effect should rewind together, which separates "resume
+loses the effect" from "resume rewinds the whole play".
+
+**Read:** on disk at the quit — `S.pendingMatch.famState.famPreserve` (predicted
+null), the preserve instance's remaining charge in `famState.pF` (predicted
+already spent), `S.pendingMatch.numDice` against
+`S.pendingMatch.matchDice.length` (predicted 5 against 6). After the resume
+mapper but before the 200 ms timer — `G.numDice` (predicted 5). After
+`startPTurn` — `G.numDice` (predicted 6), dice dealt into `#playerDiceRow`
+(predicted 6), `G.kept`, `G.turnPts`, `#keptRow` children, and the charge count.
+
+*Adjacent, not nominated:* `G._oTarPit` is decremented at 24574 with
+`G.numDice=Math.min(G.numDice||6,5)` **eight lines above** 24582's recompute. I
+found no assignment of `_oTarPit` anywhere (five occurrences: 13093, 13137,
+24573, 24574, 28092, and Tar Pit is recorded retired at 14470), so it is
+probably dead — but a grep zero is not a finding here, and if a writer exists
+this is a sixth instance in the same function. Settle it by instrumenting 24574,
+not by searching for the name.
+
+### PR5 — `_removeDieAt` has two exits with opposite snapshot policies, and the Fair-Trade exit calls the full `saveMatchState()` seventy lines above a comment forbidding exactly that
+
+```
+19267  try{
+19268    var _ftB=G._fairTrade;
+19269    if(_ftB&&_ftB.lane===lane){
+19270      G._fairTrade=null;
+19271      G.matchDice[lane]=_ftB.was;/* its owner walks back in */
+19274      G._ftDead=(G._ftDead||[]).concat([_ftB.borrowed]);
+19277      G.pool=(G.pool||[]).filter(function(q){return q.lane!==lane;});
+19280      try{saveMatchState();}catch(e){}
+19281      return true;
+19282    }
+19283  }catch(e){}
+```
+
+```
+19353     DO NOT call saveMatchState() here. That snapshot means "the state at the
+19354     START of a player turn" - startPTurn's last line is its only other
+19355     writer - and a resume replays the turn from the top. Rewriting all of it
+19356     mid-turn re-timestamps what the replayed turn is meant to hand back:
+19357     measured, a Break landing after a shatter bonus and a spent active card
+19358     moved the snapshot's pPts 0 -> 500 and recorded second_wind as used, so
+19359     the resumed turn charged the player for a card use on a turn that never
+19360     happened, and banked points it then let them earn again.
+```
+
+**The two representations.** `S.pendingMatch` as a whole record, whose declared
+meaning is start-of-turn, against the six-field dice-only subset the same
+function writes on its other exit (19372-19392). One record, one timestamp
+semantics, two writers inside one function — and the early-returning one carries
+the whole thing. `saveMatchState` refuses nothing here: its only guard is
+`G._practice||G._endMatchFired` (10240).
+
+**Exposing arrangement.** A live Fair Trade loan whose borrowed die is an
+Obsidian — per 19243-19249 the passive shatter sweep is stated to be the only
+remaining caller that reaches this branch, Break having been banned from
+borrowed dice. Within one player turn: score something so `G.pPts` moves and/or
+spend a familiar charge, then let the shatter fire so 19269 runs. Quit; resume.
+
+**Read:** `S.pendingMatch.pPts`, `.activeCardState`, `.npcCardState.usedOnce`
+and `.famState.pF` charge counts immediately before the shatter and immediately
+after 19280 returns — the claim is that they moved mid-turn. Then the same
+fields plus live `G.pPts` at the top of the replayed turn, against the identical
+arrangement resolved by a plain Break, which routes through the 19372 subset
+writer and should leave the snapshot's `pPts` unmoved.
+
+### PR6 — `S.run` is written mid-turn and cannot be rewound; the snapshot only rewinds match state, so a replayed turn pays the same brand twice
+
+```
+18342  tithe:{name:'Tithe',price:150,glyph:'◉',ink:'#d8b054',doubles:true,
+18343    desc:'Brand a coin on one face. Keep it: it banks nothing and pays you 15 gold.',
+18344    fire:function(c){
+18345      _getS();var g=15*(c.mult||1);
+18346      S.run.gold=(S.run.gold||0)+g;try{save();}catch(e){}
+```
+
+**The two representations** are the two saved records a resume treats
+differently: `S.pendingMatch`, rewound to the start of the turn, and `S.run`,
+never rewound. The reasoning at 19353-19360 covers one direction only — it
+protects the replayed turn from being re-**charged** — and says nothing about it
+being re-**paid**.
+
+Tithe is not alone. Two more run-scoped writes fire inside a match and persist
+immediately:
+
+```
+27681      total*=2;S.run._hotdNext=false;try{save();}catch(e){}      /* Hair of the Dog, consumed */
+27689      S.run.gold=(S.run.gold||0)+5;try{save();}catch(e){}        /* Corvus's Ledger, +5g per bank */
+```
+
+Both sit inside `handleBank`'s bank block, after the last boundary snapshot and
+before the next one, so a quit taken there keeps the gold and the spent
+doubling while the bank itself rewinds. Hair of the Dog runs the *other* way —
+the player loses a consumable for a bank that never happened.
+
+**Exposing arrangement.** A die carrying the `tithe` brand. Roll until the
+branded face shows, commit it so `fire` runs and the famLog line appears, do not
+bank, force-quit, resume, and make the same commit again. Kindred doubles
+`c.mult`, so the second arm should read 30 rather than 15 and distinguishes a
+real double-pay from a misread single. The Corvus arm needs the relic in the
+loadout and a quit immediately after a bank.
+
+**Read:** `S.run.gold` immediately before the commit, after `fire` returns, on
+disk at the quit, after the resume mapper, and after the replayed commit —
+predicted `g, g+15, g+15, g+15, g+30`. **Control:** the same turn played to a
+bank with no quit, ending at `g+15`. Worth sweeping the rest of `ENCH_GRID`'s
+`fire` handlers for other run-scoped writes on the same pattern.
+
+### PR7 — The chalkboard's count and its per-circle history: one win adds 3 to the count and 2 to the list, and the file says in writing that they must move together
+
+```
+13169 /* RUB OUT N CIRCLES. The chalk board is TWO structures - S.run.points is the
+13170    count and S.run._chalkMeta is the per-circle history - and they must move
+13171    together or the board disagrees with its own record. ... */
+13179     S.run.points=Math.max(0,(S.run.points||0)-1);
+13180     if(Array.isArray(S.run._chalkMeta))S.run._chalkMeta.pop();
+```
+
+The loss side honours it. The win side does not:
+
+```
+29778  var pointsEarned=win?(isHandicap?((G._sealRule&&famOwnTier('marked_table')>0)?3:2):1):0;
+...
+30560    route._earned=route.pointsEarned||1;
+30561    S.run.points+=route._earned;
+30564    S.run._chalkMeta=Array.isArray(S.run._chalkMeta)?S.run._chalkMeta:[];
+30565    S.run._chalkMeta.push('face');
+30566    if(route._earned>=2)S.run._chalkMeta.push('crown');
+```
+
+**The write that moves one and not the other:** `_earned===3` — a sealed seat
+won while the player owns `marked_table` — adds 3 to the count and 2 to the
+list. Nothing repairs it afterwards: the rebuild-from-count at 9566 is gated on
+`!Array.isArray(S.run._chalkMeta)`, false once the array exists. The loss side
+is symmetric (`_rubOutCircles(2)` at 30580 takes 2 from both), so one 3-point
+win followed by any loss leaves the list permanently one short, and the renderer
+indexes the list by circle position:
+
+```
+35789  for(var i=0;i<need;i++){
+35790    var isFilled=i<filled;
+35791    var isCrown=isFilled&&meta[i]==='crown';
+```
+
+Every crown after the drift renders on the wrong circle, and the results screen
+draws `pointsEarned` marks (29936, 29973), so the two surfaces disagree about
+the same win.
+
+**Exposing arrangement.** Own `marked_table` (it is in the FAM_LIVE enable list
+at 14479). Play the night's `handicapSeat` — `night.sealTell` is rolled for
+every night (35815/35824) and `G._handicap` is hardcoded null at 36039, so the
+sealed seat is the only live producer of `isHandicap`. Win it, win a plain seat,
+then look at the board. Note PR3: if the sealed seat was **resumed**, `_earned`
+is 1 and this does not fire — the two defects mask each other.
+
+**Read:** `S.run.points` and `S.run._chalkMeta` (the array, not its length)
+either side of the 30557 branch, plus `route.pointsEarned`; then which
+`.cb-circles` index carries `.cb-crown` against which win was the sealed one.
+Second arm: lose a sealed seat while the list is already short and read whether
+`_rubOutCircles` empties the list while `points` is still positive.
+
+### PR8 — The shatter sweep purges `G.pool` unconditionally and removes the seat conditionally, and it is the only one of three callers that ignores `_removeDieAt`'s refusal
+
+```
+25541    if(_shLanes.length)_shLanes.forEach(function(L){_removeDieAt(L,{permanent:false});});
+25542    /* P528: UNCONDITIONAL, was an `else`. ...
+25547       Safe and idempotent here - _removeDieAt already filtered the pool by lane,
+25548       so what reaches this line is exactly the set the `else` existed for. */
+25549    G.pool=G.pool.filter(function(d){return !d._shattered;});
+```
+
+against the floor:
+
+```
+19242  if(G.matchDice&&G.matchDice.length<=1)return false;
+```
+
+**The two representations** are `G.pool` — what is on the table this roll — and
+`G.matchDice`/`G.numDice` — how many seats exist. `_removeDieAt` is the one
+writer that moves both together. On a refusal it moves neither, and 25549 then
+removes the die from the pool anyway; its element was already gone on the 420 ms
+timer at 25507. The claim at 25547-25548 is false in exactly that case.
+
+The other two callers handle the refusal. `CFX.sacrifice` re-tests the floor
+itself at 14322 with the reason written above it (*"testing afterwards would
+leave a visually destroyed die still sitting in the pool"*), and `steal_die`
+captures the return (`var _seized=_removeDieAt(...)`, 24832/24847). The sweep
+does neither.
+
+**CONTRADICTION, AND IT MUST BE SETTLED BEFORE THIS IS PROBED.** The same code
+was nominated twice in this hunt. The other nomination (G5, refuted below) kills
+the single-die case on three grounds I could not fault: on a refusal
+`_dropLanes(1)` is also skipped so `numDice` stays equal to `matchDice.length`;
+`startPTurn` reconciles pool and count in one statement (24582) before anything
+reads them again; and reverting 25549 to conditional reopens D24, which P528
+closed. What survives here beyond that kill is narrow and specific: **the
+two-die arm**. `matchDice.length===2` with both dice shattering on one roll
+gives `_shLanes [1,0]`; the first call succeeds and takes the length to 1, the
+second hits the floor while 25549 still removes it from the pool. The 19240
+promise — *"If Obsidian shatters the last die it now cracks and holds"* — is not
+kept on that path, and the turn continues with an empty pool.
+
+**Read:** the return value of each `_removeDieAt` call inside the 25541 forEach;
+then immediately after 25549, `G.matchDice.length`, `G.numDice`,
+`G.pool.length`, `G.pool.map(d=>d.lane)` and `#playerDiceRow`'s child count;
+then whether control reaches the bust check at 25687 with `freeV` empty and what
+the next `startPTurn` deals. **Negative control:** `matchDice.length` 3 with one
+shatter, where the removal succeeds and the three numbers agree.
+
+### PR9 — `npcCardState.playerTurnCount` is incremented before the snapshot its sibling is incremented after, so every resume counts the replayed turn twice
+
+```
+24746  G.npcCardState.playerTurnCount++;
+24893  saveMatchState();
+10310    npcCardState:JSON.parse(JSON.stringify(G.npcCardState||{})),
+32384    if(rd.npcCardState)G.npcCardState=rd.npcCardState;
+```
+
+against the sibling counter of the same fact:
+
+```
+27826  G.phase='opp';G.turnPts=0;G.kept=[];G.numDice=6;G.turnNum++;
+```
+
+**Two counters of one fact — how many player turns this match has had.**
+`turnNum` is bumped inside `runOppTurn`, *after* the boundary snapshot, so
+restoring it and re-entering `startPTurn` does not double it. `playerTurnCount`
+is bumped at 24746, *before* the snapshot at 24893, so restoring it and
+re-entering `startPTurn` does. Repeated resumes compound. The consumer:
+
+```
+27525    if(npc.effect.mechanic==='periodic_drain'&&G.npcCardState.playerTurnCount>0&&G.npcCardState.playerTurnCount%npc.effect.interval===0){
+```
+
+**Read:** `G.turnNum` and `G.npcCardState.playerTurnCount` at the top of turn N,
+on disk at the quit, and at the top of the replayed turn — predicted
+`N/N/N` and `N/N/N+1`. For a behavioural consequence rather than a bookkeeping
+one, confirm a `periodic_drain` card is actually in the boss's dealt `G.oCards`
+first rather than assuming one exists, then read `G.pPts` across the rival's
+answering turn against a no-quit control of the identical turn sequence.
+
+### PR10 — Three mid-turn mutators of the same dice record carry three different subsets of it, and one carries none; the comment claiming they match is wrong
+
+```
+18581    replayed turn for everything it has already spent. Exactly the shape
+18582    _removeDieAt uses, for exactly the same reason.
+18588 function _tradeSnap(){
+18591     S.pendingMatch.matchDice=[...G.matchDice];
+18592     S.pendingMatch.matchOppDice=[...G.matchOppDice];
+18593     S.pendingMatch._enchArr=[...(G._enchArr||[])];
+18594     S.pendingMatch._tradeSwaps=G._tradeSwaps?JSON.parse(JSON.stringify(G._tradeSwaps)):null;
+```
+
+`_removeDieAt`'s subset (19374-19390) writes six fields — `matchDice`,
+`_enchArr`, `numDice`, `_fairTrade`, `_tradeSwaps`, `_diceOut` — and **not**
+`matchOppDice`. `_tradeSnap` writes four, including `matchOppDice`. So the
+asserted shape equality at 18581-18582 does not hold; it is the same class of
+false in-source claim as P517, P523 and D2.
+
+The consequence lives in the third mutator. `_commitVagabondDrag`
+(37011-37129) permutes `matchDice`, `_enchArr`, `_fairTrade.lane` and
+`_tradeSwaps[].lane`:
+
+```
+37078            if(_ftBefore>=0&&c.die&&c.die.lane===_ftBefore)G._fairTrade.lane=_slots[i];
+37083            if(G.matchDice&&L<G.matchDice.length&&c.mat!==undefined)G.matchDice[L]=c.mat;
+37084            if(G._enchArr&&L<G._enchArr.length)G._enchArr[L]=c.ench;
+37085            c.die.lane=L;
+```
+
+and calls no writer at all — I filtered the whole function body for `save(`,
+`saveMatchState` and `pendingMatch` and got zero. A quit after a drag and before
+any removal or Trade resumes the pre-drag seating; a `_removeDieAt` or a Trade
+afterwards silently rescues it through its own writer, which is why the ordering
+is the arrangement.
+
+**Read:** `G.matchDice`, `G._enchArr`, `G.pool.map(d=>d.lane)`,
+`G._fairTrade&&G._fairTrade.lane`, `G._tradeSwaps.map(t=>t.lane)` right after the
+drag; the same five off `S.pendingMatch` at the quit; the same five off live `G`
+after the resume. Predicted: new permutation live, old one on disk, old one
+restored. **Second arm:** drag, then Break — the reorder must survive, or the
+probe is reading noise. Sharpest with position-scoring cards equipped and a live
+loan, so `_fairTrade.lane` moved too.
+
+### PR11 — Fair Trade's gate proves a lendable die exists; its action adds a rank test and refuses in silence, so the sheet offers PLAY and nothing happens
+
+```
+12971    return !!(G&&!G._fairTrade&&(G.phase==='idle'||G.turnRollCount===0)&&
+12972      (S.run.diceInv||[]).filter(function(_d){
+12973        return (G._ftDead||[]).indexOf(_d)<0;}).length);},
+...
+12982    if(!inv.length||!G.matchDice||!G.matchDice.length)return false;
+12988    if(dieRank(inv[best])<=dieRank(G.matchDice[worst]))return false;
+```
+
+```
+13147  if(fx.canUse&&!fx.canUse(inst)){famLog('NOT NOW');return;}
+13148  if(fx.use(inst)){inst.charges--;famRenderRow();}
+```
+
+**The two representations** are the gate's condition (a non-empty, non-dead
+stash) and the action's (that, plus a stash die outranking the weakest seat).
+`famUse` logs `NOT NOW` when the **gate** refuses and prints nothing at all when
+the **action** does. There is in fact a third: `famCardTap`'s `usable` at 13129
+is `d.kind==='active'&&inst.charges>0&&CFX[inst.id]&&CFX[inst.id].use` — it
+never consults `canUse`, so the sheet says PLAY on charges alone.
+
+The correct pattern is already in the file, written by P519 for Sacrifice, four
+hundred lines below: *"eligibility in ONE place, read by canUse and use alike,
+so the button can never offer a sacrifice that use() then refuses"*
+(14299-14301, with `_targets()` at 14306). It did not travel.
+
+**Read:** with a stash holding only dice ranked at or below the weakest die in
+the loadout — `CFX.fair_trade.canUse(inst)` (expect true), `dieRank(inv[best])`
+against `dieRank(G.matchDice[worst])`, the return of `use` (expect false),
+`inst.charges` either side, `G._fairTrade` (expect null), and the last entry in
+the fam log queue — an empty log after a PLAY press is the player-facing half.
+*Instrument check:* add one better die to the stash and require the same
+sequence to produce a non-null `G._fairTrade`.
+
+### PR12 — The die-tap flourish scores the unsplit selection; every other path splits icons out first, for a reason its own neighbour states
+
+```
+24515      var selD=G.pool.filter(function(x){return x.sel&&!x.committed;});
+24516      var _tdCtx=_pCrowsForScore()||{};_tdCtx._bookendsEligible=_bookendsEligible(selD);
+24517      var pts=scoreSelection(selD.map(function(x){return x.val;}),effectiveCards(),
+24518        G.kept.reduce(function(a,k){return a+k.pts;},0),_tdCtx,
+24519        selD.map(function(x){return x.mat;}));
+24520      if(pts>0){
+```
+
+against 26097-26101, 25024-25026 and 27045-27046, all of which pass
+`_splitIcons(...).rest`:
+
+```
+26097  /* icons are withheld from the maths here for the same reason as at commit:
+26098     the engine must never see a die it would happily score. Without this a
+26099     branded 1 previewed as +100 and then banked nothing. */
+```
+
+**Two readings of one question, ten lines apart:** `toggleDie` fires the scoring
+flourish (`die-sel-pop`, `SFX.commitAt`, the stronger haptic) for a branded 1,
+and `refreshSelUI()` one call later (24562) correctly previews it as worth
+nothing. 24517 is also the only call site that omits the enchant argument
+entirely, so it is the odd one out twice.
+
+**Read:** on one tap of a branded die showing its brand face, the `pts` at 24517
+and the `pts` at 26115 for the same selection, side by side, plus whether
+`.die-sel-pop` was applied and `SFX.commitAt` called. Two numbers for one
+selection is the finding. *Instrument check:* tap a plain scoring 1 and require
+both numbers to agree.
+
+### DEMOTED — `_famDiceMigrate` vs `S.run.dieEnchInv` (K2, settled by PA3)
+
+The code reading is right and verifies verbatim: 9452-9456 filters `diceInv`
+and never `dieEnchInv`, and `_enchInit` then "reconciles" them by length alone
+(`while(S.run.dieEnchInv.length<(S.run.diceInv||[]).length)...push(null);` /
+`S.run.dieEnchInv.length=(S.run.diceInv||[]).length;`, 19608-19609), which
+shifts every stash brand at or above the removed slot and deletes the tail. K2's
+own probe instruction was *"reachability must be established first… if no live
+save carries a retired material in `diceInv` this is a latent hazard, not a
+bug — say so rather than filing it."* PA3 did that census and it comes back
+empty, and I re-ran the parts that mattered: `'brass'`, `'crystal'`, `'ruby'`
+and `'jade3'` appear in exactly seven places in the file (12301, 12305, 12320,
+12330 — the `DICE_TYPES` entries themselves — and 12461/12465, two `PERSONAS`
+`dieBias` arrays), and 11623 filters `dieBias` against `ps.dicePool`, whose
+eight definitions (10993-11030) are bone/iron/lead/flint/amber/jade/jade2/
+starstone only. The file states the same conclusion and retracts an earlier
+claim to the contrary at 19820-19836. **Latent hazard, not a survivor.** It
+becomes live the moment any retired material enters a pool or the shop, and the
+fix is to filter the two arrays as a pair rather than equalise their lengths.
+
+---
+
+## IS PRESERVE ISOLATED?
+
+**No. It is the most expensive member of a family, and the family has at least
+four unrelated branches.** Two answers, at two scopes, with different
+confidence.
+
+**Narrow scope — gate-and-action pairs among the live familiar cards: Preserve
+is currently unique, and that is not reassuring.** I read all nine `CFX` cards
+with both a `canUse` and a `use`. `steady_hand` (12917/12927) and `encore`
+(13025/13028) write the *same predicate twice*, which is the shape but cannot
+drift. `honeytrap` (14381/14388) walks `k.vals` on both sides. `sacrifice` was
+consolidated by P519 into a single `_targets()` read by both, with a comment
+naming the rule. `fair_trade` (PR11) adds a condition in `use` that `canUse`
+does not test — a divergence, but of the same *array*. Preserve is the only one
+whose gate and action read **different arrays**. So the exact defect is
+one-of-one — which means nothing on its own, because the thing that made those
+two arrays non-parallel is not Preserve.
+
+**Wider scope — the icon split is the shared cause, and it has three other live
+sites.** `_splitIcons` introduced a second representation of "the selection",
+and the conversion was done site by site. It reached `refreshSelUI`,
+`handleRoll`, `handleBank` and `_legalKeeps` for the *values*; it did not reach
+`toggleDie` at all (PR12); the `pts<0` rule that goes with it reached one of
+four predicates (PR1); and inside a single `G.kept` row the split is applied to
+`vals` at all three producers and to `dice` at only one of three (PR2). Patching
+Preserve's picker without touching those leaves three siblings live and leaves
+`k.dice` still meaning two different things depending on which button committed
+the row. **Preserve should not be patched alone**; the row's contract — is
+`k.dice` the whole keep or the scoring remainder — should be decided once and
+made true at 25125, 27121 and 27149 together, which is the same "one function,
+one exit path" ruling §5a already made for `_removeDieAt`.
+
+**Widest scope — the shape is not about icons at all.** Four survivors here
+share nothing with the selection code: the chalkboard's count against its
+per-circle history (PR7), the snapshot's hand-written field lists against the
+record they copy — three writers, three different subsets, one of them with a
+comment asserting they match (PR10) — the seal's four copies of one fact, three
+persisted and one not (PR3), and a removal's return value against the pool
+filter that runs regardless (PR8). Add the already-shipped P529/P530/P531/P532
+and this is now a dozen instances in one codebase. It is a systemic property of
+this file, not a Preserve problem.
+
+**Confidence.** High — call it 85% — on the narrow claim, because it rests on
+verbatim code I read in the pinned copy and on a complete enumeration of the
+nine `CFX` gate/action pairs rather than on a search. Medium-high, 65-70%, on
+the wider claim, for one reason and it is the standing one: **nothing here was
+driven.** Twenty-six of forty nominations died on contact, most of them to
+reachability, and this document's own record says half of every raw hit list
+dissolves. I would expect one or two of the twelve to die the same way under a
+probe — PR9 and PR12 are the likeliest, PR1 and PR2 the least likely, because
+both are arithmetic on code paths this document has already measured executing.
+
+---
+
+## REFUTED
+
+Twenty-six nominations died. One line each, with the reason. A hunt that reports
+only what it found is unfalsifiable.
+
+**Gate-versus-action lane (7):**
+
+1. **G3 — the Anchor probe index is computed against the unsplit selection and read out of the split arrays.** All three blocks are behind `cards.includes('anchor')` with `cards=effectiveCards()`, whose first statement is `return [];` (24488). Dead layer; revive with G9 as one item if the P1 cutover is ever reversed.
+2. **G4 — `_removeDieAt` has two ways to refuse and four callers never read the answer.** Structurally true (14361, 19441, 25541 discard the boolean) but each priced caller is protected by a gate that cannot disagree with the refusal: Sacrifice re-tests the floor at 14322 in the same synchronous block and guards on `_sacL>=0`; `_breakBegin` returns false at one lane so the Break tap handler is never attached. The only caller that can receive a refusal is the shatter sweep, judged as PR8.
+3. **G5 — the shatter sweep loses a die the loadout keeps.** The single-die case does not cash out: on a refusal `_dropLanes(1)` is skipped too, so `numDice` stays equal to `matchDice.length`; the only disagreement is pool 0 against matchDice 1, and 24582 reconciles both before anything reads them; the in-turn consumer busts, which is what every "last free die left the table" case does; and the 19240 behaviour it measures against is the one P528 deliberately replaced to close D24. What survives is the two-die arm, carried forward as PR8 — and PR8 must reconcile with this kill before it is probed.
+4. **G6 — Encore's gate counts uncommitted dice and its action counts uncommitted-and-unfrozen.** Enumerated all six writers of `d._frozen`: four set it false, and the two that set it true (24954, 31634) are reachable only through `activateCard`'s dead `pCards` layer; `frozen_die` is on `_npcActiveSkip` (32306). With no reachable `_frozen=true` the two predicates enumerate the identical set.
+5. **G9 — `_bookendsEligible` is handed the unsplit selection at four sites and the split remainder at the fifth.** Census confirmed (14070, 24516, 25047, 26105 raw; 27049 post-split), and dead for the same single reason as G3. One item with G3, not two.
+6. **G10 — Sacrifice's filter excludes the loaned seat by `d.lane` and its removal resolves by `matchDice.indexOf(d.mat)`.** The fallback needs a laneless pool die; every mint stamps a lane (25233, 25392, 26657), the one measured producer also sets `_shattered` which 14310 filters, and the NaN arm is closed twice (19236 and `_sacL>=0`). Default to dead.
+7. **G11 — Pickpocket's safe-target filter and its post-palm re-check ask one question with two predicates.** The predicate arm is constant-equal today because the only difference is `_anchorRescues`, which returns false against `effectiveCards()`. The window arm is real and is already S10 in this document, at #6 in its own driving order; fold the `famUse`-ignores-`_palmAnimating` observation into S10's probe.
+
+**Count-versus-collection lane (9):**
+
+8. **K1 — the player's row is filled with a bare `appendChild`, so a bust-save permanently desyncs seat order from lane order.** Two kills: every route into `_runSave` is gated on `G.pCards`, which is the empty local declared at 32221 and passed to `newG` at 32231; and no consumer joins DOM order to lane — `_laneOf` reads `d.lane` off the pool entry, `_tradePaint` replaces in place, the tap router hit-tests by distance. (Kept from it, and it is *not* what was filed: `_removeDieAt`'s Fair-Trade branch removes a pool entry without `_dropLanes`, which is a live producer of DOM/lane divergence — see PR5.)
+9. **K3 — the trade ledger's frozen `cnt` against a `matchDice` two live cards rewrite.** `cnt` is the third branch of a chain and each scenario is consumed by an earlier test: a duplicate elsewhere leaves `md[L]===t.theirs` true, so the primary branch fires; a death routes through `_removeDieAt`, which sets `seatGone` and forces `k=-1` before the count is consulted. The live-writer half is already D11.
+10. **K4 — the rival's `left` is recomputed from dice dealt while seats come from `_oSeats()`.** The clamp with a stated per-roll scope (28361) is fed entirely from `G.pCards` and is dead; the live producer, the palm at 28345, behaves exactly as the player-side palm does (`_maybeFireCutpurse` splices the pool and drops a lane for the rest of the turn). Mirror, not drift.
+11. **K5 — Snuff's `left--` is gated on `left>1` and its seat removal is not.** Both arms unreachable: `left` is never below 5 when 28283 is evaluated, and `_snuffLane` is a player lane bounded by `matchDice.length`, which is never longer than `matchOppDice` (six everywhere; the only two shrinking writers are on the dead layer).
+12. **K6 — handleRoll's Gambler's Eye branch assigns `numDice` the size of a strict subset of the pool.** Verified verbatim at 24943-24957 and behind `G._gamblersEyeActive`, written in exactly one place inside `activateCard`'s dead layer; the NPC route is closed by `_npcActiveSkip`. Inheritance for whoever revives `params.pCards`.
+13. **K7 — two consumers count dice from `k.vals.length` while the dice are in `k.dice`.** The divergent pair is real (and is PR2's), but both readers are dead: `_bankDiceUsed` has one call site behind `G._handicap==='bounty_board'` with `G._handicap` measured null, and `totalCommitted` has one consumer behind `G.pCards.includes('half_measure')`.
+14. **K8 — `D3X.tick` watches a cached count of the row, so a same-size membership change never re-measures homes.** The named consequence is already patched: P520 ends the vagabond reorder with `d.hx=undefined` plus an explicit `_measureHomes()` (37115-37116), `_homeOf` re-measures any tracked die with no cached home (20152), and every throw calls `_measureHomes` unconditionally (21482).
+15. **K9 — the refill computes lane occupancy twice with different validation.** True, and no producer can separate the two walks: every lane assignment in the file is numeric (25233, 25392, 26657, 19312, 37085), and `Math.min(needNew,_freeLanes.length)` absorbs the residue. Worth a comment tying 25340 to 25274; not a defect.
+16. **K10 — the rival's active cards carry two independent use budgets from two card tables.** They never gate the same card: the twenty cards `npcHasActive` asks about cannot enter `G.oCards` (no boss pool holds them; the patron pool builder excludes every `type:'active'` card by construction; `S.npcWonCards` has no writer), and the two that *are* seeded (`quick_hands`, `sticky_fingers_die`) have no `npcHasActive` reader. One budget moves, the other is a dead write.
+
+**Parallel-array lane (6):**
+
+17. **PA3 — `_famDiceMigrate` filters `diceInv` and never `dieEnchInv`, and the pad repairs it from the wrong end.** Correct reading, no reachable producer — see the DEMOTED entry above, which merges K2 into this verdict.
+18. **PA4 — three sites push to `S.run.diceInv` and only two run the pad.** Real asymmetry (and a fourth un-padded pusher at 13772 the nomination missed), but no misalignment is created: the new tail slot reads `undefined` where it would read `null`, and every reader treats both as falsy. The born-brand window has no consumer because `_enchInit` is self-healing in both directions and runs first at every surface, including `_wardOwned`.
+19. **PA5 — `_diceOut[].lane` is snapshotted by three writers, shifted by none, read by nobody.** The last clause is the kill: a field nothing reads has nothing on the other side of the correspondence. The source already ruled on it at the write site (19298-19300): the number is a note of where the die was, which is why the panel names the die and never the seat.
+20. **PA6 — Sequence is the only position card that reconciles `G.pCards` against `S.run.cards`.** Two unconditional kills: `effectiveCards()` returns `[]` at 24488 and `&&` short-circuits before the extra test is evaluated; and `G.pCards` is the empty local at 32221 regardless of what `launchSeat` computed.
+21. **PA7 — `rungLanes`, the rival's second seat list, still built and snuff-shifted, read by nothing.** `rungLanes` is a `var` local inside `step()` inside `runOppTurn` — "nothing reads it" is a scoping fact, not a search result. One representation and one orphan; a deletion, not a finding.
+22. **PA8 — the Stargazer peek is index-paired to a free array it was not built from, gated on length alone.** This is D7, including the equal-count arm the nomination offers as new — the plan doc already corrected itself on that point at lines 884-889 and measured the cross-turn arm at 876-881. One sliver belongs appended to D7, not filed separately: `_rollD` is per-material *and* per-brand (19705), so a peeked 4 or 6 can be stamped onto a crystal, whose faces are `[1,1,2,3,5,5]`.
+
+**Serialise-versus-rehydrate lane (4):**
+
+23. **SR-07 — the resume mapper assigns six sub-records by reference while the famState block below deep-clones four.** The aliasing is real; the leak is not. Zero `save()` calls between the mapper and `startPTurn`'s own `saveMatchState()` at 24893, which rebuilds `S.pendingMatch` as a fresh literal with `JSON.parse(JSON.stringify(...))` on all six and breaks every alias before any player input is possible.
+24. **SR-09 — Stargazer's peek and Honeytrap's stamped value survive a turn boundary but are in no snapshot, while the charge is.** Requires the arm to be alive *at* the boundary, which is D7's measured survival. The ruled D7 fix — clear the arm at the boundary — produces exactly the outcome SR-09 reports as the defect. Double-counting.
+25. **SR-10 — `_diceOut`'s restore is gated on `_enchArr`'s length test, using one array as a proxy for another's validity.** The proxy holds: `newG`'s first statement is `_enchInit()` (23247), which forces `dieEnch` to `dice.length` before `matchDice` is built from the same array, and all three snapshot writers move the pair together. Both arms offered to break it (mirror_match, an empty `_enchArr`) are closed.
+26. **SR-11 — `_shiftBreak` tolerates "a single record from an older save" for a field no save path has ever written.** `_breakPending` appears at eight sites, none of them a snapshot writer, and it is reset to `[]` at 24591 before the boundary write at 24893. A stale comment with no behavioural claim behind it.
+
+---
+
+## NOT DRIVEN
+
+**Nothing in this section was executed.** No browser, no dev server, no
+`tools/shoot.js`, nothing driven. It is static reading against
+`pinned_168c7d1.html`, a copy of `fark_proto.html` at commit **168c7d1**, and
+every item above is a **nomination awaiting a probe**. Where an item coincides
+with a measurement this document already carries (M5, D7, D11, D24, S10) the
+measurement is this document's and is cited as such. Every verbatim block above
+was re-read in the pinned copy rather than trusted from the nomination; three
+nominations changed verdict in the process, and two of the twelve survivors
+gained material that was not in the original filing (PR2's producer census,
+PR6's two extra run-scoped writers).
+
+### Priority order for driving
+
+1. **PR1 — the four keep predicates.** Cheapest arrangement in the set: one
+   brand, one junk die, no quit cycle, three reads. It settles a rule the file
+   itself prices at +80.5 win-rate points, and it is the only survivor a player
+   meets in ordinary play with no save/resume involved.
+2. **PR2 — Preserve's `k.vals`/`k.dice`.** Same rig, same session, one more
+   commit. It is already this document's largest open item and it is the one
+   Denis's question is actually about; it should not be patched until PR1 and
+   PR12 are measured beside it, because all three want one ruling on what the
+   split means.
+3. **PR3 — the sealed rule across a resume.** One quit/resume, four reads, and
+   it decides whether the whole sealed-seat payout path can be trusted. Run PR7
+   in the same session: PR3 suppresses PR7's producer, so measuring either one
+   without the other risks a clean result that means nothing.
+4. **PR4 — Preserve across the resume.** Same rig as PR3, one turn later, and
+   the complementary arm (quit before the payout) is the control that makes the
+   reading interpretable.
+5. **PR6 — the run-scoped writes.** Same rig again; the read is one number at
+   five points, with a no-quit control. Cheap enough to ride along with PR3/PR4.
+6. **PR7 — the chalkboard.** No match instrumentation needed past a win; two
+   fields off `S.run` and one DOM query.
+7. **PR8 — the shatter sweep's two-die arm.** *Reconcile the contradiction
+   first.* G5's kill of the single-die case is on the record above; if the
+   two-die arm falls to the same reconcile argument this item dies with it, and
+   that is a ten-minute read, not a probe.
+8. **PR5 — the Fair-Trade exit's full snapshot.** Real and nasty, but the
+   arrangement is expensive: a live loan, a borrowed Obsidian, a shatter, a
+   quit. Worth building only after the cheap resume rig from 3-5 exists.
+9. **PR10, PR9, PR11, PR12 last.** PR10 and PR9 are silent-state and need a
+   control run each; PR11 and PR12 are cosmetic and are two-line reads once a
+   probe harness is already up.
+
+**Instrument hazards, carried forward.** Every survivor above states its own
+instrument check, and they are not optional: PR2 must assert
+`k.dice.length !== k.vals.length` before believing anything downstream, PR1 must
+prove it can see a refusal, PR8 needs its three-die negative control, and PR6
+needs the no-quit control before any double-pay is claimed. A clean result from
+any of these without its check is a zero from an instrument that was never shown
+to be looking at the right thing — which this document has now recorded
+happening more than once.
