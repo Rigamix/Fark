@@ -1,3 +1,80 @@
+# NEXT SESSION — die renderer unification
+
+**Ruling (Denis):** every surface shows the same die. Camera framing may differ
+per surface; geometry, material, lighting and orientation may not. Lighting is
+decided: flat, one multiplier per face, no specular, matching `D3.draw`'s
+constant. Part of DONE is proving nothing still reaches the old renderers.
+
+## DONE and live on `fark`
+
+| | |
+|---|---|
+| P545 `5e0fae1` | `die_glb.js` wraps `die_cube.glb`. 24 verts, 12 tris, 840-byte mesh; wrapper 398KB -> 179KB. No code change needed - it is oriented to `D3X.FACE`. |
+| P545 | Light rig IS `D3.draw`'s ramp: white ambient 0.55 + one white directional 0.55 along `D3.LIGHT`. Lambert under that outputs `0.55+0.55*max(0,N.L)` - the same expression, not an approximation. |
+| P546 `603b412` | The GLTF fallback branch pointed at the OLD bevelled `die.glb`. Repointed. `grep "assets/models/die.glb"` is now 0. |
+| P546 | D3 no longer repaints dice D3X owns. Measured 3174 -> 0 draw calls in a 2.2s window, 6/6 chips flagged. |
+
+Tools: `make_cube_glb.py` (builds it), `check_cube_faces.py` (pixel-matches every
+face against the real art), `make_cube_check.py` / `cube_check.html` (renders each
+value under the game's own `FACE` table), `probe_p546_drawcount.js`.
+
+## THE SIZE OF WHAT REMAINS — this is a CONTAINED job
+
+Runtime-measured across 24 die-drawing sites: **15 live, 9 dead. 14 of the 15
+live ones already draw through D3X.** Exactly **ONE** live surface needs a port:
+
+**The first-night draft** (`famRunDraftShow`, `#nrDice .d3host`). It builds a
+`.d3host` and calls `D3.make` directly, so `_liveChips` (which queries `.d3chip`
+only) cannot see it. `#nrStage` is ALREADY in D3X's host list - the plumbing was
+laid and the registration never landed.
+
+Why it is the awkward one: the chip path builds a STILL die
+(`mkDie(...,still=true)`), and the draft drives its own rise-and-settle
+(`turns:0, spinMax:20`, `group:null` - not physics). It is also **the only
+surface in the game where `hover` is visible at all** (on every chip surface the
+DOM die is `visibility:hidden` and `D3.draw` bails on `_d3xOwned`, so the hover
+breathe is a no-op), and the only live contact shadow outside the match table.
+Decide whether the port keeps the animation or accepts a still die.
+
+**Three surfaces I previously called stragglers are DEAD CODE:** `_renderRewardDice`
+(only reachable via `showScreen('bossreward')`, which appears twice - the div and
+the switch case), `#tierLoDice` and `#tierBossLoDice` (CSS `display:none
+!important` under Room V2, measured width 0). Do not port them; delete or leave.
+
+## THE ONE THING THAT MUST BE READ BEFORE DELETING D3
+
+**D3 is the WebGL-failure fallback BY ACCIDENT, through a hang, not a decision.**
+`_init` calls `new THREE.WebGLRenderer(...)` on its first line, outside any
+try/catch. On a device where that throws: `ready` stays false, **`fail` stays
+FALSE**, `loading` stays true forever, every later `boot(cb)` queues a callback
+that never fires, and `html.fk3d` is never added - so the CSS die stays visible
+and the game works.
+
+That means **any future patch that wraps `boot` in a try/catch, or adds a `fail`
+check to `mkDie`, silently turns a WebGL-less device into a blank table.** Fix
+the detection before touching either.
+
+## STILL OPEN
+
+- Port the first-night draft (above).
+- `.dtype-*` face pairing: both grid-pip builders index `dice.faces` by array
+  POSITION, so opposite faces never sum to 7. Largest-with-smallest fixes the 14
+  materials whose multiset is {1..6}; for the other 10 no arrangement can. Design
+  call. **Do NOT reorder `DICE_TYPES.faces`** - seven display sites join it in
+  stored order and rely on ascending.
+- `skins.js` bone and amber are baked for the 16% bevel at 87% island coverage.
+  On a hard cube that paints a flat frame around each face. Re-bake, or delete
+  the two entries and let them fall through to the atlas + MATCOL tint.
+- `D3.TINT` (12 materials) vs `MATCOL` (22): brass, crystal and the eight relics
+  render untinted wherever D3 draws. Reachability still unestablished.
+- Retirement checklist is NOT satisfied. D3 still draws the draft and is the
+  fallback; R3 (grid-pip cube) is live via the die tooltip.
+
+
+---
+
+# Previous
+
 # Handover — start here
 
 Written before a context compaction. Everything needed to pick up cleanly.
