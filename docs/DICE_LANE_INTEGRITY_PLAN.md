@@ -3294,6 +3294,29 @@ Second arm: lose a sealed seat while the list is already short and read whether
 
 ### PR8 — The shatter sweep purges `G.pool` unconditionally and removes the seat conditionally, and it is the only one of three callers that ignores `_removeDieAt`'s refusal
 
+> **REFUTED — driven, and the flagged contradiction with G5 resolves in G5's
+> favour.** The report said PR8 survived only on the two-die arm and had to be
+> reconciled with G5's kill before probing. It was, and the two-die arm dies too.
+>
+> ```
+> _removeDieAt returns   [true, false]      the floor engaged on the second
+> after the sweep        matchDice 1, numDice 1, pool 0    counts LEVEL
+> next deal              pool 1, lanes [0]                 the die is back
+> ```
+>
+> The description was accurate — the purge *is* unconditional while the seat
+> removal is conditional — but the inference was wrong. A refusal skips
+> `_dropLanes` as well, so the two representations move together or not at all,
+> and the refill restores the die on the next deal.
+>
+> **One real thing came out of it:** the P528 comment justified the unconditional
+> purge with *"_removeDieAt has already filtered the pool by lane"*, which is
+> false on a refusal. Right behaviour, wrong reason — corrected in P536b rather
+> than left as a fourth false-safety claim.
+>
+> Kept unconditional deliberately: that is what closes D24's stranded laneless
+> die, the case the old `else` could never reach.
+
 ```
 25541    if(_shLanes.length)_shLanes.forEach(function(L){_removeDieAt(L,{permanent:false});});
 25542    /* P528: UNCONDITIONAL, was an `else`. ...
