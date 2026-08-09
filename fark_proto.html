@@ -21890,9 +21890,27 @@ var D3X={
        the light and the sides fall away. Ambient is a warm brown at low
        strength: the shaded faces go dark but stay SATURATED, where a grey
        ambient would just wash them out. */
-    var key=new THREE.DirectionalLight(0xffd9a2,1.02);key.position.set(.16,1,.34);sc.add(key);
-    var warm=new THREE.DirectionalLight(0xffb469,.20);warm.position.set(-.6,.15,.5);sc.add(warm);
-    sc.add(new THREE.AmbientLight(0x8a4f22,.58));
+    /* P545: THIS RIG IS D3.draw's FACE RAMP, ARITHMETICALLY.
+       D3.draw shades every face as `0.55 + 0.55*max(0,dot)` where dot is the
+       rotated normal against D3.LIGHT [0,-0.33,0.94]. A Lambert surface under
+       a white ambient A and one white directional K outputs A + K*max(0,N.L),
+       so A = K = 0.55 aimed along LIGHT is the SAME expression, not an
+       approximation of it. CSS Y points down and three's points up, hence the
+       flipped sign on Y.
+       Lambert stays, and it is doing what the brief asks: the cube's 24
+       vertices carry FLAT normals, so all four corners of a face share one
+       normal and therefore one value. No gradient can cross a face. Together
+       with Lambert having no specular term at all, that is "flat, one
+       multiplier per face, no specular" exactly.
+       THIS REPLACES A DELIBERATE WARM RIG, and the reason it is safe to: that
+       rig's comment said a grey ambient would wash the shaded faces out, and
+       it was written for the BEVELLED model, where smooth normals made every
+       face a gradient. A hard cube's face is one flat value - there is no
+       gradient to wash. And the warmth in the DOM dice comes from the ART and
+       D3.TINT, never from a light, so a warm rig here and none there is the
+       exact same-die-different-look this unification exists to delete. */
+    var key=new THREE.DirectionalLight(0xffffff,0.55);key.position.set(0,0.33,0.94);sc.add(key);
+    sc.add(new THREE.AmbientLight(0xffffff,0.55));
     this.cam=new THREE.PerspectiveCamera(this.FOV,1,1,20000);
     var onModel=function(g){
       var proto=g.scene;
