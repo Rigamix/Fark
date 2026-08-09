@@ -3307,7 +3307,29 @@ predicted `g, g+15, g+15, g+15, g+30`. **Control:** the same turn played to a
 bank with no quit, ending at `g+15`. Worth sweeping the rest of `ENCH_GRID`'s
 `fire` handlers for other run-scoped writes on the same pattern.
 
-### PR13 — two die renderers, two material tables, and ten materials only one of them knows
+### PR13 — two die renderers, two material tables, and ten materials only one of them knows  — **PARTLY FIXED P544**
+
+> **The three `.dtype` copies AGREE.** 72 rules, 24 names, each appearing
+> exactly 3x, byte-identical with comments stripped - measured on the running
+> page. My worry that they had diverged is refuted; it is a maintenance hazard,
+> not a colour bug.
+>
+> **`.dtype-lucky` did not exist at all,** and there is no `--dface` default, so
+> a lucky die drawn by the grid-pip renderer resolved every custom property to
+> nothing. P544 adds it to all three blocks - patching one would be the first
+> thing to make them disagree - tinted from `D3X.MATCOL.lucky` so 2D and 3D
+> agree.
+>
+> **STILL OPEN, needs a design call:** both grid-pip builders index
+> `dice.faces` by ARRAY POSITION, so opposite faces do not sum to 7 on any
+> material. Pairing largest-with-smallest fixes the 14 materials whose multiset
+> is {1..6}; for the other 10 no arrangement can sum to 7, so it is a question
+> about those dice, not a bug to patch. Do NOT reorder `DICE_TYPES.faces` to
+> fix it - seven display sites join it in stored order and rely on ascending.
+>
+> Also still open: the `D3.TINT` / `MATCOL` gap for brass, crystal and the
+> eight relics, whose player-visible reachability is still unestablished.
+
 
 **NOT DRIVEN AS A PLAYER-VISIBLE BUG YET — the divergence is measured, the
 on-screen consequence is not.**
@@ -3634,7 +3656,23 @@ restored. **Second arm:** drag, then Break — the reorder must survive, or the
 probe is reading noise. Sharpest with position-scoring cards equipped and a live
 loan, so `_fairTrade.lane` moved too.
 
-### PR11 — Fair Trade's gate proves a lendable die exists; its action adds a rank test and refuses in silence, so the sheet offers PLAY and nothing happens
+### PR11 — Fair Trade's gate proves a lendable die exists; its action adds a rank test and refuses in silence, so the sheet offers PLAY and nothing happens  — **FIXED P542**
+
+> **CLOSED.** `dieRank` is the SHOP PRICE, which is what makes this common:
+> bone, lucky and all eight relics cost 0, and the test is `<=`, so each ties
+> with a bone seat and refuses. The two paths that produce it are REWARDS -
+> take the boss relic, or take a die at For Keeps, where every generated patron
+> carries a lucky die so a cost-0 prize is always offered. The window reopens
+> every player turn. Measured 7 silent states of 17; the charge is not spent,
+> so nothing is lost but the tap - and the uses-left counter not moving is
+> exactly why no surface tells the player anything happened.
+>
+> Fixed the way P519 fixed Sacrifice: eligibility in ONE place, read by canUse
+> and use alike. `_pick()` returns the trade or null and deliberately does not
+> log. Driven on 9 states: gate and action agree on all of them, and both
+> working trades still fire and still change the board - the control that a
+> "make canUse always false" fix would have failed.
+
 
 ```
 12971    return !!(G&&!G._fairTrade&&(G.phase==='idle'||G.turnRollCount===0)&&
@@ -3670,7 +3708,23 @@ the fam log queue — an empty log after a PLAY press is the player-facing half.
 *Instrument check:* add one better die to the stash and require the same
 sequence to produce a non-null `G._fairTrade`.
 
-### PR12 — The die-tap flourish scores the unsplit selection; every other path splits icons out first, for a reason its own neighbour states
+### PR12 — The die-tap flourish scores the unsplit selection; every other path splits icons out first, for a reason its own neighbour states  — **FIXED P543, severity corrected DOWN to feedback-only**
+
+> **CLOSED, and it is smaller than this entry claimed.** `pts` in `toggleDie`
+> has exactly ONE consumer, the `if(pts>0)` VFX branch; it writes nothing to G
+> and nothing to the DOM, and `refreshSelUI()` - which splits correctly - is
+> the function's last statement. So the player got a pop, a commit sound and a
+> heavier haptic, and then read a correct number. No score was ever wrong.
+>
+> Real all the same, and reachable without any relic: a brand bought through
+> the shop's own path reproduces it, and it survives a force-close and resume.
+> This was the only live site handing `scoreSelection` the raw selection.
+>
+> Driven with the control that mattered: branded 1 alone 100 -> 0, a branded 1
+> beside a plain 5 still flourishes at 50 (the 5 alone), plain 1 unchanged at
+> 100. A fix that suppressed the flourish whenever an icon was present would
+> have closed the bug and broken every mixed keep.
+
 
 ```
 24515      var selD=G.pool.filter(function(x){return x.sel&&!x.committed;});
