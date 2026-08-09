@@ -91,7 +91,33 @@ def main():
         del argv[i:i + 2]
     if argv:
         port = int(argv[0])
-    srv = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    # A SECOND LISTENER ON THE SAME PORT IS THE FAILURE, NOT THE SYMPTOM.
+    # Three of these were found stacked on 8084, and two probe runs came back
+    # as error pages because connections landed on a wedged one.
+    # ThreadingHTTPServer sets allow_reuse_address = 1, and on Windows
+    # SO_REUSEADDR behaves like SO_REUSEPORT - so a second bind to a LIVE port
+    # succeeds instead of failing, and every re-launch quietly added to the pile.
+    # Nothing is killed here: a server that reaps processes it did not start is
+    # a worse failure than the one being fixed. Refusing loudly is the limit.
+    import socket as _sock
+    _probe = _sock.socket(_sock.AF_INET, _sock.SOCK_STREAM)
+    _probe.settimeout(0.6)
+    _busy = (_probe.connect_ex(("127.0.0.1", port)) == 0)
+    _probe.close()
+    if _busy:
+        print("REFUSING TO START: something already listens on %d." % port)
+        print("  Starting anyway would ADD a listener, not replace it, and")
+        print("  connections would be split between them - which is how two")
+        print("  probe runs came back as error pages.")
+        print("  Clear it first:  netstat -ano | grep :%d" % port)
+        print("                   taskkill //PID <pid> //F")
+        sys.exit(1)
+    ThreadingHTTPServer.allow_reuse_address = False
+    try:
+        srv = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    except OSError as e:
+        print("REFUSING TO START: port %d is not free (%s)" % (port, e))
+        sys.exit(1)
     print("fark dev server on http://localhost:%d  (root %s)" % (port, ROOT))
     print("  prop_lab save endpoint: POST /__save/prop_templates")
     try:
