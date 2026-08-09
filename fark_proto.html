@@ -10307,7 +10307,13 @@ function saveMatchState(){
       suddenDeathTurns:G._suddenDeathTurns||0,sdDisplayRound:G._sdDisplayRound||0
     },
     bossState:{...G.bossState},
-    npcCardState:JSON.parse(JSON.stringify(G.npcCardState||{})),
+    /* P537: the clone, then playerTurnCount rolled back to its turn-start
+       value. Everything else in npcCardState is either set before the turn or
+       genuinely belongs to it; only this counter was bumped above the snapshot
+       while its sibling turnNum is bumped below one. */
+    npcCardState:(function(){var _n=JSON.parse(JSON.stringify(G.npcCardState||{}));
+      if(typeof G._ptcAtTurnStart==='number')_n.playerTurnCount=G._ptcAtTurnStart;
+      return _n;})(),
     dlgFlags:{pLead:G._dlgPLead,oLead:G._dlgOLead,pNear:G._dlgPNear,
               oNear:G._dlgONear,close:G._dlgClose,loseBad:G._dlgLoseBad,winBad:G._dlgWinBad},
     /* Tell mid-match accumulated state */
@@ -10320,7 +10326,12 @@ function saveMatchState(){
 famState:{
   pF:G.pF?JSON.parse(JSON.stringify(G.pF)):null,
   oF:G.oF?JSON.parse(JSON.stringify(G.oF)):null,
-  famPreserve:G._famPreserve?JSON.parse(JSON.stringify(G._famPreserve)):null,
+  /* P537: the preserve as it was at the START of the turn. By the time this
+     runs the payout has already nulled the live one, so this field was
+     guaranteed null and a resume could neither keep the payout nor re-earn it. */
+  famPreserve:(function(){var _p=(G._famPreserveAtTurnStart!==undefined&&G._famPreserveAtTurnStart!==null)
+      ?G._famPreserveAtTurnStart:G._famPreserve;
+    return _p?JSON.parse(JSON.stringify(_p)):null;})(),
   ftDead:G._ftDead?JSON.parse(JSON.stringify(G._ftDead)):null
 }
   };
@@ -24778,7 +24789,14 @@ function startPTurn(){
      same as "last", and only checking the rendered row told them apart.
      Anything added below that clears the row belongs ABOVE this block. */
   if(G&&G._famPreserve){
-    var _fp=G._famPreserve;G._famPreserve=null;
+    /* P537: keep what the turn STARTED with, for the boundary snapshot below.
+       The payout writes G.kept and G.turnPts, which are turn PROGRESS and are
+       deliberately in no snapshot - so a resume lost the preserved die, and
+       nulling _famPreserve here meant it could not be re-paid either. Driven:
+       kept row worth 100 live, and kept / turnPts / famPreserve all absent from
+       the snapshot. Restoring the PENDING state instead lets the replayed turn
+       pay it out again, which is what replaying a turn means. */
+    var _fp=G._famPreserve;G._famPreserveAtTurnStart=_fp;G._famPreserve=null;
     /* the die's own material, not bone - see CFX.preserve.use */
     G.kept=[{vals:[_fp.val],mat:_fp.mat||'bone',pts:_fp.pts+(_fp.crack||0),
              dice:[{val:_fp.val,mat:_fp.mat||'bone'}]}];
@@ -24814,6 +24832,17 @@ function startPTurn(){
     try{refreshKeptTray();updHUD();}catch(e){}
   }
   setBtns(true,false);setTurnMode(false);
+  /* P537: the boundary snapshot means "the state at the START of this turn",
+     and it is taken further down this same function - AFTER this line. So the
+     value it must persist is the one from before the bump, exactly as turnNum
+     behaves by being bumped in runOppTurn instead. Driven: without this, a
+     restore and replay took playerTurnCount 6 -> 7 for one turn while turnNum
+     held at 5, and repeated resumes compound.
+     The increment itself is NOT moved: block_activations and limit_activations
+     read this counter DURING the player's turn, and although both sit on the
+     dead pCards layer today, "currently unreachable" is not a reason to change
+     when a counter advances. Only what gets persisted changes. */
+  G._ptcAtTurnStart=G.npcCardState.playerTurnCount;
   G.npcCardState.playerTurnCount++;
   setStatusMsg('','');
   /* NPC card challenges (steady_hands, the_verdict_npc) — fire once mid-match */

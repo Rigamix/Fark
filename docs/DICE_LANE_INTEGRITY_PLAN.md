@@ -3052,6 +3052,26 @@ one turn before quitting so 24893 runs.
 
 ### PR4 — Preserve's payout is match state that no snapshot carries, while the charge that bought it is deep-cloned; and the one field that *is* carried is guaranteed null (SR-03 + SR-04 merged)
 
+> **CLOSED — P537, driven.** The boundary snapshot means *the state at the START
+> of the turn*, and a resume replays the turn from the top. Preserve paid out at
+> the top of `startPTurn` — `G.kept`, `G.turnPts` — and nulled `_famPreserve`
+> **before** the snapshot, so the payout was on no snapshot and the one field
+> that could have re-earned it was guaranteed null.
+>
+> Fixed by snapshotting the **pending** state rather than the payout:
+> `_famPreserveAtTurnStart` is kept for the boundary write, so the replayed turn
+> pays it out again. `kept`/`turnPts` are deliberately still absent — they are
+> turn *progress*, and putting them in would break the replay contract the whole
+> design rests on.
+>
+> After: `famState.famPreserve = {val:1, mat:'amber', pts:100, crack:0}`.
+>
+> **One correction to my own evidence.** The pre-fix measurement read
+> `snapshot.famPreserve` at the top level; the field is nested inside
+> `famState`. Right conclusion, wrong path — the guaranteed-null claim holds by
+> construction (the payout nulls `_famPreserve` before the snapshot runs) and the
+> measured "before" I have is for `kept`/`turnPts`, which were genuinely absent.
+
 These were nominated separately, from the count side and the tray side. They are
 one defect: `startPTurn` pays Preserve out and then, 180 lines later, snapshots
 a turn boundary that records none of the payout.
@@ -3364,6 +3384,23 @@ the next `startPTurn` deals. **Negative control:** `matchDice.length` 3 with one
 shatter, where the removal succeeds and the three numbers agree.
 
 ### PR9 — `npcCardState.playerTurnCount` is incremented before the snapshot its sibling is incremented after, so every resume counts the replayed turn twice
+
+> **CLOSED — P537, driven.** Two counters of one fact. `turnNum` is bumped in
+> `runOppTurn`, *after* the boundary snapshot; `playerTurnCount` was bumped
+> inside `startPTurn`, *before* it. So a restore replayed the turn and
+> incremented again, and repeated resumes compound. `periodic_drain` fires on
+> `playerTurnCount % interval`, so a force-quit could skip or trigger a drain.
+>
+> | | before | after |
+> |---|---|---|
+> | snapshot `playerTurnCount` vs live | 6 vs 6 | **5** vs 6 |
+> | restore + replay | 6 → **7** | 6 → **6** |
+> | `turnNum` immune | yes | yes |
+>
+> **The increment is deliberately NOT moved.** `block_activations` and
+> `limit_activations` read this counter *during* the player's turn. Both sit on
+> the dead `pCards` layer today, and "currently unreachable" is not a reason to
+> change when a counter advances — so only what gets persisted changed.
 
 ```
 24746  G.npcCardState.playerTurnCount++;
