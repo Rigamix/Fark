@@ -56,8 +56,14 @@ COMP = {5120:('b',1),5121:('B',1),5122:('h',2),5123:('H',2),5125:('I',4),5126:('
 
 PIP_AXIS = {1:'py', 2:'px', 3:'pz', 4:'nz', 5:'nx', 6:'ny'}
 AXIS_VEC = {'px':(1,0,0),'nx':(-1,0,0),'py':(0,1,0),'ny':(0,-1,0),'pz':(0,0,1),'nz':(0,0,-1)}
+# A 3x2 grid inside a SQUARE image gives cells of 341x512 - every face
+# stretched 1.5x vertically. Cells must be square IN PIXELS, and the only
+# arrangement of six that is square and leaves both image dimensions a power of
+# two is 4x2 in 2048x1024: cells of 512x512, six used, one spare column.
+# NPOT would have worked on WebGL2 and gone black on WebGL1 with mipmaps, and
+# the lab does not guarantee which it gets.
 CELL = {1:(0,0), 2:(1,0), 3:(2,0), 4:(0,1), 5:(1,1), 6:(2,1)}
-COLS, ROWS = 3, 2
+COLS, ROWS = 4, 2
 # in-plane axes per face, and sign flips so a painted square is not mirrored
 # (u axis, v axis, u sign, v sign) with v measured UPWARD in the cell.
 # A face reads correctly from outside when U x Vdown == -N. py and ny were

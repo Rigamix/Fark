@@ -28,8 +28,11 @@ bright line along the ridge, the most visible place on the die.
 """
 import sys, zlib, struct, json, os
 
-W = H = 1024
-COLS, ROWS = 3, 2
+# 2048x1024 with a 4x2 grid: cells of exactly 512x512. A 3x2 grid in a square
+# image gave 341x512 cells and stretched every face 1.5x vertically. Both
+# dimensions stay powers of two so mipmapping is safe on WebGL1 as well as 2.
+W, H = 2048, 1024
+COLS, ROWS = 4, 2
 CW, CH = W // COLS, H // ROWS
 SAFE = 0.955     # the flat face as a fraction of the cell - from glb_unwrap
 
