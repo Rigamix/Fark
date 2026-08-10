@@ -4377,3 +4377,40 @@ needs the no-quit control before any double-pay is claimed. A clean result from
 any of these without its check is a zero from an instrument that was never shown
 to be looking at the right thing — which this document has now recorded
 happening more than once.
+
+### D25 — the player's Blessed Confiscation still pushes a seventh seat
+
+Found by Denis reviewing `docs/CARD_ART_NEEDED.md`, chasing a stale card
+description; the description was stale *because of* a fix whose twin was never
+made.
+
+`activateBlessedConfiscationPlayer` ends with:
+
+```js
+G.matchOppDice.splice(oBestIdx,1);
+G.matchDice.push(stolen);
+```
+
+**That is exactly the shape P522 removed from the rival's side** — and P522's own
+comment is the argument against it: a seventh seat is never dealt, because seats
+are consumed as `_freeSeats[i]` for `i < rollDice` and nothing live makes
+`rollDice` seven. The die is never rolled, but the array is one longer, which
+feeds `numDice`, the loadout panel and the First Strike reveal.
+
+**And it is worse here than it was there**, because of tonight's work: `push`
+grows `G.matchDice` without growing `G._enchArr`, so every lane past the new one
+is brand-misaligned — the parallel-array desync P564/P565/P569 spent the session
+closing.
+
+**Unreachable today**, and that is measured rather than assumed: it is reached
+through `activateCard`, and the legacy player-active layer is dead — driven in
+`tools/apv_frozen_reachable.js`, `canActivateCard` refuses every id tried
+including ones from that layer meant to work, with `effectiveCards()` and
+`pCards` both empty.
+
+**Not fixed with P570, on purpose.** P570 was a wording change; this is a
+behaviour decision. The fix is almost certainly P522's — swap over the player's
+worst seat rather than push — since the same seat machinery constrains both
+sides, but it should be chosen rather than assumed. **P570 corrected the
+`playerDesc` to describe the swap, so the text now describes the intended
+mechanic and this entry is the gap between text and code.**

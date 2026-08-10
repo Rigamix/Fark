@@ -200,6 +200,25 @@ The block un-keeps the rival's dice, sets `total=0`, and announces *"KEPT DICE
 REROLLED!"* without re-rolling a single value. Build the real reroll; do not
 reword the card.
 
+#### RECONCILED — there are TWO implementations, and the LIVE one already works
+
+Denis read this section and reasonably concluded the mechanic is still broken
+everywhere. It isn't. `reroll_all_kept` has **two** implementations, in opposite
+directions, and only the dead one wipes:
+
+| | direction | state |
+|---|---|---|
+| **26667** | **boss → player.** Fires off `G.oCards` through the after-roll dispatch | **WORKS.** P475 replaced the wipe with a real reroll; P557 fixed the rescoring (the pre/post-split `vals` bug that turned a punishment into a 4×). `dd.val=_rollD(dd)`, re-split, rescore per group. |
+| **29875** | **player-armed → rival.** `G._playerRerollKeptArmed`, set by `activateCrownAuthorityPlayer` / `activateBlessedDicePlayer` | **STILL WIPES.** `d.kept=false; total=0;` then announces the reroll. No roller, no `val=`. **Unreachable** — it comes through `activateCard`, and the legacy player-active layer is dead (driven tonight: `canActivateCard` refuses every id, `pCards` and `effectiveCards()` both empty). |
+
+**So the paragraph above is true only of the dead half.** The boss firing it at
+you — the direction `docs/CARD_ART_NEEDED.md` describes, and the only one a
+player meets — genuinely rerolls and rescores.
+
+**What this means for the art list:** nothing needs a caveat. Its wording for
+Crown Authority and Blessed Dice ("forces you to reroll every die you selected")
+describes the live path and is accurate today.
+
 **Correction to the original ruling, which assumed the wrong direction.** These
 were taken to be boss cards punishing the player, and therefore a softening
 lever for nights 7–8. They are not. There is **no NPC firing path at all** — the

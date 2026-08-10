@@ -126,4 +126,4 @@ game's faces, kept findable for exactly this and never loaded.
 - `never_saw_a_robe.png` - **NEVER SAW A ROBE**  
   Ambrose ignores all your cards that modify opponent rules — they have no effect this match.
 - `blessed_confiscation.png` - **BLESSED CONFISCATION**  
-  Once per match, Ambrose confiscates your best die and adds it to his own dice pool.
+  Once per match, Ambrose confiscates your best die and plays it in place of his worst — you play on with five.
