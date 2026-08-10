@@ -8,8 +8,12 @@
                    different host (its selector takes chips[0]'s nearest stage,
                    and the tier screen is still underneath) the draft renders
                    nothing and every other check below is vacuous.
-     2. HANDOVER   the DOM cube is hidden, its shadow is NOT, and _d3xOwned is
-                   set on all three - so exactly one renderer is drawing.
+     2. HANDOVER   the DOM cube is hidden and _d3xOwned is set on all three, so
+                   exactly one renderer is drawing. P554: and NO contact shadow
+                   is drawn - Denis ruled it off after it was measured never to
+                   have reached a player. Asserted on the DOM element rather
+                   than on D3X, because the rule has to hold on the WebGL-less
+                   fallback too and only CSS reaches both.
      3. MOTION     the quaternion changes between two samples taken during the
                    settle, and again between two taken after it. A still die
                    would pass 1 and 2 and be the exact failure Denis ruled
@@ -66,8 +70,7 @@ const ADOPT={
 const HAND=chips.map(c=>{
   const cube=c.querySelector('.d3die'),sh=c.querySelector('.d3shadow');
   return {cube:cube?getComputedStyle(cube).visibility:'none',
-          shadow:sh?getComputedStyle(sh).visibility:'none',
-          shadowOp:sh?+getComputedStyle(sh).opacity:null,
+          shadow:sh?getComputedStyle(sh).display:'none',
           owned:!!(c._d3&&c._d3._d3xOwned)};
 });
 
@@ -92,7 +95,7 @@ const BREATHE={
 
 const okHold =HOLD.chips===3&&HOLD.boxed===3&&HOLD.adopted===3&&HOLD.drawn===0&&HOLD.domDice===0;
 const okAdopt=ADOPT.adopted===3&&ADOPT.mount==='nrStage'&&ADOPT.fk3d&&ADOPT.canvasIn;
-const okHand =HAND.every(h=>h.cube==='hidden'&&h.shadow==='visible'&&h.owned);
+const okHand =HAND.every(h=>h.cube==='hidden'&&h.shadow==='none'&&h.owned);
 const okFace =FACE.every(f=>f.attr===f.d3x&&f.attr===f.dom&&f.inFaceList);
 
 return {HOLD,ADOPT,HAND,FACE,BREATHE,
@@ -102,4 +105,4 @@ return {HOLD,ADOPT,HAND,FACE,BREATHE,
   : !okHand  ? 'FAIL - handover: '+JSON.stringify(HAND)
   : !okFace  ? 'FAIL - the two renderers disagree about the face: '+JSON.stringify(FACE)
   : !BREATHE.moving ? 'FAIL - the dice are STILL after settling (turn '+BREATHE.turned.join(',')+' bob '+BREATHE.bobbed.map(b=>b&&b.toFixed(2)).join(',')+')'
-  : 'PASS - 3 dice on #nrStage, DOM cube hidden + shadow kept + owned, faces agree, and still breathing after the settle'};
+  : 'PASS - 3 dice on #nrStage, DOM cube hidden + no shadow + owned, faces agree, and still breathing after the settle'};

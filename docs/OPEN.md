@@ -382,33 +382,7 @@ increase on the two worst-off nights. My rec: treat the tags as the bug, drop
 them, keep the cards as player spoils. Cheap either way, but it should be a
 decision rather than a silent edit.
 
----
 
-## 6. The first-night dice have a contact shadow nobody has ever seen
-
-Found while porting that screen to the one die renderer. The ellipse is there,
-it is live, it breathes with the die — and it sits **entirely behind the die**.
-
-Measured on both renderers, so it is not something the port broke:
-
-| | how far the shadow reaches past the die |
-|---|---|
-| before the port (CSS cube, union of its visible faces) | −1.1px at best, −11px at worst |
-| after the port (real cube, its 8 corners through D3X's own camera) | −5.5px at best, −13.5px at worst |
-
-Negative means covered. **Neither renderer has ever put a pixel of it on
-screen.** The two numbers use different silhouette definitions, so the gap
-between them is instrument, not regression — the shared finding is the sign.
-
-This matters because I had it recorded as one of three things unique to that
-surface that a port must preserve, and *live in the DOM* is not *visible*.
-
-**My rec: push it down and out — offset about 0.55 of the die instead of 0.38,
-and a touch wider.** That makes it read as the die resting in a palm, which is
-what the screen is about, and the breathe already has it shrink as the die
-lifts. It is four numbers in `D3.make`. **Say the word and I will do it** — I
-have left it alone because making an invisible thing visible is a look change
-on your screen, not a bug fix.
 
 ## Not blocking, for your awareness
 

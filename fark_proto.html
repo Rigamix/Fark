@@ -1795,17 +1795,20 @@ html.fk3d #screen-match .kept-row .die-wrap::after{display:none!important}
    P553: THE DRAFT IS PORTED AND ITS CLAUSE IS BACK, narrower than it was.
    The old one read `html.fk3d .nrdie .d3host .die` and matched NOTHING - this
    surface has never had a .die element, D3.make appends a .d3slot. The rule
-   below hides .d3die, the cube itself, and deliberately leaves .d3shadow - its
-   sibling inside that slot - alone, because that ellipse is the surface's
-   contact shadow and D3X drives it directly while it owns the die.
-   AND A CORRECTION, measured after the port: that shadow has never actually
-   been SEEN. probe_p553_shadow_seen puts it entirely behind the die on both
-   renderers - 1.1px short of clearing the old CSS cube at its very best, 5.5px
-   short of the new one. It was recorded as "the only live contact shadow
-   outside the match table" and live in the DOM is not visible. Logged as
-   OPEN section 6 rather than moved, since making it visible is a look change. */
+   below hides .d3die, the cube itself.
+
+   P554: AND THE CONTACT SHADOW IS GONE, by Denis's ruling. Measured first: it
+   never reached a player on EITHER renderer - entirely behind the die through
+   the whole breathe, 1.1px short of clearing the old CSS cube at its very best
+   and 5.5px short of the new one. Offered as "move it down so it reads" or
+   "drop it"; dropped.
+   IT GOES IN CSS RATHER THAN IN THE 3D LAYER because there are two renderers
+   on this screen. D3X drawing no shadow would still have left the DOM die's
+   ellipse showing on a device with no WebGL, and that device is exactly the
+   one this screen must not look broken on. One rule covers both. */
 html.fk3d .d3chip .die{visibility:hidden}
 html.fk3d #nrDice .d3die{visibility:hidden}
+#nrDice .d3shadow{display:none}
 /* match dice: only the CUBE hides - the host keeps its hit box and its
    ground shadow, and the gold selection ring (which the cube used to draw
    for itself) comes back on */
@@ -22586,7 +22589,7 @@ var D3X={
        by the player picking a die up. */
     if(!req){
       if(!d._hold0)d._hold0=now;
-      if(now-d._hold0<2500){this._chipShadow(d,0,false);return {hold:true};}
+      if(now-d._hold0<2500)return {hold:true};
       return null;
     }
     var a=d.anim;
@@ -22608,7 +22611,7 @@ var D3X={
         roll:(Math.random()*2-1)*(req.roll||0)*Math.PI/180};
     }
     var k=a.dur>0?(now-a.t0)/a.dur:1;
-    if(k<0){this._chipShadow(d,0,false);return {hold:true};}
+    if(k<0)return {hold:true};
     a.eul.set(0,0,a.roll,'YXZ');
     a.land.setFromEuler(a.eul).multiply(rest);
     if(k<1){
@@ -22634,29 +22637,15 @@ var D3X={
       a.q.premultiply(a.drift.setFromEuler(a.eul));
     }
     a.last=now;
-    this._chipShadow(d,h,true);
     /* D3.draw lifts the die by h*0.55*s and grows it a little as it rises */
     return {q:a.q,lift:h*0.55*(sz/42),grow:1+h*0.004};
   },
-  /* the contact shadow. D3.draw owns this ellipse and _d3xOwned stops D3.draw
-     dead, so while D3X holds the die it drives the shadow with D3's own
-     formula. Otherwise a frozen blob sits under a breathing die. `s` comes off
-     the DOM die because the ellipse is sized in the slot's own pre-transform
-     pixels, as D3 sized it.
-     THIS IS DRIVING SOMETHING NOBODY CAN SEE, and that is measured, not
-     suspected: probe_p553_shadow_seen puts the ellipse entirely behind the die
-     through the whole breathe, on the old renderer as well as this one. It is
-     kept, driven and correct so that a fix to its OFFSET is four numbers in
-     D3.make rather than a fresh animation - see OPEN section 6. */
-  _chipShadow:function(d,h,on){
-    var sh=d._dom&&d._dom.shadow;
-    if(!sh)return;
-    if(!on){sh.style.opacity=0;return;}
-    var s=d._dom.s||1;
-    sh.style.transform='translate(0px,'+(16*s).toFixed(1)+'px) scale('
-      +Math.max(0.5,1-h*0.008).toFixed(3)+')';
-    sh.style.opacity=Math.max(0.15,0.5-h*0.006).toFixed(3);
-  },
+  /* P554: _chipShadow WAS HERE. It drove the draft's contact ellipse with
+     D3.draw's own formula, because _d3xOwned stops D3.draw dead. The ellipse is
+     gone by ruling (see the CSS), and a driver for something nothing draws is
+     how a file fills up with code that looks load-bearing. If a die shadow
+     comes back on this surface it comes back as a decision, not as the
+     function that outlived the one to remove it. */
   /* one frame: place every die at its chip's rect, then draw */
   frame:function(){
     if(!this.ready||!this.on||!this.mount||!this.mount.isConnected)return;

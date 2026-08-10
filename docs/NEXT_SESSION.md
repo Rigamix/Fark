@@ -81,6 +81,9 @@ surface in the game where `hover` is visible at all** (on every chip surface the
 DOM die is `visibility:hidden` and `D3.draw` bails on `_d3xOwned`, so the hover
 breathe is a no-op), and the only live contact shadow outside the match table.
 Decide whether the port keeps the animation or accepts a still die.
+*(Both since settled: the animation was kept, and the shadow was measured never
+to have been VISIBLE and then removed by ruling - P554. The claim above was
+about the DOM, not the screen.)*
 
 **Three surfaces I previously called stragglers are DEAD CODE:** `_renderRewardDice`
 (only reachable via `showScreen('bossreward')`, which appears twice - the div and
@@ -103,10 +106,10 @@ had no animation path for a non-match die at all. What landed:
 |---|---|
 | `D3X.chipAnim(el,opts)` | a surface asks for an intro. Stores an ABSOLUTE timestamp, so a late boot shows a die already settled rather than tumbling a second time |
 | `D3X._chipAnim` | the settle (slerp from a random attitude to `rollZ * rest`, D3.easeOut) then the hover breathe. Every constant carried from the `D3.roll` call it replaces and from `D3.start`'s hover branch |
-| `D3X._chipShadow` | drives `.d3shadow` with D3's own formula, because `_d3xOwned` stops `D3.draw` dead |
+| ~~`D3X._chipShadow`~~ | built to drive `.d3shadow`, then deleted in P554 when the shadow was ruled off — see below |
 | `data-anim` on the chip | hold it off screen until armed - adoption happens on frame one, arming 950ms later |
 | `data-val` on the chip | `sync` reads the face at adoption, 950ms before the draft used to pick it. Drawn from the die's OWN faces list so a loaded die never shows a "?" hero face |
-| CSS | `html.fk3d #nrDice .d3die` - the CUBE only. `.d3shadow` is its sibling and stays. `#nrStage #d3xCanvas{z-index:3}` + `#famRunDraft.focus{z-index:7}` so the canvas rides with the dice |
+| CSS | `html.fk3d #nrDice .d3die` - the CUBE only. Plus `#nrDice .d3shadow{display:none}` (P554) and `#nrStage #d3xCanvas{z-index:3}` + `#famRunDraft.focus{z-index:7}` so the canvas rides with the dice |
 
 **THE RISE CAME FOR FREE and that is why the port stayed small.** It is
 `nrFloat` on the `.nrdie` TILE, and `frame()` reads the chip's rect every frame,
@@ -157,12 +160,19 @@ Three probes, all green, all driving the real screen:
   `foreign: []`.** So the hazard is not live - and this probe is now the guard,
   failing with the competing chips named rather than leaving it to be noticed.
 
-And one measurement that is NOT about the patch: `probe_p553_shadow_seen.js`.
-The contact shadow on this screen has **never** reached a player - it sits
-entirely behind the die on both renderers (before: −1.1px at best; after:
-−5.5px, using each renderer's own silhouette). That corrects a premise this
-file carried: *live in the DOM* is not *visible*. Logged for Denis as OPEN §6
-rather than fixed, because making an invisible thing visible is a look change.
+**The contact shadow is GONE (P554), and that closed one of the three things
+this file said a port had to preserve.** It was measured never to have reached
+a player - entirely behind the die on both renderers, −1.1px clear at best
+before the port and −5.5px after, each using its own renderer's silhouette.
+Offered to Denis as move-it-or-drop-it; **ruled: drop it.**
+
+The rule is `#nrDice .d3shadow{display:none}` and it is CSS **on purpose**:
+there are two renderers on this screen, and D3X simply not drawing a shadow
+would have left the DOM die's ellipse showing on a WebGL-less device - the one
+device this screen must not look broken on. `_chipShadow` was deleted with it.
+
+Carry the lesson, not just the fact: *live in the DOM* is not *visible*, and
+this file had asserted the second from the first.
 
 **One visible change worth knowing about:** the die is now 0.80 of its host box,
 not 0.72, because that is D3X's chip factor everywhere else and the DOM shadow
@@ -195,7 +205,9 @@ detach, a future screen keeping a chip alive - showed three empty sockets on the
 first screen of a new run.
 
 P547 scoped the rule to `.d3chip`. P553 ported the surface and put a clause back,
-narrower: `html.fk3d #nrDice .d3die`, the CUBE only, leaving `.d3shadow` alone.
+narrower: `html.fk3d #nrDice .d3die`, the CUBE only. P554 then took the shadow
+off this surface entirely, so `.d3shadow` there is `display:none` rather than
+merely unhidden.
 
 **Worth recording: the old `.nrdie .d3host .die` clause matched NOTHING.** This
 surface has never had a `.die` element - `D3.make` appends a `.d3slot`. So the

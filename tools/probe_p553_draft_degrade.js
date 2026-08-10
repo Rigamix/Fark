@@ -75,14 +75,20 @@ const A={fail:!!D3X.fail,ready:!!D3X.ready,fk3d:document.documentElement.classLi
   cubes:slots.length,
   visible:[...document.querySelectorAll('#nrDice .d3die')].filter(e=>getComputedStyle(e).visibility==='visible').length,
   owned:[...document.querySelectorAll('#nrDice .d3chip')].filter(c=>c._d3&&c._d3._d3xOwned).length,
+  /* P554: THE SHADOW MUST BE OFF HERE TOO, and this is the arm that says so.
+     The whole reason the rule went in CSS rather than in D3X is that D3X
+     drawing no shadow would still leave the DOM die's ellipse showing on a
+     device with no WebGL - which is this device. Asserting it only on the 3D
+     path would have proved the easy half. */
+  shadows:[...document.querySelectorAll('#nrDice .d3shadow')].filter(e=>getComputedStyle(e).display!=='none').length,
   moving:p1.filter((p,i)=>p!==p2[i]).length};
 
 const okB=B.adopted===3&&B.drawn===3&&B.still&&B_early.held===3;
-const okA=A.fail&&!A.fk3d&&A.cubes===3&&A.visible===3&&A.owned===0&&A.moving===3;
+const okA=A.fail&&!A.fk3d&&A.cubes===3&&A.visible===3&&A.owned===0&&A.moving===3&&A.shadows===0;
 return {B_holdDeadline:{...B_early,...B},A_noWebGL:A,
   verdict:
     B_early.of!==3 ? 'INCONCLUSIVE - arm B adopted '+B_early.of+' dice, so the hold was never exercised'
   : B_early.held!==3 ? 'FAIL - the hold did not hold: '+B_early.held+'/3 hidden at 1.5s, so the deadline test below proves nothing'
   : !okB ? 'FAIL - an unarmed chip never reached the screen: '+JSON.stringify(B)
-  : !okA ? 'FAIL - no-WebGL draft: '+JSON.stringify(A)+' (want fail, no fk3d, 3 visible cubes, 0 owned, 3 moving)'
-  : 'PASS - unarmed chips fall through to a still die after 2.5s, and a WebGL-less device still gets three animating DOM dice'};
+  : !okA ? 'FAIL - no-WebGL draft: '+JSON.stringify(A)+' (want fail, no fk3d, 3 visible cubes, 0 owned, 3 moving, 0 shadows)'
+  : 'PASS - unarmed chips fall through to a still die after 2.5s, and a WebGL-less device still gets three animating DOM dice with no shadow under them'};
