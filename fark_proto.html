@@ -22021,6 +22021,57 @@ var D3X={
     }
     return (ch._d3&&ch._d3.ench)||ch._ench||null;
   },
+  /* P548: THE PIPS, DRAWN IN CODE.
+     The art is blank now - six wear variants, not six numbers - so the pips are
+     composited onto a copy of the model's own atlas. Geometry measured off the
+     old painted art rather than guessed:
+       grid   0.225 / 0.500 / 0.775 of the face
+       radius 0.104 of the face width
+       black  (0,0,0)
+     PURE BLACK IS LOAD-BEARING. _dress tints with m.color, which MULTIPLIES, so
+     black stays black on every material - the "pips must not tint" rule needs no
+     special case anywhere. Do not soften these to a dark grey without deciding
+     what a jade or amber die should do with them. */
+  PIP:{
+    GRID:[0.225,0.500,0.775], R:0.104, COL:'#000',
+    /* col,row into GRID. Standard faces; a die's VALUE picks the layout, and
+       the value-to-cell mapping is D3X.FACE's, not this table's. */
+    LAY:{1:[[1,1]],2:[[0,0],[2,2]],3:[[0,0],[1,1],[2,2]],
+         4:[[0,0],[2,0],[0,2],[2,2]],5:[[0,0],[2,0],[1,1],[0,2],[2,2]],
+         6:[[0,0],[2,0],[0,1],[2,1],[0,2],[2,2]]},
+    /* one function, so a future pip SHAPE is a change here and nowhere else */
+    draw:function(x,cx,cy,r){x.beginPath();x.arc(cx,cy,r,0,6.2832);x.fill();}
+  },
+  _pipPool:null,
+  _pipSheet:function(baseTex){
+    if(!baseTex||!baseTex.image)return null;
+    var img=baseTex.image,W=img.width||img.naturalWidth,H=img.height||img.naturalHeight;
+    if(!W||!H)return null;
+    if(!this._pipPool){
+      var P=this.PIP,cw=W/3,ch=H/2,pool=[];
+      for(var n=0;n<8;n++){
+        var cv=document.createElement('canvas');cv.width=W;cv.height=H;
+        var x=cv.getContext('2d');
+        for(var v=1;v<=6;v++){
+          var dc=(v-1)%3,dr=Math.floor((v-1)/3);
+          /* ANY variant on ANY face - that is the point of the blank art */
+          var sv=Math.floor(Math.random()*6),sc=sv%3,sr=Math.floor(sv/3);
+          x.drawImage(img,sc*cw,sr*ch,cw,ch,dc*cw,dr*ch,cw,ch);
+          x.fillStyle=P.COL;
+          var lay=P.LAY[v]||[],r=P.R*cw;
+          for(var k=0;k<lay.length;k++){
+            P.draw(x,dc*cw+P.GRID[lay[k][0]]*cw,dr*ch+P.GRID[lay[k][1]]*ch,r);
+          }
+        }
+        var t=new THREE.CanvasTexture(cv);
+        t.flipY=baseTex.flipY;t.wrapS=baseTex.wrapS;t.wrapT=baseTex.wrapT;
+        t.encoding=baseTex.encoding;t.anisotropy=baseTex.anisotropy||1;
+        t.needsUpdate=true;pool.push(t);
+      }
+      this._pipPool=pool;
+    }
+    return this._pipPool[Math.floor(Math.random()*this._pipPool.length)];
+  },
   _mkDie:function(mat,ench){
     var g=new THREE.Group();
     var m=this.proto.clone(true);
@@ -22033,13 +22084,21 @@ var D3X={
         /* Lambert, not Phong: diffuse only, so there is no specular term
            to leak back in - the painted dice never had a highlight and the
            3D ones were reading as too CG. */
+        /* P548: resolve the pip sheet ONCE. _pipSheet picks at random, so calling
+           it twice would hand the material and its baseMap two different sheets -
+           the die would change variant the first time _dress restored it. */
+        var _pipTex=D3X._pipSheet(src.map)||src.map||null;
         o.material=new THREE.MeshLambertMaterial({
-          map:src.map||null,color:new THREE.Color(col)});
+          map:_pipTex,color:new THREE.Color(col)});/* P548 */
         /* the pristine texture this mesh started from, so _dress can put an
            unskinned material back to a clean base before the brand and the
            wild ring are drawn on again. Material.userData is safe - it was
            TEXTURE.userData that does not exist in this three.js build. */
-        o.material.userData.baseMap=src.map||null;
+        /* P548: the PIPPED sheet, not src.map. This is "the pristine texture this
+           mesh started from", and _dress restores it for every unskinned material -
+           which is about to be all of them. Left as src.map, the first re-dress
+           would silently strip the pips off the die and leave a blank face. */
+        o.material.userData.baseMap=_pipTex;
         self._dress(o.material,mat,sk);
         if(ench&&ench.face&&o.material.map){
           o.material.map=self._brandedMap(o.material.map,ench,col);

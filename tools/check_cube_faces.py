@@ -24,7 +24,8 @@ from PIL import Image
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, '..'))
 GLB = os.path.join(ROOT, 'assets', 'models', 'die_cube.glb')
-ART = os.path.abspath(os.path.join(ROOT, '..', '..', '..', 'Art', 'Assets', 'Dice'))
+ART = os.path.abspath(os.path.join(ROOT, '..', '..', '..',
+                                   'Art', 'Assets', 'Dice', 'Bone', 'texture'))
 GAME = os.path.join(ROOT, 'fark_proto.html')
 
 if not os.path.exists(GLB):
@@ -78,11 +79,11 @@ atlas = Image.open(io.BytesIO(bin_[iv['byteOffset']:iv['byteOffset'] + iv['byteL
 AW, AH = atlas.size
 art = {}
 for v in range(1, 7):
-    p = os.path.join(ART, 'bone_%d.png' % v)
+    p = os.path.join(ART, '%d.png' % v)
     if not os.path.exists(p):
         print('FAIL: missing ' + p)
         sys.exit(1)
-    art[v] = Image.open(p).convert('RGBA').tobytes()
+    art[v] = Image.open(p).convert('RGB').convert('RGBA').tobytes()
 
 prim = gj['meshes'][0]['primitives'][0]
 N = acc(prim['attributes']['NORMAL'])
@@ -100,21 +101,26 @@ for f in range(len(N) // 4):
     match = [v for v in art if art[v] == crop]
     got = match[0] if match else None
     exp = want_at.get(n)
-    ok = got is not None and got == exp
+    # THE PREMISE CHANGED WITH THE BLANK ART: any wear-variant may sit on any
+    # face, so 'cell N wears bone_N' is meaningless now. What must still hold is
+    # the face NORMAL -> atlas CELL mapping, which D3X.FACE and the brand
+    # compositor both index by value.
+    cell = (box[1] // 128) * 3 + (box[0] // 128)
+    ok = got is not None and exp is not None and cell == exp - 1
     if not ok:
         bad += 1
     seen[n] = got
     print('  %s face %s  wears %s   D3X.FACE wants %s'
           % ('OK  ' if ok else 'FAIL', nm.get(n, str(n)).ljust(3),
-             ('bone_%d' % got) if got else 'NO EXACT ART MATCH',
+             ('cell %d, variant %s' % (cell, got)) if got else 'NO MATCH',
              ('value %s' % exp) if exp else '(no entry)'))
 
 for ax in [(1,0,0),(0,1,0),(0,0,1)]:
-    a, b = seen.get(ax), seen.get(tuple(-c for c in ax))
+    a, b = want_at.get(ax), want_at.get(tuple(-c for c in ax))
     if a and b and a + b != 7:
         bad += 1
         print('  FAIL %s/%s hold %d and %d - opposite faces must sum to 7' % (nm[ax], nm[tuple(-c for c in ax)], a, b))
 
 print(('\nFAILURES: %d' % bad) if bad
-      else '\nall six faces match D3X.FACE, pixel-matched against the real art')
+      else '\nall six faces match D3X.FACE, in the cell D3X.FACE expects; every cell is one of the six blank variants')
 sys.exit(1 if bad else 0)
