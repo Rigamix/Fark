@@ -382,7 +382,41 @@ increase on the two worst-off nights. My rec: treat the tags as the bug, drop
 them, keep the cards as player spoils. Cheap either way, but it should be a
 decision rather than a silent edit.
 
+---
 
+## 9. When a die is SWAPPED off your seat, does its brand go with it?
+
+Blocking D11, and it needs you because the file currently answers it **both
+ways** and neither is written down.
+
+**Trade** moves the brand out with the die and ledgers it so it can come home
+(`myEn`, `G._enchArr[L]=null`, `_tradeSwaps.push`).
+
+**The four same-seat swap cards** — `swap_die` and `sleight_of_hand` on the
+rival's side, Sleight of Hand and Sticky Fingers on yours — move only the
+material. `G._enchArr` is untouched, so **the seat keeps the brand and the die
+leaves without one.** Measured: your lane-4 `jade + tithe` becomes
+`bone + tithe`, and the jade crosses to the rival unbranded.
+
+That body is byte-identical in all four places, and the comment claiming
+"lanes and brands stay aligned" sat on one of them — which is how the other
+three stayed out of the audit. Comment corrected (P558); behaviour untouched.
+
+**Two readings, and they play very differently:**
+
+| | what it means |
+|---|---|
+| **the brand stays on the seat** | a brand belongs to your *place at the table*. Sticky Fingers becomes a way to launder a bad die into a good one and keep your Tithe. This is current behaviour. |
+| **the brand travels with the die** | a brand belongs to the *die*. Losing a branded die really costs you the brand — and it matches what Trade already does. |
+
+**My rec: the brand travels, matching Trade** — one rule for same-seat swaps
+instead of two, and it makes a branded die worth protecting. But it is a real
+difficulty increase across four cards at once, so it is your call.
+
+Whichever you pick, the fix is one shared helper across the four sites rather
+than four edits — the same shape as `_removeDieAt`.
+
+---
 
 ## Not blocking, for your awareness
 
