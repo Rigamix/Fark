@@ -20253,23 +20253,43 @@ var D3X={
      The old flow dropped the die and re-synced, which built a new object at
      the rest pose - a cut, on the frame the spin ended, which is exactly the
      snap that read as jarring. */
+  /* P552: ONE PLACE THAT DECIDES WHAT A FACE SHOWS.
+     This sequence - dress, brand, glow, wild - used to be written out longhand
+     in THREE places: _rebrand, the icon-decode callback, and material creation.
+     Measured before merging: two were byte-identical and the third differed
+     only in variable names, so they agreed - but they agreed by hand, which is
+     where every drift bug in this file started.
+
+     LAYER ORDER IS THE LOAD-BEARING PART and it was implicit in all three
+     copies and written down in none:
+       1. the base map        - the pip sheet, already on the material
+       2. the brand + glow    - the enchant icon in its face's cell
+       3. the wild mark       - LAST, so it owns its cell outright
+     A wild face and a branded face can be the same cell; the wild mark wins,
+     which is what the old order did and is now stated rather than inferred.
+
+     `col` exists because the creation path has the material colour to hand and
+     the rebrand paths look it up from MATCOL - same value, two routes. */
+  _faceLayers:function(m,mat,ench,col){
+    if(!m)return;
+    if(ench&&ench.face&&m.map){
+      m.map=this._brandedMap(m.map,ench,(col!==undefined&&col!==null)?col:this.MATCOL[mat]);
+      var gm=this._brandGlowMap(m.map,ench);
+      if(gm){m.emissiveMap=gm;if(m.emissive)m.emissive.setRGB(1,1,1);}
+      m.needsUpdate=true;
+    }
+    if(this._isWildMat(mat)&&m.map){
+      m.map=this._wildMap(m.map);
+      m.needsUpdate=true;
+    }
+  },
   _rebrand:function(d){
     if(!d||!d.obj)return;
     var self=this,sk=this._skinFor(d.mat),ench=this._deckEnch(d.chip);
     d.obj.traverse(function(o){
       if(!o.isMesh||o.userData.outline)return;
       self._dress(o.material,d.mat,sk);
-      if(ench&&ench.face&&o.material.map){
-        o.material.map=self._brandedMap(o.material.map,ench,self.MATCOL[d.mat]);
-        var gm2=self._brandGlowMap(o.material.map,ench);
-        if(gm2){o.material.emissiveMap=gm2;
-          if(o.material.emissive)o.material.emissive.setRGB(1,1,1);}
-        o.material.needsUpdate=true;
-      }
-      if(self._isWildMat(d.mat)&&o.material.map){
-        o.material.map=self._wildMap(o.material.map);
-        o.material.needsUpdate=true;
-      }
+      self._faceLayers(o.material,d.mat,ench);/* P552 */
     });
   },
   _idQ:function(){return this.__idq||(this.__idq=new THREE.Quaternion());},
@@ -20282,20 +20302,10 @@ var D3X={
       d.obj.traverse(function(o){
         if(!o.isMesh||o.userData.outline)return;
         self._dress(o.material,d.mat,sk);
-        /* re-apply the brand: _dress resets map to the base skin, and this
-           is the very callback an icon's decode fires, so without this the
-           brand could never survive the one event meant to apply it */
-        if(ench&&ench.face&&o.material.map){
-          o.material.map=self._brandedMap(o.material.map,ench,self.MATCOL[d.mat]);
-          var gm3=self._brandGlowMap(o.material.map,ench);
-          if(gm3){o.material.emissiveMap=gm3;
-            if(o.material.emissive)o.material.emissive.setRGB(1,1,1);}
-          o.material.needsUpdate=true;
-        }
-        if(self._isWildMat(d.mat)&&o.material.map){
-          o.material.map=self._wildMap(o.material.map);
-          o.material.needsUpdate=true;
-        }
+        /* re-apply the layers: _dress resets map to the base, and this is the
+           very callback an icon's decode fires, so without this the brand could
+           never survive the one event meant to apply it. */
+        self._faceLayers(o.material,d.mat,ench);/* P552 */
       });
     });
     this.frame();
@@ -22230,17 +22240,7 @@ var D3X={
            would silently strip the pips off the die and leave a blank face. */
         o.material.userData.baseMap=_pipTex;
         self._dress(o.material,mat,sk);
-        if(ench&&ench.face&&o.material.map){
-          o.material.map=self._brandedMap(o.material.map,ench,col);
-          var gm=self._brandGlowMap(o.material.map,ench);
-          if(gm){o.material.emissiveMap=gm;
-            if(o.material.emissive)o.material.emissive.setRGB(1,1,1);}
-          o.material.needsUpdate=true;
-        }
-        if(self._isWildMat(mat)&&o.material.map){
-          o.material.map=self._wildMap(o.material.map);
-          o.material.needsUpdate=true;
-        }
+        self._faceLayers(o.material,mat,ench,col);/* P552 */
       }
     });
     g.add(m);
