@@ -87,6 +87,41 @@ Decide whether the port keeps the animation or accepts a still die.
 the switch case), `#tierLoDice` and `#tierBossLoDice` (CSS `display:none
 !important` under Room V2, measured width 0). Do not port them; delete or leave.
 
+## DRAFT PORT - WHAT I LEARNED ABOUT WHERE THE CODE GOES
+
+Done since: pips in code (P548), per-material ink + "?" (P549/P550), chirality
+verified Western (triple product +1, no change needed), skins.js retired,
+the DELIBERATE WebGL fallback (P551), and the unified face pass (P552).
+The draft port is the ONLY die item left.
+
+Concrete notes for whoever writes it, gathered but NOT acted on:
+
+* `D3X.frame()` (22500) does camera setup, then a focus/zoom pass, then
+  `this.dice.forEach` (the per-die loop, below 22537) which reads
+  `d.chip.getBoundingClientRect()` and branches on `if(d.match)`. **Every tween
+  is inside that branch.** A chip die is posed once at adoption by `_isoQ` and
+  then holds still. The intro tween belongs in the ELSE side of that branch,
+  driven off a per-die `t0` the adoption loop already sets.
+* Adoption is `D3X.sync`'s loop (~22180): it pushes
+  `{chip,obj,mat,val,top,uYaw,uPit,t0}` and already stamps `t0` with
+  `performance.now()` - so the clock the tween needs is present.
+* The draft's own animation is `D3.roll(d, val, {delay:i*200+80, dur:1250,
+  turns:0, spinMax:20, flat:true, homeX:0, homeY:0})` at famRunDraftShow. It is
+  a RISE AND SETTLE, never physics: `group:null` means it cannot reach
+  `_physQueue`. Match those numbers, do not invent new ones.
+* The draft builds `.nrdie > .d3host` and calls `D3.make` directly, so
+  `_liveChips` (which queries `.d3chip` only) cannot see it. `#nrStage` is
+  ALREADY in the mount host list, so only the registration is missing.
+* Three things are unique to this surface and must survive: the settle, the
+  only VISIBLE hover in the game (every chip surface hides its DOM die, so the
+  breathe is a no-op everywhere else), and the only live contact shadow outside
+  the match table.
+* **Restore the `.nrdie` clause in CSS 1788 in the SAME commit** - P547 scoped
+  it to `.d3chip` precisely because nothing draws the draft in 3D yet.
+
+DO NOT START THIS WITHOUT ROOM TO VERIFY. It is the first screen a new player
+sees and a half-ported draft is three empty sockets.
+
 ## SIZING THE DRAFT PORT - IT IS NOT A CONVERSION, IT IS NEW CODE
 
 Denis ruled the draft KEEPS its rise-and-settle. Measured what that costs:
