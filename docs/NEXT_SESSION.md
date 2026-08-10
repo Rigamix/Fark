@@ -87,111 +87,144 @@ Decide whether the port keeps the animation or accepts a still die.
 the switch case), `#tierLoDice` and `#tierBossLoDice` (CSS `display:none
 !important` under Room V2, measured width 0). Do not port them; delete or leave.
 
-## DRAFT PORT - WHAT I LEARNED ABOUT WHERE THE CODE GOES
+## DRAFT PORT - DONE (P553 / P553b)
 
 Done since: pips in code (P548), per-material ink + "?" (P549/P550), chirality
 verified Western (triple product +1, no change needed), skins.js retired,
-the DELIBERATE WebGL fallback (P551), and the unified face pass (P552).
-The draft port is the ONLY die item left.
+the DELIBERATE WebGL fallback (P551), the unified face pass (P552), and now
+the draft. **There is no die surface left on D3.**
 
-Concrete notes for whoever writes it, gathered but NOT acted on:
+**It was not a conversion, it was new code**, and the earlier survey undersold
+it: `frame()` branches on `d.match` and EVERY tween lived inside that branch,
+so a chip die was posed once at adoption by `_isoQ` and then held still. D3X
+had no animation path for a non-match die at all. What landed:
 
-* `D3X.frame()` (22500) does camera setup, then a focus/zoom pass, then
-  `this.dice.forEach` (the per-die loop, below 22537) which reads
-  `d.chip.getBoundingClientRect()` and branches on `if(d.match)`. **Every tween
-  is inside that branch.** A chip die is posed once at adoption by `_isoQ` and
-  then holds still. The intro tween belongs in the ELSE side of that branch,
-  driven off a per-die `t0` the adoption loop already sets.
-* Adoption is `D3X.sync`'s loop (~22180): it pushes
-  `{chip,obj,mat,val,top,uYaw,uPit,t0}` and already stamps `t0` with
-  `performance.now()` - so the clock the tween needs is present.
-* The draft's own animation is `D3.roll(d, val, {delay:i*200+80, dur:1250,
-  turns:0, spinMax:20, flat:true, homeX:0, homeY:0})` at famRunDraftShow. It is
-  a RISE AND SETTLE, never physics: `group:null` means it cannot reach
-  `_physQueue`. Match those numbers, do not invent new ones.
-* The draft builds `.nrdie > .d3host` and calls `D3.make` directly, so
-  `_liveChips` (which queries `.d3chip` only) cannot see it. `#nrStage` is
-  ALREADY in the mount host list, so only the registration is missing.
-* Three things are unique to this surface and must survive: the settle, the
-  only VISIBLE hover in the game (every chip surface hides its DOM die, so the
-  breathe is a no-op everywhere else), and the only live contact shadow outside
-  the match table.
-* **Restore the `.nrdie` clause in CSS 1788 in the SAME commit** - P547 scoped
-  it to `.d3chip` precisely because nothing draws the draft in 3D yet.
+| | |
+|---|---|
+| `D3X.chipAnim(el,opts)` | a surface asks for an intro. Stores an ABSOLUTE timestamp, so a late boot shows a die already settled rather than tumbling a second time |
+| `D3X._chipAnim` | the settle (slerp from a random attitude to `rollZ * rest`, D3.easeOut) then the hover breathe. Every constant carried from the `D3.roll` call it replaces and from `D3.start`'s hover branch |
+| `D3X._chipShadow` | drives `.d3shadow` with D3's own formula, because `_d3xOwned` stops `D3.draw` dead |
+| `data-anim` on the chip | hold it off screen until armed - adoption happens on frame one, arming 950ms later |
+| `data-val` on the chip | `sync` reads the face at adoption, 950ms before the draft used to pick it. Drawn from the die's OWN faces list so a loaded die never shows a "?" hero face |
+| CSS | `html.fk3d #nrDice .d3die` - the CUBE only. `.d3shadow` is its sibling and stays. `#nrStage #d3xCanvas{z-index:3}` + `#famRunDraft.focus{z-index:7}` so the canvas rides with the dice |
 
-DO NOT START THIS WITHOUT ROOM TO VERIFY. It is the first screen a new player
-sees and a half-ported draft is three empty sockets.
+**THE RISE CAME FOR FREE and that is why the port stayed small.** It is
+`nrFloat` on the `.nrdie` TILE, and `frame()` reads the chip's rect every frame,
+so the 3D die inherits the tile's scale and translate exactly. Only the SETTLE
+needed writing.
 
-## SIZING THE DRAFT PORT - IT IS NOT A CONVERSION, IT IS NEW CODE
+**P553b exists because I asked P551's question of my own patch**: does the hold
+end because something ENDS it, or because the thing that would strand it happens
+not to occur? It was the second. Adoption is also the moment `sync` adds
+`fk3d` and hides the DOM cube, so an arming call that never arrives means
+nothing draws the die - the empty-sockets failure this file warned about, newly
+reachable. The hold now has a 2500ms deadline and an unarmed chip falls through
+to a still die. Found by reasoning, not by seeing it.
 
-Denis ruled the draft KEEPS its rise-and-settle. Measured what that costs:
+**P553c came out of the probe, not out of reading.** Letting go of a focused die
+flicked it: the 450ms return ease slerps to `rest`, but an animated die holds
+`rest` PLUS the settle's permanent in-plane roll, so the frame after the ease
+finished moved it the rest of the way in one step. Sampled at 40ms:
+`.0703 .0961 .0335 .0210 .0100 .0052 .0000` then **`.0485`** at 521ms, against
+`.0004` for the breathe either side. The ease now targets the held pose.
 
-**D3X has no animation path for a non-match die at all.** `frame()` branches on
-`if(d.match)` and every tween lives inside that branch; a chip die is posed once
-by `_isoQ` at adoption and then holds still. The only motion entry point is
-`_physQueue` (physics, match-only), and `RISE_MATCH` is a camera framing offset
-gated on `_matchOn`, not a die animation.
+And the first version of that probe was wrong in my favour - it took the largest
+step anywhere and found `.1034` at 160ms, which was the ease legitimately moving
+fast. Right conclusion, wrong evidence; a threshold that fires on a working
+animation would have gone on firing after the fix.
 
-So porting the draft means **writing a rise-and-settle for chip dice in D3X**,
-not converting `.d3host` to `.d3chip`. The earlier survey called the draft "the
-awkward one" while framing the other three surfaces as mechanical - that framing
-undersold this one, and the other three turned out to be dead code anyway.
+Three probes, all green, all driving the real screen:
+* `probe_p553_draft_port.js` - adoption on `#nrStage`, DOM cube hidden while its
+  shadow is kept and `_d3xOwned` set, both renderers agreeing on the face, and
+  the quaternion + Y still moving 3.5s in. Stable over three runs.
+* `probe_p553_draft_degrade.js` - the two ways it can lose the 3D die. Arm B
+  stubs `chipAnim` to a no-op: held 3/3 at 1.5s, then all three drawn and STILL
+  past the deadline. Arm A denies `getContext('webgl')`: `fail` set, `fk3d` off,
+  three visible DOM cubes, 0 owned, all three animating - the `D3.roll` call was
+  deliberately kept beside the D3X one for exactly this.
+* `probe_p553_draft_focus.js` - the interactive half. Tap: one die drawn, 2.36x,
+  turning. Layers: canvas z7 over scrim z5, panel z8 over the canvas. Let go:
+  smooth to `.0014`. Take: the overlay goes.
+* `probe_p553_draft_real_entry.js` - **the one that reaches the screen the way a
+  player does**, `startNewRun()` then `showScreen('gauntlet')`, letting
+  `renderTier` open the draft. The other three call `famRunDraftShow()` by hand
+  and therefore never put the tier screen underneath. That matters because
+  `sync` lets `chips[0]` - the first live chip in DOCUMENT ORDER - choose the
+  host for all of them, skips every chip outside it, and adds `fk3d`
+  unconditionally. One sized `.d3chip` on the tier screen sorting before the
+  overlay would hide the draft's cubes with nobody drawing them.
+  **Measured on the real path: 3 live chips on the page, all three the draft's,
+  `foreign: []`.** So the hazard is not live - and this probe is now the guard,
+  failing with the competing chips named rather than leaving it to be noticed.
 
-What the port must carry, all three unique to this surface:
-1. the rise-and-settle (`D3.roll` with `turns:0, spinMax:20, flat:true`, group
-   null - a settle, never physics),
-2. `hover:true` - the ONLY surface where the hover breathe is visible, because
-   every chip surface hides its DOM die and `D3.draw` bails on `_d3xOwned`,
-3. the `.d3shadow` CSS ellipse - the only live contact shadow outside the match
-   table.
+And one measurement that is NOT about the patch: `probe_p553_shadow_seen.js`.
+The contact shadow on this screen has **never** reached a player - it sits
+entirely behind the die on both renderers (before: −1.1px at best; after:
+−5.5px, using each renderer's own silhouette). That corrects a premise this
+file carried: *live in the DOM* is not *visible*. Logged for Denis as OPEN §6
+rather than fixed, because making an invisible thing visible is a look change.
 
-And **restore the `.nrdie` clause in CSS (P547) in that same commit.**
-
-Do not start this without room to verify it: it is the first screen a new player
-sees, and a half-ported draft is three empty sockets.
+**One visible change worth knowing about:** the die is now 0.80 of its host box,
+not 0.72, because that is D3X's chip factor everywhere else and the DOM shadow
+has to sit under whichever renderer is drawing. About 11% bigger than before.
 
 ## THE ONE THING THAT MUST BE READ BEFORE DELETING D3
 
-**D3 is the WebGL-failure fallback BY ACCIDENT, through a hang, not a decision.**
-`_init` calls `new THREE.WebGLRenderer(...)` on its first line, outside any
-try/catch. On a device where that throws: `ready` stays false, **`fail` stays
-FALSE**, `loading` stays true forever, every later `boot(cb)` queues a callback
-that never fires, and `html.fk3d` is never added - so the CSS die stays visible
-and the game works.
+**D3 IS THE FALLBACK ON PURPOSE NOW (P551), AND THAT IS WHY IT STAYS.** It used
+to be the fallback BY ACCIDENT, through a hang: `_init` built a WebGLRenderer on
+its first line outside any try/catch, so on a device where that threw, `ready`
+stayed false, **`fail` stayed FALSE**, `loading` stayed true forever, and
+`html.fk3d` was never added - the CSS die stayed visible and the game worked
+because the exception stopped the code before it could hide anything.
 
-That means **any future patch that wraps `boot` in a try/catch, or adds a `fail`
-check to `mkDie`, silently turns a WebGL-less device into a blank table.** Fix
-the detection before touching either.
+`_giveUp` is now the single exit, `boot` refuses to retry after a real failure,
+and `webglcontextlost` routes into the same place. **The historical warning
+still applies to anything NEW: a patch that adds a `fail` check to `mkDie`, or
+that "tidies" `_giveUp` into a plain catch that lets `sync` run, turns a
+WebGL-less device into a blank table.** The draft is now the sharpest case -
+`probe_p553_draft_degrade.js` arm A is the test that says so.
 
-## THE DRAFT HAZARD - CLOSED (P547), the port itself still open
+## THE DRAFT HAZARD - CLOSED TWICE (P547 scoped it, P553 ported the surface)
 
-CSS 1788 is already `html.fk3d .d3chip .die, html.fk3d .nrdie .d3host .die
-{visibility:hidden}` - the draft's hide rule EXISTS, written for a port that
-never landed. So the draft's dice are hidden whenever `fk3d` is on, and nothing
-draws them, because D3X has never adopted that surface.
+The original rule was `html.fk3d .d3chip .die, html.fk3d .nrdie .d3host .die` -
+a hide clause written for a port that never landed, so under `fk3d` the draft's
+dice were hidden with nothing drawing them. It was safe only because `fk3d`
+happened to be OFF on that screen. **Correct by coincidence, not by design**, and
+anything that left `fk3d` on while the draft was up - a surface that failed to
+detach, a future screen keeping a chip alive - showed three empty sockets on the
+first screen of a new run.
 
-It is safe TODAY only because `fk3d` happens to be off on that screen: `tick`
-finds no `.d3chip` and no `.die.d3on` in `#screen-match`, so `detach` removes
-the class. Verified on the live page - 3 hosts, all `visible`, `fk3dOn:false`,
-`D3X.dice` 0.
+P547 scoped the rule to `.d3chip`. P553 ported the surface and put a clause back,
+narrower: `html.fk3d #nrDice .d3die`, the CUBE only, leaving `.d3shadow` alone.
 
-**But that is the same shape as the WebGL fallback below: correct by
-coincidence, not by design.** Anything that leaves `fk3d` on while the draft is
-up - a surface that fails to detach, a future screen that keeps a chip alive -
-makes the first screen of a new run show three empty sockets. **FIXED P547: the rule is scoped to `.d3chip`.** Denis ruled the draft KEEPS
-its rise-and-settle - it is the only surface with visible hover and the only
-live contact shadow outside the match table, so a still die there is a
-visible downgrade, not a neutral simplification. **Restore the `.nrdie`
-clause in the same commit that ports the draft, not before.**
+**Worth recording: the old `.nrdie .d3host .die` clause matched NOTHING.** This
+surface has never had a `.die` element - `D3.make` appends a `.d3slot`. So the
+hazard as originally written was not live, and `probe_p547_draft_hide.js` passed
+by reading `.d3slot` visibility, which no rule has ever touched. The shape of the
+danger was real and the specific mechanism was not; both halves are true and the
+doc said only the first.
 
-Driven both ways (`tools/probe_p547_draft_hide.js`): with `fk3d` FORCED on,
-the draft keeps 3/3 dice visible; and a chip surface still hides 6/6 of its
-DOM dice with 6 meshes over them - the control a too-wide fix would fail by
-making every 3D surface double-draw.
+That probe is now superseded - it asserts the draft's dice stay visible under
+`fk3d`, which is deliberately half-false since P553. `probe_p553_draft_port.js`
+is the one that means something.
 
 ## STILL OPEN
 
-- Port the first-night draft (above).
+- **The retirement checklist is now the live question.** D3 no longer draws any
+  surface, but it is still (a) the WebGL-failure fallback, deliberately, and
+  (b) the animator the draft falls back to. R3, the grid-pip CSS cube, is still
+  live via the die tooltip. So D3 is not deletable and R3 is the next renderer
+  to look at, not D3.
+- **D3X keeps its die records after a chip surface closes.** Found while
+  probing the draft, then checked against the loadout on the same page so it
+  would not be blamed on the port: **loadout 6 open / 6 after close, draft 3 /
+  3.** It is D3X's lifecycle, not the draft's. `tick`'s no-live-chips branch
+  falls into `syncMatch`, which returns early without detaching when `_matchOn`
+  is already false, so the records survive until the next `sync` filters them.
+  Bounded - three undisposed materials and a detached canvas until the next
+  chip surface opens, and `frame()` bails on `!mount.isConnected` meanwhile -
+  but it is a parallel exit path on a lifecycle op, which is the shape that has
+  bitten before. One canonical teardown, or an explicit detach in that branch.
 - `.dtype-*` face pairing: both grid-pip builders index `dice.faces` by array
   POSITION, so opposite faces never sum to 7. Largest-with-smallest fixes the 14
   materials whose multiset is {1..6}; for the other 10 no arrangement can. Design

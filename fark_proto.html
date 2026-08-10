@@ -1792,12 +1792,20 @@ html.fk3d #screen-match .kept-row .die-wrap::after{display:none!important}
    is a safety resting on something not happening rather than on something
    preventing it. Anything that left fk3d on while the draft was up showed
    three empty sockets on the first screen of a new run.
-   The draft KEEPS its CSS renderer and its rise-and-settle for now - it is
-   the only surface where hover is visible at all and the only live contact
-   shadow outside the match table, so a still die there is a visible
-   downgrade, not a neutral simplification. Restore the .nrdie clause in the
-   same commit that ports the draft, not before. */
+   P553: THE DRAFT IS PORTED AND ITS CLAUSE IS BACK, narrower than it was.
+   The old one read `html.fk3d .nrdie .d3host .die` and matched NOTHING - this
+   surface has never had a .die element, D3.make appends a .d3slot. The rule
+   below hides .d3die, the cube itself, and deliberately leaves .d3shadow - its
+   sibling inside that slot - alone, because that ellipse is the surface's
+   contact shadow and D3X drives it directly while it owns the die.
+   AND A CORRECTION, measured after the port: that shadow has never actually
+   been SEEN. probe_p553_shadow_seen puts it entirely behind the die on both
+   renderers - 1.1px short of clearing the old CSS cube at its very best, 5.5px
+   short of the new one. It was recorded as "the only live contact shadow
+   outside the match table" and live in the DOM is not visible. Logged as
+   OPEN section 6 rather than moved, since making it visible is a look change. */
 html.fk3d .d3chip .die{visibility:hidden}
+html.fk3d #nrDice .d3die{visibility:hidden}
 /* match dice: only the CUBE hides - the host keeps its hit box and its
    ground shadow, and the gold selection ring (which the cube used to draw
    for itself) comes back on */
@@ -1827,6 +1835,12 @@ html.fk3d #screen-match .die-wrap:has(.die.d3on.selected)::after{
 #d3xCanvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;
   z-index:2}
 #ptPanelSheet #d3xCanvas{z-index:2}
+/* P553: the draft stage stacks hand 2, dice 3, chalk 4, scrim 5; focusing
+   lifts the dice row to 7 and puts the read-out panel at 8. The canvas has to
+   ride with the dice or the die it is drawing renders UNDER the scrim that is
+   there to set it apart, and under the glow that is meant to sit behind it. */
+#nrStage #d3xCanvas{z-index:3}
+#famRunDraft.focus #d3xCanvas{z-index:7}
 #ptPanelSheet.pt-focus #d3xCanvas{z-index:55}
 #gbShop.st-focus #d3xCanvas,#gbLoadout.lo-focus #d3xCanvas{z-index:60}
 /* the die picker covers the shop at z-40, and the 3D canvas has to come up
@@ -13781,9 +13795,19 @@ function famRunDraftShow(){
   var dice='';
   _starterOffer.forEach(function(mt,i){
     var dt=getDie(mt);
+    /* P553: THE FACE IS DECIDED HERE, not when the die is built below. D3X
+       adopts a .d3chip on the first frame it has a box and reads data-val
+       then - 950ms before this surface builds anything - so a face picked at
+       build time left the two renderers disagreeing about what the die says.
+       Drawn from the die's OWN face list, never 1..6: iron has no 3, flint no
+       2, lead no 6, and P549 paints a face a die cannot roll with a "?".
+       Uniform 1..6 would have put that question mark on the first die a new
+       player is ever offered. */
+    var _fl=(dt.faces&&dt.faces.length)?dt.faces:[1,2,3,4,5,6];
+    var _fv=_fl[Math.floor(Math.random()*_fl.length)];
     dice+='<div class="nrdie" style="--fd:'+(0.95+i*0.2)+'s" onclick="_nrFocus('+i+')">'
       +'<div class="nrglow"></div><div class="nrparts"></div>'
-      +'<div class="d3host" data-mat="'+mt+'"></div>'
+      +'<div class="d3host d3chip" data-mat="'+mt+'" data-val="'+_fv+'" data-anim="1"></div>'
       +'<span class="sub">'+dt.name.toLowerCase()+'</span></div>';
   });
   ov.innerHTML='<div id="nrStage">'
@@ -13801,11 +13825,27 @@ function famRunDraftShow(){
   setTimeout(function(){
     var stg=document.getElementById('nrStage');if(!stg)return;
     [].forEach.call(ov.querySelectorAll('.d3host'),function(hd,i){
-      var sz=Math.round(hd.clientWidth*0.72);
-      var d=D3.make(hd,{size:sz,mat:hd.getAttribute('data-mat'),hover:true,face:1+Math.floor(Math.random()*6)});
+      /* P553: 0.80, matching D3X's chip factor, so the DOM die and the 3D one
+         are the same size - the shadow below is the DOM die's and it has to
+         sit under whichever of the two is showing. */
+      var sz=Math.round(hd.clientWidth*0.80);
+      var d=D3.make(hd,{size:sz,mat:hd.getAttribute('data-mat'),hover:true,
+        face:parseInt(hd.getAttribute('data-val'),10)||1});
       d.slot.style.margin='auto';
+      /* P553: _drop and the animation pass both reach the DOM die through
+         .d3chip._d3, which is how a MATCH die is found. Nothing set it here. */
+      hd._d3=d;
       d.pitch=Math.random()*360;d.yaw=Math.random()*360;
       D3.roll(d,d.result,{delay:i*200+80,dur:1250,turns:0,spinMax:20,flat:true,homeX:0,homeY:0});
+      /* P553: THE SAME THROW, HANDED TO THE 3D LAYER. D3 keeps its copy: it is
+         the fallback on a device with no WebGL, and on that device this screen
+         must still animate - it is the first thing a new player sees.
+         The 330/1000 split is not a different animation from the 80/1250 above,
+         it lands on the same instant (80+1250 = 330+1000). It waits out the
+         tile's own opacity ramp - nrFloat reaches full opacity at 22% of 1.5s -
+         because a 3D die cannot fade with its tile the way a DOM one does, so
+         it would have popped in at full strength over a translucent tile. */
+      if(window.D3X&&D3X.chipAnim)D3X.chipAnim(hd,{delay:i*200+330,dur:1000,roll:20,breathe:true});
       var nd=hd.parentNode;
       setTimeout(function(){nd.style.animation='none';nd._floatDone=true;},i*200+1620);
     });
@@ -22496,6 +22536,127 @@ var D3X={
     this.dice=[];
     document.documentElement.classList.remove('fk3d');
   },
+  /* P553: THE CHIP ANIMATION PASS - the only motion a non-match die has.
+     frame() branches on d.match and every tween lives inside that branch, so a
+     chip die was posed once at adoption by _isoQ and then held still. That is
+     the whole reason the first-night draft was the last surface D3 still drew:
+     it is the one place that needs motion without physics.
+
+     A surface asks for one with D3X.chipAnim(chipEl, opts). EVERY CONSTANT
+     BELOW IS CARRIED, not invented - the D3.roll call this replaces
+     (turns:0, spinMax:20, flat:true) and D3.start's hover branch. The one
+     deliberate departure is named at the site.
+
+     THE RISE IS NOT IN HERE, and that is the point: it is nrFloat on the tile,
+     and frame() reads the chip's rect every frame, so the die inherits the
+     tile's scale and translate exactly. Only the SETTLE needed writing. */
+  chipAnim:function(el,o){
+    if(!el)return;o=o||{};
+    /* AN ABSOLUTE TIMESTAMP, not a delay measured from adoption. If the 3D
+       layer boots late the die should appear already settled, not tumble a
+       second time in front of someone who just watched the DOM one land. */
+    el._d3xAnim={at:performance.now()+(o.delay||0),dur:o.dur||1250,
+                 roll:o.roll||0,breathe:!!o.breathe};
+  },
+  _chipAnim:function(d,now,sz,rest){
+    if(d._anim0===undefined)
+      d._anim0=!!(d.chip&&d.chip.hasAttribute&&d.chip.hasAttribute('data-anim'));
+    if(!d._anim0)return null;
+    /* CLAIM THE DOM DIE EVERY FRAME, not once at adoption. On this surface the
+       DOM die is built 950ms after the chip exists - the innkeep's hand has to
+       arrive first - so sync's one-shot flagging found nothing to flag, and D3
+       would have gone on stepping a hidden cube AND on writing the very shadow
+       this pass drives. _drop hands it back, so the fallback still works. */
+    if(!d._dom&&d.chip._d3)d._dom=d.chip._d3;
+    if(d._dom)d._dom._d3xOwned=true;
+    var req=d.chip._d3xAnim;
+    /* declared but not yet armed: hold it off screen. Without this the dice
+       are drawn at their rest pose from the first frame, sitting in an empty
+       palm before the hand has arrived.
+       P553b: AND THE HOLD HAS A DEADLINE. Adoption is also the moment sync
+       adds html.fk3d and hides the DOM cube, so while this holds, NOTHING
+       draws the die. That is intended for the 1280ms the intro actually
+       needs - and unbounded if the arming call never comes, which nothing
+       here prevents: it sits in a setTimeout behind an early return. An
+       unarmed die therefore falls through to its rest pose. It has lost its
+       intro, which is a downgrade; it is on screen, which is the difference
+       between a downgrade and three empty sockets on the first screen of a
+       new run. Stamped separately from d.t0 - frame() resets that one every
+       time a die enters focus, so a deadline read off it would be re-armed
+       by the player picking a die up. */
+    if(!req){
+      if(!d._hold0)d._hold0=now;
+      if(now-d._hold0<2500){this._chipShadow(d,0,false);return {hold:true};}
+      return null;
+    }
+    var a=d.anim;
+    if(!a){
+      a=d.anim={t0:req.at,
+        /* D3.roll's own per-die spread on the duration */
+        dur:(req.dur||1250)*(0.7+Math.random()*0.6),
+        breathe:!!req.breathe,ph:Math.random()*6.28,
+        pit:0,yaw:0,last:now,hT0:0,
+        q:new THREE.Quaternion(),land:new THREE.Quaternion(),
+        drift:new THREE.Quaternion(),eul:new THREE.Euler(0,0,0,'YXZ'),
+        /* the die starts at a random attitude and turns onto its face - which
+           is what D3 did by randomising pitch and yaw before the roll */
+        from:new THREE.Quaternion().setFromEuler(
+          new THREE.Euler(Math.random()*6.283,Math.random()*6.283,0,'YXZ')),
+        /* a small in-plane roll KEPT FOR GOOD: spinMax:20 moves D3's spin from
+           0 to +/-20 degrees and leaves it there. It is what stops three dice
+           landing perfectly square to one another. */
+        roll:(Math.random()*2-1)*(req.roll||0)*Math.PI/180};
+    }
+    var k=a.dur>0?(now-a.t0)/a.dur:1;
+    if(k<0){this._chipShadow(d,0,false);return {hold:true};}
+    a.eul.set(0,0,a.roll,'YXZ');
+    a.land.setFromEuler(a.eul).multiply(rest);
+    if(k<1){
+      /* D3.easeOut. With flat:true D3 set krFull, so the rotation ran on the
+         FULL k rather than finishing early - one curve does the whole settle. */
+      a.q.copy(a.from).slerp(a.land,1-Math.pow(1-k,1.4));
+    }else{
+      a.q.copy(a.land);
+      if(a.breathe&&!a.hT0)a.hT0=a.t0+a.dur;
+    }
+    var h=0;
+    if(a.hT0){
+      /* D3.start's hover breathe, numbers unchanged. ONE DEPARTURE: D3
+         ACCUMULATES the two drifts once per frame, which makes the wander
+         frame-rate dependent - twice as fast on a 120Hz phone. Scaled by dt*60
+         here: identical at 60fps, stable everywhere else. */
+      var sec=now/1000,s=sz/42;
+      h=(6*s*(1+Math.sin(sec*1.1+a.ph))*0.5+2*s)*Math.min(1,(now-a.hT0)/700);
+      var dt=Math.min(4,(now-a.last)/16.667);
+      a.pit+=Math.sin(sec*0.53+a.ph)*0.05*dt;
+      a.yaw+=Math.cos(sec*0.41+a.ph)*0.06*dt;
+      a.eul.set(a.pit*Math.PI/180,a.yaw*Math.PI/180,0,'YXZ');
+      a.q.premultiply(a.drift.setFromEuler(a.eul));
+    }
+    a.last=now;
+    this._chipShadow(d,h,true);
+    /* D3.draw lifts the die by h*0.55*s and grows it a little as it rises */
+    return {q:a.q,lift:h*0.55*(sz/42),grow:1+h*0.004};
+  },
+  /* the contact shadow. D3.draw owns this ellipse and _d3xOwned stops D3.draw
+     dead, so while D3X holds the die it drives the shadow with D3's own
+     formula. Otherwise a frozen blob sits under a breathing die. `s` comes off
+     the DOM die because the ellipse is sized in the slot's own pre-transform
+     pixels, as D3 sized it.
+     THIS IS DRIVING SOMETHING NOBODY CAN SEE, and that is measured, not
+     suspected: probe_p553_shadow_seen puts the ellipse entirely behind the die
+     through the whole breathe, on the old renderer as well as this one. It is
+     kept, driven and correct so that a fix to its OFFSET is four numbers in
+     D3.make rather than a fresh animation - see OPEN section 6. */
+  _chipShadow:function(d,h,on){
+    var sh=d._dom&&d._dom.shadow;
+    if(!sh)return;
+    if(!on){sh.style.opacity=0;return;}
+    var s=d._dom.s||1;
+    sh.style.transform='translate(0px,'+(16*s).toFixed(1)+'px) scale('
+      +Math.max(0.5,1-h*0.008).toFixed(3)+')';
+    sh.style.opacity=Math.max(0.15,0.5-h*0.006).toFixed(3);
+  },
   /* one frame: place every die at its chip's rect, then draw */
   frame:function(){
     if(!this.ready||!this.on||!this.mount||!this.mount.isConnected)return;
@@ -22716,9 +22877,14 @@ var D3X={
       if(d.warp&&(d.warpT||0)<1)
         rest=d.warp.clone().slerp(D3X._idQ(),d.warpT||0).multiply(rest);
       var sz=cr.width*(d===zoomed?0.92:0.80);
-      d.obj.scale.setScalar(sz);
+      /* P553: the chip animation pass. `hold` is a chip that has declared an
+         animation and not yet been handed one - drawing it at its rest pose in
+         the meantime puts a die in an empty palm. */
+      var an=D3X._chipAnim(d,now,sz,rest);
+      if(an&&an.hold){d.obj.visible=false;return;}
+      d.obj.scale.setScalar(an?sz*an.grow:sz);
       var x=cr.left-mr.left+cr.width/2,y=-(cr.top-mr.top+cr.height/2);
-      d.obj.position.set(x,y,0);
+      d.obj.position.set(x,y+(an?an.lift:0),0);
       /* focus: a slow turn, plus whatever the player has dragged */
       if(d===zoomed){
         /* the slow turn never stops; dragging just adds to it */
@@ -22729,7 +22895,13 @@ var D3X={
       }else if(d.retT0){
         var rk=Math.min(1,(now-d.retT0)/450);
         var re=1-Math.pow(1-rk,3);
-        d.obj.quaternion.copy(d.retFrom).slerp(rest,re);
+        /* P553c: EASE TO THE POSE THAT WILL ACTUALLY BE HELD, not to the bare
+           rest pose. An animated die settles onto `rest` PLUS a small in-plane
+           roll it keeps for good, so easing to `rest` landed the die a few
+           degrees off and the next frame moved it the rest of the way in one
+           step - measured at .0485 against .0004 for the breathe around it,
+           one frame after the ease had decayed to zero. */
+        d.obj.quaternion.copy(d.retFrom).slerp((an&&an.q)?an.q:rest,re);
         if(rk>=1){d.retT0=0;d.retFrom=null;}
         d.obj.userData.posed=-1;
       }else if(d.uYaw||d.uPit){
@@ -22739,6 +22911,11 @@ var D3X={
         var sp=new THREE.Quaternion().setFromEuler(
           new THREE.Euler(d.uPit||0,d.uYaw||0,0,'YXZ'));
         d.obj.quaternion.copy(sp).multiply(rest);
+        d.obj.userData.posed=-1;
+      }else if(an){
+        /* P553: the settle, then the breathe. Below the focus branch on
+           purpose - a die the player has picked up is turned by the player. */
+        d.obj.quaternion.copy(an.q);
         d.obj.userData.posed=-1;
       }else{
         d.obj.quaternion.copy(rest);
