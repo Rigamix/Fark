@@ -14683,6 +14683,7 @@ CFX.preserve={
        die quietly downgraded it - the player paid for a family trait and got a
        plain die back. The kept entry it came from already carries `mat`. */
     var found=null,foundMat=null;
+    var foundEnch=null;/* P559 - the brand, captured with the material */
     /* P514: take the material of the DIE that carries the 1 or the 5, not
        k.mat - which is selDice[0].mat, the first die of the whole commit
        (built at the G.kept.push). Keep a triple of 3s on bone/iron/flint
@@ -14698,14 +14699,20 @@ CFX.preserve={
          and brands live on faces 1 and 5, which are the only faces this
          looks for, so every brand was a candidate and worth 100 or 50. */
       var _pd=_keptScorers(k).filter(function(dd){return dd&&(dd.val===1||dd.val===5);})[0];
-      if(_pd){found=_pd.val;foundMat=_pd.mat||k.mat||'bone';return true;}
+      /* P559 (D6b): TAKE THE BRAND WITH THE MATERIAL. P514 added mat to this
+         capture and did not add ench beside it, so the die came back the right
+         material wearing nothing. Everywhere else in the file the two travel
+         together - the kept group's own dice entries are {val,mat,ench}, which
+         is exactly where _pd comes from, and _removeDieAt's _diceOut record is
+         {lane,mat,ench}. */
+      if(_pd){found=_pd.val;foundMat=_pd.mat||k.mat||'bone';foundEnch=_pd.ench||null;return true;}
       return (k.vals||[]).some(function(v){
         if(v===1||v===5){found=v;foundMat=k.mat||'bone';return true;}
         return false;
       });
     });
     if(!found)return false;
-    G._famPreserve={val:found,mat:foundMat,pts:found===1?100:50,crack:(inst.tier===3?100:0)};
+    G._famPreserve={val:found,mat:foundMat,ench:foundEnch||null,pts:found===1?100:50,crack:(inst.tier===3?100:0)};/* P559 */
     famLog('PRESERVED — A '+found+' WAITS IN AMBER FOR NEXT TURN');
     return true;
   }
@@ -25350,8 +25357,11 @@ function startPTurn(){
        pay it out again, which is what replaying a turn means. */
     var _fp=G._famPreserve;G._famPreserveAtTurnStart=_fp;G._famPreserve=null;
     /* the die's own material, not bone - see CFX.preserve.use */
+    /* P559 (D6b): the brand rides back with it. Without the third field the
+       restored group looked like every other kept group except that its die
+       had quietly lost its enchant. */
     G.kept=[{vals:[_fp.val],mat:_fp.mat||'bone',pts:_fp.pts+(_fp.crack||0),
-             dice:[{val:_fp.val,mat:_fp.mat||'bone'}]}];
+             dice:[{val:_fp.val,mat:_fp.mat||'bone',ench:_fp.ench||null}]}];
     G.turnPts=G.kept[0].pts;
     /* ONE FEWER THAN THE LOADOUT, not a hardcoded five. A player whose loadout
        is already down a die to Break has five, and would have been handed five
@@ -25375,7 +25385,10 @@ function startPTurn(){
     try{
       var _kr=document.getElementById('keptRow');
       if(_kr&&typeof mkDie==='function'){
-        var _pd=mkDie(_fp.val,_fp.mat||'bone',null,true,null);
+        /* P559 (D6b): the fifth argument is the enchant, and it was a hardcoded
+           null - so even once the record carried the brand, the die on the
+           table would not have shown it. */
+        var _pd=mkDie(_fp.val,_fp.mat||'bone',null,true,_fp.ench||null);
         _pd.classList.add('in-tray');
         _kr.appendChild(typeof _wrapDie==='function'?_wrapDie(_pd):_pd);
       }

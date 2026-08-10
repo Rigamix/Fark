@@ -878,6 +878,52 @@ The Preserve chip left standing in `#keptRow` is unmeasured — §4.
 
 ### D6 — Preserve benches the wrong seat, and drops the brand
 
+> **(b) CLOSED — P559. (a) STILL OPEN, deliberately — see below.**
+>
+> Driven through `CFX.preserve.use`, same test data both sides:
+>
+> | | record keys | `ench` |
+> |---|---|---|
+> | before | `crack, mat, pts, val` | absent |
+> | after | `crack, **ench**, mat, pts, val` | `{t:'tithe',face:5}` |
+>
+> with `preserveActuallyFired` and `materialSurvives` true on both sides — the
+> gate, and P514's own fix as the control.
+>
+> Three touches on one identity: the capture takes `_pd.ench`, the restored kept
+> group carries it into `dice[0]`, and `mkDie`'s fifth argument stops being a
+> hardcoded `null`. Nothing needed in the snapshot — `famState` deep-clones
+> `_famPreserve` whole.
+>
+> **The shape is the lesson.** P514 added `mat` to this capture and did not add
+> `ench` beside it, though the two travel together everywhere else: the kept
+> group's own dice entries are `{val,mat,ench}` — which is where `_pd` comes
+> from — and `_removeDieAt`'s `_diceOut` record is `{lane,mat,ench}`. One
+> capture was written with half the identity.
+>
+> **The probe's first test data was wrong and reported the landed fix as
+> missing.** It branded face 1 on a die showing 1, which makes it an ICON —
+> `_keptScorers` filters on `!_dieIsIcon(dd)`, so it was excluded, `_pd` came
+> back undefined and the scan fell through to the legacy vals-only branch that
+> has no die to read a brand from. A die on its brand face scores nothing and is
+> correctly not a preserve candidate; **the case D6(b) is about is a brand on a
+> face the die is NOT showing.**
+>
+> **(a) IS NOT FIXED, and it is not a small addition.** It needs the preserved
+> LANE recorded, then *maintained across removals* — `_removeDieAt` shifts every
+> lane above the one it takes, which is the same problem `_fairTrade.lane` has
+> and solves with an explicit `if(ft.lane>lane)ft.lane--`. And the exclusion has
+> to reach the refill's ascending free-lane walk, which runs on the **first
+> roll**, not in `startPTurn` where the restore happens. A lane recorded and not
+> honoured in both places is worse than none.
+>
+> Two candidate approaches, neither costed: carry `G._famPreserve.lane` through
+> to `_freeLanes` and subtract it; or push the preserved die into `G.pool` as a
+> committed entry at its lane, so `_occNow`, `needNew` and `_freeLanes` all
+> account for it through machinery that already exists — but that trades
+> `_dropLanes(1)`'s explicit "pay for the preserve" for an implicit one, and
+> `numDice` is read widely enough that the swap needs its own measurement.
+
 **(a) Wrong seat.** Nothing records the lane the preserved die came from;
 `_dropLanes(1)` (24571) moves only the count, and the refill's free-lane walk
 (25121-25124) iterates `i<needNew` over ascending free lanes, so the budget
