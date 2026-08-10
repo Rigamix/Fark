@@ -1158,13 +1158,38 @@ now been driven.)
 
 ### D10 — Fair Trade: the brand never travels, and `_ftDead` retires dice by material string
 
-> **STILL OPEN, and it is now the LAST piece of the OPEN §9 ruling.** P564
-> shipped "the brand travels with the die" across every same-seat **swap** and
-> **destroy**, and P566 brought Trade onto the same helper. Fair Trade is
-> neither: it is a **loan**, so the brand has to travel *and come back*, which
-> means a ledger in the shape of `_tradeSwaps` rather than the one-line clear
-> `_dieLeftSeat` performs. The helper is the place to hang it — see P564's
-> comment beside `_removeDieAt`. **(b)** is untouched and independent.
+> **(a) CLOSED — P569, and with it OPEN §9 is shipped at every site.** Fair
+> Trade is a **loan**, so it needed a ledger like Trade's `myEn` rather than
+> `_dieLeftSeat`'s one-line clear. Driven through the real handler:
+>
+> | | before | after |
+> |---|---|---|
+> | `matchDice[0]` | `bone` → `starstone` | same *(control)* |
+> | **brand during the loan** | **`ward`** — the host's, worn by the visitor | **`tithe`** — the lender's, arrived with their die |
+> | loan record | `{lane, was, borrowed}` | `+ invIdx, hostEn, lentEn` |
+> | brand after expiry | `ward` | `ward` — but now a *return*, not a no-op |
+> | lane 5, untouched *(control)* | `seal` | `seal` |
+>
+> **The expiry key passes pre-fix, for the wrong reason** — the ward never left
+> the seat, so "it came home" and "it never moved" are indistinguishable at that
+> instant. The probe therefore carries a separate key reading the seat at *both*
+> moments, which can only be true if the brand actually travelled and returned.
+>
+> **(b) is half closed, and had to be.** The loan record stored `borrowed` as a
+> **material string**, so it could not name *which* jade was lent — and without
+> that there is no way to look up its brand. `_pick` now carries the stash
+> index. Checked rather than assumed: the picked die is unchanged, because
+> `filter` preserves order and both old and new take the first maximum with a
+> strict `>`. **What remains of (b)** is `_ftDead` holding materials, so one dead
+> die still retires every die of that material — the index now exists to fix it
+> properly.
+>
+> **Deliberately not covered:** the died-on-loan branch, whose own comment
+> already says *"DO NOT touch the lane — whatever holds it now is not ours to
+> overwrite"*. The same argument covers the brand. Narrow residue: a borrowed
+> die that dies in its seat with nothing re-branding the lane leaves the lender's
+> brand behind. Recorded rather than papered over — the honest test needs
+> identity the post-resume record cannot carry.
 
 **(a)** `CFX.fair_trade.use` writes `G.matchDice[worst]=inv[best]` (12992) and
 never `G._enchArr[worst]`. **Independently reproduced twice.** Lane 2 bone with

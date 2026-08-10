@@ -13158,24 +13158,47 @@ CFX.fair_trade={
        spent until the next match (brief 4b), and it has to be invisible to the
        picker as well as to canUse - this reaches for the highest-ranked die in
        the stash, which is exactly the one a player just lost. */
-    var inv=(S.run.diceInv||[]).filter(function(_d){
-      return (G._ftDead||[]).indexOf(_d)<0;});
-    if(!inv.length||!G.matchDice||!G.matchDice.length)return null;
+    /* P569 (D10b): THE STASH INDEX, NOT JUST THE MATERIAL. This filtered into a
+       new array and then reported the winning MATERIAL, so the record could not
+       name WHICH jade was lent - and D10(a) cannot move that die's brand without
+       knowing. S.run.dieEnchInv is index-parallel to S.run.diceInv (15240 pushes
+       to both; 15247/15253 splice and push in step), so the index is the lookup.
+       SAME DIE AS BEFORE: the old code took the first maximum of the filtered
+       array, this takes the first maximum of the live entries in original order,
+       and filter preserves order - with a strict `>` in both, the same element
+       wins. */
+    var _ftIdx=[];
+    (S.run.diceInv||[]).forEach(function(_d,_i){
+      if((G._ftDead||[]).indexOf(_d)<0)_ftIdx.push(_i);});
+    if(!_ftIdx.length||!G.matchDice||!G.matchDice.length)return null;
     /* the weakest seat out, the best thing in the stash in */
     var worst=0;
     G.matchDice.forEach(function(m,i){if(dieRank(m)<dieRank(G.matchDice[worst]))worst=i;});
-    var best=0;
-    inv.forEach(function(m,i){if(dieRank(m)>dieRank(inv[best]))best=i;});
-    if(dieRank(inv[best])<=dieRank(G.matchDice[worst]))return null;
-    return {lane:worst,was:G.matchDice[worst],borrowed:inv[best]};
+    var _ftBest=_ftIdx[0];
+    _ftIdx.forEach(function(_i){
+      if(dieRank(S.run.diceInv[_i])>dieRank(S.run.diceInv[_ftBest]))_ftBest=_i;});
+    if(dieRank(S.run.diceInv[_ftBest])<=dieRank(G.matchDice[worst]))return null;
+    return {lane:worst,was:G.matchDice[worst],borrowed:S.run.diceInv[_ftBest],invIdx:_ftBest};
   },
   use:function(inst){
     var p=CFX.fair_trade._pick();
     if(!p)return false;
     /* a LOAN, not a gift: the stash die goes back after this roll and the
        original returns. Restored in startPTurn. */
+    /* P569 (D10a): THE BRANDS TRAVEL WITH THE DICE, and the host's is LEDGERED
+       rather than cleared, because a loan comes back. Measured before this: the
+       seat kept ['ward'] through the whole loan, so the visiting starstone wore
+       the host's Ward while the lender's own Tithe sat inert in the stash - both
+       halves of Denis's OPEN 9 ruling broken at once. Same shape as Trade's
+       `myEn`, which is the file's existing pattern for a brand that must come
+       home. Written onto `p` BEFORE it becomes G._fairTrade so the record is
+       whole the moment anything can read it. */
+    G._enchArr=G._enchArr||[];
+    p.hostEn=G._enchArr[p.lane]||null;
+    p.lentEn=(S.run.dieEnchInv&&typeof p.invIdx==='number')?(S.run.dieEnchInv[p.invIdx]||null):null;
     G._fairTrade=p;
     G.matchDice[p.lane]=p.borrowed;
+    G._enchArr[p.lane]=p.lentEn;
     try{famLog('FAIR TRADE — '+(getDie(p.was)||{}).name+' OUT, '+(getDie(p.borrowed)||{}).name+' IN');}catch(e){}
     return true;
   }
@@ -19660,6 +19683,9 @@ function _removeDieAt(lane,opts){
     if(_ftB&&_ftB.lane===lane){
       G._fairTrade=null;
       G.matchDice[lane]=_ftB.was;/* its owner walks back in */
+      /* P569 (D10a): with their brand. Same old-snapshot guard as the expiry
+         path in startPTurn. */
+      if(G._enchArr&&('hostEn' in _ftB))G._enchArr[lane]=_ftB.hostEn||null;
       /* the borrowed die is spent for THIS match and back for the next one -
          match-scoped, so this record dies with G and nothing touches the run */
       G._ftDead=(G._ftDead||[]).concat([_ftB.borrowed]);
@@ -25386,6 +25412,11 @@ function startPTurn(){
       G.matchDice[_lane]===_ft.borrowed);
     if(_stillThere){
       G.matchDice[_lane]=_ft.was;/* loan simply expired */
+      /* P569 (D10a): and its brand comes home with it. GATED ON THE RECORD
+         CARRYING THE FIELD, because a snapshot written before this patch has a
+         host brand that never left the seat - writing `undefined||null` over it
+         would clear a brand that was correct. */
+      if(G._enchArr&&('hostEn' in _ft))G._enchArr[_lane]=_ft.hostEn||null;
     }else{
       /* the borrowed die is not in its seat any more: it died there. It is
          spent for the REST OF THIS MATCH and back for the next one - the same

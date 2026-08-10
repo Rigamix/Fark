@@ -14,15 +14,20 @@ D3.**
 
 | | items | what they need |
 |---|---|---|
-| **needs a design call** | D17 | Sleight is inert *and* single-use forever — implement the effect or retire the card. Not a patch either way |
+| **with Denis** | D17 | Sleight is inert *and* single-use forever. The rival's version is a working template, so building it is small — but it is a **player buff**, so it belongs in the §1 retune batch. **`docs/OPEN.md` §7** |
 | **still open** | D23(b) | a double-rule seat shows one badge and enforces two; `_updateTellHUD` keys every branch off `G._tell` by construction |
 | **known-hard** | D6(a) | lane staleness + a refill/restore timing mismatch — both candidate fixes written up in the plan, neither costed |
 | **needs a ruling from Denis** | D19 | vagabond drag: seat vs lane identity. **Written up in `docs/OPEN.md` §6** with a recommendation |
-| **the last of the §9 ruling** | D10(a) | Fair Trade is a **loan**, so the brand must travel *and come back* — a ledger like `_tradeSwaps`, not `_dieLeftSeat`'s one-line clear. Hang it on the helper |
+| **small, unblocked** | D10(b) *(rest)* | `_ftDead` holds **materials**, so one dead die retires every die of that material. P569 added the stash index to the loan record — the identity needed to fix this properly now exists |
 
-**Closed since the last handover:** D11 + §9 (P564), D16 (P565 + P566), D20
-(P563), D22 (P567), D18(b) + D23(a) (P568). **D18(a) withdrawn** — Transmute has
-a targeting prompt, so it was never the same defect as Sacrifice.
+**Closed since the last handover:** D11 (P564), D16 (P565 + P566), D20 (P563),
+D22 (P567), D18(b) + D23(a) (P568), D10(a) + half of D10(b) (P569).
+**D18(a) withdrawn** — Transmute has a targeting prompt, so it was never the
+same defect as Sacrifice.
+
+**OPEN §9 is fully shipped.** "The brand travels with the die" now holds at every
+site: five swap/destroy bodies (P564), Trade (P566) and Fair Trade's loan, which
+needed a ledger because it has a return leg (P569).
 
 **D24 was already closed** by P528 and never marked — worth grepping any entry's
 anchor against current code before assuming it is live. Task #30 carries that as
