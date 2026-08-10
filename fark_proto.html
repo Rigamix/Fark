@@ -14365,17 +14365,43 @@ CFX.short_fuse={
     ev.me.state.lit=false;}
 };
 /* forces applied to a fresh roll (stargazer peek, honeytrap pull) */
+/* P556 (D7): THE ROLL-FORCES BUFFER IS SPENT, WHETHER OR NOT IT LANDED.
+   Stargazer and Honeytrap both promise something about THE NEXT ROLL OF THIS
+   TURN, so the buffer belongs to that roll and to that turn and to nothing
+   else. Both scopes are enforced here rather than at the two call sites,
+   because they are one decision:
+
+     the roll   famApplyRollForces runs on every player roll and calls this
+                after its attempt, so a peek that could not apply is over
+                rather than left armed for a later roll of the same turn
+     the turn   startPTurn calls it, so a buffer armed and then banked on
+                cannot reach the next turn's opening roll
+
+   Neither scope subsumes the other. Arm on roll 1 and miss on roll 2 and only
+   the roll scope stops roll 3 taking it; arm and then bank without rolling and
+   only the turn scope stops the next turn taking it. Measured before the fix:
+   a peek missed by one die stayed armed, and a honeytrap survived endPTurn
+   with the kept pair it was matching already gone (keptAfter 0). */
+function _clearRollForces(){
+  if(!G)return;
+  G._famPeekVals=null;G._famHoneyVal=null;
+}
 function famApplyRollForces(){
   if(!G)return;
   var free=G.pool.filter(function(d){return !d.committed&&!d._frozen;});
   if(G._famPeekVals&&G._famPeekVals.length===free.length){
     free.forEach(function(d,i){d.val=G._famPeekVals[i];try{reDrawDieFace(d);}catch(e){}});
-    G._famPeekVals=null;famLog('THE OMEN HOLDS');
+    famLog('THE OMEN HOLDS');
   }
+  /* honeytrap runs SECOND and overwrites lane 0 even when the peek just set
+     it. Left that way on purpose: its promise is the stronger of the two
+     ("guaranteed triple"), so it winning is the defensible reading. Recorded
+     rather than incidental - apv_roll_forces_scope measures the order. */
   if(G._famHoneyVal&&free.length){
     var d0=free[0];d0.val=G._famHoneyVal;try{reDrawDieFace(d0);}catch(e){}
-    _famPop('HONEYTRAP → '+G._famHoneyVal);G._famHoneyVal=null;
+    _famPop('HONEYTRAP → '+G._famHoneyVal);
   }
+  _clearRollForces();/* P556 - spent by this roll either way */
 }
 /* fool's gold: auto-fires on a dead roll, one reroll; double-fail burns */
 /* THE BODY OF CFX.fools_gold_f.deadRoll, kept as a named function.
@@ -25526,6 +25552,12 @@ function startPTurn(){
       }
     }
   });
+  /* P556 (D7): a fresh turn inherits no roll-forces. Cleared HERE rather than
+     in endPTurn because there are several ways a turn can end and one way it
+     can begin - the same reason _removeDieAt is the single removal path. It
+     also runs BEFORE the snapshot below, which is correct: at this instant
+     nothing is armed, so the snapshot recording null is the true state. */
+  _clearRollForces();
   updHUD();
   /* Persist turn boundary so app restart can resume here */
   saveMatchState();
@@ -28488,6 +28520,14 @@ function endPTurn(){
   try{famFire('rivalTurn',{actor:'o',pts:_pTurnPts});}catch(e){}
   G.pTurns=(G.pTurns||0)+1;/* P3: a completed player turn (bank or bust) */
   G._pLastRolls=G.turnRollCount||0;
+  /* P556b: THE TURN THE BUFFER BELONGED TO IS OVER. startPTurn clears it too,
+     and in the live sequence that was already enough - endPTurn, the rival's
+     turn, startPTurn, and nothing applies it in between because
+     _afterRollImpl gates on phase!=='opp'. That is safety by ANOTHER
+     function's guard rather than by this one's decision, and one edit to that
+     gate or one new caller puts a peek armed in your turn onto the rival's
+     roll. Cleared here so the invariant holds at every instant. */
+  _clearRollForces();
   if(G._oIllOmen){
     /* P463: BOTH outcomes, off _pTurnPts - the same value the rivalTurn seam
        carries and the same test CFX.ill_omen uses for the player (pts<=0).

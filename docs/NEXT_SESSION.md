@@ -244,7 +244,26 @@ The window is not exotic: `saveMatchState()` is the **last statement of
 `startPTurn`**, and both flags are armed in the rival's preceding turn and
 consumed after it. Every ordinary turn boundary lands inside it.
 
-Nine fields now cross a resume. Restored with `!==undefined`, **not `||`** —
+**SCOPE CORRECTION, made after the fact.** P555's commit message implies nine
+live losses. It is **six**, and the difference is reachability: the snapshot has
+**one writer and one call site** — the last statement of `startPTurn` — so a
+field only matters here if it can be non-default at that instant.
+
+| field | reachable at snapshot time? |
+|---|---|
+| `_oSleight`, `_oIllOmen` | **yes** — armed in the rival's preceding turn. Driven. |
+| `_famBankCount`, `_famMinBank` | **yes** — accumulate, never reset mid-match |
+| `_famSleight`, `_famKegTriple` | **yes** — once-per-match latches with *no clear site at all* |
+| `_famPeekVals`, `_famHoneyVal` | no — armed mid-turn, and P556 now clears them at both turn boundaries, so they are provably null here |
+| `_famIllOmen` | no — armed in the player's turn, consumed in the rival's, so null by the next `startPTurn` |
+
+The two latches are worth their own line: `_famSleight`'s `canUse` gates on
+`!G._famSleight` and nothing ever clears it, so losing it on resume **re-enabled
+a spent Sleight** — a second savescum in the player's favour, found only by
+asking the reachability question of my own patch. `_famKegTriple` is the
+`keg_triple` feat's latch; losing it dropped earned progress.
+
+Nine fields cross a resume. Restored with `!==undefined`, **not `||`** —
 `_famBankCount` and `_famMinBank` are numbers that are legitimately 0, and the
 count seeds "is this your FIRST bank" (Hair of the Dog). The probe's falsy arm
 poisons them to 99 before reloading and asserts they come back **0**, because

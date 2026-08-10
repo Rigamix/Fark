@@ -868,6 +868,45 @@ at 24556-24557 builds `dice:[{val,mat}]` and mints the tray die with
 
 ### D7 — The roll-forces buffer is never cleared, so Stargazer and Honeytrap fire a turn late, on the wrong dice, and clobber each other
 
+> **CLOSED — P556 / P556b, reproduced on the current build before the fix.**
+>
+> Re-derived rather than implemented as written, because the entry predates
+> several patches. All three mechanisms still held:
+>
+> | arm | before | after |
+> |---|---|---|
+> | peek missed by one committed die | stayed armed `[4,2,3,6,4]` | `null` |
+> | peek across `endPTurn` | unchanged | `null` |
+> | honeytrap across `endPTurn` | `4`, with `keptAfter 0` | `null` |
+>
+> Arm three is the one that settles the design question: honeytrap's text ties
+> it to a **kept pair** ("tap a kept pair… guaranteed triple"), and banking
+> destroys the pair — so surviving a bank meant forcing a face to match
+> something that no longer existed.
+>
+> **Two scopes, neither subsuming the other**, both through one
+> `_clearRollForces()`: spent by the roll it was armed for (else roll 3 of the
+> same turn takes a peek armed on roll 1), and dead at turn end (else the next
+> turn's opening roll takes one that was banked on).
+>
+> Cleared at `endPTurn` as well as `startPTurn` **on purpose**. `startPTurn`
+> alone was already sufficient in the live sequence — nothing applies the
+> buffer during the rival's turn because `_afterRollImpl` gates on
+> `phase!=='opp'` — which is safety by another function's guard rather than by
+> this one's decision. One edit to that gate and a peek armed in your turn
+> lands on the rival's roll.
+>
+> **The clobber is left as it is and is now measured rather than incidental**
+> (`apv_roll_forces_scope` arm D): honeytrap runs second and takes lane 0 even
+> when the peek just set it. Its promise is the stronger one, so it winning is
+> the defensible reading.
+>
+> **NOT closed by this: the peek is rolled at USE time** over the dice free
+> *then*, and applied to whatever is free at the next roll. Even at equal
+> counts the composition can differ and `_rollD` is material-biased, so index
+> `i` can be a different die. Delivering Stargazer's actual text needs a
+> preview-and-decide flow that does not exist. Flagged, not invented.
+
 `famApplyRollForces` gates on `G._famPeekVals.length === free.length` (14169).
 Playing Stargazer during `'choosing'` then rolling means committing at least one
 die first, so the counts usually differ — **and the miss does not clear the
