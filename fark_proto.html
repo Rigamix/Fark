@@ -1700,6 +1700,28 @@ body.dlg-speaking #screen-match #tellBadge{opacity:0;pointer-events:none}
 /* the row measured 399.8 inside a 418 line - the 18px of slack goes into the
    gaps, where it buys separation */
 #screen-match .player-dice-row{gap:3.8cqw}
+/* P575 (note 7): A TALLER TAP TARGET, VERTICAL ONLY.
+   Horizontally the dice are already forgiving - _dieTapRouter redirects a near
+   miss to the die with the nearest centre, so the gaps are arbitrated.
+   Vertically nothing arbitrates: a tap a few px above a die lands on
+   .throw-line, outside #playerDiceRow, and never reaches the router. This pad
+   closes that and nothing else.
+   A CHILD of .die rather than a bigger .die, so the painted geometry and the
+   D3X slot are untouched and e.target.closest('.die') still resolves - the
+   capture router, the long-press and the vagabond drag all keep working with no
+   change to their code.
+   left:0/right:0 pins it to the die's own padding box: it CANNOT reach into a
+   neighbour's lane, which is Denis's "not on the sides though".
+   display:none on the bare class scopes it to the player's row - _wrapDie also
+   runs for the rival's row, and those pads stay inert without a second code
+   path.
+   .committed is NOT excluded, deliberately: a cast brand is committed, and that
+   is the surface note 2 adds a tap message to. Excluding it would leave the one
+   die the player is invited to tap as the only small target on the row. */
+.die-hit{display:none;position:absolute}
+#screen-match #playerDiceRow .die:not(.kept-still):not(.rolling)>.die-hit{
+  display:block;left:0;right:0;top:-6cqw;bottom:-6cqw;
+  background:transparent;touch-action:none}
 /* The rival's row is the player's row - same gap, and the die size comes from
    `#screen-match .die` for both. The old !important overrides existed only to
    beat the little row's hard-coded 48px, which is gone. */
@@ -24270,6 +24292,19 @@ function _trayMs(){return (window.D3X&&D3X.TRAY&&D3X.TRAY.ms)||440;}
    insertBefore(wrap, ref). */
 function _wrapDie(die){
   if(!die)return null;
+  /* P575 (note 7): the taller hit pad.
+     HERE and not in mkDie, because mkDie also builds the shop, loadout, patron,
+     draft and first-strike dice, none of which want it.
+     APPENDED LAST, and that is load-bearing: settleDie and reDrawDieFace index
+     el.children[0..48] for the 49 pip cells on the D3_MATCH===false path, so the
+     pad must come after them.
+     ABOVE the already-wrapped early return, and guarded on the pad's OWN flag:
+     _wrapDie is re-entered on re-append and returns early once wrapped, so a
+     guard on the wrap would skip dice that need the pad. */
+  if(!die._hitPad){
+    var _hp=document.createElement('i');_hp.className='die-hit';
+    die.appendChild(_hp);die._hitPad=_hp;
+  }
   /* Idempotent — if already wrapped, return existing wrap */
   if(die.parentElement&&die.parentElement.classList&&die.parentElement.classList.contains('die-wrap'))return die.parentElement;
   var mat=die._trueMat||(die.className.match(/dtype-(\w+)/)||['','bone'])[1];
