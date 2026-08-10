@@ -21883,7 +21883,30 @@ var D3X={
     return {x:f.x,y:f.y,z:f.z,q:q,done:done};
   },
   _need:[],
+  /* P551: THE ONE PLACE A 3D FAILURE IS RECORDED. Everything a giving-up must
+     do happens here, so a future failure mode cannot record half of it:
+       fail=true      so every consumer that gates on it (tick, D3.roll's
+                      physics branch) knows the layer is DEAD, not still loading
+       loading=false  or boot would refuse to be called again forever
+       _need dropped  NOT called - see boot below, calling them re-enters
+       detach()       removes html.fk3d, so CSS 1788 stops hiding the DOM die
+                      and D3 is visible again
+     The DOM renderer then draws because a flag says so, which is the whole
+     difference between this and what was here before. */
+  _giveUp:function(why){
+    if(this.fail)return;
+    this.fail=true;this.loading=false;this.ready=false;
+    this._need.length=0;
+    try{this.detach&&this.detach();}catch(e){}
+    try{document.documentElement.classList.remove('fk3d');}catch(e){}
+    try{console.warn('[D3X] 3D disabled, falling back to the DOM dice: '+why);}catch(e){}
+  },
   boot:function(cb){
+    /* P551: NEVER RETRY AFTER A REAL FAILURE. syncMatch's not-ready branch
+       calls boot with a callback that calls syncMatch again, so draining the
+       queue on failure - the obvious move - spins an infinite retry. Refusing
+       here makes fail terminal and makes the queue safe to drop. */
+    if(this.fail)return;
     if(this.ready){cb&&cb();return;}
     this._need.push(cb);
     if(this.loading)return;
@@ -21891,12 +21914,22 @@ var D3X={
     var self=this;
     var add=function(src,next){
       var sc=document.createElement('script');sc.src=src;
-      sc.onload=next;sc.onerror=function(){self.loading=false;self.fail=true;};
+      sc.onload=next;sc.onerror=function(){self._giveUp('could not load '+src);};
       document.head.appendChild(sc);
     };
     add('assets/vendor/three.min.js',function(){
       add('assets/vendor/GLTFLoader.js',function(){
-        add('assets/models/die_glb.js',function(){self._init();self._warmCannon();});
+        add('assets/models/die_glb.js',function(){
+          /* P551: _init's FIRST statement builds a WebGLRenderer, and on a
+             device without a usable context that throws. Unguarded, the throw
+             escaped this onload handler and left fail FALSE and loading TRUE
+             forever - the accidental fallback this patch replaces. */
+          try{self._init();}
+          catch(e){self._giveUp('WebGL unavailable: '+(e&&e.message||e));return;}
+          /* the physics warm-up is separate: it must never take down a
+             renderer that came up fine */
+          try{self._warmCannon();}catch(e){}
+        });
       });
     });
   },
@@ -21907,6 +21940,15 @@ var D3X={
     r.outputEncoding=THREE.sRGBEncoding;
     r.toneMapping=THREE.NoToneMapping;
     r.domElement.id='d3xCanvas';
+    /* P551: CONTEXT LOSS IS THE SAME BUG ONE STEP LATER. Backgrounding a phone
+       can drop the GL context; without this D3X still believes it is ready,
+       renders nothing, and html.fk3d keeps hiding the DOM dice underneath -
+       invisible dice, the exact failure this patch exists to prevent. Same
+       exit path as a boot failure. */
+    try{r.domElement.addEventListener('webglcontextlost',function(ev){
+      try{ev.preventDefault();}catch(e){}
+      self._giveUp('the WebGL context was lost');
+    },false);}catch(e){}
     this.renderer=r;
     var sc=new THREE.Scene();this.scene=sc;
     /* the tavern's candle rig, matched to the painted screens */
@@ -21959,7 +22001,12 @@ var D3X={
       q.forEach(function(f){f&&f();});
       self.frame();
     };
-    var onErr=function(){self.loading=false;self.fail=true;};
+    /* P551: THE SECOND HALF-RECORDED FAILURE, and the one I did not know was
+       here - the gate on the first patch found it. A model that fails to load
+       or parse set fail and loading and nothing else: the _need queue kept its
+       callbacks, fk3d was never cleared, and detach never ran. Same exit path
+       as every other way this layer can die. */
+    var onErr=function(e){self._giveUp('the die model failed to load: '+((e&&e.message)||e||'unknown'));};
     var ld=new THREE.GLTFLoader();
     if(window.FK_DIE_GLB){
       /* file:// safe: the model ships as base64 in a script */
