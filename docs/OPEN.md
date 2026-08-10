@@ -464,7 +464,35 @@ does nothing is worse than one that isn't offered.
 
 ---
 
-## Not blocking, for your awareness
+## 8. A cast brand: does "spent this turn" bind the rule, or just the words?
+
+You asked for a cast enchanted die to show it can't be used again this turn, and
+to say so when tapped. Building it turned up a rule question I can't answer for
+you.
+
+**There is no "already fired" state today at all.** A brand fires through one
+function and records nothing. The only thing marking a cast die is the ordinary
+keep flag — so a die that just cast Tithe looks exactly like a die that scored
+100, and the tap is dead.
+
+**And as shipped, a brand CAN fire twice in one turn**, via hot dice: the sweep
+rebuilds the pool and the same brand comes back live. So "this turn" isn't
+currently true.
+
+- **(a) Make it true.** A spent brand stops counting as a live icon, so it
+  cannot fire again until the next turn. The greyed icon and the words are then
+  honest. **This is a balance change** — it removes a real (if rare) double-cast,
+  and it creates a new way to lose a turn: a row whose only live face is a spent
+  brand becomes a bust.
+- **(b) Feedback only.** Grey it and message it, change no rule. Then the flag
+  must die with the die rather than follow the brand, and the message has to read
+  *"CAST — THIS DIE IS SPENT"* with no "this turn" in it, because after hot dice
+  it would be a lie.
+
+**My rec: (a).** It's what you described, and it's the only version where the
+words on screen are true. But it moves difficulty, so it's yours — and if you'd
+rather not touch balance right now, (b) is honest as long as the wording changes
+with it.
 
 - **Pages deploy is stuck behind a GitHub outage.** Actions and Pages both still
   at `major_outage`, failing on `Invalid actions OIDC token`. Nothing fixable at
