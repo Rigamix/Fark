@@ -1158,6 +1158,14 @@ now been driven.)
 
 ### D10 — Fair Trade: the brand never travels, and `_ftDead` retires dice by material string
 
+> **STILL OPEN, and it is now the LAST piece of the OPEN §9 ruling.** P564
+> shipped "the brand travels with the die" across every same-seat **swap** and
+> **destroy**, and P566 brought Trade onto the same helper. Fair Trade is
+> neither: it is a **loan**, so the brand has to travel *and come back*, which
+> means a ledger in the shape of `_tradeSwaps` rather than the one-line clear
+> `_dieLeftSeat` performs. The helper is the place to hang it — see P564's
+> comment beside `_removeDieAt`. **(b)** is untouched and independent.
+
 **(a)** `CFX.fair_trade.use` writes `G.matchDice[worst]=inv[best]` (12992) and
 never `G._enchArr[worst]`. **Independently reproduced twice.** Lane 2 bone with
 its own Ward, starstone lent from a stash where it carries a Tithe:
@@ -1174,6 +1182,36 @@ The loan record `{lane,was,borrowed}` also stores a material, so it cannot name
 *which* jade was lent.
 
 ### D11 — `swap_die` leaves the brand on the seat, and over a traded lane it conjures a die from nothing
+
+> **CLOSED — P564, reproduced on the current build first, then matched
+> before/after with only the guilty lanes moving.** Denis's OPEN §9 ruling: the
+> brand **travels with the die**, matching Trade. Shipped as one batch across
+> all five bodies plus Trade (P566), through a single helper `_dieLeftSeat` —
+> grep that name for the complete census.
+>
+> | | before | after |
+> |---|---|---|
+> | Sticky Fingers, lane 0 jade + tithe | `bone` + **tithe** | `bone` + — |
+> | Collateral, lanes 0–1 jade/starstone | both `bone`, **both brands kept** | both `bone`, both brands gone |
+> | lane 1 under Sticky Fingers *(control)* | `seal` | `seal` |
+> | lane 5, neither card *(control)* | `ward` | `ward` |
+>
+> **Only two of the five bodies are live**, which the write-up below did not
+> distinguish: `sticky_fingers_die` (Finnick's `cardPool[0]`) and
+> `collateral_die` (Corvus's). The other three are unreachable today —
+> `sleight_of_hand` carries `dep:true` and sits in no `cardPool`, and both npc
+> cards carry `npcOnly:true`, which every player draft pool filters out (34020,
+> 34025, 34026, 35328, 35583). **They were fixed anyway**, and the reason is
+> specific rather than defensive: both `npcOnly` cards already ship a
+> `playerDesc` written for the player's hand, so those activators are a feature
+> waiting on a delivery route, not dead ends.
+>
+> `activateCollateralPlayer` writes `matchOppDice` only, and `G._enchArr` is
+> player-side and sole — there is no rival brand array, so there was nothing to
+> move. Commented in place rather than skipped in silence.
+>
+> The **worse half** below (`_tradeRestore` defeated over a traded lane) is
+> **not** closed by this: it is a ledger problem, tracked with D10.
 
 `fark_proto.html:24618-24620`:
 ```js
@@ -1468,7 +1506,9 @@ pinched die is deterministically the **highest lane** — measured lanes
 > |---|---|
 > | **D24** | **ALREADY CLOSED — by P528, never marked here.** The `else`-gated pool filter is gone; the filter is unconditional and P528's own comment names D24 as the case it closes. Nothing to do. |
 > | **D21** | Held, now **FIXED (P562)** — see below. |
-> | **D16, D17, D20, D22** | **HOLD.** Anchors re-checked against current code. |
+> | **D16** | Held, now **FIXED (P565 + P566)** — see below. |
+> | **D17, D22** | **HOLD.** Anchors re-checked against current code. |
+> | **D20** | Held, now **FIXED (P563)** — see below. |
 > | **D18, D23** | **NOT SETTLED** by this pass — need reading at their named sites, not a grep. |
 > | **D19** | Needs a **ruling**, not a patch, exactly as the entry says. |
 >
@@ -1490,6 +1530,36 @@ pinched die is deterministically the **highest lane** — measured lanes
   startPTurn (24426) and `_turnTableClear` (23164) replace those objects. "For
   the rest of the match. Stacks." is at most one turn, and only pays on a second
   fire inside the same turn.
+
+  > **CLOSED — P565 + P566, reproduced first, eight arms plus five controls.**
+  > The store is now `G._cultArr`, lane-indexed beside `G._enchArr`, because a
+  > lane is the only per-die identity that outlives the pool. Measured before:
+  > 3 carriers all on pool objects, **0 reachable anywhere in `G` after the real
+  > `startPTurn`**, 0 in the snapshot. After: 150 on `G`, 150 in the snapshot,
+  > growth travels on Sticky Fingers and on Trade, slides correctly through a
+  > `_removeDieAt` splice, and survives Powder Keg.
+  >
+  > **The entry understated it.** The growth only ever paid on a *later commit
+  > including the same object*, and a committed die is never selectable again.
+  > There are exactly two un-commit sites in the file: `powder_keg.use` (in
+  > place) and `double_down` (which then does `G.pool=[]`). **Powder Keg was
+  > therefore the only route by which Cultivate had ever scored a point** — which
+  > is why the probe's Powder Keg arm is a control, not a curiosity.
+  >
+  > **P565 shipped a hole and P566 closed it: there are TWO snapshot writers.**
+  > `saveMatchState` (10293) rebuilds `S.pendingMatch` whole at every turn
+  > boundary; `_snapDiceOnly` (19530) updates the dice fields in place mid-turn.
+  > P565 patched only the second, so the growth reached the snapshot during a
+  > turn and was dropped by the next boundary — worse than never saving it.
+  > `saveMatchState`'s own `_diceOut` comment is the warning, word for word.
+  >
+  > **What caught it was a control, not an assert.** The assert passed — the
+  > line *was* in the file. And "growth not in snapshot" reads identically
+  > whether the patch is wrong or `saveMatchState` never ran, since it wraps its
+  > body in a swallowing `try/catch` behind an early return. The arm only became
+  > readable once it carried a **sentinel brand on the line directly above the
+  > growth's**: brand landed, growth did not, so the write ran and my line was
+  > somewhere else.
 - **D17. Sleight is inert *and* single-use forever.** `CFX.sleight.use` sets
   `G._famSleight` (14387); the only other reference in the loaded corpus is its
   own `canUse` guard (14385, `!G._famSleight`) — measured over every global

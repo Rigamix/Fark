@@ -10341,6 +10341,13 @@ function saveMatchState(){
        and every lane past the gap wore its neighbour's brand. This snapshot
        is the only record of the live array. */
     _enchArr:[...(G._enchArr||[])],
+    /* P566 (D16): CULTIVATE'S GROWTH, and it belongs HERE as much as in
+       _snapDiceOnly. P565 patched only that one - the mid-turn partial writer -
+       so the growth reached the snapshot during a turn and was dropped by the
+       next boundary that rebuilt this object, which is worse than never saving
+       it. The _diceOut comment directly below was already the warning: this
+       function rebuilds S.pendingMatch whole. Two writers, both or neither. */
+    _cultArr:[...(G._cultArr||[])],
     /* THE OUT-DICE RECORD, for the same reason as _enchArr above. This
        function rebuilds S.pendingMatch whole, so without this line the next
        turn boundary would quietly drop what _removeDieAt wrote mid-turn and
@@ -14465,10 +14472,23 @@ CFX.bloom={
 };
 CFX.cultivate={
   /* the jade wild fired: those dice grow, and their growth pays now. The
-     mutation of d._cult is why this cannot be a pure scoring function. */
+     mutation of the growth store is why this cannot be a pure scoring function.
+     P565 (D16): THE STORE IS G._cultArr, BY LANE. It was `d._cult` on the pool
+     die object, and every turn boundary replaces those objects - measured, 0
+     growth reachable anywhere in G after startPTurn, and 0 in the snapshot. The
+     card says "for the rest of the match. Stacks."; it meant one turn, and in
+     practice not even that, because a committed die is never selectable again
+     and only powder_keg un-commits one in place. A lane is the only per-die
+     identity that outlives the pool. */
   commit:function(ev){if(!_fxMine(ev)||!(ev.isTriple||ev.isStraight)||!ev.jade.length)return;
     var grown=0;
-    ev.jade.forEach(function(d){grown+=(d._cult||0);d._cult=(d._cult||0)+50;});
+    G._cultArr=G._cultArr||[];
+    ev.jade.forEach(function(d){
+      var L=d.lane;
+      if(typeof L!=='number'||!(L>=0))return;/* NaN fails >=0, unlike <0 */
+      grown+=(G._cultArr[L]||0);
+      G._cultArr[L]=(G._cultArr[L]||0)+50;
+    });
     if(grown>0){ev.add(grown);_famPop('+'+grown+' CULTIVATE');}
     else _famPop('CULTIVATE GROWS');}
 };
@@ -18747,7 +18767,13 @@ var ENCH_ICONS={
          a table with no S.run behind it, and it is left as it is rather than
          papered over - a runless table has no shop to have bought the second
          brand from. */
-      G._enchArr[L]=null;
+      /* P566: THROUGH THE HELPER, not by hand. P564 excluded Trade on the
+         grounds that it ledgers its brand for the restore - but `myEn` is
+         captured on the line above, so the clear itself is the same operation
+         every other card performs, and doing it inline meant Cultivate's growth
+         stayed on the seat for the rival's die to inherit. That is the exact
+         laundering Denis ruled against in OPEN 9, one card over. */
+      _dieLeftSeat(L);
       /* THE LEDGER. It makes the restore an act rather than an absence, and
          something downstream really does read the live loadout before G is
          dropped: endMatch's feat pass runs after the restore point and
@@ -19520,12 +19546,44 @@ function _snapDiceOnly(alsoOpp){
     S.pendingMatch.matchDice=[...G.matchDice];
     if(alsoOpp&&G.matchOppDice)S.pendingMatch.matchOppDice=[...G.matchOppDice];/* P538 */
     S.pendingMatch._enchArr=[...(G._enchArr||[])];
+    /* P565 (D16): AND THE GROWTH, for exactly the reason above it. Measured
+       absent before this line: a reload used to hand back a match with every
+       Cultivate stack wiped, which is the same silent loss as the turn
+       boundary, just on a path the player did not choose. */
+    S.pendingMatch._cultArr=[...(G._cultArr||[])];
     S.pendingMatch.numDice=G.numDice;
     S.pendingMatch._fairTrade=G._fairTrade?{...G._fairTrade}:null;
     try{S.pendingMatch._tradeSwaps=G._tradeSwaps?JSON.parse(JSON.stringify(G._tradeSwaps)):null;}catch(e){}
     S.pendingMatch._diceOut=(G._diceOut||[]).map(function(o){return{lane:o.lane,mat:o.mat,ench:o.ench};});
     save();
   }catch(e){}
+}
+/* P564 (D11 / OPEN 9): A DIE LEFT THIS SEAT - its per-die facts go with it.
+   Ruled by Denis: the brand TRAVELS with a swapped die, matching Trade. The
+   argument is the measurement - a brand that stays behind means Sticky Fingers
+   LAUNDERS a die, handing over a jade and keeping the jade's Tithe on the bone
+   that replaces it, which is strictly better for the player than the card's own
+   name says it should be. Driven pre-patch on both live cards: matchDice moved,
+   _enchArr ['tithe','seal',...] came back byte-identical.
+   ONE FUNCTION BECAUSE THE FACT LIST WILL GROW. A die's identity here is
+   {mat, ench} and D16 wants Cultivate's growth in it; five inline
+   `G._enchArr[i]=null` would mean finding these sites again. Grep this name for
+   the complete census - five callers, listed in the P564 write-up.
+   TRADE CALLS THIS TOO (P566), after capturing `myEn` for its ledger - the
+   capture is a separate act from the clear, and P564 wrongly treated them as
+   one. The restore brings the BRAND home, because the player bought it; it does
+   not bring growth home, because _tradeRestore's only two call sites (30612,
+   31299) both run at match end and growth is match-scoped by the card's text.
+   NOT CALLED BY _removeDieAt, which splices the seat out of existence rather
+   than re-seating it - see the splice in its own body. */
+function _dieLeftSeat(lane){
+  if(!G||typeof lane!=='number'||!(lane>=0))return;/* NaN fails >=0, unlike <0 */
+  if(G._enchArr&&lane<G._enchArr.length)G._enchArr[lane]=null;
+  /* P565 (D16): AND CULTIVATE'S GROWTH, which is the reason this is a function
+     rather than five inline lines. Denis ruled a brand travels with a swapped
+     die; growth is the same kind of fact about the same die, so it cannot be
+     allowed to drift from that ruling by living somewhere else. */
+  if(G._cultArr&&lane<G._cultArr.length)G._cultArr[lane]=0;
 }
 function _removeDieAt(lane,opts){
   opts=opts||{};
@@ -19613,6 +19671,11 @@ function _removeDieAt(lane,opts){
   }catch(e){}
   if(G.matchDice&&lane<G.matchDice.length)G.matchDice.splice(lane,1);
   if(G._enchArr&&lane<G._enchArr.length)G._enchArr.splice(lane,1);
+  /* P565 (D16): the growth array is lane-indexed too, so it splices with the
+     rest. Without this, removing lane 2 would slide every later die's growth
+     down a seat - the exact parallel-array desync this function exists to
+     prevent for materials and brands. */
+  if(G._cultArr&&lane<G._cultArr.length)G._cultArr.splice(lane,1);
   /* DECREMENT. Assigning matchDice.length here refunded every per-turn dice
      penalty (Tar Pit, Pocket Sand) and ate Seven Dice's bonus. */
   _dropLanes(1);/* P516 */
@@ -25485,13 +25548,14 @@ function startPTurn(){
            write-up. See tools/brand_travel_census.py:
              here (swap_die)                   30400 (sleight_of_hand, rival)
              32279 (activateSleightOfHand)     32575 (activateStickyFingersPlayer)
-           NOT FIXED HERE, on purpose. Whether a swapped die carries its brand
-           away or leaves it on the seat has never been ruled: Trade, the other
-           same-seat swap, explicitly moves the brand out and ledgers it, so the
-           file currently holds two same-seat swaps with opposite brand rules.
-           Asking rather than inventing - OPEN section 9. */
+           P564 FIXED ALL OF THEM, as one batch. Denis ruled OPEN 9: the brand
+           TRAVELS with the die, matching Trade - a brand left on the seat let
+           this card LAUNDER a die, swapping a jade out and keeping the jade's
+           Tithe on the bone that arrived. See _dieLeftSeat beside
+           _removeDieAt; grep that name for the whole census. */
         var pOld=G.matchDice[pBestIdx],oOld=G.matchOppDice[oWorstIdx];
         G.matchDice[pBestIdx]=oOld;G.matchOppDice[oWorstIdx]=pOld;
+        _dieLeftSeat(pBestIdx);/* P564: the brand goes with the die */
         triggerCard(cid,npc.name+': SWAPPED '+pOld.toUpperCase()+' ↔ '+oOld.toUpperCase(),false);
         setStatusMsg(G.rung.name+' SWAPPED YOUR '+pOld.toUpperCase()+'!','red');
         spawnPop('🔄 SWAPPED');
@@ -25506,6 +25570,11 @@ function startPTurn(){
           var oldDie=G.matchDice[pBestIdx2];
           if(dieRank(oldDie)<=dieRank('bone'))break;/* nothing left to downgrade */
           G.matchDice[pBestIdx2]='bone';
+          /* P564: THE SAME RULING ON A DESTROY RATHER THAN A SWAP. The premium
+             die is gone; keeping its brand on the bone left behind is the same
+             laundering, and leaving this site out would have shipped half a
+             fix. Inside the loop, so both downgraded lanes are covered. */
+          _dieLeftSeat(pBestIdx2);
           _dgnDowngraded.push(oldDie);
         }
         if(_dgnDowngraded.length){
@@ -30487,6 +30556,7 @@ function _npcEndOfTurnActives(){
       npcUseActive('sleight_of_hand');
       var pOld=G.matchDice[pBestIdx],oOld=G.matchOppDice[oWorstIdx];
       G.matchDice[pBestIdx]=oOld;G.matchOppDice[oWorstIdx]=pOld;
+      _dieLeftSeat(pBestIdx);/* P564 */
       triggerCard('sleight_of_hand',G.rung.name+' SLEIGHT',false);
       setStatusMsg(G.rung.name+' STOLE YOUR '+pOld.toUpperCase()+' FOR '+oOld.toUpperCase(),'red');
       return;
@@ -32366,6 +32436,7 @@ function activateSleightOfHand(){
   var oBestIdx=0;G.matchOppDice.forEach(function(d,i){if(dieRank(d)>dieRank(G.matchOppDice[oBestIdx]))oBestIdx=i;});
   var pOld=G.matchDice[pWorstIdx],oOld=G.matchOppDice[oBestIdx];
   G.matchDice[pWorstIdx]=oOld;G.matchOppDice[oBestIdx]=pOld;
+  _dieLeftSeat(pWorstIdx);/* P564 */
   setStatusMsg('SLEIGHT OF HAND: '+pOld.toUpperCase()+' ↔ '+oOld.toUpperCase()+'!','gold');
   spawnPop('🃏 SWAPPED');
   SFX.commit();
@@ -32662,6 +32733,7 @@ function activateStickyFingersPlayer(){
   var oBestIdx=0;G.matchOppDice.forEach(function(d,i){if(dieRank(d)>dieRank(G.matchOppDice[oBestIdx]))oBestIdx=i;});
   var pOld=G.matchDice[pWorstIdx],oOld=G.matchOppDice[oBestIdx];
   G.matchDice[pWorstIdx]=oOld;G.matchOppDice[oBestIdx]=pOld;
+  _dieLeftSeat(pWorstIdx);/* P564 */
   setStatusMsg('STICKY FINGERS: '+pOld.toUpperCase()+' ↔ '+oOld.toUpperCase(),'gold');
   /* spawnPop arrow badge removed — status-msg above already communicates
      the swap and the dice visibly change. The floating badge was redundant. */
@@ -32674,6 +32746,11 @@ function activateCollateralPlayer(){
   var oBestIdx=0;G.matchOppDice.forEach(function(d,i){if(dieRank(d)>dieRank(G.matchOppDice[oBestIdx]))oBestIdx=i;});
   var oldDie=G.matchOppDice[oBestIdx];
   if(oldDie==='bone'){setStatusMsg('ALREADY BONE — NO EFFECT','red');return;}
+  /* P564: NO _dieLeftSeat HERE, AND THAT IS THE POINT. This writes
+     matchOppDice, and G._enchArr is player-side and sole - the rival has no
+     brand array at all - so there is no per-die fact to move. Recorded rather
+     than skipped in silence, because the next reader comparing the five patched
+     bodies to this one deserves the reason. */
   G.matchOppDice[oBestIdx]='bone';
   setStatusMsg('COLLATERAL: '+oldDie.toUpperCase()+' → BONE','gold');
   spawnPop('📦 DOWNGRADED');SFX.commit();
@@ -33255,6 +33332,14 @@ function initMatchScreen(data){
   G._enchArr=(Array.isArray(_rdEnch)&&_rdEnch.length===(G.matchDice?G.matchDice.length:0))
     ?_rdEnch.slice()
     :((S&&S.run&&S.run.dieEnch)?S.run.dieEnch.slice():[]);
+  /* P565 (D16): Cultivate's growth, behind the SAME length test and for the
+     same reason - it is lane-indexed, so it is only true of the loadout it was
+     recorded against. There is no run-level fallback and there should not be:
+     the card says "for the rest of the MATCH", so a fresh match starts at
+     nothing, and so does a snapshot whose loadout no longer matches. */
+  var _rdCult=params&&params._resumeData&&params._resumeData._cultArr;
+  G._cultArr=(Array.isArray(_rdCult)&&_rdCult.length===(G.matchDice?G.matchDice.length:0))
+    ?_rdCult.slice():[];
   /* THE OUT-DICE RECORD, restored behind the SAME length test, because it is
      only true of the snapshot's own loadout. A mirror_match resume re-seeds
      matchDice from rung._mirrorOppDice a few lines above and throws the

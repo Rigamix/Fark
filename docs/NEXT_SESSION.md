@@ -1,6 +1,6 @@
 # NEXT SESSION — START HERE
 
-**Deployed HEAD: `42cb49c` on `fark`.** Branch and deploy in step. `die_cube.glb`
+**Deployed HEAD: `P566` on `fark`.** Branch and deploy in step. `die_cube.glb`
 and `die_glb.js` hash-match (`f8f8189154ea`) — check that stays true if you
 touch either.
 
@@ -14,15 +14,32 @@ D3.**
 
 | | items | what they need |
 |---|---|---|
-| **implementable as written** | D16, D17, D20, D22 | anchors re-checked against current code; go |
+| **implementable as written** | D17, D22 | anchors re-checked against current code; go |
 | **need reading first** | D18, D23 | greps match too much to decide; read the named sites |
 | **known-hard** | D6(a) | lane staleness + a refill/restore timing mismatch — both candidate fixes written up in the plan, neither costed |
 | **needs a ruling from Denis** | D19 | vagabond drag: seat vs lane identity |
-| **batched behind a ruling already given** | D10, D11 | §9 answered — **the brand TRAVELS, matching Trade**. Ship as ONE measured change across all four swap sites, not four stealth edits |
+| **the last of the §9 ruling** | D10(a) | Fair Trade is a **loan**, so the brand must travel *and come back* — a ledger like `_tradeSwaps`, not `_dieLeftSeat`'s one-line clear. Hang it on the helper |
 
-**D24 was already closed** by P528 and never marked — worth grepping any entry's
-anchor against current code before assuming it is live. Task #30 carries that as
-a standing rule.
+**Closed since the last handover:** D11 + §9 (P564), D16 (P565 + P566), D20
+(P563). **D24 was already closed** by P528 and never marked — worth grepping any
+entry's anchor against current code before assuming it is live. Task #30 carries
+that as a standing rule.
+
+## THE ONE THING TO KNOW ABOUT THE DIE ARRAYS
+
+`G._enchArr` (brands) and `G._cultArr` (Cultivate's growth) are **lane-indexed
+parallel to `G.matchDice`**, and every per-die fact must travel with its die.
+There is now **one exit** for that: **`_dieLeftSeat(lane)`**, beside
+`_removeDieAt`. Seven callers; grep the name for the complete census. Adding a
+third per-die fact means adding one line there, not finding seven sites again.
+
+Two snapshot writers, and **both** need any new field — this bit P565:
+
+* `saveMatchState` (10293) rebuilds `S.pendingMatch` **whole**, at every turn boundary
+* `_snapDiceOnly` (19530) updates the dice fields **in place**, mid-turn
+
+Patch only the second and the value survives a turn and then vanishes, which is
+worse than never saving it.
 
 ## READ THESE BEFORE TOUCHING ANYTHING
 
@@ -34,9 +51,9 @@ a standing rule.
   turn-scope from each write's enclosing function) and
   `tools/brand_travel_census.py` (every indexed die-array write vs `_enchArr`).
 
-## THE HABIT THAT PAID, twelve commits' worth
+## THE HABIT THAT PAID
 
-Four instrument faults tonight, **two pointing AWAY from correct answers** — a
+Six instrument faults so far, **two pointing AWAY from correct answers** — a
 probe that passed green against a broken build (its pool busted before reaching
 the code under test), and test data that reported a landed fix as missing. Plus
 a count that nearly retired a *correct* entry as stale.
@@ -44,6 +61,14 @@ a count that nearly retired a *correct* entry as stale.
 So: **prove the code under test ran** before believing any verdict, and check a
 count means what you think before marking anything closed. Both directions cost
 something.
+
+**And the sharpest version of that, from P565→P566:** when a check reads "the
+value is not there", it cannot tell you *why* on its own. Put a **sentinel on
+the neighbouring line** — a second value written by the same code, one line
+above the one you are testing. If the sentinel lands and yours does not, your
+patch is in the wrong place. If neither lands, the arm measured nothing. That
+one control is what turned an invisible wrong-function patch into a two-minute
+fix, and the assert could never have caught it: the line *was* in the file.
 
 ---
 

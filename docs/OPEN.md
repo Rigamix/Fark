@@ -391,6 +391,32 @@ decision rather than a silent edit.
 
 ---
 
+## 6. Vagabond's drag — does a die keep its lane, or does the seat?
+
+**A one-line ruling, and four cards are waiting on it.** Dragging a die to
+reorder your row moves the die's *look* but not its *lane*, so lane stops
+meaning "the seat you can see". Driven: vagabond dragged seat 2 → seat 6, and
+**Trade took the rival's silver — the die facing lane 1 — while the player was
+looking at a starstone** in the seat it now sits in. Snuff and Fog read the same
+way, and all four cards say *"in the same seat"* in their own text.
+
+Two coherent answers:
+
+- **(a) the seat wins.** The drag permutes material, brand and lane together, so
+  seat == lane always and every card takes the die the player is pointing at.
+- **(b) the lane wins.** Lanes are an invisible identity, and those four cards
+  stop presenting as seat-facing — their text has to change.
+
+**My rec: (a).** It matches what you already ruled for §9 — per-die facts travel
+*with the die* — and it is the only one where the card's existing text stays
+true. (b) means rewriting four cards to describe an identity the player cannot
+see.
+
+Separate and confirmed, same drag: it reorders **committed** dice too, which
+moves Finnick's Palm adjacency mid-turn. That one is a bug on either ruling.
+
+---
+
 ## Not blocking, for your awareness
 
 - **Pages deploy is stuck behind a GitHub outage.** Actions and Pages both still
