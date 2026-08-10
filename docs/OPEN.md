@@ -131,29 +131,36 @@ One known gap in the model regardless: it has **no hot-dice rule** (`hot`
 appears zero times in it), while the player's real engine does. The keep
 policies *are* exercised — via `_oppChooseFrom` — so P495 is genuinely measured.
 
-### 1e-bis. LOGGED, not actioned — two bosses hold a card they cannot use
+### 1e-bis. RETRACTED — those two bosses can fire the card, and the premise was backwards
 
-Found while dropping the `npcOnly`/`owner` tags (§5). `blessed_dice` is in
-**AMBROSE's** cardPool and `crown_authority` is in **WHISPER's**, and
-`generateOppCards` deals them — but the only activations that exist are
-`activateBlessedDicePlayer` / `activateCrownAuthorityPlayer`, both player-side.
+**This section used to say** `blessed_dice` (Ambrose) and `crown_authority`
+(Whisper) were **dead slots**: dealt into the boss's hand, activatable only by
+the player, so each boss could draw a card it can never fire. It concluded that
+removing the ids would make both bosses **stronger** by freeing a wasted draw.
 
-So each of those two bosses can draw **a dead slot**: a card it can never fire,
-occupying one of its hand positions.
+**Both halves are false, and the conclusion points the wrong way.**
 
-**This is a real, if small, difficulty item and it belongs in the retune
-conversation, not in a tidy-up.** Removing the ids from those pools would make
-Ambrose and Whisper *stronger*, because every remaining draw becomes functional.
-Ambrose draws 3 of 6 and Whisper 4 of 6, so the wasted-draw chance is material
-rather than rounding.
+Measured while fixing D3 (P557). Both cards carry
+`effect:{type:'once',mechanic:'reroll_all_kept'}`, and the after-roll dispatch
+runs straight off `G.oCards` keyed on `effect.mechanic` with **no**
+`type:'active'` or player-only gate. Driven 40/40 through the real dispatch:
+`usedOnce:{crown_authority:1}`. The `activate...Player` functions are the
+*mirror*, not the only path — the cards' own text says so:
 
-Both are tiers already flagged as needing help — Whisper is one of the three
-with a confirmed bust-rate gap; Ambrose is in the unestablished five.
+> `desc`: "Once per match, **Whisper forces you** to reroll every die you selected"
+> `playerDesc`: "Activate while yielding: **the opponent must** reroll…"
 
-**No urgency:** the retune is parked and nothing is being tuned against live
-numbers. Logged so it is not missed, and kept **separable** from the aggression
-change and the `challenge` fix, for the same reason those two had to stay apart
-— three difficulty changes on one axis cannot be attributed afterwards.
+So they are dual-use by design, and the boss half works.
+
+**Why this mattered more than a documentation slip:** the section sat inside the
+retune conversation with a difficulty recommendation attached. Removing those
+ids would make Ambrose and Whisper **weaker**, not stronger — and both are
+already flagged as needing help. Acting on it would have pushed the wrong way on
+two of the three worst-off nights.
+
+**The same false claim was in the source** (a P509 comment reading "those bosses
+can draw a card only the player can activate"); corrected in place by P557. This
+doc inherited it. Nothing to action here now — the item is simply withdrawn.
 
 ### 1b. `challenge` is broken on the PLAYER side too
 
@@ -381,40 +388,6 @@ boss firing path was intended and never built.
 increase on the two worst-off nights. My rec: treat the tags as the bug, drop
 them, keep the cards as player spoils. Cheap either way, but it should be a
 decision rather than a silent edit.
-
----
-
-## 9. When a die is SWAPPED off your seat, does its brand go with it?
-
-Blocking D11, and it needs you because the file currently answers it **both
-ways** and neither is written down.
-
-**Trade** moves the brand out with the die and ledgers it so it can come home
-(`myEn`, `G._enchArr[L]=null`, `_tradeSwaps.push`).
-
-**The four same-seat swap cards** — `swap_die` and `sleight_of_hand` on the
-rival's side, Sleight of Hand and Sticky Fingers on yours — move only the
-material. `G._enchArr` is untouched, so **the seat keeps the brand and the die
-leaves without one.** Measured: your lane-4 `jade + tithe` becomes
-`bone + tithe`, and the jade crosses to the rival unbranded.
-
-That body is byte-identical in all four places, and the comment claiming
-"lanes and brands stay aligned" sat on one of them — which is how the other
-three stayed out of the audit. Comment corrected (P558); behaviour untouched.
-
-**Two readings, and they play very differently:**
-
-| | what it means |
-|---|---|
-| **the brand stays on the seat** | a brand belongs to your *place at the table*. Sticky Fingers becomes a way to launder a bad die into a good one and keep your Tithe. This is current behaviour. |
-| **the brand travels with the die** | a brand belongs to the *die*. Losing a branded die really costs you the brand — and it matches what Trade already does. |
-
-**My rec: the brand travels, matching Trade** — one rule for same-seat swaps
-instead of two, and it makes a branded die worth protecting. But it is a real
-difficulty increase across four cards at once, so it is your call.
-
-Whichever you pick, the fix is one shared helper across the four sites rather
-than four edits — the same shape as `_removeDieAt`.
 
 ---
 
