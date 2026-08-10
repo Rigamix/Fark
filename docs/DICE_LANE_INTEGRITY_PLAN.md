@@ -1568,7 +1568,32 @@ pinched die is deterministically the **highest lane** — measured lanes
   `famSleight true, sleightCanUseAgain false, sleightCharges 2`. A 2-charge card
   that does nothing, once. The rival's Sleight is a *different* flag,
   `G._oSleight`, and **is** implemented (25184-25188).
-- **D18. Transmute and Sacrifice both admit `_frozen` dice; every other card
+- **D18. HALF CLOSED — P568, half WITHDRAWN.**
+
+  > **The Transmute half is a non-finding and is withdrawn, not fixed.** It was
+  > paired with Sacrifice on the strength of its *filter* alone. Its `use` runs
+  > `var d=free[pick-1]` — **the player picks**. Transmuting your own held die
+  > is a choice, not a theft.
+  >
+  > **The Sacrifice half is real and is fixed.** `_targets()` was
+  > `!committed && !_shattered && lane!==ftLane` while `use` takes
+  > `free[free.length-1]` with **no targeting prompt at all**, so a deliberately
+  > held die is destroyed without ever being chosen. That filter is curated —
+  > the loan lane and the one-die floor are both carved out on purpose — so
+  > `_frozen` was never *considered*, not deliberately allowed. Measured 6
+  > targets → 5 after the fix, with one die frozen.
+  >
+  > **No live effect today, and that is measured rather than assumed.**
+  > `_frozen` has exactly two writers, both in the legacy player-active layer.
+  > Driven on the current build (`tools/apv_frozen_reachable.js`): a real roll
+  > yields 0 frozen dice, and `canActivateCard` refuses **every** id tried —
+  > including ones from the same layer that are supposed to work — with
+  > `effectiveCards()` and `pCards` both empty. That last one is the arm's void
+  > check: it proves the layer is dead rather than that these two cards are
+  > special. **Landmine removal** — the frozen mechanic is a feature someone
+  > will revive.
+
+- **D18 (original entry). Transmute and Sacrifice both admit `_frozen` dice; every other card
   excludes them.** Transmute: `G.pool.filter(d=>!d.committed)` (14241).
   Sacrifice: `filter(d=>!d.committed && !d._shattered)` (14281/14283). Since
   Sacrifice takes `free[free.length-1]` with **no targeting UI**, a player who
@@ -1648,12 +1673,71 @@ pinched die is deterministically the **highest lane** — measured lanes
   `[bone,iron,lead,amber,jade,starstone]` → `[bone,iron,lead,amber,bone,bone]`.
   Bounded — stale for one player turn; 24426 repaints it next turn.
   `CFX.sacrifice` is on the same uncovered route (D14).
-- **D22. Drill Order's cap is derived on the player's side and a literal on the
+- **D22. CLOSED — P567.** *Drill Order's cap, derived six ways, one a literal.*
+
+  > **Driven, not read**, because the defect is latent: every fallback is also
+  > 3, so a build as shipped shows agreeing numbers. The probe **retunes the
+  > record to 5** — the maintenance act the defect waits for — and asks each
+  > surface. Before / after:
+  >
+  > | surface | before | after |
+  > |---|---|---|
+  > | player `_drillCap().cap` | 5 | 5 |
+  > | sleeve chip | `1/5` | `1/5` |
+  > | **rival, rolls per turn, rule sealed** | **3** | **5** |
+  > | rival, rule off *(control)* | 14 | 4 |
+  >
+  > **The probe corrected the entry twice.** (1) The sleeve chip was listed as a
+  > divergent derivation and is not — `_st` is `_tellById(G._sleeve)`, already
+  > the record. (2) There are **six** derivations, not two, and one of them is
+  > not a cap bug at all: the hot-dice dialogue re-asked
+  > `G._tell.id==='drill_order'` instead of the rule system, **D20's shape
+  > exactly**, so a *sleeved* Drill Order killed the ROLL button and withheld
+  > the line explaining why. Enforced in silence. That half is a **behaviour
+  > change**, not a refactor.
+  >
+  > **Two instrument faults on the way, both caught by the same control.** The
+  > arm first waited on `G.phase !== 'opp'` (no such phase — counted one roll),
+  > then on a 1.2s quiet period, which is *shorter than* `_oppDelay(1900)`: it
+  > declared the turn over mid-turn, started the next trial, and let ghost
+  > timers from the previous turn inflate the count — **an arm with a hard cap
+  > of 3 reported 4**. Fixed by using `G._oppTurnActive`, which has two writers
+  > and whose clear is the first line of `finOpp`, the single exit for bank,
+  > bust and cap alike. Plus `oppShouldBank` stubbed to `false`, isolating the
+  > roll cap from the banking policy.
+
+- **D22 (original entry). Drill Order's cap is derived on the player's side and a literal on the
   rival's.** 23541 `var def=(G._tell&&G._tell.id==='drill_order')?G._tell:(_tellById('drill_order')||{}); var cap=def.maxRolls||3` versus 28011
   `if(_ruleActive('drill_order','o')&&oppRollNum>=3)`. Measured
   `_tellById('drill_order').maxRolls === 3`, so they agree **today**; retune the
   RUNGS record and the sealed/sleeved rule silently applies two different caps
   to the two sides. 13114 carries a third copy.
+- **D23(a). CLOSED — P568.** *Still Waters could never be sealed.*
+
+  > Censused off the live `RUNGS`: **eight boss tells, seven in `_SEAL_POOL`**,
+  > with the parked `steeped` in the eighth slot. Aldric's was the only badge
+  > with no cursed-seat route. **Not a judgement call — the file had already
+  > made it**: the note above `_SEAL_POOL` records taking `still_waters` off a
+  > *blocklist* precisely so a sealed or sleeved one would work, on the grounds
+  > that a rule the player can win as boss spoils must be usable. Unblocked,
+  > then never enrolled. Added rather than swapped: `steeped`'s place is
+  > deliberate and documented.
+  >
+  > **Said out loud because it is a balance change**, not only a fix:
+  > `_rollSealTell` picks uniformly, so every other rule moves from 1/8 to 1/9
+  > on a cursed seat. Two consumers, both in the night builder; no other reader
+  > of `_SEAL_POOL` exists.
+  >
+  > **The new probe asserts the class, not the instance.**
+  > `tools/apv_seal_pool_covers_tells.js` derives the tell list from `RUNGS` and
+  > fails the day a ninth boss lands unenrolled. Its census control earned its
+  > place immediately: the first version walked `TIERS`, which carries no `tell`
+  > field, so the walk returned `[]` and "nothing is missing" passed **over
+  > nothing at all**. Membership and reachability are also separated — the
+  > picker is driven 400 times, not read.
+  >
+  > **(b) is still open** — a double-rule seat shows one badge and enforces two.
+
 - **D23. Two tell-HUD gaps.** `still_waters` can never be sealed — `_SEAL_POOL`
   (11234) has eight entries but substitutes the parked `steeped` for it,
   programmatically confirmed `sealPoolMissing: ["still_waters"]`; Aldric's is the

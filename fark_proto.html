@@ -11354,7 +11354,17 @@ function _initHandicapHUD(){
 /* zero_hour joins; last_call and steeped both stay - one is a live badge
    rule again, the other is parked but still perfectly playable as a cursed
    seat, which is the whole point of parking it rather than deleting it. */
-var _SEAL_POOL=['last_call','zero_hour','steeped','pickpocket','first_strike','drill_order','kindred','reckoning'];
+/* P568 (D23a): still_waters JOINS. Censused - there are eight boss tells and
+   this list held seven of them, so Aldric's was the only badge with no
+   cursed-seat route. The file had already decided this: the note below records
+   taking still_waters OFF a blocklist so a sealed or sleeved one would work,
+   "a rule the player had won and could not use" - unblocked, then never
+   enrolled. The rule is live (_ruleActive('still_waters','p') gates a real
+   effect) and _initTellHUD carries its own case for it.
+   ADDED, NOT SWAPPED: steeped's place here is deliberate, see above.
+   AND IT IS A BALANCE CHANGE, said out loud - _rollSealTell picks uniformly, so
+   every other rule moves from 1/8 to 1/9 on a cursed seat. */
+var _SEAL_POOL=['last_call','zero_hour','steeped','pickpocket','first_strike','drill_order','kindred','reckoning','still_waters'];
 function _rollSealTell(){return _SEAL_POOL[Math.floor(Math.random()*_SEAL_POOL.length)];}
 /* PARKED RULES — real, working table rules that no boss currently wears.
    Steeped is the first: Zero Hour took Mabel's badge, and every other
@@ -11525,7 +11535,7 @@ function _initTellHUD(){
   /* DRILL ORDER: roll counter inline next to the name (was appended as a
      separate row below the desc, which overlapped the player score row).
      Player feedback: "Put the 1/3 number next to DRILL ORDER". */
-  var _drillInlineVal=(t.id==='drill_order')?' <span class="tb-val tb-val-inline" id="drillVal">0/'+t.maxRolls+'</span>':'';
+  var _drillInlineVal=(t.id==='drill_order')?' <span class="tb-val tb-val-inline" id="drillVal">0/'+_drillMax()+'</span>':'';/* P567 */
   badge.innerHTML='<span class="tb-icon">'+t.icon+'</span>'+
     '<span class="tb-name">'+_tellNameHtml+_stedInlineVal+_arInlineVal+_drillInlineVal+'</span>'+
     '<span class="tb-desc">'+t.desc+'</span>';
@@ -11571,9 +11581,11 @@ function _updateTellHUD(){
        rule breaking. The count stays honest for everything that reads it;
        only the label stops at the cap, where it says the one thing the player
        needs: no allowance left. */
-    if(d){var rc=Math.min(G.turnRollCount||0,t.maxRolls);d.textContent=rc+'/'+t.maxRolls;
-      d.classList.toggle('tb-warn',rc>=t.maxRolls-1);
-      d.classList.toggle('tb-danger',rc>=t.maxRolls);}
+    /* P567: the NUMBER comes from the record; WHICH BRANCH RUNS still keys on
+       `t`, because a sleeved rule getting no badge at all is D23, not this. */
+    if(d){var _dm=_drillMax(),rc=Math.min(G.turnRollCount||0,_dm);d.textContent=rc+'/'+_dm;
+      d.classList.toggle('tb-warn',rc>=_dm-1);
+      d.classList.toggle('tb-danger',rc>=_dm);}
   }
   if(t.id==='reckoning'){
     var r=document.getElementById('reckoningVal');
@@ -13285,7 +13297,11 @@ function famRenderRow(){
        explaining the dead ROLL button. Clamped at the cap for the same reason
        as the badge: a free hot roll taken at the cap still counts, and 4/3
        reads as the rule breaking. */
-    var _slCap=(G._sleeve==='drill_order')?((_st&&_st.maxRolls)||3):0;
+    /* P567: routed through the helper for uniformity, NOT as a fix - driven,
+       this chip already read the record (`_st` is _tellById(G._sleeve)) and
+       printed 1/5 against a retuned 5. Recorded because the D22 write-up had
+       it listed as a divergent derivation and it is not. */
+    var _slCap=(G._sleeve==='drill_order')?_drillMax():0;
     var _slVal=_slCap?(' '+Math.min(G.turnRollCount||0,_slCap)+'/'+_slCap):'';
     ha+='<div title="'+((_st?_st.name+' — '+_st.desc:G._sleeve)+' Binds both sides.').replace(/"/g,'&quot;')+'" onclick="_gbInspect(this.title)" '
       +'style="cursor:pointer;padding:2px 7px;background:#122;color:#6bc;border:1px dashed #365">SLEEVED: '
@@ -14572,8 +14588,22 @@ CFX.sacrifice={
   _targets:function(){
     if(!G||!G.pool)return [];
     var ftLane=(G._fairTrade&&typeof G._fairTrade.lane==='number')?G._fairTrade.lane:-1;
+    /* P568 (D18b): _frozen JOINS THE EXCLUSIONS. `use` takes
+       free[free.length-1] with no targeting prompt, so without this a die the
+       player deliberately HELD is shattered without ever being chosen. This
+       filter is curated - the loan lane and the one-die floor are both carved
+       out on purpose - so _frozen was never considered rather than allowed, and
+       the census at _fxMine lists every other card excluding it.
+       NO LIVE EFFECT TODAY, measured rather than assumed: _frozen's only two
+       writers are Gambler's Eye and activateFrozenDie, both in the legacy
+       player-active layer, and a driven check found canActivateCard refusing
+       every id in that layer with effectiveCards() and pCards empty. Landmine
+       removal - the frozen mechanic is a feature someone will revive.
+       TRANSMUTE IS NOT THE SAME CASE and is deliberately left alone: its `use`
+       runs free[pick-1], so the player chooses, and transmuting your own held
+       die is a decision rather than a theft. */
     return G.pool.filter(function(d){
-      return !d.committed&&!d._shattered&&d.lane!==ftLane;
+      return !d.committed&&!d._shattered&&!d._frozen&&d.lane!==ftLane;
     });
   },
   canUse:function(){return G&&(G.phase==='choosing'||G.phase==='idle')&&
@@ -24399,11 +24429,21 @@ function setBtns(r,b){
    by _afterRollImpl, which the hot branch calls. So the player gets the six
    dice they earned and can commit and bank them, but not roll a fifth time -
    and the badge clamps at 3/3 rather than reading 4/3. */
+/* P567 (D22): ONE ANSWER TO "HOW MANY ROLLS". There were six derivations of
+   this number - a gate, a literal 3 in the rival's loop, the sleeve chip, the
+   hot-dice line and two in the HUD - agreeing only because the RUNGS record and
+   every fallback both say 3. Retune the record and the player, the rival and
+   the badge enforce three different caps. Reads the rule's OWN record whichever
+   slot holds it, the same shape P563 landed on for Pickpocket's chance. */
+function _drillMax(){
+  var d=(typeof G!=='undefined'&&G&&G._tell&&G._tell.id==='drill_order')
+        ?G._tell:(_tellById('drill_order')||{});
+  return d.maxRolls||3;
+}
 function _drillCap(){
   var off={active:false,cap:0,count:0,capped:false,free:false,blocked:false};
   if(!G||!_ruleActive('drill_order','p'))return off;
-  var def=(G._tell&&G._tell.id==='drill_order')?G._tell:(_tellById('drill_order')||{});
-  var cap=def.maxRolls||3, count=G.turnRollCount||0, capped=count>=cap;
+  var cap=_drillMax(), count=G.turnRollCount||0, capped=count>=cap;/* P567 */
   var live=(G.pool||[]).filter(function(d){return !d.committed;});
   var free=live.length>0&&live.every(function(d){return d.sel;});
   return {active:true,cap:cap,count:count,capped:capped,free:free,
@@ -25171,7 +25211,13 @@ function showHot(){
   /* Drill Order: if Hot Dice fires AT/PAST the roll cap, the free
      auto-roll is the "Hot Dice always rolls" exception — call it out
      with an opponent line so the player understands the rule. */
-  if(window.DLG&&G&&G._tell&&G._tell.id==='drill_order'&&(G.turnRollCount||0)>=(G._tell.maxRolls||3)){
+  /* P567 (D22), AND THIS ONE IS A BEHAVIOUR CHANGE. It asked G._tell.id
+     directly - D20's shape - while the cap it is explaining is enforced through
+     _ruleActive, which is symmetric for a sleeve. So a Drill Order SLEEVED over
+     a seat already carrying another rule killed the ROLL button and withheld the
+     line that says why. The rule is asked of the rule system now, and the cap
+     comes from the rule's own record. */
+  if(window.DLG&&G&&_ruleActive('drill_order','p')&&(G.turnRollCount||0)>=_drillMax()){
     setTimeout(function(){try{DLG.show("Hot dice. Even my drill can't halt that. Roll it, recruit.");}catch(e){}},650);
   }
   const ov=document.getElementById('hot-ov');
@@ -29206,7 +29252,10 @@ function runOppTurn(){
   }
   function step(){
     if(G!==_matchG||!G||G._endMatchFired)return;/* ghost-timer guard */
-    if(_ruleActive('drill_order','o')&&oppRollNum>=3){finOpp(oppBank);return;}
+    /* P567 (D22): THE LITERAL IS GONE. This was `oppRollNum>=3` against a
+       player side that derived its cap from the rule's record, so a retune
+       would have capped the two sides differently under one rule. */
+    if(_ruleActive('drill_order','o')&&oppRollNum>=_drillMax()){finOpp(oppBank);return;}
     _oppHoldKept();oppRollNum++;
     /* THE OPPONENT'S roll SEAM, after the counter advances, same reason. */
     try{famFire('roll',{actor:'o'});}catch(e){}

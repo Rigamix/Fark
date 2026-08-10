@@ -14,16 +14,26 @@ D3.**
 
 | | items | what they need |
 |---|---|---|
-| **implementable as written** | D17, D22 | anchors re-checked against current code; go |
-| **need reading first** | D18, D23 | greps match too much to decide; read the named sites |
+| **needs a design call** | D17 | Sleight is inert *and* single-use forever — implement the effect or retire the card. Not a patch either way |
+| **still open** | D23(b) | a double-rule seat shows one badge and enforces two; `_updateTellHUD` keys every branch off `G._tell` by construction |
 | **known-hard** | D6(a) | lane staleness + a refill/restore timing mismatch — both candidate fixes written up in the plan, neither costed |
-| **needs a ruling from Denis** | D19 | vagabond drag: seat vs lane identity |
+| **needs a ruling from Denis** | D19 | vagabond drag: seat vs lane identity. **Written up in `docs/OPEN.md` §6** with a recommendation |
 | **the last of the §9 ruling** | D10(a) | Fair Trade is a **loan**, so the brand must travel *and come back* — a ledger like `_tradeSwaps`, not `_dieLeftSeat`'s one-line clear. Hang it on the helper |
 
 **Closed since the last handover:** D11 + §9 (P564), D16 (P565 + P566), D20
-(P563). **D24 was already closed** by P528 and never marked — worth grepping any
-entry's anchor against current code before assuming it is live. Task #30 carries
-that as a standing rule.
+(P563), D22 (P567), D18(b) + D23(a) (P568). **D18(a) withdrawn** — Transmute has
+a targeting prompt, so it was never the same defect as Sacrifice.
+
+**D24 was already closed** by P528 and never marked — worth grepping any entry's
+anchor against current code before assuming it is live. Task #30 carries that as
+a standing rule.
+
+**Three entries turned out to be wrong about their own scope this session** —
+D18 paired a targeting card with a non-targeting one, D22 named two derivations
+where there are six (one of them a different defect entirely), and D16
+understated a growth that could essentially never pay. **Re-derive before
+implementing** is not ceremony here; it changed the work three times out of
+three.
 
 ## THE ONE THING TO KNOW ABOUT THE DIE ARRAYS
 

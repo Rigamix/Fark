@@ -44,17 +44,31 @@ v.blockLowBankGone = (function(){
 })();
 
 /* ── P475: reroll_all_kept actually rerolls ──
-   The branch lives inside a card loop, so this checks the SHIPPED source for
-   the reroll and the absence of the wipe, rather than driving a boss card. */
+   REWRITTEN AFTER A FALSE FAILURE. This used to require the literal
+   `rollFace(dd.mat)` in the shipped source. P557 replaced that call with
+   `_rollD(dd)` while FIXING the same block — the kept group's `vals` is
+   post-icon-split while its `dice` is pre-split, so the old rescore paid the
+   wrong dice — and this probe then reported the improvement as a regression.
+   Confirmed by git rather than assumed: `git log -S"rollFace(dd.mat)"` shows the
+   string arriving in P475-477 and leaving in P557.
+
+   So the positive half is no longer asserted here AT ALL, and that is the fix
+   rather than a gap: naming `_rollD` instead would break on the next rename for
+   the same reason. `tools/apv_reroll_kept_split.js` DRIVES the reroll — real
+   dispatch, real DOM, gated on the dispatch having actually fired — and is the
+   assertion of record for "it rerolls and rescores correctly".
+
+   What stays here is the part a driving probe cannot cheaply prove absent: the
+   WIPE, which is what the ruling was actually about. It is a user-visible
+   string, so it is stable in a way an internal call name is not. */
 v.rerollNotWipe = (function(){
   try {
     const src = (typeof runOppTurn === 'function' ? runOppTurn.toString() : '')
       + (typeof _afterRollImpl === 'function' ? _afterRollImpl.toString() : '')
       + (typeof handleRoll === 'function' ? handleRoll.toString() : '');
-    v._hasReroll = src.indexOf('rollFace(dd.mat)') >= 0;
-    v._hasRescore = src.indexOf('_rrTotal') >= 0;
+    v._srcLen = src.length;                     /* control: the sources resolved */
     v._wipeGone = src.indexOf('KEPT DICE WIPED') < 0;
-    return v._hasReroll && v._hasRescore && v._wipeGone;
+    return src.length > 0 && v._wipeGone;
   } catch(e) { v._rrErr = String(e).slice(0,60); return false; }
 })();
 
