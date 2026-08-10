@@ -11618,9 +11618,29 @@ function _consumeWard(label){
      locked during the 650 ms animation so the player can't pre-select dice
      and break selection state mid-palm. */
 function _maybeFireCutpurse(){
-  if(!G||!G._tell||(G._tell.id!=='cutpurse'&&G._tell.id!=='pickpocket'))return;
+  /* P563 (D20): ASK THE RULE SYSTEM, DO NOT RE-ASK G._tell.
+     The caller already does this right - `if(_ruleActive('pickpocket','p'))`
+     schedules the palm - and this line then asked a DIFFERENT question, what is
+     sitting in G._tell, and refused. _ruleActive is symmetric for a sleeve
+     (`if(G._sleeve===id)return true`) while _applySleeve installs into G._tell
+     only when it is EMPTY, so a sleeved pickpocket over a seat already carrying
+     any other rule was live by the rule system and invisible here. Measured:
+     tell last_call + sleeve pickpocket gave _ruleActive true on both sides and
+     no palm - the player keeps a die a rule they beat Finnick to win says they
+     should lose. */
+  var _ppId=_ruleActive('pickpocket','p')?'pickpocket'
+           :(_ruleActive('cutpurse','p')?'cutpurse':null);
+  if(!G||!_ppId)return;
   if(G.pCards&&G.pCards.includes('iron_grip'))return;/* counter-card */
-  if(Math.random()>(G._tell.chance||0.3))return;
+  /* P563: AND THE CHANCE COMES FROM PICKPOCKET'S OWN RECORD. It was read off
+     G._tell too, so even past the gate a sleeved pickpocket would have rolled
+     against whatever other rule occupied that slot. Same shape D22 documents on
+     the player's side of Drill Order, so this is the file's existing pattern.
+     They agree today (the RUNGS record carries chance:.30 against a 0.3
+     fallback) - which is precisely D22's point: retune the record and the two
+     paths diverge in silence. */
+  var _ppDef=(G._tell&&G._tell.id===_ppId)?G._tell:(_tellById(_ppId)||{});
+  if(Math.random()>(_ppDef.chance||0.3))return;
   /* WARDED shield: fizzle the palm before any animation. */
   if(_consumeWard('PICKPOCKET'))return;
   /* Pick a random uncommitted die — but EXCLUDE candidates whose removal

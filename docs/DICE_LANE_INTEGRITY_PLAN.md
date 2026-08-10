@@ -1522,7 +1522,31 @@ pinched die is deterministically the **highest lane** — measured lanes
   has no committed-die test, so the drag reorders **committed** dice, which
   changes `_cRow.indexOf(_palm)` adjacency for Finnick's Palm (14127-14131) — a
   live relic commit effect.
-- **D20. A sleeved rule binds the rival and not the player.** `fark_proto.html:11505`
+- **D20. CLOSED — P563.** *A sleeved rule binds the rival and not the player.*
+  **The caller already got this right** — `if(_ruleActive('pickpocket','p'))`
+  schedules the palm — and the callee re-asked a different question (what is in
+  `G._tell`) and refused. Driven, four arms, only the guilty one moved:
+
+  | arm | before | after |
+  |---|---|---|
+  | tell **is** pickpocket *(control)* | fired, 2 tries | fired |
+  | **sleeved over another tell** | **never, 120 tries** | **fired, 10** |
+  | both *(control)* | fired | fired |
+  | pickpocket nowhere *(over-correction control)* | silent, 120 | silent, 120 |
+
+  `chance` was fixed too — it was read off `G._tell`, so past the gate a sleeved
+  pickpocket would have rolled against whatever other rule held that slot. Now
+  from its own record via `_tellById`, the same shape D22 documents for Drill
+  Order. Latent today (both are .30); D22's point is exactly that a retune
+  separates them silently.
+
+  **The probe measured the wrong thing first** and reported zero palms in *all
+  four* arms on *both* builds — the removal sits inside a `setTimeout` behind a
+  650ms flight, so the pool had not changed yet. Control A failing is what
+  exposed it immediately. It now reads `die-palmed`, the class the palm adds
+  synchronously.
+
+- ~~**D20. A sleeved rule binds the rival and not the player.**~~ `fark_proto.html:11505`
   `if(!G||!G._tell||(G._tell.id!=='cutpurse'&&G._tell.id!=='pickpocket'))return;`
   — the callee re-asks by `G._tell.id` what the file's own comments (18618,
   18787, 18829, 11259) say must be asked via `_ruleActive`. Measured matrix:
