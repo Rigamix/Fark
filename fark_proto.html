@@ -24514,7 +24514,14 @@ function refreshKeptTray(){
      readable face in the pile, never one anonymous die per group */
   G.kept.forEach(k=>{
     (k.dice||k.vals.map(function(v){return{val:v,mat:k.mat};})).forEach(function(dd){
-      const el=mkDie(dd.val,dd.mat,'sm',true);el.style.cursor='default';el.classList.add('kept-die');
+      /* P560: FIFTH ARGUMENT IS THE ENCHANT. Four arguments left it
+         undefined, so a branded kept die was drawn with no brand even
+         though dd.ench sits right there whenever the group carries real
+         dice entries. Same omission P559 fixed in the preserve restore.
+         The `k.vals.map` fallback above genuinely has no brand to pass -
+         vals carries no per-die data - so `dd.ench` is simply undefined
+         there, which is the honest answer rather than a loss. */
+      const el=mkDie(dd.val,dd.mat,'sm',true,dd.ench||null);el.style.cursor='default';el.classList.add('kept-die');
       t.appendChild(el);
     });
   });
@@ -26404,7 +26411,13 @@ function _afterRollImpl(){
      zero AND skipped its effect. */
   if(G.pCards.includes('last_stand')&&free.length===1&&(freeV[0]===1||freeV[0]===5)&&!_dieIsIcon(free[0])){
     const d=free[0];d.committed=true;if(d.el){d.el.classList.add('committed');d.el.onclick=null;if(d.el._d3)D3.draw(d.el._d3);}
-    G.kept.push({vals:[freeV[0]],mat:d.mat,pts:600,dice:[{val:freeV[0],mat:d.mat}]});G.turnPts=G.kept.reduce((a,k)=>a+k.pts,0)+(G._turnBonusPot||0);refreshKeptTray();updHUD();
+    /* P560: `d` is a live pool die and carries d.ench - the same object
+       _rollD and _dieIsIcon read. The gate above is !_dieIsIcon(free[0]),
+       so this die is NOT on its brand face, which is precisely the case
+       D6(b) was about: a branded die scoring as a plain 1 or 5. Without
+       the third field the brand died here, and the kept group is what
+       preserve, _keptScorers and every icon check downstream read. */
+    G.kept.push({vals:[freeV[0]],mat:d.mat,pts:600,dice:[{val:freeV[0],mat:d.mat,ench:d.ench||null}]});G.turnPts=G.kept.reduce((a,k)=>a+k.pts,0)+(G._turnBonusPot||0);refreshKeptTray();updHUD();
     triggerCard('last_stand','LAST STAND! 600',true);if(window.DLG)setTimeout(function(){DLG.triggerCard('last_stand',true);},800);setBtns(false,true);return;
   }
   /* ── Boss edicts removed — patron "edict" system simplified away.

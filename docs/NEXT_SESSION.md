@@ -279,6 +279,41 @@ thought of" is the same instrument class this sweep exists to catch.
 **Still open in this area:** `CFX.tamper` mutating opponent card instances, and
 `S.run.cards` / the equip and tier UIs.
 
+## {mat, ench} IS A NEAR-INVARIANT — census, not discovery (P560)
+
+Three defects have been the same omission (D6b's preserve capture, D11's four
+swaps, D10a's Fair Trade loan), so the rest were **enumerated instead of waited
+for**. A die's identity in this file is *material and brand together* — the sites
+that get it right say so: kept-group dice entries are `{val,mat,ench}`,
+`_removeDieAt`'s `_diceOut` is `{lane,mat,ench}`, Trade ledgers the brand.
+
+Two sweeps. `mat:` literals with no `ench:` — 24 hits, **22 correctly not bugs**:
+shop catalogue rows (price/stock/label — a listing, not a die), renderer option
+bags, `G.oppDice` (no opponent-side enchants, documented), and payout rows
+carrying `dice:[]`. And `mkDie` arity — 17 sites, **6 already pass the enchant**,
+one correctly does not.
+
+Two real, both fixed:
+
+* **Last Stand** built its kept group from a live pool die and dropped `d.ench`.
+  Behavioural — the kept group is what `_keptScorers`, `CFX.preserve.use` and
+  every icon check read. Its own gate is `!_dieIsIcon(free[0])`, so the die is
+  branded on a face it is *not* showing: exactly D6(b)'s case, second site.
+* **The kept tray** called `mkDie(val, mat, 'sm', true)` — four arguments, so a
+  branded kept die was drawn with no brand while `dd.ench` sat right there. Same
+  hardcoded-fifth-argument shape P559 fixed in the preserve restore.
+
+**One non-finding worth keeping**, because it looks identical and is not: the
+tray's `k.vals.map(v => ({val:v, mat:k.mat}))` fallback has no `ench` either —
+but `vals` carries no per-die data at all, so nothing was dropped. The field was
+never there.
+
+**Deliberately not touched:** the shop, loadout-panel and tier-roster previews
+(31808, 31866, 34960, 34998, 35918, 36511) also call `mkDie` with four
+arguments. They render from a *material alone* — a purchasable, a roster entry —
+so showing a brand needs `S.run.dieEnch` plumbed in. That is a design question
+about what roster views show, not this defect.
+
 ## SUITE STATE — 47 pass, 2 fail, 0 error, 1 skip, 1 indet
 
 First full run in a while. **Neither failure came from the die work**, and both
