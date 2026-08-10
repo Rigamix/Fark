@@ -684,6 +684,37 @@ root cause — see §5.
 
 ### D3 — `reroll_all_kept` rescores from a non-parallel array; a punishment card becomes a 4× buff and folds an unbankable face into the score
 
+> **CLOSED — P557, reproduced on the current build first.**
+>
+> 40 trials through the real dispatch: 9 ended with a die on its brand face and
+> **all 9 folded it in** — `vals [1,1], icons [1], pts 200` on a group that went
+> in at 50. The write-up's 4× reproduced independently a third time.
+>
+> **Two changes.** `k.vals` and the mats now come from `_splitIcons(k.dice).rest`
+> after the roll — re-split rather than remembered, because that is also the
+> correct rule: a branded die that rerolls OFF its face stops being an icon and
+> should score, one that lands back on it should not. And `rollFace(dd.mat)` →
+> `_rollD(dd)`, the brand-aware roller; the group records `ench`, so **the
+> write-up's "the brand cannot survive the reroll" is stale** — only the roller
+> was ignoring it.
+>
+> **The stale reachability comment is corrected in place.** The P509 block ended
+> "those bosses can draw a card only the player can activate". False: the
+> after-roll dispatch runs straight off `G.oCards` with no `type:'active'` gate.
+>
+> **Counted, not spot-fixed.** The other reroll site (`_playerRerollKeptArmed`,
+> player-fired at the rival) works on `G.oppDice` — a flat array with `.kept`
+> flags and no vals/dice pair — so it cannot have this bug. Its own
+> "reroll means wipe" question stays OPEN §8.
+>
+> **The probe that found it passed green against the broken build first**, and
+> that is worth carrying: its pool showed `[2,3]`, which busts, so
+> `_afterRollImpl` returned at the bust path long before the NPC block and the
+> kept group was never touched — an untouched group is trivially parallel. The
+> tell was `sawIcon 40/40` when flint shows face 1 one time in six. It now gates
+> the verdict on the block incrementing its own use counter, and requires
+> `sawIcon` strictly between 0 and the trial count.
+
 `fark_proto.html:25510-25511`
 ```js
 k.dice.forEach(function(dd){ try{ dd.val=rollFace(dd.mat); }catch(e){} });

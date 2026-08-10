@@ -11856,7 +11856,7 @@ function generateDiceLoadout(tierIndex){
    twice, once for code paths and once for asset paths.
 
    DO NOT ADD TO THIS ARRAY. New cards are family cards. */
-/* P509: blessed_dice and crown_authority lost npcOnly/owner - the tags claimed a boss-firing mechanic that has never existed. Measured inert: owner has zero consumers, and the npcOnly filters are gated on c.rarity===rar against draftPools of tin/silver/gold, which rarity:'npc' never matches - and tin/silver/gold is the RETIRED roster's scheme anyway (the live family cards carry fam+tier and no rarity at all), whose last consumer was the patron pool that P507 switched off. Documentation fix, no behaviour change. STILL OPEN: both ids remain in boss cardPools (ambrose, whisper), so those bosses can draw a card only the player can activate. */const CARDS=[
+/* P509: blessed_dice and crown_authority lost npcOnly/owner - the tags claimed a boss-firing mechanic that has never existed. Measured inert: owner has zero consumers, and the npcOnly filters are gated on c.rarity===rar against draftPools of tin/silver/gold, which rarity:'npc' never matches - and tin/silver/gold is the RETIRED roster's scheme anyway (the live family cards carry fam+tier and no rarity at all), whose last consumer was the patron pool that P507 switched off. Documentation fix, no behaviour change. P557: THE 'STILL OPEN' LINE THAT USED TO END THIS COMMENT WAS FALSE. It said both ids sit in boss cardPools so those bosses draw a card only the player can activate. They can fire it: the after-roll dispatch runs straight off G.oCards with no type:'active' or player-only gate, and driving it at Whisper gave usedOnce:{crown_authority:1}. The reroll it fires is the one P557 fixed. */const CARDS=[
   {id:'flintlock',name:'THE FLINTLOCK',icon:'🔫',rarity:'silver',eff:'FIRST 1 EACH TURN: +200',desc:'The first 1 you roll each turn adds +200 to your turn score. Lost if you bust.',arch:'brinksman'},
   {id:'copper_pincher',name:'COPPER PINCHER',icon:'🪙',rarity:'silver',eff:'1s=200, 5s=100 PTS',desc:'Singles are worth more: 1s score 200 (not 100), 5s score 100 (not 50).',arch:'safeBanker'},
   {id:'half_measure',name:'HALF MEASURE',icon:'⚖️',rarity:'tin',eff:'+400 IF YOU BANK 3 DICE THIS TURN',desc:'Bank with exactly three dice committed across the entire turn (not per roll). Awards a flat +400 bonus.',arch:'safeBanker'},
@@ -26451,10 +26451,27 @@ function _afterRollImpl(){
       var _rrTotal=0;
       (G.kept||[]).forEach(function(k){
         if(!k||!k.dice||!k.dice.length){ _rrTotal+=(k&&k.pts)||0; return; }
-        k.dice.forEach(function(dd){ try{ dd.val=rollFace(dd.mat); }catch(e){} });
-        k.vals=k.dice.map(function(dd){ return dd.val; });
+        /* P557 (D3): _rollD, not rollFace(mat). rollFace takes only a material
+           so it cannot see the brand; _rollD is the enchant-aware roller the
+           rest of the file uses, and this group records `ench` alongside val
+           and mat, so the brand is right here to be honoured. */
+        k.dice.forEach(function(dd){ try{ dd.val=_rollD(dd); }catch(e){} });
+        /* P557 (D3): RE-SPLIT, and rebuild vals from the SCORING dice only.
+           `vals` was written from _splitIcons(...).rest when the group was
+           kept - icons are withheld from scoring by law - while `dice` is the
+           pre-split selection. Rebuilding vals from `dice` therefore folded a
+           face that banks zero back into the score: measured 9 times in 40
+           real dispatches, `vals [1,1]` on a group that went in at 50 coming
+           out at 200. A card meant to punish became a 4x.
+           Re-split rather than remembering which dice were icons, because that
+           is also what the rule means: a branded die that rerolls OFF its face
+           is no longer an icon and should score, and one that lands back on it
+           should not. Mats come from the same split so they stay parallel to
+           vals as well. */
+        var _rrSp=_splitIcons(k.dice);
+        k.vals=_rrSp.rest.map(function(dd){ return dd.val; });
         var _rrR=null;
-        try{ _rrR=scoreRoll(k.vals,G.pCards||[],0,{},k.dice.map(function(dd){return dd.mat;})); }catch(e){}
+        try{ _rrR=scoreRoll(k.vals,G.pCards||[],0,{},_rrSp.rest.map(function(dd){return dd.mat;})); }catch(e){}
         k.pts=(_rrR&&_rrR.total)||0;
         _rrTotal+=k.pts;
       });
