@@ -1445,17 +1445,44 @@ ordering was uninformative; only the checking was.
 
 **Stated plainly, so nothing here is mistaken for cleared.**
 
-1. **The entire card-slot parallel — NOT REACHED.** The brief's fourth standing
-   item ("do card slots suffer the same index/count-desync class of bug that
-   dice lanes did?") was **not investigated by this sweep**. Every layer here
-   was indexed by *die* lane. Card slots have their own ordering
-   (`G.pF`, the familiar bar, RSX slots, `S.run.cards`, the equip/tier UIs) and
-   at least three adjacent smells were noticed in passing without being chased:
-   `CFX.tamper` mutates opponent card *instances*; `famUse(i)` indexes the
-   familiar bar by position; and P511 already found a charge-accounting bug on
-   save/resume, which is the card-side analogue of the dice-side resume bugs.
-   **Assume nothing. This is the largest single gap and should be the next
-   sweep.**
+1. **The card-slot parallel — SWEPT (P555). It found a real defect, and NOT the
+   one this item predicted.** The question asked was index/count desync. That
+   half came back **clean, and was checked rather than assumed**: `famRenderRow`
+   emits `famCardTap(i)` with the **source-array** index from its `forEach` over
+   `G.pF`, not a running count of rendered cards — so the two `return`s that
+   skip a card (no def, `fam==='tavern'`) cannot shift it. `famUse(i)` then
+   reads `G.pF[i]`. The one positional-index smell named here is not a bug.
+
+   **The desync is in TIME, not in position.** `tools/card_state_census.py`
+   put every card-layer field against the snapshot and found nine that are
+   written, live across a turn, and never saved. P511 taught the snapshot to
+   carry `pF`/`oF` — the CHARGES — and did not carry the FLAGS those charges
+   buy. Carrying one without the other is worse than carrying neither: before
+   P511 the charge came back with the effect, so at least they agreed.
+
+   Driven end to end (`tools/apv_opp_armed_resume.js`), arming through
+   `_npcArmActives` rather than by setting flags:
+
+   | | sleight | ill_omen |
+   |---|---|---|
+   | armed | 2 → 1, flag set | 2 → 1, flag set |
+   | after RESUME MATCH | charge **1**, flag **gone** | charge **1**, flag **gone** |
+
+   with two controls on the same reload — the spent charges stayed spent and
+   `_oGrudgeStack` came back — so the loss is not a broken restore. The window
+   is every ordinary turn boundary: `saveMatchState()` is the **last statement
+   of `startPTurn`**, and both flags are armed in the rival's preceding turn and
+   consumed after it.
+
+   Nine fields now carried: `_oSleight`, `_oIllOmen`, the player's mirrors
+   `_famSleight`/`_famIllOmen`, the roll-forces buffer
+   `_famPeekVals`/`_famHoneyVal`/`_famKegTriple`, and `_famBankCount` /
+   `_famMinBank` — the count seeds "is this your FIRST bank" (Hair of the Dog)
+   and the minimum is reseeded from it, so losing it rewrote the smallest bank
+   of the match.
+
+   **What remains open here:** `CFX.tamper` mutating opponent card instances,
+   and `S.run.cards` / the equip and tier UIs, were not reached.
 2. **Charge accounting and UI reachability were never exercised for FAM
    cards.** Every probe in the FAM layer calls `CFX.<id>.use(inst)` directly,
    never `famUse(i)`. That still executes the real handler, so the behavioural

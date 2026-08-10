@@ -10409,7 +10409,34 @@ famState:{
   famPreserve:(function(){var _p=(G._famPreserveAtTurnStart!==undefined&&G._famPreserveAtTurnStart!==null)
       ?G._famPreserveAtTurnStart:G._famPreserve;
     return _p?JSON.parse(JSON.stringify(_p)):null;})(),
-  ftDead:G._ftDead?JSON.parse(JSON.stringify(G._ftDead)):null
+  ftDead:G._ftDead?JSON.parse(JSON.stringify(G._ftDead)):null,
+  /* P555: THE ARMED FLAGS, which P511 left behind when it carried the charges.
+     _npcArmActives spends a charge AND sets a flag; only the charge was in
+     here, so a reload kept the cost and deleted the effect. Driven: sleight
+     2->1 and ill_omen 2->1 with both flags set, then RESUME MATCH gave back
+     charges 1 and 1 with both flags gone.
+     The window is not exotic - saveMatchState is the last statement of
+     startPTurn, and both flags are armed by the rival in the turn BEFORE that
+     and consumed after it, so the ordinary turn-boundary save lands inside
+     both of them every time.
+     Live values, not start-of-turn copies: unlike famPreserve above, nothing
+     has consumed these by the time this runs (_oIllOmen goes in endPTurn,
+     _oSleight at the player's first roll - both after this line). */
+  oSleight:!!G._oSleight,
+  oIllOmen:G._oIllOmen?JSON.parse(JSON.stringify(G._oIllOmen)):null,
+  /* the player's mirrors of the same two, plus the roll-forces buffer they
+     share a lifetime with */
+  famSleight:!!G._famSleight,
+  famIllOmen:G._famIllOmen?JSON.parse(JSON.stringify(G._famIllOmen)):null,
+  famPeekVals:Array.isArray(G._famPeekVals)?G._famPeekVals.slice():null,
+  famHoneyVal:(G._famHoneyVal===undefined)?null:G._famHoneyVal,
+  famKegTriple:(G._famKegTriple===undefined)?null:G._famKegTriple,
+  /* and the two match counters. _famBankCount seeds "is this your FIRST bank"
+     - Hair of the Dog reads it - and _famMinBank is RESEEDED from it
+     (`_famBankCount===1 ? total : Math.min(...)`), so losing the count does
+     not merely reset a tally, it rewrites the smallest bank of the match. */
+  famBankCount:(G._famBankCount===undefined)?null:G._famBankCount,
+  famMinBank:(G._famMinBank===undefined)?null:G._famMinBank
 }
   };
   save();
@@ -33117,6 +33144,26 @@ if(_rdFam){
   if(Array.isArray(_rdFam.oF))G.oF=JSON.parse(JSON.stringify(_rdFam.oF));
   G._famPreserve=_rdFam.famPreserve?JSON.parse(JSON.stringify(_rdFam.famPreserve)):null;
   G._ftDead=Array.isArray(_rdFam.ftDead)?JSON.parse(JSON.stringify(_rdFam.ftDead)):null;
+  /* P555: the armed flags. GUARDED ON !==undefined RATHER THAN ON TRUTHINESS,
+     and that is the whole care in this block: _famBankCount and _famMinBank
+     are numbers that are legitimately 0, _famSleight is a boolean that is
+     legitimately false. A `||` restore would drop precisely the states worth
+     carrying and would pass every test that armed something first.
+     Each field is also guarded on its own presence, so a snapshot written
+     before this patch still resumes - it simply keeps the old behaviour for
+     the fields it does not carry, rather than clobbering them with null. */
+  if(_rdFam.oSleight!==undefined)G._oSleight=!!_rdFam.oSleight;
+  if(_rdFam.oIllOmen!==undefined)
+    G._oIllOmen=_rdFam.oIllOmen?JSON.parse(JSON.stringify(_rdFam.oIllOmen)):null;
+  if(_rdFam.famSleight!==undefined)G._famSleight=!!_rdFam.famSleight;
+  if(_rdFam.famIllOmen!==undefined)
+    G._famIllOmen=_rdFam.famIllOmen?JSON.parse(JSON.stringify(_rdFam.famIllOmen)):null;
+  if(_rdFam.famPeekVals!==undefined)
+    G._famPeekVals=Array.isArray(_rdFam.famPeekVals)?_rdFam.famPeekVals.slice():[];
+  if(_rdFam.famHoneyVal!==undefined&&_rdFam.famHoneyVal!==null)G._famHoneyVal=_rdFam.famHoneyVal;
+  if(_rdFam.famKegTriple!==undefined&&_rdFam.famKegTriple!==null)G._famKegTriple=_rdFam.famKegTriple;
+  if(_rdFam.famBankCount!==undefined&&_rdFam.famBankCount!==null)G._famBankCount=_rdFam.famBankCount;
+  if(_rdFam.famMinBank!==undefined&&_rdFam.famMinBank!==null)G._famMinBank=_rdFam.famMinBank;
 }
 var _rdTs=params._resumeData._tradeSwaps;
     G._tradeSwaps=(Array.isArray(_rdTs)&&_rdTs.length)

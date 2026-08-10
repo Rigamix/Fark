@@ -220,6 +220,46 @@ That probe is now superseded - it asserts the draft's dice stay visible under
 `fk3d`, which is deliberately half-false since P553. `probe_p553_draft_port.js`
 is the one that means something.
 
+## CARD-SLOT SWEEP (P555) — the resume loses what the rival paid for
+
+The integrity plan's largest named gap, closed. **It found a defect, and not the
+one the item predicted** — worth saying plainly, because the predicted half was
+checked and is clean.
+
+**Index desync: CLEAN, verified not assumed.** `famRenderRow` emits
+`famCardTap(i)` with the SOURCE-ARRAY index from its `forEach` over `G.pF`, not
+a count of rendered cards, so its two skipping `return`s cannot shift it.
+`famUse(i)` reads `G.pF[i]`. The positional-index smell the plan named is not a
+bug.
+
+**The desync is in TIME.** P511 taught the snapshot to carry `pF`/`oF` — the
+CHARGES — and never carried the FLAGS those charges buy. That is worse than
+carrying neither: before P511 the charge came back with the effect, so the two
+at least agreed. Driven through `_npcArmActives`, then the RESUME MATCH button:
+sleight and ill_omen both went `2 → 1` with their flags set, and came back with
+charge `1` and **no flag**. Two controls on the same reload — spent charges
+stayed spent, `_oGrudgeStack` came back at 3 — so it is not a broken restore.
+
+The window is not exotic: `saveMatchState()` is the **last statement of
+`startPTurn`**, and both flags are armed in the rival's preceding turn and
+consumed after it. Every ordinary turn boundary lands inside it.
+
+Nine fields now cross a resume. Restored with `!==undefined`, **not `||`** —
+`_famBankCount` and `_famMinBank` are numbers that are legitimately 0, and the
+count seeds "is this your FIRST bank" (Hair of the Dog). The probe's falsy arm
+poisons them to 99 before reloading and asserts they come back **0**, because
+every other check arms something first and would pass on a `||` restore too.
+
+`tools/card_state_census.py` is the instrument and is worth re-running after any
+card work: it derives turn-scope from **each write's enclosing function** rather
+than from a hand list of turn functions. Its first version hard-coded
+`startPTurn`/`_turnTableClear`/`doBust`, missed `runOppTurn`, and reported 37 of
+48 fields at risk. The real number was 8. A hand list of "the functions I
+thought of" is the same instrument class this sweep exists to catch.
+
+**Still open in this area:** `CFX.tamper` mutating opponent card instances, and
+`S.run.cards` / the equip and tier UIs.
+
 ## SUITE STATE — 47 pass, 2 fail, 0 error, 1 skip, 1 indet
 
 First full run in a while. **Neither failure came from the die work**, and both
