@@ -41,6 +41,34 @@ Decide whether the port keeps the animation or accepts a still die.
 the switch case), `#tierLoDice` and `#tierBossLoDice` (CSS `display:none
 !important` under Room V2, measured width 0). Do not port them; delete or leave.
 
+## SIZING THE DRAFT PORT - IT IS NOT A CONVERSION, IT IS NEW CODE
+
+Denis ruled the draft KEEPS its rise-and-settle. Measured what that costs:
+
+**D3X has no animation path for a non-match die at all.** `frame()` branches on
+`if(d.match)` and every tween lives inside that branch; a chip die is posed once
+by `_isoQ` at adoption and then holds still. The only motion entry point is
+`_physQueue` (physics, match-only), and `RISE_MATCH` is a camera framing offset
+gated on `_matchOn`, not a die animation.
+
+So porting the draft means **writing a rise-and-settle for chip dice in D3X**,
+not converting `.d3host` to `.d3chip`. The earlier survey called the draft "the
+awkward one" while framing the other three surfaces as mechanical - that framing
+undersold this one, and the other three turned out to be dead code anyway.
+
+What the port must carry, all three unique to this surface:
+1. the rise-and-settle (`D3.roll` with `turns:0, spinMax:20, flat:true`, group
+   null - a settle, never physics),
+2. `hover:true` - the ONLY surface where the hover breathe is visible, because
+   every chip surface hides its DOM die and `D3.draw` bails on `_d3xOwned`,
+3. the `.d3shadow` CSS ellipse - the only live contact shadow outside the match
+   table.
+
+And **restore the `.nrdie` clause in CSS (P547) in that same commit.**
+
+Do not start this without room to verify it: it is the first screen a new player
+sees, and a half-ported draft is three empty sockets.
+
 ## THE ONE THING THAT MUST BE READ BEFORE DELETING D3
 
 **D3 is the WebGL-failure fallback BY ACCIDENT, through a hang, not a decision.**
