@@ -1,5 +1,51 @@
 # NEXT SESSION — die renderer unification
 
+# DENIS'S DECISIONS — all seven answered, build to these
+
+**New art landed:** `Art/Assets/Dice/Bone/texture/1..6.png`, 120x120, **pips
+REMOVED**. Verified all six blank (0 dark pixels). This is now the ONLY die art.
+Every other material is bone + a tint. Do NOT use the amber texture or anything
+else from the old 3D dice.
+
+1. **Pips are drawn in CODE.** Match the old look exactly for now - near-black
+   flat circles with a faint ring. Build the drawing so shape is a PARAMETER:
+   Denis wants pip-shape customization later.
+2. **Pips do NOT tint.** The face tints with the material; the pips stay dark on
+   every die. No exceptions requested.
+3. **Texture-to-face is RANDOM.** The six are wear/marble variants, not numbers.
+   Any face may take any of the six; randomise per die so no two look alike.
+4. **Flatten all six to RGB.** None of them use transparency - drop the alpha
+   channel, which also makes them lighter. (Five ship RGBA today, `6.png` RGB.)
+   Optimize into `Art/Assets/Dice/Bone/texture/optimized/` - masters untouched.
+5. **Chirality: standard Western convention** (1-2-3 counter-clockwise around a
+   corner). One renderer means one die; this is the one.
+6. **DO NOT TOUCH THE FACE LISTS. This is GAMEPLAY, not rendering.**
+   Denis, verbatim in substance: iron missing a 3, flint leaning toward 4s, lead
+   loaded with extra 1s are what make those dice MEAN something. Reordering any
+   of them to force opposite-faces-sum-to-7 would change WHAT THOSE DICE ROLL,
+   not just how the cube looks.
+   So the tooltip/zoom cube showing an "impossible" die is ACCEPTED and closed -
+   not a bug, and not to be fixed by pairing in the renderer either. Leave it.
+7. **Build a REAL WebGL fallback with deliberate detection.** An old phone must
+   silently get a working table - never a "3D unavailable" message. And the
+   detection must be ON PURPOSE: today it works only because
+   `new THREE.WebGLRenderer()` throws out of a script onload handler, leaving
+   `ready` false, `fail` FALSE and `loading` true forever. Catch the failure,
+   set `fail` properly, and make D3 the chosen path rather than the leftover one.
+   That is the entire point - see the landmine section below.
+
+Already settled earlier: the draft KEEPS its rise-and-settle; `skins.js` loses
+BOTH bone and amber (everything is bone + tint now).
+
+## What this changes about the atlas
+
+`tools/make_cube_glb.py` currently bakes `Art/Assets/Dice/bone_N.png` (WITH
+pips) into a 3x2 atlas. It must now bake the six BLANK textures instead, and the
+pips move to a code pass. Note the brand/wild compositors index the sheet as
+`col=(v-1)%3, row=floor((v-1)/3)` with `cw=W/3, ch=H/2` - keep the 3x2 shape or
+they break.
+
+
 **Ruling (Denis):** every surface shows the same die. Camera framing may differ
 per surface; geometry, material, lighting and orientation may not. Lighting is
 decided: flat, one multiplier per face, no specular, matching `D3.draw`'s
