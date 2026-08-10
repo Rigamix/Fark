@@ -70,17 +70,32 @@ G.matchDice.splice(1,1);               /* no _enchArr splice - the bug */
 v._afterBug = { mat: brandedMat(), len: [G.matchDice.length, G._enchArr.length] };
 v.testDetectsTheBug = brandedMat() !== 'amber';
 
-/* every removal site in the shipped source now splices both */
+/* every removal keeps the two arrays aligned.
+   THIS WENT RED WITHOUT THE GAME CHANGING. It counted splices inside doBust,
+   startPTurn and runOppTurn and found ZERO of either - md:0, ea:0 - so `md>0`
+   failed and it reported the alignment bug as back. It was not: removal was
+   consolidated into _removeDieAt (PR5) and those three no longer splice at all.
+   A count of N sites cannot survive N becoming 1, and this probe's own header
+   argues against source checks - "a source check would pass on a splice with
+   the wrong index" - three lines before making one.
+   So it now does what the header says. The structural half asks the stronger
+   question the refactor made askable: not "is every site correct" but "is there
+   only one site". The behavioural half runs it. */
 v.allSitesFixed = (function(){
   try {
-    const srcs = [typeof doBust==='function'?doBust.toString():'',
-                  typeof startPTurn==='function'?startPTurn.toString():'',
-                  typeof runOppTurn==='function'?runOppTurn.toString():''].join('');
-    const md = (srcs.match(/G\.matchDice\.splice\(/g)||[]).length;
-    const ea = (srcs.match(/G\._enchArr\.splice\(/g)||[]).length;
-    v._counts = { matchDice: md, enchArr: ea };
-    return md > 0 && ea >= md;
-  } catch(e) { return false; }
+    if (typeof _removeDieAt !== 'function') { v._noCanonicalPath = true; return false; }
+    const fn = _removeDieAt.toString();
+    const md = (fn.match(/G\.matchDice\.splice\(/g)||[]).length;
+    const ea = (fn.match(/G\._enchArr\.splice\(/g)||[]).length;
+    v._counts = { matchDiceInRemoveDieAt: md, enchArrInRemoveDieAt: ea,
+      documentWide: (document.documentElement.outerHTML.match(/G\.matchDice\.splice\(/g)||[]).length };
+    if (md !== 1 || ea !== 1 || v._counts.documentWide !== 1) return false;
+    /* and the real path keeps the brand on its own die */
+    board();
+    _removeDieAt(1);
+    v._afterCanonical = { mat: brandedMat(), len: [G.matchDice.length, G._enchArr.length] };
+    return brandedMat() === 'amber' && G.matchDice.length === G._enchArr.length;
+  } catch(e) { v._canonErr = String(e).slice(0,80); return false; }
 })();
 
 const notes = {};

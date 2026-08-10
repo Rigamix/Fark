@@ -94,27 +94,61 @@ v.syncedNumDiceIsCleanEverywhere = good === 6;
   v.materialWrapsToo = mats[5] === mats[0] && mats[5] === 'jade';
 })();
 
-/* ── 3. THE ONE THAT SHOULD FAIL TODAY: every splice site must sync numDice ──
-   Structural by necessity - firing four different removal mechanics live is a
-   much bigger harness than this. Named for what it checks, per PROBE_AUDIT.md:
-   it reads source, it does not observe behaviour. */
+/* ── 3. every removal must keep numDice in step ──────────────────────────
+   THIS CHECK WENT RED WITHOUT THE GAME CHANGING, and the reason is worth more
+   than the check was. It scanned the whole document for `G.matchDice.splice(`
+   and required `G.numDice =` within 320 characters of each hit. Both halves
+   were true when it was written and neither is now:
+
+     - removal was consolidated into _removeDieAt (PR5), so there is exactly
+       ONE splice site instead of the four this was policing;
+     - and numDice no longer moves by assignment there. It moves through
+       _dropLanes(1), because assigning matchDice.length refunded every
+       per-turn dice penalty and ate Seven Dice's bonus (P516). The regex
+       looks for an `=` that was deliberately removed.
+
+   So a refactor that made the property STRUCTURAL - one choke point instead of
+   four sites to keep in step - is exactly what blinded the probe guarding it.
+   That is the standing lesson in reverse: a source-text count of N sites
+   cannot survive N becoming 1.
+
+   And the old excuse for being structural is gone with it. "Firing four
+   different removal mechanics live is a much bigger harness than this" was
+   true of four mechanics; there is one path now, and it is one call. So this
+   RUNS IT, and keeps a structural check only for the thing behaviour cannot
+   show - that the one path is the only path. */
 v.everySpliceSiteSyncsNumDiceInSource = (function () {
   try {
     const src = document.documentElement.outerHTML;
-    const sites = [];
-    const re = /G\.matchDice\.splice\(/g;
-    let m;
-    while ((m = re.exec(src)) !== null) {
-      const win = src.slice(m.index, m.index + 320);
-      sites.push(/G\.numDice\s*=/.test(win));
-    }
-    notes._spliceSites = sites.length;
-    notes._spliceSitesThatSyncNumDice = sites.filter(Boolean).length;
-    return sites.length > 0 && sites.every(Boolean);
+    notes._spliceSites = (src.match(/G\.matchDice\.splice\(/g) || []).length;
+    if (typeof _removeDieAt !== 'function') { notes._noCanonicalPath = true; return false; }
+    const fn = _removeDieAt.toString();
+    notes._spliceInsideRemoveDieAt = (fn.match(/G\.matchDice\.splice\(/g) || []).length;
+    notes._removeDieAtDropsLanes  = /_dropLanes\s*\(/.test(fn);
+    notes._dropLanesMovesNumDice  = typeof _dropLanes === 'function'
+      && /G\.numDice\s*=/.test(_dropLanes.toString());
+    /* ONE PATH, and it is the one in _removeDieAt */
+    const structural = notes._spliceSites === 1
+      && notes._spliceInsideRemoveDieAt === 1
+      && notes._removeDieAtDropsLanes
+      && notes._dropLanesMovesNumDice;
+
+    /* AND RUN IT. A structural check passes on a splice with the wrong index;
+       this does not. Left in place afterwards on purpose - check 4 below then
+       reads the invariant AFTER a real removal rather than on a pristine
+       board, which is the harder version of the same question. */
+    notes._beforeRemoval = { numDice: G.numDice, matchDice: (G.matchDice || []).length };
+    const lane = Math.max(0, (G.matchDice || []).length - 2);
+    _removeDieAt(lane);
+    notes._afterRemoval = { numDice: G.numDice, matchDice: (G.matchDice || []).length };
+    const behavioural = notes._afterRemoval.matchDice === notes._beforeRemoval.matchDice - 1
+      && G.numDice === (G.matchDice || []).length;
+
+    return structural && behavioural;
   } catch (e) { notes._structErr = String(e).slice(0, 80); return false; }
 })();
 
-/* ── 4. the live invariant, as far as it can be checked without firing cards ── */
+/* ── 4. the live invariant - now read AFTER check 3's real removal ────── */
 v.liveNumDiceMatchesMatchDice = (function () {
   try {
     notes._liveNumDice = G.numDice;

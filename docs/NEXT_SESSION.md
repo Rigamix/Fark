@@ -220,6 +220,34 @@ That probe is now superseded - it asserts the draft's dice stay visible under
 `fk3d`, which is deliberately half-false since P553. `probe_p553_draft_port.js`
 is the one that means something.
 
+## SUITE STATE — 47 pass, 2 fail, 0 error, 1 skip, 1 indet
+
+First full run in a while. **Neither failure came from the die work**, and both
+were the same shape, so it is worth naming rather than just fixing:
+
+`apv_ench_align :: allSitesFixed` and
+`apv_lane_integrity :: everySpliceSiteSyncsNumDiceInSource` both guarded "a die
+removal keeps its parallel arrays in step" by **counting `G.matchDice.splice(`
+sites and checking each one**. Written when there were four. Removal was later
+consolidated into `_removeDieAt` (PR5), so both counters found **zero** sites in
+the functions they searched, and both were phrased `sites.length > 0 && every()`
+— zero fails. The second also required `G.numDice =` near the splice, and that
+assignment had been deliberately replaced by `_dropLanes(1)` (P516: assigning
+`matchDice.length` refunded every per-turn dice penalty).
+
+**The refactor that made the property structural is what blinded the probes
+guarding it.** Both now ask the stronger question the consolidation makes
+askable — *is there only one site* — and then RUN it: `_removeDieAt` on a
+branded board leaves the brand on `amber` with lengths `[5,5]`, and on the live
+match takes `numDice` and `matchDice` 6→5 together. The old excuse for being
+structural ("firing four removal mechanics live is a much bigger harness") died
+with the fourth mechanic.
+
+The skip (`apv_break_doublepush`) and the indet (`apv_pturn_value ::
+liveBankReal=null`) are setup-dependence under CPU contention — `apv_pturn_value`
+is green standalone (`turnPtsBeforeBank:450`). A skip measured nothing; neither
+is a regression.
+
 ## STILL OPEN
 
 - **The retirement checklist is now the live question.** D3 no longer draws any
