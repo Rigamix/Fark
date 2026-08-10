@@ -20195,13 +20195,22 @@ var D3X={
     var px=x.getImageData(Math.round(ix+iw*0.06),Math.round(iy+ih*0.06),1,1).data;
     x.fillStyle='rgb('+px[0]+','+px[1]+','+px[2]+')';
     x.fillRect(ix,iy,iw,ih);
-    /* one open ring, in the ink the pips are cut in - it reads as "any face"
-       without pretending to be a number */
+    /* P550: A QUESTION MARK, not a ring. Same intent as the ring it replaces -
+       it reads as "any face" without pretending to be a number - and it now
+       matches the glyph P549 puts on any value a die has no face for, because
+       those are the same statement: this face has no specific pip.
+       Denis asked for this directly; I had put the glyph on unrollable values
+       and left the ring alone, which was a misread of "instead of the circle". */
     x.strokeStyle='rgba(38,22,10,.82)';
-    x.lineWidth=Math.max(2,iw*0.055);
-    x.beginPath();
-    x.arc(ix+iw/2,iy+ih/2,Math.min(iw,ih)*0.26,0,Math.PI*2);
-    x.stroke();
+    x.fillStyle='rgba(38,22,10,.88)';
+    /* sized off the face, and centred by MEASURING the glyph rather than
+       trusting textBaseline - the font falls back at different metrics
+       depending on what is installed, and the first cut sat low and left. */
+    x.font='bold '+Math.round(Math.min(iw,ih)*0.80)+'px Georgia,serif';
+    x.textAlign='center';x.textBaseline='alphabetic';
+    var _qm=x.measureText('?');
+    var _qh=(_qm.actualBoundingBoxAscent||Math.min(iw,ih)*0.55);
+    x.fillText('?',ix+iw/2,iy+ih/2+_qh/2);
     x.restore();
     var out=new THREE.CanvasTexture(cv);
     out.flipY=baseTex.flipY;out.wrapS=baseTex.wrapS;out.wrapT=baseTex.wrapT;
@@ -21925,8 +21934,19 @@ var D3X={
        gradient to wash. And the warmth in the DOM dice comes from the ART and
        D3.TINT, never from a light, so a warm rig here and none there is the
        exact same-die-different-look this unification exists to delete. */
-    var key=new THREE.DirectionalLight(0xffffff,0.55);key.position.set(0,0.33,0.94);sc.add(key);
-    sc.add(new THREE.AmbientLight(0xffffff,0.55));
+    /* P550: THE FLOOR COMES UP, THE CEILING STAYS. P545 used 0.55/0.55 to
+       reproduce D3.draw's `0.55 + 0.55*max(0,dot)` exactly, and that WAS the
+       brief - but the context changed under it. The DOM die showed one face at
+       a time, flat on, with its shaded faces mostly hidden; a cube shows three
+       at once, two of them shaded and at grazing angles. Measured on the real
+       render at 0.55/0.55: brightest die pixel 0.863, darkest 0.350.
+       0.72 + 0.38 still peaks at 1.10 on a face pointing at the light, exactly
+       as before, while a face turned away lifts from 0.55 to 0.72. Same
+       brightest, lifted darkest, less contrast between adjacent faces.
+       This is a DELIBERATE departure from "match D3's constant", not a drift:
+       the constant was right for a renderer that showed one face. */
+    var key=new THREE.DirectionalLight(0xffffff,0.38);key.position.set(0,0.33,0.94);sc.add(key);
+    sc.add(new THREE.AmbientLight(0xffffff,0.72));
     this.cam=new THREE.PerspectiveCamera(this.FOV,1,1,20000);
     var onModel=function(g){
       var proto=g.scene;
@@ -22086,9 +22106,10 @@ var D3X={
            the brand compositor both need that), so it gets a "?" rather than
            pips for a face the die does not have. */
         x.save();
-        x.font='bold '+Math.round(cw*0.46)+'px Georgia,serif';
-        x.textAlign='center';x.textBaseline='middle';
-        x.fillText('?',dc*cw+cw*0.5,dr*ch+ch*0.52);
+        x.font='bold '+Math.round(cw*0.62)+'px Georgia,serif';
+        x.textAlign='center';x.textBaseline='alphabetic';
+        var _m=x.measureText('?'),_h=(_m.actualBoundingBoxAscent||cw*0.42);
+        x.fillText('?',dc*cw+cw*0.5,dr*ch+ch*0.5+_h/2);
         x.restore();
       }else{
         var lay=P.LAY[v]||[],r=P.R*cw;
@@ -22111,9 +22132,10 @@ var D3X={
         var dc2=(v2-1)%3,dr2=Math.floor((v2-1)/3);
         x.fillStyle=ink;
         if(!has[v2]){
-          x.save();x.font='bold '+Math.round(cw*0.46)+'px Georgia,serif';
-          x.textAlign='center';x.textBaseline='middle';
-          x.fillText('?',dc2*cw+cw*0.5,dr2*ch+ch*0.52);x.restore();
+          x.save();x.font='bold '+Math.round(cw*0.62)+'px Georgia,serif';
+          x.textAlign='center';x.textBaseline='alphabetic';
+          var _m2=x.measureText('?'),_h2=(_m2.actualBoundingBoxAscent||cw*0.42);
+          x.fillText('?',dc2*cw+cw*0.5,dr2*ch+ch*0.5+_h2/2);x.restore();
         }else{
           var lay2=P.LAY[v2]||[],r2=P.R*cw;
           for(var k2=0;k2<lay2.length;k2++){
