@@ -26662,12 +26662,32 @@ function _afterRollImpl(){
   freeV=free.map(d=>d.val);
   if(!anyScoring(freeV,cards,freeMats,free)&&!_anchorRescues(cards)){
     /* THE deadRoll SEAM: nothing scored, and the bust has not resolved yet.
-       A hook may claim the roll, which cancels the bust. */
-    var _drEv={actor:'p',free:free};
-    famFire('deadRoll',_drEv);
-    if(_drEv._claimed)return;
-    if(_tryBustSave(free))return;
-    _delayedDoBust(free);return;
+       A hook may claim the roll, which cancels the bust.
+       P574: AND IT WAITS FOR THE THROW, for exactly the reason _delayedDoBust
+       does twenty lines down - read its comment, this is the same bug one branch
+       earlier. At this instant the dice are 480ms into a throw that physics runs
+       to ~2000ms: settleDie has dropped the .rolling class but cannot stop a
+       tape. A card firing here rewrites every face of a roll the player has not
+       seen land, which is what Denis reported as "it rerolls dice even before
+       they land so you don't even understand what it's doing".
+       THE HELPER IS THE EXISTING ONE. _afterRowSettle polls _rowSettled and
+       carries its own ghost-timer guard and a 4200ms cap for a die that never
+       gets a pose. No new timing machinery.
+       AT THE SEAM, NOT AT THE THREE 480ms ROLL TIMERS - normal, hot dice and
+       Mabel's Stitch all funnel through here, and fixing it three times is how
+       this file grew its duplicate implementations.
+       Safe to wrap: every path inside this branch returns, so nothing below was
+       reachable from it, and the player cannot act meanwhile - phase is still
+       'rolling' and the buttons were disabled at the tap. */
+    _afterRowSettle('#playerDiceRow',DEADROLL_BEAT_MS,function(){
+      if(typeof G==='undefined'||!G||G._endMatchFired)return;/* the trailing beat outlives _afterRowSettle's own guard */
+      var _drEv={actor:'p',free:free};
+      famFire('deadRoll',_drEv);
+      if(_drEv._claimed)return;
+      if(_tryBustSave(free))return;
+      _delayedDoBust(free);
+    });
+    return;
   }
   /* ...and not on a branded face: 1 and 5 are exactly the legal brand set,
      so without this guard Last Stand banked 600 for a die that must bank
@@ -27324,6 +27344,10 @@ function _afterRowSettle(sel,beat,fn){
   })();
 }
 var BUST_PAUSE_MS=600;
+/* P574: the deadRoll seam's beat, deliberately shorter than the bust's. A card
+   firing is a "watch this" moment and then it acts; a bust is a verdict and
+   earns the longer pause. Both start counting only once the row has stopped. */
+var DEADROLL_BEAT_MS=260;
 function _delayedDoBust(_freeArr){
   /* THE PAUSE STARTS WHEN THE DICE STOP, not when the roll animation's fixed
      budget runs out. Measured on a forced bust: the word BUST hit the screen
