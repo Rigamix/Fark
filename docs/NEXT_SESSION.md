@@ -54,6 +54,25 @@ That means **any future patch that wraps `boot` in a try/catch, or adds a `fail`
 check to `mkDie`, silently turns a WebGL-less device into a blank table.** Fix
 the detection before touching either.
 
+## A LATENT HAZARD ON THE DRAFT, FOUND WHILE CHECKING IT
+
+CSS 1788 is already `html.fk3d .d3chip .die, html.fk3d .nrdie .d3host .die
+{visibility:hidden}` - the draft's hide rule EXISTS, written for a port that
+never landed. So the draft's dice are hidden whenever `fk3d` is on, and nothing
+draws them, because D3X has never adopted that surface.
+
+It is safe TODAY only because `fk3d` happens to be off on that screen: `tick`
+finds no `.d3chip` and no `.die.d3on` in `#screen-match`, so `detach` removes
+the class. Verified on the live page - 3 hosts, all `visible`, `fk3dOn:false`,
+`D3X.dice` 0.
+
+**But that is the same shape as the WebGL fallback below: correct by
+coincidence, not by design.** Anything that leaves `fk3d` on while the draft is
+up - a surface that fails to detach, a future screen that keeps a chip alive -
+makes the first screen of a new run show three empty sockets. Either port the
+draft (then the rule is right) or scope the rule to `.d3chip` only until it is
+ported. Do not leave it as-is.
+
 ## STILL OPEN
 
 - Port the first-night draft (above).
