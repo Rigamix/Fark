@@ -131,6 +131,22 @@ One known gap in the model regardless: it has **no hot-dice rule** (`hot`
 appears zero times in it), while the player's real engine does. The keep
 policies *are* exercised — via `_oppChooseFrom` — so P495 is genuinely measured.
 
+### 1i. RULED — the double-cast closes, and it is a difficulty change
+
+Denis ruled: a brand that can fire twice in one turn via hot dice makes the
+card's own promise ("this turn") false as written, so **make it true** — a spent
+brand stops counting as a live icon until the next turn. Correctness grounds.
+
+**It lands OUTSIDE this batch, deliberately, and must be flagged as a real
+difficulty change when it ships** — not folded in silently. Denis's reasoning for
+letting it go early: the ladder already sits well under target across most of the
+game, so closing a double-cast that is currently overperforming is very likely
+relief in the right direction rather than a new problem.
+
+Two knock-ons to carry into any retune measured after it: it removes a real (if
+rare) double-cast, and it creates a **new way to lose a turn** — a row whose only
+live face is a spent brand is now a bust.
+
 ### 1e-bis. RETRACTED — those two bosses can fire the card, and the premise was backwards
 
 **This section used to say** `blessed_dice` (Ambrose) and `crown_authority`
@@ -464,49 +480,14 @@ does nothing is worse than one that isn't offered.
 
 ---
 
-## 8. A cast brand: does "spent this turn" bind the rule, or just the words?
+## Not blocking, for your awareness
 
-You asked for a cast enchanted die to show it can't be used again this turn, and
-to say so when tapped. Building it turned up a rule question I can't answer for
-you.
-
-**There is no "already fired" state today at all.** A brand fires through one
-function and records nothing. The only thing marking a cast die is the ordinary
-keep flag — so a die that just cast Tithe looks exactly like a die that scored
-100, and the tap is dead.
-
-**And as shipped, a brand CAN fire twice in one turn**, via hot dice: the sweep
-rebuilds the pool and the same brand comes back live. So "this turn" isn't
-currently true.
-
-- **(a) Make it true.** A spent brand stops counting as a live icon, so it
-  cannot fire again until the next turn. The greyed icon and the words are then
-  honest. **This is a balance change** — it removes a real (if rare) double-cast,
-  and it creates a new way to lose a turn: a row whose only live face is a spent
-  brand becomes a bust.
-- **(b) Feedback only.** Grey it and message it, change no rule. Then the flag
-  must die with the die rather than follow the brand, and the message has to read
-  *"CAST — THIS DIE IS SPENT"* with no "this turn" in it, because after hot dice
-  it would be a lie.
-
-**My rec: (a).** It's what you described, and it's the only version where the
-words on screen are true. But it moves difficulty, so it's yours — and if you'd
-rather not touch balance right now, (b) is honest as long as the wording changes
-with it.
-
-- **Pages deploy is stuck behind a GitHub outage.** Actions and Pages both still
-  at `major_outage`, failing on `Invalid actions OIDC token`. Nothing fixable at
-  our end — the newest push did not even queue a run.
-  **Last successful deploy: 15:32Z. Four runs since have failed.**
-  Everything is safely on `origin/fark`; only the publish step is stuck.
-  Measured, not assumed: the live `fark_proto.html` is **2,073,103** bytes
-  against **2,076,799** in `origin/fark`, and the marker
-  `numDice=Math.max(1,G.numDice-1)` is **absent live** while `_laneOf` and
-  `noble:'combo'` are present — so the live build predates P504. The player
-  therefore still has the hot-dice lane bug.
-  It will go out on the first push after recovery. **Verify with that marker
-  grep against `fark_proto.html`, never a green build** — and note `index.html`
-  is only a redirect stub, so grepping the site root always looks empty.
+- **Pages deploy is healthy.** The GitHub outage recorded here is over; six
+  deploys went out tonight and each was verified LIVE by grepping a marker on
+  `rigamix.github.io`, never by a green build — `_dieLeftSeat`, `_cultArr` and
+  `_drillMax` are all present on the served file. **Keep verifying that way**:
+  `index.html` is only a redirect stub, so grepping the site root always looks
+  empty.
 - **Four model assumptions remain untested** — 65% patron win rate, boss beaten
   first try, buys the dearest die in stock, no enchant/tavern gold. None *looks*
   load-bearing, but that is an impression rather than a measurement; the same
