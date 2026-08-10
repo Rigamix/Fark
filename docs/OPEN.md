@@ -480,6 +480,40 @@ does nothing is worse than one that isn't offered.
 
 ---
 
+## 8. Last Orders: the labels are boxed in by the art. Above, or below?
+
+You said the icons and text sit too high in the panel. **The sign itself is
+fixed** (P573 hangs it as low as the painted ceiling allows — the ropes and beam
+are part of the panel image, so the whole thing moves together and its dark top
+has to stay on the background's dark ceiling; 8.7% is where a seam opens).
+
+**Inside the panel I've run out of room, and it's the art, not the CSS.** The
+moon and mug are *painted into* `LastOrders_panel.png` at 56.7%–72% of its
+height. The hearts and the night number are already centred on them (measured:
+hearts 57.6%–70.6%, number 63.9%, painted icons ~64.3%). There is no slack —
+lowering them would pull them off the row they belong to.
+
+That leaves the labels, and one real choice:
+
+- **(a) Keep them above the icons**, as you asked. They fit in an 18-unit strip
+  of clear parchment, which caps them at **11.5px**. That is a ceiling from the
+  artwork, not a tuning choice.
+- **(b) Move them into the writing band below the icons** — 5× taller, ruled
+  lines already painted there. Labels roughly **double** the size, and it fills
+  the empty lower two-thirds you're seeing. But it isn't "above".
+- **(c) Repaint the panel** with more clearance above the icons, and keep (a).
+
+**My rec: (b)**, on the grounds that the writing band is clearly what the art was
+drawn to hold and it solves the empty-space problem in the same move. But you
+asked for "above", so I'm not reversing that on my own.
+
+**Also worth confirming:** the lower two-thirds is empty now because the night
+number and NEW ROSTER moved up out of it. That matches your mockup — but it is a
+change to what used to live there, so say if it was an accepted trade rather than
+a side effect.
+
+---
+
 ## Not blocking, for your awareness
 
 - **Pages deploy is healthy.** The GitHub outage recorded here is over; six
