@@ -54,7 +54,7 @@ That means **any future patch that wraps `boot` in a try/catch, or adds a `fail`
 check to `mkDie`, silently turns a WebGL-less device into a blank table.** Fix
 the detection before touching either.
 
-## A LATENT HAZARD ON THE DRAFT, FOUND WHILE CHECKING IT
+## THE DRAFT HAZARD - CLOSED (P547), the port itself still open
 
 CSS 1788 is already `html.fk3d .d3chip .die, html.fk3d .nrdie .d3host .die
 {visibility:hidden}` - the draft's hide rule EXISTS, written for a port that
@@ -69,9 +69,16 @@ the class. Verified on the live page - 3 hosts, all `visible`, `fk3dOn:false`,
 **But that is the same shape as the WebGL fallback below: correct by
 coincidence, not by design.** Anything that leaves `fk3d` on while the draft is
 up - a surface that fails to detach, a future screen that keeps a chip alive -
-makes the first screen of a new run show three empty sockets. Either port the
-draft (then the rule is right) or scope the rule to `.d3chip` only until it is
-ported. Do not leave it as-is.
+makes the first screen of a new run show three empty sockets. **FIXED P547: the rule is scoped to `.d3chip`.** Denis ruled the draft KEEPS
+its rise-and-settle - it is the only surface with visible hover and the only
+live contact shadow outside the match table, so a still die there is a
+visible downgrade, not a neutral simplification. **Restore the `.nrdie`
+clause in the same commit that ports the draft, not before.**
+
+Driven both ways (`tools/probe_p547_draft_hide.js`): with `fk3d` FORCED on,
+the draft keeps 3/3 dice visible; and a chip surface still hides 6/6 of its
+DOM dice with 6 meshes over them - the control a too-wide fix would fail by
+making every 3D surface double-draw.
 
 ## STILL OPEN
 
