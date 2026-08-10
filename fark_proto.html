@@ -25704,7 +25704,22 @@ function handleRoll(){
     if(_rfrId){
       var _rfrCard=getNpcCard(_rfrId);
       var _rfrChance=(_rfrCard&&_rfrCard.effect&&_rfrCard.effect.chance!=null)?_rfrCard.effect.chance:0.7;
-      if(Math.random()<_rfrChance){
+      /* P561 (D15): ASK WHETHER THERE IS A DIE TO TAKE BEFORE TAKING ONE.
+         `G.numDice>5` is exactly the condition under which the Math.min below
+         changes anything, so the applying case is untouched and only the no-op
+         is skipped. Two things used to happen when the player was ALREADY at
+         five - an obsidian die shattered earlier, or a per-turn penalty already
+         armed:
+           the card ANNOUNCED "5 DICE" having changed nothing, telling the
+           player a die had been taken when none had;
+           and _consumeWard ran first, burning a Ward charge to block an effect
+           that was not going to happen. That half is inert today - D11 measured
+           G._wardCharges as having no live origin - so it is a correctness fix
+           rather than a live one, which is worth keeping straight.
+         THE CLAMP ITSELF IS CORRECT AND STAYS. Both cards carrying this
+         mechanic say "leaving you with five instead of six", so reducing an
+         already-shattered player to four would contradict their own text. */
+      if(Math.random()<_rfrChance&&G.numDice>5){
         if(!_consumeWard((_rfrCard?_rfrCard.name:'POCKET SAND'))){
           G.numDice=Math.min(G.numDice,5);
           triggerCard(_rfrId,(_rfrCard?_rfrCard.name:'').toUpperCase()+' — 5 DICE!',false);

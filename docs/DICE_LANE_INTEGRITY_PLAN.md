@@ -1399,6 +1399,34 @@ target "full stop"; Sacrifice can still shatter one.
 
 ### D15 — `reduce_first_roll` clamps to a literal 5, so Mabel's Pinch is free against a player already down a die
 
+> **CLOSED — P561, and the fix is NOT the one the title implies.**
+>
+> Both corrections in this entry hold, and reading the card text settled it:
+> `mabels_pinch` and `pocket_sand` both say **"leaving you with five instead of
+> six"**, so the clamp matches the card and `_dropLanes(1)` would contradict it.
+> The clamp stays.
+>
+> **What was actually wrong is that the announcement did not depend on the
+> effect.** With the player already at five, the clamp is a no-op and the game
+> still said "MABEL'S PINCH — 5 DICE!" — a message vouching for a die that was
+> never taken. Driven, control on both sides:
+>
+> | | at six *(control)* | at five |
+> |---|---|---|
+> | before | 6→5, announced | 5→5, **announced** |
+> | after | 6→5, announced | 5→5, silent |
+>
+> The control matters: a fix that silenced the card everywhere would pass an
+> announcement-only check and break it.
+>
+> **And the Ward was spent on the no-op** — `_consumeWard` ran before anything
+> asked whether there was an effect to block. That half is **inert today**
+> (D11 measured `G._wardCharges` as having no live origin), so it is a
+> correctness fix rather than a live one, and the two are worth keeping apart.
+>
+> One gate does both: `G.numDice>5` is exactly the condition under which
+> `Math.min(G.numDice,5)` changes anything.
+
 `fark_proto.html:24804`
 ```js
 G.numDice=Math.min(G.numDice,5);
