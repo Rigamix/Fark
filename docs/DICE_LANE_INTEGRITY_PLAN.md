@@ -1460,6 +1460,31 @@ pinched die is deterministically the **highest lane** — measured lanes
 
 ### D16-D24 — lesser confirmed defects
 
+> **RE-DERIVED against the current build before implementing any of them**, on
+> the reasoning that D3, D7 and D15 all turned out partly stale on inspection.
+> The list is **not one queue** — these are four different states:
+>
+> | | state |
+> |---|---|
+> | **D24** | **ALREADY CLOSED — by P528, never marked here.** The `else`-gated pool filter is gone; the filter is unconditional and P528's own comment names D24 as the case it closes. Nothing to do. |
+> | **D21** | Held, now **FIXED (P562)** — see below. |
+> | **D16, D17, D20, D22** | **HOLD.** Anchors re-checked against current code. |
+> | **D18, D23** | **NOT SETTLED** by this pass — need reading at their named sites, not a grep. |
+> | **D19** | Needs a **ruling**, not a patch, exactly as the entry says. |
+>
+> **A count is not a re-derivation, and this pass nearly got that wrong.** `_cult`
+> came back with 4 hits against the entry's claim of 1, which looked like
+> staleness — it was one line using `d._cult` twice plus a comment. Two real
+> sites, entry correct. Checking instead of concluding is the only reason D16 is
+> in the HOLD row rather than wrongly retired.
+>
+> **D17 has picked up an interaction with P555.** `_famSleight` is now carried
+> across a resume, so "single-use forever" is *durable* where a reload used to
+> reset it and accidentally refund the card. For an inert card the two states are
+> equally worthless, so nothing got worse — but the interaction belongs on the
+> record, because the real fix is to implement the effect or retire the card, and
+> whoever does that will meet the snapshot field.
+
 - **D16. Cultivate's growth dies with the turn.** `d._cult` (14223) is the only
   occurrence in the file and lives solely on the pool die object; `G.pool=[]` at
   startPTurn (24426) and `_turnTableClear` (23164) replace those objects. "For

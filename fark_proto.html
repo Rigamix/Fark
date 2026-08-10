@@ -25592,6 +25592,20 @@ function startPTurn(){
      also runs BEFORE the snapshot below, which is correct: at this instant
      nothing is armed, so the snapshot recording null is the true state. */
   _clearRollForces();
+  /* P562 (D21): REPAINT THE FIRST STRIKE PANEL AFTER EVERYTHING THIS FUNCTION
+     DOES TO THE LOADOUT. P515 put a repaint at the TOP of startPTurn, but the
+     NPC swap and steal blocks run later in this same function and splice
+     matchDice inline rather than through _removeDieAt (which does repaint). So
+     the panel was painted, the loadout then changed, and nothing painted again -
+     measured byte-identical panel text across a swap that replaced two dice.
+     Placed HERE rather than after the swap block on purpose: startPTurn moves
+     matchDice in several places (the Fair Trade expiry, the preserve restore's
+     _dropLanes, the swap, the steal), and chasing each with its own repaint is
+     how a call-site count grows until one is missed. One call after the last of
+     them covers all of them - and it sits beside the snapshot below for the
+     same reason both exist: they mean "the state this turn actually starts
+     from". No-op while the panel is closed. */
+  try{_firstStrikeRender();}catch(e){}
   updHUD();
   /* Persist turn boundary so app restart can resume here */
   saveMatchState();
