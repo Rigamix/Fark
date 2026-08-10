@@ -1,4 +1,53 @@
-# NEXT SESSION — die renderer unification
+# NEXT SESSION — START HERE
+
+**Deployed HEAD: `42cb49c` on `fark`.** Branch and deploy in step. `die_cube.glb`
+and `die_glb.js` hash-match (`f8f8189154ea`) — check that stays true if you
+touch either.
+
+**The die renderer work is DONE.** Every surface draws through D3X; the sections
+below it are kept as reference, not as a queue. D3 stays because it is the
+deliberate WebGL fallback and the draft's fallback animator. **R3 — the grid-pip
+CSS cube, still live via the die tooltip — is the next renderer to look at, not
+D3.**
+
+## THE LIVE QUEUE is task #27, and it is FOUR DIFFERENT STATES, not one list
+
+| | items | what they need |
+|---|---|---|
+| **implementable as written** | D16, D17, D20, D22 | anchors re-checked against current code; go |
+| **need reading first** | D18, D23 | greps match too much to decide; read the named sites |
+| **known-hard** | D6(a) | lane staleness + a refill/restore timing mismatch — both candidate fixes written up in the plan, neither costed |
+| **needs a ruling from Denis** | D19 | vagabond drag: seat vs lane identity |
+| **batched behind a ruling already given** | D10, D11 | §9 answered — **the brand TRAVELS, matching Trade**. Ship as ONE measured change across all four swap sites, not four stealth edits |
+
+**D24 was already closed** by P528 and never marked — worth grepping any entry's
+anchor against current code before assuming it is live. Task #30 carries that as
+a standing rule.
+
+## READ THESE BEFORE TOUCHING ANYTHING
+
+* **`docs/OPEN.md`** — Denis's file. Questions and blockers only.
+* **`docs/DICE_LANE_INTEGRITY_PLAN.md`** — the D-entries, each now carrying a
+  CLOSED banner with its measurement, or a re-derivation note.
+* **The census tools re-run; they are not one-off findings.**
+  `tools/card_state_census.py` (card-layer state vs the snapshot, deriving
+  turn-scope from each write's enclosing function) and
+  `tools/brand_travel_census.py` (every indexed die-array write vs `_enchArr`).
+
+## THE HABIT THAT PAID, twelve commits' worth
+
+Four instrument faults tonight, **two pointing AWAY from correct answers** — a
+probe that passed green against a broken build (its pool busted before reaching
+the code under test), and test data that reported a landed fix as missing. Plus
+a count that nearly retired a *correct* entry as stale.
+
+So: **prove the code under test ran** before believing any verdict, and check a
+count means what you think before marking anything closed. Both directions cost
+something.
+
+---
+
+# REFERENCE — die renderer decisions (all delivered)
 
 # DENIS'S DECISIONS — all seven answered, build to these
 
