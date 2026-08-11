@@ -3707,6 +3707,20 @@ body.crit-dilate{animation:critDilate .55s ease-out both}
    activation zone (see .mcard.in-zone rules). The .used class stays on the element
    for JS tracking (it disables drag) but doesn't change how the card looks in-hand. */
 /* — Frozen Die: ice — */
+/* P618: THE FAMILY'S COLOUR AS THE DEFAULT ACCENT. --card-accent is the
+   card's border, and P617 made the armed glow, the fire flash and the
+   activation plume all read it - but only 18 ids defined one, so most
+   cards glowed deck-gold regardless of family. These sit ABOVE the per-id
+   rules on purpose: same specificity, so the id rules that follow still
+   win and frozen_die keeps its pale blue. Colours are FAMILIES[fam].color
+   verbatim, the table the shelf panel and the card art already read. */
+.mcard.fam-jade{--card-accent:#2f9e5f}
+.mcard.fam-amber{--card-accent:#d89a20}
+.mcard.fam-silver{--card-accent:#b9c2cc}
+.mcard.fam-obsidian{--card-accent:#e2582f}
+.mcard.fam-starstone{--card-accent:#4f74e3}
+.mcard.fam-vagabond{--card-accent:#c4404f}
+.mcard.fam-tavern{--card-accent:#b09a72}
 .mcard-active[data-cid="frozen_die"]{--card-accent:rgba(100,180,220,.8);--card-dither:rgba(100,180,255,.09)}
 /* — Double Down: amber — */
 .mcard-active[data-cid="double_down"]{--card-accent:rgba(200,160,60,.8);--card-dither:rgba(200,160,60,.07)}
@@ -3939,7 +3953,9 @@ body.crit-dilate{animation:critDilate .55s ease-out both}
          drop-shadow(0 0 2.6cqw rgba(255,180,60,.55))
          brightness(1.14) saturate(1.12);
   transition:filter .12s ease-out}
-.mcard.armed .gcard{outline:0.22cqw solid rgba(255,226,150,.92);outline-offset:-0.22cqw}
+/* P617: the armed rim is the CARD'S border colour, not a fixed gold */
+.mcard.armed .gcard{outline:0.22cqw solid var(--card-accent,rgba(255,226,150,.92));
+  outline-offset:-0.22cqw}
 /* P615: THE HALO HAD TO WIN THE CASCADE, and it did not. `.mcard.dragging`
    declares its lift shadow with !important, and `.armed` is only ever set on
    a card that is ALREADY dragging - onDragMove adds 'dragging' before it
@@ -3951,12 +3967,13 @@ body.crit-dilate{animation:critDilate .55s ease-out both}
    appearing. */
 .mcard.dragging.armed{
   filter:drop-shadow(0 8px 24px rgba(0,0,0,.7))
-         drop-shadow(0 0 0.9cqw rgba(255,214,120,.95))
-         drop-shadow(0 0 2.6cqw rgba(255,180,60,.55))
+         drop-shadow(0 0 0.9cqw var(--card-accent,rgba(255,214,120,.95)))
+         drop-shadow(0 0 2.6cqw var(--card-accent,rgba(255,180,60,.55)))
          brightness(1.16) saturate(1.12)!important}
 /* the release beat: one bright flash, then it is gone */
 @keyframes cardFired{
-  0%{filter:drop-shadow(0 0 1.4cqw rgba(255,240,200,1)) brightness(1.6) saturate(1.2)}
+  0%{filter:drop-shadow(0 0 1.6cqw var(--card-accent,rgba(255,240,200,1)))
+            drop-shadow(0 0 0.5cqw rgba(255,248,225,.9)) brightness(1.55) saturate(1.2)}
   100%{filter:none}}
 .mcard.card-fired{animation:cardFired .42s ease-out}
 /* the spent card does not fly home, it IS home - this only softens the cut
@@ -24389,7 +24406,12 @@ function buildCBar(barId,cardIds,isOpp,label){
        static card (matters for mirror_match where player's actives swap to NPC). */
     const isActive=c.type==='active'&&!isOpp;
     const _mRar=c.npc?'boss-'+c.npc:(c.npcOnly&&c.owner?'boss-'+c.owner:(c.npcOnly?'npc':c.rarity));
-    const w=document.createElement('div');w.className='mcard rarity-'+_mRar+(isActive?' mcard-active':'');w.dataset.cid=id;
+    /* P618: the family tag, so the card's own colour reaches every cue.
+       famDef is the family-card table; a card outside it (an NPC or boss
+       card) simply gets no fam- class and keeps the deck gold fallback. */
+    var _fam='';try{var _fd=(typeof famDef==='function')?famDef(id):null;
+      if(_fd&&_fd.fam)_fam=' fam-'+_fd.fam;}catch(e){}
+    const w=document.createElement('div');w.className='mcard rarity-'+_mRar+(isActive?' mcard-active':'')+_fam;w.dataset.cid=id;
     const _tarnish=!isOpp&&typeof S!=='undefined'&&S.run?(function(){
       var _c=getCard(id);
       if(_c&&_c.npc&&S.run.cardTarnish){
@@ -24769,6 +24791,10 @@ function returnCardToHand(mcardEl,savedState){
 function _commitActivation(mcardEl,cardId,savedState){
   SFX.nav();
   try{_haptic([12,30,12]);}catch(e){}
+  /* P617: the plume, in the card's own colour, BEFORE the effect runs - so a
+     card that rebuilds the row as part of its effect (the Pyre, a self-refund)
+     still gets its beat off the element the player was actually holding. */
+  try{spawnCardBurst(mcardEl);}catch(e){}
   mcardEl.classList.add('card-fired');
   setTimeout(function(){mcardEl.classList.remove('card-fired');},420);
   activateCard(cardId);
@@ -25882,6 +25908,48 @@ function spawnPixelSparks(el,count){
     var a=Math.random()*Math.PI*2;
     FX.emit({x:cx+Math.cos(a)*rect.width*0.4,y:cy+Math.sin(a)*rect.height*0.4,
       vx:Math.cos(a)*per,vy:Math.sin(a)*per,life:life+Math.random()*0.12,size:4,color:'#c8a050'});
+  }
+}
+/* P617: THE CARD ACTIVATION PLUME. Light leaves the card upward - the way
+   the player just dragged it - rises, slows under gravity and falls back,
+   which is the shape in Denis's reference. A radial ring would read as an
+   impact; this reads as the card discharging along the gesture.
+   The colour is the CARD'S OWN --card-accent, i.e. its border, so the plume
+   can never disagree with the glow or the frame. Reuses FX, the pooled
+   emitter behind every other burst here - the pool silently drops when it is
+   full, so a busy moment costs nothing. */
+function _cardAccent(el){
+  try{
+    var c=getComputedStyle(el).getPropertyValue('--card-accent');
+    c=(c||'').trim();
+    if(c)return c;
+  }catch(e){}
+  return 'rgba(255,215,0,.9)';
+}
+function spawnCardBurst(el,color){
+  if(!el||typeof FX==='undefined'||!FX.emit)return;
+  var r=el.getBoundingClientRect();
+  if(!(r.width>0))return;
+  var cx=r.left+r.width/2, cy=r.top+r.height*0.42;
+  var col=color||_cardAccent(el);
+  for(var i=0;i<26;i++){
+    /* upward, +/- ~30 degrees, so the plume keeps a clear direction */
+    var a=-Math.PI/2+(Math.random()-0.5)*1.05;
+    var sp=70+Math.random()*150;
+    FX.emit({x:cx+(Math.random()-0.5)*r.width*0.78,
+             y:cy+(Math.random()-0.5)*r.height*0.42,
+             vx:Math.cos(a)*sp, vy:Math.sin(a)*sp,
+             g:150+Math.random()*90,
+             life:0.55+Math.random()*0.55,
+             size:(Math.random()<0.4?3:4),
+             color:col});
+  }
+  /* a few bright motes that hang and drift, the slow ones in the reference */
+  for(var j=0;j<7;j++){
+    var a2=-Math.PI/2+(Math.random()-0.5)*1.6;
+    FX.emit({x:cx+(Math.random()-0.5)*r.width*0.9, y:cy,
+             vx:Math.cos(a2)*30, vy:Math.sin(a2)*46, g:26,
+             life:0.9+Math.random()*0.7, size:2, color:col});
   }
 }
 /* Shatter burst — angular chunks pop outward + tumble + fall under
