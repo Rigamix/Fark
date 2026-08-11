@@ -52,8 +52,18 @@ def opaque_run(px, x, thresh=215):
     return (rows[0], rows[-1]) if rows else (None, None)
 
 def channel(px, x):
-    """the trough: inside the frame's outer silhouette, the run of rows that are
-       darker than the plate around them. Read as the darkest contiguous band."""
+    """The trough: inside the frame's silhouette, the LONGEST CONTIGUOUS dark
+       run.
+
+       CONTIGUITY IS THE WHOLE CORRECTION. The first version took the first and
+       last row below the cut without requiring them to be connected, so it
+       swallowed the dark outer OUTLINES at both extremes and returned the whole
+       plank silhouette (rows 93..380) while calling it the channel - the trough
+       is rows ~137..333. It happened not to change the verdict, because the two
+       light rims are near-identical thicknesses (35 and 36 rows) and the
+       silhouette's centre therefore lands within 2 rows of the trough's. That is
+       luck, not method: an asymmetric frame would have been certified centred
+       while visibly sitting high."""
     top, bot = alpha_run(px, x)
     if top is None:
         return None, None
@@ -63,8 +73,15 @@ def channel(px, x):
     dark = min(v for _, v in lum)
     light = max(v for _, v in lum)
     cut = dark + (light - dark) * 0.45
-    run = [y for y, v in lum if v <= cut]
-    return (run[0], run[-1]) if run else (None, None)
+    best, run = None, None
+    for y, v in lum:
+        if v <= cut:
+            run = [y, y] if run is None else [run[0], y]
+            if best is None or run[1] - run[0] > best[1] - best[0]:
+                best = list(run)
+        else:
+            run = None
+    return (best[0], best[1]) if best else (None, None)
 
 print('\n%-7s | %-21s | %-21s | delta' % ('x', 'FRAME channel (rows)', 'FILL ink (rows)'))
 print('-' * 74)

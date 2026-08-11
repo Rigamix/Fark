@@ -1641,11 +1641,12 @@ body.dlg-speaking #screen-match #tellBadge{opacity:0;pointer-events:none}
 #screen-match .hud::after{display:none}
 #screen-match .controls::before{display:none}
 /* the whole bar is one canvas: frame, fill, portraits and the centre plate
-   are pre-registered layers of a single 3795x950 painting, so every one of
+   are pre-registered layers of a single 3795x933 painting, so every one of
    them is inset:0 and nothing needs aligning by hand. */
 /* P577: 3795/933, the NEW frame's own ratio. It was 3795/950 against a file
    that is now 933 tall, so the bar rendered 1.8% taller than drawn. The fill
-   overlay is still 3795x950 and still lines up: both are stretched to THIS box,
+   overlay was 3795x950 when this was written and is 3795x933 now (P593 - Denis
+   redrew it on the frame's canvas); both are stretched to THIS box,
    so alignment comes from their internal percentages - measured at four x
    positions, the frame's channel is 10.2%..40.5% of its height and the fill's
    ink 16.5%..36.4% of its own, so the fill sits inside the channel either way. */
@@ -1704,10 +1705,32 @@ body.dlg-speaking #screen-match #tellBadge{opacity:0;pointer-events:none}
    On `scale`, the standalone property, not `transform`: .rbFlag:active already
    animates transform as its press feedback, and the two would clobber each
    other. Same reasoning as the card fan in P580. */
+/* P596: THE Z-INDEX IS LOAD-BEARING, and leaving it off was a live regression.
+   A transform makes an element a STACKING CONTEXT, so the moment .lead added
+   `scale` the wrapper's children stopped using their own z-indices (.rbFlag 4,
+   .tok 3, .hud-score 18) and collapsed into the wrapper at z-index auto - under
+   .rb's 1 and .rbClip's 2. The LEADING side therefore painted BEHIND the bar
+   frame and behind the coloured fill, while a non-leading side, having no
+   transform and so no stacking context, painted correctly. Declaring it here
+   rather than on .lead is the point: the layering must not depend on who is
+   winning. 18 is .hud-score's old value, the highest of the three; the sides
+   never overlap .rbCentre (43.47%..57.47%) so nothing else reorders.
+   IT HID BEHIND A LUCKY TEST STATE: at 1900/2800 the fill stops short of the
+   ring, so the occlusion is invisible. It shows up once a fill runs long.
+   P596: transform-origin moves OUT of .lead too. On the class being removed the
+   origin reverted to the 50%/50% default for the shrink, so the side animated
+   about its centre and slid sideways on the way down; measured one rAF pair
+   after the toggle as `215px 52.8516px`. An origin is a property of the
+   element, not of the state, so it belongs on the unconditional rule.
+   THE PERCENTAGES ARE THE MEASURED DISC CENTRES, not the derived ones. P594 used
+   35.16%/34.05% from the file's own note, which had divided by a 25.03cqw bar;
+   the bar measures 24.582cqw, so the true centres are 35.79%/34.65%. That 0.6px
+   error was the whole of P594's 0.09px residual drift. */
 #raceWrap .rbSide{position:absolute;inset:0;pointer-events:none;
-  transition:scale .22s ease}
-#raceWrap .rbSideL.lead{scale:var(--lead-s);transform-origin:0% 35.16%}
-#raceWrap .rbSideR.lead{scale:var(--lead-s);transform-origin:100% 34.05%}
+  z-index:18;transition:scale .22s ease}
+#raceWrap .rbSideL{transform-origin:0% 35.79%}
+#raceWrap .rbSideR{transform-origin:100% 34.65%}
+#raceWrap .rbSideL.lead,#raceWrap .rbSideR.lead{scale:var(--lead-s)}
 /* a press the flag can answer on its own - the whole point of the split art */
 #raceWrap .rbFlag:active{filter:drop-shadow(0 0.25cqw 0 rgba(26,15,7,.34)) brightness(1.12);
   transform:translateY(0.18cqw)}
@@ -1748,7 +1771,12 @@ body.dlg-speaking #screen-match #tellBadge{opacity:0;pointer-events:none}
    ScoreBar_new_fill.png on the frame's own canvas, so the offset became a
    2.1px error in the other direction.
    MEASURED, not assumed - tools/measure_scorebar_bands.py reads both masters as
-   alpha runs down five matched columns: the frame's channel is rows 93..380 and
+   alpha runs down five matched columns. P596 CORRECTION: 93..380 is the plank's
+   whole SILHOUETTE, not its channel - the trough is rows ~137..333, and the
+   script's first/last-below-a-cut rule swallowed the dark outer outlines at both
+   ends. The verdict survives only because the two rims are near-identical (35
+   and 36 rows), putting silhouette centre 237.5 against trough centre 235.5, so
+   the fill's ink is
    the fill's ink 140..331, centred in it to within 1.4px of 933 (0.15% of the
    height, 0.16 css px at the design width). Aligned art wants no offset. */
 #oProg img{position:absolute;left:0;top:0;width:200cqw;height:100cqh;max-width:none}
@@ -1844,8 +1872,12 @@ body.dlg-speaking #screen-match #tellBadge{opacity:0;pointer-events:none}
    are the same cream. */
 /* P593: 3.4cqw -> 2.85cqw. The plate shrank in P589 and the type did not, so the
    ink filled 68.6% of the plate's height (measured: 23.0px of ink in a 33.5px
-   plate, base 14.62px). At 2.85cqw the base is 12.25px and the ink 19.3px, or
-   57.5% - the caption and number sit inside the plate's border instead of
+   plate, base 14.62px). At 2.85cqw the base is 12.255px and the ink 19.0px, or
+   56.7% - the caption and number sit inside the plate's border instead of
+   crowding it.
+   (P596: 19.3px/57.5% here was a PREDICTION - 23.0 scaled by 12.255/14.62 -
+   not a reading. Re-measured on the page it is 19.0px/56.7%. Cosmetic, but a
+   comment that looks measured and is not is worse than carrying no number.
    crowding it. */
 #screen-match #turnNum{font-family:'JMH Beda',serif;font-size:2.85cqw;letter-spacing:.06em;
   /* P589: beige rather than near-white. #f6ecd4 is the score's cream and read
@@ -9237,7 +9269,7 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
 <!-- HUD -->
 <div class="hud" id="hud">
   <div id="raceWrap">
-    <!-- four layers on one 3795x950 canvas, so they register themselves -->
+    <!-- four layers on one 3795x933 canvas, so they register themselves -->
     <img class="rb" src="Art/Assets/Match/optimized/ScoreBar_new_opt.webp" alt="">
     <!-- 26.82% is empty, not zero: it is where the clip edge reaches the
          first painted column of the fill art. -->
