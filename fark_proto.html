@@ -16817,6 +16817,23 @@ function _dlgOutcome(won){
     return r2?r2.t:null;
   }catch(e){return null;}
 }
+/* P628: DOES THIS DECISION DESERVE A PAUSE?
+   Only when it was genuinely close. `agg` is what oppShouldBank converges on
+   and its last word is `Math.random() > agg`, so near 0.5 the same board goes
+   either way and at 0.15 or 0.9 it does not. The band is taken from the two
+   exits that gate on agg, not chosen for feel.
+   Returns null for a blowout, and null is the caller's cue to say nothing -
+   a hesitation on an obvious decision reads as noise, not character. */
+var _HESITATE_LO=0.40,_HESITATE_HI=0.65;
+function _dlgHesitate(willBank){
+  try{
+    var a=(typeof G!=='undefined'&&G)?G._oppAgg:undefined;
+    if(typeof a!=='number')return null;
+    if(a<_HESITATE_LO||a>_HESITATE_HI)return null;
+    /* the two moments fall straight out of the decision itself */
+    return _dlgEvent(willBank?'banksafe':'push');
+  }catch(e){return null;}
+}
 /* the four DLG events these answer, and which side each belongs to */
 var _DLG_MOMENT={OPP_BUST:'bust',PLAYER_BUST:'yourBust',
                  OPP_BIG_BANK:'bank',BIG_BANK:'yourBank'};
@@ -17926,6 +17943,50 @@ var PATRON_LINES=[
   {p:'patron:vess:win',s:0,g:'plain',t:"There it is."},
   {p:'patron:vess:win',s:0,g:'plain',t:"Fine."},
   {p:'patron:vess:win',s:0,g:'plain',t:"Good."}
+,
+  /* ── P628 (Part 7): HESITATION BEFORE A CLOSE DECISION ──
+     Trait-keyed, not per-patron - the brief's reasoning, and it also means
+     these apply in EVERY match rather than only named-patron ones.
+     `strong` is this build's name for the brief's BULLISH; PERSONAS is a
+     different six-way split and writing to it would have shipped 36 lines
+     that never fire. Reached through _dlgEvent, so a per-patron override
+     would beat these for free if one is ever written. ── */
+  {p:'trait:cunning:banksafe',s:0,g:'hesitate-banksafe',t:"Might know something you don't. Thinking it through."},
+  {p:'trait:cunning:banksafe',s:0,g:'hesitate-banksafe',t:"The safe play isn't always the smart one. Weighing it."},
+  {p:'trait:cunning:banksafe',s:0,g:'hesitate-banksafe',t:"A pause here is worth more than it looks."},
+  {p:'trait:cunning:push',s:0,g:'hesitate-push',t:"Calculating something. Won't say what."},
+  {p:'trait:cunning:push',s:0,g:'hesitate-push',t:"There's a read here worth taking a moment for."},
+  {p:'trait:cunning:push',s:0,g:'hesitate-push',t:"Patience now pays later. Usually."},
+  {p:'trait:greedy:banksafe',s:0,g:'hesitate-banksafe',t:"Feels small to walk away with. Feels safe, too."},
+  {p:'trait:greedy:banksafe',s:0,g:'hesitate-banksafe',t:"Bird in hand, and all that. Still tempting, though."},
+  {p:'trait:greedy:banksafe',s:0,g:'hesitate-banksafe',t:"Weighing the sure thing against the maybe-more."},
+  {p:'trait:greedy:push',s:0,g:'hesitate-push',t:"That's real coin sitting there. Real coin."},
+  {p:'trait:greedy:push',s:0,g:'hesitate-push',t:"One more roll could double it. Could also lose it."},
+  {p:'trait:greedy:push',s:0,g:'hesitate-push',t:"Counting what's already banked versus what's still possible."},
+  {p:'trait:orderly:banksafe',s:0,g:'hesitate-banksafe',t:"Is this the optimal point? Checking."},
+  {p:'trait:orderly:banksafe',s:0,g:'hesitate-banksafe',t:"The expected value here is close. Very close."},
+  {p:'trait:orderly:banksafe',s:0,g:'hesitate-banksafe',t:"Worth a moment's calculation before I commit."},
+  {p:'trait:orderly:push',s:0,g:'hesitate-push',t:"Recalculating the odds here. Give me a moment."},
+  {p:'trait:orderly:push',s:0,g:'hesitate-push',t:"The numbers aren't clear yet. Let me work it through."},
+  {p:'trait:orderly:push',s:0,g:'hesitate-push',t:"One more roll changes the math considerably. Thinking."},
+  {p:'trait:reckless:banksafe',s:0,g:'hesitate-banksafe',t:"Banking feels wrong. But maybe, this once."},
+  {p:'trait:reckless:banksafe',s:0,g:'hesitate-banksafe',t:"Every instinct says push. Every instinct's usually right, too."},
+  {p:'trait:reckless:banksafe',s:0,g:'hesitate-banksafe',t:"Fighting myself on this one, honestly."},
+  {p:'trait:reckless:push',s:0,g:'hesitate-push',t:"...actually thinking about this one. Weird feeling."},
+  {p:'trait:reckless:push',s:0,g:'hesitate-push',t:"Even I pause sometimes. Rare, but it happens."},
+  {p:'trait:reckless:push',s:0,g:'hesitate-push',t:"Hm. That's a lot on the table. Even for me."},
+  {p:'trait:steady:banksafe',s:0,g:'hesitate-banksafe',t:"Might be more here. Might not be worth the risk, though."},
+  {p:'trait:steady:banksafe',s:0,g:'hesitate-banksafe',t:"Small bank's still a bank. Let me weigh it."},
+  {p:'trait:steady:banksafe',s:0,g:'hesitate-banksafe',t:"Tempting to push. Tempting isn't the same as wise."},
+  {p:'trait:steady:push',s:0,g:'hesitate-push',t:"Hm. One more, or is that greedy..."},
+  {p:'trait:steady:push',s:0,g:'hesitate-push',t:"Let me think on this one a moment."},
+  {p:'trait:steady:push',s:0,g:'hesitate-push',t:"Careful, now. Careful."},
+  {p:'trait:strong:banksafe',s:0,g:'hesitate-banksafe',t:"Feels small. Feels too small to stop at."},
+  {p:'trait:strong:banksafe',s:0,g:'hesitate-banksafe',t:"Banking already? Let me just... no. Fine. Maybe."},
+  {p:'trait:strong:banksafe',s:0,g:'hesitate-banksafe',t:"Ugh. Banking's boring. But smart, probably."},
+  {p:'trait:strong:push',s:0,g:'hesitate-push',t:"...No, go again. Probably."},
+  {p:'trait:strong:push',s:0,g:'hesitate-push',t:"One more. Just one more, I mean it this time."},
+  {p:'trait:strong:push',s:0,g:'hesitate-push',t:"Fine, FINE, let me actually think for a second."}
 
 ];
 var _ptOpen=false,_ptSeats=[];
@@ -30615,6 +30676,12 @@ function oppShouldBank(rung,oppBank,diceLeft,oppTotal,playerTotal,target){
   var pProg=playerTotal/target,oProg=oppTotal/target;
   if(pProg>0.70&&(pProg-oProg)>0.30)agg=Math.max(agg,0.85);
   else if(pProg>0.50&&(pProg-oProg)>0.20)agg=Math.max(agg,0.78);
+  /* P628: agg is FINAL here - nothing below mutates it, the branches only
+     read it. Stashed so the call site can tell a coin-flip from a foregone
+     conclusion without this function knowing anything about dialogue. Same
+     pattern as G._lastBankAmount: expose a value computed mid-decision
+     rather than reshape the return. */
+  try{if(typeof G!=='undefined'&&G)G._oppAgg=agg;}catch(e){}
   /* ── Context-aware push logic ── Score gap relative to target decides whether a
      low-dice push is rational:
        • BEHIND  (player leads by ≥10% target): push even at 1-2 dice, nothing to lose
@@ -31802,6 +31869,13 @@ function runOppTurn(){
         setTimeout(function(){clearRow('oppDiceRow');G.oppDice=[];left=_oFullHand;setTimeout(step,_oppDelay(200));},_oppDelay(900));return;
       }
       const bank=oppShouldBank(G.rung,oppBank,left,G.oPts,G.pPts,G.target);
+      /* P628: the hesitation beat goes in the pause that was ALREADY here.
+         _oppDelay(1900) exists so the rival's decision does not land
+         instantly; on a close call it now has something in it. No new timing,
+         and the delay is unchanged whether or not a line comes back.
+         Here and not inside oppShouldBank, which stays pure - and this is the
+         in-match call, so FSIM's own caller never speaks. */
+      try{var _hes=_dlgHesitate(bank);if(_hes)setStatusMsg(_hes,'');}catch(e){}
       setTimeout(()=>{if(bank)finOpp(oppBank);else step();},_oppDelay(1900));
     });
   }
