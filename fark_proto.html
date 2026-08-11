@@ -69,6 +69,12 @@
      the drop target is spent out of the same band, and 88 keeps it positive
      at every height in the 700-760 band Denis plays on. */
   --dice-reserve-gap: 88px;
+  /* P613: how far above the player's card row the invisible activation
+     threshold sits. THE ONE KNOB for the whole gesture - see _cardThresholdY.
+     cqw so it scales with the row it is measured from. The brief asks for
+     this to be tuned by hand: raise it if cards fire by accident, lower it
+     if the drag feels unresponsive. */
+  --card-arm-lift: 16cqw;
   --dice-min-clearance: 36px;    /* mandatory min space between zones — also
                                     reserves room for floating card-trigger
                                     labels (e.g. "+200 BOWL") that appear
@@ -2740,8 +2746,15 @@ html.fk3d #screen-match .die-wrap:has(.die.d3on.selected)::after{
 /* Mid-match panel is z:10200 — tooltip needs higher to clear it. */
 #mLoadout-ov .lo-mini-card.peeked .mcard-tooltip{z-index:10500;opacity:1!important;pointer-events:auto}
 
-/* ─── ACTIVATE ZONE (drag target) ─── */
-.activate-zone{
+/* ─── ACTIVATE ZONE (drag target) ─── *//* P613: RETIRED. The threshold replaced it - there is no drop target to aim
+   at any more, and nothing adds .dragging-active. Its RESERVED SPACE is a
+   different matter and is deliberately kept: --activate-zone-h and
+   --dice-reserve-gap now set where the dice block sits, which Denis tuned to
+   his mark in P610, and reclaiming the 76px here would drop the dice ~56px
+   and undo it. The rules below are inert; the display:none is what matters. */
+
+.activate-zone{display:none!important}
+.activate-zone_retired{
   position:absolute;left:20%;right:20%;height:76px;
   /* P583c: THE VAR NOW ACTUALLY SETS THIS. It was a literal 100px while
      --activate-zone-gap - whose own comment reads "gap from controls top to
@@ -3912,6 +3925,27 @@ body.crit-dilate{animation:critDilate .55s ease-out both}
 .match-btn-bank.bank-to-win{transform:scale(1.08);filter:drop-shadow(0 0 12px rgba(224,214,184,.85))}
 .match-btn-bank.bank-to-win .btn-inner{font-size:clamp(13px,3.8vw,18px);letter-spacing:0}
 
+/* ═══ P613: THE THRESHOLD'S ONLY VISIBLE SIGN ═══
+   Snaps on when the card crosses the line and holds while it is above it.
+   Deliberately NOT a pulse: the dice already use slow breathing glows for
+   Ward and the enchant faces, and a player should never have to work out
+   whether a moving light means "this die is warded" or "this card will
+   fire". Steady = a state you are holding; moving = a property of a die. */
+.mcard.armed{
+  filter:drop-shadow(0 0 0.9cqw rgba(255,214,120,.95))
+         drop-shadow(0 0 2.6cqw rgba(255,180,60,.55))
+         brightness(1.14) saturate(1.12);
+  transition:filter .12s ease-out}
+.mcard.armed .gcard{outline:0.22cqw solid rgba(255,226,150,.92);outline-offset:-0.22cqw}
+/* the release beat: one bright flash, then it is gone */
+@keyframes cardFired{
+  0%{filter:drop-shadow(0 0 1.4cqw rgba(255,240,200,1)) brightness(1.6) saturate(1.2)}
+  100%{filter:none}}
+.mcard.card-fired{animation:cardFired .42s ease-out}
+/* the spent card does not fly home, it IS home - this only softens the cut
+   so the change of state is legible rather than a pop */
+@keyframes cardSpentCut{0%{opacity:.25;filter:brightness(1.35)}100%{opacity:1;filter:none}}
+.mcard.card-spent-cut{animation:cardSpentCut .3s ease-out}
 /* Yield — matches activate-zone exactly */
 .match-btn-yield{
   display:none;position:absolute;left:20%;right:20%;height:80px;
@@ -24374,8 +24408,11 @@ function clampTooltip(mcardEl){
       const cardR=mcardEl.getBoundingClientRect();
       /* Move tooltip to body so it's truly fixed-positioned */
       tip._origParent=mcardEl;
-      /* Carry over greyed-state class so body-promoted tooltip stays desaturated for used/in-zone cards */
-      if(mcardEl.classList.contains('in-zone')||mcardEl.classList.contains('used')||mcardEl.classList.contains('draft-greyed')||mcardEl.classList.contains('draft-locked')){
+      /* Carry over greyed-state so the body-promoted tooltip stays desaturated.
+         P614: `.in-zone` dropped from the test - nothing sets it since the
+         threshold replaced the zone, and `.used` was always the real signal
+         for a spent card anyway. */
+      if(mcardEl.classList.contains('used')||mcardEl.classList.contains('draft-greyed')||mcardEl.classList.contains('draft-locked')){
         tip.classList.add('tip-greyed');
       }
       document.body.appendChild(tip);
@@ -24426,10 +24463,12 @@ function clampTooltip(mcardEl){
 /* ═══════ DRAG-TO-ACTIVATE SYSTEM ═══════ */
 function initCardDrag(mcardEl,cardId){
   function onDragStart(e){
-    if(mcardEl.classList.contains('used'))return;
-    /* Cards in the activation zone (already spent this turn) shouldn't
-       be draggable — tap-for-tooltip still works via click listeners. */
-    if(mcardEl.classList.contains('in-zone'))return;
+    /* P612: THE FLAG DECIDES, not a class and never a position. `.in-zone`
+       used to refuse here, and because it was pure DOM position a card whose
+       use had been refunded read as usable and still could not be picked up.
+       usedCards is the source of truth; `.used` is only its mirror and is
+       kept as a fallback for any card outside activeCardState. */
+    if(!_cardHasUse(cardId))return;
     closeAllChips();
     const touch=e.touches?e.touches[0]:e;
     const rect=mcardEl.getBoundingClientRect();
@@ -24462,7 +24501,8 @@ function initCardDrag(mcardEl,cardId){
     if(e.cancelable)e.preventDefault();
     mcardEl.style.left=(_dragState.origRect.left+dx)+'px';
     mcardEl.style.top=(_dragState.origRect.top+dy)+'px';
-    hitTestActivateZone(touch.clientX,touch.clientY);
+    /* P612: the glow, and nothing else, tells the player the line is there */
+    mcardEl.classList.toggle('armed',_cardIsArmed(mcardEl)&&canActivateCard(cardId));
     /* Track velocity (smoothed) */
     var now=Date.now();var dt=now-_dragState.lastT;
     if(dt>0){
@@ -24477,51 +24517,22 @@ function initCardDrag(mcardEl,cardId){
     if(!_dragState||_dragState.el!==mcardEl)return;
     if(!_dragState.dragging){_dragState=null;return;}
     var savedState={el:_dragState.el,cardId:_dragState.cardId,origRect:_dragState.origRect,origStyle:_dragState.origStyle,vx:_dragState.vx,vy:_dragState.vy};
-    function tryDrop(){
-      var zone=document.getElementById('activateZone');
-      var cr=mcardEl.getBoundingClientRect();
-      var zr=zone.getBoundingClientRect();
-      var overlapL=Math.max(cr.left,zr.left),overlapR=Math.min(cr.right,zr.right);
-      var overlapT=Math.max(cr.top,zr.top),overlapB=Math.min(cr.bottom,zr.bottom);
-      var overlapArea=(overlapR>overlapL&&overlapB>overlapT)?(overlapR-overlapL)*(overlapB-overlapT):0;
-      var cardArea=cr.width*cr.height;
-      return overlapArea>cardArea*0.5;
-    }
-    var dropInZone=tryDrop();
+    /* P612: RELEASED ABOVE THE LINE - that is the whole rule, and it is read
+       on the release frame. The old code could also fire the card during the
+       momentum COAST, i.e. after the player had let go, so where it drifted
+       to decided rather than where they released. The coast survives as a
+       purely visual flourish and can no longer activate anything.
+       canActivateCard is consulted HERE, one statement before activateCard
+       runs, so nothing can invalidate a target between the check and the
+       effect. */
+    var released=_cardIsArmed(mcardEl);
     var canUse=canActivateCard(cardId);
-    if(dropInZone&&canUse){
+    mcardEl.classList.remove('armed');
+    window._dragEndedAt=Date.now();_dragState=null;
+    if(released&&canUse){
       _commitActivation(mcardEl,cardId,savedState);
-      hideActivateZone();window._dragEndedAt=Date.now();_dragState=null;
     }else{
-      /* Momentum: if velocity is high enough and moving upward, coast the card */
-      var speed=Math.sqrt(savedState.vx*savedState.vx+savedState.vy*savedState.vy);
-      if(speed>200&&savedState.vy<-80){
-        /* Coast with deceleration */
-        var vx=savedState.vx,vy=savedState.vy;
-        var friction=0.92;var _momFrame=null;
-        (function coast(){
-          vx*=friction;vy*=friction;
-          var curLeft=parseFloat(mcardEl.style.left)||0;
-          var curTop=parseFloat(mcardEl.style.top)||0;
-          mcardEl.style.left=(curLeft+vx/60)+'px';
-          mcardEl.style.top=(curTop+vy/60)+'px';
-          hitTestActivateZone(curLeft+savedState.origRect.width/2+vx/60,curTop+savedState.origRect.height/2+vy/60);
-          if(tryDrop()&&canActivateCard(cardId)){
-            _commitActivation(mcardEl,cardId,savedState);
-            hideActivateZone();return;
-          }
-          if(Math.abs(vx)+Math.abs(vy)>30){
-            _momFrame=requestAnimationFrame(coast);
-          }else{
-            snapCardBack(mcardEl,savedState);
-            hideActivateZone();
-          }
-        })();
-      }else{
-        snapCardBack(mcardEl,savedState);
-        hideActivateZone();
-      }
-      window._dragEndedAt=Date.now();_dragState=null;
+      _returnCardToSlot(mcardEl,savedState,false);
     }
   }
   mcardEl.addEventListener('mousedown',onDragStart);
@@ -24533,6 +24544,12 @@ function initCardDrag(mcardEl,cardId){
   document.addEventListener('touchend',endFn);
   document.addEventListener('touchcancel',endFn);
   _dragCleanups.push(()=>{
+    /* P612: a card mid-drag when the row is rebuilt (resume, a new turn, a
+       card burned) would leave _dragState pointing at a detached element,
+       and the next pointer event would move a card that is no longer in the
+       DOM. Clearing it here makes teardown the third way a drag can end -
+       silently, with the row about to be rebuilt from state anyway. */
+    try{if(_dragState&&_dragState.el===mcardEl){mcardEl.classList.remove('dragging','armed');_dragState=null;}}catch(e){}
     document.removeEventListener('mousemove',moveFn);
     document.removeEventListener('touchmove',moveFn);
     document.removeEventListener('mouseup',endFn);
@@ -24557,6 +24574,60 @@ function hideActivateZone(){
   const label=zone.querySelector('.az-label');
   if(label)label.textContent='ACTIVATE';
 }
+/* P612: THE INVISIBLE THRESHOLD.
+   A horizontal line a fixed lift above the player's card row. Below it a
+   drag is just a drag; above it the card glows, and that glow is the only
+   sign the line exists. Measured off the row rather than stored as a screen
+   coordinate, so it survives every viewport and the row moving. */
+function _cardThresholdY(){
+  var row=document.getElementById('playerCards');
+  if(!row)return -1e9;/* no row: nothing can be above the line */
+  var r=row.getBoundingClientRect();
+  var lift=parseFloat(getComputedStyle(document.documentElement)
+    .getPropertyValue('--card-arm-lift'))||0;
+  /* the var is in cqw against the screen's width, same as the row's own
+     sizing, so resolve it the same way rather than trusting a px read */
+  var sc=document.getElementById('screen-match');
+  var w=sc?sc.getBoundingClientRect().width:innerWidth;
+  return r.top-(w*lift/100);
+}
+/* is THIS card currently above the line? the card's centre, which is the
+   most predictable point for a finger to aim */
+function _cardIsArmed(el){
+  if(!el)return false;
+  var r=el.getBoundingClientRect();
+  return (r.top+r.height/2)<_cardThresholdY();
+}
+/* uses remaining, read from the flag. `.used` is a fallback only. */
+function _cardHasUse(cardId){
+  try{
+    var u=G&&G.activeCardState&&G.activeCardState.usedCards;
+    if(u&&u[cardId]!==undefined)return (u[cardId]||0)>0;
+  }catch(e){}
+  var el=document.querySelector('.mcard[data-cid="'+cardId+'"]');
+  return !(el&&el.classList.contains('used'));
+}
+/* THE ONLY WAY A DRAG ENDS. Both outcomes put the card back in its own
+   slot; the only difference is whether it lands spent. origStyle is the
+   fan-slot custom properties captured at drag start, which is why nothing
+   here may ever call cssText='' - that was what destroyed the slot. */
+function _returnCardToSlot(mcardEl,savedState,spent){
+  mcardEl.classList.remove('dragging','peeked','armed');
+  if(spent){
+    /* A CUT, NOT A RETURN FLIGHT, as the brief asks: the dragged card is
+       gone and the spent one is simply already home. Restoring origStyle
+       with no FLIP is exactly that. */
+    mcardEl.style.cssText=savedState.origStyle;
+    mcardEl.classList.add('card-spent-cut');
+    setTimeout(function(){mcardEl.classList.remove('card-spent-cut');},300);
+  }else{
+    snapCardBack(mcardEl,savedState);
+  }
+  /* the greyed rendering is DERIVED, every time, from the current flag -
+     never written once at drop time and left to go stale */
+  if(typeof _updatePlayerCardVisuals==='function')_updatePlayerCardVisuals();
+  if(typeof _updateCardGlints==='function'){try{_updateCardGlints();}catch(e){}}
+}
 function hitTestActivateZone(clientX,clientY){
   const zone=document.getElementById('activateZone');
   if(!zone.classList.contains('dragging-active'))return;
@@ -24569,73 +24640,21 @@ function hitTestActivateZone(clientX,clientY){
   const mostly=overlap>cr.width*cr.height*0.5;
   zone.classList.toggle('hot',mostly&&!zone.classList.contains('unavailable'));
 }
+/* P612: DEAD, and kept only as a loud stub for a stray caller. It reparented
+   the card into #activateZone and ran style.cssText='' - which destroyed the
+   fan-slot custom properties that say where the card lives. Nothing parks a
+   card any more; see _returnCardToSlot. */
 function placeCardInZone(mcardEl,dragState){
-  const zone=document.getElementById('activateZone');
-  const zr=zone.getBoundingClientRect();
-
-  /* Calculate scale to fit card inside zone with margin */
-  const margin=6;
-  const fitH=(zr.height-margin*2)/dragState.origRect.height;
-  const fitScale=Math.min(fitH,0.85);
-
-  /* First: capture current drag position */
-  const firstRect=mcardEl.getBoundingClientRect();
-
-  /* Move card into zone DOM immediately, apply in-zone class */
-  mcardEl.classList.remove('dragging','peeked');
-  mcardEl.classList.add('in-zone');
-  mcardEl.style.cssText='';
-  const cardW=dragState.origRect.width*fitScale;
-  const cardH=dragState.origRect.height*fitScale;
-
-  /* Count existing in-zone cards to position side by side */
-  const existing=zone.querySelectorAll('.mcard.in-zone');
-  const idx=existing.length;/* this card hasn't been appended yet */
-  const gap=6;
-  const totalCards=idx+1;
-  const totalW=totalCards*cardW+(totalCards-1)*gap;
-  const startX=(zr.width-totalW)/2;
-
-  mcardEl.style.width=cardW+'px';
-  mcardEl.style.height=cardH+'px';
-  mcardEl.style.left=(startX+idx*(cardW+gap))+'px';
-  mcardEl.style.top=((zr.height-cardH)/2)+'px';
-  mcardEl.style.margin='0';
-  zone.appendChild(mcardEl);
-
-  /* Reposition all existing in-zone cards for even spacing */
-  const allInZone=zone.querySelectorAll('.mcard.in-zone');
-  const newTotalW=allInZone.length*cardW+(allInZone.length-1)*gap;
-  const newStartX=(zr.width-newTotalW)/2;
-  allInZone.forEach(function(el,i){
-    el.style.left=(newStartX+i*(cardW+gap))+'px';
-    el.style.top=((zr.height-cardH)/2)+'px';
-  });
-
-  /* Last: where the card now sits in the zone */
-  const lastRect=mcardEl.getBoundingClientRect();
-
-  /* Invert: make it appear at the dragged position */
-  const dx=firstRect.left-lastRect.left;
-  const dy=firstRect.top-lastRect.top;
-  const sx=firstRect.width/lastRect.width;
-  const sy=firstRect.height/lastRect.height;
-  mcardEl.style.transition='none';
-  mcardEl.style.transform=`translate(${dx}px,${dy}px) scale(${sx},${sy})`;
-  mcardEl.style.filter='brightness(1) sepia(0)';
-
-  /* Play: animate into zone */
-  requestAnimationFrame(()=>{
-    mcardEl.style.transition='transform .3s ease-out, filter .3s ease-out';
-    mcardEl.style.transform='translate(0,0)';
-    mcardEl.style.filter='none';
-    setTimeout(()=>{mcardEl.style.transition='none';mcardEl.style.transform='none';mcardEl.style.filter='';},320);
-  });
-
-  /* Fade out the label */
-  const label=zone.querySelector('.az-label');
-  if(label)label.style.opacity='0';
+  try{console.warn('placeCardInZone is retired (P612)');}catch(e){}
+  if(mcardEl&&dragState)_returnCardToSlot(mcardEl,dragState,true);
+  return;
 }
+/* P612: the old placeCardInZone body (67 lines) is DELETED here, not just
+   unreferenced. It reparented a card into #activateZone, laid several of
+   them out side by side against the zone rect, and ran style.cssText='' -
+   the line that destroyed the fan-slot custom properties. Keeping it as
+   dead code would leave the next reader a complete, plausible implementation
+   of a mechanic that no longer exists. */
 function snapCardBack(mcardEl,dragState){
   /* FLIP technique: First (current drag pos), Last (fan pos), Invert, Play */
   /* First: capture current dragged position */
@@ -24686,12 +24705,20 @@ function returnCardToHand(mcardEl,savedState){
    hand so it can be used again; if spent (0 uses) park it in the zone, greyed. */
 function _commitActivation(mcardEl,cardId,savedState){
   SFX.nav();
+  try{_haptic([12,30,12]);}catch(e){}
+  mcardEl.classList.add('card-fired');
+  setTimeout(function(){mcardEl.classList.remove('card-fired');},420);
   activateCard(cardId);
   var usesLeft=(G&&G.activeCardState&&G.activeCardState.usedCards)?(G.activeCardState.usedCards[cardId]||0):0;
-  /* The Pyre opens an async picker — keep the card in hand until it resolves
-     (a Cancel refunds the use; parking it in the zone stranded it there). */
-  if(usesLeft>0||(G&&G._pyrePickerOpen))returnCardToHand(mcardEl,savedState);
-  else placeCardInZone(mcardEl,savedState);
+  /* P612: BOTH OUTCOMES GO BACK TO THE SLOT - that is the redesign. A card
+     with uses left flies home and stays live; a spent one cuts home and
+     lands greyed. Nothing is parked anywhere and no space is reserved for a
+     card before or after it fires.
+     The Pyre's async picker still counts as "uses left" until it resolves,
+     for the reason the old comment gives: a Cancel refunds the use. */
+  var live=(usesLeft>0||(G&&G._pyrePickerOpen));
+  if(live)returnCardToHand(mcardEl,savedState);
+  else _returnCardToSlot(mcardEl,savedState,true);
   /* The tooltip "X/Y USES" counter is updated centrally by markActiveCardUsed
      (via _refreshCardUsesDisplay), which preserves the accent-coloured spans. */
 }
@@ -25434,19 +25461,27 @@ function refreshKeptTray(){
 function triggerCard(cardId,msg,isPlayer,persist){
   const barId=isPlayer?'playerCards':'oppCards';
   const bar=document.getElementById(barId);
-  const zone=document.getElementById('activateZone');
   let mc=bar?bar.querySelector('.mcard[data-cid="'+cardId+'"]'):null;
-  const isInZone=mc&&mc.classList.contains('in-zone');
+  /* P614: the `isInZone` suppression is gone with the zone. It existed to
+     stop a card that had been PARKED from playing its trigger flash, and to
+     reparent the floating effect label into #activateZone. Nothing is parked
+     now - a spent card sits in its own slot - so every card that fires plays
+     the flash in place, which is what the redesign wants. */
   SFX.cardTrigger();
-  if(mc&&!isInZone){
+  if(mc){
     mc.classList.remove('card-trigger');void mc.offsetWidth;
     mc.classList.add('card-trigger');
     setTimeout(function(){mc.classList.remove('card-trigger');},750);
   }
   /* Clear any existing persistent label for this card */
   document.querySelectorAll('.card-trig-label[data-cid="'+cardId+'"]').forEach(e=>e.remove());
-  /* Pick correct parent: zone if card is placed there, otherwise the bar */
-  const labelParent=(isInZone&&zone)?zone:bar;
+  /* P614: the bar, always. This used to pick #activateZone when the card was
+     parked there - and removing the `isInZone` declaration above without
+     removing these two uses left them referencing an undeclared variable,
+     i.e. a ReferenceError on the first card that fired. The parse gate
+     cannot see that: the file parses fine and the path only runs in play.
+     Caught by grepping for the identifier after the edit, not by the gate. */
+  const labelParent=bar;
   if(mc&&labelParent){
     const lbl=document.createElement('div');
     lbl.className='card-trig-label'+(isPlayer?'':' opponent')+(persist?' persist':'');
@@ -25454,11 +25489,7 @@ function triggerCard(cardId,msg,isPlayer,persist){
     lbl.textContent=msg;
     const cr=mc.getBoundingClientRect(),br=labelParent.getBoundingClientRect();
     lbl.style.left=(cr.left-br.left+cr.width/2)+'px';
-    if(isInZone){
-      /* Position at bottom of zone, floats down into gap between zone and cards */
-      lbl.style.top=(br.height+2)+'px';
-      lbl.style.left='50%';
-    }else if(isPlayer){
+    if(isPlayer){
       lbl.style.top=(cr.top-br.top-10)+'px';
     }else{
       lbl.style.top=(cr.bottom-br.top+4)+'px';
@@ -32961,7 +32992,8 @@ function _updateCardGlints(){
     var cd=CARDS.find(function(c){return c.id===cid;})||getNpcCard(cid);
     if(!cd||cd.type!=='active')return;
     var mc=bar.querySelector('.mcard[data-cid="'+cid+'"]');
-    if(!mc||mc.classList.contains('in-zone')||mc.classList.contains('used'))return;
+    /* P612: `.in-zone` is gone; `.used` is the flag's mirror */
+    if(!mc||mc.classList.contains('used'))return;
     var winOpen=canActivateCard(cid);
     mc.classList.toggle('card-dormant',!winOpen);
     mc.classList.toggle('card-ready',winOpen&&_glintReady(cid));
