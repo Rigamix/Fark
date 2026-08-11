@@ -59,11 +59,21 @@ window.anyScoring = function(){
   return withRule;
 };
 
+/* SWEEPING THE POLICIES, because the single-policy caveat is the one thing the
+   two earlier checks could NOT test: they shared bea, the gear and the seed, so
+   their agreement said nothing about any of those. The event needs a brand to
+   fire and the turn to KEEP ROLLING afterwards, so a policy that banks later is
+   where it would appear if it appears at all - bea banks at 500, rita at 200,
+   greg gambles. */
+var POLS = ['bea','carl','rita','ned','greg_naive','greg_informed'];
+out.byPolicy = {};
 FSIM.quiet();
-FSIM.installRng(20260810);
 try {
+ POLS.forEach(function(pname){
+  var pol = FSIM.POLICIES[pname]; if(!pol) return;
+  stats = { iconChecks:0, rescuedEither:0, costByRule:0, fires:0, turns:0, busts:0, hot:0 };
+  FSIM.installRng(20260810);
   FSIM.setupMatch({ tier: 3, dice: GEAR.dice, ench: GEAR.ench, fcards: [] });
-  var pol = FSIM.POLICIES.bea;
   for (var i = 0; i < TURNS; i++) {
     var r;
     try { r = FSIM.simTurn(pol, { turnsLeft: 8, oppTotal: 0 }); } catch (e) { continue; }
@@ -72,6 +82,12 @@ try {
     stats.hot += r.hot || 0;
     if (i % 8 === 7) FSIM.setupMatch({ tier: 3, dice: GEAR.dice, ench: GEAR.ench, fcards: [] });
   }
+  out.byPolicy[pname] = { turns:stats.turns, costByRule:stats.costByRule,
+    hookFired:stats.iconChecks>100, rescuedEither:stats.rescuedEither,
+    firesPerTurn:+(stats.fires/Math.max(1,stats.turns)).toFixed(3),
+    rollsHot:+(stats.hot/Math.max(1,stats.turns)).toFixed(3),
+    bustRate:+(stats.busts/Math.max(1,stats.turns)).toFixed(4) };
+ });
 } finally {
   window.anyScoring = realAnyScoring;
   window._iconFire = realIconFire;
@@ -79,14 +95,7 @@ try {
   FSIM.restoreRng(); FSIM.loud();
 }
 
-out.stats = stats;
-/* CONTROLS first - a zero below means nothing unless both of these hold */
-out.theHookFired = stats.iconChecks > 100;
-out.brandsActuallyFired = stats.fires > 0;
-out.firesPerTurn = +(stats.fires / Math.max(1, stats.turns)).toFixed(3);
-
-out.turnsCostByTheRule = stats.costByRule;
-out.costPerThousandTurns = +(1000 * stats.costByRule / Math.max(1, stats.turns)).toFixed(2);
-out.asShareOfBusts = +(100 * stats.costByRule / Math.max(1, stats.busts)).toFixed(2) + '% of busts';
-out.bustRate = +(stats.busts / Math.max(1, stats.turns)).toFixed(4);
+out.everyHookFired = Object.keys(out.byPolicy).every(function(k){return out.byPolicy[k].hookFired;});
+out.everyPolicyFiredBrands = Object.keys(out.byPolicy).every(function(k){return out.byPolicy[k].firesPerTurn>0;});
+out.totalCostEvents = Object.keys(out.byPolicy).reduce(function(a,k){return a+out.byPolicy[k].costByRule;},0);
 return out;

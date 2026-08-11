@@ -160,8 +160,31 @@ changed a bust decision** (0 events), with both controls green — the hook fire
 22,475 times and the icon rescue was genuinely exercised 13,918 times.
 
 **So it is a correctness fix with no measurable difficulty cost**, not a balance
-change to account for in the retune. Caveat kept honest: one policy (bea), one
-gear (three tithes on bone). A policy that banks much later could differ.
+change to account for in the retune.
+
+**AND THE POLICY CAVEAT IS NOW TESTED, not just stated.** The two checks above
+shared a harness, a policy, a gear and a seed — they observed different things
+(an outcome vs a decision) but their agreement said nothing about any of those.
+Sweeping the event count across every shipped policy, 12,000 turns each:
+
+| policy | fires/turn | bust rate | rescues seen | cost events |
+|---|---|---|---|---|
+| bea | 0.200 | 71.3% | 13,918 | **0** |
+| carl | 0.047 | 65.6% | 13,153 | **0** |
+| rita | 0.057 | 71.6% | 13,719 | **0** |
+| ned | 0.212 | 63.6% | 12,899 | **0** |
+| greg_naive | 0.221 | 97.1% | 16,616 | **0** |
+| greg_informed | 0.221 | 97.1% | 16,616 | **0** |
+
+The greg arms matter most: they roll hardest after firing and bust 97% of the
+time, which is the exact shape that would produce the event.
+
+**Counted as FIVE distinct policies, not six** — greg_naive and greg_informed
+returned byte-identical numbers in every column, which usually means they
+collapsed to the same behaviour. Worth someone checking why; it does not change
+this conclusion.
+
+Remaining caveat: one gear (three tithes on bone), and FSIM itself.
 
 **A TRAP FOR THE NEXT READER:** FSIM's `iconsFired` now reads **0** by
 construction — it splits with `_splitIcons` *after* the commit that marks the
