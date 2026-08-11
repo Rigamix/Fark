@@ -1650,7 +1650,13 @@ body.dlg-speaking #screen-match #tellBadge{opacity:0;pointer-events:none}
    positions, the frame's channel is 10.2%..40.5% of its height and the fill's
    ink 16.5%..36.4% of its own, so the fill sits inside the channel either way. */
 #raceWrap{position:absolute;left:0;right:0;top:var(--bar-top);aspect-ratio:3795/933;z-index:15;
-  /* decoration only: the portrait tokens sit UNDER this and must stay tappable */
+  /* P594: HOW MUCH THE LEADER GROWS - one dial, read by both .rbSide rules and
+     nothing else, so the two sides cannot drift apart. */
+  --lead-s:1.14;
+  /* P594: the tokens now live INSIDE this, so this is no longer "decoration
+     only" - but it stays pointer-events:none because .rbFlag opts back in and
+     .tok is explicitly pointer-events:none ("the flag layer above owns the
+     tap"). Nothing here wants a tap except the two flags. */
   pointer-events:none}
 #raceWrap .rb{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none;
   filter:drop-shadow(0 0.5cqw 0 rgba(26,15,7,.34))}
@@ -1671,19 +1677,37 @@ body.dlg-speaking #screen-match #tellBadge{opacity:0;pointer-events:none}
    player who has the biggest score so it's more clear who's winning ... ensure
    they don't get cropped out, meaning bring the portraits closer to the center
    and when scaling offset them toward center as well."
-   THE TRANSFORM-ORIGIN IS THE WHOLE TRICK. Each flag is pinned to its own screen
-   edge, so scaling about its centre pushes half the growth off-screen. Anchoring
-   the left flag's origin at its LEFT edge and the right flag's at its RIGHT edge
-   would do the same; anchoring each at the edge FACING THE CENTRE makes every
-   extra pixel grow inward, which is what "offset them toward center" asks for
-   and needs no companion translate.
+   THE TRANSFORM-ORIGIN IS THE WHOLE TRICK, and P590 had it exactly inverted.
+   transform-origin names the FIXED point, so the element grows AWAY from it:
+   anchoring the edge that faces the centre pins that edge and pushes every extra
+   pixel OUTWARD, which is the opposite of what was wanted. Measured on the
+   shipped build: the right flag, origin at its left edge, ran from [360.6..430]
+   to [360.6..439.7] on a 430px viewport - 9.7px off the screen.
+   P594: AND IT SCALED THE WRONG THING. The gold ring is .rbFlag, but the
+   portrait is .tok/.tokImg and the number is .hud-score, and those were three
+   elements in two different parents. Growing one of the three is exactly what
+   Denis saw: "the circular image doesn't match the outer circle you scaled up
+   ... the individual scores doesn't scale with the png either". So the scale
+   moves up to a per-side wrapper that owns all three, and there is one dial
+   (--lead-s) and one origin per side instead of three sets of compensating
+   transforms - which is what a "match the scale and position" fix degenerates
+   into if each element is nudged on its own.
+   THE ORIGIN, both halves measured rather than picked:
+     x at the SCREEN EDGE (0% / 100%) so the growth runs inward and nothing is
+       cropped - the standing constraint from the first pass.
+     y at the PORTRAIT HOLE'S OWN CENTRE (35.16% / 34.05%, the hole centres this
+       file already records twelve lines below), so the disc grows about itself
+       and stays sitting on the bar instead of sinking below it. That is Denis's
+       "as you scale the portraits up, move them up as well so they roughly
+       remain centered to the bar" - it falls out of the origin, no companion
+       translate.
    On `scale`, the standalone property, not `transform`: .rbFlag:active already
    animates transform as its press feedback, and the two would clobber each
    other. Same reasoning as the card fan in P580. */
-#raceWrap .rbFlag{transition:scale .22s ease}
-#raceWrap .rbFlagL{transform-origin:right center}
-#raceWrap .rbFlagR{transform-origin:left center}
-#raceWrap .rbFlagL.lead,#raceWrap .rbFlagR.lead{scale:1.14}
+#raceWrap .rbSide{position:absolute;inset:0;pointer-events:none;
+  transition:scale .22s ease}
+#raceWrap .rbSideL.lead{scale:var(--lead-s);transform-origin:0% 35.16%}
+#raceWrap .rbSideR.lead{scale:var(--lead-s);transform-origin:100% 34.05%}
 /* a press the flag can answer on its own - the whole point of the split art */
 #raceWrap .rbFlag:active{filter:drop-shadow(0 0.25cqw 0 rgba(26,15,7,.34)) brightness(1.12);
   transform:translateY(0.18cqw)}
@@ -1717,12 +1741,18 @@ body.dlg-speaking #screen-match #tellBadge{opacity:0;pointer-events:none}
   transition:width .45s cubic-bezier(.25,.9,.3,1)}
 #screen-match #pProg{position:absolute;right:0;top:0;bottom:0;width:26.82%;overflow:hidden;background:none;border-radius:0;
   transition:width .45s cubic-bezier(.25,.9,.3,1)}
-/* P589: up ~2px. The fill art's ink sat a hair below the frame's channel - the
-   two files are separate masters and their bands do not have to agree to the
-   pixel. cqw here resolves against .rbClip (container-type:size, half the bar),
-   so -1cqw is about 2.1px at the design width. */
-#oProg img{position:absolute;left:0;top:-1cqw;width:200cqw;height:100cqh;max-width:none}
-#pProg img{position:absolute;right:0;top:-1cqw;width:200cqw;height:100cqh;max-width:none}
+/* P593: NO OFFSET, because the masters now agree. P589 nudged the fill up 1cqw
+   (~2.1px) on the reasoning that "two separate masters need not agree to the
+   pixel" - true then, because ScoreBar_new.png had been rebuilt at 3795x933
+   under a fill still drawn at 3795x950. Denis has since redrawn
+   ScoreBar_new_fill.png on the frame's own canvas, so the offset became a
+   2.1px error in the other direction.
+   MEASURED, not assumed - tools/measure_scorebar_bands.py reads both masters as
+   alpha runs down five matched columns: the frame's channel is rows 93..380 and
+   the fill's ink 140..331, centred in it to within 1.4px of 933 (0.15% of the
+   height, 0.16 css px at the design width). Aligned art wants no offset. */
+#oProg img{position:absolute;left:0;top:0;width:200cqw;height:100cqh;max-width:none}
+#pProg img{position:absolute;right:0;top:0;width:200cqw;height:100cqh;max-width:none}
 /* centred in the diamond: the plate spans y 0-53.3% of the canvas, so its
    middle is 26.6% */
 /* P578: 25.30% is the plank ink band's centre (rows 91..381 of 933), which is
@@ -1738,7 +1768,12 @@ body.dlg-speaking #screen-match #tellBadge{opacity:0;pointer-events:none}
 /* the wells, measured off ScoreBar_new_portraits: left centre 7.9%, right
    centre 92.0%, each ~9.2% of the bar wide. The portrait art draws its own
    frame, so the old ring image is switched off below. */
-#screen-match .tok{position:absolute;width:13.2cqw;text-align:center;z-index:14;
+/* P594: z-index 14 -> 3, because the token MOVED INTO #raceWrap. It used to sit
+   outside, in .hud, where 14 lost to #raceWrap's own 15 and the ring painted
+   over the disc's edges - which is the whole look. Inside the bar it competes
+   with .rbFlag's 4 instead, and 14 would have put the flat disc ON TOP of the
+   gold ring. 3 keeps it above the fills (2) and under the ring (4). */
+#screen-match .tok{position:absolute;width:13.2cqw;text-align:center;z-index:3;
   /* the flag layer above owns the tap now */
   pointer-events:none}
 /* hole centres: left (7.89%, 35.16%), right (91.91%, 34.05%) of the bar.
@@ -1746,8 +1781,13 @@ body.dlg-speaking #screen-match #tellBadge{opacity:0;pointer-events:none}
 /* deliberately a shade WIDER than the holes (12.25% / 12.86%): the ring is
    opaque out to 15.84%, so the excess is cropped by the frame, and sizing to
    the hole exactly would leave a sliver of bare bar on the wider side. */
-#screen-match .tok.tokO{left:1.29cqw;top:calc(var(--bar-top) + 8.80cqw);transform:translateY(-50%)}
-#screen-match .tok.tokP{right:1.49cqw;top:calc(var(--bar-top) + 8.52cqw);transform:translateY(-50%)}
+/* P594: --bar-top is GONE from these two, and dropping it is required, not
+   tidying. The token now lives inside #raceWrap, whose own top already IS
+   --bar-top, so keeping it would count that offset twice and push both
+   portraits a full bar-height down the table. Same trap the .hud-score comment
+   below records for its own move inside the bar. */
+#screen-match .tok.tokO{left:1.29cqw;top:8.80cqw;transform:translateY(-50%)}
+#screen-match .tok.tokP{right:1.49cqw;top:8.52cqw;transform:translateY(-50%)}
 #screen-match .tok .tokRing{display:none}
 #screen-match .tok .hud-lbl{display:none}
 /* a flat colour disc with the character on top - no ring art, the scorebar
@@ -1802,7 +1842,12 @@ body.dlg-speaking #screen-match #tellBadge{opacity:0;pointer-events:none}
    was dark brown; the new art is dark metal, so the old colours would have been
    ink on ink. Matched to .hud-score's #f6ecd4 so the two readings on this bar
    are the same cream. */
-#screen-match #turnNum{font-family:'JMH Beda',serif;font-size:3.4cqw;letter-spacing:.06em;
+/* P593: 3.4cqw -> 2.85cqw. The plate shrank in P589 and the type did not, so the
+   ink filled 68.6% of the plate's height (measured: 23.0px of ink in a 33.5px
+   plate, base 14.62px). At 2.85cqw the base is 12.25px and the ink 19.3px, or
+   57.5% - the caption and number sit inside the plate's border instead of
+   crowding it. */
+#screen-match #turnNum{font-family:'JMH Beda',serif;font-size:2.85cqw;letter-spacing:.06em;
   /* P589: beige rather than near-white. #f6ecd4 is the score's cream and read
      too bright against the dark plate. */
   color:#dcc9a4;text-shadow:0 1px 0 rgba(12,7,3,.8);
@@ -1837,11 +1882,16 @@ body.dlg-speaking #screen-match #tellBadge{opacity:0;pointer-events:none}
   color:#b7a582;
   color:color-mix(in srgb,#f2e4c6 calc(var(--tn-w,0) * 100%),#b7a582);
   position:relative;top:0}
-/* P577: THE THIRD SPAN. `TURN 1/8` is three elements - caption, number and
-   this "/8" - and changing only two would have left the denominator as dark ink
-   on the new dark plate. Caught by asserting the old colour was gone rather
-   than by looking at two of the three rules. */
-#screen-match #turnNum .tn-o{font-size:.92em;letter-spacing:.08em;color:#a89070}/* P589 */
+/* P593 CORRECTION. P577's note here claimed this was the "/8" of `TURN 1/8` and
+   that the label is three spans. MEASURED on the running page, it is two:
+   _turnLabel emits <tn-w>TURN</tn-w><tn-n>1/8</tn-n>, so the "/8" lives INSIDE
+   .tn-n and takes the number's colour ramp with it.
+   .tn-o is the OTHER branch - `if(!num)` - which today has exactly one caller,
+   _turnLabel('OVERTIME',''). So this rule styles the word OVERTIME and nothing
+   else. Left at the caption's dim beige for now, which is what P589 gave it
+   while the comment said it was a denominator; whether overtime should instead
+   read as the loudest thing on the bar is a design call, not a bug fix. */
+#screen-match #turnNum .tn-o{font-size:.92em;letter-spacing:.08em;color:#a89070}
 #screen-match .hud-mid{width:auto;padding:0}
 #btnQuit{display:none !important}
 #screen-match .controls{background:none;border-top:none;align-items:center;justify-content:center;gap:3.5%}
@@ -9176,20 +9226,30 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
          first painted column of the fill art. -->
     <div class="rbClip o"><div class="prog-fill o" id="oProg" style="width:26.82%"><img src="Art/Assets/Match/optimized/ScoreBar_new_fill_opt.webp" alt=""></div></div>
     <div class="rbClip p"><div class="prog-fill p" id="pProg" style="width:26.82%"><img src="Art/Assets/Match/optimized/ScoreBar_new_fill_opt.webp" alt=""></div></div>
-    <div class="rbFlag rbFlagL" onclick="showBankSummary('o')" title="Tap for rival bank history"><img src="Art/Assets/Match/optimized/ScoreBar_new_portraits_left_opt.webp" alt=""></div>
-    <div class="rbFlag rbFlagR" onclick="showBankSummary('p')" title="Tap for bank history"><img src="Art/Assets/Match/optimized/ScoreBar_new_portraits_right_opt.webp" alt=""></div>
+    <!-- P594: ONE WRAPPER PER SIDE, so the ring, the portrait disc and the
+         number are a single thing to scale. They were three siblings in two
+         different parents - .rbFlag inside here, .tok outside in .hud - so
+         P590's scale on the flag grew the gold ring and left the portrait and
+         the score behind it. The wrapper is inset:0 over #raceWrap, so every
+         percentage its children already use resolves exactly as before. -->
+    <div class="rbSide rbSideL">
+      <div class="rbFlag rbFlagL" onclick="showBankSummary('o')" title="Tap for rival bank history"><img src="Art/Assets/Match/optimized/ScoreBar_new_portraits_left_opt.webp" alt=""></div>
+      <div class="tok tokO">
+        <div class="tokImg" id="tokOImg"></div>
+        <div class="hud-lbl" id="oppName">RIVAL <span id="skillIcon" style="display:none;cursor:pointer;color:var(--red);font-size:11px" onclick="event.stopPropagation();toggleLoadoutPanel()" title="Skill active">&#9889;</span></div>
+      </div>
+      <div class="hud-score o" id="oScore">0</div>
+    </div>
+    <div class="rbSide rbSideR">
+      <div class="rbFlag rbFlagR" onclick="showBankSummary('p')" title="Tap for bank history"><img src="Art/Assets/Match/optimized/ScoreBar_new_portraits_right_opt.webp" alt=""></div>
+      <div class="tok tokP">
+        <div class="tokImg tokPImg"></div>
+        <div class="hud-lbl">YOU</div>
+      </div>
+      <div class="hud-score p" id="pScore">0</div>
+    </div>
     <img class="rb rbCentre" src="Art/Assets/Match/optimized/ScoreBar_new_centre_opt.webp" alt="">
     <div class="hud-target" id="targetScore">3500</div>
-    <div class="hud-score o" id="oScore">0</div>
-    <div class="hud-score p" id="pScore">0</div>
-  </div>
-  <div class="tok tokO">
-    <div class="tokImg" id="tokOImg"></div>
-    <div class="hud-lbl" id="oppName">RIVAL <span id="skillIcon" style="display:none;cursor:pointer;color:var(--red);font-size:11px" onclick="event.stopPropagation();toggleLoadoutPanel()" title="Skill active">&#9889;</span></div>
-  </div>
-  <div class="tok tokP">
-    <div class="tokImg tokPImg"></div>
-    <div class="hud-lbl">YOU</div>
   </div>
   <div class="hud-mid">
     <div class="hud-turn-pts" id="turnPts" style="display:none"></div>
@@ -25036,11 +25096,14 @@ function updHUD(){
      winning" has no answer at 0-0, and the opening seconds of every match are a
      tie, so growing both would make the cue mean nothing exactly when it is
      first seen. */
+  /* P594: on the SIDE WRAPPER, not the flag. The flag is only the gold ring;
+     the wrapper also holds the portrait disc and the score, and Denis caught
+     P590 growing the ring alone. Same two lines, one level up. */
   try{
-    var _fl=document.querySelector('#raceWrap .rbFlagL'),
-        _fr=document.querySelector('#raceWrap .rbFlagR');
+    var _fl=document.querySelector('#raceWrap .rbSideL'),
+        _fr=document.querySelector('#raceWrap .rbSideR');
     var _pAhead=(G.pPts||0)>(G.oPts||0), _oAhead=(G.oPts||0)>(G.pPts||0);
-    if(_fl)_fl.classList.toggle('lead',_oAhead);/* left flag is the RIVAL's */
+    if(_fl)_fl.classList.toggle('lead',_oAhead);/* left side is the RIVAL's */
     if(_fr)_fr.classList.toggle('lead',_pAhead);
   }catch(e){}
   /* ── Escalation VFX ── */
