@@ -142,9 +142,31 @@ letting it go early: the ladder already sits well under target across most of th
 game, so closing a double-cast that is currently overperforming is very likely
 relief in the right direction rather than a new problem.
 
-Two knock-ons to carry into any retune measured after it: it removes a real (if
-rare) double-cast, and it creates a **new way to lose a turn** — a row whose only
-live face is a spent brand is now a bust.
+**MEASURED AFTER SHIPPING, and the "difficulty change" framing was overstated.**
+I called it one on the strength of "a row whose only live face is a spent brand
+is now a bust" — which says it *can* happen and nothing about how often. Driven
+through FSIM (whose player side is the real engine):
+
+| | rule off | rule on | delta |
+|---|---|---|---|
+| no brands *(control)* | 67.55% | 67.55% | **0.00pp** |
+| one brand | 68.40% | 68.60% | +0.20pp |
+| three brands | 71.25% | 71.03% | −0.22pp |
+
+n=4000 per arm, SE ≈ 0.72pp — both deltas inside the noise and pointing opposite
+ways. Counting the **event** instead of its effect on the aggregate, wrapped at
+the bust gate itself: in **12,000 turns holding three brands the rule never once
+changed a bust decision** (0 events), with both controls green — the hook fired
+22,475 times and the icon rescue was genuinely exercised 13,918 times.
+
+**So it is a correctness fix with no measurable difficulty cost**, not a balance
+change to account for in the retune. Caveat kept honest: one policy (bea), one
+gear (three tithes on bone). A policy that banks much later could differ.
+
+**A TRAP FOR THE NEXT READER:** FSIM's `iconsFired` now reads **0** by
+construction — it splits with `_splitIcons` *after* the commit that marks the
+brand spent, so `_dieIsIcon` correctly says "not a live icon". Brands still fire
+(counted at `_iconFire`: 0.2/turn). Do not read that zero as a regression.
 
 ### 1e-bis. RETRACTED — those two bosses can fire the card, and the premise was backwards
 
