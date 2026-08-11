@@ -1457,7 +1457,13 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 #stBuyBtn:active{transform:scale(.96)}
 #stBuyBtn.off{filter:saturate(.5) brightness(.72);cursor:default}
 #stBuyBtn.off span{color:#6a5238;text-shadow:none}
-#stBuyBtn img{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;pointer-events:none}
+/* P605: img.plq, NOT img. This was written for the plaque background, but a
+   type selector also catches the inline price glyph <img class="pcoin"> in
+   the label - and at (1,0,1) it outranks .pcoin's (0,1,0), so the coin was
+   stretched across the whole button with object-fit:fill, hiding the text
+   behind it. Only the unaffordable branch shows a label, which is why it
+   only ever looked broken when you could not afford the die. */
+#stBuyBtn img.plq{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;pointer-events:none}
 #stBuyBtn span{position:relative;z-index:1;font-family:'JMH Beda',serif;font-size:2.9cqh;letter-spacing:.02em;
   white-space:nowrap;max-width:72%;overflow:visible;text-align:center;
   color:#f7ecd2;text-shadow:0 2px 0 rgba(16,9,3,.85),0 4px 10px rgba(0,0,0,.55);transform:translateY(-4%)}
@@ -10698,7 +10704,10 @@ function showRenownInfo(tab){
   var current=_getCurrentTier(renown);
   var next=_getNextTier(renown);
   var progress=next?Math.min(100,Math.round((renown/next.threshold)*100)):100;
-  var html='<div class="rnk-info-title">\u2B50 '+(current?current.label:'Unknown')+'</div>';
+  /* P607: the tier header is gone too. _getCurrentTier() walks an empty array
+     and always returns null, so this rendered the literal word 'Unknown' as a
+     rank - reachable in-match from the loadout's renown corner. */
+  var html='';
   html+='<div class="rnk-info-sub">Renown: '+renown+(next?' / '+next.threshold:'')+'</div>';
   if(next){
     html+='<div class="rnk-info-bar"><div class="rnk-info-bar-fill" style="width:'+progress+'%"></div></div>';
@@ -14522,7 +14531,12 @@ function famRunDraftPick(i){
   else{S.run.diceInv=S.run.diceInv||[];S.run.diceInv.push(mt);}
   S.run._famFirstDraft=false;_starterOffer=null;save();
   var ov=document.getElementById('famRunDraft');if(ov)ov.remove();
-  famLog(getDie(mt).name.toUpperCase()+' — YOURS, WITH YOUR FIRST ALE');
+  /* P606: no announcement here. famLog routes off-match to _famToast, which
+     parents to `#phoneShell || document.body` - and #phoneShell does not
+     exist on this path, so the plate landed on BODY and outlived both the
+     draft overlay's removal and showScreen. The pick reads fine without it:
+     the die is visibly taken and the screen advances. Anything put back here
+     must not be body-parented. */
   showScreen('gauntlet');
 }
 /* ── loadout greybox panel: equip 3 / inventory / sell 15g ── */
@@ -15815,7 +15829,6 @@ function _gbRunWon(){
   _getS();
   host.innerHTML='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;line-height:2.2">'
     +'<div style="font-size:22px;letter-spacing:4px;color:#dc5;border:2px solid #dc5;padding:14px 26px">RUN WON</div>'
-    +'<div style="margin-top:14px;color:#ca8">'+(playerTitle()!=='nobody'?playerTitle():'')+'</div>'
     +'<div style="color:#999;font-size:12px">eight nights survived · '+(S.run.gold||0)+'g in the purse</div>'
     +'<div style="color:#999;font-size:12px">renown '+(S.renown||0)+' · feats '+(Object.keys(S.featsDone||{}).length)+'</div>'
     +'<div style="margin-top:8px">'+((S.trophies||[]).map(function(t){return '<span style="border:1px solid #dd6;color:#dd6;font-size:10px;padding:4px 8px;margin:2px">🏆 '+getDie(t).name+'</span>';}).join(''))+'</div>'
@@ -16009,7 +16022,7 @@ function _gbBook(){
     +'the trailing player always gets the final answer</div>'
     +'<h2>your standing</h2>'
     +'<div class="gbx-box sub" style="display:block;padding:8px;font-size:12px;text-align:left;line-height:1.6">'
-    +'title: '+playerTitle()+' · renown '+(S.renown||0)+'<br>'
+    +'renown '+(S.renown||0)+'<br>'
     +'feats done: '+(Object.keys(S.featsDone||{}).length)+' · trophies: '+((S.trophies||[]).length)+'</div>'
     +'<div class="gbx-btn" style="height:48px;margin-top:12px" onclick="_gbSheetClose()">back</div>';
   _gbSheetOpen(h);
@@ -16401,7 +16414,7 @@ function _gbShelf(){
     +"font-family:'JMH Beda',serif";
   var h='<div class="gbx" style="min-height:100%;display:flex;flex-direction:column;padding:10px 14px 14px">'
     +'<div style="font-weight:700;font-size:15px;padding:70px 0 4px">The Shelf</div>'
-    +'<div class="gbx-label">'+playerTitle()+' · renown '+(S.renown||0)+' · feats '+(Object.keys(S.featsDone||{}).length)+'</div>'
+    +'<div class="gbx-label">renown '+(S.renown||0)+' · feats '+(Object.keys(S.featsDone||{}).length)+'</div>'
     +'<div style="flex:1"></div>'
     +'<div style="display:flex;gap:10px;flex-wrap:wrap;padding-bottom:8px">';
   (S.trophies||[]).forEach(function(t){h+='<div class="gbx-box sub" style="width:70px;height:70px">🏆<br><span class="gbx-label" style="font-size:8px">'+getDie(t).name+'</span></div>';});
@@ -16443,7 +16456,7 @@ function _gbBarred(){
   }else{
     h+='<div class="gbx-box" style="width:230px;height:64px">BARRED<br><span class="gbx-label">'+(tier.boss?tier.boss.name:'the house')+' took your last heart — night '+((S.run?S.run.tier||0:0)+1)+'</span></div>'
       +'<div class="gbx-box sub" style="width:230px;height:84px;font-size:12px">'+(S.run?(S.run.gold||0):0)+'g in the purse · '
-      +(Object.keys(S.featsDone||{}).length)+' feats · '+playerTitle()+'</div>';
+      +(Object.keys(S.featsDone||{}).length)+' feats</div>';
   }
   h+='</div><div style="display:flex;flex-direction:column;gap:8px;padding:0 14px 10px">';
   if(won)h+='<div class="gbx-btn primary" style="height:64px" onclick="_gbShelf()">TO THE SHELF</div>';
@@ -17168,7 +17181,7 @@ function _ptRoom(host,tier,bossReady){
     +'<div id="ptGold"'+(window._fkDbgOn?' style="cursor:pointer" onclick="_fkGold()"':'')+'><img class="pl" src="'+PT_A+'plate_goldCounter.png" alt="">'
       +'<img class="co" src="Art/Assets/Icons/optimized/coin_opt.webp" alt=""><div class="amt">'+(S.run.gold||0)+'</div></div>'
     +'<div class="pt-ov" id="ptChalk"'+(window._fkDbgOn?' style="pointer-events:auto;cursor:pointer" onclick="_fkSeedPanel()"':'')+'>NIGHT '+((S.run.tier||0)+1)+'/8'
-      +(playerTitle()!=='nobody'?' · '+playerTitle():'')+'</div>'
+      +'</div>'/* P607: rank gone; NIGHT n/8 is the whole label now */
     +(chips?'<div class="pt-ov" id="ptChips">'+chips+'</div>':'')
     +'<div class="pt-ov'+(bossReady?' ready':'')+'" id="ptBossBar">'
       +'<div class="bp">'+wicons+'</div>'
@@ -21300,7 +21313,12 @@ var D3X={
   dropY:5.4, dropZ:1.9,
   /* how high a die has to be to be out of the candlelight, and how far the
      brown goes at the top of that */
-  airDarkFrom:1.4, airDarkTo:5.4, airDark:0.35,
+  /* P608: airSwell is the apex scale, and it deliberately shares airDark's
+     ramp - see _airRamp. 0.18 means a die is 18% larger at throw height and
+     eases back to its own size as it falls, which is the fake perspective
+     Denis asked for. airDark 0.35 -> 0.45 because the darkening he also asked
+     for ALREADY existed on this ramp and was too faint to read. */
+  airDarkFrom:1.4, airDarkTo:5.4, airDark:0.45, airSwell:0.18,
     /* The collision box is WIDER THAN THE DIE in the plane of the table, so
        two dice simply cannot end up closer than this - no force acting at a
        distance, no push after they have landed. Not taller: a uniformly
@@ -22370,11 +22388,16 @@ var D3X={
      darkened colour - they never overlap in practice (a die in the tray is
      not in the air) but one of them caching the other's output would be a
      very quiet bug. */
+  /* P608: 0 on the table, 1 at throw height. THE one height ramp - the air
+     darkening and the apex swell both read it, so they cannot come to peak on
+     different frames. Two copies of this expression is the bug to avoid. */
+  _airRamp:function(y){
+    var P=this.PHYS,k=(y-P.airDarkFrom)/(P.airDarkTo-P.airDarkFrom);
+    return k<0?0:(k>1?1:k);
+  },
   _airTint:function(d,y){
     var P=this.PHYS;
-    var k=(y-P.airDarkFrom)/(P.airDarkTo-P.airDarkFrom);
-    k=k<0?0:(k>1?1:k);
-    k*=P.airDark;
+    var k=this._airRamp(y)*P.airDark;
     if(!k&&!d._airK)return;/* nothing to do, and nothing to undo */
     d._airK=k;
     d.obj.traverse(function(o){
@@ -23550,7 +23573,12 @@ var D3X={
           root.position.set(hc.x,-hc.y,0);
           if(d.obj.parent!==root)root.add(d.obj);
           d.obj.visible=true;
-          d.obj.scale.setScalar(1);
+          /* P608: fake perspective - a die is airSwell larger at the top of
+             the throw and eases back to 1 as it falls, on the SAME ramp that
+             darkens it. Purely visual: it writes only obj.scale, which the
+             settled branch overwrites on the very next frame, and _burstPose
+             below still wins when a burst is running. */
+          d.obj.scale.setScalar(1+(D3X.PHYS.airSwell||0)*D3X._airRamp(pose.y));
           d.obj.position.set(pose.x,pose.y,pose.z);
           d.obj.quaternion.copy(pose.q);
           D3X._airTint(d,pose.y);
@@ -31927,7 +31955,6 @@ function endMatch(win){
     }
     if(resCard){resCard.innerHTML='<div style="font-family:monospace;color:#dc5;padding:24px 10px;text-align:center;line-height:2">'
       +'THE HOUSE REMEMBERS YOUR NAME<br>'
-      +'<span style="color:#ca8">TITLE: '+playerTitle().toUpperCase()+'</span><br>'
       +'<span style="color:#999;font-size:11px">+150 renown · his weight sits on your shelf</span></div>';
       resCard.classList.add('show');}
     if(endBtns)endBtns.style.display='';_endScreenPhase='ready';
@@ -34186,9 +34213,9 @@ var _rdTs=params._resumeData._tradeSwaps;
   }
   /* ── Apply patron Tell (signature passive rule) ── */
   _applyTellAndSleeve();
-  if(typeof playerTitle==='function'&&playerTitle()!=='nobody'){
-    setTimeout(function(){try{setStatusMsg((G&&G.rung?G.rung.name:'')+': “WELL MET, '+playerTitle().toUpperCase()+'.”','');}catch(e){}},400);
-  }
+  /* P607: the match-start rank greeting is gone with the rest of the ladder.
+     This one fired on EVERY match once renown hit 40, so leaving it would
+     have kept announcing a rank the game no longer shows anywhere. */
 
   // Update gold display
   var _goldEl=document.getElementById('goldAmt');
@@ -37446,12 +37473,12 @@ var _TRAIT_FAM={aggro:['obsidian'],hoard:['amber'],combo:['vagabond','starstone'
 var TITLE_BANDS=[['Goodman','Goodwife','Goody','Gaffer','Gammer','Widow'],
   ['Master','Mistress','Dame'],['Sir','Lady','Squire','Father','His Grace']];
 var _NPC_NAMES=['Slink','Bramble','Tuck','Moss','Fen','Wick','Sorrel','Hob','Nettle','Cinder','Marrow','Twill'];
-var PLAYER_TITLES=[[0,'nobody'],[40,'Goodman'],[140,'Master'],[350,'Sir'],[700,'a Name']];
-function playerTitle(){
-  var r=(S&&S.renown)||0,t='nobody';
-  PLAYER_TITLES.forEach(function(row){if(r>=row[0])t=row[1];});
-  return t;
-}
+/* P607: PLAYER_TITLES and playerTitle() are gone - the player has no rank any
+   more, only NIGHT n/8. They were pure-derived from S.renown and nothing ever
+   consumed the return value except string concatenation, so removing the eight
+   call sites left them with none. The save blob never carried a title, so no
+   migration is needed. _titleFor / TITLE_BANDS below are the PATRON and BOSS
+   titles - a different ladder, still very much in use. */
 function _titleFor(night){
   var band=night<=2?0:(night<=5?1:2);
   var pool=TITLE_BANDS[band];
