@@ -1993,10 +1993,31 @@ body.dlg-speaking #screen-match #tellBadge{opacity:0;pointer-events:none}
    `transform` (scale .98) and #btnBank.bank-to-win sets transform:none, so a
    transform-based swap would be clobbered by both. The two compose instead, and
    a press while shrunk reads as .88 x .98. */
-#screen-match #btnRoll{transform-origin:left center;transition:scale .28s cubic-bezier(.25,.9,.3,1)}
-#screen-match #btnBank{transform-origin:right center;transition:scale .28s cubic-bezier(.25,.9,.3,1)}
-#screen-match .controls.bank-to-win #btnRoll{scale:.88}
-#screen-match .controls.bank-to-win #btnBank{scale:1.18}
+/* P601: THE PIVOT IS BACK TO THE DEFAULT CENTRE, and the margins are held by a
+   companion translate instead. Denis: "when I bank and pass my turn to the npc,
+   the bank button slides to the left side for no reason before settling back ...
+   probably as you changed the pivot point."
+   P599 set transform-origin on these two buttons UNCONDITIONALLY, which re-pivots
+   not just my own scale but EVERY `transform` that ever lands on them - present
+   or future, mine or not. A symmetric pulse about the centre becomes a lopsided
+   lunge toward one edge, which is exactly the shape Denis describes. I could not
+   reproduce it in the headless harness (its timers throttle to ~7fps, far too
+   coarse to catch a .28s transition - recorded so nobody reads the null result
+   as evidence of absence), so this fixes the MECHANISM rather than a confirmed
+   repro: with the origin left alone, no other animation can be affected at all.
+   THE ARITHMETIC. Scaling by s about the centre moves each edge by W(s-1)/2, so
+   translating by -(s-1)/2 of the element's own width puts the outer edge back
+   exactly. `translate` percentages resolve against the UNSCALED border box, so
+   these stay correct at every viewport:
+     ROLL  s=.88  -> -(.88-1)/2 =  +6%  ... but the edge to pin is the LEFT one,
+                     which moved +6%, so translate -6%
+     BANK  s=1.18 -> the RIGHT edge moved +9%, so translate -9%
+   Both are on `translate`, the standalone property, so they compose with `scale`
+   and still cannot collide with `transform`. */
+#screen-match #btnRoll,#screen-match #btnBank{
+  transition:scale .28s cubic-bezier(.25,.9,.3,1),translate .28s cubic-bezier(.25,.9,.3,1)}
+#screen-match .controls.bank-to-win #btnRoll{scale:.88;translate:-6% 0}
+#screen-match .controls.bank-to-win #btnBank{scale:1.18;translate:-9% 0}
 /* pressed and disabled are derived from the one plate Denis supplied per
    button - see .match-btn:active / .match-btn.disabled above. */
 #screen-match .match-btn.disabled .btn-inner{color:rgba(240,232,208,.55)}
