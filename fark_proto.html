@@ -16741,13 +16741,36 @@ function _dlgPick(pool,stage,skip){
    "keeps an arc from getting crowded out by ambient texture, while still giving
    an exhausted patron something live to say instead of repeating themselves".
    The King pool additionally never repeats a line within a run. */
+/* P629: who can credibly carry the Discrepancy. See the note in _dlgSay. */
+var _DISCREPANCY_SPEAKERS={corbin:1,sparr:1,pell:1};
 function _dlgSay(id){
   if(!id)return null;
   try{_getS();}catch(e){return null;}
   var run=S&&S.run;if(!run)return null;
   run._dlgStage=run._dlgStage||{};run._dlgHeard=run._dlgHeard||{};
   var key=String(id).toLowerCase(),stage=run._dlgStage[key]||0;
-  var row=_dlgPick('patron:'+key,stage,null);
+  /* P629 FIX: BEFORE the personal pool, not after. Placed after it the thread
+     was measured UNREACHABLE - 0 of 300 fresh runs - because a patron's own
+     stage-0 lines are a floor that never empties, so `row` was never null for
+     the three speakers who are supposed to carry this. That is the same fact
+     behind the King bug and the reason _dlgAmbient exists at all: this file's
+     own note records "30 consecutive draws from Krox returned only Krox".
+     The per-run de-dup makes the arc self-limiting rather than permanent - each
+     line fires once, so Corbin is full of this news early in a run and back to
+     his own lines once the thread has played out. */
+  var row=null;
+  if(_DISCREPANCY_SPEAKERS[key])row=_dlgPick('reaction:discrepancy',stage,run._dlgHeard);
+  if(!row)row=_dlgPick('patron:'+key,stage,null);
+  /* THE DISCREPANCY, for the few who could credibly know of it.
+     A missing sum in Corvus's private books is not tavern-wide gossip the
+     way a royal visit is, so eligibility is the thread's own shape rather
+     than a setting: Corbin owns the story, Sparr carries messages past it,
+     Pell is in Corvus's orbit. Extend the object to widen it.
+     BEFORE the King branch on purpose - these three carry the ledger thread
+     and everyone else carries the royal one, so the two run in parallel
+     through different mouths instead of one starving the other.
+     Deliberately absent from _dlgAmbient: the room at large has no business
+     knowing this, and ambient talk has no speaker to qualify. */
   if(!row)row=_dlgPick('reaction:king',stage,run._dlgHeard);
   if(!row)row=_dlgPick('gossip:town',stage,null);
   if(!row)return null;
@@ -17987,6 +18010,42 @@ var PATRON_LINES=[
   {p:'trait:strong:push',s:0,g:'hesitate-push',t:"...No, go again. Probably."},
   {p:'trait:strong:push',s:0,g:'hesitate-push',t:"One more. Just one more, I mean it this time."},
   {p:'trait:strong:push',s:0,g:'hesitate-push',t:"Fine, FINE, let me actually think for a second."}
+,
+  /* ── P629 (Part 8): THE DISCREPANCY ── a second gated thread.
+     Same three-tier machinery as the King: an untagged tier 1 that sets
+     `discrepancy_intro`, a tier 2 gated on having heard it, and a tier 3
+     gated on that AND night_gte:4. _dlgPick prefers MOST conditions, so
+     once night 4 arrives the resolution outranks the speculation and the
+     story ENDS - where the King's permanently deflates. Two threads that
+     both trailed off would read as one mechanism in different words.
+     The per-run no-repeat and the tag both come free: _dlgSay already
+     records reaction:* lines and any tagged row. ── */
+  {p:'reaction:discrepancy',s:0,tag:'discrepancy_intro',g:'discrepancy-intro',t:"Corbin's been quieter than usual at the counting house. Something's off there."},
+  {p:'reaction:discrepancy',s:0,tag:'discrepancy_intro',g:'discrepancy-intro',t:"Heard the books didn't balance this month. First time in years, they say."},
+  {p:'reaction:discrepancy',s:0,tag:'discrepancy_intro',g:'discrepancy-intro',t:"Corvus is asking more questions than usual. Never a good sign, that."},
+  {p:'reaction:discrepancy',s:0,tag:'discrepancy_intro',g:'discrepancy-intro',t:"Something's not adding up in Corvus's ledgers. Literally, from what I hear."},
+  {p:'reaction:discrepancy',s:0,tag:'discrepancy_intro',g:'discrepancy-intro',t:"The counting house had its door locked longer than usual last week."},
+  {p:'reaction:discrepancy',s:0,tag:'discrepancy_intro',g:'discrepancy-intro',t:"Word is a sum's gone missing somewhere in Corvus's books."},
+  {p:'reaction:discrepancy',s:0,tag:'discrepancy_intro',g:'discrepancy-intro',t:"Corbin looked like he hadn't slept. Something's wrong over there."},
+  {p:'reaction:discrepancy',s:0,c:['heard:discrepancy_intro'],g:'discrepancy-speculation',t:"Wonder if someone's skimming. Wouldn't be the first."},
+  {p:'reaction:discrepancy',s:0,c:['heard:discrepancy_intro'],g:'discrepancy-speculation',t:"Corvus finding a shortfall would explain why he's been extra sharp lately."},
+  {p:'reaction:discrepancy',s:0,c:['heard:discrepancy_intro'],g:'discrepancy-speculation',t:"If Corbin's covering for someone, that's not like him at all."},
+  {p:'reaction:discrepancy',s:0,c:['heard:discrepancy_intro'],g:'discrepancy-speculation',t:"Bet it's nothing. Corvus finds these things eventually."},
+  {p:'reaction:discrepancy',s:0,c:['heard:discrepancy_intro'],g:'discrepancy-speculation',t:"Whoever's responsible better hope Corvus doesn't find them first."},
+  {p:'reaction:discrepancy',s:0,c:['heard:discrepancy_intro'],g:'discrepancy-speculation',t:"Corbin's too precise to make an error like that himself. Has to be someone else."},
+  {p:'reaction:discrepancy',s:0,c:['heard:discrepancy_intro'],g:'discrepancy-speculation',t:"Maybe it's not theft. Maybe just bad bookkeeping, for once."},
+  {p:'reaction:discrepancy',s:0,c:['heard:discrepancy_intro'],g:'discrepancy-speculation',t:"I'd hate to be whoever owes Corvus money right now, with him already on edge."},
+  {p:'reaction:discrepancy',s:0,c:['heard:discrepancy_intro'],g:'discrepancy-speculation',t:"Sparr's been carrying more messages than usual between the counting house and the Hall. Interesting timing."},
+  {p:'reaction:discrepancy',s:0,c:['heard:discrepancy_intro'],g:'discrepancy-speculation',t:"If it's a debtor covering their tracks, Corvus will find the thread eventually. He always does."},
+  {p:'reaction:discrepancy',s:0,c:['heard:discrepancy_intro'],g:'discrepancy-speculation',t:"Corbin's reputation's on the line if this doesn't get sorted quietly."},
+  {p:'reaction:discrepancy',s:0,c:['heard:discrepancy_intro'],g:'discrepancy-speculation',t:"Wonder how much is actually missing. Nobody's said a number."},
+  {p:'reaction:discrepancy',s:0,c:['heard:discrepancy_intro'],g:'discrepancy-speculation',t:"Could just be a clerical slip. Could also be something worse."},
+  {p:'reaction:discrepancy',s:0,c:['heard:discrepancy_intro'],g:'discrepancy-speculation',t:"Corvus doesn't miss much. Whoever did this picked the wrong ledger to touch."},
+  {p:'reaction:discrepancy',s:0,c:['heard:discrepancy_intro'],g:'discrepancy-speculation',t:"I heard it's not coin missing, just numbers that don't match. Different problem, maybe worse."},
+  {p:'reaction:discrepancy',s:0,c:['heard:discrepancy_intro','night_gte:4'],g:'discrepancy-resolution',t:"Turned out to be an honest error. Corbin fixed it himself, mortified the whole time."},
+  {p:'reaction:discrepancy',s:0,c:['heard:discrepancy_intro','night_gte:4'],g:'discrepancy-resolution',t:"Never did find out what really happened with Corvus's books. Some things stay buried."},
+  {p:'reaction:discrepancy',s:0,c:['heard:discrepancy_intro','night_gte:4'],g:'discrepancy-resolution',t:"Corbin's back to his usual precise self. Whatever happened, it's handled."},
+  {p:'reaction:discrepancy',s:0,c:['heard:discrepancy_intro','night_gte:4'],g:'discrepancy-resolution',t:"Heard Corvus quietly wrote it off. Strange, for him. Makes you wonder."}
 
 ];
 var _ptOpen=false,_ptSeats=[];
