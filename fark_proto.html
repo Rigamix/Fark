@@ -52,11 +52,23 @@
      build, zone bottom to card top was 140px, far more than the lap it was
      raised to cure. Dropping the zone 60px keeps ~80px of that and buys the
      band the kept tray needs (below). */
-  --activate-zone-gap: 80px;
+  /* P610: 80 -> 70. Buys the kept tray 10px more clearance to the drop target
+     at the tight end of Denis's band (710 was +6.12px after the dice came
+     down) and costs nothing else: since P597 this var no longer feeds the
+     dice reservation, so lowering the zone does not move the dice. Paid for
+     out of zone-to-card clearance, still 70px against the lap P583 cured. */
+  --activate-zone-gap: 70px;
   /* P597: the DICE BLOCK's reservation, split out of the var above. Same
      number P583 found there (100), so the dice return to their pre-P583 height
      rather than to a new invented one. */
-  --dice-reserve-gap: 100px;
+  /* P610: 100 -> 88. P597 restored the pre-P583 value and landed the dice at
+     44.16%% of viewport height at 740, about 10px above the line Denis marked
+     at 45.6%%. The response is flat and measured - 0.7436px of block travel
+     per 1px of reserve removed, the 2.9:1 .dice-spacer split - so 12px buys
+     8.9px, which is the gap. Not taken lower: the kept tray's clearance to
+     the drop target is spent out of the same band, and 88 keeps it positive
+     at every height in the 700-760 band Denis plays on. */
+  --dice-reserve-gap: 88px;
   --dice-min-clearance: 36px;    /* mandatory min space between zones — also
                                     reserves room for floating card-trigger
                                     labels (e.g. "+200 BOWL") that appear
@@ -32979,10 +32991,25 @@ function _refreshCardUsesDisplay(cardId){
 function refundActiveCardUse(cardId){
   if(!G||!G.activeCardState||!G.activeCardState.usedCards)return;
   G.activeCardState.usedCards[cardId]=(G.activeCardState.usedCards[cardId]||0)+1;
-  /* Remove .used from all card representations (chip in activation zone + base mcard) */
-  document.querySelectorAll('[data-cid="'+cardId+'"]').forEach(function(el){el.classList.remove('used');});
-  /* Refresh card visuals so any chip that was greyed gets restored */
+  /* P611: THE ROW IS REBUILT, not patched class by class.
+     Stripping `.used` restored the LOGICAL state and left the POSITIONAL one
+     stuck: a refunded card sat in the activation zone still wearing
+     `.in-zone`, and initCardDrag's onDragStart returns early on that class -
+     so canActivateCard said yes and the card could not be picked up. Removing
+     the class alone is not the fix either: placeCardInZone has already done
+     `style.cssText=''` and destroyed the fan-slot properties (--rot, --cx,
+     --lift), so the card would be draggable with no resting slot to return
+     to. Rebuilding from G.pCards is the path resume already uses, and it puts
+     the card back in its own slot with `.used` derived from the flag. */
+  try{
+    if(typeof buildCBar==='function')buildCBar('playerCards',G.pCards,false,'YOU');
+  }catch(e){}
+  /* belt and braces for any representation outside the player's row */
+  document.querySelectorAll('[data-cid="'+cardId+'"]').forEach(function(el){
+    el.classList.remove('used');el.classList.remove('in-zone');
+  });
   if(typeof _updatePlayerCardVisuals==='function')_updatePlayerCardVisuals();
+  if(typeof _updateCardGlints==='function'){try{_updateCardGlints();}catch(e){}}
   _refreshCardUsesDisplay(cardId);
 }
 
@@ -33356,8 +33383,11 @@ function activateFrozenDie(){
   const selDice=G.pool.filter(d=>d.sel&&!d.committed&&!d._frozen);
   if(!selDice.length){setStatusMsg('SELECT A DIE TO FREEZE FIRST','red');
     /* Refund use */
-    G.activeCardState.usedCards['frozen_die']=(G.activeCardState.usedCards['frozen_die']||0)+1;
-    var _chip=document.querySelector('.mcard-active[data-cid="frozen_die"]');if(_chip)_chip.classList.remove('used');
+    /* P611: through the one function that owns a refund. This used to
+       hand-roll it - bump the counter, find the chip, strip `.used` - which
+       is three copies of an intent that all forgot `.in-zone` in the same
+       way, and stranded the card exactly as the main refund path did. */
+    refundActiveCardUse('frozen_die');
     return;}
   var d=selDice[0];
   d._frozen=true;
@@ -33393,8 +33423,11 @@ function activateTheTab(){
 function activateDoubleDown(){
   var _ddOldPts=G.kept.reduce(function(a,k){return a+k.pts;},0);
   if(_ddOldPts<=0){setStatusMsg('NO POINTS TO DOUBLE','red');
-    G.activeCardState.usedCards['double_down']=(G.activeCardState.usedCards['double_down']||0)+1;
-    var _chip=document.querySelector('.mcard-active[data-cid="double_down"]');if(_chip)_chip.classList.remove('used');
+    /* P611: through the one function that owns a refund. This used to
+       hand-roll it - bump the counter, find the chip, strip `.used` - which
+       is three copies of an intent that all forgot `.in-zone` in the same
+       way, and stranded the card exactly as the main refund path did. */
+    refundActiveCardUse('double_down');
     return;}
   /* Double each kept entry's pts in place — preserves the original dice
      icons in the kept tray (was overwriting kept with a single empty-vals
@@ -33494,8 +33527,11 @@ function activateSecondWind(){
 function activateThePyre(){
   var burnableCards=G.pCards.filter(function(cid){return cid!=='the_pyre';});
   if(!burnableCards.length){setStatusMsg('NO CARDS TO BURN','red');
-    G.activeCardState.usedCards['the_pyre']=(G.activeCardState.usedCards['the_pyre']||0)+1;
-    var _chip=document.querySelector('.mcard-active[data-cid="the_pyre"]');if(_chip)_chip.classList.remove('used');
+    /* P611: through the one function that owns a refund. This used to
+       hand-roll it - bump the counter, find the chip, strip `.used` - which
+       is three copies of an intent that all forgot `.in-zone` in the same
+       way, and stranded the card exactly as the main refund path did. */
+    refundActiveCardUse('the_pyre');
     return;}
   /* Show card picker. While it's open, _commitActivation must NOT park the
      card in the activation zone — the picker resolves ASYNCHRONOUSLY, and a
