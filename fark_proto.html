@@ -11444,6 +11444,31 @@ const SFX={
   },
   cardFlip(){this._click(1200,0.06,0.04);this._tone(380,'sine',0.04,0.004,0.08,0.02);},
   cardTrigger(){this._tone(540,'sine',0.05,0.005,0.12);this._tone(810,'sine',0.03,0.003,0.09,0.03);this._click(1400,0.025,0.03,0.01);},
+  /* P619: THE CARD FIRES. The release beat had only SFX.nav() - the same
+     click as every menu button - so the biggest moment in the card system
+     sounded like navigation.
+     BODY so it lands, BLOOM so it is magical, TAIL so it matches the plume
+     still in the air. The bloom is a stacked fifth and octave 35ms apart,
+     close enough to read as one chord rather than an arpeggio - the same way
+     synergy() builds its. Sparkles stay under ~2.6kHz because _tone runs a
+     2400Hz lowpass and anything above it is only wasted voices.
+     Front-loaded on purpose: activateCard usually calls triggerCard right
+     after, so this attacks first and rings underneath rather than colliding. */
+  cardFire(){
+    /* body - the push that makes it satisfying rather than thin */
+    this._click(300,0.075,0.055);
+    this._tone(196,'sine',0.055,0.006,0.22);
+    /* bloom - G5 / D6 / G6, one chord */
+    this._tone(784,'sine',0.075,0.004,0.28);
+    this._tone(1175,'sine',0.048,0.003,0.26,0.035);
+    this._tone(1568,'sine',0.032,0.003,0.24,0.07);
+    /* tail - the particles, in sound */
+    for(let i=0;i<7;i++){
+      const t=0.09+i*0.05+Math.random()*0.03;
+      this._tone(1500+Math.random()*1000,'sine',0.019,0.002,0.10,t);
+      if(i%2===0)this._click(2200+Math.random()*700,0.012,0.028,t);
+    }
+  },
   nav(){this._click(800,0.05,0.03);this._tone(500,'sine',0.03,0.003,0.04);},
   pop(){/* long-press pop — subtle bubble-like chirp */
     this._tone(880,'sine',0.055,0.002,0.06);
@@ -24789,7 +24814,8 @@ function returnCardToHand(mcardEl,savedState){
    card goes: if uses remain (multi-use / Brewer bonus) bounce it back to the
    hand so it can be used again; if spent (0 uses) park it in the zone, greyed. */
 function _commitActivation(mcardEl,cardId,savedState){
-  SFX.nav();
+  /* P619: the card's own sound, not the menu click this used to borrow */
+  try{SFX.cardFire();}catch(e){try{SFX.nav();}catch(e2){}}
   try{_haptic([12,30,12]);}catch(e){}
   /* P617: the plume, in the card's own colour, BEFORE the effect runs - so a
      card that rebuilds the row as part of its effect (the Pyre, a self-refund)
