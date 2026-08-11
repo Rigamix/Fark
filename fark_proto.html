@@ -1970,6 +1970,31 @@ body.dlg-speaking #screen-match #tellBadge{opacity:0;pointer-events:none}
 #screen-match .match-btn:active{box-shadow:none;
   filter:drop-shadow(0 0.35cqw 0 rgba(26,15,7,.34)) brightness(.88) saturate(1.05)}
 #btnBank.bank-to-win{transform:none;filter:var(--plate-sh)}
+/* P599: WHEN THE BANK WINS THE MATCH, THE TWO BUTTONS TRADE WEIGHT. Denis:
+   "bank button becomes bigger and roll becomes smaller. Smooth animation and
+   also ensure the distance to screen borders don't change."
+   THE ORIGINS ARE WHAT KEEP THE MARGINS. .controls is justify-content:center
+   with ROLL at 62% and BANK at 30% either side of a 3.5% gap, so the row's
+   outer edges sit 2.25% off each screen edge. A transform does not touch
+   layout, so those flex boxes never move - but scaling about the default
+   centre would walk each PAINTED edge inward and the margins would visibly
+   breathe. Anchoring each button at the edge FACING ITS SCREEN BORDER pins that
+   margin exactly: ROLL keeps its left, BANK keeps its right, and both grow or
+   shrink toward the middle. Measured: ROLL spans 2.25%..64.25% and BANK
+   67.75%..97.75%; at .88/1.18 they become 2.25%..56.81% and 62.35%..97.75%, so
+   the gap OPENS 3.5% -> 5.5% and they cannot collide.
+   ORIGIN AND TRANSITION ARE UNCONDITIONAL, not part of .bank-to-win. Put an
+   origin inside the state and removing the class reverts it to 50%/50% midway
+   through the shrink, so the buttons slide sideways on the way back - the exact
+   bug P596 fixed on the leader's flag.
+   ON `scale`, THE STANDALONE PROPERTY: #btnRoll:active already animates
+   `transform` (scale .98) and #btnBank.bank-to-win sets transform:none, so a
+   transform-based swap would be clobbered by both. The two compose instead, and
+   a press while shrunk reads as .88 x .98. */
+#screen-match #btnRoll{transform-origin:left center;transition:scale .28s cubic-bezier(.25,.9,.3,1)}
+#screen-match #btnBank{transform-origin:right center;transition:scale .28s cubic-bezier(.25,.9,.3,1)}
+#screen-match .controls.bank-to-win #btnRoll{scale:.88}
+#screen-match .controls.bank-to-win #btnBank{scale:1.18}
 /* pressed and disabled are derived from the one plate Denis supplied per
    button - see .match-btn:active / .match-btn.disabled above. */
 #screen-match .match-btn.disabled .btn-inner{color:rgba(240,232,208,.55)}
@@ -24961,6 +24986,12 @@ function setBtns(r,b){
     var _selNow=(G&&G.pool)?G.pool.filter(function(d){return d.sel&&!d.committed;}):[];
     var _castOnly=!!(b&&_bpts<=0&&_selNow.length&&_selNow.every(_dieIsIcon));
     bankBtn.classList.toggle('bank-to-win',_wins);
+    /* P599: the same state on the ROW, because the swap needs to size the ROLL
+       button too and it is not this button's child. One class, both rules,
+       toggled from the flag that already decides everything else about this
+       state - so the two buttons cannot disagree about whether the bank wins. */
+    try{var _ctl=bankBtn.closest('.controls');
+        if(_ctl)_ctl.classList.toggle('bank-to-win',_wins);}catch(e){}
     bankBtn.classList.toggle('bank-cast',_castOnly);
     if(_verb)_verb.textContent=_castOnly?'CAST':(_wins?'BANK TO WIN':'BANK');
     /* no running total on the winning press - the button says what it does */
