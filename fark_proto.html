@@ -3925,6 +3925,9 @@ body.crit-dilate{animation:critDilate .55s ease-out both}
 .match-btn-bank.bank-to-win{transform:scale(1.08);filter:drop-shadow(0 0 12px rgba(224,214,184,.85))}
 .match-btn-bank.bank-to-win .btn-inner{font-size:clamp(13px,3.8vw,18px);letter-spacing:0}
 
+/* P615: the strut whose HEIGHT is the threshold lift - see _cardThresholdY */
+#armLiftStrut{position:absolute;left:0;top:0;width:0;height:var(--card-arm-lift);
+  visibility:hidden;pointer-events:none}
 /* ═══ P613: THE THRESHOLD'S ONLY VISIBLE SIGN ═══
    Snaps on when the card crosses the line and holds while it is above it.
    Deliberately NOT a pulse: the dice already use slow breathing glows for
@@ -3937,6 +3940,20 @@ body.crit-dilate{animation:critDilate .55s ease-out both}
          brightness(1.14) saturate(1.12);
   transition:filter .12s ease-out}
 .mcard.armed .gcard{outline:0.22cqw solid rgba(255,226,150,.92);outline-offset:-0.22cqw}
+/* P615: THE HALO HAD TO WIN THE CASCADE, and it did not. `.mcard.dragging`
+   declares its lift shadow with !important, and `.armed` is only ever set on
+   a card that is ALREADY dragging - onDragMove adds 'dragging' before it
+   toggles 'armed' - so the two-stop gold halo lost on every frame of every
+   drag and the threshold had NO visible sign at all. Behaviour was correct
+   throughout, which is exactly why a behavioural test could not see it.
+   Folding the drag's own shadow into this declaration lets one !important
+   carry both, so nothing about the drag's look changes except the halo
+   appearing. */
+.mcard.dragging.armed{
+  filter:drop-shadow(0 8px 24px rgba(0,0,0,.7))
+         drop-shadow(0 0 0.9cqw rgba(255,214,120,.95))
+         drop-shadow(0 0 2.6cqw rgba(255,180,60,.55))
+         brightness(1.16) saturate(1.12)!important}
 /* the release beat: one bright flash, then it is gone */
 @keyframes cardFired{
   0%{filter:drop-shadow(0 0 1.4cqw rgba(255,240,200,1)) brightness(1.6) saturate(1.2)}
@@ -9532,6 +9549,11 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
 
 <!-- PLAYER CARD BAR (fanned, tucked under controls) -->
 <div class="card-bar bot" id="playerCards">
+  <!-- P615: the activation threshold's height, carried as a real CSS length
+       so the engine resolves --card-arm-lift in whatever unit it is written.
+       Zero width, hidden, pointer-events:none - it lays out and nothing else.
+       buildCBar only sweeps .mcard/.cchip, so it survives every rebuild. -->
+  <div id="armLiftStrut"></div>
   <div class="activate-zone" id="activateZone"><svg class="az-border" width="100%" height="100%" preserveAspectRatio="none"><rect x="1" y="1" rx="8" ry="8"></rect></svg><span class="az-label">ACTIVATE</span></div>
 </div>
 
@@ -10094,7 +10116,18 @@ function _getS(){
   if(typeof S!=='undefined'&&S&&S.renownPerks&&Object.keys(S.renownPerks).length){
     S.renownPerks={};/* brief §8: perk ladder deleted; slots/seats are baseline */
   }
-  if(typeof S!=='undefined'&&S&&S.run){
+  /* P616: LATCHED, ONCE PER RUN. This converts legacy equipped cards to 15g
+     and blanks the slots - and it used to run on EVERY _getS() call, with
+     nothing to distinguish a card left over from the P1.2 cutover from one
+     the player equipped five seconds ago. So equipping a card and then
+     touching anything that reads state sold it back, every time, and
+     S.run.cards could never hold anything. That is the other half of why
+     the player's hand was always empty.
+     The pattern is the file's own: the one-shot un-mute twenty lines up
+     latches on S.settings._protoUnmuted precisely so it "never fights the
+     user". A latch rather than a deletion, because a save written before
+     the cutover still needs converting exactly once. */
+  if(typeof S!=='undefined'&&S&&S.run&&!S.run._p12CardsConverted){
     var _mg=0;/* audit P1.2: legacy equipped cards (incl. signatures) -> sell value */
     if(Array.isArray(S.run.cards)&&S.run.cards.some(function(c){return !!c;})){
       _mg+=S.run.cards.filter(function(c){return !!c;}).length;S.run.cards=[null,null,null,null];
@@ -10103,6 +10136,7 @@ function _getS(){
       _mg+=S.run.pouch.filter(function(c){return !!c;}).length;S.run.pouch=[null,null,null];
     }
     if(_mg)S.run.gold=(S.run.gold||0)+15*_mg;
+    S.run._p12CardsConverted=1;
   }
   if(!S){
     try{S=JSON.parse(localStorage.getItem('gambit4_proto'))}catch(e){}
@@ -24469,6 +24503,18 @@ function initCardDrag(mcardEl,cardId){
        usedCards is the source of truth; `.used` is only its mirror and is
        kept as a fallback for any card outside activeCardState. */
     if(!_cardHasUse(cardId))return;
+    /* P615: A SECOND POINTER MUST NOT STEAL AN AIRBORNE DRAG. _dragState is
+       one global and this used to overwrite it unconditionally, so a stray
+       second finger - or a right-button press, since e.button was never
+       checked - left the first card orphaned in `.dragging` (position:fixed,
+       z-index 9500) with onDragEnd early-returning on it forever. That is a
+       FOURTH way for a drag to end and the only one that ends nowhere, which
+       contradicts the one-exit-path invariant P612 claims for itself. Worse
+       under the threshold: the stolen card takes its delta from the other
+       pointer's origin, so it can be carried across the line and released
+       armed - firing a card the player never touched. */
+    if(e&&e.button!==undefined&&e.button!==0)return;
+    if(_dragState&&_dragState.dragging&&_dragState.el!==mcardEl)return;
     closeAllChips();
     const touch=e.touches?e.touches[0]:e;
     const rect=mcardEl.getBoundingClientRect();
@@ -24583,13 +24629,24 @@ function _cardThresholdY(){
   var row=document.getElementById('playerCards');
   if(!row)return -1e9;/* no row: nothing can be above the line */
   var r=row.getBoundingClientRect();
-  var lift=parseFloat(getComputedStyle(document.documentElement)
-    .getPropertyValue('--card-arm-lift'))||0;
-  /* the var is in cqw against the screen's width, same as the row's own
-     sizing, so resolve it the same way rather than trusting a px read */
-  var sc=document.getElementById('screen-match');
-  var w=sc?sc.getBoundingClientRect().width:innerWidth;
-  return r.top-(w*lift/100);
+  /* P615: THE CSS ENGINE RESOLVES THE KNOB, not parseFloat.
+     The old line read the NUMBER and threw the UNIT away, then treated what
+     was left as a percentage of the shell width: '16px' became 62.4px, and
+     any calc()/clamp()/min() parsed to NaN -> ||0 -> the threshold landed on
+     the row top, where the fan's own --lift already puts middle cards'
+     centres ABOVE the line. Armed at rest, first 10px of any drag fires.
+     That mattered because the comment on --card-arm-lift invites hand-tuning
+     and clamp(40px,16cqw,90px) is the obvious response to a small screen.
+     A zero-width hidden strut inside the row carries the value as a HEIGHT,
+     so every unit works and cqw resolves against the same container the
+     row's own sizing does. */
+  var strut=document.getElementById('armLiftStrut');
+  if(!strut||!strut.isConnected)return r.top;/* fail CLOSED: no strut, no lift,
+     so the line sits on the row and a card must still be lifted clear of it -
+     never the other way round, which is what ||0 used to do */
+  var lift=strut.getBoundingClientRect().height;
+  if(!(lift>0))return r.top;
+  return r.top-lift;
 }
 /* is THIS card currently above the line? the card's centre, which is the
    most predictable point for a finger to aim */
@@ -24600,6 +24657,12 @@ function _cardIsArmed(el){
 }
 /* uses remaining, read from the flag. `.used` is a fallback only. */
 function _cardHasUse(cardId){
+  /* P615: A CARD THAT IS NOT IN THE HAND HAS NO USE. The Pyre expresses
+     "spent" by DELETING the usedCards key rather than zeroing it, so the
+     absence of a flag used to fall through to the `.used` fallback and mean
+     "usable". Absence now means "not mine", which is what a burn actually
+     is. Fails closed. */
+  try{if(G&&G.pCards&&G.pCards.indexOf(cardId)<0)return false;}catch(e){}
   try{
     var u=G&&G.activeCardState&&G.activeCardState.usedCards;
     if(u&&u[cardId]!==undefined)return (u[cardId]||0)>0;
@@ -33584,10 +33647,21 @@ function activateThePyre(){
       if(G.activeCardState.usedCards[cid]!==undefined)delete G.activeCardState.usedCards[cid];
       /* Add +300 to current bank total via pyre bonus */
       G.activeCardState.pyreBonus=(G.activeCardState.pyreBonus||0)+500;
+      picker.remove();
+      /* P615: THE BURNED CARD MUST LEAVE THE ROW. The two lines above have
+         just removed it from G.pCards AND deleted its usedCards key - and
+         every derived visual pass iterates G.pCards, so nothing could see it
+         to grey it, while _cardHasUse fell through to its `.used` fallback
+         and reported a card the player paid 500 points to destroy as usable.
+         It sat in the fan as the only un-greyed card, still dragging, still
+         arming, doing nothing. Rebuild the row - the path refundActiveCardUse
+         already uses - and do it BEFORE triggerCard, whose floating label is
+         parented to the bar buildCBar sweeps. */
+      try{if(typeof buildCBar==='function')buildCBar('playerCards',G.pCards,false,'YOU');}catch(e){}
       triggerCard('the_pyre','BURNED '+cd.name+' +500',true);
       setStatusMsg('BURNED '+cd.name+' → +500 BANK','gold');
-      picker.remove();
       _updatePlayerCardVisuals();
+      if(typeof _updateCardGlints==='function'){try{_updateCardGlints();}catch(e){}}
     };
     picker.appendChild(btn);
   });
@@ -34021,7 +34095,16 @@ function initMatchScreen(data){
   /* Accept either a direct rung object or a rungId lookup */
   const rung=params.rung?{...params.rung}:{...RUNGS[params.rungId||0]};
   // Apply card effects to rung
-  const pCards=[];/* P1 cutover: old cards retired */
+  /* P615: THE PLAYER'S HAND, AT LAST. This returned [] unconditionally since
+     the P1 cutover, so G.pCards was ALWAYS empty: #playerCards rendered no
+     cards, initCardDrag was never called, and the entire drag-to-activate
+     system - including the P612 threshold - was unreachable in real play.
+     Measured 0 initCardDrag calls across match start, a roll and a resume,
+     against a control that saw 1 on a forced build.
+     params.pCards is what launchSeat and launchBossMatch already send and
+     what saveMatchState/resumeMatch already round-trip, so nothing new has
+     to be plumbed - the hand died on this one line. */
+  const pCards=(params.pCards||[]).filter(Boolean);
   if(pCards.includes('plague_wind'))rung.agg=Math.max(0.1,rung.agg-0.25);
   if(pCards.includes('jesters_mask'))rung.chaotic=true;
   if(pCards.includes('serpents_whisper'))rung.minBank=rung.minBank+300;
