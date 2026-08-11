@@ -1139,11 +1139,46 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 .loFeat:active{transform:var(--jt,translate(-50%,-50%)) scale(1.12)}
 
 .loBadge:active{transform:translate(-50%,-50%) scale(1.15)}
-#famRowP{position:absolute;left:50%;transform:translateX(-50%);bottom:11.6%;display:flex;gap:2cqw;z-index:41}
-#famRowP .fcv{width:11.5cqw;cursor:pointer;transition:transform .15s,filter .15s}
-#famRowP .fcv.spent{filter:saturate(.25) brightness(.55) drop-shadow(2px 3px 0 rgba(15,9,4,.4))}
+/* P576 (note 6): RAISED FIRST, THEN GROWN - in that order, because the row
+   already overlapped ROLL. At bottom:11.6% its lower edge sat 97.9px above the
+   screen bottom against ROLL's top at ~110.8px, so ~13px of live-onclick card
+   lay over the button at z-index 41 vs .controls' 20. The same bug is written up
+   for .card-bar: "at z-index 5, swallowed its taps: elementFromPoint inside ROLL
+   returned the card bar." Growing the cards without this would bury it.
+   The calc idiom is #matchPause's, whose comment reads "clears ROLL, which is
+   the tall plate". */
+#famRowP{position:absolute;left:50%;transform:translateX(-50%);
+  bottom:calc(env(safe-area-inset-bottom,0px) + 34cqw);
+  display:flex;gap:2.5cqw;z-index:41}
+/* P576: 11.5cqw -> 20cqw (44.9x63.9px -> 78x111px at the 390 shell), and the
+   shadow becomes a PAIR - a tight contact shadow at the card's edge plus a soft
+   cast - so the card reads as sitting on the table rather than stamped onto it.
+   In cqw, so it scales with the card; the old 2px/3px did not. */
+#famRowP .fcv{width:20cqw;cursor:pointer;transition:transform .18s ease,filter .18s ease;
+  filter:drop-shadow(0 0.25cqw 0.3cqw rgba(10,6,2,.5)) drop-shadow(0 0.9cqw 1.3cqw rgba(10,6,2,.45))}
+/* P576: ALL THREE filter declarations move together or none do - a filter
+   REPLACES the property, so leaving this one behind would snap a spent card back
+   to the old hard offset the moment it greyed out. */
+#famRowP .fcv.spent{filter:saturate(.25) brightness(.55)
+  drop-shadow(0 0.25cqw 0.3cqw rgba(10,6,2,.5)) drop-shadow(0 0.9cqw 1.3cqw rgba(10,6,2,.4))}
 #famRowP .fcv.sealed::after{content:'';position:absolute;inset:0;background:rgba(24,12,34,.58);border-radius:7%}
-#famRowP .fcv.armed{filter:drop-shadow(0 0 6px rgba(255,217,138,.8)) drop-shadow(2px 3px 0 rgba(15,9,4,.4))}
+#famRowP .fcv.armed{filter:drop-shadow(0 0 1.1cqw rgba(255,217,138,.85))
+  drop-shadow(0 0.9cqw 1.3cqw rgba(10,6,2,.5))}/* P576: third of the three */
+/* P576: THE BOB. fcvFloat was checked first and rejected with a reason: it
+   exists, but it is already bound to `#ptvFan .fcv.zoom .fcvIn`, so redefining
+   it would silently change the peek fan. This one lives on .fcvIn rather than
+   .fcv so it can never fight .fcv's own transform - the armed lift, the tap
+   scale - which is the collision that eats animations in this file.
+   NEGATIVE delays start each card mid-cycle, so the three are desynced from the
+   first frame instead of drifting apart over a minute. nth-child is enough: the
+   row is at most three cards, and this needs no JS at all. */
+@keyframes famBob{
+  0%,100%{transform:translateY(0) rotate(0deg)}
+  50%{transform:translateY(-0.85cqw) rotate(.45deg)}}
+#famRowP .fcv .fcvIn{animation:famBob 4.6s ease-in-out infinite;will-change:transform}
+#famRowP .fcv:nth-child(1) .fcvIn{animation-delay:-0.0s}
+#famRowP .fcv:nth-child(2) .fcvIn{animation-delay:-1.7s}
+#famRowP .fcv:nth-child(3) .fcvIn{animation-delay:-3.2s}
 /* Their side, mirroring the player's row across the table: same shape and
    spacing, a shade smaller because they sit further up the frame. */
 /* Hung off --bar-top like the rest of the HUD rather than off a percentage:
@@ -1156,7 +1191,16 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 #famRowO{position:absolute;left:3cqw;
   top:calc(env(safe-area-inset-top,0px) + 8px + var(--bar-top) + 26cqw);
   display:flex;gap:2cqw;z-index:40}
-#screen-match #famRowO .mcBack{width:9.6cqw}
+/* P576: 9.6cqw -> 14cqw (37.4x53.3px -> 54.6x77.8px), still clearly smaller
+   than the player's 20cqw, plus the same soft cast so the rival's hand sits on
+   the table too.
+   NO BOB HERE, deliberately: .mcBack is a bare div with no inner wrapper, and
+   .mcBack.armed already animates its own transform as the telegraph that a rival
+   card is about to fire. An animation on the same element would delete that, and
+   restating the lift inside the bob's keyframes is the shape that breaks the
+   moment either is retuned. Size and shadow now; the float waits for a wrapper. */
+#screen-match #famRowO .mcBack{width:14cqw;
+  box-shadow:0 0.2cqw 0.3cqw rgba(10,6,2,.5),0 0.8cqw 1.2cqw rgba(10,6,2,.45),inset 0 0 0 1px rgba(0,0,0,.5)}
 /* FLAT family colour, standing in for painted backs. The border is the
    family (brief section 2: "family = border colour, full stop") and the face
    is a darker wash of the same so the card reads as an object rather than as
