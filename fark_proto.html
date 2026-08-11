@@ -1152,8 +1152,10 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
    returned the card bar." Growing the cards without this would bury it.
    The calc idiom is #matchPause's, whose comment reads "clears ROLL, which is
    the tall plate". */
-#famRowP{position:absolute;left:50%;transform:translateX(-50%);
+#famRowP{position:absolute;left:50%;
   bottom:calc(env(safe-area-inset-bottom,0px) + 34cqw);
+  /* P591: the near row leans into the same plane - see the note on #famRowO. */
+  transform:translateX(-50%) perspective(900px) rotateX(13deg);
   display:flex;gap:1.1cqw;z-index:41}
 /* P580: the player's fan. Same `rotate`-not-`transform` reasoning as the rival's
    row: .fcv's spent/armed/sealed states all declare `filter` and none declare
@@ -1233,17 +1235,24 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
    leaves every child's free. It reverses their order too, which is meaningless
    for identical backs. */
 #famRowO{position:absolute;left:50%;top:calc(env(safe-area-inset-top,0px) + 8px + var(--bar-top) + 23cqw);/* P580: down, off the turn plate */
-  transform:translateX(-50%) rotate(180deg);display:flex;gap:0.6cqw;z-index:40}
+  /* P591: TILTED INTO THE TABLE. The row is the plane, not each card: the cards'
+     own `rotate` is already carrying the fan, and one element cannot hold two
+     rotations. Tilting the row is also what perspective actually means here -
+     a hand lying on a surface, not four independently skewed cards.
+     The 180deg comes first, so the rotateX after it leans the far edge away
+     from the viewer exactly as the near row's does. */
+  transform:translateX(-50%) rotate(180deg) perspective(900px) rotateX(15deg);
+  display:flex;gap:0.6cqw;z-index:40}
 /* P580: THE FAN, ON `rotate` RATHER THAN `transform`, and that is the point.
    The row's own 180deg and .mcBack.armed's translateY telegraph both live on
    `transform`; the standalone `rotate` property composes with it instead of
    replacing it, so a fan angle costs neither of them anything and nothing has to
    restate anyone else's values inside a keyframe. */
-#screen-match #famRowO .mcBack:nth-child(1){rotate:-7deg}
-#screen-match #famRowO .mcBack:nth-child(2){rotate:7deg}
-#screen-match #famRowO .mcBack:nth-child(3){rotate:0deg}
+#screen-match #famRowO .fcv:nth-child(1){rotate:-7deg}
+#screen-match #famRowO .fcv:nth-child(2){rotate:7deg}
+#screen-match #famRowO .fcv:nth-child(3){rotate:0deg}
 /* P586: same for the rival - a lone card sits straight. */
-#screen-match #famRowO .mcBack:only-child{rotate:0deg}
+#screen-match #famRowO .fcv:only-child{rotate:0deg}
 /* P576: 9.6cqw -> 14cqw (37.4x53.3px -> 54.6x77.8px), still clearly smaller
    than the player's 20cqw, plus the same soft cast so the rival's hand sits on
    the table too.
@@ -1255,10 +1264,14 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 /* P579: 14cqw -> 11cqw. The player's are 20cqw, so the rival's now read as
    further away rather than merely smaller, and the extra shadow sits them
    deeper in the candlelight Denis is lighting the table with. */
-/* P580: 11cqw -> 15cqw. Still well under the player's 20cqw, so they read as
-   further away rather than as an accident. */
-#screen-match #famRowO .mcBack{width:15cqw;filter:brightness(.82) saturate(.92);
-  box-shadow:0 0.2cqw 0.3cqw rgba(10,6,2,.55),0 0.9cqw 1.4cqw rgba(10,6,2,.5),inset 0 0 0 1px rgba(0,0,0,.5)}
+/* P591: the rival's cards are .fcv now (real faces), so the sizing that used to
+   dress .mcBack moves with them. 15cqw against the player's 20cqw, and the same
+   darkening keeps them sitting further back in the candlelight. */
+#screen-match #famRowO .fcv{width:15cqw;cursor:pointer;
+  filter:brightness(.80) saturate(.90)
+         drop-shadow(0 0.2cqw 0.3cqw rgba(10,6,2,.55))
+         drop-shadow(0 0.9cqw 1.4cqw rgba(10,6,2,.5))}
+/* the old .mcBack rule is gone with the element - see famRenderRow */
 /* FLAT family colour, standing in for painted backs. The border is the
    family (brief section 2: "family = border colour, full stop") and the face
    is a darker wash of the same so the card reads as an object rather than as
@@ -1654,6 +1667,23 @@ body.dlg-speaking #screen-match #tellBadge{opacity:0;pointer-events:none}
 #raceWrap .rbFlagL img{left:0;width:630.52%}
 #raceWrap .rbFlagR{right:0;width:16.15%}
 #raceWrap .rbFlagR img{right:0;width:619.20%}
+/* P590 (note 4): THE LEADER'S PORTRAIT GROWS. Denis: "scale the portrait of the
+   player who has the biggest score so it's more clear who's winning ... ensure
+   they don't get cropped out, meaning bring the portraits closer to the center
+   and when scaling offset them toward center as well."
+   THE TRANSFORM-ORIGIN IS THE WHOLE TRICK. Each flag is pinned to its own screen
+   edge, so scaling about its centre pushes half the growth off-screen. Anchoring
+   the left flag's origin at its LEFT edge and the right flag's at its RIGHT edge
+   would do the same; anchoring each at the edge FACING THE CENTRE makes every
+   extra pixel grow inward, which is what "offset them toward center" asks for
+   and needs no companion translate.
+   On `scale`, the standalone property, not `transform`: .rbFlag:active already
+   animates transform as its press feedback, and the two would clobber each
+   other. Same reasoning as the card fan in P580. */
+#raceWrap .rbFlag{transition:scale .22s ease}
+#raceWrap .rbFlagL{transform-origin:right center}
+#raceWrap .rbFlagR{transform-origin:left center}
+#raceWrap .rbFlagL.lead,#raceWrap .rbFlagR.lead{scale:1.14}
 /* a press the flag can answer on its own - the whole point of the split art */
 #raceWrap .rbFlag:active{filter:drop-shadow(0 0.25cqw 0 rgba(26,15,7,.34)) brightness(1.12);
   transform:translateY(0.18cqw)}
@@ -1687,8 +1717,12 @@ body.dlg-speaking #screen-match #tellBadge{opacity:0;pointer-events:none}
   transition:width .45s cubic-bezier(.25,.9,.3,1)}
 #screen-match #pProg{position:absolute;right:0;top:0;bottom:0;width:26.82%;overflow:hidden;background:none;border-radius:0;
   transition:width .45s cubic-bezier(.25,.9,.3,1)}
-#oProg img{position:absolute;left:0;top:0;width:200cqw;height:100cqh;max-width:none}
-#pProg img{position:absolute;right:0;top:0;width:200cqw;height:100cqh;max-width:none}
+/* P589: up ~2px. The fill art's ink sat a hair below the frame's channel - the
+   two files are separate masters and their bands do not have to agree to the
+   pixel. cqw here resolves against .rbClip (container-type:size, half the bar),
+   so -1cqw is about 2.1px at the design width. */
+#oProg img{position:absolute;left:0;top:-1cqw;width:200cqw;height:100cqh;max-width:none}
+#pProg img{position:absolute;right:0;top:-1cqw;width:200cqw;height:100cqh;max-width:none}
 /* centred in the diamond: the plate spans y 0-53.3% of the canvas, so its
    middle is 26.6% */
 /* P578: 25.30% is the plank ink band's centre (rows 91..381 of 933), which is
@@ -1769,7 +1803,9 @@ body.dlg-speaking #screen-match #tellBadge{opacity:0;pointer-events:none}
    ink on ink. Matched to .hud-score's #f6ecd4 so the two readings on this bar
    are the same cream. */
 #screen-match #turnNum{font-family:'JMH Beda',serif;font-size:3.4cqw;letter-spacing:.06em;
-  color:#f6ecd4;text-shadow:0 1px 0 rgba(12,7,3,.8);
+  /* P589: beige rather than near-white. #f6ecd4 is the score's cream and read
+     too bright against the dark plate. */
+  color:#dcc9a4;text-shadow:0 1px 0 rgba(12,7,3,.8);
   /* P581: center/100% 100%, not contain - a vertical-only scale means the art
      must STRETCH rather than keep 516:134. */
   background:url('Art/Assets/Match/optimized/turn_number_opt.webp') center/100% 100% no-repeat;
@@ -1782,28 +1818,30 @@ body.dlg-speaking #screen-match #tellBadge{opacity:0;pointer-events:none}
      band to aim at any more, so the type sits in the middle of the plate. */
   /* P581: an explicit height instead of the art's ratio - 29px -> 37.8px, a 30%
      vertical growth, which is the "scale up vertically" asked for. */
-  width:26cqw;height:8.8cqw;display:flex;align-items:center;justify-content:center;
+  width:23cqw;height:7.8cqw;display:flex;align-items:center;justify-content:center;/* P589: smaller */
   padding-top:0.8%;filter:drop-shadow(0 0.42cqw 0 rgba(26,15,7,.34))}
 /* TURN is the caption, the number is the read. Centring the flex box puts the
    two middles level, which leaves the small word floating above the number's
    baseline - the nudge drops it back onto the line. */
 /* P577: the caption is dimmer than the number but both are now light, and the
    baseline nudges go with the switch from align-items:baseline to center. */
-#screen-match #turnNum .tn-w{font-size:.72em;letter-spacing:.11em;color:#bfa585;/* P579: bigger */
+#screen-match #turnNum .tn-w{font-size:.72em;letter-spacing:.11em;color:#a89070;/* P589 *//* P579: bigger */
   margin-right:.40em;position:relative;top:0}
 /* P579: OFF-WHITE THAT WHITENS TOWARD THE CAP. --tn-w is 0 on turn one and 1
    on the last, set by _turnLabel; the flat colour first is the fallback for any
    engine without color-mix. The cap decides the whole match in the late game -
    92% of night-6 matches end on it - so the number earning urgency is honest. */
 #screen-match #turnNum .tn-n{font-size:1.34em;letter-spacing:.02em;
-  color:#cbbb9e;
-  color:color-mix(in srgb,#ffffff calc(var(--tn-w,0) * 100%),#cbbb9e);
+  /* P589: the ramp ends at a warm beige, not pure white - "more beige, less
+     bright" - so the late-match urgency still reads without going stark. */
+  color:#b7a582;
+  color:color-mix(in srgb,#f2e4c6 calc(var(--tn-w,0) * 100%),#b7a582);
   position:relative;top:0}
 /* P577: THE THIRD SPAN. `TURN 1/8` is three elements - caption, number and
    this "/8" - and changing only two would have left the denominator as dark ink
    on the new dark plate. Caught by asserting the old colour was gone rather
    than by looking at two of the three rules. */
-#screen-match #turnNum .tn-o{font-size:.92em;letter-spacing:.08em;color:#c9b393}
+#screen-match #turnNum .tn-o{font-size:.92em;letter-spacing:.08em;color:#a89070}/* P589 */
 #screen-match .hud-mid{width:auto;padding:0}
 #btnQuit{display:none !important}
 #screen-match .controls{background:none;border-top:none;align-items:center;justify-content:center;gap:3.5%}
@@ -13567,8 +13605,14 @@ function famRenderRow(){
     var d=famDef(inst.id);if(!d)return;
     var _tg=(inst.id==='tar_pit'&&G._oTarPit)||(inst.id==='sleight'&&G._oSleight)||(inst.id==='ill_omen'&&G._oIllOmen);
     var col=(FAMILIES[d.fam]||{}).color||'#888';
-    ho+='<div class="mcBack'+(_tg?' armed':'')+(inst.broken?' broken':'')+'" style="--fc:'+col+'" '
-      +'onclick="famOppTap('+i+')"></div>';
+    /* P591: THE REAL FACE, through the same builder the player's row uses.
+       .mcBack was a CSS rectangle - flat family colour, a rim and a rotated
+       diamond - because no art existed. All 41 boss faces are in assets/cards/
+       now, so the rival's hand shows what it is holding. famCardArt rather than
+       a second markup path: one builder, one look, and the tier pip and badge
+       come along for free. */
+    ho+=famCardArt(inst.id,inst.tier,{cls:'oppcard'+(_tg?' armed':'')+(inst.broken?' broken':''),
+                                      onclick:'famOppTap('+i+')'});
   });
   hostO.innerHTML=ho;
   /* aux chips: quicksilver reroll + the sleeved rule */
@@ -18187,7 +18231,16 @@ function _matchDress(isBoss){
     var mag=Math.max(0.7,len*0.045)*flat;
     var ox=dx/len*mag,oy=(dy/len*mag)/1.9;
     _jobs.push({src:PP+q.n+'.png?v=2',x:+(q.x+ox).toFixed(2),y:+(q.y+oy).toFixed(2),
-      w:+(w*1.1).toFixed(1),rot:q.rot,fx:q.fx||1,fy:q.fy||1,a:a,flat:flat,
+      /* P592: THE SILHOUETTE'S INFLATION SCALES WITH `flat` TOO. This was a flat
+         w*1.1 for every prop - a shadow 10% wider than its object, sticking out
+         on EVERY side including the one facing the light. That is what Denis
+         kept seeing on the towel and reading as "going toward center": not the
+         offset (damped to 0.11% of the screen in P584 and still wrong), but the
+         halo, which no amount of damping the offset could touch. A tall bottle
+         wants that spill; a towel lying on the wood does not.
+         min(1,flat/0.35) maps the FLAT_PROPS band onto 0..1, so a tall prop
+         (flat 1) keeps its 1.10 and the towel (flat 0.05) drops to 1.014. */
+      w:+(w*(1+0.10*Math.min(1,flat/0.35))).toFixed(1),rot:q.rot,fx:q.fx||1,fy:q.fy||1,a:a,flat:flat,
       ux:+(dx/len).toFixed(3),uy:+((dy/len)/1.9).toFixed(3),
       bl:+(Math.min(1.6,0.4+len*0.02)*flat).toFixed(2)});
   });
@@ -24977,6 +25030,19 @@ function updHUD(){
      The 26.82 floor is unchanged - it is where the fill art's ink begins. */
   document.getElementById('pProg').style.width=(26.82+58.24*_pf).toFixed(2)+'%';
   document.getElementById('oProg').style.width=(26.82+60.12*_of).toFixed(2)+'%';
+  /* P590 (note 4): whoever is ahead wears the bigger portrait. HERE because both
+     totals are already in hand two lines up, and updHUD is the one function that
+     runs on every meaningful state change. A TIE SCALES NEITHER - "who is
+     winning" has no answer at 0-0, and the opening seconds of every match are a
+     tie, so growing both would make the cue mean nothing exactly when it is
+     first seen. */
+  try{
+    var _fl=document.querySelector('#raceWrap .rbFlagL'),
+        _fr=document.querySelector('#raceWrap .rbFlagR');
+    var _pAhead=(G.pPts||0)>(G.oPts||0), _oAhead=(G.oPts||0)>(G.pPts||0);
+    if(_fl)_fl.classList.toggle('lead',_oAhead);/* left flag is the RIVAL's */
+    if(_fr)_fr.classList.toggle('lead',_pAhead);
+  }catch(e){}
   /* ── Escalation VFX ── */
   if(G.target){
     var pPct=G.pPts/G.target,oPct=G.oPts/G.target;
