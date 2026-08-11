@@ -286,8 +286,14 @@ start = s.index('var PATRON_LINES=[')
 end = s.index('\n];', start)
 
 # every key must already exist as a pool, or the content is unreachable
+s_file = s
 existing = set(re.findall(r"\{p:'([^']+)'", s[start:end]))
-rows, seen = [], set()
+# EXISTING LINES COUNT AS SEEN. The first version only checked new lines against
+# each other, so a line identical to one ALREADY in the table went straight in
+# beside it - boss:whisper:loss shipped "Twice now. You're becoming genuinely
+# interesting to me." twice. Denis heard the collision before this caught it.
+existing_text = set(re.findall(r"\{p:'([^']+)'[^}]*?t:\"(.*?)\"\}", s_file[start:end]))
+rows, seen = [], set(existing_text)
 for (boss, outcome) in sorted(B):
     pool = 'boss:%s:%s' % (boss, outcome)
     if pool not in existing:
