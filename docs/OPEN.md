@@ -496,34 +496,6 @@ moves Finnick's Palm adjacency mid-turn. That one is a bug on either ruling.
 
 ---
 
-## 7. Sleight does nothing, and fixing it is a difficulty change
-
-**The card's text:** *"Force your opponent to reroll everything they just rolled.
-Once per match."* Tier 2 twice, tier 3 twice plus once per table-rule trigger.
-
-**What it does:** sets `G._famSleight = true` and prints *"SLEIGHT READY — THEIR
-NEXT ROLL COMES BACK"*. **Nothing anywhere reads that flag** except the card's
-own "have I been used?" guard. Nothing clears it either, so the 2- and 3-charge
-tiers are inert too — one use, then the button is dead for the match.
-
-**The rival's Sleight is fully built** and is a working template: armed when
-they're 800+ behind, fires on your first roll of a turn, rerolls your free dice,
-clears itself. Mirroring it for the player is a small, bounded job.
-
-**So why this is a question and not just a fix:** a working Sleight is a **new
-player weapon**, and §1 already ruled that difficulty changes ship as one
-measured batch rather than uncontrolled swings. Building it quietly would be a
-stealth buff on a ladder whose numbers you've already been told not to trust.
-It's the same reasoning that put §1b and §1c in the batch.
-
-**My rec: implement it, but land it inside the §1 retune batch**, tiers 1–2 only
-(the tier-3 "once whenever the table rule triggers" clause is a separate
-mechanic and can wait). If you'd rather not carry another card into that batch,
-the honest alternative is to **retire it** — a card that prints a promise and
-does nothing is worse than one that isn't offered.
-
----
-
 ## 8. Last Orders: the labels are boxed in by the art. Above, or below?
 
 You said the icons and text sit too high in the panel. **The sign itself is

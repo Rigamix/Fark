@@ -11997,7 +11997,7 @@ function generatePatron(tierIndex){
     var all=Object.keys(FAMILIES);fams=[all[Math.floor(Math.random()*all.length)]];
   }
   var count=night<=2?(Math.random()<0.5?0:1):(night<=5?(Math.random()<0.4?2:1):(Math.random()<0.5?3:2));
-  var pool=FAM_CARDS.filter(function(d){return FAM_LIVE[d.id]&&!d.unique&&fams.indexOf(d.fam)>=0;});
+  var pool=FAM_CARDS.filter(function(d){return _famDraftable(d)&&fams.indexOf(d.fam)>=0;});/* P588 */
   var fc=[];
   for(var ci=0;ci<count&&pool.length;ci++){
     var pick=pool.splice(Math.floor(Math.random()*pool.length),1)[0];
@@ -12011,7 +12011,7 @@ function generatePatron(tierIndex){
     _gp._grudgeNight=night;
     _gp.grudge=true;_gp.agg=Math.min(0.95,(_gp.agg||0.5)+0.12);
     if(fc.length<3&&Math.random()<0.5){/* +1 aggression tier: an extra card */
-      var gPool=FAM_CARDS.filter(function(d){return FAM_LIVE[d.id]&&!d.unique&&d.fam!=='tavern';});
+      var gPool=FAM_CARDS.filter(function(d){return _famDraftable(d)&&d.fam!=='tavern';});/* P588 */
       var gp2=gPool[Math.floor(Math.random()*gPool.length)];
       fc.push({id:gp2.id,tier:1});
     }
@@ -13147,7 +13147,7 @@ function _famInitOpp(rung){
       var fam=BOSS_FAM[_bk]||'obsidian';
       var night=((S&&S.run&&S.run.tier)||0)+1;
       var n=1+(night>=4?1:0)+(night>=7?1:0);
-      var pool=FAM_CARDS.filter(function(d){return FAM_LIVE[d.id]&&!d.unique&&d.fam===fam;});
+      var pool=FAM_CARDS.filter(function(d){return _famDraftable(d)&&d.fam===fam;});/* P588 */
       for(var i=0;i<n&&pool.length;i++){
         var pick=pool.splice(Math.floor(Math.random()*pool.length),1)[0];
         list.push({id:pick.id,tier:Math.min(3,1+Math.floor(night/3))});
@@ -13806,7 +13806,7 @@ function famTabPay(){
 function famOffer(forceTier1){
   var night=(S.run.tier||0)+1;
   var pool=FAM_CARDS.filter(function(d){
-    if(!FAM_LIVE[d.id]||d.unique)return false;
+    if(!_famDraftable(d))return false;/* P588 */
     if(d.fam==='tavern')return famOwnTier(d.id)===0;/* no tiers, no duplicates */
     return famOwnTier(d.id)<3;
   });
@@ -15088,6 +15088,24 @@ CFX.preserve={
    draft pool and the offer check read it. */
 ['transmute','fools_gold_f','bloom','preserve','honeytrap','powder_keg','sacrifice','short_fuse','stargazer','ill_omen','sleight','vanguard_f','anchor_f','bookends_f','for_keeps','double_stakes','the_tab','hair_of_the_dog','marked_table','high_table'].forEach(function(id){FAM_LIVE[id]=1;});
 FAM_LIVE.cultivate=1;/* P2: jade dice exist */
+/* P588 (OPEN 7): RETIRED FROM THE PLAYER'S DRAFT ONLY.
+   Denis ruled: retire Sleight rather than build it, on the grounds that "one
+   inert card is low stakes". THAT PREMISE IS HALF TRUE, and taking it off
+   FAM_LIVE - which is how this file retires a card, see the note above - would
+   have acted on the wrong half.
+   Sleight is inert for the PLAYER (CFX.sleight writes G._famSleight and nothing
+   reads it) and FULLY WORKING for the RIVAL (G._oSleight fires a real reroll of
+   the player's free dice). FAM_LIVE gates BOTH: the draft pools read it, and so
+   does _famInitOpp. So a blanket retirement would also strip a working card from
+   every vagabond boss - BOSS_FAM says finnick and whisper - and night 3 is the
+   one night already ABOVE target at 65%. That is a difficulty cut in the wrong
+   direction, and Denis did not ask for one.
+   So the retirement is scoped to the side that is actually broken. ONE predicate
+   rather than a clause in each of the four draft filters: those four are the
+   paired-operation shape this file keeps getting wrong, and a fifth pool added
+   later would silently reintroduce the card. */
+var FAM_PLAYER_RETIRED={sleight:1};
+function _famDraftable(d){return !!(d&&FAM_LIVE[d.id]&&!d.unique&&!FAM_PLAYER_RETIRED[d.id]);}
 FAM_LIVE.tamper=1;/* P5: opponent cards visible */
 /* ── PROTO greybox loadout: six dice, reorder + swap ── */
 function famLoadoutShow(){
