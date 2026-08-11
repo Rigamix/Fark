@@ -1650,10 +1650,26 @@ body.dlg-speaking #screen-match #tellBadge{opacity:0;pointer-events:none}
 #matchProps img{position:absolute;transition:filter .12s linear}
 /* clears ROLL, which is the tall plate and now sits on this side - 29cqw
    cleared BANK but ROLL reaches 20px higher */
-#matchPause{position:absolute;left:2.2%;bottom:calc(32.5cqw + env(safe-area-inset-bottom,0px));top:auto;right:auto;
-  width:11cqw;height:11cqw;z-index:21;cursor:pointer;transition:transform .1s}
+/* P602: LINED UP WITH ROLL. Denis: "line it up to the roll button so it has the
+   same space between it and the screen left." ROLL's painted left edge measures
+   21.14px on the 430px design width = 4.92% of the viewport, so that is the
+   number - taken off the rendered button rather than derived from .controls'
+   62%/30%/3.5% split, because .controls carries padding of its own and the
+   derivation would have put it at 2.25%.
+   AND THE BOX FOLLOWS THE NEW ART. The icon Denis replaced is 129x150 where the
+   old one was 141x137 - portrait now, not landscape. The img is
+   object-fit:contain inside this box, so a square 11cqw box would have
+   letterboxed the new icon and rendered it SMALLER than the space reserved for
+   it, with the shrinkage read as "the icon didn't update". aspect-ratio off the
+   art keeps it filling its box. */
+#matchPause{position:absolute;left:4.92%;bottom:calc(32.5cqw + env(safe-area-inset-bottom,0px));top:auto;right:auto;
+  width:9.5cqw;height:auto;aspect-ratio:129/150;z-index:21;cursor:pointer;transition:transform .1s}
 #matchPause:active{transform:scale(.9)}
-#matchPause img{width:100%;height:100%;object-fit:contain}
+/* P602: the IMAGE sets the height, not a box it has to fit inside. With
+   height:100% + object-fit:contain the icon letterboxed 3px inside its own
+   button (measured 40.84x47.48 painted in a 40.84x50.48 box), which is the
+   art rendering smaller than the space reserved for it. */
+#matchPause img{width:100%;height:auto;display:block}
 #screen-match .hud{display:block;position:relative;background:none;border-bottom:none;height:29cqw;z-index:15}
 #screen-match .hud::after{display:none}
 #screen-match .controls::before{display:none}
@@ -13322,9 +13338,9 @@ var FAM_CARDS=[
  {id:'double_stakes',fam:'tavern',kind:'active',name:'Double Stakes',
   text:['Before sitting down, double the buy-in AND the pot.','','']},
  {id:'the_tab',fam:'tavern',kind:'active',name:'The Tab',consumable:true,
-  text:['Borrow 250 gold from the innkeep right now. Owe 400 by last orders, or it costs a chalk circle.','','']},
+  text:['Borrow 250 gold from the innkeep right now. Owe 400 by last orders, or it costs a point.','','']},
  {id:'hair_of_the_dog',fam:'tavern',kind:'passive',name:'Hair of the Dog',
-  text:['Lose a match, and your first bank next match is doubled \u2014 but bust before banking, and it costs an extra circle.','','']},
+  text:['Lose a match, and your first bank next match is doubled \u2014 but bust before banking, and it costs an extra point.','','']},
  /* CURSED TABLE, not Marked Table. Two renames land on this one card: the
      cursed seat is no longer a seal, and a mark on a die now means an enchant -
      so a card called Marked Table read like an enchant card. The brief already
@@ -13339,7 +13355,7 @@ var FAM_CARDS=[
      patron chalks two, three with this card - and losing to the cursed patron
      rubs one out. This card only changes the WIN side, so the copy only claims
      the win side. Names the smoke, which is what a player can point at. */
-  text:['Beat the patron the smoke clings to and the board chalks you THREE circles, not two \u2014 lose, and it costs you two circles, not one.','','']},
+  text:['A CURSED patron has smoke around their portrait. Beat one and you take THREE points instead of two \u2014 lose to one and it costs two, not one.','','']},
  {id:'high_table',fam:'tavern',kind:'passive',name:'High Table',
   text:['When you sit down, raise the match target by 500 for both sides. Win: the pot pays half again more, and GREEDY or BULLISH patrons pay double.','','']}
 ];
@@ -15929,7 +15945,7 @@ function _gbPeek(i){
        one-sided deal at the moment the player commits is the worst place for
        it to be wrong. */
     +(sealed?' · cursed: win '+((famOwnTier('marked_table')>0)?'3':'2')
-      +' circles / lose '+((famOwnTier('marked_table')>0)?'2':'1'):'')+'</div>';
+      +' points / lose '+((famOwnTier('marked_table')>0)?'2':'1'):'')+'</div>';
   _gbSheetOpen(h);
 }
 /* ── boss peek sheet (flow spec 4) ── */
@@ -15981,7 +15997,7 @@ function _gbBook(){
     var done=i<(S.run.tier||0);
     sched+='<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0'+(i===(S.run.tier||0)?';font-weight:700':'')+'">'
       +'<span>'+(done?'✓ ':'')+'night '+(i+1)+' — '+(t.boss?t.boss.name:'?')+'</span>'
-      +'<span>'+t.pointsNeeded+' circles · '+(NIGHT_BUYINS[i]||0)+'g seats</span></div>';
+      +'<span>'+t.pointsNeeded+' points · '+(NIGHT_BUYINS[i]||0)+'g seats</span></div>';
   });
   var h='<div style="font-weight:700;font-size:15px;margin-bottom:4px">The Innkeep&#39;s Book</div>'
     +'<h2>the nights</h2><div class="gbx-box sub" style="display:block;padding:8px;text-align:left">'+sched+'</div>'
@@ -17094,7 +17110,7 @@ function _ptRoom(host,tier,bossReady){
      Rendered in both because this row is written out twice; adding it to one
      would make the marker depend on which screen the player arrived through. */
   if(S.run._hotdNext)chips+='<div style="cursor:default;border-color:#6b4a7a">'
-    +'hungover \u2014 first bank doubled, bust first and a circle goes</div>';
+    +'hungover \u2014 first bank doubled, bust first and a point goes</div>';
   if(famOwnTier('the_tab')>0&&!S.run._tabOwed)chips+='<div onclick="famTabTake()">the tab — borrow 250g</div>';
   if(famOwnTier('double_stakes')>0)chips+='<div '+(S.run._dsArmed?'style="border-color:#a58a3c;color:#f3dfa6"':'')
     +' onclick="_rsToggle(&quot;_dsArmed&quot;);showScreen(&quot;gauntlet&quot;)">'
@@ -22004,7 +22020,21 @@ var D3X={
      between the cut-out and the stroke returns - see the note at 21447.
      strength is the knob for a second pass; it moves both branches identically
      and needs no other reasoning. */
-  GLOW:{soft:10, rim:3.5, rimPasses:5, softPasses:1, line:2.4, grow:1.004, clear:0.7, strength:0.78},
+  /* P603: fb* are the STROKED-RINGS FALLBACK's own dials - the branch phones
+     take, because ctx.filter is a silent no-op on iOS Safari before 18. Denis:
+     "on phone make the glow a bit tighter and a bit more saturated". They are
+     separate from soft/rim/strength on purpose: those feed the blur branch that
+     desktop uses, and a shared number would have moved both.
+       fbWide  multiplies soft for the widest ring. 2 -> 1.35 pulls the halo's
+               reach in from 20px to 13.5px: TIGHTER.
+       fbCross where the ramp switches from the pale SOFT to the saturated COL.
+               .55 -> .40 puts six of the ten rings on the bright colour
+               instead of four: MORE SATURATED, without touching strength,
+               which would have brightened desktop too.
+       fbA0/A1 the alpha ramp, 0.09..0.32 -> 0.11..0.41, so the accumulated
+               rim survives the punch-out that throws away its inner half. */
+  GLOW:{soft:10, rim:3.5, rimPasses:5, softPasses:1, line:2.4, grow:1.004, clear:0.7, strength:0.78,
+        fbWide:1.35, fbCross:0.40, fbA0:0.11, fbA1:0.30},
   /* ctx.filter is the only thing that spreads the halo, and WebKit shipped it
      in Safari 18 - before that the assignment is a silent no-op. See
      window._cfBlur, tested once and shared with the dice shadows. */
@@ -22205,13 +22235,13 @@ var D3X={
          off-canvas, which is three reports of no glow on iOS.
          Widest and faintest first: the punch-out below throws away the inner
          half of every ring, so the alpha has to accumulate toward the rim. */
-      var RINGS=10, widest=Math.max(6,G.soft*2);
+      var RINGS=10, widest=Math.max(6,G.soft*(G.fbWide||2));
       gx.lineJoin='round'; gx.lineCap='round';
       for(var ri=0;ri<RINGS;ri++){
         var f=ri/(RINGS-1);/* 0 widest and softest, 1 tightest and brightest */
-        gx.strokeStyle=(f<0.55)?SOFT:COL;
+        gx.strokeStyle=(f<(G.fbCross===undefined?0.55:G.fbCross))?SOFT:COL;
         gx.lineWidth=widest*(1-f)+2;
-        gx.globalAlpha=0.09+0.23*f;
+        gx.globalAlpha=(G.fbA0===undefined?0.09:G.fbA0)+(G.fbA1===undefined?0.23:G.fbA1)*f;
         sel.forEach(function(h){trace(gx,h,0);gx.stroke();});
       }
       gx.globalAlpha=1;
