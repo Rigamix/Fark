@@ -137,8 +137,7 @@ Denis ruled: a brand that can fire twice in one turn via hot dice makes the
 card's own promise ("this turn") false as written, so **make it true** — a spent
 brand stops counting as a live icon until the next turn. Correctness grounds.
 
-**It lands OUTSIDE this batch, deliberately, and must be flagged as a real
-difficulty change when it ships** — not folded in silently. Denis's reasoning for
+**SHIPPED — P585, flagged as a real difficulty change, outside this batch** — not folded in silently. Denis's reasoning for
 letting it go early: the ladder already sits well under target across most of the
 game, so closing a double-cast that is currently overperforming is very likely
 relief in the right direction rather than a new problem.

@@ -19275,7 +19275,21 @@ function _tradeRestore(){
 function _enchDef(k){return ENCHANTS[k]||ENCH_ICONS[k]||null;}
 function _isIcon(ench){return !!(ench&&ENCH_ICONS[ench.t]);}
 /* is this die SHOWING its branded face right now? */
-function _dieIsIcon(d){return !!(d&&_isIcon(d.ench)&&d.val===d.ench.face);}
+/* P585: has this brand already fired THIS TURN? Keyed on the ench OBJECT, not
+   the lane: the same reference lives in S.run.dieEnch, G._enchArr and the pool
+   die's .ench, and survives the hot-dice pool rebuild - which is the exact case
+   the rule exists for. Cleared in startPTurn with its siblings. */
+function _brandSpent(d){
+  try{return !!(d&&d.ench&&(G._castEnch||[]).indexOf(d.ench)>=0);}catch(e){return false;}
+}
+/* P585 (Denis's ruling, OPEN 1i): A SPENT BRAND IS NOT A LIVE ICON. The test
+   belongs here because this is the canonical predicate - _splitIcons,
+   _iconOnTable, _iconRescuesRow, the bust check and _markLoneCast all read it,
+   so the rule lands everywhere at once rather than being restated per consumer.
+   A DIFFICULTY CHANGE: it removes a real double-cast (hot dice used to hand the
+   same brand back live), and it makes a row whose only live face is a spent
+   brand a BUST where the brand used to rescue it. */
+function _dieIsIcon(d){return !!(d&&_isIcon(d.ench)&&d.val===d.ench.face&&!_brandSpent(d));}
 /* WHISPER - KINDRED. While worn, 2+ enchanted dice in the PLAYER's loadout
    make icon effects fire at double strength for the match. Player-only on
    purpose: the engine has no opponent-side enchants, so the original "either
@@ -19350,6 +19364,13 @@ function _iconFire(d,side){
      _ruleActive, not G._tell - the direct read is exactly why the rule
      worked as a badge and was dead through a sleeve and a sealed seat. */
   try{if(_ruleActive('zero_hour','p'))G._zeroHourEnds=true;}catch(e){}
+  /* P585: this brand is spent for the turn. The class is the fact; D3X._spentLook
+     re-derives the look from it every sync, the same way .kept-still drives
+     _keptLook. */
+  try{
+    if(d&&d.ench){(G._castEnch=G._castEnch||[]).push(d.ench);
+      if(d.el)d.el.classList.add('brand-spent');}
+  }catch(e){}
   return 0;/* ALWAYS zero */
 }
 /* GROG - ZERO HOUR: a branded keep ends the turn on the spot, whichever
@@ -22069,6 +22090,19 @@ var D3X={
     });
   },
   /* spent, but still on the table: see-through rather than moved away */
+  /* P585: a spent brand's icon goes dark. The brand's glow is m.emissive, set
+     to RGB(1,1,1) by _faceLayers, so this is the same shape as _keptLook below -
+     coerce, bail if unchanged, walk the meshes. No new render path. */
+  _spentLook:function(d,on){
+    on=!!on;
+    if(!d||!d.obj||!!d._spentLook===on)return;
+    d._spentLook=on;
+    d.obj.traverse(function(o){
+      if(!o.isMesh||!o.material||!o.material.emissive||!o.material.emissiveMap)return;
+      o.material.emissive.setRGB(on?0.22:1,on?0.22:1,on?0.22:1);
+      o.material.needsUpdate=true;
+    });
+  },
   _keptLook:function(d,on){
     /* COERCE. A die that has never been through here has _keptLook undefined,
        and `undefined === false` is false, so the un-spent case fell through
@@ -22968,6 +23002,7 @@ var D3X={
     this.dice.forEach(function(d){
       if(!d.match||!d.chip)return;
       self._keptLook(d,d.chip.classList&&d.chip.classList.contains('kept-still'));
+      self._spentLook(d,d.chip.classList&&d.chip.classList.contains('brand-spent'));/* P585 */
     });
     this.on=true;
   },
@@ -25578,6 +25613,15 @@ function effectiveCards(){
 function _haptic(ms){try{if(navigator.vibrate&&(!S||!S.settings||S.settings.haptics!==false))navigator.vibrate(ms);}catch(e){}}
 
 function toggleDie(d){
+  /* P585: BEFORE the early return, which is what made this tap dead - a cast
+     brand is `committed`, so every tap on it did nothing at all. famLog goes
+     through the announce queue, so this cannot be overwritten by another effect
+     resolving in the same tick. */
+  if(d&&_brandSpent(d)){
+    try{famLog(((d.ench&&d.ench.t)||'BRAND').toUpperCase()+' — ALREADY CAST THIS TURN');}catch(e){}
+    try{_haptic(8);}catch(e){}
+    return;
+  }
   if(G.phase!=='choosing'||d.committed)return;
   /* Block selection while a Pickpocket palm animation is in flight — a
      click landing during the 650ms animation could select a die that's
@@ -25684,7 +25728,7 @@ function startPTurn(){
      Zero Hour re-arms each turn. Snare/Snuff/Fog are NOT reset
      here - they are armed on the player's turn to resolve on the rival's,
      and clear themselves when they fire. */
-  G._wardArmed=false;G._bustImmuneTurn=false;G._zeroHourEnds=false;G._breakArmed=false;
+  G._wardArmed=false;G._bustImmuneTurn=false;G._zeroHourEnds=false;G._breakArmed=false;G._castEnch=[];/* P585 */
   G._breakPending=[];/* P526: a queue now */
   /* FAIR TRADE: the loan ends. Two ways it can end, and they are not the same.
 
