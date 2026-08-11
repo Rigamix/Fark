@@ -38,7 +38,12 @@
   --hud-h: 80px;                 /* HUD bar at top of screen */
   --controls-h: 80px;            /* match controls bar at bottom */
   --activate-zone-h: 76px;       /* activation zone above controls */
-  --activate-zone-gap: 100px;    /* gap from controls top to activate zone bottom */
+  /* P583: 100px -> 168px, so the zone clears the card row now that the cards
+     are 122px tall. Raised HERE and not on .activate-zone's own `bottom`,
+     because this var also feeds --dice-area-pad-bottom - the two are meant to
+     move together, and nudging only the zone would silently desync the space
+     reserved for it from where it actually sits. */
+  --activate-zone-gap: 140px;    /* gap from controls top to activate zone bottom. P583b: 168 still lapped the cards by 33px (measured zone bottom 663 vs card top 629) - the zone hangs off .controls while the row hangs off #screen-match, so the clearance had to be measured rather than derived. */
   --dice-min-clearance: 36px;    /* mandatory min space between zones — also
                                     reserves room for floating card-trigger
                                     labels (e.g. "+200 BOWL") that appear
@@ -1185,6 +1190,17 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
   0%,100%{transform:translateY(0) rotate(0deg)}
   50%{transform:translateY(-0.85cqw) rotate(.45deg)}}
 #famRowP .fcv .fcvIn{animation:famBob 4.6s ease-in-out infinite;will-change:transform}
+/* P583: THE CANDLE IS ABOVE THE TABLE, so a card lying on it catches light at
+   the top and loses it toward the player. A gradient on .fcvIn's ::after rather
+   than a filter on .fcv, because all three of .fcv's states (spent, armed,
+   sealed) already declare `filter` and a fourth declaration would replace
+   whichever of them was active.
+   PLAYER ROW ONLY: #famRowO is rotated 180deg, so the same gradient would darken
+   the rival's cards at their VISUAL top - the opposite of the light. Their
+   depth comes from the brightness(.82) they already carry. */
+#famRowP .fcv .fcvIn::after{content:'';position:absolute;inset:0;border-radius:6%;
+  background:linear-gradient(to bottom,rgba(10,6,2,0) 38%,rgba(10,6,2,.30) 82%,rgba(10,6,2,.42) 100%);
+  pointer-events:none}
 #famRowP .fcv:nth-child(1) .fcvIn{animation-delay:-0.0s}
 #famRowP .fcv:nth-child(2) .fcvIn{animation-delay:-1.7s}
 #famRowP .fcv:nth-child(3) .fcvIn{animation-delay:-3.2s}
@@ -1728,7 +1744,7 @@ body.dlg-speaking #screen-match #tellBadge{opacity:0;pointer-events:none}
    triangular voids either side of its point, so closing it means bringing the
    plate up under the badge's wider part, not resizing a gap that is not there.
    10.1cqw puts the plate's top ~6px behind the shortened shield. */
-#screen-match .hud-mid{position:absolute;left:50%;top:calc(var(--bar-top) + 10.1cqw);transform:translateX(-50%);/* P580b: the badge reaches 56.7px below the bar top and the plate is 29px tall, so 9.4cqw put 16 of those 29 behind it - more than half the number. 12.6cqw leaves the few px of lap Denis asked for. */
+#screen-match .hud-mid{position:absolute;left:50%;top:calc(var(--bar-top) + 9.2cqw);/* P582: a touch higher again, ~4px */transform:translateX(-50%);/* P580b: the badge reaches 56.7px below the bar top and the plate is 29px tall, so 9.4cqw put 16 of those 29 behind it - more than half the number. 12.6cqw leaves the few px of lap Denis asked for. */
   /* P580: UNDER the bar group (#raceWrap is 15), not over it. The plate's top
      is 9.4cqw and the plank's ink ends at 10.04cqw, so the bar now laps the
      plate by a few px instead of the plate covering the badge. */
@@ -2471,16 +2487,28 @@ html.fk3d #screen-match .die-wrap:has(.die.d3on.selected)::after{
 /* ─── ACTIVATE ZONE (drag target) ─── */
 .activate-zone{
   position:absolute;left:20%;right:20%;height:76px;
-  bottom:calc(100% + 100px);
+  /* P583c: THE VAR NOW ACTUALLY SETS THIS. It was a literal 100px while
+     --activate-zone-gap - whose own comment reads "gap from controls top to
+     activate zone bottom" - fed only --dice-area-pad-bottom. So the space
+     RESERVED for the zone and the zone's POSITION were two independent numbers
+     that happened to agree at 100. Raising the var moved the reservation and
+     left the zone where it was, which is how this was caught. */
+  bottom:calc(100% + var(--activate-zone-gap));
   display:flex;align-items:center;justify-content:center;
   background:transparent;
   border:none;border-radius:8px;
   font-family:var(--font-ui);font-size:18px;letter-spacing:3px;
   color:rgba(180,160,130,.0);
-  transition:background .3s,color .3s;
+  transition:background .3s,color .3s,opacity .18s ease;
   z-index:55;pointer-events:none;
   overflow:visible;
+  /* P583: INVISIBLE UNTIL A CARD IS BEING DRAGGED. No new state was needed -
+     showActivateZone() already adds .dragging-active on drag start and
+     hideActivateZone() removes it, so this is the existing hook finally being
+     used for visibility instead of only for the label. */
+  opacity:0;
 }
+.activate-zone.dragging-active{opacity:1}
 /* SVG border — positioned to fill zone exactly */
 .activate-zone .az-border{
   position:absolute;inset:0;pointer-events:none;
