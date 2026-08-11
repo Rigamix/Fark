@@ -632,7 +632,9 @@ body{letter-spacing:.045em}
 #ptPanelSheet.pt-focus #ptvDice .d3chip:not(.zoom),
 #ptPanelSheet.pt-focus #ptvFan .fcv:not(.zoom){opacity:0;pointer-events:none}
 #ptvFan .fcv.zoom{z-index:60}
-#ptvFan .fcv.zoom .fcvIn{animation:fcvFloat 4.4s ease-in-out .55s infinite}
+/* P609: unscoped from #ptvFan - the same bob now serves the shelf's card
+   focus. `.zoom` is only ever set by the focus openers, never in-match. */
+.fcv.zoom .fcvIn{animation:fcvFloat 4.4s ease-in-out .55s infinite}
 @keyframes fcvFloat{0%,100%{transform:rotate(0deg) translateY(0)}
   25%{transform:rotate(1.05deg) translateY(-0.5px)}
   50%{transform:rotate(0deg) translateY(-0.8px)}
@@ -1390,6 +1392,17 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
   opacity:0 !important;pointer-events:none !important}
 #loStage .loDie{cursor:pointer}
 .loFeat.unpinned{opacity:0;pointer-events:none;transition:opacity .35s}
+/* P609: the shelf's CARD focus, matching its die focus. */
+#loStage .loCard{transition:opacity .3s}
+#loStage .loCard.zoom{z-index:60}
+#gbLoadout.lo-focus #loStage .loCard:not(.zoom){opacity:0;pointer-events:none}
+/* THIS ONE IS LOAD-BEARING. #gbLoadout.lo-focus lifts #d3xCanvas to z-index
+   60 so a zoomed DIE clears the scrim, and D3X only hides the other dice
+   when one of its own chips carries .zoom. With a CARD zoomed nothing tells
+   it to stand down, so six fully-lit sharp dice sat on top of the blurred
+   room. D3X's visibility test reads computed opacity, which is exactly how
+   the patron panel already solves this. */
+#gbLoadout.lo-focus #loStage .loDie:not(.zoom){opacity:0;pointer-events:none}
 #fcOv{position:fixed;inset:0;z-index:9600;background:rgba(8,5,2,.88);
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   opacity:0;transition:opacity .3s;font-family:'JMH Beda',serif;container-type:size}
@@ -15560,10 +15573,11 @@ function famLoadoutShow(){
     var cd=!bd&&ev.target.closest?ev.target.closest('.loCard'):null;
     if(bd)_loTip(bd,bd.getAttribute('data-nm'),bd.getAttribute('data-ds'));
     else if(cd){
-      var cdd=famDef(cd.getAttribute('data-cid'));
-      var own=(S.run.fcards||[]).filter(function(c){return famDef(c.id)===cdd;})[0];
-      var t=(own&&own.tier)||1;
-      if(cdd)_loTip(cd,cdd.name+(cdd.fam==='tavern'?'':' '+['I','II','III'][t-1]),cdd.text[t-1]);
+      /* P609: the full focus treatment, not _loTip's small anchored box.
+         The die branch two lines up has always opened _loFocus; this is the
+         same delegate finally treating both taps alike. */
+      var own=(S.run.fcards||[]).filter(function(c){return c.id===cd.getAttribute('data-cid');})[0];
+      _loCardFocus(cd,(own&&own.tier)||1);
     }
     else if(!(ev.target.closest&&ev.target.closest('#loTip')))_loTipHide();
   });
@@ -15749,6 +15763,44 @@ function _loUnfocus(){
     sp.style.transform='';
     setTimeout(function(){sp.classList.remove('zoom');sp.style.transition='';},470);
   }
+}
+/* P609: the shelf's card focus - the die treatment, for a card.
+   Deliberately a near-copy of _ptCardFocus rather than a generalisation of
+   it: the two panels differ in which screen root and scrim they mount on,
+   and folding them together would mean a parameterised opener serving four
+   surfaces whose only shared part is already shared - the CSS block.
+   _loUnfocus needs no change: .loCard's resting transform is CSS-only, so
+   clearing the inline one restores it, and its chip._d3 guard no-ops here. */
+function _loCardFocus(el,tier){
+  var ov=document.getElementById('gbLoadout');
+  if(!ov||ov.classList.contains('lo-focus'))return;
+  var d=famDef(el.getAttribute('data-cid'));if(!d)return;
+  tier=tier||1;
+  var col=(FAMILIES[d.fam]||{}).color||'#ffd98a';
+  _loTipHide();
+  var stage=document.getElementById('loStage');
+  var scrim=document.getElementById('loFocusScrim');
+  if(!scrim){scrim=document.createElement('div');scrim.id='loFocusScrim';(stage||ov).appendChild(scrim);}
+  scrim.onclick=_loUnfocus;
+  var pan=document.getElementById('loFocusPanel');
+  if(!pan){pan=document.createElement('div');pan.id='loFocusPanel';ov.appendChild(pan);}
+  pan.innerHTML='<div class="fname" style="color:'+col+';--fnoc:'+_fkDarker(col)+'">'+_fkSheen(d.name)+'</div>'
+    +'<div class="ffaces" style="font-size:2cqh"><span style="color:'+col+'">'+FAMILIES[d.fam].name+'</span>'
+      +'<span style="color:#cfc0a8"> \u00b7 '+(d.kind==='active'?'ACTIVE':'PASSIVE')+'</span></div>'
+    +'<div class="fdesc">'+_accG(d.text[tier-1])+'</div>'
+    +'<div id="loFBack" onclick="_loUnfocus()"><img src="Art/Assets/Icons/optimized/close_opt.webp" alt="close"></div>';
+  var gr=ov.getBoundingClientRect(),nr=el.getBoundingClientRect();
+  /* K is 2.05, not the die's 2.3: a card is already the taller subject and
+     2.3 pushed its head under the panel's name line. */
+  var K=2.05;
+  var wr=(Math.random()<0.5?-1:1)*(0.6+Math.random()*1.0);
+  var ncx=nr.left+nr.width/2,ncy=nr.top+nr.height/2;
+  var dx=(gr.left+gr.width/2)-ncx,dy=(gr.top+gr.height*0.365)-ncy;
+  el.style.transition='transform .55s cubic-bezier(.3,1.35,.35,1)';
+  el.style.transform='translate(calc(-50% + '+dx.toFixed(1)+'px), calc(-50% + '+dy.toFixed(1)+'px)) rotate('+wr.toFixed(1)+'deg) scale('+K+')';
+  el.classList.add('zoom');
+  ov.classList.add('lo-focus');
+  window._loFocSp=el;
 }
 /* small anchored tooltip: name + one-liner, tap-away dismiss */
 function _loTip(el,name,desc){
