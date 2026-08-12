@@ -85,12 +85,22 @@ function touch(type,x,y){ const t=new Touch({identifier:1,target:card,clientX:x,
 card.dispatchEvent(touch('touchstart', from.x, from.y));
 await sleep(40);
 for (let i=1;i<=8;i++){ document.dispatchEvent(touch('touchmove', from.x, from.y + (to.y-from.y)*i/8)); await sleep(30); }
+/* P658: the glow and the fire FX are the point of that patch, so they are
+   measured rather than eyeballed - the armed class is only half of it, the
+   COMPUTED filter has to actually be the gold one and not the drag's. */
+out.armedFilter = card.classList.contains('armed') ? getComputedStyle(card).filter.slice(0,60) : null;
 out.draggingClass = card.classList.contains('fcv-drag');
 out.armedClass = card.classList.contains('armed');
 const rMid = card.getBoundingClientRect();
 out.liftedCentreY = +(rMid.top + rMid.height/2).toFixed(1);
+let burst = 0, sfx = 0;
+{ const rb = window.spawnCardBurst; if (rb) window.spawnCardBurst = function(){ burst++; return rb.apply(this, arguments); };
+  const rs = SFX.cardFire; if (rs) SFX.cardFire = function(){ sfx++; return rs.apply(this, arguments); }; }
 document.dispatchEvent(touch('touchend', to.x, to.y));
+await sleep(120);
+out.firedClass = card.classList.contains('card-fired');
 await sleep(900);
+out.burstCalls = burst; out.sfxCalls = sfx;
 
 out.chargesAfter = (G.pF && G.pF[0]) ? G.pF[0].charges : null;
 out.useHandlerCalls = useCalls;

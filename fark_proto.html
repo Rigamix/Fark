@@ -1250,12 +1250,20 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
   0%,100%{transform:translateY(0) rotate(0deg)}
   50%{transform:translateY(-0.85cqw) rotate(.45deg)}}
 #famRowP .fcv .fcvIn{animation:famBob 4.6s ease-in-out infinite;will-change:transform}
-/* P657: the card in hand. No transition while dragging - the transform is set
-   every move and an easing curve on it lags the finger - and above the rest
-   of the table so it is never dragged behind the dice or the controls. */
+/* P657/P658: the card in hand. No transition while dragging - the transform is
+   set every frame and an easing curve on it lags the finger - and above the
+   rest of the table so it is never dragged behind the dice or the controls.
+   NO `filter` HERE, and that is the fix for "no glow": .fcv.armed carries the
+   gold drop-shadow, a filter REPLACES rather than adds, and this rule has the
+   same specificity but comes later - so the drag's own shadow won every time
+   the card was in hand, which is the only time armed can happen.
+   will-change so the compositor keeps the moving card on its own layer. */
 #famRowP .fcv.fcv-drag{transition:none;z-index:9500;pointer-events:none;
-  filter:drop-shadow(0 1cqw 1.4cqw rgba(10,6,2,.6))}
+  will-change:transform}
 #famRowP .fcv.fcv-drag .fcvIn{animation:none}
+/* the fire flash, on the family card too - one selector rather than a second
+   set of keyframes */
+.fcv.card-fired{animation:cardFired .42s ease-out}
 /* P583: THE CANDLE IS ABOVE THE TABLE, so a card lying on it catches light at
    the top and loses it toward the player. A gradient on .fcvIn's ::after rather
    than a filter on .fcv, because all three of .fcv's states (spent, armed,
@@ -14397,7 +14405,15 @@ function _famDragInit(el,i){
        the same rule P615 had to add to the legacy row */
     if(_famDrag&&_famDrag.live&&_famDrag.el!==el)return;
     var t=e.touches?e.touches[0]:e;
-    _famDrag={el:el,i:i,x0:t.clientX,y0:t.clientY,live:false};
+    /* P658: EVERYTHING THAT NEEDS LAYOUT IS READ ONCE, HERE. Reading the
+       card's rect and the threshold on every move meant three forced layouts
+       per event - the card, the row and the strut - and a finger produces
+       sixty events a second. Neither number can change mid-drag: the row is
+       not being relaid out and the strut's height is a CSS constant. */
+    var r0=el.getBoundingClientRect();
+    _famDrag={el:el,i:i,x0:t.clientX,y0:t.clientY,live:false,
+              cy0:r0.top+r0.height/2,line:_famThresholdY(),
+              dx:0,dy:0,armed:false};
   }
   function move(e){
     if(!_famDrag||_famDrag.el!==el)return;
@@ -14407,10 +14423,17 @@ function _famDragInit(el,i){
     if(!_famDrag.live){_famDrag.live=true;el.classList.add('fcv-drag');}
     /* `transform` and not `translate`: .fcv's rotate and translate carry the
        fan, and the standalone properties compose rather than replace, so the
-       card keeps its angle while it lifts */
+       card keeps its angle while it lifts.
+       WRITTEN SYNCHRONOUSLY, not batched into a frame. A rAF was tried and
+       reverted: it buys almost nothing here - the write is a style set with no
+       layout read behind it - and it makes the card stop following the finger
+       wherever frames are throttled, which is every backgrounded or low-power
+       state. The lag was the three forced LAYOUTS per move, and those are gone
+       because cy0 and line were measured once at start. */
+    _famDrag.dx=dx;_famDrag.dy=dy;
     el.style.transform='translate('+dx.toFixed(1)+'px,'+dy.toFixed(1)+'px)';
-    var r=el.getBoundingClientRect();
-    el.classList.toggle('armed',(r.top+r.height/2)<_famThresholdY());
+    var armed=(_famDrag.cy0+dy)<_famDrag.line;
+    if(armed!==_famDrag.armed){_famDrag.armed=armed;el.classList.toggle('armed',armed);}
     if(e.cancelable)e.preventDefault();
   }
   function end(){
@@ -14420,7 +14443,19 @@ function _famDragInit(el,i){
     el.classList.remove('fcv-drag','armed');
     el.style.transform='';
     if(!live)return;/* a tap - famCardTap's onclick still has it */
-    if(armed)try{famUse(idx);}catch(err){}
+    if(!armed)return;/* released short of the line - it just goes home */
+    /* P658: THE GAME'S OWN FIRE, not new effects. All four of these were
+       written for the legacy row's activation in P617/P619 and none of them
+       knows or cares which row the card came from. The plume goes BEFORE the
+       effect for the same reason it does there: a card that rebuilds the row
+       as part of its own effect still gets its beat off the element the
+       player was holding. */
+    try{SFX.cardFire();}catch(err){try{SFX.nav();}catch(e2){}}
+    try{_haptic([12,30,12]);}catch(err){}
+    try{spawnCardBurst(el);}catch(err){}
+    el.classList.add('card-fired');
+    setTimeout(function(){el.classList.remove('card-fired');},420);
+    try{famUse(idx);}catch(err){}
   }
   el.addEventListener('mousedown',start);
   el.addEventListener('touchstart',start,{passive:true});
