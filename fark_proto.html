@@ -1635,9 +1635,6 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
   transform:translateY(-6%);text-shadow:0 2px 0 rgba(16,9,3,.85)}
 .stNavBtn:active{transform:scale(.96)}
 /* ═══ MATCH DRESSING (FARK_MATCH_BRIEF pass 1) ═══ */
-#screen-match .activate-zone{left:20%;right:20%;height:auto;aspect-ratio:720/218}
-#screen-match .activate-zone .az-border rect{rx:18px;ry:18px}
-#screen-match .activate-zone .az-label{font-family:'JMH Beda',serif;font-size:4.2cqw;letter-spacing:.08em}
 /* kept pile: persistent dice cluster + one chalk TURN tag (brief §9) */
 #screen-match #keptTray .kept-die+.kept-die{margin-left:-1.6cqw}
 #screen-match #keptTray .kept-pts{font-family:'JMH Beda',serif;font-size:3.6cqw;color:#f0e3c6;
@@ -2915,14 +2912,17 @@ html.fk3d #screen-match .die-wrap:has(.die.d3on.selected)::after{
 /* Mid-match panel is z:10200 — tooltip needs higher to clear it. */
 #mLoadout-ov .lo-mini-card.peeked .mcard-tooltip{z-index:10500;opacity:1!important;pointer-events:auto}
 
-/* ─── ACTIVATE ZONE (drag target) ─── *//* P613: RETIRED. The threshold replaced it - there is no drop target to aim
-   at any more, and nothing adds .dragging-active. Its RESERVED SPACE is a
-   different matter and is deliberately kept: --activate-zone-h and
-   --dice-reserve-gap now set where the dice block sits, which Denis tuned to
-   his mark in P610, and reclaiming the 76px here would drop the dice ~56px
-   and undo it. The rules below are inert; the display:none is what matters. */
+/* ─── THE ACTIVATE ZONE IS GONE ───
+   P613 retired it behind display:none; P663 removed the element, its rules
+   and its three functions outright, because a feature switched off reads as
+   present to anyone scanning the file. There is no drop target: cards sit at
+   the bottom, nothing is above them, and an invisible threshold decides.
+   ITS RESERVED SPACE IS A DIFFERENT MATTER AND IS DELIBERATELY KEPT.
+   --activate-zone-h and --dice-reserve-gap now set where the dice block
+   sits, which Denis tuned to his mark in P610; reclaiming that 76px would
+   drop the dice ~56px and undo it. The names are historical - they reserve
+   room for the card row, not for a zone. */
 
-.activate-zone{display:none!important}
 .activate-zone_retired{
   position:absolute;left:20%;right:20%;height:76px;
   /* P583c: THE VAR NOW ACTUALLY SETS THIS. It was a literal 100px while
@@ -2992,19 +2992,6 @@ html.fk3d #screen-match .die-wrap:has(.die.d3on.selected)::after{
   100%{stroke-dashoffset:-28}
 }
 /* Card dropped in zone — stays there, browned out like the table */
-.mcard.in-zone{
-  position:absolute!important;
-  z-index:56!important;
-  opacity:1!important;
-  /* Keep pointer-events on so the player can tap the used card to see its
-     tooltip. Drag-activation still requires actual drag motion, so this
-     won't cause accidental re-activation. */
-  pointer-events:auto!important;
-  cursor:help!important;
-  margin:0!important;
-  animation:none!important;
-  transition:none!important;
-}
 /* In-zone card: greyed out, emoji hidden, no sheen sweep */
 .mcard.in-zone .gcard,
 .mcard.used .gcard{filter:brightness(.55) saturate(.3) grayscale(.4)!important}
@@ -6727,7 +6714,6 @@ body::before,body::after{display:none!important}
   /* Override only top padding — bottom is now driven by --dice-area-pad-bottom */
   .dice-area{padding-top:2px}
   .loadout-fab{bottom:88px}
-  .activate-zone{bottom:calc(100% + 50px);height:50px}
   .match-btn-yield{bottom:calc(100% + 50px);height:50px;left:20%;right:20%}
   /* On short phones, push the player dice DOWN within the dice area so
      they sit closer to the kept tray, but leave clearance above the
@@ -9955,7 +9941,10 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
        Zero width, hidden, pointer-events:none - it lays out and nothing else.
        buildCBar only sweeps .mcard/.cchip, so it survives every rebuild. -->
   <div id="armLiftStrut"></div>
-  <div class="activate-zone" id="activateZone"><svg class="az-border" width="100%" height="100%" preserveAspectRatio="none"><rect x="1" y="1" rx="8" ry="8"></rect></svg><span class="az-label">ACTIVATE</span></div>
+  <!-- P663: the activation box is gone. The threshold replaced it in P612 and
+       the box was only switched off with display:none, which reads as present
+       to anyone scanning this file. Cards sit at the bottom, nothing above
+       them, and an invisible line decides. -->
 </div>
 
 <!-- CONTROLS -->
@@ -25915,8 +25904,6 @@ function buildCBar(barId,cardIds,isOpp,label){
      next match's board. Player feedback: "card text effects remain on
      screen... sometimes they even remain on the next match". */
   bar.querySelectorAll('.card-trig-label').forEach(e=>e.remove());
-  var _atz=document.getElementById('activateZone');
-  if(_atz)_atz.querySelectorAll('.card-trig-label').forEach(e=>e.remove());
   /* Clean up previous drag listeners */
   _dragCleanups.forEach(fn=>fn());_dragCleanups=[];
   const n=cardIds.length;if(!n)return;
@@ -26086,7 +26073,6 @@ function initCardDrag(mcardEl,cardId){
       mcardEl.style.width=_dragState.origRect.width+'px';
       mcardEl.style.height=_dragState.origRect.height+'px';
       mcardEl.style.margin='0';
-      showActivateZone(cardId);
     }
     if(e.cancelable)e.preventDefault();
     mcardEl.style.left=(_dragState.origRect.left+dx)+'px';
@@ -26148,22 +26134,10 @@ function initCardDrag(mcardEl,cardId){
   });
 }
 
-function showActivateZone(cardId){
-  const zone=document.getElementById('activateZone');
-  const canUse=canActivateCard(cardId);
-  zone.classList.add('dragging-active');zone.classList.remove('hot','unavailable');
-  let label=zone.querySelector('.az-label');
-  if(!label){label=document.createElement('span');label.className='az-label';zone.prepend(label);}
-  if(canUse){label.textContent='ACTIVATE';}
-  else{zone.classList.add('unavailable');label.textContent='NOT AVAILABLE';}
-}
-function hideActivateZone(){
-  const zone=document.getElementById('activateZone');
-  zone.classList.remove('dragging-active','hot','unavailable');
-  /* Restore label text but preserve any .in-zone cards */
-  const label=zone.querySelector('.az-label');
-  if(label)label.textContent='ACTIVATE';
-}
+/* P663: showActivateZone / hideActivateZone / hitTestActivateZone removed with
+   the box. Counted first: the last two had no callers at all, and the first
+   had exactly one - on the legacy row's drag start, a row P657 showed is
+   empty in every real run. */
 /* P612: THE INVISIBLE THRESHOLD.
    A horizontal line a fixed lift above the player's card row. Below it a
    drag is just a drag; above it the card glows, and that glow is the only
@@ -26243,22 +26217,6 @@ function _returnCardToSlot(mcardEl,savedState,spent){
   if(typeof _updatePlayerCardVisuals==='function')_updatePlayerCardVisuals();
   if(typeof _updateCardGlints==='function'){try{_updateCardGlints();}catch(e){}}
 }
-function hitTestActivateZone(clientX,clientY){
-  const zone=document.getElementById('activateZone');
-  if(!zone.classList.contains('dragging-active'))return;
-  if(!_dragState||!_dragState.el)return;
-  const cr=_dragState.el.getBoundingClientRect();
-  const zr=zone.getBoundingClientRect();
-  const oL=Math.max(cr.left,zr.left),oR=Math.min(cr.right,zr.right);
-  const oT=Math.max(cr.top,zr.top),oB=Math.min(cr.bottom,zr.bottom);
-  const overlap=(oR>oL&&oB>oT)?(oR-oL)*(oB-oT):0;
-  const mostly=overlap>cr.width*cr.height*0.5;
-  zone.classList.toggle('hot',mostly&&!zone.classList.contains('unavailable'));
-}
-/* P612: DEAD, and kept only as a loud stub for a stray caller. It reparented
-   the card into #activateZone and ran style.cssText='' - which destroyed the
-   fan-slot custom properties that say where the card lives. Nothing parks a
-   card any more; see _returnCardToSlot. */
 function placeCardInZone(mcardEl,dragState){
   try{console.warn('placeCardInZone is retired (P612)');}catch(e){}
   if(mcardEl&&dragState)_returnCardToSlot(mcardEl,dragState,true);
@@ -35153,7 +35111,7 @@ function refundActiveCardUse(cardId){
   }catch(e){}
   /* belt and braces for any representation outside the player's row */
   document.querySelectorAll('[data-cid="'+cardId+'"]').forEach(function(el){
-    el.classList.remove('used');el.classList.remove('in-zone');
+    el.classList.remove('used');
   });
   if(typeof _updatePlayerCardVisuals==='function')_updatePlayerCardVisuals();
   if(typeof _updateCardGlints==='function'){try{_updateCardGlints();}catch(e){}}
