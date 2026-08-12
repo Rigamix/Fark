@@ -620,3 +620,38 @@ you play on, which is why it wasn't fixed with the rest.
 Fixing it means dropping the activation zone there too, and card clearance is
 already only 50px at that size — so it trades one tight number for another.
 *My recommendation: leave it until someone reports it on a real short phone.*
+
+---
+
+## 12. THE DOUBLED CARDS ON A BOSS — both rows are real, and I need your call
+
+You: *"On boss match I still see a doubling up of cards... a small one and behind
+it, two big ones with the weathering effect I had asked to completely remove."*
+
+**Reproduced and measured**, in a real boss match through `launchBossMatch()`:
+
+    G.oF     = [short_fuse]                  -> #famRowO .fcv   the small one
+    G.oCards = [grogs_bump, her_lucky_coin]  -> #oppCards .mcard  the two big ones
+
+So it is not one set of cards drawn twice. **They are two different sets of cards
+from two different systems, and both are live.**
+
+**And this is why I stopped rather than deleting the big ones.** I counted what
+reads `G.oCards` first: **about ninety sites**. It is the whole NPC card
+mechanic layer — the opponent's bust saves, scoring bonuses, bank triggers,
+`brutus_grit`, `mabels_stitch`, `aegis`, `hot_streak`, all of it. Those two cards
+are *affecting the match you are playing*. Hiding them would leave the mechanics
+running invisibly, which is worse than the doubling.
+
+**Three ways out:**
+
+- **(a) One row, both sources.** `famRenderRow` draws `G.oF` and `G.oCards`
+  together as `.fcv`, so the rival has a single hand in one visual language and
+  the weathered `.mcard` look disappears with the renderer. Most work, best
+  result. **My rec.**
+- **(b) Keep both rows, restyle the legacy one** to match `.fcv` — kills the
+  weathering you asked about but leaves two separate card strips on screen.
+- **(c) Stop dealing NPC cards on boss nights** so `G.oCards` is empty there and
+  only the family row shows. Cheapest, but it removes boss mechanics you have.
+
+Which one? (a) is a real piece of work and I did not want to start it on a guess.

@@ -796,11 +796,16 @@ body{letter-spacing:.045em}
 @keyframes nrGlowPulse{0%,100%{transform:translate(-50%,-50%) scale(1)}50%{transform:translate(-50%,-50%) scale(1.12)}}
 .nrparts{position:absolute;left:50%;top:33%;width:0;height:0;pointer-events:none;display:none;z-index:-1}
 #famRunDraft.focus .nrdie.zoom .nrparts{display:block}
-.nrparts span{position:absolute;left:0;top:0;background:var(--pc,#ffd98a);
+/* P667: ONE SPARK BAND, three hosts. This rule was copied once per site -
+   same background, same glow, same nrSpark keyframe - and the #fcOv copy was
+   missing .pdiamond entirely, so that band could never have drawn one. Only
+   the positioning is per-site now, because that is the only part that ever
+   genuinely differed. */
+.nrparts span,.stparts span,#fcOv .fcp span{position:absolute;left:0;top:0;background:var(--pc,#ffd98a);
   filter:drop-shadow(0 0 3px var(--pc,#ffd98a));opacity:0;animation:nrSpark 2.6s linear infinite}
-.nrparts span.pdot{border-radius:50%}
-.nrparts span.pstar{clip-path:polygon(50% 0,61% 39%,100% 50%,61% 61%,50% 100%,39% 61%,0 50%,39% 39%)}
-.nrparts span.pdiamond{clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)}
+.nrparts span.pdot,.stparts span.pdot,#fcOv .fcp span.pdot{border-radius:50%}
+.nrparts span.pstar,.stparts span.pstar,#fcOv .fcp span.pstar{clip-path:polygon(50% 0,61% 39%,100% 50%,61% 61%,50% 100%,39% 61%,0 50%,39% 39%)}
+.nrparts span.pdiamond,.stparts span.pdiamond,#fcOv .fcp span.pdiamond{clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)}
 @keyframes nrSpark{0%{opacity:0;transform:translate(var(--px),26px) scale(.5)}
   18%{opacity:.95}100%{opacity:0;transform:translate(calc(var(--px) + var(--dx)),-96px) scale(1.05)}}
 #nrFocusPanel{position:absolute;left:6%;right:6%;top:57%;z-index:8;text-align:center;color:#fff;
@@ -1264,6 +1269,47 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 /* the fire flash, on the family card too - one selector rather than a second
    set of keyframes */
 .fcv.card-fired{animation:cardFired .42s ease-out}
+/* P666: the two motions the whole feedback vocabulary is built from. Both
+   ride `transform`, which .fcv leaves free - its fan angle is on the
+   standalone `rotate` and `translate`, so neither is disturbed. */
+@keyframes fxShake{
+  0%,100%{transform:translateX(0) rotate(0deg)}
+  15%{transform:translateX(-4px) rotate(-2.5deg)}
+  32%{transform:translateX(4px) rotate(2.5deg)}
+  50%{transform:translateX(-3px) rotate(-1.6deg)}
+  68%{transform:translateX(3px) rotate(1.6deg)}
+  85%{transform:translateX(-1px) rotate(-.6deg)}}
+/* the glow is the SAME recipe the die sparkles use - drop-shadow in the
+   particle's own colour - so a card lighting up and a die sparkling are one
+   visual language. --fx-glow is written by cardFx from the family accent.
+   The card's own 2px drop-shadow is repeated here because an animated
+   `filter` REPLACES the computed one; omitting it drops the card's shadow
+   for the half second of the pulse. */
+@keyframes fxPulse{
+  0%{transform:scale(1);filter:drop-shadow(2px 3px 0 rgba(15,9,4,.4))}
+  35%{transform:scale(1.09);
+      filter:drop-shadow(2px 3px 0 rgba(15,9,4,.4))
+             drop-shadow(0 0 12px var(--fx-glow,#ffd98a)) brightness(1.35)}
+  100%{transform:scale(1);filter:drop-shadow(2px 3px 0 rgba(15,9,4,.4))}}
+.fx-shake{animation:fxShake .46s ease-in-out}
+.fx-pulse{animation:fxPulse .5s ease-out}
+/* P666: BROKEN IS A LASTING FACT, not a beat - the card is out for the night,
+   so it stays grey through every famRenderRow. The row already writes this
+   class from inst.broken; nothing had styled it since P633 removed the
+   .mcBack rules. Grey ONLY - no cross, no torn outline - because that
+   weathering is exactly what Denis asked to be rid of on boss cards. */
+.fcv.broken{filter:grayscale(.92) brightness(.5)}
+/* P668: AND IT HAS TO OUTRANK THE ROW. `.fcv.broken` is 0,2,0 and
+   `#screen-match #famRowO .fcv` is 2,1,0, so the row won and - because
+   `filter` REPLACES rather than adds - its brightness/saturate/drop-shadow
+   chain was the entire computed value with no grayscale in it. Measured: the
+   broken card carried the class and rendered at full colour.
+   The two drop-shadows are repeated for the same reason: a rule that omits
+   them does not inherit them, it deletes them. */
+#screen-match #famRowO .fcv.broken{
+  filter:grayscale(.95) brightness(.45) saturate(.2)
+         drop-shadow(0 0.2cqw 0.3cqw rgba(10,6,2,.55))
+         drop-shadow(0 0.9cqw 1.4cqw rgba(10,6,2,.5))}
 /* P583: THE CANDLE IS ABOVE THE TABLE, so a card lying on it catches light at
    the top and loses it toward the player. A gradient on .fcvIn's ::after rather
    than a filter on .fcv, because all three of .fcv's states (spent, armed,
@@ -1461,11 +1507,7 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 .stStand.zoom{z-index:60}
 .stStand .stparts{position:absolute;left:50%;top:45%;width:0;height:0;pointer-events:none;display:none;z-index:-1}
 #gbShop.st-focus .stStand.zoom .stparts{display:block}
-.stparts span{position:absolute;left:0;top:0;background:var(--pc,#ffd98a);
-  filter:drop-shadow(0 0 3px var(--pc,#ffd98a));opacity:0;animation:nrSpark 2.6s linear infinite}
-.stparts span.pdot{border-radius:50%}
-.stparts span.pstar{clip-path:polygon(50% 0,61% 39%,100% 50%,61% 61%,50% 100%,39% 61%,0 50%,39% 39%)}
-.stparts span.pdiamond{clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)}
+/* P667: the .stparts copy of the span rule folded into the shared one above. */
 #stFocusPanel,#loFocusPanel,#ptFocusPanel{position:absolute;left:6%;right:6%;top:53%;z-index:55;text-align:center;color:#fff;
   opacity:0;pointer-events:none;transform:translateY(3%);transition:opacity .4s,transform .4s}
 #gbLoadout.lo-focus #loFocusPanel{opacity:1;pointer-events:auto;transform:none;transition-delay:.18s}
@@ -1494,10 +1536,8 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 #fcOv.on{opacity:1}
 #fcOv .fcw{position:relative}
 #fcOv .fcp{position:absolute;left:50%;top:35%;width:0;height:0;pointer-events:none}
-#fcOv .fcp span{position:absolute;left:0;top:0;background:var(--pc,#ffd98a);
-  filter:drop-shadow(0 0 3px var(--pc,#ffd98a));opacity:0;animation:nrSpark 2.6s linear infinite}
-#fcOv .fcp span.pdot{border-radius:50%}
-#fcOv .fcp span.pstar{clip-path:polygon(50% 0,61% 39%,100% 50%,61% 61%,50% 100%,39% 61%,0 50%,39% 39%)}
+/* P667: the #fcOv copy folded into the shared rule above - and it gains the
+   .pdiamond it never had. */
 #fcOv .fcr{display:flex;align-items:flex-end;justify-content:center;gap:4cqw;flex-wrap:wrap;max-width:92cqw}
 #fcOv .fci{display:flex;flex-direction:column;align-items:center;gap:1.1cqh}
 #fcOv .fci .cap{font-size:1.7cqh;color:#ffd98a;letter-spacing:.1em;text-align:center;max-width:26cqw;
@@ -14282,7 +14322,9 @@ CFX.reprisal={
 CFX.pickpocket={
   bank:function(ev){if(!_fxMine(ev))return;
     var lift=Math.min(ev.P,G.oPts);
-    if(lift>0){G.oPts-=lift;G.pPts+=lift;famLog('PICKPOCKET LIFTS '+lift);try{updHUD();}catch(e){}}}
+    if(lift>0){G.oPts-=lift;G.pPts+=lift;famLog('PICKPOCKET LIFTS '+lift);
+      cardFx('steal',{row:'oppDice'},{to:{row:'score'}});
+      try{updHUD();}catch(e){}}}
 };
 CFX.falling_star={
   bank:function(ev){if(!_fxMine(ev))return;
@@ -14491,6 +14533,107 @@ function _famDragInit(el,i){
   document.addEventListener('mouseup',end);
   document.addEventListener('touchend',end);
   document.addEventListener('touchcancel',end);
+}
+/* ═══════ CARD EFFECT FEEDBACK ═══════
+   FOUR VERBS FOR TWENTY-THREE CARDS. Audited before it was written: 19 of the
+   23 CFX registrations produced nothing visible at all, only famLog text. What
+   they DO, though, is one of four things to something on screen - so this is
+   the whole vocabulary, and a card's effect adds one line at the point it
+   already calls famLog, which is the instant the effect lands.
+
+     hit    something of theirs is disabled or broken
+     gain   something of yours is improved or saved
+     steal  value crosses from them to you
+     churn  dice are rerolled or changed
+
+   Everything here is reused: the particles are FX with P664's diamond and star,
+   coloured by _cardAccent so a jade card throws jade; the shake and pulse are
+   two keyframes beside the ones already animating cards; and _fxEl finds a card
+   by id in whichever row holds it, so no caller needs to know whose it is. */
+function _fxEl(t){
+  if(!t)return null;
+  if(t.nodeType===1)return t;
+  try{
+    if(t.card)return document.querySelector('#famRowP .fcv[data-cid="'+t.card+'"]')
+                     ||document.querySelector('#famRowO .fcv[data-cid="'+t.card+'"]');
+    if(t.oppCard)return document.querySelector('#famRowO .fcv[data-cid="'+t.oppCard+'"]');
+    if(t.myCard)return document.querySelector('#famRowP .fcv[data-cid="'+t.myCard+'"]');
+    if(t.row==='dice')return document.getElementById('playerDiceRow');
+    if(t.row==='oppDice')return document.getElementById('oppDiceRow');
+    if(t.row==='score')return document.querySelector('#raceWrap')||document.getElementById('hud');
+  }catch(e){}
+  return null;
+}
+/* the shared emitter: a spray of the game's own diamonds off an element */
+function _fxSpray(el,col,count,opts){
+  if(!el||typeof FX==='undefined'||!FX.emit)return;
+  var r=el.getBoundingClientRect();if(!(r.width>0))return;
+  opts=opts||{};
+  var cx=r.left+r.width/2, cy=r.top+r.height/2;
+  for(var i=0;i<count;i++){
+    var a=(opts.dir!==undefined?opts.dir:-Math.PI/2)+(Math.random()-0.5)*(opts.spread||1.6);
+    var sp=(opts.speed||70)*(0.5+Math.random());
+    FX.emit({x:cx+(Math.random()-0.5)*r.width*0.8,
+             y:cy+(Math.random()-0.5)*r.height*0.6,
+             vx:Math.cos(a)*sp, vy:Math.sin(a)*sp,
+             g:opts.g===undefined?90:opts.g,
+             life:0.45+Math.random()*0.6,
+             size:(opts.size||7)*(0.7+Math.random()*0.7),
+             rot:Math.random()*Math.PI, vr:(Math.random()-0.5)*6,
+             shape:(Math.random()<0.2?'star':'diamond'), color:col});
+  }
+}
+/* P668: ONE FRAME LATER, ALWAYS. famUse is
+     if(fx.use(inst)){inst.charges--;famRenderRow();}
+   - it rebuilds the row AFTER the effect returns, so a class an effect puts
+   on a card is thrown away with the element a line later and nothing moves.
+   Measured: Tamper's target came back `fcv oppcard broken` with no fx-shake
+   and no running animation.
+   Deferring here rather than in each effect is the whole point - otherwise
+   every card written from now on has to know about famUse's re-render. It
+   is also why the target is a DESCRIPTOR and not an element: a descriptor
+   can be resolved again after the rebuild, an element cannot. */
+function cardFx(kind,target,opts){
+  var f=function(){_cardFxNow(kind,target,opts||{});};
+  if(window.requestAnimationFrame)requestAnimationFrame(f);else setTimeout(f,16);
+}
+function _cardFxNow(kind,target,opts){
+  opts=opts||{};
+  var el=_fxEl(target);
+  if(!el)return;
+  var col=opts.color||_cardAccent(el);
+  try{el.style.setProperty('--fx-glow',col);}catch(e){}
+  /* the class is removed first so a repeat of the same verb re-triggers the
+     animation rather than being swallowed as "already applied" */
+  function beat(cls,ms){
+    el.classList.remove(cls);void el.offsetWidth;el.classList.add(cls);
+    setTimeout(function(){el.classList.remove(cls);},ms);
+  }
+  try{
+    if(kind==='hit'){
+      beat('fx-shake',460);
+      _fxSpray(el,opts.color||'#6b5a48',14,{speed:55,g:220,size:6,spread:2.4});
+      try{SFX.err&&SFX.err();}catch(e){}
+    }else if(kind==='gain'){
+      beat('fx-pulse',520);
+      _fxSpray(el,col,16,{speed:60,g:-10,size:8,spread:1.1});
+    }else if(kind==='churn'){
+      beat('fx-pulse',420);
+      _fxSpray(el,col,20,{speed:110,g:140,size:7,spread:2.8});
+    }else if(kind==='steal'){
+      /* value crossing the table: motes leave the target toward `to` */
+      var dst=_fxEl(opts.to)||document.getElementById('hud');
+      var a=r2(el,dst);
+      _fxSpray(el,col,18,{dir:a,spread:0.5,speed:170,g:0,size:8});
+      beat('fx-pulse',420);
+    }
+  }catch(e){}
+  function r2(from,to){
+    if(!to)return -Math.PI/2;
+    var f=from.getBoundingClientRect(),t=to.getBoundingClientRect();
+    return Math.atan2((t.top+t.height/2)-(f.top+f.height/2),
+                      (t.left+t.width/2)-(f.left+f.width/2));
+  }
 }
 /* tap a card at the table: the painted sheet; PLAY when usable */
 function famCardTap(i){
@@ -15269,19 +15412,9 @@ function _nrFocus(i){
   die.classList.add('zoom');
   var mt=_starterOffer[i],dt=getDie(mt);
   var spk=D3.SPARK[mt]||D3.SPARK.bone;
-  var pts=die.querySelector('.nrparts');
-  if(pts){pts.innerHTML='';
-    for(var p2=0;p2<12;p2++){
-      var sp=document.createElement('span');
-      var w2,h2;
-      if(spk.shape==='star'){w2=5+Math.random()*4;h2=w2;sp.className='pstar';}
-      else if(spk.shape==='diamond'){w2=3+Math.random()*3;h2=w2*(1.5+Math.random()*0.5);sp.className='pdiamond';}
-      else{w2=2+Math.random()*3;h2=w2;sp.className='pdot';}
-      sp.style.cssText='--pc:'+spk.c+';--px:'+((Math.random()*2-1)*46).toFixed(0)+'px;--dx:'+((Math.random()*2-1)*26).toFixed(0)+'px;'
-        +'width:'+w2.toFixed(1)+'px;height:'+h2.toFixed(1)+'px;'
-        +'animation-duration:'+(2+Math.random()*1.6).toFixed(2)+'s;animation-delay:'+(Math.random()*2.4).toFixed(2)+'s';
-      pts.appendChild(sp);
-    }}
+  /* P667: the band this call draws is the one every other site now draws. The
+     arguments are exactly what this loop used, so nothing here changed look. */
+  _sparkBand(die.querySelector('.nrparts'),spk,{count:12,spread:46,drift:26});
   var acc=_accG;
   var nbh=function(t){return String(t).replace(/[\w]+(?:-[\w]+)+/g,function(m){return '<span style="white-space:nowrap">'+m+'</span>';});};
   var pan=document.getElementById('nrFocusPanel');
@@ -16025,8 +16158,10 @@ CFX.ill_omen={
     var _ioT=G._famIllOmen.tier||1,_ioP=famDef('ill_omen').p[_ioT-1];
     if(ev.pts<=0){var take=Math.min(_ioP[0],G.oPts);G.oPts-=take;G.pPts+=take;
       G._featOmenTrue=true;/* OMENS TRUE */
-      famLog('THE OMEN LANDS — YOU TAKE '+take);}
-    else{G.oPts+=_ioP[1];famLog('THE OMEN MISSES — THEY GAIN '+_ioP[1]);}
+      famLog('THE OMEN LANDS — YOU TAKE '+take);
+      cardFx('steal',{row:'oppDice'},{to:{row:'score'}});}
+    else{G.oPts+=_ioP[1];famLog('THE OMEN MISSES — THEY GAIN '+_ioP[1]);
+      cardFx('hit',{row:'score'});}
     G._famIllOmen=null;try{updHUD();}catch(e){}},
   canUse:function(){return G&&G.phase!=='opp'&&!G._famIllOmen;},
   use:function(inst){
@@ -16046,6 +16181,12 @@ CFX.tamper={
     famLog('TAMPERED — THEIR '+famDef(tgt.id).name.toUpperCase()+' IS BROKEN FOR THE NIGHT');
     if(inst.tier===3){var st=Math.min(300,G.oPts);G.oPts-=st;G.pPts+=st;_famPop('+300 LIFTED');try{updHUD();}catch(e){}}
     try{famRenderRow();}catch(e){}
+    /* P666: the card Denis named - it shakes as it breaks, then stays grey.
+       AFTER famRenderRow, not before: the row rebuilds its innerHTML, so a
+       class put on the old element is thrown away with it. The rebuilt card
+       already carries `broken` from inst.broken, so the grey is there when
+       the shake starts and stays after it ends. */
+    cardFx('hit',{oppCard:tgt.id});
     return true;
   }
 };
@@ -16054,6 +16195,7 @@ CFX.sleight={
   use:function(inst){
     G._famSleight=true;
     famLog('SLEIGHT READY — THEIR NEXT ROLL COMES BACK');
+    cardFx('churn',{row:'oppDice'});
     return true;
   }
 };
@@ -16423,14 +16565,15 @@ function _featCeremony_RETIRED(list){
       var old=document.getElementById('fcOv');if(old)old.remove();
       ov=document.createElement('div');ov.id='fcOv';
       var spread=Math.min(150,60+(n-1)*30);
-      var parts='';
-      for(var i=0;i<14+(n-1)*4;i++){
-        var w2=(2.5+Math.random()*4).toFixed(1);
-        parts+='<span class="'+(Math.random()<0.4?'pstar':'pdot')+'" style="--pc:'+(Math.random()<0.5?'#e1a755':'#ffd98a')+';'
-          +'--px:'+((Math.random()*2-1)*spread).toFixed(0)+'px;--dx:'+((Math.random()*2-1)*30).toFixed(0)+'px;'
-          +'width:'+w2+'px;height:'+w2+'px;'
-          +'animation-duration:'+(2+Math.random()*1.6).toFixed(2)+'s;animation-delay:'+(Math.random()*2).toFixed(2)+'s"></span>';
-      }
+      /* P667: THE ONE THAT WAS BEHIND. This band had its own builder, written
+         before the shape table: a coin flip between star and dot, no diamond
+         at all - and the CSS behind it had no .pdiamond rule either, so it
+         could not have drawn one. It goes through the shared band now, which
+         is where the diamond and the size-by-shape come from. The two golds
+         stay: they are this overlay's own colour, not a material's. */
+      var parts=_sparkBand(null,{c:['#e1a755','#ffd98a'],
+                                 shape:['star','star','diamond','dot','dot']},
+                           {count:14+(n-1)*4,spread:spread,drift:30});
       var artH=n===1?24:(n===2?17:12.5);
       var arts='';
       list.forEach(function(f,i2){
@@ -27425,6 +27568,39 @@ var FX=(function(){
    Same signature as before; now drawn on the FX canvas pool. The first
    8 sparks fire in the fixed 8-direction pattern (preserves the original
    look for the common small counts); any extra are scattered radially. */
+/* P667: THE SPARK BAND, once. The rising glitter under a zoomed die on the
+   new-run offer, on a shop stand and over the feats overlay was three copies
+   of this loop - two identical, the third an older one that predated the
+   shape table and could only draw stars and dots.
+   `spark` is the record D3.SPARK already holds per material, {c, shape}.
+   Either field may be an ARRAY when a caller wants a mix rather than one
+   material's look - which is how the feats overlay keeps its two golds while
+   drawing the same shapes the dice do.
+     host    the .nrparts / .stparts / .fcp element (emptied and refilled)
+     opts    {count, spread, drift} - spread and drift in px, because each
+             host sits in a differently scaled box and only the caller knows
+   Returns the markup as well as filling the host, so a caller building a
+   string with innerHTML (the feats overlay does) can use the same source. */
+function _sparkBand(host,spark,opts){
+  opts=opts||{};spark=spark||{};
+  var pick=function(v){return Array.isArray(v)?v[(Math.random()*v.length)|0]:v;};
+  var count=opts.count||12, spread=opts.spread||46, drift=opts.drift||26;
+  var out='';
+  for(var i=0;i<count;i++){
+    var sh=pick(spark.shape)||'dot', c=pick(spark.c)||'#ffd98a', w,h,cls;
+    if(sh==='star'){w=5+Math.random()*4;h=w;cls='pstar';}
+    else if(sh==='diamond'){w=3+Math.random()*3;h=w*(1.5+Math.random()*0.5);cls='pdiamond';}
+    else{w=2+Math.random()*3;h=w;cls='pdot';}
+    out+='<span class="'+cls+'" style="--pc:'+c+';'
+      +'--px:'+((Math.random()*2-1)*spread).toFixed(0)+'px;'
+      +'--dx:'+((Math.random()*2-1)*drift).toFixed(0)+'px;'
+      +'width:'+w.toFixed(1)+'px;height:'+h.toFixed(1)+'px;'
+      +'animation-duration:'+(2+Math.random()*1.6).toFixed(2)+'s;'
+      +'animation-delay:'+(Math.random()*2.4).toFixed(2)+'s"></span>';
+  }
+  if(host)host.innerHTML=out;
+  return out;
+}
 function spawnPixelSparks(el,count){
   if(!el||!count)return;
   var rect=el.getBoundingClientRect();
@@ -37448,17 +37624,9 @@ function _stFocus(i){
      (the stand is tiny then zoomed 2.3x — fixed px offsets scattered
      the sparks across the screen) */
   var pw=stand.offsetWidth*0.4;
-  for(var p2=0;p2<12;p2++){
-    var sp=document.createElement('span');
-    var w2,h2;
-    if(spk.shape==='star'){w2=5+Math.random()*4;h2=w2;sp.className='pstar';}
-    else if(spk.shape==='diamond'){w2=3+Math.random()*3;h2=w2*(1.5+Math.random()*0.5);sp.className='pdiamond';}
-    else{w2=2+Math.random()*3;h2=w2;sp.className='pdot';}
-    sp.style.cssText='--pc:'+spk.c+';--px:'+((Math.random()*2-1)*pw).toFixed(0)+'px;--dx:'+((Math.random()*2-1)*pw*0.55).toFixed(0)+'px;'
-      +'width:'+w2.toFixed(1)+'px;height:'+h2.toFixed(1)+'px;'
-      +'animation-duration:'+(2+Math.random()*1.6).toFixed(2)+'s;animation-delay:'+(Math.random()*2.4).toFixed(2)+'s';
-    pts.appendChild(sp);
-  }
+  /* P667: same band, same numbers this loop used - spread in chip widths
+     because the stand is tiny then zoomed 2.3x. */
+  _sparkBand(pts,spk,{count:12,spread:pw,drift:pw*0.55});
   var scrim=document.getElementById('stFocusScrim');
   if(!scrim){scrim=document.createElement('div');scrim.id='stFocusScrim';scrim.onclick=_stUnfocus;
     (document.getElementById('stStage')||gb).appendChild(scrim);}
