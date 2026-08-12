@@ -1250,6 +1250,12 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
   0%,100%{transform:translateY(0) rotate(0deg)}
   50%{transform:translateY(-0.85cqw) rotate(.45deg)}}
 #famRowP .fcv .fcvIn{animation:famBob 4.6s ease-in-out infinite;will-change:transform}
+/* P657: the card in hand. No transition while dragging - the transform is set
+   every move and an easing curve on it lags the finger - and above the rest
+   of the table so it is never dragged behind the dice or the controls. */
+#famRowP .fcv.fcv-drag{transition:none;z-index:9500;pointer-events:none;
+  filter:drop-shadow(0 1cqw 1.4cqw rgba(10,6,2,.6))}
+#famRowP .fcv.fcv-drag .fcvIn{animation:none}
 /* P583: THE CANDLE IS ABOVE THE TABLE, so a card lying on it catches light at
    the top and loses it toward the player. A gradient on .fcvIn's ::after rather
    than a filter on .fcv, because all three of .fcv's states (spent, armed,
@@ -14317,6 +14323,9 @@ function famRenderRow(){
     hp+=famCardArt(inst.id,inst.tier,{cls:cls.trim(),onclick:'famCardTap('+i+')'});
   });
   hostP.innerHTML=hp;
+  /* P657: the row is rebuilt on every change, so the gesture is bound here
+     rather than once - _famDragInit is idempotent per element. */
+  try{[].forEach.call(hostP.querySelectorAll('.fcv'),function(el,ix){_famDragInit(el,ix);});}catch(e){}
   /* opponent: their cards face-down on their own side of the table, on flat
      family colour until painted backs exist. Armed actives rise with a red
      glow one roll ahead, and flip face-up when they fire (brief §6). */
@@ -14361,6 +14370,65 @@ function famRenderRow(){
       +(_st?_st.name:G._sleeve)+_slVal+' (both) ⓘ</div>';
   }
   hostA.innerHTML=ha;
+}
+/* P657: DRAG A FAMILY CARD UP TO PLAY IT. The same gesture P612 built for the
+   legacy row, on the row that actually holds the player's cards - see the
+   note in tools/_p657_family_card_drag.py for how it came to be on the wrong
+   one.
+   A TAP IS STILL A TAP: nothing happens under 10px of travel, so famCardTap
+   still opens the sheet and its PLAY button still works. Two ways in, and the
+   drag is the fast one.
+   THE GUARDS ARE famUse'S, NOT COPIES OF THEM. Whether a card can be played -
+   active kind, a use handler, charges left, its own canUse - is decided in
+   exactly one place, and this only asks whether it is worth starting a drag. */
+var _famDrag=null;
+function _famCanPlay(i){
+  if(!G||!G.pF||!G.pF[i])return false;
+  var inst=G.pF[i],d=famDef(inst.id),fx=CFX[inst.id];
+  if(!d||d.kind!=='active'||!fx||!fx.use)return false;
+  return inst.charges>0;
+}
+function _famDragInit(el,i){
+  if(!el||el._famDrag)return;el._famDrag=1;
+  function start(e){
+    if(!_famCanPlay(i))return;
+    if(e&&e.button!==undefined&&e.button!==0)return;
+    /* one drag at a time - a second finger must not steal an airborne card,
+       the same rule P615 had to add to the legacy row */
+    if(_famDrag&&_famDrag.live&&_famDrag.el!==el)return;
+    var t=e.touches?e.touches[0]:e;
+    _famDrag={el:el,i:i,x0:t.clientX,y0:t.clientY,live:false};
+  }
+  function move(e){
+    if(!_famDrag||_famDrag.el!==el)return;
+    var t=e.touches?e.touches[0]:e;
+    var dx=t.clientX-_famDrag.x0,dy=t.clientY-_famDrag.y0;
+    if(!_famDrag.live&&Math.hypot(dx,dy)<10)return;
+    if(!_famDrag.live){_famDrag.live=true;el.classList.add('fcv-drag');}
+    /* `transform` and not `translate`: .fcv's rotate and translate carry the
+       fan, and the standalone properties compose rather than replace, so the
+       card keeps its angle while it lifts */
+    el.style.transform='translate('+dx.toFixed(1)+'px,'+dy.toFixed(1)+'px)';
+    var r=el.getBoundingClientRect();
+    el.classList.toggle('armed',(r.top+r.height/2)<_famThresholdY());
+    if(e.cancelable)e.preventDefault();
+  }
+  function end(){
+    if(!_famDrag||_famDrag.el!==el)return;
+    var live=_famDrag.live,idx=_famDrag.i;_famDrag=null;
+    var armed=el.classList.contains('armed');
+    el.classList.remove('fcv-drag','armed');
+    el.style.transform='';
+    if(!live)return;/* a tap - famCardTap's onclick still has it */
+    if(armed)try{famUse(idx);}catch(err){}
+  }
+  el.addEventListener('mousedown',start);
+  el.addEventListener('touchstart',start,{passive:true});
+  document.addEventListener('mousemove',move);
+  document.addEventListener('touchmove',move,{passive:false});
+  document.addEventListener('mouseup',end);
+  document.addEventListener('touchend',end);
+  document.addEventListener('touchcancel',end);
 }
 /* tap a card at the table: the painted sheet; PLAY when usable */
 function famCardTap(i){
@@ -26007,8 +26075,11 @@ function hideActivateZone(){
    drag is just a drag; above it the card glows, and that glow is the only
    sign the line exists. Measured off the row rather than stored as a screen
    coordinate, so it survives every viewport and the row moving. */
-function _cardThresholdY(){
-  var row=document.getElementById('playerCards');
+/* P657: takes the ROW now. The lift is the same knob and the same strut for
+   both hands; what differs is which row's top the line sits above. Defaults
+   to the legacy row so every existing caller is unchanged. */
+function _cardThresholdY(rowEl){
+  var row=rowEl||document.getElementById('playerCards');
   if(!row)return -1e9;/* no row: nothing can be above the line */
   var r=row.getBoundingClientRect();
   /* P615: THE CSS ENGINE RESOLVES THE KNOB, not parseFloat.
@@ -26032,6 +26103,11 @@ function _cardThresholdY(){
 }
 /* is THIS card currently above the line? the card's centre, which is the
    most predictable point for a finger to aim */
+/* P657: the family hand's own line - same strut, same lift, measured from
+   #famRowP because that is the row those cards leave. */
+function _famThresholdY(){
+  return _cardThresholdY(document.getElementById('famRowP'));
+}
 function _cardIsArmed(el){
   if(!el)return false;
   var r=el.getBoundingClientRect();
