@@ -1352,7 +1352,31 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
   background:rgba(22,13,6,.82);border:1.5px solid #a58a3c;border-radius:999px;padding:1% 4%}
 .fcv .fcvBadge{position:absolute;left:5%;top:3.5%;font-size:min(1.6cqh,10px);letter-spacing:.08em;
   background:#ffd98a;color:#2a1808;padding:2% 5%;border-radius:3px;font-weight:bold}
-.loCard{position:absolute;width:21.5%;transform:translate(-50%,-50%);cursor:pointer}
+/* P636: THE GROUND PLANE THE SLOTS ARE PAINTED ON. Measured off shelf_bg.png:
+   the middle slot's width runs 402.9 -> 494.2 top to bottom (ratio 1.2266) and
+   its centre holds at the image centre, so the three slots share one plane
+   with the vanishing point above the middle one. rotateX is acos of the slot's
+   107.9px height over the card's authored 131.7px = 35deg; the perspective is
+   the distance that gives that taper at that angle = 371px. Two measurements,
+   one from height and one from width, neither fitted to the other.
+   THE ORIGIN IS ON THE SLOT ROW (71.4%, against the 71.5% the SLOTS array
+   uses), so all three card centres sit on it and do not move - only their
+   shapes change. _loCardFocus measures those rects to aim its flight.
+   Transparent to taps: it covers the whole stage, and the dice, feats and
+   badges underneath still need theirs. */
+#loCardPlane{position:absolute;inset:0;pointer-events:none;
+  transform-origin:50% 71.4%;transform:perspective(371px) rotateX(35deg);
+  transition:transform .55s cubic-bezier(.3,1.35,.35,1)}
+/* FLAT WHILE A CARD IS OUT OF IT. The focus panel sits near 36% of the screen,
+   far above the origin, where the divide would draw the card small and hard
+   trapezoidal - so the plane lays down and the card un-tilts as it rises.
+   A class set by _loCardFocus, NOT .lo-focus: a DIE focus must leave the plane
+   alone or the cards flip flat behind the scrim and back as they fade in.
+   The z-index rides with it because a transform is a stacking context, so
+   .loCard.zoom's 60 means nothing outside this element - P594's bug exactly.
+   Lifted only while flat, so ordinary stacking is untouched. */
+#loCardPlane.flat{transform:none;z-index:60}
+.loCard{position:absolute;width:21.5%;transform:translate(-50%,-50%);cursor:pointer;pointer-events:auto}
 .loCard .fcvTier{font-size:1.9cqw}
 #loStage .loDie{position:absolute !important;left:0;top:82.6%;width:13.6%;aspect-ratio:1;
   transform:translate(-50%,-50%);display:block}
@@ -15713,7 +15737,11 @@ function famLoadoutShow(){
     +'<div id="loStage">'
       +'<img class="bgExt" src="'+BG+'" alt="">'
       +'<img class="bg" src="'+BG+'" alt="">'
-      +fHtml+'<div id="loWallVig"></div>'+bHtml+cHtml+dHtml
+      +fHtml+'<div id="loWallVig"></div>'+bHtml
+      /* P636: the cards go inside the tilted plane. inset:0 on the plane means
+         their % placements resolve against the same box as before, so the
+         SLOTS array is untouched. */
+      +'<div id="loCardPlane">'+cHtml+'</div>'+dHtml
     +'</div>'
     +'<div id="loHud"><div class="hs">'+hearts+'</div>'
       +'<div class="gd"><img class="pl" src="'+PT_A+'plate_goldCounter.png" alt="">'
@@ -15904,6 +15932,10 @@ function _loUnfocus(){
   var ov=document.getElementById('gbLoadout');
   if(!ov||!ov.classList.contains('lo-focus'))return;
   ov.classList.remove('lo-focus');
+  /* P636: unconditional, because it is idempotent and a die focus never set
+     it - the alternative is remembering which kind of focus this was, which is
+     a second piece of state for no gain. */
+  try{var _pl=document.getElementById('loCardPlane');if(_pl)_pl.classList.remove('flat');}catch(e){}
   var sp=window._loFocSp;window._loFocSp=null;
   if(sp){
     var chip=sp.querySelector('.die');
@@ -15953,6 +15985,10 @@ function _loCardFocus(el,tier){
   el.style.transition='transform .55s cubic-bezier(.3,1.35,.35,1)';
   el.style.transform='translate(calc(-50% + '+dx.toFixed(1)+'px), calc(-50% + '+dy.toFixed(1)+'px)) rotate('+wr.toFixed(1)+'deg) scale('+K+')';
   el.classList.add('zoom');
+  /* P636: the plane lays down so the card arrives flat, and rises out of the
+     stacking context its own transform creates. Same duration as the flight
+     above, so the un-tilt and the travel are one movement. */
+  try{var _pl=document.getElementById('loCardPlane');if(_pl)_pl.classList.add('flat');}catch(e){}
   ov.classList.add('lo-focus');
   window._loFocSp=el;
 }
