@@ -112,4 +112,8 @@ return {
   exitParchment: pct(q('#exitParchment')),
   continueBtn: pct(q('#endBtns')),
   resCard: pct(q('#end-ov .res-card')),
+  /* Denis: the win and loss primary buttons should land in the same place.
+     Reported as a number on both arms so "they match" is checkable. */
+  primaryBtn: pct(q('#end-ov.win-art-on .fo-skip') || q('#end-btns')),
+  deckSlots: [...document.querySelectorAll('#end-ov .fo-slot')].map(pct),
 };
