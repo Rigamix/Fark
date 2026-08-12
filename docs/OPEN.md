@@ -542,3 +542,41 @@ a side effect.
   first try, buys the dearest die in stock, no enchant/tavern gold. None *looks*
   load-bearing, but that is an impression rather than a measurement; the same
   sensitivity method settles any of them if a retune leans on one.
+
+---
+
+## 9. FOUR THINGS THAT WANT YOUR HANDS, NOT MORE MEASURING
+
+All shipped and working. Each is one number or one reading pass, and none blocks
+anything else.
+
+**9a. The 23 patron voices.** Part 6b placed the brief's content against the real
+pools — placement is verified, correctness is not claimed. The brief locked those
+voices partly against backstory lines this build doesn't have (it assumed 6 per
+patron; there are 3). `tools/_p627_patron_lines.py` lists every line by patron
+and group in one place if you want to read them together.
+*My recommendation: read them; don't have me rewrite them blind.*
+
+**9b. The card activation threshold** — `--card-arm-lift`, currently 16cqw
+(≈68.8px above the card row). Measured, not played. Raise it if cards fire by
+accident, lower it if the drag feels dead. One value in `:root`.
+
+**9c. The NPC hesitation band** — `_HESITATE_LO`/`_HESITATE_HI`, currently
+0.40–0.65 on `agg`. Derived from the two probabilistic exits in `oppShouldBank`,
+so the derivation is sound; whether it fires at the right *rate* in play is a
+feel question. Widening it makes the rival hesitate more often.
+
+**9d. The card activation sound** — `SFX.cardFire()`. The voices are verified as
+scheduled and shaped; whether it's satisfying is your ear. Body / bloom / tail
+are three tunable blocks in one function.
+
+---
+
+## 10. THE ≤700 KEPT-TRAY OVERLAP — pre-existing, out of your band
+
+On viewports 700px tall and under, the kept-dice tray overlaps the card-drop
+target (-8.97px at 690). It predates this work and sits outside the 700–760 band
+you play on, which is why it wasn't fixed with the rest.
+Fixing it means dropping the activation zone there too, and card clearance is
+already only 50px at that size — so it trades one tight number for another.
+*My recommendation: leave it until someone reports it on a real short phone.*
