@@ -1719,7 +1719,15 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
      A WIDE CAP COSTS NOTHING ON SHORT LINES, which is why this is safe: the
      fit search still pins each bubble to the narrowest width that holds its
      own line count, so only the long ones ever reach the cap. */
-  box-shadow:none;padding:22px 24px;max-width:94%;margin:0 auto;flex:0 1 auto}
+  /* P660: LEFT, not centred. margin:0 auto put a narrow bubble in the middle
+     of the table with its tail pointing at nothing. The speaker's portrait is
+     the HUD's top-left avatar - this screen hides .dlg-portrait, so that IS
+     their side - and tailPos 0.99 puts the tail on the top-left corner, so
+     the box starts there and the tail points at them. .dlg-inner was already
+     justify-content:flex-start; the auto margin was fighting it. */
+  box-shadow:none;padding:22px 24px;max-width:94%;margin:0 0 0 3cqw;flex:0 1 auto;
+  /* and it GROWS from that corner rather than fading in place */
+  transform-origin:0% 0%}
 /* behind the text, and allowed out of the box: the tail lives out here.
    P652: THE ISOLATION IS NOT HERE ANY MORE. P649 put it on the root so the
    light layer would tint the parchment rather than the page - correct then,
@@ -1733,17 +1741,7 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
    IT ALSO HAS TO GO FOR THE SHADOW TO WORK AT ALL: a filter on an ancestor
    is a backdrop root, and backdrop-filter cannot see past one. */
 #screen-match .dlg-scroll{filter:none}
-/* P654: THE CAST SHADOW. Not a colour laid over the table - a darkening OF
-   the table, clipped to the bubble's outline, which is what Denis's "multiply
-   rather than half transparent brown" describes. mix-blend-mode could not do
-   it from in here: it stops at the nearest stacking context and #dlgBox is
-   one. backdrop-filter reads through them.
-   ONE LIMIT WORTH KNOWING: .dlg-box fades in on opacity, and an opacity below
-   1 IS a backdrop root - so for the half second of the fade this darkens
-   nothing, and lands as the fade settles. */
-#screen-match .dlg-scroll .dlg-bubble-shadow{position:absolute;pointer-events:none;
-  -webkit-backdrop-filter:brightness(var(--sh-dark,.52)) saturate(var(--sh-sat,1.15));
-  backdrop-filter:brightness(var(--sh-dark,.52)) saturate(var(--sh-sat,1.15))}
+/* P660: the cast shadow is gone entirely - see the note in DLG_BUBBLE. */
 #screen-match .dlg-scroll canvas{display:none}
 /* P651: BIGGER, AND THE THREE-LINE RULE STILL HOLDS - which needed both
    halves of this, because they trade off. Measured across all 1075 lines at
@@ -3351,6 +3349,12 @@ html.fk3d #screen-match .die-wrap:has(.die.d3on.selected)::after{
 }
 @media (max-height:700px){.dlg-box{--dlg-y:128px}}
 @media (max-height:580px){.dlg-box{--dlg-y:100px}}
+/* P660: SCALES UP FROM THE SPEAKER'S SIDE. Denis: "scale up from the side of
+   the patron portrait rather than a fade". The origin is the bubble's own
+   top-left - the corner the tail is on - so it reads as coming out of them.
+   The opacity fade stays underneath; what changed is that something moves. */
+#screen-match .dlg-scroll{scale:.72;transition:scale .34s cubic-bezier(.2,1.3,.35,1),opacity .3s ease}
+#screen-match .dlg-box.show .dlg-scroll{scale:1}
 .dlg-box.show{opacity:1}
 .dlg-inner{display:flex;align-items:center;gap:8px;padding:2px 4px;width:100%;max-width:100vw;justify-content:flex-start}
 .dlg-portrait{
@@ -34400,15 +34404,12 @@ var DLG_BUBBLE = {
   embossDepth: 0.25, embossHighlight: 0.5, embossShadow: 0.3,
   /* the brief's corrected stops - beige and dark brown, NOT white and black */
   lightStop: '#d9bd90', shadowStop: '#4a2f18', ink: '#1c140c',
-  /* P654: THE CAST SHADOW DARKENS WHAT IS UNDER IT, which is what P652's
-     multiply was trying to do and could not. mix-blend-mode stops at the
-     nearest stacking context, and there are two between this and the table
-     (the SVG's own z-index, and #dlgBox's) - so multiply saw an empty
-     backdrop and returned its own colour, rendering as a flat mid-brown.
-     backdrop-filter reads through instead: it filters the pixels actually
-     behind the element and is stopped only by a backdrop root. shadowDarken
-     is the brightness multiplier applied to the table beneath the shape. */
-  shadowDarken: 0.52, shadowSat: 1.15, shadowDX: 3, shadowDY: 5
+  /* P660: no cast shadow. P652 tried multiply and it could not reach the table
+     through two stacking contexts; P654 got there with backdrop-filter; Denis
+     then decided the bubble reads better with nothing under it. The knobs are
+     removed rather than zeroed - a switched-off feature is a thing the next
+     reader has to work out the state of. */
+  _noShadow: true
 };
 
 /* THE SEED IS THE LINE. mulberry32 exists so a shape reproduces; hashing the
@@ -34456,7 +34457,11 @@ function _bbFitWidth(textEl) {
   if (!(maxW > 0)) return 0;
   if (natural <= maxW) return natural;
   var minH = textEl.scrollHeight;
-  var lo = Math.max(60, maxW * 0.3), hi = maxW;
+  /* P660: 0.3 -> 0.12. The floor was the width wobble Denis is describing: at
+     the shipped 349px cap, lo started at 105px, so any line whose tightest
+     honest width was under that stopped at the floor and kept the slack as
+     side padding. Short two-line messages are exactly that case. */
+  var lo = Math.max(60, maxW * 0.12), hi = maxW;
   for (var i = 0; i < 10 && hi - lo > 3; i++) {
     var mid = (lo + hi) / 2;
     textEl.style.width = mid + 'px';
@@ -34495,9 +34500,13 @@ function dlgBubblePaint(scrollEl, textEl, seed) {
     if (p[1] < minY) minY = p[1];
     if (p[1] > maxY) maxY = p[1];
   });
-  /* P652: the offset shadow has to fit inside the box too, or it clips at the
-     bottom-right exactly where it is most visible. */
-  var margin = o.strokeW + 4 + Math.max(o.shadowDX, o.shadowDY);
+  /* P660: back to stroke + 4. P652 added the shadow's offset here and P660
+     removed the shadow's knobs without removing this line, so Math.max of two
+     undefineds made the margin NaN - and every size derived from it, so the SVG
+     rendered with width="NaN" and disappeared entirely while the text stayed.
+     Grepping the identifiers after deleting them is the habit that catches
+     this; it was caught by the parchment vanishing from a screenshot instead. */
+  var margin = o.strokeW + 4;
   var offX = margin - minX, offY = margin - minY;
   var svgW = (maxX - minX) + margin * 2, svgH = (maxY - minY) + margin * 2;
   var pathD = pointsToPath(built.points.map(function(p) { return [p[0] + offX, p[1] + offY]; }), built.flags);
@@ -34537,24 +34546,12 @@ function dlgBubblePaint(scrollEl, textEl, seed) {
     + '</g>'
     + '</svg>';
 
-  /* THE CAST SHADOW, as a plain div clipped to the bubble's own outline.
-     clip-path takes the SAME path string the SVG is built from, in the same
-     coordinate space, so there is no second shape to keep in sync - move the
-     bubble and the shadow moves with it by construction.
-     It is a div and not another SVG path because what it does is
-     backdrop-filter: darkening the table's real pixels rather than laying a
-     colour over them. See the note in DLG_BUBBLE for why blending could not. */
-  var shadow = '<div class="dlg-bubble-shadow" aria-hidden="true" style="'
-    + '--sh-dark:' + o.shadowDarken + ';--sh-sat:' + o.shadowSat + ';'
-    + 'left:' + (-offX + o.shadowDX).toFixed(1) + 'px;top:' + (-offY + o.shadowDY).toFixed(1) + 'px;'
-    + 'width:' + svgW.toFixed(1) + 'px;height:' + svgH.toFixed(1) + 'px;'
-    + 'clip-path:path(\'' + pathD + '\');-webkit-clip-path:path(\'' + pathD + '\')"></div>';
   var old = scrollEl.querySelector('svg.dlg-bubble');
   if (old) old.remove();
+  /* P660: and any shadow left over from a build that had one */
   var oldSh = scrollEl.querySelector('.dlg-bubble-shadow');
   if (oldSh) oldSh.remove();
   scrollEl.insertAdjacentHTML('afterbegin', svg);
-  scrollEl.insertAdjacentHTML('afterbegin', shadow);
   /* the emboss is on the TEXT, two offset shadows and not one drop shadow */
   textEl.style.textShadow = (-o.embossDepth) + 'px ' + (-o.embossDepth) + 'px 0 rgba(217,189,144,' + o.embossHighlight + '),'
     + o.embossDepth + 'px ' + o.embossDepth + 'px .4px rgba(74,47,24,' + o.embossShadow + ')';
