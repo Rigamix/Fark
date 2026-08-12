@@ -2031,6 +2031,11 @@ body.dlg-speaking #screen-match #tellBadge{opacity:0;pointer-events:none}
   background:url('Art/Assets/Match/optimized/ROLL_new_opt.webp') center/contain no-repeat;
   filter:var(--plate-sh)}
 #btnRoll:active{transform:scale(.98)}
+/* P634: LOAD-BEARING TWICE. It stops a disabled button showing a press
+   state, which is the reason it exists - and it also outranks animations,
+   which is why rollBounce's stale translate was invisible on some bank paths
+   and a 131px lunge on others. The translate is fixed at its source; this
+   stays for its real job. */
 #btnRoll.disabled{transform:none !important}
 /* pressed: the plate drops toward the table, so its shadow tightens */
 #screen-match .match-btn:active{box-shadow:none;
@@ -3921,7 +3926,10 @@ body.crit-dilate{animation:critDilate .55s ease-out both}
   box-shadow:inset 0 4px 10px rgba(0,0,0,.6),inset 0 0 0 3px rgba(0,0,0,.35),inset 0 1px 3px rgba(0,0,0,.4);
   filter:brightness(.85);transform:scale(.98);
 }
-.match-btn-roll:active{transform:translateX(-50%) scale(.98)}
+/* P634: the same stale centring as @keyframes rollBounce. It does not fire
+   today only because #btnRoll:active outranks it - an accident, not a plan,
+   and one selector edit from being the same 131px jump on every press. */
+.match-btn-roll:active{transform:scale(.98)}
 .match-btn.disabled{opacity:.35;pointer-events:none;cursor:default}
 /* Drill Order roll-lock: the roll button is greyed + shows a chain/lock
    glyph so the player understands they CAN'T roll again this turn (Drill
@@ -4017,10 +4025,23 @@ body.crit-dilate{animation:critDilate .55s ease-out both}
   100%{transform:scale(1);filter:brightness(1)}
 }
 
-/* ─── Roll bounce-back ─── */
+/* ─── Roll bounce-back ───
+   P634: THE translateX(-50%) IS GONE, and it is the whole of Denis's "roll
+   button jitters to the side". It was the other half of a left:50% centring
+   #btnRoll stopped using long ago - the rule now reads position:relative;
+   left:auto;transform:none - so the compensating shift had nothing left to
+   compensate for and simply dragged the button a half-width left for the
+   150ms the bounce played. Measured: left edge 21.1px -> -109.8px, a 131px
+   lunge off a 430px screen, with matrix(1.04,0,0,1.04,-125.859,0) on the
+   element - and 125.859 is exactly half its 251.7px width.
+   Intermittent because #btnRoll.disabled carries `transform:none !important`,
+   which outranks an animation: whether the jump is seen depends on whether
+   something re-disables the button inside those 150ms. A probe that drove a
+   real bank measured 0px across 151 samples for exactly that reason.
+   The bounce is a scale pop. That is all it ever was. */
 @keyframes rollBounce{
-  0%{transform:translateX(-50%) scale(1.04)}
-  100%{transform:translateX(-50%) scale(1)}
+  0%{transform:scale(1.04)}
+  100%{transform:scale(1)}
 }
 
 /* ─── Button flash ─── */
