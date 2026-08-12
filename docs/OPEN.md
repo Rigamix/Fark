@@ -561,14 +561,54 @@ and group in one place if you want to read them together.
 (≈68.8px above the card row). Measured, not played. Raise it if cards fire by
 accident, lower it if the drag feels dead. One value in `:root`.
 
-**9c. The NPC hesitation band** — `_HESITATE_LO`/`_HESITATE_HI`, currently
-0.40–0.65 on `agg`. Derived from the two probabilistic exits in `oppShouldBank`,
-so the derivation is sound; whether it fires at the right *rate* in play is a
-feel question. Widening it makes the rival hesitate more often.
+**9c. How often the rival hesitates** — `DLG.prob.OPP_HESITATE_PUSH` and
+`.OPP_HESITATE_BANK`, both `.3`. Raise for more, lower for fewer.
+*(The old `_HESITATE_LO`/`_HESITATE_HI` band is gone — P632. It claimed to fire
+only on close decisions; measured, `agg` is the same value every roll of a match,
+so it was really a per-OPPONENT switch: some patrons hesitated on every single
+roll, others never. The spacing is `DLG.trigger`'s job now, like every other
+beat.)*
 
 **9d. The card activation sound** — `SFX.cardFire()`. The voices are verified as
 scheduled and shaped; whether it's satisfying is your ear. Body / bloom / tail
 are three tunable blocks in one function.
+
+---
+
+## 11. FIRST STRIKE — it is a sealed-seat rule, and most players can never trigger it
+
+You asked: *"Is First Strike still an handicap match? Or a card now? What is it?
+I went into a handicap match that said First Strike, with a super abstract
+description, and in game nothing happened."*
+
+**What it is.** A sealed-seat **tell** — one of the nine in `_SEAL_POOL`, Corvus's
+own. Not a card, and not a legacy handicap (those were deleted; the sealed seat
+replaced them). It took the `first_strike` id from the retired In Arrears rule,
+which is why the id turns up in gold-drain code that has nothing to do with it.
+
+**Why nothing happened, and it is not a bug.** The reveal fires from exactly one
+place: `_firstStrike(side)`, called by the *fire* handler of four enchant brands —
+**Snare, Trade, Snuff and Fog**. If you are not carrying one of those and do not
+cast it that match, the rule has no trigger at all. They cost 250–350g, so on an
+early night the seal is guaranteed to do nothing. When it does fire it opens both
+six-seat dice layouts side by side for the rest of the match.
+
+**And the description says none of that.** It reads *"Reach across the table and I
+read both sides of the book."* — flavour with no mechanical statement, which is
+the "super abstract" you hit.
+
+**Three ways out, and this one is yours:**
+
+- **(a) Say what it does.** Rewrite the desc to name the trigger — *"Cast a brand
+  at their row and both hands open."* Cheapest, keeps the design, and the rule
+  stops looking broken. **My rec.**
+- **(b) Widen the trigger** so it fires on something every player has — first
+  bank, first hot dice, first card. Makes it always land, but it stops being
+  Corvus's counting-house identity and becomes a generic reveal.
+- **(c) Take it out of `_SEAL_POOL`** and keep it for Corvus's own boss match,
+  where the player is likelier to be geared for it.
+
+I have not touched it — (b) and (c) are design changes and (a) is your words.
 
 ---
 
