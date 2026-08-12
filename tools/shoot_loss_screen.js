@@ -52,7 +52,11 @@ if (BOSS) { G._isBoss = true;
 G.pPts = Math.max(0, (G.target || 2800) - 900); G.oPts = G.target;
 
 const ov = document.getElementById('end-ov');
-endMatch(false);
+/* ?win=1 photographs the WIN screen through the same harness - useful for
+   putting the two paintings side by side, and for checking P635's shortened
+   draft delay did not disturb the win layout. */
+const WIN = /(?:\?|&)win=1/.test(location.search);
+endMatch(WIN);
 
 /* THE HEART IS GONE BY THE TIME THE SCREEN SETTLES, and that is the animation
    working: the boss loss fades the wrapper in at 700ms, drains at 1400 and
@@ -82,7 +86,7 @@ const q = s => document.querySelector(s);
 const board = q('#end-ov .loss-board');
 
 return {
-  arm: BOSS ? (NOSTAKE ? 'boss-loss-no-stake' : 'boss-loss') : 'patron-loss',
+  arm: WIN ? 'win' : (BOSS ? (NOSTAKE ? 'boss-loss-no-stake' : 'boss-loss') : 'patron-loss'),
   /* CONTROL: the class must be on and the art must actually be opaque, or the
      placements below are of an invisible layer */
   control: { lossArtOn: ov.classList.contains('loss-art-on'),
