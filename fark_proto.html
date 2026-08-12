@@ -16844,26 +16844,21 @@ function _dlgOutcome(won){
     return r2?r2.t:null;
   }catch(e){return null;}
 }
-/* P628: DOES THIS DECISION DESERVE A PAUSE?
-   Only when it was genuinely close. `agg` is what oppShouldBank converges on
-   and its last word is `Math.random() > agg`, so near 0.5 the same board goes
-   either way and at 0.15 or 0.9 it does not. The band is taken from the two
-   exits that gate on agg, not chosen for feel.
-   Returns null for a blowout, and null is the caller's cue to say nothing -
-   a hesitation on an obvious decision reads as noise, not character. */
-var _HESITATE_LO=0.40,_HESITATE_HI=0.65;
-function _dlgHesitate(willBank){
-  try{
-    var a=(typeof G!=='undefined'&&G)?G._oppAgg:undefined;
-    if(typeof a!=='number')return null;
-    if(a<_HESITATE_LO||a>_HESITATE_HI)return null;
-    /* the two moments fall straight out of the decision itself */
-    return _dlgEvent(willBank?'banksafe':'push');
-  }catch(e){return null;}
-}
-/* the four DLG events these answer, and which side each belongs to */
+/* P632: THE HESITATION BEAT IS JUST ANOTHER MOMENT NOW.
+   P628 gave it a private helper with an `agg` band, on the reasoning that agg
+   near 0.5 meant the rival's decision was a coin flip. Measured over a real
+   match, agg was 0.53 on all seven calls - the same value every time, because
+   it starts as rung.agg and for an ordinary patron nothing moves it. So the
+   band selected OPPONENTS, not decisions: in-band patrons hesitated on every
+   single roll, out-of-band ones never (24 calls, 0 lines, in a second run).
+   Both the helper and the band are gone. These two are ordinary _DLG_MOMENT
+   entries, so they reach the same _dlgEvent every other beat uses and inherit
+   DLG.trigger's probability and spacing - which is where a pause belongs, and
+   was the whole of what the band was pretending to do. */
+/* the moments these answer, and which side each belongs to */
 var _DLG_MOMENT={OPP_BUST:'bust',PLAYER_BUST:'yourBust',
-                 OPP_BIG_BANK:'bank',BIG_BANK:'yourBank'};
+                 OPP_BIG_BANK:'bank',BIG_BANK:'yourBank',
+                 OPP_HESITATE_PUSH:'push',OPP_HESITATE_BANK:'banksafe'};
 /* sitting down opposite them is where a patron's OWN voice belongs, and it
    routes through _dlgSay so their stage advances and the arc moves */
 var _DLG_PERSONAL={MATCH_START:1,REMATCH_START:1};
@@ -30739,12 +30734,10 @@ function oppShouldBank(rung,oppBank,diceLeft,oppTotal,playerTotal,target){
   var pProg=playerTotal/target,oProg=oppTotal/target;
   if(pProg>0.70&&(pProg-oProg)>0.30)agg=Math.max(agg,0.85);
   else if(pProg>0.50&&(pProg-oProg)>0.20)agg=Math.max(agg,0.78);
-  /* P628: agg is FINAL here - nothing below mutates it, the branches only
-     read it. Stashed so the call site can tell a coin-flip from a foregone
-     conclusion without this function knowing anything about dialogue. Same
-     pattern as G._lastBankAmount: expose a value computed mid-decision
-     rather than reshape the return. */
-  try{if(typeof G!=='undefined'&&G)G._oppAgg=agg;}catch(e){}
+  /* P632: P628's G._oppAgg stash removed. Its only reader has gone, and it
+     was never sound anyway - the three huge-bank returns above exit before
+     this line, so those decisions were read against the PREVIOUS one's
+     value. This function knows nothing about dialogue again. */
   /* ── Context-aware push logic ── Score gap relative to target decides whether a
      low-dice push is rational:
        • BEHIND  (player leads by ≥10% target): push even at 1-2 dice, nothing to lose
@@ -31932,13 +31925,15 @@ function runOppTurn(){
         setTimeout(function(){clearRow('oppDiceRow');G.oppDice=[];left=_oFullHand;setTimeout(step,_oppDelay(200));},_oppDelay(900));return;
       }
       const bank=oppShouldBank(G.rung,oppBank,left,G.oPts,G.pPts,G.target);
-      /* P628: the hesitation beat goes in the pause that was ALREADY here.
-         _oppDelay(1900) exists so the rival's decision does not land
-         instantly; on a close call it now has something in it. No new timing,
-         and the delay is unchanged whether or not a line comes back.
-         Here and not inside oppShouldBank, which stays pure - and this is the
-         in-match call, so FSIM's own caller never speaks. */
-      try{var _hes=_dlgHesitate(bank);if(_hes)setStatusMsg(_hes,'');}catch(e){}
+      /* P632: the hesitation beat goes in the pause that was ALREADY here -
+         _oppDelay(1900) exists so the rival's decision does not land instantly
+         - but it goes through DLG like every other beat, so it lands in the
+         parchment box and obeys the same probability and spacing. P628 called
+         setStatusMsg here, which put dialogue in the 'PATRON IS ROLLING…'
+         channel AND skipped the pacing gate, so a mid-aggression rival
+         hesitated on every roll. Denis's notes 5 and 6, one line apart.
+         Still the in-match call, so FSIM's own caller never speaks. */
+      try{if(window.DLG)DLG.trigger(bank?'OPP_HESITATE_BANK':'OPP_HESITATE_PUSH');}catch(e){}
       setTimeout(()=>{if(bank)finOpp(oppBank);else step();},_oppDelay(1900));
     });
   }
@@ -33556,7 +33551,10 @@ const LEDGER_LINES={
      5-9s) and were too tightly spaced. trigger() now blocks until
      busyUntil + gap. */
   const DLG={lastTime:0,cooldown:4000,busyUntil:0,gap:1400,hideTimer:null,active:false,oppKey:null,usedLines:{},cardFiredThisMatch:{},
-    prob:{MATCH_START:1,REMATCH_START:1,CARD_EFFECT:.8,RISKY_REROLL:.5,GREEDY_REROLL:.5,EARLY_BANK:.3,BIG_BANK:.6,PLAYER_BUST:.85,PLAYER_HOT_DICE:1,PLAYER_TRIPLE:.4,PLAYER_STRAIGHT:1,PLAYER_SIX_KIND:1,PLAYER_TAKES_LEAD:.45,PLAYER_NEAR_WIN:.7,OPP_BUST:.8,OPP_BIG_BANK:.6,OPP_TAKES_LEAD:.45,OPP_NEAR_WIN:.7,MATCH_CLOSE:.4,LOSING_BADLY:.35,WINNING_BADLY:.35,OPP_WINS:1,CARD_FIRE:1,PLAYER_CARD_REACT:1,TELL:1},
+    prob:{MATCH_START:1,REMATCH_START:1,CARD_EFFECT:.8,RISKY_REROLL:.5,GREEDY_REROLL:.5,EARLY_BANK:.3,BIG_BANK:.6,PLAYER_BUST:.85,PLAYER_HOT_DICE:1,PLAYER_TRIPLE:.4,PLAYER_STRAIGHT:1,PLAYER_SIX_KIND:1,PLAYER_TAKES_LEAD:.45,PLAYER_NEAR_WIN:.7,OPP_BUST:.8,OPP_BIG_BANK:.6,OPP_TAKES_LEAD:.45,OPP_NEAR_WIN:.7,MATCH_CLOSE:.4,LOSING_BADLY:.35,WINNING_BADLY:.35,OPP_WINS:1,CARD_FIRE:1,PLAYER_CARD_REACT:1,TELL:1,/* P632: low on purpose. A rival turn holds three or four decisions, so a
+       high number stops the pause reading as a pause; and these share the
+       spacing gate with OPP_BUST and OPP_BIG_BANK, which are the payoff
+       beats. This is the dial - there is no other. */OPP_HESITATE_PUSH:.3,OPP_HESITATE_BANK:.3},
     init(rungName,rungKey){this.oppKey=rungName.toUpperCase();this.portraitKey=rungKey||rungName.toLowerCase();this.lastTime=0;this.active=false;this.usedLines={};this.cardFiredThisMatch={};if(this.hideTimer)clearTimeout(this.hideTimer);this.hide();},
     getLine(cat){const data=OPP_DIALOGUE[this.oppKey];if(!data)return null;
       /* THE REGULARS REMEMBER: when a boss has real shared history with this
