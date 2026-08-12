@@ -10,9 +10,15 @@
  * the game can actually say, laid out in the real element at the real font, at
  * a range of candidate caps.
  *
- * WHAT IT REPORTS is the worst case at each cap, not the average - a cap that
- * holds three lines for most lines and four for the longest has not solved
- * anything, because the longest lines are exactly the ones that overflow.
+ * WHAT IT REPORTS is the worst case, not the average - a setting that holds
+ * three lines for most lines and four for the longest has not solved anything,
+ * because the longest lines are exactly the ones that overflow.
+ *
+ * ?font=1 sweeps FONT SIZE at the shipped width instead of sweeping width at
+ * the shipped font. Denis: "scale up the font, a bit too hard to read". Those
+ * two are coupled - a bigger face needs more width for the same line count, and
+ * the width is already at 94% of the shell - so the question is how far the
+ * font can go before the three-line guarantee breaks.
  */
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const until = async (fn, ms) => { const t0 = Date.now();
@@ -71,7 +77,7 @@ function linesAt(text, wpx) {
   tx.style.whiteSpace = '';
   tx.style.width = wpx + 'px';
   void tx.offsetWidth;
-  return { lines: Math.round(tx.scrollHeight / lineH), got: tx.offsetWidth };
+  return { lines: Math.round(tx.scrollHeight / (arguments[2] || lineH)), got: tx.offsetWidth };
 }
 
 /* the widest text box each cap allows: cap% of the shell, less the scroll's
@@ -79,8 +85,12 @@ function linesAt(text, wpx) {
 const shell = document.querySelector('.dlg-box .dlg-inner').offsetWidth;
 const padX = parseFloat(getComputedStyle(sc).paddingLeft) + parseFloat(getComputedStyle(sc).paddingRight);
 
-const CAPS = [66, 72, 78, 84, 90, 94];
-const PADS = [68, 48, 36];   /* current 34+34, then tighter */
+const FONT = /(?:\?|&)font=1/.test(location.search);
+const TIGHT = /(?:\?|&)tight=1/.test(location.search);
+const CAPS = FONT ? [94] : [66, 72, 78, 84, 90, 94];
+const PADS = FONT ? [48] : [68, 48, 36];
+/* the shipped face is 3.4cqw; these are the steps up from it */
+const FONTS = FONT ? [3.4, 3.8, 4.2, 4.6, 5.0] : [0];
 const out = { corpus: lines.length, shell, currentPadX: padX, lineHeight: lineH, caps: [] };
 
 /* only the long tail matters - sort by character count and take the worst 40 */
@@ -90,14 +100,26 @@ out.longestChars = worst[0].length;
 
 CAPS.forEach(cap => {
   PADS.forEach(pad => {
-    const wpx = Math.floor(shell * cap / 100) - pad;
-    let over3 = 0, max = 0, gotW = 0;
-    worst.forEach(t => { const r = linesAt(t, wpx);
-      if (r.lines > 3) over3++; if (r.lines > max) max = r.lines; gotW = r.got; });
-    out.caps.push({ cap: cap + '%', padX: pad, askedW: wpx, gotW: gotW,
-                    applied: Math.abs(gotW - wpx) < 3, worstLines: max, linesOver3: over3 });
+    FONTS.forEach(fcqw => {
+      if (fcqw) { tx.style.fontSize = (shell * fcqw / 100).toFixed(2) + 'px'; }
+      /* THE OTHER LEVER. .dlg-text ships letter-spacing:.3px and word-spacing:2px;
+         at ~16 words a line that is ~35px of width spent on air. ?tight=1 zeroes
+         them, which buys back roughly one font step - so the choice is not
+         only "bigger face or three lines". */
+      if (TIGHT) { tx.style.wordSpacing = '0px'; tx.style.letterSpacing = '0px'; }
+      const lh = parseFloat(getComputedStyle(tx).lineHeight);
+      const wpx = Math.floor(shell * cap / 100) - pad;
+      let over3 = 0, max = 0, gotW = 0;
+      worst.forEach(t => { const r = linesAt(t, wpx, lh);
+        if (r.lines > 3) over3++; if (r.lines > max) max = r.lines; gotW = r.got; });
+      out.caps.push({ cap: cap + '%', padX: pad,
+                      tight: TIGHT, fontCqw: fcqw || 'shipped', fontPx: +getComputedStyle(tx).fontSize.replace('px',''),
+                      askedW: wpx, gotW: gotW,
+                      applied: Math.abs(gotW - wpx) < 3, worstLines: max, linesOver3: over3 });
+    });
   });
 });
+tx.style.fontSize = ''; tx.style.wordSpacing = ''; tx.style.letterSpacing = '';
 tx.style.width = '';
 box.classList.remove('show');
 return out;
