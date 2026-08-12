@@ -4507,8 +4507,16 @@ body.crit-dilate{animation:critDilate .55s ease-out both}
    family is legible from the card's border without a halo repeating it. The
    --fglow variable is still set on the element, so anything that wants the
    family colour here later has it without re-deriving it. */
-.fo-card{position:relative;transition:transform .18s ease}
+.fo-card{position:relative;transition:transform .18s ease;touch-action:none}
 .fo-card:active{transform:translateY(1px) scale(.985)}
+/* P645: the card in hand. No transition while dragging - the transform is
+   being set every pointermove and an easing curve on it lags the finger. */
+.fo-card.fo-dragging{transition:none;z-index:9;pointer-events:none;
+  filter:drop-shadow(0 6px 10px rgba(0,0,0,.55))}
+/* the slot under the finger, in the same gold the slots are drawn in */
+#end-ov .fo-slot.drop-hover{border-color:rgba(255,216,120,.95);
+  background:rgba(255,216,120,.16);
+  box-shadow:0 0 10px rgba(255,216,120,.35)}
 
 /* ── YOUR DECK, AS A HAND ── three full-size dashed boxes in a row read as a
    second offer competing with the real one. Overlapped, tilted and smaller
@@ -14594,6 +14602,45 @@ function _resDlgShow(el){
   if(!txt){el.classList.remove('show');el.innerHTML='';return;}
   el.classList.add('show');
 }
+/* P645: WHICH OF THE THREE POSITIONS HOLD CARDS. Denis's rule - "if I have
+   one card it's always in the middle slot, etc." - so the hand is centred
+   rather than left-packed. Returns a position->card-index map with nulls for
+   the empty places.
+   PURELY VISUAL. S.run.fcards stays the dense array _famDiceMigrate
+   normalises it to, so nothing downstream ever sees a hole, and this is
+   recomputed from the count each time the screen opens. One function, one
+   rule: change it here and every deck row on this screen follows. */
+function _foLayout(count){
+  if(count<=0)return [null,null,null];
+  if(count===1)return [null,0,null];
+  if(count===2)return [0,null,1];
+  return [0,1,2];
+}
+/* the deck row, with an optional OVERRIDE: {pos:index} pins one card to the
+   position it was just dropped in, which is the whole point of the drag. */
+function _foDeckHtml(pin){
+  _getS();S.run.fcards=S.run.fcards||[];
+  var cards=S.run.fcards,lay=_foLayout(cards.length);
+  if(pin&&pin.pos!=null&&pin.idx!=null){
+    /* the pinned card takes its slot and the rest fill the others in order */
+    var rest=[];for(var r=0;r<cards.length;r++)if(r!==pin.idx)rest.push(r);
+    lay=[null,null,null];lay[pin.pos]=pin.idx;
+    for(var p=0,q=0;p<3&&q<rest.length;p++)if(lay[p]===null)lay[p]=rest[q++];
+  }
+  var h='<div class="fo-deck">';
+  for(var _s=0;_s<3;_s++){
+    var _ci=lay[_s],_c=(_ci!=null)?cards[_ci]:null;
+    if(_c){
+      var _cd=famDef(_c.id);
+      h+='<div class="fo-slot filled" data-pos="'+_s+'" data-ci="'+_ci+'"'
+        +' onclick="famCardSheet(\''+_c.id+'\','+_c.tier+')">'
+        +famCardArt(_c.id,_c.tier,{tierAlways:(_cd&&_cd.fam!=='tavern')})+'</div>';
+    }else{
+      h+='<div class="fo-slot empty" data-pos="'+_s+'"></div>';
+    }
+  }
+  return h+'</div>';
+}
 function famOfferHtml(offer,pickFn,declineGold){
   /* CLASSES, because there were none. This block used to be pure inline style,
      which is why every stylesheet rule aimed at it missed - including mine, at
@@ -14617,20 +14664,7 @@ function famOfferHtml(offer,pickFn,declineGold){
   /* what the player already holds, under the offer. Three cards is the cap,
      so the empty ones show as slot outlines rather than as nothing - the
      player needs to see "I have room" as clearly as "I have these". */
-  _getS();S.run.fcards=S.run.fcards||[];
-  h+='<div class="fo-decklbl">YOUR DECK</div>'
-    +'<div class="fo-deck">';
-  for(var _s=0;_s<3;_s++){
-    var _c=S.run.fcards[_s];
-    if(_c){
-      var _cd=famDef(_c.id);
-      h+='<div class="fo-slot filled" onclick="famCardSheet(\''+_c.id+'\','+_c.tier+')">'
-        +famCardArt(_c.id,_c.tier,{tierAlways:(_cd&&_cd.fam!=='tavern')})+'</div>';
-    }else{
-      h+='<div class="fo-slot empty">+</div>';
-    }
-  }
-  h+='</div>';
+  h+='<div class="fo-decklbl">YOUR DECK</div>'+_foDeckHtml(null);
   if(declineGold!=null){
     /* the coin makes the trade legible at a glance - a card, or this much
        gold. NOTE: the brief also asks this to flip to CONTINUE once a card is
@@ -14640,6 +14674,90 @@ function famOfferHtml(offer,pickFn,declineGold){
       +'<span>SKIP — TAKE</span><span class="fo-coin"></span><span>'+declineGold+'</span></div>';
   }
   return h+'</div>';
+}
+/* P645: DRAG AN OFFER ONTO A SLOT. Installed on the offer row after it
+   renders; delegated, so it survives the row being rebuilt.
+   A TAP IS NOT A SHORT DRAG - nothing happens under 8px of travel, so the
+   card's own onclick still opens its sheet. Past the threshold the click is
+   swallowed on release, or every drop would open the sheet of the card the
+   player just took. */
+var _FO_DRAG_MIN=8;
+function _foInstallDrag(){
+  var offer=document.querySelector('#end-ov .fo-offer');if(!offer)return;
+  if(offer._foDrag)return;offer._foDrag=1;
+  var st=null;
+  function slotAt(x,y){
+    var el=document.elementFromPoint(x,y);
+    return el&&el.closest?el.closest('#end-ov .fo-slot'):null;
+  }
+  function clearHover(){
+    document.querySelectorAll('#end-ov .fo-slot.drop-hover')
+      .forEach(function(e){e.classList.remove('drop-hover');});
+  }
+  offer.addEventListener('pointerdown',function(ev){
+    var card=ev.target.closest&&ev.target.closest('.fo-card');if(!card)return;
+    var idx=[].indexOf.call(offer.children,card);if(idx<0)return;
+    st={card:card,idx:idx,x0:ev.clientX,y0:ev.clientY,live:false};
+  });
+  offer.addEventListener('pointermove',function(ev){
+    if(!st)return;
+    var dx=ev.clientX-st.x0,dy=ev.clientY-st.y0;
+    if(!st.live&&Math.hypot(dx,dy)<_FO_DRAG_MIN)return;
+    if(!st.live){st.live=true;st.card.classList.add('fo-dragging');
+      try{st.card.setPointerCapture(ev.pointerId);}catch(e){}}
+    st.card.style.transform='translate('+dx+'px,'+dy+'px) scale(1.04)';
+    clearHover();
+    var sl=slotAt(ev.clientX,ev.clientY);if(sl)sl.classList.add('drop-hover');
+    ev.preventDefault();
+  });
+  function end(ev){
+    if(!st)return;var s0=st;st=null;
+    s0.card.classList.remove('fo-dragging');s0.card.style.transform='';
+    clearHover();
+    if(!s0.live)return;/* it was a tap - let the onclick through */
+    /* swallow exactly one click, the one this release is about to produce */
+    var eat=function(e){e.stopPropagation();e.preventDefault();};
+    document.addEventListener('click',eat,{capture:true,once:true});
+    setTimeout(function(){document.removeEventListener('click',eat,true);},300);
+    var sl=slotAt(ev.clientX,ev.clientY);if(!sl)return;
+    _foDropOn(s0.idx,sl);
+  }
+  offer.addEventListener('pointerup',end);
+  offer.addEventListener('pointercancel',end);
+}
+/* WHERE IT LANDED DECIDES WHICH EXISTING DOOR IT USES. An empty slot is the
+   CLAIM path; a filled one is the TRADE OUT path with the choice already
+   made by where the player let go. Neither decision is re-implemented here. */
+function _foDropOn(offerIdx,slotEl){
+  var o=_famOffer&&_famOffer[offerIdx];if(!o)return;
+  var pos=+slotEl.getAttribute('data-pos');
+  var ciAttr=slotEl.getAttribute('data-ci');
+  try{SFX.cardTrigger&&SFX.cardTrigger();}catch(e){}
+  _getS();S.run.fcards=S.run.fcards||[];
+  if(ciAttr!=null&&ciAttr!==''){
+    /* dropped onto a card you hold: that is the one you are letting go */
+    window._famReplaceOffer=o;
+    var ci=+ciAttr;
+    S.run.fcards[ci]={id:o.id,tier:o.tier};save();
+    window._famReplaceOffer=null;
+    _foDraftDoneAt(o,pos,ci);
+    return;
+  }
+  if(!o.upgrade&&S.run.fcards.length>=3){_famReplacePick(o);return;}
+  famApplyPick(o);
+  var newIdx=-1;
+  for(var i=0;i<S.run.fcards.length;i++)if(S.run.fcards[i].id===o.id)newIdx=i;
+  _foDraftDoneAt(o,pos,newIdx);
+}
+/* the drag's own finish. _famDraftDone writes "TAKEN: NAME" over the panel,
+   which throws away the one thing this gesture just established - WHERE the
+   card went. This answers with the picture instead: the deck, with the card
+   pinned to the slot it was dropped in. */
+function _foDraftDoneAt(o,pos,idx){
+  var rc=document.querySelector('#end-ov .res-card')||document.getElementById('resCard');
+  if(rc)rc.innerHTML='<div class="fo-wrap"><div class="fo-title">TAKEN</div>'
+    +_foDeckHtml({pos:pos,idx:idx})+'</div>';
+  _famEndReady();
 }
 function famApplyPick(o){
   _getS();S.run.fcards=S.run.fcards||[];
@@ -33338,6 +33456,7 @@ function endMatch(win){
       var _sk=resCard&&resCard.querySelector('.fo-skip');
       if(_sk&&_ovSk)_ovSk.appendChild(_sk);
     }catch(e){}
+    try{_foInstallDrag();}catch(e){}
     if(endBtns)endBtns.style.display='none';
   }
 
