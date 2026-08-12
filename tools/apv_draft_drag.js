@@ -118,6 +118,12 @@ out.deckAfter = [...document.querySelectorAll('#end-ov .fo-slot')].map(
 /* did it land WHERE it was dropped? */
 const landed = out.deckAfter.find(d => d.pos === out.targetPos);
 out.landedInDroppedSlot = !!(landed && landed.filled);
+/* P659: the offer must still be THERE after a pick, greyed rather than gone,
+   with the layout unmoved. Counted, and the picked one distinguished. */
+out.afterPick = { offerCardsStillPresent: document.querySelectorAll('#end-ov .fo-card').length,
+                  wrapTaken: !!document.querySelector('#end-ov .fo-wrap.taken'),
+                  greyed: document.querySelectorAll('#end-ov .fo-wrap.taken .fo-card:not(.picked)').length,
+                  picked: document.querySelectorAll('#end-ov .fo-card.picked').length };
 out.sheetOpened = !!document.querySelector('.gbx-sheet.on, #gbSheet.on');
 out.continueShown = vis(document.getElementById('end-btns'));
 

@@ -4597,6 +4597,21 @@ body.crit-dilate{animation:critDilate .55s ease-out both}
    inset:0, so 1vh is one per cent of the overlay's height: the same unit the
    52%->47% move was made in, and therefore an exact cancellation. */
 #end-ov.win-art-on .fo-deck{padding-top:calc(6px + 5vh)}
+/* P659: SHORT PHONES LIFT THE WHOLE BLOCK. Measured slots-bottom against
+   button-top: +12px at 891 (the design shell, which is why this looked fine
+   here), -51px at 760, -80px at 700. The stack is taller than a short screen
+   leaves room for, so trimming the deck's padding cannot reach it - at 760
+   that padding is 38px of the 51 needed. In a media query so the design
+   shell's tuned numbers are untouched. */
+@media (max-height:820px){
+  #end-ov.win-art-on .res-card{top:41%!important}
+  #end-ov.win-art-on .fo-deck{padding-top:2px}
+  #end-ov.win-art-on .fo-offer{gap:6px}
+}
+@media (max-height:730px){
+  #end-ov.win-art-on .res-card{top:37%!important}
+  #end-ov.win-art-on .fo-title{margin-bottom:2px}
+}
 
 /* ═══ THE END-OF-MATCH DRAFT ═══════════════════════════════════════════
    These classes did not exist until P422 - the block was built out of inline
@@ -4621,7 +4636,12 @@ body.crit-dilate{animation:critDilate .55s ease-out both}
    family is legible from the card's border without a halo repeating it. The
    --fglow variable is still set on the element, so anything that wants the
    family colour here later has it without re-deriving it. */
-.fo-card{position:relative;transition:transform .18s ease;touch-action:none}
+.fo-card{position:relative;transition:transform .18s ease,filter .3s ease,opacity .3s ease;touch-action:none}
+/* P659: taken. The unpicked cards grey where they stand rather than being
+   removed, so nothing below them moves; the picked one stays lit. Both stop
+   taking taps, because the choice is made. */
+.fo-wrap.taken .fo-card{pointer-events:none}
+.fo-wrap.taken .fo-card:not(.picked){filter:grayscale(1) brightness(.45);opacity:.6}
 .fo-card:active{transform:translateY(1px) scale(.985)}
 /* P645: the card in hand. No transition while dragging - the transform is
    being set every pointermove and an easing curve on it lags the finger. */
@@ -14791,6 +14811,9 @@ function famCardHtml(id,tier,opts){
      their names as it shows on the card itself with the tag". */
   var cap='<div style="margin-top:4px;text-align:center;font-family:\'JMH Beda\',serif;letter-spacing:.05em">'
     +'<div style="font-size:12px;color:#f0e3c6">'+d.name.toUpperCase()+'</div>'
+    /* P659: the sub line - "(upgrade)" today. Under the name, not a corner
+       badge over the art. */
+    +(opts.sub?'<div style="font-size:10px;color:'+col+';margin-top:1px">'+opts.sub+'</div>':'')
     +'</div>';
   return '<div '+(opts.onclick?'onclick="'+opts.onclick+'"':'')
     +' style="cursor:'+(opts.onclick?'pointer':'default')+';position:relative">'
@@ -14884,9 +14907,12 @@ function famOfferHtml(offer,pickFn,declineGold){
        it is edged with rather than something invented for this screen */
     var _fd=famDef(o.id)||{},_fc=((FAMILIES[_fd.fam]||{}).color)||'#a58a3c';
     h+='<div class="fo-card" style="--fglow:'+_fc+'">'
+      /* P659: no corner badge. "Write upgrade in parenthesis under the card
+         name" - so it goes in famCardHtml's sub line, the slot the tier
+         numeral used to duplicate before P646 took it out. */
       +famCardHtml(o.id,o.tier,{onclick:"famCardSheet('"+o.id+"',"+o.tier
         +",{btn:'CLAIM',badge:"+(o.upgrade?"'UPGRADE'":"null")+",cb:'function(){"+pickFn+"("+i+");}'})",
-        badge:(o.upgrade?'UPGRADE':null)})
+        sub:(o.upgrade?'(upgrade)':null)})
       +'</div>';
   });
   h+='</div>';
@@ -14983,10 +15009,9 @@ function _foDropOn(offerIdx,slotEl){
    card went. This answers with the picture instead: the deck, with the card
    pinned to the slot it was dropped in. */
 function _foDraftDoneAt(o,pos,idx){
-  var rc=document.querySelector('#end-ov .res-card')||document.getElementById('resCard');
-  if(rc)rc.innerHTML='<div class="fo-wrap"><div class="fo-title">TAKEN</div>'
-    +_foDeckHtml({pos:pos,idx:idx})+'</div>';
-  _famEndReady();
+  var pick=-1;
+  try{for(var i=0;i<(_famOffer||[]).length;i++)if(_famOffer[i]===o)pick=i;}catch(e){}
+  _foFinish(pick,{pos:pos,idx:idx});
 }
 function famApplyPick(o){
   _getS();S.run.fcards=S.run.fcards||[];
@@ -14995,12 +15020,28 @@ function famApplyPick(o){
   }else if(S.run.fcards.length<3)S.run.fcards.push({id:o.id,tier:o.tier});
   save();
 }
-function _famDraftDone(o){
-  var rc=document.querySelector('#end-ov .res-card')||document.getElementById('resCard');
-  var d=famDef(o.id);
-  if(rc)rc.innerHTML='<div style="font-family:monospace;color:#8e8;padding:30px 10px;text-align:center">TAKEN: '
-    +d.name.toUpperCase()+(d.fam==='tavern'?'':' '+['I','II','III'][o.tier-1])+'</div>';
+/* P659: THE OFFER STAYS PUT. Denis: "even I take a card don't make the other
+   ones disappear. Just grey them out and don't change the layout."
+   Both finishes used to replace .res-card's innerHTML - one with a TAKEN line,
+   one with the deck alone - so the row vanished and everything under it
+   jumped. This keeps every element where it is and only re-renders the deck,
+   which is the one thing that genuinely changed.
+   `pick` is the index of the offer that was taken, or -1 for a decline. */
+function _foFinish(pick,pin){
+  var wrap=document.querySelector('#end-ov .fo-wrap');
+  if(wrap){
+    wrap.classList.add('taken');
+    var cards=wrap.querySelectorAll('.fo-card');
+    for(var i=0;i<cards.length;i++)cards[i].classList.toggle('picked',i===pick);
+    var deck=wrap.querySelector('.fo-deck');
+    if(deck)deck.outerHTML=_foDeckHtml(pin);
+  }
   _famEndReady();
+}
+function _famDraftDone(o){
+  var pick=-1;
+  try{for(var i=0;i<(_famOffer||[]).length;i++)if(_famOffer[i]===o)pick=i;}catch(e){}
+  _foFinish(pick,null);
 }
 function famDraftPick(i){
   var o=_famOffer[i];if(!o)return;
@@ -33580,7 +33621,13 @@ function endMatch(win){
      the guess this replaced.
      Named rather than left as literals in a ternary: this is the pacing of
      the most-looked-at screen in the game, and it should be findable. */
-  var _DRAFT_DELAY={bossWin:2400,patronWin:2400,loss:2800};
+  /* P659: 2400 -> 1300 on a win. P635 measured where the coin ceremony ENDS,
+     which was the wrong question - Denis is not waiting for the flourish to
+     finish, he is waiting to be able to ACT. The title, the scores and the
+     lift are all down by 1300ms and the coins carry on behind the offer
+     perfectly well. The loss keeps a longer beat: its heart drain is the
+     content of that screen rather than a flourish over it. */
+  var _DRAFT_DELAY={bossWin:1300,patronWin:1300,loss:1800};
   var _draftDelay=win?(isBoss?_DRAFT_DELAY.bossWin:_DRAFT_DELAY.patronWin):_DRAFT_DELAY.loss;
 
   /* Delayed content — appears after animation sequence */
