@@ -19720,12 +19720,31 @@ function _diceShadowPaint(pts,scx,scy,size,d){
 /* the shadow's colour, as a multiplier on the table. Darker = deeper. */
 window.DICE_SHADOW_COL='#3a2110';
 
+/* P665: A CANVAS KEEPS ITS LAST FRAME. Denis: "following rolls, I can see frozen
+   shadows on the table even if the dice are in mid air" - shadows sitting where
+   the dice USED to be, for his side and the rival's.
+   Three of this function's early returns fired BEFORE the clearRect below, so
+   any frame where the light went off, the screen was unmeasurable, or the table
+   image was not ready left the previous frame's shadows painted and walked away.
+   Nothing repaints a canvas you stop drawing to.
+   The clear is now the FIRST thing that happens, before any decision about
+   whether there is anything to draw - so the worst case is an empty canvas
+   rather than a stale one. */
+function _dsClear(){
+  var cv=document.getElementById('dsCanvas');
+  if(!cv||!cv.width)return null;
+  var x=cv.getContext('2d');
+  x.setTransform(1,0,0,1,0,0);
+  x.clearRect(0,0,cv.width,cv.height);
+  return x;
+}
 function _drawDiceShadows(tSec){
   var cv=document.getElementById('dsCanvas'),ml=window._mLight;
-  if(!cv||!ml||!ml.on)return;
+  if(!cv){_dsClear();return;}
+  if(!ml||!ml.on){_dsClear();return;}
   var scEl=document.getElementById('screen-match');
   var sc=scEl.getBoundingClientRect();
-  var W=sc.width,H=sc.height;if(W<10)return;
+  var W=sc.width,H=sc.height;if(W<10){_dsClear();return;}
   var dpr=Math.min(window.devicePixelRatio||1,2);
   if(cv.width!==Math.round(W*dpr)||cv.height!==Math.round(H*dpr)){
     cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);
@@ -19734,6 +19753,7 @@ function _drawDiceShadows(tSec){
   var sMul=1+0.05*f,alphaB=0.45+0.09*f;
   var x=cv.getContext('2d');x.setTransform(dpr,0,0,dpr,0,0);
   x.clearRect(0,0,W,H);
+  /* already cleared above, so this one may simply leave */
   if(!_tblImg.complete||!_tblImg.naturalWidth)return;
   var C=[[-1,-1,-1],[1,-1,-1],[-1,1,-1],[1,1,-1],[-1,-1,1],[1,-1,1],[-1,1,1],[1,1,1]];
   window._dsState={x:x,sc:sc,ml:ml,dpr:dpr,f:f,alphaB:alphaB};
@@ -27257,7 +27277,17 @@ var FX=(function(){
       var k=p.fade?Math.max(0,p.life/p.max):1;
       ctx.globalAlpha=k;
       ctx.fillStyle=p.color;
-      if(p.vr){
+      /* P664: SHAPES. The square is still the default, so every existing
+         caller draws exactly what it drew before. */
+      if(p.shape&&p.shape!=='square'){
+        if(p.vr)p.rot+=p.vr*dt;
+        ctx.save();
+        ctx.translate(p.x,p.y);
+        if(p.rot)ctx.rotate(p.rot);
+        _fxPath(ctx,p.shape,p.size);
+        ctx.fill();
+        ctx.restore();
+      } else if(p.vr){
         p.rot+=p.vr*dt;
         ctx.save();
         ctx.translate(p.x,p.y);
@@ -27304,6 +27334,24 @@ var FX=(function(){
     else { running=false; ctx.clearRect(0,0,W,H); }
   }
 
+  /* P664: THE GAME'S OWN SPARKLE SHAPES, transcribed from the clip-path
+     polygons the DOM sparkles already use (.pdiamond and .pstar on the
+     night-roll offer, the shop stands and the focus overlay) so a canvas
+     particle and a DOM one are the same silhouette. Percentages there,
+     unit coordinates here, one table either way. */
+  var _FX_SHAPES={
+    diamond:[[.5,0],[1,.5],[.5,1],[0,.5]],
+    star:[[.5,0],[.61,.39],[1,.5],[.61,.61],[.5,1],[.39,.61],[0,.5],[.39,.39]]
+  };
+  function _fxPath(ctx,shape,size){
+    var pts=_FX_SHAPES[shape];if(!pts)return;
+    ctx.beginPath();
+    for(var i=0;i<pts.length;i++){
+      var x=(pts[i][0]-0.5)*size, y=(pts[i][1]-0.5)*size;
+      if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+    }
+    ctx.closePath();
+  }
   function _spawn(o){
     for(var i=0;i<pool.length;i++){
       if(!pool[i].a){
@@ -27316,6 +27364,7 @@ var FX=(function(){
         p.size=o.size||4;
         p.color=o.color||'#fff';
         p.rot=o.rot||0; p.vr=o.vr||0;
+        p.shape=o.shape||null;/* P664: null = the square it always drew */
         p.fade=o.fade!==false;
         return true;
       }
@@ -27413,6 +27462,18 @@ function _cardAccent(el){
     c=(c||'').trim();
     if(c)return c;
   }catch(e){}
+  /* P664: A FAMILY CARD HAS NO --card-accent - that variable belongs to the
+     legacy .mcard. Its colour is its FAMILY's, the same table the card's border
+     and tier numeral already read, so a burst off a jade card is jade rather
+     than the generic gold every card used to throw. */
+  try{
+    var cid=el&&el.dataset?el.dataset.cid:null;
+    if(cid){
+      var d=famDef(cid);
+      var fc=d&&FAMILIES[d.fam]?FAMILIES[d.fam].color:null;
+      if(fc)return fc;
+    }
+  }catch(e){}
   return 'rgba(255,215,0,.9)';
 }
 function spawnCardBurst(el,color){
@@ -27421,29 +27482,49 @@ function spawnCardBurst(el,color){
   if(!(r.width>0))return;
   var cx=r.left+r.width/2, cy=r.top+r.height*0.42;
   var col=color||_cardAccent(el);
-  for(var i=0;i<26;i++){
-    /* upward, +/- ~30 degrees, so the plume keeps a clear direction */
-    var a=-Math.PI/2+(Math.random()-0.5)*1.05;
-    var sp=70+Math.random()*150;
+  /* P664: ONE TABLE, because this is what Denis will tune. The old burst was 26
+     motes at 3-4px, which read as dust; the reference is a dense gold bloom with
+     big slow diamonds turning in it. Every particle rotates - a diamond that
+     does not turn reads as a lozenge. */
+  var B=spawnCardBurst.tune;
+  var i,a,sp;
+  for(i=0;i<B.plume;i++){
+    a=-Math.PI/2+(Math.random()-0.5)*1.05;
+    sp=B.speed[0]+Math.random()*(B.speed[1]-B.speed[0]);
     FX.emit({x:cx+(Math.random()-0.5)*r.width*0.78,
              y:cy+(Math.random()-0.5)*r.height*0.42,
              vx:Math.cos(a)*sp, vy:Math.sin(a)*sp,
              g:150+Math.random()*90,
-             life:0.55+Math.random()*0.55,
-             size:(Math.random()<0.4?3:4),
+             life:B.life[0]+Math.random()*(B.life[1]-B.life[0]),
+             size:B.size[0]+Math.random()*(B.size[1]-B.size[0]),
+             rot:Math.random()*Math.PI, vr:(Math.random()-0.5)*7,
+             shape:(Math.random()<B.starShare?'star':'diamond'),
              color:col});
   }
-  /* a few bright motes that hang and drift, the slow ones in the reference */
-  for(var j=0;j<7;j++){
-    var a2=-Math.PI/2+(Math.random()-0.5)*1.6;
+  /* the slow motes that hang and drift - the ones that sell the bloom */
+  for(i=0;i<B.motes;i++){
+    a=-Math.PI/2+(Math.random()-0.5)*1.6;
     FX.emit({x:cx+(Math.random()-0.5)*r.width*0.9, y:cy,
-             vx:Math.cos(a2)*30, vy:Math.sin(a2)*46, g:26,
-             life:0.9+Math.random()*0.7, size:2, color:col});
+             vx:Math.cos(a)*30, vy:Math.sin(a)*46, g:26,
+             life:B.moteLife[0]+Math.random()*(B.moteLife[1]-B.moteLife[0]),
+             size:B.moteSize[0]+Math.random()*(B.moteSize[1]-B.moteSize[0]),
+             rot:Math.random()*Math.PI, vr:(Math.random()-0.5)*3.4,
+             shape:'diamond', color:col});
+  }
+  /* and a ring that pushes out from the card's own edge, so the burst reads as
+     coming OFF the card rather than being sprayed over it */
+  for(i=0;i<B.ring;i++){
+    a=(i/B.ring)*Math.PI*2;
+    FX.emit({x:cx+Math.cos(a)*r.width*0.42, y:cy+Math.sin(a)*r.height*0.34,
+             vx:Math.cos(a)*B.ringSpeed, vy:Math.sin(a)*B.ringSpeed-40, g:120,
+             life:0.5+Math.random()*0.4, size:B.size[0],
+             rot:a, vr:(Math.random()-0.5)*6,
+             shape:'diamond', color:col});
   }
 }
-/* Shatter burst — angular chunks pop outward + tumble + fall under
-   gravity, for a die that physically breaks (Obsidian). Reads as "pieces
-   flying off" rather than an even radial spark burst. */
+spawnCardBurst.tune={plume:44,motes:14,ring:12,
+  speed:[80,250], life:[0.6,1.25], size:[6,13],
+  moteLife:[1.0,1.9], moteSize:[7,15], ringSpeed:120, starShare:0.22};
 function spawnShards(el,color){
   if(!el)return;
   var rect=el.getBoundingClientRect();
