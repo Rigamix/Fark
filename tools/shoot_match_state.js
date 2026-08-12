@@ -58,9 +58,27 @@ try { if (cv && cv.width > 0) { const d = cv.getContext('2d').getImageData(0,0,c
   let p = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 8) p++; scroll.paintedPx = p; } }
 catch (e) { scroll.err = String(e).slice(0,80); }
 
+/* P649: is the procedural bubble actually there, and is it the SHAPE the
+   algorithm built rather than a rectangle? A path with fewer than ~40 commands
+   is a rounded rect, not a jittered-and-notched perimeter. */
+const bub = document.querySelector('#dlgScroll svg.dlg-bubble');
+const bpath = bub && bub.querySelector('path');
+const bubble = {
+  present: !!bub,
+  size: bub ? bub.getAttribute('width') + 'x' + bub.getAttribute('height') : null,
+  pathCommands: bpath ? (bpath.getAttribute('d').match(/[MLCZ]/g) || []).length : 0,
+  paths: bub ? bub.querySelectorAll('path').length : 0,
+  textureHref: bub ? (bub.querySelector('image') || {}).getAttribute?.('href') : null,
+  /* the flat panel must be GONE, or the bubble is just sitting behind it */
+  scrollBg: (() => { const e = document.getElementById('dlgScroll');
+    return e ? getComputedStyle(e).backgroundColor + ' / border ' + getComputedStyle(e).borderTopWidth : null; })(),
+  textEmboss: (() => { const e = document.getElementById('dlgText');
+    return e ? (e.style.textShadow || '').slice(0, 60) : null; })(),
+};
+
 return {
   arm: 'match-table',
-  scroll,
+  scroll, bubble,
   control: { oppCards: document.querySelectorAll('#famRowO .fcv').length,
              playerCards: document.querySelectorAll('#famRowP .fcv').length,
              dlgBoxShowing: !!(box && box.classList.contains('show')) },
