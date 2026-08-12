@@ -96,7 +96,9 @@ const FONTS = FONT ? [3.4, 3.8, 4.2, 4.6, 5.0] : [0];
 const out = { corpus: lines.length, shell, currentPadX: padX, lineHeight: lineH, caps: [] };
 
 /* only the long tail matters - sort by character count and take the worst 40 */
-const worst = lines.slice().sort((a, b) => b.length - a.length).slice(0, 40);
+const ALL = /[?&]all=1/.test(location.search);
+const worst = ALL ? lines.slice()
+                  : lines.slice().sort((a, b) => b.length - a.length).slice(0, 40);
 out.longest = worst[0];
 out.longestChars = worst[0].length;
 

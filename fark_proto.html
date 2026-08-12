@@ -1714,9 +1714,22 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
    shadow is a sibling outside it. Two blend targets, two scopes. */
 #screen-match .dlg-scroll svg.dlg-bubble{position:absolute;z-index:0;
   pointer-events:none;overflow:visible}
-/* the flat drop-shadow the multiply layer replaces. Scoped off here rather
-   than deleted from .dlg-scroll, which #resDlg and the shop bubble share. */
+/* the flat drop-shadow the darkening layer replaces. Scoped off here rather
+   than deleted from .dlg-scroll, which #resDlg and the shop bubble share.
+   IT ALSO HAS TO GO FOR THE SHADOW TO WORK AT ALL: a filter on an ancestor
+   is a backdrop root, and backdrop-filter cannot see past one. */
 #screen-match .dlg-scroll{filter:none}
+/* P654: THE CAST SHADOW. Not a colour laid over the table - a darkening OF
+   the table, clipped to the bubble's outline, which is what Denis's "multiply
+   rather than half transparent brown" describes. mix-blend-mode could not do
+   it from in here: it stops at the nearest stacking context and #dlgBox is
+   one. backdrop-filter reads through them.
+   ONE LIMIT WORTH KNOWING: .dlg-box fades in on opacity, and an opacity below
+   1 IS a backdrop root - so for the half second of the fade this darkens
+   nothing, and lands as the fade settles. */
+#screen-match .dlg-scroll .dlg-bubble-shadow{position:absolute;pointer-events:none;
+  -webkit-backdrop-filter:brightness(var(--sh-dark,.52)) saturate(var(--sh-sat,1.15));
+  backdrop-filter:brightness(var(--sh-dark,.52)) saturate(var(--sh-sat,1.15))}
 #screen-match .dlg-scroll canvas{display:none}
 /* P651: BIGGER, AND THE THREE-LINE RULE STILL HOLDS - which needed both
    halves of this, because they trade off. Measured across all 1075 lines at
@@ -1749,7 +1762,10 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 #screen-match .dlg-text{font-family:'JMH Beda',serif;font-size:3.8cqw;
   color:var(--patCol,#3a2812);
   color:color-mix(in srgb, var(--patCol,#3a2812) 78%, #14100a);
-  line-height:1.3;letter-spacing:.2px;word-spacing:0}
+  /* P654: .2px -> .6px. Measured over all 1075 lines: 0.2 costs nothing,
+     and 0.4, 0.6 and 0.8 all cost the SAME single line - so the top of that
+     range is free relative to the bottom of it. Word-spacing stays at 0. */
+  line-height:1.3;letter-spacing:.6px;word-spacing:0}
 /* NPC kept dice: die-shaped RIM only in the patron's colour — no
    blurred halo (it read as a tinted shadow under the dice) */
 .die.oppkeep .d3selg i{background:#d94c3d}
@@ -13513,7 +13529,10 @@ function _wnHtml(s){
   out=out.replace(/(\d+)/g,'<b class="tip-num">$1</b>');
   out=out.replace(_MECHANIC_KEYWORDS,function(m){return '<i class="tip-kw">'+m+'</i>';});
   /* Honor literal \n in desc strings — render as a hard line break in tooltips. */
-  return out.replace(/\n/g,'<br>');
+  /* P655: and every die tooltip and effect label comes through here. It
+     already bound word+number pairs against orphan NUMBERS; the last two
+     words are the same problem one step further along. */
+  return _noOrphan(out.replace(/\n/g,'<br>'));
 }
 function _dieEffectLabel(eff){
   if(!eff)return'';
@@ -14624,8 +14643,10 @@ function _fkDarker(c){
 function _fkSheen(nm){return nm+'<span class="sheenTxt" aria-hidden="true">'+nm+'</span>';}
 function _accG(t){
   t=String(t).replace(/(\d[\d,]*)/g,'<span class="num">$1</span>');
-  return t.replace(/\b(once per match|twice per match|three times per match|hot dice|sudden death|bust(?:s|ed)?|bank(?:s|ed|ing)?|reroll(?:s|ed)?|triple(?:s)?|straight(?:s)?|wild(?:s)?|shatter(?:s|ed)?|kept)\b/gi,
-    '<span class="kw">$1</span>');
+  /* P655: every card rule and focus-panel description comes through here, so
+     the orphan rule is applied once rather than at each of them. */
+  return _noOrphan(t.replace(/\b(once per match|twice per match|three times per match|hot dice|sudden death|bust(?:s|ed)?|bank(?:s|ed|ing)?|reroll(?:s|ed)?|triple(?:s)?|straight(?:s)?|wild(?:s)?|shatter(?:s|ed)?|kept)\b/gi,
+    '<span class="kw">$1</span>'));
 }
 /* THE painted card — one look everywhere (loadout, draft, match, peek).
    Face art carries the family frame; tier is a roman chip (art law:
@@ -33413,7 +33434,9 @@ function endMatch(win){
     if(_portrait||_dlgText){
       _dlgHTML='<div class="dlg-portrait">';
       if(_portrait)_dlgHTML+='<img src="'+_portrait+'" style="width:100%;height:100%;object-fit:cover;image-rendering:pixelated">';
-      _dlgHTML+='</div><div class="dlg-scroll"><canvas class="res-dlg-canvas"></canvas><div class="dlg-text">'+_dlgText+'</div></div>';
+      /* P655: the end screen speaks in the same kind of box and wraps the same
+         way, so it gets the same guarantee. */
+      _dlgHTML+='</div><div class="dlg-scroll"><canvas class="res-dlg-canvas"></canvas><div class="dlg-text">'+_noOrphan(_dlgText)+'</div></div>';
     }
     if(_dlgHTML)_bossLossData={cardHTML:'',dlgHTML:_dlgHTML};
   }
@@ -34206,13 +34229,15 @@ var DLG_BUBBLE = {
   embossDepth: 0.25, embossHighlight: 0.5, embossShadow: 0.3,
   /* the brief's corrected stops - beige and dark brown, NOT white and black */
   lightStop: '#d9bd90', shadowStop: '#4a2f18', ink: '#1c140c',
-  /* P652: THE CAST SHADOW, and it MULTIPLIES. It was a flat
-     drop-shadow(2px 4px 0 rgba(38,22,12,.85)) - a near-black wash sitting ON
-     the table rather than darkening it, identical over bare wood, a coin or a
-     card. A filter cannot blend, so this is a third copy of the path, offset
-     and multiplied. Mid-brown on purpose: multiply already darkens, so a dark
-     colour here goes to near-black and loses the wood grain underneath. */
-  shadowColor: '#7a5a3c', shadowDX: 2, shadowDY: 4
+  /* P654: THE CAST SHADOW DARKENS WHAT IS UNDER IT, which is what P652's
+     multiply was trying to do and could not. mix-blend-mode stops at the
+     nearest stacking context, and there are two between this and the table
+     (the SVG's own z-index, and #dlgBox's) - so multiply saw an empty
+     backdrop and returned its own colour, rendering as a flat mid-brown.
+     backdrop-filter reads through instead: it filters the pixels actually
+     behind the element and is stopped only by a backdrop root. shadowDarken
+     is the brightness multiplier applied to the table beneath the shape. */
+  shadowDarken: 0.52, shadowSat: 1.15, shadowDX: 3, shadowDY: 5
 };
 
 /* THE SEED IS THE LINE. mulberry32 exists so a shape reproduces; hashing the
@@ -34224,16 +34249,26 @@ function _bbSeed(str) {
   return h >>> 0;
 }
 
-/* THE ORPHAN GUARANTEE, ON THE STRING THAT ACTUALLY WRAPS. The brief's
-   orphanSafe swaps the last space of PLAIN text; by the time this text is laid
-   out it is HTML - jitterText has wrapped every word in its own nowrap span and
-   joined them with a literal space. So the LAST of those joins becomes U+00A0,
-   which binds the final two words into one unbreakable run. Same guarantee,
-   applied where the line breaks are actually decided. */
-function _bbOrphanHtml(html) {
-  var i = html.lastIndexOf('</span> <span');
-  if (i < 0) return html;
-  return html.slice(0, i + 7) + '\u00A0' + html.slice(i + 8);
+/* P655: NO ORPHAN WORD AT THE END OF A LINE. Denis's rule, and global - so
+   this is one function applied at the funnels every surface's prose already
+   passes through (_accG, _wnHtml, the two dialogue boxes) rather than a fix
+   per surface waiting for an eighth surface to be written.
+   THE WHOLE DIFFICULTY IS THAT THESE STRINGS ARE HTML by the time they exist.
+   A plain "replace the last space" lands inside style="white-space:nowrap"
+   as often as not, which does not prevent an orphan - it corrupts an
+   attribute. So it walks back to the last space that is in TEXT, by asking
+   whether the nearest angle bracket behind it opened a tag or closed one.
+   NOT a substitute for text-wrap:balance: balance distributes the lines, this
+   guarantees the last one is never a lone word. Both, everywhere. */
+function _noOrphan(html) {
+  if (typeof html !== 'string') return html;
+  var i = html.lastIndexOf(' ');
+  while (i > 0) {
+    var lt = html.lastIndexOf('<', i), gt = html.lastIndexOf('>', i);
+    if (lt <= gt) return html.slice(0, i) + '\u00A0' + html.slice(i + 1);
+    i = html.lastIndexOf(' ', i - 1);
+  }
+  return html;
 }
 
 /* SHRINK-TO-FIT, per the brief's bug list: not a flat cap. Measure the height
@@ -34321,11 +34356,6 @@ function dlgBubblePaint(scrollEl, textEl, seed) {
         + '<stop offset="100%" stop-color="' + o.shadowStop + '" stop-opacity="' + o.shadowIntensity + '"/>'
       + '</linearGradient>'
     + '</defs>'
-    /* THE CAST SHADOW FIRST, and OUTSIDE the isolation group below - it has to
-       multiply against the table, not against the paper. */
-    + '<path d="' + pathD + '" fill="' + o.shadowColor + '" stroke="none"'
-      + ' transform="translate(' + o.shadowDX + ',' + o.shadowDY + ')"'
-      + ' style="mix-blend-mode:multiply" filter="url(#gr-' + uid + ')"/>'
     /* the parchment, then a SECOND copy of the same path carrying the light as
        a blended tint - the brief is specific that the lighting is a layer over
        the real texture, not baked into it. ISOLATED TOGETHER so the overlay
@@ -34336,9 +34366,24 @@ function dlgBubblePaint(scrollEl, textEl, seed) {
     + '</g>'
     + '</svg>';
 
+  /* THE CAST SHADOW, as a plain div clipped to the bubble's own outline.
+     clip-path takes the SAME path string the SVG is built from, in the same
+     coordinate space, so there is no second shape to keep in sync - move the
+     bubble and the shadow moves with it by construction.
+     It is a div and not another SVG path because what it does is
+     backdrop-filter: darkening the table's real pixels rather than laying a
+     colour over them. See the note in DLG_BUBBLE for why blending could not. */
+  var shadow = '<div class="dlg-bubble-shadow" aria-hidden="true" style="'
+    + '--sh-dark:' + o.shadowDarken + ';--sh-sat:' + o.shadowSat + ';'
+    + 'left:' + (-offX + o.shadowDX).toFixed(1) + 'px;top:' + (-offY + o.shadowDY).toFixed(1) + 'px;'
+    + 'width:' + svgW.toFixed(1) + 'px;height:' + svgH.toFixed(1) + 'px;'
+    + 'clip-path:path(\'' + pathD + '\');-webkit-clip-path:path(\'' + pathD + '\')"></div>';
   var old = scrollEl.querySelector('svg.dlg-bubble');
   if (old) old.remove();
+  var oldSh = scrollEl.querySelector('.dlg-bubble-shadow');
+  if (oldSh) oldSh.remove();
   scrollEl.insertAdjacentHTML('afterbegin', svg);
+  scrollEl.insertAdjacentHTML('afterbegin', shadow);
   /* the emboss is on the TEXT, two offset shadows and not one drop shadow */
   textEl.style.textShadow = (-o.embossDepth) + 'px ' + (-o.embossDepth) + 'px 0 rgba(217,189,144,' + o.embossHighlight + '),'
     + o.embossDepth + 'px ' + o.embossDepth + 'px .4px rgba(74,47,24,' + o.embossShadow + ')';
@@ -34535,8 +34580,8 @@ const LEDGER_LINES={
       if(PORTRAITS[key])img.src=PORTRAITS[key];
       const full='\u201c'+text+'\u201d';
       /* P649: the orphan guarantee goes on the JITTERED html, because that is
-         the string whose line breaks the browser decides - see _bbOrphanHtml. */
-      textEl.innerHTML=_bbOrphanHtml(jitterText(full));
+         the string whose line breaks the browser decides - see _noOrphan. */
+      textEl.innerHTML=_noOrphan(jitterText(full));
       textEl.style.width='';
       box.classList.remove('hiding');box.classList.add('show');this.active=true;
       /* P649: paint the procedural bubble behind the text. Seeded on the LINE,
