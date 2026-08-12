@@ -646,9 +646,13 @@ running invisibly, which is worse than the doubling.
 **Three ways out:**
 
 - **(a) One row, both sources.** `famRenderRow` draws `G.oF` and `G.oCards`
-  together as `.fcv`, so the rival has a single hand in one visual language and
-  the weathered `.mcard` look disappears with the renderer. Most work, best
-  result. **My rec.**
+  together as `.fcv`, so the rival has a single hand in one visual language.
+  **This also kills the weathering for free, and I checked rather than hoped:**
+  the weathered look is a MutationObserver that fires on any `.card-outer`
+  entering the DOM and forces `BOSS_AGING_LEVEL = 3` on any card whose def has
+  `npc` or `npcOnly` — which is why it lands on exactly those two and nothing
+  else. `famCardArt` emits no `.card-outer`, so a card drawn as `.fcv` is
+  outside that observer entirely. Most work, best result. **My rec.**
 - **(b) Keep both rows, restyle the legacy one** to match `.fcv` — kills the
   weathering you asked about but leaves two separate card strips on screen.
 - **(c) Stop dealing NPC cards on boss nights** so `G.oCards` is empty there and
