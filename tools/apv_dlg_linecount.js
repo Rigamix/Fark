@@ -87,6 +87,8 @@ const padX = parseFloat(getComputedStyle(sc).paddingLeft) + parseFloat(getComput
 
 const FONT = /(?:\?|&)font=1/.test(location.search);
 const TIGHT = /(?:\?|&)tight=1/.test(location.search);
+const LSM = location.search.match(/[?&]ls=([-0-9.]+)/);
+const LS = LSM ? parseFloat(LSM[1]) : null;
 const CAPS = FONT ? [94] : [66, 72, 78, 84, 90, 94];
 const PADS = FONT ? [48] : [68, 48, 36];
 /* the shipped face is 3.4cqw; these are the steps up from it */
@@ -107,13 +109,18 @@ CAPS.forEach(cap => {
          them, which buys back roughly one font step - so the choice is not
          only "bigger face or three lines". */
       if (TIGHT) { tx.style.wordSpacing = '0px'; tx.style.letterSpacing = '0px'; }
+      /* ?ls=N sweeps LETTER-SPACING at the shipped face. Denis wants "a touch
+         more spacing between letters", and tracking is what P651 spent to buy
+         the font step - so how much can go back before the line count moves is
+         a budget, not a preference. */
+      if (LS !== null) tx.style.letterSpacing = LS + 'px';
       const lh = parseFloat(getComputedStyle(tx).lineHeight);
       const wpx = Math.floor(shell * cap / 100) - pad;
       let over3 = 0, max = 0, gotW = 0;
       worst.forEach(t => { const r = linesAt(t, wpx, lh);
         if (r.lines > 3) over3++; if (r.lines > max) max = r.lines; gotW = r.got; });
       out.caps.push({ cap: cap + '%', padX: pad,
-                      tight: TIGHT, fontCqw: fcqw || 'shipped', fontPx: +getComputedStyle(tx).fontSize.replace('px',''),
+                      tight: TIGHT, letterSpacing: LS, fontCqw: fcqw || 'shipped', fontPx: +getComputedStyle(tx).fontSize.replace('px',''),
                       askedW: wpx, gotW: gotW,
                       applied: Math.abs(gotW - wpx) < 3, worstLines: max, linesOver3: over3 });
     });

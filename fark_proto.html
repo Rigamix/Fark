@@ -1707,11 +1707,16 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
      own line count, so only the long ones ever reach the cap. */
   box-shadow:none;padding:22px 24px;max-width:94%;margin:0 auto;flex:0 1 auto}
 /* behind the text, and allowed out of the box: the tail lives out here.
-   isolation:isolate because the light layer is mix-blend-mode:overlay - the
-   brief wants it tinting the PARCHMENT PATH under it, and without an
-   isolation group it blends against whatever is behind the whole SVG. */
+   P652: THE ISOLATION IS NOT HERE ANY MORE. P649 put it on the root so the
+   light layer would tint the parchment rather than the page - correct then,
+   and it would trap the drop shadow now, which has to multiply against the
+   TABLE. It lives on an inner <g> holding the parchment and the light; the
+   shadow is a sibling outside it. Two blend targets, two scopes. */
 #screen-match .dlg-scroll svg.dlg-bubble{position:absolute;z-index:0;
-  pointer-events:none;overflow:visible;isolation:isolate}
+  pointer-events:none;overflow:visible}
+/* the flat drop-shadow the multiply layer replaces. Scoped off here rather
+   than deleted from .dlg-scroll, which #resDlg and the shop bubble share. */
+#screen-match .dlg-scroll{filter:none}
 #screen-match .dlg-scroll canvas{display:none}
 /* P651: BIGGER, AND THE THREE-LINE RULE STILL HOLDS - which needed both
    halves of this, because they trade off. Measured across all 1075 lines at
@@ -1730,8 +1735,21 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
    handful of four-line bubbles; that one is Denis's call, not a measurement.
    SCOPED to the match: the base .dlg-text tracking is shared with #resDlg
    and the shop's cant-afford bubble, which are not what he is reading. */
+/* P652: 0.2px of tracking back, and that is the WHOLE budget - measured at
+   3.8cqw across the 40 longest of 1075 lines, 0.2 holds three lines and 0.35
+   tips one to four. Word-spacing stays at 0; it was the expensive one.
+   AND THE INK IS A STEP BELOW THE ACCENT, per Denis's standing rule that text
+   should always be a little darker than the accent it is drawn from. This
+   prints in the speaker's own --patCol, so it is that colour mixed 78/22 with
+   a near-black brown: still recognisably theirs, but sitting under the accent
+   rather than glowing at it on parchment. color-mix because --patCol is a
+   different value per patron and there is nowhere to hand-darken 29 of them.
+   The plain declaration stays above as the fallback, so anything that does
+   not understand color-mix keeps today's colour rather than losing the rule. */
 #screen-match .dlg-text{font-family:'JMH Beda',serif;font-size:3.8cqw;
-  color:var(--patCol,#3a2812);line-height:1.3;letter-spacing:0;word-spacing:0}
+  color:var(--patCol,#3a2812);
+  color:color-mix(in srgb, var(--patCol,#3a2812) 78%, #14100a);
+  line-height:1.3;letter-spacing:.2px;word-spacing:0}
 /* NPC kept dice: die-shaped RIM only in the patron's colour — no
    blurred halo (it read as a tinted shadow under the dice) */
 .die.oppkeep .d3selg i{background:#d94c3d}
@@ -34187,7 +34205,14 @@ var DLG_BUBBLE = {
   lightBalance: 35, lightBlend: 'overlay',
   embossDepth: 0.25, embossHighlight: 0.5, embossShadow: 0.3,
   /* the brief's corrected stops - beige and dark brown, NOT white and black */
-  lightStop: '#d9bd90', shadowStop: '#4a2f18', ink: '#1c140c'
+  lightStop: '#d9bd90', shadowStop: '#4a2f18', ink: '#1c140c',
+  /* P652: THE CAST SHADOW, and it MULTIPLIES. It was a flat
+     drop-shadow(2px 4px 0 rgba(38,22,12,.85)) - a near-black wash sitting ON
+     the table rather than darkening it, identical over bare wood, a coin or a
+     card. A filter cannot blend, so this is a third copy of the path, offset
+     and multiplied. Mid-brown on purpose: multiply already darkens, so a dark
+     colour here goes to near-black and loses the wood grain underneath. */
+  shadowColor: '#7a5a3c', shadowDX: 2, shadowDY: 4
 };
 
 /* THE SEED IS THE LINE. mulberry32 exists so a shape reproduces; hashing the
@@ -34264,7 +34289,9 @@ function dlgBubblePaint(scrollEl, textEl, seed) {
     if (p[1] < minY) minY = p[1];
     if (p[1] > maxY) maxY = p[1];
   });
-  var margin = o.strokeW + 4;
+  /* P652: the offset shadow has to fit inside the box too, or it clips at the
+     bottom-right exactly where it is most visible. */
+  var margin = o.strokeW + 4 + Math.max(o.shadowDX, o.shadowDY);
   var offX = margin - minX, offY = margin - minY;
   var svgW = (maxX - minX) + margin * 2, svgH = (maxY - minY) + margin * 2;
   var pathD = pointsToPath(built.points.map(function(p) { return [p[0] + offX, p[1] + offY]; }), built.flags);
@@ -34294,11 +34321,19 @@ function dlgBubblePaint(scrollEl, textEl, seed) {
         + '<stop offset="100%" stop-color="' + o.shadowStop + '" stop-opacity="' + o.shadowIntensity + '"/>'
       + '</linearGradient>'
     + '</defs>'
+    /* THE CAST SHADOW FIRST, and OUTSIDE the isolation group below - it has to
+       multiply against the table, not against the paper. */
+    + '<path d="' + pathD + '" fill="' + o.shadowColor + '" stroke="none"'
+      + ' transform="translate(' + o.shadowDX + ',' + o.shadowDY + ')"'
+      + ' style="mix-blend-mode:multiply" filter="url(#gr-' + uid + ')"/>'
     /* the parchment, then a SECOND copy of the same path carrying the light as
        a blended tint - the brief is specific that the lighting is a layer over
-       the real texture, not baked into it */
+       the real texture, not baked into it. ISOLATED TOGETHER so the overlay
+       tints the paper and nothing further back. */
+    + '<g style="isolation:isolate">'
     + '<path d="' + pathD + '" fill="url(#par-' + uid + ')" stroke="' + o.ink + '" stroke-width="' + o.strokeW + '" stroke-linejoin="round" stroke-linecap="round" filter="url(#gr-' + uid + ')"/>'
     + '<path d="' + pathD + '" fill="url(#li-' + uid + ')" stroke="none" style="mix-blend-mode:' + o.lightBlend + '" filter="url(#gr-' + uid + ')"/>'
+    + '</g>'
     + '</svg>';
 
   var old = scrollEl.querySelector('svg.dlg-bubble');
