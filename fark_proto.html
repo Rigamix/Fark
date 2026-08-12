@@ -4042,13 +4042,30 @@ body.crit-dilate{animation:critDilate .55s ease-out both}
 .status-msg{
   font-family:'JMH Beda',serif;
   font-size:5cqw;text-align:center;letter-spacing:.03em;
-  white-space:nowrap;color:var(--textdim);opacity:.55;
+  /* P669: WAS `nowrap`, AND THAT WAS THE CROP. The strip is a centred flex
+     box with no min-width, so a line too wide to fit could neither wrap nor
+     shrink - it grew past both edges at once and, being centred, lost its
+     start and its end together. Measured at 430px: 55 characters rendered
+     610px wide and hung 90px off each side; the crop begins around 38.
+     max-width and min-width:0 are what actually hold it inside the strip -
+     wrapping alone does not, because a flex item will not shrink below its
+     content width without them. */
+  white-space:normal;max-width:100%;min-width:0;
+  overflow-wrap:break-word;text-wrap:balance;
+  color:var(--textdim);opacity:.55;
   line-height:1.2;text-shadow:0 2px 0 rgba(20,12,4,.75);
 }
 .status-msg.gold{color:#f0c860;opacity:1;text-shadow:0 1px 0 rgba(20,12,4,.85),0 0 6px rgba(20,12,4,.7)}
 .status-msg.red{color:#e07058;opacity:1;text-shadow:0 1px 0 rgba(20,12,4,.85),0 0 6px rgba(20,12,4,.7)}
 .status-msg.green{color:#7ec888;opacity:1;text-shadow:0 1px 0 rgba(20,12,4,.85),0 0 6px rgba(20,12,4,.7)}
 .status-msg.active{color:var(--text);opacity:.85}
+/* P669: and long messages come down a step, so a wrapped line reads as two
+   tidy lines rather than filling the table. The class is chosen in
+   setStatusMsg from the message length - one place, every caller. The bands
+   come from the corpus: the median message is 24 characters and 73 of 181
+   are over 26, so the common case keeps the full size. */
+.status-msg.sm-long{font-size:4.2cqw}
+.status-msg.sm-xlong{font-size:3.6cqw;letter-spacing:.02em}
 /* THE OFF-MATCH ANNOUNCEMENT. Lives on the shell, not inside a screen, because
    the bug it fixes is that #screen-match's status strips are invisible from
    anywhere else. Same family as .status-msg above so the game keeps one voice.
@@ -27013,11 +27030,20 @@ function _placeTurnText(){
   bot.style.top=(loY-zr.top+_STACK_GAP)+'px';
   bot.style.bottom='';
 }
+/* P669: THE SIZE STEP LIVES HERE, once, rather than at 105 famLog call sites.
+   Every card, die, enchant and rule announcement reaches the table through
+   this function while the match screen is up - famLog -> _famAnnounce ->
+   setStatusMsg - so this is the one place that sees every message and can
+   size it. */
+function _statusCls(m,c){
+  var n=(m==null?0:String(m).length);
+  return 'status-msg '+(c||'')+(n>44?' sm-xlong':(n>26?' sm-long':''));
+}
 function setStatusMsg(m,c){
   const isOpp=G&&G.phase==='opp';
   const topEl=document.getElementById('statusTop'),botEl=document.getElementById('statusBot');
-  if(isOpp){topEl.textContent=m;topEl.className='status-msg '+(c||'');botEl.textContent='';botEl.className='status-msg';}
-  else{botEl.textContent=m;botEl.className='status-msg '+(c||'');topEl.textContent='';topEl.className='status-msg';}
+  if(isOpp){topEl.textContent=m;topEl.className=_statusCls(m,c);botEl.textContent='';botEl.className='status-msg';}
+  else{botEl.textContent=m;botEl.className=_statusCls(m,c);topEl.textContent='';topEl.className='status-msg';}
   try{_placeTurnText();}catch(e){}
 }
 function setTurnMode(isOpp){
@@ -31241,6 +31267,13 @@ function handleBank(){
     try{spawnPop('+'+_ssBonus+' ⭐ STARSTONE');}catch(e){}
   }
   /* ── TELL HOOKS (applied after all card bonuses, before celebration) ── */
+  /* P669: DID THE BANK GET REFUSED? Two house rules below zero a bank and
+     announce it in red - Ambrose's Reckoning and Grog's Last Call - and both
+     were overwritten unconditionally by the gold 'BANKED 0' line at the end
+     of this function: same element, same turn, so the red was on screen for
+     no frames at all. What the player saw was a success-coloured message for
+     a rejected bank, which is why Denis reported the refusal as missing. */
+  var _bankRefused=false;
   if(G._tell){
     /* Steeped (Mabel): +50 per roll past first, accumulated in G._tellState.bonus */
     if(_ruleActive('steeped','p')&&G._tellState&&G._tellState.bonus>0){
@@ -31252,6 +31285,7 @@ function handleBank(){
     if(_ruleActive('reckoning','p')&&G._tellState&&G._tellState.lastNpcBank>0&&total<G._tellState.lastNpcBank){
       var _rkFloor=G._tellState.lastNpcBank;
       total=0;bonusMsg=' RECKONING — BANK <'+_rkFloor;
+      _bankRefused=true;/* P669 - or the gold BANKED line below erases this */
       setStatusMsg("RECKONING — BANK BELOW "+_rkFloor+'!','red');
       try{SFX.bust&&SFX.bust();}catch(e){}
       try{Haptic.bust&&Haptic.bust();}catch(e){}
@@ -31268,6 +31302,7 @@ function handleBank(){
     var _lcT=(_lcRule&&_lcRule.minBank)||800;
     if(_ruleActive('last_call','p')&&total>0&&total<_lcT){
       total=0;bonusMsg=' LAST CALL — BANK <'+_lcT;
+      _bankRefused=true;/* P669 - the one Denis reported */
       setStatusMsg('LAST CALL — NOTHING UNDER '+_lcT,'red');
       /* Distinct harsh sound - reusing SFX.bust felt like a normal bust;
          this is a house-rule rejection and deserves its own tone. */
@@ -31276,7 +31311,11 @@ function handleBank(){
       _flashTellRule();
     }
   }
-  const msg='BANKED '+total.toLocaleString()+(bonusMsg||'');setStatusMsg(msg,'gold');
+  /* P669: no gold BANKED line over a refusal - the red one above is the
+     message, and it is the only one that is true. */
+  if(!_bankRefused){
+    const msg='BANKED '+total.toLocaleString()+(bonusMsg||'');setStatusMsg(msg,'gold');
+  }
   G._lastBankForDlg=total;
   _bankCelebrate(total);
   /* Record for tap-score summary — snapshot dice before G.kept is cleared */
