@@ -1230,7 +1230,13 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 #famRowP .fcv.spent{filter:saturate(.25) brightness(.55)
   drop-shadow(0 0.25cqw 0.3cqw rgba(10,6,2,.5)) drop-shadow(0 0.9cqw 1.3cqw rgba(10,6,2,.4))}
 #famRowP .fcv.sealed::after{content:'';position:absolute;inset:0;background:rgba(24,12,34,.58);border-radius:7%}
-#famRowP .fcv.armed{filter:drop-shadow(0 0 1.1cqw rgba(255,217,138,.85))
+/* P633: BOTH ROWS. The rival's armed telegraph was .mcBack.armed, and P591
+   deleted the element that carried it - so since then famRenderRow has been
+   adding `armed` to a .fcv that only #famRowP styled, and a rival card arming
+   showed nothing at all. The brief's section 6 gives the player that tell.
+   Widened rather than duplicated: one armed look, and it cannot drift. */
+#famRowP .fcv.armed,#screen-match #famRowO .fcv.armed{
+  filter:drop-shadow(0 0 1.1cqw rgba(255,217,138,.85))
   drop-shadow(0 0.9cqw 1.3cqw rgba(10,6,2,.5))}/* P576: third of the three */
 /* P576: THE BOB. fcvFloat was checked first and rejected with a reason: it
    exists, but it is already bound to `#ptvFan .fcv.zoom .fcvIn`, so redefining
@@ -1267,28 +1273,34 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
    that padding, while this row is an absolute child of #screen-match, whose
    padding box starts at zero. Same variable, two origins, 8px apart. The bar
    is 25.03cqw tall, so +26 clears its underside. */
-/* P579: MIRRORS THE PLAYER'S ROW - centred, upside down, and smaller for
-   perspective. It sits below the turn plate (whose top is 9.4cqw and which is
-   6.75cqw tall at 26cqw wide), so 17cqw clears it.
-   THE ROTATION IS ON THE ROW, NOT THE CARDS. .mcBack.armed animates its own
-   transform as the telegraph that a rival card is about to fire, and a per-card
-   rotate would be deleted the moment one armed. One transform on the parent
-   leaves every child's free. It reverses their order too, which is meaningless
-   for identical backs. */
+/* P579: MIRRORS THE PLAYER'S ROW - centred, smaller for perspective, and sat
+   below the turn plate (whose top is 9.4cqw and which is 6.75cqw tall at 26cqw
+   wide), so 17cqw clears it.
+   P633: THE 180deg IS GONE. It was written for .mcBack - a flat rectangle with
+   a rim and a diamond - and its own note said reversing their order was
+   "meaningless for identical backs". P591 put PAINTED FACES in this row and
+   nothing counter-rotated them, so the rival's hand rendered upside down
+   (measured: the row's matrix was a=-1, d=-0.966). Denis, from play: "Looks
+   like my card mirrored on top of theirs."
+   Taken off the row rather than cancelled per card: a counter-rotation on .fcv
+   would still leave the drop-shadows pointing up the screen, because a filter
+   is applied before the element's own transform. Without it this row is built
+   exactly like #famRowP, which is one shape to reason about instead of two. */
 #famRowO{position:absolute;left:50%;top:calc(env(safe-area-inset-top,0px) + 8px + var(--bar-top) + 23cqw);/* P580: down, off the turn plate */
   /* P591: TILTED INTO THE TABLE. The row is the plane, not each card: the cards'
      own `rotate` is already carrying the fan, and one element cannot hold two
      rotations. Tilting the row is also what perspective actually means here -
      a hand lying on a surface, not four independently skewed cards.
-     The 180deg comes first, so the rotateX after it leans the far edge away
-     from the viewer exactly as the near row's does. */
-  transform:translateX(-50%) rotate(180deg) perspective(900px) rotateX(15deg);
+     A positive rotateX leans the far edge away, the same way the near row's
+     13deg does - which is now the whole of it. */
+  transform:translateX(-50%) perspective(900px) rotateX(15deg);
   display:flex;gap:0.6cqw;z-index:40}
 /* P580: THE FAN, ON `rotate` RATHER THAN `transform`, and that is the point.
-   The row's own 180deg and .mcBack.armed's translateY telegraph both live on
-   `transform`; the standalone `rotate` property composes with it instead of
-   replacing it, so a fan angle costs neither of them anything and nothing has to
-   restate anyone else's values inside a keyframe. */
+   The row's own plane lives on `transform`; the standalone `rotate` property
+   composes with it instead of replacing it, so a fan angle costs it nothing and
+   nothing has to restate anyone else's values inside a keyframe.
+   P633: these angles now read the same direction as the player's fan, because
+   the row no longer flips them. */
 #screen-match #famRowO .fcv:nth-child(1){rotate:-7deg}
 #screen-match #famRowO .fcv:nth-child(2){rotate:7deg}
 #screen-match #famRowO .fcv:nth-child(3){rotate:0deg}
@@ -1297,14 +1309,18 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 /* P576: 9.6cqw -> 14cqw (37.4x53.3px -> 54.6x77.8px), still clearly smaller
    than the player's 20cqw, plus the same soft cast so the rival's hand sits on
    the table too.
-   NO BOB HERE, deliberately: .mcBack is a bare div with no inner wrapper, and
-   .mcBack.armed already animates its own transform as the telegraph that a rival
-   card is about to fire. An animation on the same element would delete that, and
-   restating the lift inside the bob's keyframes is the shape that breaks the
-   moment either is retuned. Size and shadow now; the float waits for a wrapper. */
+   NO BOB HERE, and P633 corrects WHY. The old reason was that .mcBack was a bare
+   div with no inner wrapper and .mcBack.armed animated its own transform, so a
+   bob would have deleted the telegraph. Both halves are false now: .fcv has a
+   .fcvIn to hang it on, exactly as the player's row does, and the armed look is
+   a `filter` that an animation could not collide with. It is simply not written
+   yet - the rival's hand sits still on purpose until Denis wants it moving. */
 /* P579: 14cqw -> 11cqw. The player's are 20cqw, so the rival's now read as
    further away rather than merely smaller, and the extra shadow sits them
-   deeper in the candlelight Denis is lighting the table with. */
+   deeper in the candlelight Denis is lighting the table with.
+   P633: the shadows fall DOWN the screen now. Under the old 180deg they were
+   cast upward - a dark halo above each card, with the light source below it -
+   which is the other half of what read as a damaged card. */
 /* P591: the rival's cards are .fcv now (real faces), so the sizing that used to
    dress .mcBack moves with them. 15cqw against the player's 20cqw, and the same
    darkening keeps them sitting further back in the candlelight. */
@@ -1313,28 +1329,19 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
          drop-shadow(0 0.2cqw 0.3cqw rgba(10,6,2,.55))
          drop-shadow(0 0.9cqw 1.4cqw rgba(10,6,2,.5))}
 /* the old .mcBack rule is gone with the element - see famRenderRow */
-/* FLAT family colour, standing in for painted backs. The border is the
-   family (brief section 2: "family = border colour, full stop") and the face
-   is a darker wash of the same so the card reads as an object rather than as
-   a swatch. */
-.mcBack{width:8cqw;aspect-ratio:911/1298;border-radius:8%;position:relative;cursor:pointer;
-  /* FLAT family colour as the cover, standing in until painted backs exist -
-     the face IS the family, with a dark rim so the card reads as an object
-     against the table rather than as a swatch. */
-  background:var(--fc,#666);border:0.5cqw solid #1d1309;
-  box-shadow:inset 0 0 0 0.35cqw rgba(255,255,255,.16),
-             inset 0 -0.9cqw 1.2cqw rgba(0,0,0,.28),
-             1px 2px 0 rgba(15,9,4,.45);
-  transition:transform .2s,box-shadow .2s,filter .2s}
-/* a single centred diamond, in the dark rim colour, so the flat face has one
-   thing on it and the cards do not read as blank chips */
-.mcBack::after{content:'';position:absolute;inset:34%;border:0.34cqw solid rgba(20,12,6,.5);
-  transform:rotate(45deg)}
-.mcBack.armed{transform:translateY(-1.5cqw);
-  box-shadow:0 0 9px 2px rgba(224,70,45,.6),inset 0 0 0 1px rgba(0,0,0,.5)}
-.mcBack.broken{filter:grayscale(.85) brightness(.5)}
-.mcBack.broken::before{content:'\2715';position:absolute;inset:0;display:flex;align-items:center;
-  justify-content:center;color:#c96a5a;font-size:4cqw;z-index:1}
+/* P633: THE WHOLE .mcBack BLOCK IS GONE. P591 removed the last thing that
+   emitted one - famRenderRow builds the rival's row with famCardArt now - so
+   these rules had had nothing to match for a while. Two of them mattered:
+     .mcBack.broken  greyed the card and stamped a crossed-out mark over it.
+                     That is the degradation Denis asked to have removed, and
+                     it had already stopped painting; `inst.broken` has been
+                     landing on a .fcv no rule matched. THE STATE IS UNTOUCHED -
+                     broken still zeroes charges and the sheet still reads
+                     "BROKEN - Tampered for the night". Only the picture is
+                     gone, which is the half Denis is doing himself.
+     .mcBack.armed   the rival's about-to-fire telegraph, moved to .fcv above.
+   Deleted rather than left: a dead rule keyed to a class name is a trap for
+   whoever writes the next element called .mcBack. */
 #famAux{position:absolute;left:2cqw;bottom:11.6%;display:flex;flex-direction:column;gap:4px;z-index:40;
   font-family:monospace;font-size:10px;max-width:34cqw}
 .fcv{position:relative;aspect-ratio:911/1298;filter:drop-shadow(2px 3px 0 rgba(15,9,4,.4))}
