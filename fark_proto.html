@@ -363,7 +363,7 @@ html.fkSA #gbSheet,html.fkSA #peekSheet{padding-bottom:env(safe-area-inset-botto
    away as the shard burst (spawnShards) flies off. */
 @keyframes pxDieShatter{0%{transform:scale(1) rotate(0);opacity:1}25%{transform:scale(1.12) rotate(-6deg)}100%{transform:scale(0) rotate(35deg);opacity:0}}
 .die.die-shatter{animation:pxDieShatter .36s ease-in forwards!important}
-.px-spark{position:fixed;width:4px;height:4px;pointer-events:none;z-index:9501;image-rendering:pixelated;background:var(--gold)}
+.px-spark-dead{/* P684: no caller creates .px-spark any more */position:fixed;width:4px;height:4px;pointer-events:none;z-index:9501;image-rendering:pixelated;background:var(--gold)}
 #matchVignette{position:fixed;inset:0;pointer-events:none;z-index:14;opacity:0;background:repeating-conic-gradient(rgba(180,30,30,.28) 0% 25%,transparent 0% 50%) 0 0/4px 4px;-webkit-mask-image:radial-gradient(ellipse 80% 70% at 50% 50%,transparent 50%,black 100%);mask-image:radial-gradient(ellipse 80% 70% at 50% 50%,transparent 50%,black 100%);image-rendering:pixelated}
 @keyframes pxVigPulse{0%{opacity:.55}100%{opacity:.9}}
 #matchVignette.on{opacity:.7;animation:pxVigPulse .5s steps(1,end) infinite alternate}
@@ -4532,7 +4532,10 @@ body.crit-dilate{animation:critDilate .55s ease-out both}
   display:flex;align-items:center;justify-content:center;opacity:0;
 }
 #hot-ov.flash{animation:hFlash 1s ease-out forwards}
-@keyframes hFlash{0%{background:rgba(180,140,30,.5);opacity:1}50%{background:rgba(140,105,20,.25);opacity:1}100%{background:transparent;opacity:0}}
+/* P684: the full-screen amber wash was the old game's idiom - the word
+   stays, the background never paints, and the celebration is the diamond
+   fountain showHot now emits. */
+@keyframes hFlash{0%{background:transparent;opacity:1}100%{background:transparent;opacity:0}}
 .hot-word{
   font-family:'Uncial Antiqua',serif;font-size:clamp(28px,9vw,52px);
   color:var(--gold);letter-spacing:6px;white-space:nowrap;
@@ -4584,7 +4587,7 @@ body.crit-dilate{animation:critDilate .55s ease-out both}
   font-family:var(--font-ui);font-size:clamp(17px,4.8vw,23px);
   color:var(--gold);
   text-shadow:2px 2px 0 #000,-1px 0 0 #000,0 -1px 0 #000,1px 0 0 rgba(255,220,80,.4);
-  animation:sPop .8s steps(5) forwards;
+  animation:sPop .8s ease-out forwards;/* P684: steps(5) was the pixel era */
 }
 @keyframes sPop{0%{transform:translateX(-50%) translateY(0);opacity:1}100%{transform:translateX(-50%) translateY(-52px);opacity:0}}
 .spop-bank{
@@ -21587,6 +21590,9 @@ function _iconFire(d,side){
      not have covered them and why the brief refused to let Code guess. BREAK
      and TRADE stay off the list explicitly: nothing coherent exists for
      doubling a die-destruction or a one-time swap. */
+  /* P684: 6 of 7 icon enchants fired with ZERO visual (census). One spray
+     at the shared resolver covers them all, in the enchant's own ink. */
+  try{if(d&&d.el&&typeof _fxSpray==='function')_fxSpray(d.el,def.ink||'#ffd98a',12,{speed:85,g:70,size:7,spread:2.4});}catch(eV){}
   var mult=(def.doubles&&_kindredActive())?2:1;
   try{def.fire({die:d,side:side||'p',lane:_laneOf(d),mult:mult});}
   catch(e){try{console.error('icon '+d.ench.t,e);}catch(e2){}}
@@ -22356,6 +22362,10 @@ function _breakDie(d){
   try{if(d.el){
     /* the class alone animates a box nobody can see - see D3X.shatter */
     try{if(window.D3X&&D3X.shatter)D3X.shatter(d.el);}catch(e2){}
+    /* P684: the flagship enchant destroyed a die with NO burst at all -
+       counted in the census: obsidian shatter had one, Sacrifice had one,
+       Break had nothing. The die's own material colour. */
+    try{spawnShards(d.el,_dieSparkCol(d.el));}catch(e3){}
     d.el.classList.add('die-shatter');var _w=d.el.parentElement;
     setTimeout(function(){try{(_w||d.el).remove();}catch(e){}},420);}}catch(e){}
   try{SFX.err&&SFX.err();}catch(e){}
@@ -22624,6 +22634,8 @@ function famQuicksilver(){
   if(!d)return;
   G._qsTurn=G.turnNum;
   d.val=_rollD(d);d.sel=false;try{reDrawDieFace(d);}catch(e){}
+  /* P684: the free reroll was invisible - the face just changed */
+  try{if(d.el&&typeof _fxSpray==='function')_fxSpray(d.el,'#eef4fb',10,{speed:75,g:50,size:6,spread:2.6});}catch(eQ){}
   famLog('QUICKSILVER — IT ROLLS ALONE, FREE');
   var free=G.pool.filter(function(x){return !x.committed&&!x._frozen;});
   var fv=free.map(function(x){return x.val;}),fm=free.map(function(x){return x.mat;});
@@ -27773,27 +27785,37 @@ function _sparkBand(host,spark,opts){
   if(host)host.innerHTML=out;
   return out;
 }
+/* P684: THE DIE'S OWN COLOUR. The offer and shop sparkles already know every
+   material's spark identity (D3.SPARK); the in-match sparks were hardcoded
+   #c8a050 squares. One lookup shares that identity everywhere. */
+function _dieSparkCol(el){
+  try{
+    var w=el&&el.closest?el.closest('.die-wrap,.die'):null;
+    var rec=(typeof G!=='undefined'&&G&&G.pool)?G.pool.find(function(d){return d.el===w||d.el===el||(w&&d.el===w);}):null;
+    var mat=rec&&rec.mat;
+    if(mat&&typeof D3!=='undefined'&&D3.SPARK&&D3.SPARK[mat])return D3.SPARK[mat].c;
+  }catch(e){}
+  return '#ffd98a';
+}
+/* P684: NEW BODY, OLD SIGNATURE - all ~35 call sites modernise at once. Was 8
+   flat 4px #c8a050 squares; now the game's diamonds (a star now and then) in
+   the die's material colour, rotating - the same silhouettes as everywhere
+   else in the new engine. */
 function spawnPixelSparks(el,count){
   if(!el||!count)return;
   var rect=el.getBoundingClientRect();
-  var cx=rect.left+rect.width/2;
-  var cy=rect.top+rect.height/2;
-  /* 8 directions: cardinal first, then diagonal */
-  var dirs=[[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,-1],[-1,1],[1,1]];
-  var life=0.26, per=14/life; /* travel ≈14px over the spark's lifetime */
-  var n=Math.min(count,8), i;
-  for(i=0;i<n;i++){
-    var d=dirs[i];
-    /* Start each spark at the die's edge in its travel direction */
-    var sx=d[0]===0?cx:(d[0]<0?rect.left:rect.right);
-    var sy=d[1]===0?cy:(d[1]<0?rect.top:rect.bottom);
-    FX.emit({x:sx,y:sy,vx:d[0]*per,vy:d[1]*per,life:life,size:4,color:'#c8a050'});
-  }
-  /* extra sparks (count>8) scatter from the edge at random angles */
-  for(i=8;i<count;i++){
+  if(!(rect.width>0))return;
+  var cx=rect.left+rect.width/2, cy=rect.top+rect.height/2;
+  var col=_dieSparkCol(el);
+  var nOut=Math.max(4,Math.min(count,16));
+  for(var i=0;i<nOut;i++){
     var a=Math.random()*Math.PI*2;
-    FX.emit({x:cx+Math.cos(a)*rect.width*0.4,y:cy+Math.sin(a)*rect.height*0.4,
-      vx:Math.cos(a)*per,vy:Math.sin(a)*per,life:life+Math.random()*0.12,size:4,color:'#c8a050'});
+    var sp=55+Math.random()*70;
+    FX.emit({x:cx+Math.cos(a)*rect.width*0.38, y:cy+Math.sin(a)*rect.height*0.38,
+      vx:Math.cos(a)*sp, vy:Math.sin(a)*sp-25, g:120,
+      life:0.35+Math.random()*0.35, size:5+Math.random()*4,
+      rot:Math.random()*Math.PI, vr:(Math.random()-0.5)*7,
+      shape:(Math.random()<0.15?'star':'diamond'), color:col});
   }
 }
 /* P617: THE CARD ACTIVATION PLUME. Light leaves the card upward - the way
@@ -27873,80 +27895,61 @@ function spawnCardBurst(el,color){
 spawnCardBurst.tune={plume:44,motes:14,ring:12,
   speed:[80,250], life:[0.6,1.25], size:[6,13],
   moteLife:[1.0,1.9], moteSize:[7,15], ringSpeed:120, starShare:0.22};
+/* P684: the heavy shatter - large tumbling diamonds in the caller's colour,
+   the weight the old 11 grey squares never had. */
 function spawnShards(el,color){
   if(!el)return;
-  var rect=el.getBoundingClientRect();
-  var cx=rect.left+rect.width/2, cy=rect.top+rect.height/2;
-  var col=color||'#3a3a52';
-  for(var i=0;i<11;i++){
-    var ang=Math.random()*Math.PI*2;
-    var speed=60+Math.random()*120;
-    FX.emit({
-      x:cx, y:cy,
-      vx:Math.cos(ang)*speed,
-      vy:Math.sin(ang)*speed-40,   /* slight upward pop before falling */
-      g:700,                        /* gravity → pieces drop */
-      life:0.55+Math.random()*0.25,
-      size:3+Math.floor(Math.random()*5),
-      color:col,
-      vr:(Math.random()*12-6)       /* tumble ±6 rad/s */
-    });
+  var r=el.getBoundingClientRect();if(!(r.width>0))return;
+  var cx=r.left+r.width/2, cy=r.top+r.height/2;
+  for(var i=0;i<13;i++){
+    var a=Math.random()*Math.PI*2, sp=90+Math.random()*140;
+    FX.emit({x:cx+(Math.random()-0.5)*r.width*0.5, y:cy+(Math.random()-0.5)*r.height*0.5,
+      vx:Math.cos(a)*sp, vy:Math.sin(a)*sp-60, g:260,
+      life:0.5+Math.random()*0.5, size:7+Math.random()*7,
+      rot:Math.random()*Math.PI, vr:(Math.random()-0.5)*10,
+      shape:'diamond', color:color||'#8a8aa8'});
   }
 }
 /* Obsidian coming apart, as against the generic break: heavier, slower, and
    in three readings of the same fracture - the glass in its own near-black,
    the pale edge where it cleaves, and the ember at the core. The die is gone
    for the rest of the match; it should land like it. */
+/* P684: same glass-and-ember palette, the game's shapes - dark diamonds with
+   ember stars in them instead of 32 flat squares. */
 function spawnObsidianBurst(el){
   if(!el)return;
-  var r=el.getBoundingClientRect();
-  if(!r.width)return;
+  var r=el.getBoundingClientRect();if(!(r.width>0))return;
   var cx=r.left+r.width/2, cy=r.top+r.height/2;
-  var glass=['#1a1a28','#0a0a14'],edge='#7a7aa0',ember='#d4552f';
-  var i,a,sp;
-  /* chunks: few, big, and they fall */
-  for(i=0;i<7;i++){
-    a=Math.random()*Math.PI*2;sp=70+Math.random()*90;
-    FX.emit({x:cx,y:cy,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-70,g:820,
-      life:0.7+Math.random()*0.3,size:6+Math.floor(Math.random()*5),
-      color:glass[i%2],vr:Math.random()*10-5});
+  var glass=['#1a1a28','#0a0a14','#7a7aa0'];
+  for(var i=0;i<14;i++){
+    var a=Math.random()*Math.PI*2, sp=100+Math.random()*130;
+    FX.emit({x:cx, y:cy, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp-70, g:280,
+      life:0.45+Math.random()*0.5, size:6+Math.random()*7,
+      rot:Math.random()*Math.PI, vr:(Math.random()-0.5)*11,
+      shape:'diamond', color:glass[i%3]});
   }
-  /* splinters: many, small, fast, pale */
-  for(i=0;i<16;i++){
-    a=Math.random()*Math.PI*2;sp=130+Math.random()*160;
-    FX.emit({x:cx,y:cy,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-50,g:640,
-      life:0.4+Math.random()*0.25,size:2+Math.floor(Math.random()*3),
-      color:edge,vr:Math.random()*16-8});
-  }
-  /* the ember: thrown upward and barely weighed down, so it hangs a moment
-     after the glass has hit the table */
-  for(i=0;i<9;i++){
-    a=Math.random()*Math.PI*2;sp=90+Math.random()*130;
-    FX.emit({x:cx,y:cy,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-110,g:180,
-      life:0.5+Math.random()*0.3,size:2+Math.floor(Math.random()*3),
-      color:ember,vr:0});
+  for(var k=0;k<6;k++){
+    var a2=Math.random()*Math.PI*2;
+    FX.emit({x:cx, y:cy, vx:Math.cos(a2)*70, vy:Math.sin(a2)*70-90, g:180,
+      life:0.6+Math.random()*0.5, size:6+Math.random()*4,
+      rot:Math.random()*Math.PI, vr:(Math.random()-0.5)*8,
+      shape:'star', color:'#d4552f'});
   }
 }
 /* Sawdust burst — brown flecks that drift DOWN from a die dampened by the
    Sawdust card. Distinct from spawnPixelSparks (which radiates evenly) so
    it reads as dust falling, not an explosion. */
+/* P684: fine dust that sinks - tiny brown diamonds now, same motion. */
 function spawnSawdust(el,count){
   if(!el)return;
-  var rect=el.getBoundingClientRect();
-  var n=count||7;
-  var shades=['#b89058','#9a7038','#caa468','#876030'];
-  for(var i=0;i<n;i++){
-    var sx=rect.left+Math.random()*rect.width;
-    var sy=rect.top+rect.height*0.35+Math.random()*rect.height*0.4;
-    FX.emit({
-      x:sx, y:sy,
-      vx:(Math.random()-0.5)*40,
-      vy:30+Math.random()*50,
-      g:150,
-      life:0.5+Math.random()*0.25,
-      size:3,
-      color:shades[i%4]
-    });
+  var r=el.getBoundingClientRect();if(!(r.width>0))return;
+  var cx=r.left+r.width/2, cy=r.top+r.height/2;
+  for(var i=0;i<(count||10);i++){
+    FX.emit({x:cx+(Math.random()-0.5)*r.width*0.8, y:cy+(Math.random()-0.5)*r.height*0.4,
+      vx:(Math.random()-0.5)*36, vy:16+Math.random()*30, g:60,
+      life:0.5+Math.random()*0.5, size:3+Math.random()*3,
+      rot:Math.random()*Math.PI, vr:(Math.random()-0.5)*4,
+      shape:'diamond', color:['#8a6a42','#6a5232','#a5825a'][i%3]});
   }
 }
 function spawnPop(txt,anchorEl){
@@ -28077,6 +28080,24 @@ function showHot(){
   const ov=document.getElementById('hot-ov');
   _alignOverlayWord(ov.querySelector('.hot-word'));
   ov.classList.remove('flash');void ov.offsetWidth;ov.classList.add('flash');
+  /* P684: the new-engine celebration - a fountain of gold diamonds off the
+     dice row, where the six scoring dice actually are */
+  try{
+    var _hr=document.getElementById('playerDiceRow')||document.getElementById('diceArea');
+    if(_hr&&typeof FX!=='undefined'&&FX.emit){
+      var _hb=_hr.getBoundingClientRect();
+      for(var _hi=0;_hi<34;_hi++){
+        var _ha=-Math.PI/2+(Math.random()-0.5)*1.1;
+        var _hs=140+Math.random()*160;
+        FX.emit({x:_hb.left+Math.random()*_hb.width, y:_hb.top+_hb.height*0.5,
+          vx:Math.cos(_ha)*_hs, vy:Math.sin(_ha)*_hs, g:210,
+          life:0.7+Math.random()*0.7, size:6+Math.random()*7,
+          rot:Math.random()*Math.PI, vr:(Math.random()-0.5)*8,
+          shape:(Math.random()<0.25?'star':'diamond'),
+          color:['#ffd98a','#f0c860','#e1a755'][_hi%3]});
+      }
+    }
+  }catch(eH){}
   setTimeout(()=>ov.classList.remove('flash'),1050);
 }
 function flashEdict(emoji){
@@ -29974,16 +29995,18 @@ function refreshSelUI(){
     if(isSixKind){
       SFX.angelChoir();
       /* spawn particles bursting outward from each die */
+      /* P684: was the last per-particle DOM-node spawner in the file - the
+         exact pattern the FX header says it replaced. Stars, through the
+         pooled engine. */
       selD.forEach(function(d,di){const dr=d.el.getBoundingClientRect();
-        const cx=dr.left+dr.width/2-areaRect.left;const cy=dr.top+dr.height/2-areaRect.top;
-        for(let j=0;j<5;j++){const sp=document.createElement('div');sp.className='perf-spark';
-          const angle=Math.random()*Math.PI*2;const dist=120+Math.random()*180;
-          const dx=Math.cos(angle)*dist;const dy=Math.sin(angle)*dist;
-          sp.style.left=cx+'px';sp.style.top=cy+'px';
-          sp.style.setProperty('--dx',dx+'px');sp.style.setProperty('--dy',dy+'px');
-          sp.style.animationDelay=(di*0.07+j*0.06)+'s';
-          sp.style.width=sp.style.height=(2+Math.random()*3)+'px';
-          area.appendChild(sp);setTimeout(function(){sp.remove();},2800);}
+        const cx=dr.left+dr.width/2;const cy=dr.top+dr.height/2;
+        for(let j=0;j<5;j++){
+          const angle=Math.random()*Math.PI*2;const sp2=90+Math.random()*130;
+          FX.emit({x:cx,y:cy,vx:Math.cos(angle)*sp2,vy:Math.sin(angle)*sp2-40,g:130,
+            life:0.8+Math.random()*0.8,size:5+Math.random()*5,
+            rot:Math.random()*Math.PI,vr:(Math.random()-0.5)*7,
+            shape:'star',color:['#ffe9b0','#ffd98a','#fff4d8'][j%3]});
+        }
       });
     }
   }else if(!isPerfect){G._perfFired=false;}
@@ -38430,7 +38453,7 @@ function _stEnchChoose(i){
   },function(d){
     /* halfway through the turn: the icon appears on the face, on the same
        mesh that is already spinning. No swap, nothing to cut to. */
-    try{D3X._rebrand(d);}catch(x){}
+    try{D3X._rebrand(d);try{if(d&&d.el&&typeof _fxSpray==='function'){var _bi=(typeof ENCH_ICONS!=='undefined'&&typeof _stEnchK!=='undefined'&&ENCH_ICONS[_stEnchK]&&ENCH_ICONS[_stEnchK].ink)||'#ffd98a';_fxSpray(d.el,_bi,14,{speed:95,g:90,size:8,spread:2.4});}}catch(eB){};}catch(x){}
   });
 }
 function _gbEnchantPick(k){
