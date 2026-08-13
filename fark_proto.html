@@ -1286,6 +1286,9 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
   scale .24s cubic-bezier(.3,1.45,.4,1)}
 #screen-match .fcv.focus{scale:1.3;z-index:9000}
 #screen-match #famRowO .fcv.focus{scale:1.24}
+/* P681: the strips give way to an open tip */
+#screen-match.tip-open .status-strip{opacity:0;transition:opacity .18s ease}
+#screen-match .status-strip{transition:opacity .18s ease}
 #cardFocusTip{position:absolute;z-index:9001;pointer-events:none;
   /* P677: 60 -> 50cqw. The wide word gaps WERE this box: justify pads the
      spaces to fill whatever width it is given, so the narrower box closes
@@ -4823,6 +4826,10 @@ body.crit-dilate{animation:critDilate .55s ease-out both}
    taking taps, because the choice is made. */
 .fo-wrap.taken .fo-card{pointer-events:none}
 .fo-wrap.taken .fo-card:not(.picked){filter:grayscale(1) brightness(.45);opacity:.6}
+/* P681: the picked card is in the deck row now, so it LEAVES the offer -
+   the unpicked stay greyed in place, per the earlier ruling */
+.fo-wrap.taken .fo-card.picked{opacity:0;scale:.55;
+  transition:opacity .35s ease,scale .35s ease;pointer-events:none}
 .fo-card:active{transform:translateY(1px) scale(.985)}
 /* P645: the card in hand. No transition while dragging - the transform is
    being set every pointermove and an easing curve on it lags the finger. */
@@ -14832,7 +14839,21 @@ function _cardFocusClose(){
   var t=document.getElementById('cardFocusTip');if(t)t.remove();
   if(_cardFocusEl){try{_cardFocusEl.classList.remove('focus');}catch(e){}}
   _cardFocusEl=null;
+  try{var ms=document.getElementById('screen-match');if(ms)ms.classList.remove('tip-open');}catch(e){}
 }
+/* P681: TAP ANYWHERE ELSE DISMISSES. One document-level listener, installed
+   once; taps on a card route through the toggle (switch or close) and taps
+   on the tip itself are inert, so only genuine elsewhere-taps close. */
+(function(){
+  function away(e){
+    if(!_cardFocusEl)return;
+    var t=e.target;
+    if(t&&t.closest&&(t.closest('.fcv')||t.closest('#cardFocusTip')))return;
+    _cardFocusClose();
+  }
+  document.addEventListener('pointerdown',away,true);
+  document.addEventListener('touchstart',away,true);
+})();
 /* words wrapped for the stagger; delay written inline so the CSS stays one
    keyframe. _noOrphan first, so the widow rule holds here too. */
 function _cftWords(txt,t0){
@@ -14847,6 +14868,9 @@ function _cardFocusToggle(el,o){
   _cardFocusClose();
   _cardFocusEl=el;el.classList.add('focus');
   var ms=document.getElementById('screen-match')||document.body;
+  /* P681: while a tip is open the status strips fade, so it never overlaps
+     the score or the 'X IS ROLLING' line */
+  try{ms.classList.add('tip-open');}catch(e){}
   var tip=document.createElement('div');tip.id='cardFocusTip';
   /* the accent travels as a variable, NOT as inline color - an inline color
      outranks every stylesheet rule, so the darkening step below it could
@@ -14885,14 +14909,15 @@ function npcOppTap(cid){
   /* P675: a hidden card does not read its rules out */
   if(_npcHandHidden()&&!_npcCardRevealed(cid)){
     _cardFocusToggle(document.querySelector('#famRowO .fcv[data-cid="'+cid+'"]'),{
-      title:'HIDDEN',sub:'their card',
+      title:'HIDDEN',sub:'',
       body:'Whisper keeps it face down. It shows itself when it fires.',below:true});
     return;
   }
   /* P672: grow-and-read, like every other card at the table */
   _cardFocusToggle(document.querySelector('#famRowO .fcv[data-cid="'+cid+'"]'),{
     title:c.name,
-    sub:spent?'spent — used up for this match':'their card',
+    /* P681: no 'their card' caption - Denis knows whose it is */
+    sub:spent?'spent — used up for this match':'',
     body:(c.desc||_sentenceCase(c.eff||'')),below:true});
 }
 function famOppTap(i){
@@ -14904,7 +14929,7 @@ function famOppTap(i){
   _cardFocusToggle(document.querySelectorAll('#famRowO .fcv')[i],{
     title:d.name.toUpperCase(),/* P673: no numeral - the pip says it */
     sub:inst.broken?'BROKEN — tampered for the night'
-       :(_tg?'ARMED — it fires after your next roll':'their card'),
+       :(_tg?'ARMED — it fires after your next roll':''),
     body:d.text[inst.tier-1],col:col,below:true});
 }
 function famUse(i){
@@ -15668,7 +15693,11 @@ var _nrFocused=-1;
 function _nrFocus(i){
   var ov=document.getElementById('famRunDraft');if(!ov)return;
   if(ov.classList.contains('focus'))return;
-  var die=ov.querySelectorAll('.nrdie')[i];if(!die||!die._floatDone)return;
+  var die=ov.querySelectorAll('.nrdie')[i];if(!die)return;
+  /* P681: a tap mid-float lands - stop the deal animation where it is and
+     proceed, instead of refusing until the settle (Denis: "I don't want to
+     have to wait for their settle to select when I know what I want"). */
+  if(!die._floatDone){die.style.animation='none';die._floatDone=true;}
   _nrFocused=i;
   var stg=document.getElementById('nrStage');
   var host=die.querySelector('.d3host');
@@ -32899,7 +32928,8 @@ function runOppTurn(){
       }
       /* the "+N" is on the table now, over the dice that earned it - what
          the table cannot show is what they are sitting on */
-      oppBank+=total;setStatusMsg((G.rung?G.rung.name:'RIVAL')+' HOLDS '+oppBank.toLocaleString(),'active');
+      oppBank+=total;/* P681: no 'HOLDS n' line - the number sits right
+        beneath it already, and a display can vouch for a bug */
       /* the same numbers the player gets, over the same dice. Here rather
          than at the keep, because every card that rewrites the roll - Quick
          Hands, Grog's Bump, Slippery Table, Triple Hunter - has had its say
@@ -37968,7 +37998,8 @@ function _stTrade(mat,slot){
   _enchInit();if(S.run.dieEnch)S.run.dieEnch[slot]=null;
   save();
   try{SFX.bank();}catch(e){}
-  famLog(getDie(mat).name.toUpperCase()+' JOINS YOUR SIX \u2014 '+getDie(out).name.toUpperCase()+' TRADED OUT');
+  /* P681: no 'JOINS YOUR SIX' toast - the tray shows the new die (Denis:
+     any message like this can be removed) */
   /* Let the swap land before the screen changes under it. The slot flashes,
      the caption says what happened, and only then does the shop repaint -
      closing on the same frame as the drop threw away the one moment the
