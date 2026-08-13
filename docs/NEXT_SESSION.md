@@ -141,3 +141,29 @@ Every check needs a control that FAILS. Reachability before correctness: three
 times in the previous session the code was correct and simply never reached.
 `tools/apv_loadout_reaches_table.js` exists specifically because its absence let
 `const pCards=[]` survive review.
+
+---
+
+## State as of 2026-08-13 (deployed: c734cef)
+
+Shipped and marker-verified live: P666-668 (card FX vocabulary: cardFx
+hit/gain/steal/churn, four cards wired, broken-card grey), P667 (one spark
+band), P669 (status line wraps + Last Call/Reckoning refusals no longer
+overwritten), P670 (ONE rival hand - G.oCards folded into #famRowO as .fcv,
+buildCBar opp bar retired, _npcCardSpent one exhaustion truth, triggerCard
+repointed), P671/b (card sheet parchment variant, scoped by 'fam-sheet'),
+P672 (rival arch mirrors player, match-screen tap = grow+word-stagger text,
+PLAY button gone - drag is the only activation).
+
+Suite: 63 pass / 0 fail / 0 error. Triage of not-greens, all measured:
+- 5 skips were transient (pass on individual re-run)
+- ench_align + drill_cap setup flake is PRE-EXISTING (reproduced a skip on
+  the pre-fold build via the root 8084 server) - their patron-intro wait is
+  the weak part, not the game
+- apv_selglow_size FAILS on the deployed site too -> pre-existing regression
+  (glow strength grew back); chip spawned for it
+- suite BASELINE IS STALE (7 probes "new, not in baseline") - run
+  `node tools/run_probes.js --record` on a quiet build to reset it
+
+Known deliberate gap: Whisper's hidden_cards still shows cards on the table
+row (it never hid the old bar either) - P670 docstring records it.
