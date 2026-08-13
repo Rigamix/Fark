@@ -24564,19 +24564,33 @@ var D3X={
      table's shadow. Cached per composed map + value; the composed map
      already encodes {mat, ench}, so the pair travels together. */
   SIDEDIM:'#5a3d24',
-  _dimMap:function(tex,v){
-    if(!tex||!tex.image||!v)return null;
+  /* P703, both from Denis on device: half the strength, and the arrival
+     must be 'very gradual and unnoticeable'. Lambert still cannot blend
+     two maps, so gradual = QUANTIZED BAKES: steps of ~4%% walked on a
+     smoothstepped ramp, each cached per composed map + value + step. */
+  SIDEDIM_MAX:0.5,
+  SIDEDIM_RAMP:{delay:150,dur:700,steps:8},
+  _dimMap:function(tex,v,k){
+    if(!tex||!tex.image||!v||!k)return null;
     if(!tex.userData)tex.userData={};
     var dm=tex.userData.dimMaps||(tex.userData.dimMaps={});
-    if(dm[v])return dm[v];
+    var kq=Math.round(k*1000)/1000,key=v+'|'+kq;
+    if(dm[key])return dm[key];
     var im=tex.image;
     var w=im.width||im.naturalWidth,h=im.height||im.naturalHeight;
     if(!w||!h)return null;
+    /* the multiply colour at strength k: each channel walks from 255
+       toward SIDEDIM's, so k=0 is the authored sheet and k=1 the full
+       shadow - one hex stays the only colour opinion */
+    var hx=this.SIDEDIM.replace('#',''),fc=[0,1,2].map(function(i){
+      return parseInt(hx.substr(i*2,2),16)/255;});
+    var col='rgb('+fc.map(function(f){
+      return Math.round(255*(1-(1-f)*kq));}).join(',')+')';
     var cv=document.createElement('canvas');cv.width=w;cv.height=h;
     var cx=cv.getContext('2d');
     cx.drawImage(im,0,0,w,h);
     cx.globalCompositeOperation='multiply';
-    cx.fillStyle=this.SIDEDIM;
+    cx.fillStyle=col;
     cx.fillRect(0,0,w,h);
     cx.globalCompositeOperation='source-over';
     /* the scoring face, back at its authored brightness - same cell
@@ -24586,7 +24600,7 @@ var D3X={
     var out=new THREE.CanvasTexture(cv);
     out.flipY=tex.flipY;out.wrapS=tex.wrapS;out.wrapT=tex.wrapT;
     out.encoding=tex.encoding;out.needsUpdate=true;
-    dm[v]=out;
+    dm[key]=out;
     return out;
   },
   /* k=0 is the die as painted, k=1 is fully in shadow, k>1 is the bust wipe
@@ -24963,7 +24977,7 @@ var D3X={
       q.slerp(r.home,e);
     }
     if(done){
-      d.phys={x:f.x,y:f.y,z:f.z,q:q.clone(),v:(d.roll&&d.roll.val)||null};d.roll=null;/* P702 */
+      d.phys={x:f.x,y:f.y,z:f.z,q:q.clone(),v:(d.roll&&d.roll.val)||null,t:performance.now()};d.roll=null;/* P702/P703 */
       if(!this._rolling())this._shDirty=true;/* they have landed: draw them */
     }
     return {x:f.x,y:f.y,z:f.z,q:q,done:done};
@@ -25412,8 +25426,12 @@ var D3X={
       var R=d.roll,len=R.sol.frames.length;
       if(nowT-R.t0<=(len+8)*PD)return;/* still inside its own tape */
       var lf=R.sol.frames[len-1][R.i],rr=R.sol.rest[R.i];
+      /* P703b: the SAME payload as _physPose's done branch - v drives the
+         side dim, t its ramp; a bare pose here meant a watchdog-settled
+         die silently never dimmed (two exits, one payload - the rule). */
       d.phys={x:lf.x,y:lf.y,z:lf.z,
-        q:rr.flat.clone().multiply(new THREE.Quaternion(lf.qx,lf.qy,lf.qz,lf.qw)).multiply(rr.fix)};
+        q:rr.flat.clone().multiply(new THREE.Quaternion(lf.qx,lf.qy,lf.qz,lf.qw)).multiply(rr.fix),
+        v:(R&&R.val)||null,t:performance.now()};
       d.roll=null;
     });
     /* SYNC BEFORE STARTING A DEFERRED THROW. This was the other way round,
@@ -25831,15 +25849,24 @@ var D3X={
           d.obj.quaternion.copy(d.phys.q);
           /* P702: scoring face bright, sides in shadow - derived from
              map identity every frame, so a reskin/rebrand self-heals on
-             the next one (the spent-look lesson; no flags). */
-          if(d.phys.v)d.obj.traverse(function(o){
-            if(!o.isMesh||!o.material||o.userData.outline)return;
-            var m=o.material;
-            if(!m.userData)m.userData={};
-            if(!m.userData.liveMap)m.userData.liveMap=m.map;
-            var want=D3X._dimMap(m.userData.liveMap,d.phys.v)||m.userData.liveMap;
-            if(m.map!==want){m.map=want;m.needsUpdate=true;}
-          });
+             the next one (the spent-look lesson; no flags). P703: the
+             shadow ARRIVES on a smoothstepped ramp in quantized baked
+             steps - ~4%% a swap, below noticing, per Denis. */
+          if(d.phys.v){
+            var _R=D3X.SIDEDIM_RAMP;
+            var _k=(performance.now()-(d.phys.t||0)-_R.delay)/_R.dur;
+            _k=_k<0?0:(_k>1?1:_k);
+            _k=_k*_k*(3-2*_k);/* smoothstep: no visible start, no visible stop */
+            var _kk=(Math.round(_k*_R.steps)/_R.steps)*D3X.SIDEDIM_MAX;
+            d.obj.traverse(function(o){
+              if(!o.isMesh||!o.material||o.userData.outline)return;
+              var m=o.material;
+              if(!m.userData)m.userData={};
+              if(!m.userData.liveMap)m.userData.liveMap=m.map;
+              var want=(_kk>0?D3X._dimMap(m.userData.liveMap,d.phys.v,_kk):null)||m.userData.liveMap;
+              if(m.map!==want){m.map=want;m.needsUpdate=true;}
+            });
+          }
           D3X._weightOutline(d);
           if(d.burst)D3X._burstPose(d);
           else if(d.pulseOn)D3X._pulsePose(d);

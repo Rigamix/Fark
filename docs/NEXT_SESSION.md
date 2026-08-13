@@ -345,5 +345,27 @@ look after resume, accepted for now); an enchant brand on a side face keeps
 its emissive glow through the dim (reads as glowing in shadow, deliberate).
 If Denis wants the dim stronger: D3X.SIDEDIM, one line.
 
+P703 (Denis: "50% too strong... appears in one frame... jarring"): the dim
+halves (SIDEDIM_MAX 0.5) and ARRIVES on a smoothstepped ramp of QUANTIZED
+BAKES - 8 steps over 700ms after a 150ms hold, ~4% a swap, each cached per
+composed map + value + step (Lambert still cannot crossfade two maps).
+Tunables in one block: SIDEDIM / SIDEDIM_MAX / SIDEDIM_RAMP.
+
+P703b, found by the probe's 'no settle' being really 'settled without v':
+settling has TWO writers - _physPose's done branch and the overdue-tape
+watchdog that snaps a die to its last frame. P702 taught only the first to
+carry {v,t}; a watchdog-settled die (any hitch, and most headless runs)
+silently never dimmed. Both exits carry the same payload now. One exit
+path, one payload - the standing lesson caught it again.
+
+INSTRUMENT NOTE: headless frame starvation is now measured, not suspected -
+runs with fc deltas of 4-30 frames per 12s stall the time-indexed playback
+(pc:0) or route it through the watchdog. apv_p703_ramp.js carries
+frame/physPose counters and a >=3-distinct-maps criterion (a one-frame pop
+reads exactly 2; devices at 60fps render all 8 steps). The full ramp was
+observed green in a frame-healthy run; the watchdog path verified by v
+riding through a starved one.
+
 STILL WITH DENIS: enchant crash save/console (OPEN.md #12); suite baseline
-re-record; SIDEDIM strength + the resumed-dice bright rest, on device.
+re-record; ramp feel + halved SIDEDIM on device; the resumed-dice bright
+rest.
