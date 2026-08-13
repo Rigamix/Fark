@@ -2695,6 +2695,40 @@ html.fk3d #screen-match .die-wrap:has(.die.d3on.selected)::after{
    Gold plaque fill, ink darker than the trim. */
 #gbSheet.fam-sheet .gbx-btn{background:#d9bd84;border:2px solid #8a6a2c;color:#241505}
 #gbSheet.fam-sheet .gbx-btn.primary{background:#c9a24a;border-color:#7a5a1c;color:#241505}
+/* ── P688: THE PAINTED GAME OVER. #gbBarred is its own container so the
+   cqw units track the screen the way the match does. Ink on the pennants
+   darker than their cloth, per the rule. ── */
+#gbBarred{position:absolute;inset:0;container-type:size;overflow:hidden}
+#gbBarred .go-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+#gbBarred .go-col{position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:flex-start;padding-top:14cqh}
+#gbBarred .go-banner{width:88cqw;max-width:520px;
+  filter:drop-shadow(0 1cqw 0 rgba(15,9,4,.45))}
+#gbBarred .go-head{font-family:'JMH Beda',serif;font-size:8.6cqw;color:#f0c860;
+  letter-spacing:.06em;text-shadow:0 2px 0 rgba(20,12,4,.85),0 0 14px rgba(20,12,4,.7)}
+#gbBarred .go-sub{font-family:'JMH Beda',serif;font-size:4cqw;color:#e8d8b8;
+  margin-top:1.6cqh;text-shadow:0 1px 0 rgba(20,12,4,.85),0 0 6px rgba(20,12,4,.7)}
+#gbBarred .go-stats{display:flex;gap:3cqw;margin-top:5cqh}
+#gbBarred .go-stat{position:relative;width:19cqw;aspect-ratio:180/202;
+  filter:drop-shadow(0 0.7cqw 0 rgba(15,9,4,.4))}
+#gbBarred .go-stat img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+#gbBarred .go-stat b{position:absolute;left:0;right:0;top:34%;text-align:center;
+  font-family:'JMH Beda',serif;font-size:5.4cqw;font-weight:normal;color:#241505}
+#gbBarred .go-stat span{position:absolute;left:0;right:0;top:62%;text-align:center;
+  font-family:'JMH Beda',serif;font-size:2.5cqw;letter-spacing:.12em;color:rgba(36,21,5,.75)}
+#gbBarred .go-btns{position:absolute;left:0;right:0;bottom:5cqh;display:flex;
+  flex-direction:column;align-items:center;gap:1.8cqh}
+#gbBarred .go-btn{position:relative;width:64cqw;height:9.5cqh;display:flex;
+  align-items:center;justify-content:center;cursor:pointer;transition:transform .1s}
+#gbBarred .go-btn:active{transform:scale(.96)}
+#gbBarred .go-btn img.plq{position:absolute;inset:0;width:100%;height:100%;
+  object-fit:fill;pointer-events:none;filter:drop-shadow(0 0.65cqh 0 rgba(30,18,8,.55))}
+/* P688b: ink on the parchment plaque - cream-on-parchment broke the
+   darker-than-accent rule and barely read */
+#gbBarred .go-btn span{position:relative;z-index:1;font-family:'JMH Beda',serif;
+  font-size:4.6cqw;letter-spacing:.08em;color:#2a1808}
+#gbBarred .go-btn-min{width:auto;height:auto;padding:1cqh 4cqw}
+#gbBarred .go-btn-min span{font-size:3.4cqw;color:#c9b490}
 #gbModalHost{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.55);z-index:9620}
 #gbModalHost.on{display:flex}
 #gbModalHost .gbx-card{width:82%;max-width:360px;background:#d6d6d6;border-radius:16px;padding:18px;text-align:center;color:#1c1c1c;
@@ -17753,38 +17787,39 @@ function _gbShelf(){
 }
 /* ── BARRED / RUN WON (flow spec 13/14) ── */
 function _gbBarred(){
+  /* P688: the painted run-end. Same function, same three buttons, same two
+     states - the grey gbx tiles are gone and Denis's street, banner and
+     stat pennants render instead. */
   _getS();_gbSheetInfra();
   var scr=document.getElementById('screen-gameover');if(!scr)return;
   var host=document.getElementById('gbBarred');
   if(!host){host=document.createElement('div');host.id='gbBarred';scr.appendChild(host);}
   var won=!!(S.run&&(S.run.tier||0)>=TIERS.length);
   var tier=TIERS[Math.min(S.run?S.run.tier||0:0,TIERS.length-1)];
-  var h='<div class="gbx" style="min-height:100%;display:flex;flex-direction:column;padding:10px 14px 14px">'
-    +'<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px">';
+  var GO='Art/Assets/GameOver/optimized/';
+  var night=Math.min((S.run?(S.run.tier||0):0)+1,TIERS.length);
+  var gold=(S.run&&S.run.gold)||0;
+  var feats=(S.run&&S.run._featsThisRun)||0;
+  var cards=((S.run&&S.run.fcards)||[]).length+((S.run&&S.run.finv)||[]).length;
+  var stats=[[night,'NIGHT'],[gold,'GOLD'],[feats,'FEATS'],[cards,'CARDS']];
+  var h='<img class="go-bg" src="'+GO+'GameOver_bg_opt.webp" alt="">'
+    +'<div class="go-col">';
   if(won){
-    /* RULED (AUDIT_RESOLUTIONS #4). "LAST ORDERS RUNG" is the NIGHT-END beat -
-       _showLastOrders' own comment says that screen must be impossible to
-       misread as a win - and it was being used for the run-END one too, so the
-       single biggest moment in the game shared its headline with a night you
-       failed. The Ambrose-reuse alternative was rejected outright: the same
-       line twice running reads as copy-paste, not callback.
-       THE SUB-LINE GOES FOR A DIFFERENT REASON. Master brief section 8 deletes
-       the renown counter and states there is NO trophy shelf - the feats wall
-       is the only meta surface. This box promised a trophy to a shelf that does
-       not exist and printed a counter that does not either. What replaces it is
-       what the brief actually asks 3.11 to show: the run, and the wall. */
-    h+='<div class="gbx-box" style="width:230px;height:64px">THE HOUSE IS YOURS<br><span class="gbx-label">you own the night</span></div>'
-      +'<div class="gbx-box sub" style="width:230px;height:64px;font-size:12px">'
-      +((S.run&&S.run._featsThisRun)||0)+' feats this run · '+((S.run&&S.run.gold)||0)+'g in the purse</div>';
+    h+='<div class="go-head">THE HOUSE IS YOURS</div>'
+      +'<div class="go-sub">you own the night</div>';
   }else{
-    h+='<div class="gbx-box" style="width:230px;height:64px">BARRED<br><span class="gbx-label">'+(tier.boss?tier.boss.name:'the house')+' took your last heart — night '+((S.run?S.run.tier||0:0)+1)+'</span></div>'
-      +'<div class="gbx-box sub" style="width:230px;height:84px;font-size:12px">'+(S.run?(S.run.gold||0):0)+'g in the purse · '
-      +(Object.keys(S.featsDone||{}).length)+' feats</div>';
+    h+='<img class="go-banner" src="'+GO+'GameOver_banner_opt.webp" alt="GAME OVER">'
+      +'<div class="go-sub">'+(tier.boss?tier.boss.name:'the house')+" won't have you back</div>";
   }
-  h+='</div><div style="display:flex;flex-direction:column;gap:8px;padding:0 14px 10px">';
-  if(won)h+='<div class="gbx-btn primary" style="height:64px" onclick="_gbShelf()">TO THE SHELF</div>';
-  h+='<div class="gbx-btn'+(won?'':' primary')+'" style="height:'+(won?'48':'64')+'px" onclick="startNewRun();showScreen(\'gauntlet\')">NEW RUN</div>'
-    +'<div class="gbx-btn" style="height:48px" onclick="SFX.nav();showScreen(\'menu\')">title</div>'
+  h+='<div class="go-stats">';
+  stats.forEach(function(st,i2){
+    h+='<div class="go-stat"><img src="'+GO+'GameOver_stat0'+(i2+1)+'_opt.webp" alt="">'
+      +'<b>'+st[0].toLocaleString()+'</b><span>'+st[1]+'</span></div>';
+  });
+  h+='</div><div class="go-btns">';
+  if(won)h+='<div class="go-btn" onclick="_gbShelf()"><img class="plq" src="Art/Assets/Buttons/optimized/Button_new_02_opt.webp" alt=""><span>TO THE SHELF</span></div>';
+  h+='<div class="go-btn" onclick="startNewRun();showScreen(\'gauntlet\')"><img class="plq" src="Art/Assets/Buttons/optimized/Button_new_02_opt.webp" alt=""><span>ONE MORE RUN</span></div>'
+    +'<div class="go-btn go-btn-min" onclick="SFX.nav();showScreen(\'menu\')"><span>title</span></div>'
     +'</div></div>';
   host.innerHTML=h;
 }
