@@ -167,3 +167,32 @@ Suite: 63 pass / 0 fail / 0 error. Triage of not-greens, all measured:
 
 Known deliberate gap: Whisper's hidden_cards still shows cards on the table
 row (it never hid the old bar either) - P670 docstring records it.
+
+---
+
+## State as of 2026-08-13 late (deployed: ea50567)
+
+The seventeen-notes batch, complete and live: P681 (five quick items), P682/683
+(eleven investigated fixes - boss dialogue leak, music dead-air duck removed,
+D3X warm boot, draft delay 500ms, bubble anim/padding, short-line rounding,
+strip anchoring, score de-double, dice-over-rival-cards z, row perspective
+19/-9deg), P684 (legacy FX sweep - four spawners reborn on FX.emit
+diamonds/stars with material colours, Break's missing burst, enchant-fire
+sprays via _iconFire, hot-dice fountain instead of the amber wash, six-kind
+through the pooled engine), P685-687 (one lighting for all matches; the
+dice-shadow lifecycle on one _dsDirty mark - keep/remove/shatter verified by
+band-area deltas 14583->11754->9241; late table-image repaint).
+
+OPEN with Denis: the enchant-page crash (OPEN.md #12 - five probes, two
+builds, zero exceptions; need his save or console text). The pre-existing
+selglow regression has its own spawned task chip.
+
+Headless quirk worth knowing: under SwiftShader the PATRON leg's settle
+shadows sometimes never paint (D3X match-dice adoption race; boss legs and
+all screenshot runs paint fine, devices unaffected). If a shadow probe reads
+zero, check `D3X.dice.filter(d=>d.match).length` before believing it - the
+instrument note is in _diag_shadows.js.
+
+Suite baseline still stale (run `node tools/run_probes.js --record` on a
+quiet build). Dev server: worktree on 8085 (python http.server, restart if
+dead); probes need FARK_URL=http://localhost:8085/fark_proto.html.
