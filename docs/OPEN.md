@@ -620,19 +620,3 @@ you play on, which is why it wasn't fixed with the rest.
 Fixing it means dropping the activation zone there too, and card clearance is
 already only 50px at that size — so it trades one tight number for another.
 *My recommendation: leave it until someone reports it on a real short phone.*
-
----
-
-## 12. BOSS DIALOGUE VOICE — the pass stopped at the patron line, on purpose
-
-The voice doc rewrote backstory, trait reactions, hesitation and (by its rule)
-the patron end-of-match barks — all shipped. **The 16 boss pools (274 lines)
-are untouched.** The doc doesn't cover them, and its own scope note names the
-risk: rewriting voices without solid grounding is the "invented-voice problem"
-it corrected once already. Grog's "Hmph. Luck, that's all you had" is already
-half-blurt; Mabel and Ambrose run longer and more composed.
-
-- **(a) Leave them.** Bosses are set-pieces; longer speech reads as status. Free.
-- **(b) You write (or bless) a boss addendum to the voice doc** — same format,
-  I apply it the same way. **My rec** if you want one register everywhere.
-
