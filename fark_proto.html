@@ -11764,11 +11764,26 @@ function abandonMatch(){
   _refreshResumeBanners();
 }
 function _refreshResumeBanners(){
-  /* The on-screen resume banner is gone — resume now lives ONLY as a button in
-     Settings (see #settingsResume / initSettingsUI). This stays as a cleanup
-     no-op so any banner left in a cached older build gets cleared, and existing
-     callers (abandonMatch, initTierScreen, initMenuScreen) keep working. */
+  /* P692: the banner is BACK - the save audit found resume buried in
+     Settings was most of why leaving read as losing the match. Same class
+     the old no-op cleared, so cached builds stay clean. Lives on the room
+     screen, where the next match would be chosen. */
   document.querySelectorAll('.resume-banner').forEach(function(b){b.remove();});
+  try{
+    _getS();
+    if(!S||!S.pendingMatch)return;
+    var host=document.getElementById('gbRoom');
+    if(!host)return;
+    var b=document.createElement('div');
+    b.className='resume-banner';
+    b.style.cssText='position:absolute;left:50%;top:9%;transform:translateX(-50%);'
+      +'z-index:80;background:#e7d6ac;color:#2a1808;border:2px solid #a58a3c;'
+      +'border-radius:10px;padding:8px 18px;font-family:'+"'JMH Beda'"+',serif;'
+      +'font-size:14px;cursor:pointer;box-shadow:0 4px 14px rgba(10,6,2,.5)';
+    b.textContent='\u25B6 RESUME \u2014 '+((S.pendingMatch.rung&&S.pendingMatch.rung.name)||'THE MATCH');
+    b.onclick=function(){try{SFX.nav();}catch(e){}resumeMatch();};
+    host.appendChild(b);
+  }catch(e){}
 }
 
 _getS(); // Initialize on load
@@ -14502,8 +14517,14 @@ CFX.fair_trade={
        and filter preserves order - with a strict `>` in both, the same element
        wins. */
     var _ftIdx=[];
+    /* P691 (D10b): dead by INDEX. A pre-fix snapshot can still hold bare
+       material strings - those keep the old (conservative) material match
+       rather than being invalidated by a resume. */
     (S.run.diceInv||[]).forEach(function(_d,_i){
-      if((G._ftDead||[]).indexOf(_d)<0)_ftIdx.push(_i);});
+      var _dead=(G._ftDead||[]).some(function(_r){
+        return (_r&&typeof _r==='object')?(_r.i===_i):(_r===_d);
+      });
+      if(!_dead)_ftIdx.push(_i);});
     if(!_ftIdx.length||!G.matchDice||!G.matchDice.length)return null;
     /* the weakest seat out, the best thing in the stash in */
     var worst=0;
@@ -16630,7 +16651,7 @@ CFX.preserve={
       });
     });
     if(!found)return false;
-    G._famPreserve={val:found,mat:foundMat,ench:foundEnch||null,pts:found===1?100:50,crack:(inst.tier===3?100:0)};/* P559 */
+    G._famPreserve={val:found,mat:foundMat,ench:foundEnch||null,lane:(typeof foundLane==='number')?foundLane:null,pts:found===1?100:50,crack:(inst.tier===3?100:0)};/* P559 + P691 (D6a): the SEAT is preserved too */
     famLog('PRESERVED — A '+found+' WAITS IN AMBER FOR NEXT TURN');
     return true;
   }
@@ -22237,7 +22258,10 @@ function _removeDieAt(lane,opts){
       if(G._enchArr&&('hostEn' in _ftB))G._enchArr[lane]=_ftB.hostEn||null;
       /* the borrowed die is spent for THIS match and back for the next one -
          match-scoped, so this record dies with G and nothing touches the run */
-      G._ftDead=(G._ftDead||[]).concat([_ftB.borrowed]);
+      /* P691 (D10b): an {i,m} record, not a material string - one dead jade
+         used to retire every jade in the stash (driven). m stays for the
+         log and for legacy-shape tolerance. */
+      G._ftDead=(G._ftDead||[]).concat([(typeof _ftB.invIdx==='number')?{i:_ftB.invIdx,m:_ftB.borrowed}:_ftB.borrowed]);
       /* it is off the table for this roll like any destroyed die, but the lane
          it stood in keeps its number, so no other lane shifts */
       G.pool=(G.pool||[]).filter(function(q){return q.lane!==lane;});
@@ -22303,6 +22327,19 @@ function _removeDieAt(lane,opts){
     if(ft){
       /* the ft.lane===lane case is handled above, where the lane is kept */
       if(ft.lane>lane)ft.lane--;
+    }
+    /* P691 (D6a): the preserved seat is a lane record in the same sense.
+       Above the removed lane it slides down; AT the removed lane the seat
+       itself died, so the claim is void and the restore falls back to the
+       old free-lane behaviour rather than pointing at a moved seat. */
+    var pv=G._famPreserve;
+    if(pv&&typeof pv.lane==='number'){
+      if(pv.lane===lane)pv.lane=null;
+      else if(pv.lane>lane)pv.lane--;
+    }
+    if(typeof G._pvLane==='number'){
+      if(G._pvLane===lane)G._pvLane=null;
+      else if(G._pvLane>lane)G._pvLane--;
     }
   }catch(e){}
   /* P527: AND THE TRADE LEDGER'S SEATS, which are seats in the same sense and
@@ -28263,6 +28300,8 @@ function startPTurn(){
   if(G)G._anyPlayerRoll=false;/* yield earns its place per turn, not per match */
   try{_renderSelTags([],0,true);}catch(e){}
   if(typeof famFire==='function'&&G){famFire('turnStart',{actor:'p'});try{famRenderRow();}catch(e){}}
+  G._pvLane=null;/* P691 (D6a): the seat stash is one turn's fact - the NEXT
+     turn's preserve (if any) writes its own on restore, after this clear */
   /* CONFESSION v2 (Aldric): ONE card sealed at a time, the seal moves
      every turn (old stacking seal is dead — it emptied a 3-slot loadout). */
   /* Confession's card-sealing retired; Still Waters suppresses a worked
@@ -28320,7 +28359,7 @@ function startPTurn(){
          Break's own cost is match-scoped for everyone and there is nothing
          left for Fair Trade to erase. DO NOT touch the lane - whatever holds
          it now is not ours to overwrite. */
-      G._ftDead=(G._ftDead||[]).concat([_ft.borrowed]);
+      G._ftDead=(G._ftDead||[]).concat([(typeof _ft.invIdx==='number')?{i:_ft.invIdx,m:_ft.borrowed}:_ft.borrowed]);/* P691 (D10b) */
       try{famLog('FAIR TRADE — THE BORROWED '+((getDie(_ft.borrowed)||{}).name||'DIE')
         +' DIED ON LOAN, BACK NEXT MATCH');}catch(e){}
     }
@@ -28421,8 +28460,11 @@ function startPTurn(){
     /* P559 (D6b): the brand rides back with it. Without the third field the
        restored group looked like every other kept group except that its die
        had quietly lost its enchant. */
+    /* P691 (D6a): stash the preserved SEAT for this turn's deal - the record
+       itself is consumed below, and the deal walk runs later in handleRoll. */
+    G._pvLane=(typeof _fp.lane==='number')?_fp.lane:null;
     G.kept=[{vals:[_fp.val],mat:_fp.mat||'bone',pts:_fp.pts+(_fp.crack||0),
-             dice:[{val:_fp.val,mat:_fp.mat||'bone',ench:_fp.ench||null}]}];
+             dice:[{val:_fp.val,mat:_fp.mat||'bone',ench:_fp.ench||null,lane:(typeof _fp.lane==='number')?_fp.lane:null}]}];
     G.turnPts=G.kept[0].pts;
     /* ONE FEWER THAN THE LOADOUT, not a hardcoded five. A player whose loadout
        is already down a die to Break has five, and would have been handed five
@@ -28920,7 +28962,7 @@ function handleRoll(){
       ss:_starstonePay(_scoreDice),
       /* P534: the brand travels with the record. Without it nothing
          downstream can tell a branded face from a scoring one. */
-      dice:selDice.map(function(dd){return{val:dd.val,mat:dd.mat,ench:dd.ench||null};})});
+      dice:selDice.map(function(dd){return{val:dd.val,mat:dd.mat,ench:dd.ench||null,lane:(typeof dd.lane==='number')?dd.lane:null};})/* P691 (D6a): the lane is part of the identity */});
     G.turnPts=G.kept.reduce((a,k)=>a+k.pts,0)+(G._turnBonusPot||0);refreshKeptTray();
     /* OPENING SHOT (opener): track scoring dice committed on roll 1 only.
        turnRollCount === 1 means this commit happened during the very first
@@ -29134,6 +29176,11 @@ G.numDice=Math.min((G.matchDice?G.matchDice.length:6),(G.numDice||(G.matchDice?G
          numDice and the pool disagreeing; G.pool cannot drift from G.pool.
          Mirrors _removeDieAt (19143-19144), the reference on the remove side. */
       var _occLane={};(G.pool||[]).forEach(function(_d){_occLane[_d.lane]=1;});
+      /* P691 (D6a): the preserved die's own seat is occupied by the die in
+         amber - without this the deal put a fresh die into that seat and
+         the lane budget ran out on the HIGHEST lane instead, so the wrong
+         die (a warded one, in the recorded repro) sat out the turn. */
+      if(typeof G._pvLane==='number')_occLane[G._pvLane]=1;
       var _freeLanes=[];for(var _fl=0;_fl<G.matchDice.length;_fl++){if(!_occLane[_fl])_freeLanes.push(_fl);}
       /* P529: never ask for more dice than there are seats to put them in. The
          same clamp P521 put on the rival's deal, on the player's side - and it
@@ -31705,6 +31752,19 @@ function endPTurn(){
   var _pTurnPts=(G.turnPts||0);
   G._pTurnPts=_pTurnPts;
   G.phase='opp';G.turnPts=0;G.kept=[];G.numDice=6;G.turnNum++;
+  /* P692: THE POST-BANK BOUNDARY. The only snapshot used to be the next
+     startPTurn - a full round away - so a banked turn evaporated on any
+     exit during the rival's animation. The four turn-start anchors are
+     re-stashed first, so the snapshot's replay contract holds: 'turn
+     start' is simply 'the moment after the bank'. Cost measured at 0.03ms
+     on a 5KB payload - free. */
+  try{
+    G._goldAtTurnStart=(S&&S.run&&typeof S.run.gold==='number')?S.run.gold:null;
+    G._hotdAtTurnStart=!!(S&&S.run&&S.run._hotdNext);
+    if(G.npcCardState)G._ptcAtTurnStart=G.npcCardState.playerTurnCount;
+    G._famPreserveAtTurnStart=G._famPreserve||null;
+    saveMatchState();
+  }catch(e){}
   /* THE rivalTurn SEAM, MIRRORED. finOpp fires {actor:'p', pts:<rival scored>}
      so the PLAYER's cards see the rival's turn resolve. This is the inverse:
      {actor:'o', pts:<player scored>}, so a BOSS-held card sees ITS rival's
@@ -36310,8 +36370,21 @@ function activateBlessedConfiscationPlayer(){
   var oBestIdx=0;G.matchOppDice.forEach(function(d,i){if(dieRank(d)>dieRank(G.matchOppDice[oBestIdx]))oBestIdx=i;});
   var stolen=G.matchOppDice[oBestIdx];
   G.matchOppDice.splice(oBestIdx,1);
-  G.matchDice.push(stolen);
-  setStatusMsg('BLESSED CONFISCATION: TOOK '+stolen.toUpperCase(),'gold');
+  /* P691 (D25): A SWAP, NOT A SEVENTH SEAT - P522's fix, mirrored to the
+     player's copy it never reached. The push made matchDice seven long
+     while _enchArr stayed six (driven: enchDesynced true), and the seventh
+     seat is never dealt. The stolen die replaces the player's WORST seat,
+     and only if it is actually an upgrade - the player already gained by
+     stripping the rival either way. The displaced die's brand leaves with
+     it: {mat,ench} travel together, and the stolen die arrives bare. */
+  var _bcW=0;G.matchDice.forEach(function(m,i){if(dieRank(m)<dieRank(G.matchDice[_bcW]))_bcW=i;});
+  if(dieRank(stolen)>dieRank(G.matchDice[_bcW])){
+    G.matchDice[_bcW]=stolen;
+    if(G._enchArr)G._enchArr[_bcW]=null;
+    setStatusMsg('BLESSED CONFISCATION: '+stolen.toUpperCase()+' REPLACES YOUR WORST','gold');
+  }else{
+    setStatusMsg('BLESSED CONFISCATION: TOOK THEIR '+stolen.toUpperCase(),'gold');
+  }
   spawnPop('✝️ CONFISCATED');SFX.commit();
 }
 
@@ -40502,7 +40575,27 @@ function closePeek(){
   if(sh){sh.classList.remove('on');document.getElementById('peekScrim').classList.remove('on');}
   _peekIdx=null;
 }
+/* P692: NEVER BURN A SAVED MATCH SILENTLY. The heart charge itself stays in
+   initMatchScreen (single enforcement site); this only makes sure it is a
+   choice. The flag is consumed by the relaunch. */
+function _confirmDiscardPending(onYes){
+  var pm=S&&S.pendingMatch;
+  var nm=(pm&&pm.rung&&pm.rung.name)||'a match';
+  var boss=!!(pm&&pm.isBoss);
+  _gbModalOpen('<div style="font-size:15px;text-align:center">A game against '+nm+' is waiting.</div>'
+    +'<div style="font-size:12px;text-align:center;opacity:.85">Starting another one abandons it'
+    +(boss?' \u2014 and walking from a boss costs a heart.':'.')+'</div>'
+    +'<div class="gbx-btn primary" style="height:46px" id="pdResume">RESUME IT</div>'
+    +'<div class="gbx-btn" style="height:42px" id="pdDiscard">PLAY THIS ONE INSTEAD</div>');
+  var r=document.getElementById('pdResume'),d=document.getElementById('pdDiscard');
+  if(r)r.onclick=function(){_gbModalClose();try{SFX.nav();}catch(e){}resumeMatch();};
+  if(d)d.onclick=function(){_gbModalClose();try{SFX.nav();}catch(e){}onYes();};
+}
 function launchSeat(seatIdx){
+  if(S&&S.pendingMatch&&!window._fkDiscardOk){
+    _confirmDiscardPending(function(){window._fkDiscardOk=true;try{launchSeat(seatIdx);}finally{window._fkDiscardOk=false;}});
+    return;
+  }
   _getS();_ensureNight();
   var night=S.run.night;
   if(!night||seatIdx<0||seatIdx>=night.roster.length)return;
@@ -40575,6 +40668,10 @@ function launchPatronMatch(isHandicap){
 
 function launchBossMatch(){
   _getS();
+  if(S&&S.pendingMatch&&!window._fkDiscardOk){
+    _confirmDiscardPending(function(){window._fkDiscardOk=true;try{launchBossMatch();}finally{window._fkDiscardOk=false;}});
+    return;
+  }
   /* P682: the stale-seat hygiene half of the same fix */
   window._lastSeatArt=null;window._lastSeatTrait=null;
   var tier=TIERS[S.run.tier]||TIERS[0];

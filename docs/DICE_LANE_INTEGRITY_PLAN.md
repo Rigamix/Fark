@@ -1532,10 +1532,22 @@ pinched die is deterministically the **highest lane** — measured lanes
 > | **D24** | **ALREADY CLOSED — by P528, never marked here.** The `else`-gated pool filter is gone; the filter is unconditional and P528's own comment names D24 as the case it closes. Nothing to do. |
 > | **D21** | Held, now **FIXED (P562)** — see below. |
 > | **D16** | Held, now **FIXED (P565 + P566)** — see below. |
-> | **D17, D22** | **HOLD.** Anchors re-checked against current code. |
+> | **D17** | **CLOSED by ruling + P588.** Denis ruled: retire the player's Sleight rather than build it. P588 scoped the retirement to the broken side only (`FAM_PLAYER_RETIRED` — the rival's `G._oSleight` implementation keeps working for the vagabond bosses). The inert `CFX.sleight` remains reachable only from a legacy save that already holds the card. |
+> | **D22** | **CLOSED — P567** (its own entry below says so; this row was never updated to match). |
 > | **D20** | Held, now **FIXED (P563)** — see below. |
-> | **D18, D23** | **NOT SETTLED** by this pass — need reading at their named sites, not a grep. |
-> | **D19** | Needs a **ruling**, not a patch, exactly as the entry says. |
+> | **D18** | **HALF CLOSED — P568** (Sacrifice half fixed; Transmute half withdrawn as a non-finding — see the entry). This row previously said NOT SETTLED and was never updated. |
+> | **D23** | Part (a) **CLOSED — P568**; part (b) under re-derivation 2026-08-13. |
+> | **D19** | **RULED AND CLOSED — P520** (Option A: the drag permutes lane, material and brand together; Denis confirmed in play). This row predated the closure recorded at the D12/P520 entry. The tail (committed dice participate in the reorder; Palm adjacency becomes aimable) is a balance question under the ruling, not an integrity defect. |
+>
+> **2026-08-13 re-derivation (nine investigators, current build):** D3, D7, D11,
+> D15, D23(b) confirmed CLOSED at their recorded patches. D25 was STILL OPEN —
+> its "unreachable" mitigation went stale when P615 revived the player hand —
+> and D6(a) and D10(b) held exactly as recorded. **All three fixed by P691**,
+> each verified by a driven probe: D25 swaps instead of pushing a seventh seat
+> (arrays stay parallel), D10's dead-loan list holds stash indexes (legacy
+> material strings still match conservatively), and D6's amber preserves the
+> SEAT as well as the die (the deal walk leaves the preserved lane alone —
+> dealt [0,1,3,4,5] with lane 2 claimed). |
 >
 > **A count is not a re-derivation, and this pass nearly got that wrong.** `_cult`
 > came back with 4 hits against the entry's claim of 1, which looked like
