@@ -1306,6 +1306,13 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
    broken card carried the class and rendered at full colour.
    The two drop-shadows are repeated for the same reason: a rule that omits
    them does not inherit them, it deletes them. */
+/* P670: spent npc card, same statement as the player row's spent family
+   card. The drop-shadows are repeated because filter REPLACES - the P668
+   lesson, one selector up. */
+#screen-match #famRowO .fcv.spent{
+  filter:saturate(.25) brightness(.55)
+         drop-shadow(0 0.2cqw 0.3cqw rgba(10,6,2,.55))
+         drop-shadow(0 0.9cqw 1.4cqw rgba(10,6,2,.5))}
 #screen-match #famRowO .fcv.broken{
   filter:grayscale(.95) brightness(.45) saturate(.2)
          drop-shadow(0 0.2cqw 0.3cqw rgba(10,6,2,.55))
@@ -1364,6 +1371,11 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 #screen-match #famRowO .fcv:nth-child(1){rotate:-7deg}
 #screen-match #famRowO .fcv:nth-child(2){rotate:7deg}
 #screen-match #famRowO .fcv:nth-child(3){rotate:0deg}
+/* P670: the row can hold five now (up to 3 family + 2 npc on a late boss
+   night) - the fan pattern covered three and children past it sat dead
+   straight. */
+#screen-match #famRowO .fcv:nth-child(4){rotate:-4deg}
+#screen-match #famRowO .fcv:nth-child(5){rotate:4deg}
 /* P586: same for the rival - a lone card sits straight. */
 #screen-match #famRowO .fcv:only-child{rotate:0deg}
 /* P576: 9.6cqw -> 14cqw (37.4x53.3px -> 54.6x77.8px), still clearly smaller
@@ -1406,6 +1418,14 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
   font-family:monospace;font-size:10px;max-width:34cqw}
 .fcv{position:relative;aspect-ratio:911/1298;filter:drop-shadow(2px 3px 0 rgba(15,9,4,.4))}
 .fcv .fcvIn{position:relative;width:100%;height:100%}
+/* P670: the art-less card's face - CARD_BG colour plus the card's icon,
+   which is exactly what the mcard system showed for the 16 opponent ids
+   with no webp. The img sits above it (z-index 1 vs 0) and simply paints
+   over the cover when the art exists; onerror removes the img and the
+   cover IS the face. */
+.fcv .fcvCover{position:absolute;inset:0;display:flex;align-items:center;
+  justify-content:center;font-size:5cqw;z-index:0;border-radius:6%}
+.fcv .fcvIn img{position:relative;z-index:1}
 .fcv img{width:100%;height:100%;display:block;-webkit-user-select:none;user-select:none}
 .fcv .fcvTier{position:absolute;right:-2%;top:-1.5%;min-width:13%;box-sizing:border-box;text-align:center;
   font-family:'JMH Beda',serif;font-size:min(2cqh,12px);line-height:1.45;color:#f6ecd4;
@@ -2549,6 +2569,20 @@ html.fk3d #screen-match .die-wrap:has(.die.d3on.selected)::after{
   overflow-y:auto;padding:10px 14px 24px;font-family:'JMH Beda',serif}
 #gbSheet.on{transform:translateY(0)}
 #gbSheet h2{font-size:12px;margin:10px 0 4px;opacity:.75;color:#1c1c1c}
+/* P671: THE CARD SHEET'S OWN FACE. Every card focus - match tap, win-screen
+   draft, deck row, peek - goes through famCardSheet/npcOppTap into this one
+   element, which is why the win screen showed "the old greybox stuff": the
+   sheet IS the greybox, shared with the shop and the innkeep's book. The
+   variant class scopes the parchment to the card callers so those other
+   surfaces keep the look they were built against. Ink (#2a1808/#3a2812,
+   already set by the content) darker than the gold trim, per the rule. */
+#gbSheet.fam-sheet{background:#e7d6ac;color:#2a1808;
+  border-top:2px solid #a58a3c;
+  box-shadow:0 -4px 18px rgba(20,12,4,.45)}
+#gbSheet.fam-sheet h2{color:#2a1808}
+#gbSheet.fam-sheet .num,#gbSheet.fam-sheet .kw{color:#8a4a18}
+/* the drag pill is written inline as grey; on parchment it goes tea-brown */
+#gbSheet.fam-sheet>div:first-child{background:rgba(90,60,20,.35)!important}
 #gbModalHost{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.55);z-index:9620}
 #gbModalHost.on{display:flex}
 #gbModalHost .gbx-card{width:82%;max-width:360px;background:#d6d6d6;border-radius:16px;padding:18px;text-align:center;color:#1c1c1c;
@@ -3881,6 +3915,9 @@ body.crit-dilate{animation:critDilate .55s ease-out both}
   100%{opacity:.35;transform:translateX(-50%) translateY(-34px)}
 }
 .card-bar.top .card-trig-label{animation:cardTrigFloatDown 2.8s ease-out forwards}
+/* P670: trigger labels land in the family row now that the rival's cards
+   live there - same float-down the top bar used. */
+#famRowO .card-trig-label{animation:cardTrigFloatDown 2.8s ease-out forwards}
 @keyframes cardTrigFloatDown{
   0%{opacity:1;transform:translateX(-50%) translateY(0) scale(1.1)}
   10%{opacity:1;transform:translateX(-50%) translateY(8px) scale(1)}
@@ -14437,6 +14474,18 @@ function famRenderRow(){
     ho+=famCardArt(inst.id,inst.tier,{cls:'oppcard'+(_tg?' armed':'')+(inst.broken?' broken':''),
                                       onclick:'famOppTap('+i+')'});
   });
+  /* P670: AND THE NPC CARDS, same row, same builder. These were buildCBar's
+     weathered .mcard bar - the doubling Denis reported. G.oCards is the
+     live NPC mechanic layer (~90 read sites), so the cards stay visible;
+     only the second renderer went. Spent is BAKED here because this row is
+     rebuilt every turn and a bake that disagreed with the updater would
+     flicker - both ask _npcCardSpent. A card the Pyre burns leaves at the
+     next rebuild, which the old bar never did (it was built once and the
+     burned card sat orphaned on screen for the rest of the match). */
+  (G&&G.oCards||[]).forEach(function(cid){
+    ho+=famCardArt(cid,1,{cls:'oppcard npccard'+(_npcCardSpent(cid)?' spent':''),
+                          onclick:"npcOppTap('"+cid+"')"});
+  });
   hostO.innerHTML=ho;
   /* aux chips: quicksilver reroll + the sleeved rule */
   var ha='';
@@ -14663,6 +14712,22 @@ function famCardTap(i){
   var sub=(d.kind==='active'?(inst.charges>0?'uses left: '+inst.charges:'spent for this match'):'');
   famCardSheet(inst.id,inst.tier,{sub:sub,
     btn:usable?'PLAY':null,cb:usable?('function(){famUse('+i+');}'):null});
+}
+/* P670: the npc card's read-sheet - the same shape famCardSheet builds for a
+   family card, from the CARDS/getNpcCard def instead. Informational only,
+   like famOppTap: their card, no PLAY button. */
+function npcOppTap(cid){
+  var c=(typeof CARDS!=='undefined'&&CARDS.find(function(x){return x.id===cid;}))
+        ||(typeof getNpcCard==='function'&&getNpcCard(cid));
+  if(!c)return;
+  var spent=_npcCardSpent(cid);
+  var h='<div style="text-align:center;padding:6px 4px 14px">'
+    +famCardArt(cid,1,{style:'width:38%;max-width:170px;margin:0 auto;display:inline-block'})
+    +'<div style="font-family:'+"'JMH Beda'"+',serif;font-size:19px;color:#2a1808;margin-top:8px">'+c.name+'</div>'
+    +'<div style="font-size:12px;color:#6a5238;margin-top:2px">'+(spent?'SPENT — used up for this match':'their card — read the table')+'</div>'
+    +'<div style="font-size:14px;line-height:1.5;color:#3a2812;margin:10px auto 4px;max-width:88%">'+_accG(c.desc||_sentenceCase(c.eff||''))+'</div>'
+    +'</div>';
+  _gbSheetOpen(h,'fam-sheet');/* P671: same parchment as famCardSheet */
 }
 function famOppTap(i){
   if(!G||!G.oF||!G.oF[i])return;
@@ -14957,7 +15022,27 @@ function _accG(t){
    Art/Assets/Cards (sources stay out of the repo). */
 function famCardArt(id,tier,opts){
   opts=opts||{};
-  var d=famDef(id);if(!d)return '';
+  var d=famDef(id);
+  /* P670: AN NPC CARD THROUGH THE SAME BUILDER. The rival's G.oCards ids
+     have no famDef - they live in CARDS/getNpcCard - and used to be drawn
+     by buildCBar as weathered .mcard, which is the doubled look Denis
+     reported. One builder, one look (P591): no tier pip because npc cards
+     have no tiers, and a CARD_BG-coloured cover with the card's icon
+     underneath the art, because 16 of the 57 opponent-capable ids have no
+     webp - the cover is exactly what the mcard system showed for those. */
+  if(!d){
+    var c=(typeof CARDS!=='undefined'&&CARDS.find(function(x){return x.id===id;}))
+          ||(typeof getNpcCard==='function'&&getNpcCard(id));
+    if(!c)return '';
+    return '<div class="fcv'+(opts.cls?' '+opts.cls:'')+'" data-cid="'+c.id+'"'
+      +(opts.onclick?' onclick="'+opts.onclick+'"':'')
+      +(opts.style?' style="'+opts.style+'"':'')+'>'
+      +'<div class="fcvIn">'
+      +'<div class="fcvCover" style="background:'+((typeof CARD_BG!=='undefined'&&CARD_BG[c.id])||'#444')+'">'+(c.icon||'')+'</div>'
+      +'<img src="assets/cards/'+c.id+'.webp" alt="" draggable="false" onerror="this.remove()">'
+      +(opts.badge?'<span class="fcvBadge">'+opts.badge+'</span>':'')
+      +'</div></div>';
+  }
   var col=(FAMILIES[d.fam]||{}).color||'#a58a3c';
   var showTier=d.fam!=='tavern'&&(opts.tierAlways||((tier||1)>=2));
   return '<div class="fcv'+(opts.cls?' '+opts.cls:'')+'" data-cid="'+d.id+'"'
@@ -15008,7 +15093,7 @@ function famCardSheet(id,tier,opts){
     +'<div style="font-size:14px;line-height:1.5;color:#3a2812;margin:10px auto 4px;max-width:88%">'+_accG(d.text[tier-1])+'</div>'
     +(opts.btn?'<div class="gbx-btn primary" style="margin-top:10px" onclick="_gbSheetClose();('+opts.cb+')()">'+opts.btn+'</div>':'')
     +'</div>';
-  _gbSheetOpen(h);
+  _gbSheetOpen(h,'fam-sheet');/* P671: the card sheet wears parchment */
 }
 /* SHOW THE SCROLL ONLY IF SOMEBODY SPEAKS. The bubble draws a painted
    parchment behind whatever line the dialogue resolver returns - and when it
@@ -16881,9 +16966,13 @@ function _gbSheetInfra(){
   var sh=document.createElement('div');sh.id='gbSheet';document.body.appendChild(sh);
   var mo=document.createElement('div');mo.id='gbModalHost';document.body.appendChild(mo);
 }
-function _gbSheetOpen(html){
+/* P671: `cls` is a per-open variant class. Written fresh on EVERY open, so a
+   variant can never leak from one caller to the next; close leaves it alone
+   on purpose - the sheet keeps its face while it slides out. */
+function _gbSheetOpen(html,cls){
   _gbSheetInfra();
   var sh=document.getElementById('gbSheet');
+  sh.className=cls||'';
   sh.innerHTML='<div style="width:44px;height:5px;border-radius:3px;background:#999;margin:2px auto 10px"></div>'+html;
   document.getElementById('gbScrim').classList.add('on');
   sh.classList.add('on');
@@ -27229,6 +27318,12 @@ function triggerCard(cardId,msg,isPlayer,persist){
   const barId=isPlayer?'playerCards':'oppCards';
   const bar=document.getElementById(barId);
   let mc=bar?bar.querySelector('.mcard[data-cid="'+cardId+'"]'):null;
+  /* P670: the rival's cards are .fcv in the family row now, and this
+     function used to no-op silently when the selector missed - every NPC
+     trigger flash would simply have vanished with the bar. The flash on a
+     .fcv is P666's own fx-pulse, not a second system. */
+  const row=document.getElementById(isPlayer?'famRowP':'famRowO');
+  const fcv=(!mc&&row)?row.querySelector('.fcv[data-cid="'+cardId+'"]'):null;
   /* P614: the `isInZone` suppression is gone with the zone. It existed to
      stop a card that had been PARKED from playing its trigger flash, and to
      reparent the floating effect label into #activateZone. Nothing is parked
@@ -27239,6 +27334,10 @@ function triggerCard(cardId,msg,isPlayer,persist){
     mc.classList.remove('card-trigger');void mc.offsetWidth;
     mc.classList.add('card-trigger');
     setTimeout(function(){mc.classList.remove('card-trigger');},750);
+  }else if(fcv){
+    fcv.classList.remove('fx-pulse');void fcv.offsetWidth;
+    fcv.classList.add('fx-pulse');
+    setTimeout(function(){fcv.classList.remove('fx-pulse');},520);
   }
   /* Clear any existing persistent label for this card */
   document.querySelectorAll('.card-trig-label[data-cid="'+cardId+'"]').forEach(e=>e.remove());
@@ -27248,13 +27347,16 @@ function triggerCard(cardId,msg,isPlayer,persist){
      i.e. a ReferenceError on the first card that fired. The parse gate
      cannot see that: the file parses fine and the path only runs in play.
      Caught by grepping for the identifier after the edit, not by the gate. */
-  const labelParent=bar;
-  if(mc&&labelParent){
+  /* P670: the label anchors to whichever element the card actually is - the
+     legacy .mcard in its bar, or the .fcv in the family row. */
+  const anchor=mc||fcv;
+  const labelParent=mc?bar:row;
+  if(anchor&&labelParent){
     const lbl=document.createElement('div');
     lbl.className='card-trig-label'+(isPlayer?'':' opponent')+(persist?' persist':'');
     lbl.dataset.cid=cardId;
     lbl.textContent=msg;
-    const cr=mc.getBoundingClientRect(),br=labelParent.getBoundingClientRect();
+    const cr=anchor.getBoundingClientRect(),br=labelParent.getBoundingClientRect();
     lbl.style.left=(cr.left-br.left+cr.width/2)+'px';
     if(isPlayer){
       lbl.style.top=(cr.top-br.top-10)+'px';
@@ -27270,19 +27372,34 @@ function triggerCard(cardId,msg,isPlayer,persist){
 function clearCardLabel(cardId){
   document.querySelectorAll('.card-trig-label[data-cid="'+cardId+'"]').forEach(e=>e.remove());
 }
+/* P670: ONE EXHAUSTION TRUTH. _updateNpcCardVisuals read usedOnce and
+   npcUseActive read npcActiveUses - two fields, two verdicts, and the gap
+   went live the moment the row started rebuilding every turn: a rebuild
+   would un-grey an exhausted active card because the updater cannot see
+   the field the exhaustion lives in. Both writers and famRenderRow's bake
+   now ask this one question. */
+function _npcCardSpent(cid){
+  try{
+    var npc=getNpcCard(cid)||(typeof CARDS!=='undefined'&&CARDS.find(function(x){return x.id===cid;}));
+    if(!npc)return false;
+    var eff=npc.effect||{};
+    var st=(G&&G.npcCardState)||{};
+    if(st.npcActiveUses&&typeof st.npcActiveUses[cid]==='number'&&st.npcActiveUses[cid]<=0)return true;
+    var usedVal=st.usedOnce&&st.usedOnce[cid];
+    if(eff.type==='start_bonus')return true;
+    if(typeof usedVal==='boolean')return usedVal;
+    if(typeof usedVal==='number')return usedVal>=_useCap(eff);
+  }catch(e){}
+  return false;
+}
 function _updateNpcCardVisuals(){
   if(!G||!G.oCards)return;
-  var bar=document.getElementById('oppCards');if(!bar)return;
+  var bar=document.getElementById('oppCards');
+  var row=document.getElementById('famRowO');
   G.oCards.forEach(function(cid){
-    var mc=bar.querySelector('.mcard[data-cid="'+cid+'"]');if(!mc)return;
-    var npc=getNpcCard(cid);if(!npc)return;
-    var eff=npc.effect||{};
-    var usedVal=G.npcCardState.usedOnce[cid];
-    var isExhausted=false;
-    if(eff.type==='start_bonus')isExhausted=true;
-    else if(typeof usedVal==='boolean')isExhausted=usedVal;
-    else if(typeof usedVal==='number')isExhausted=usedVal>=_useCap(eff);
-    mc.classList.toggle('used',isExhausted);
+    var spent=_npcCardSpent(cid);
+    if(bar){var mc=bar.querySelector('.mcard[data-cid="'+cid+'"]');if(mc)mc.classList.toggle('used',spent);}
+    if(row){var fc=row.querySelector('.fcv[data-cid="'+cid+'"]');if(fc)fc.classList.toggle('spent',spent);}
   });
 }
 function _updatePlayerCardVisuals(){
@@ -36013,9 +36130,12 @@ function npcHasActive(cid){
 function npcUseActive(cid){
   if(!G.npcCardState.npcActiveUses)G.npcCardState.npcActiveUses={};
   G.npcCardState.npcActiveUses[cid]=Math.max(0,(G.npcCardState.npcActiveUses[cid]||0)-1);
-  /* Visual: dim the card in the opp bar */
+  /* Visual: dim the card in the opp bar - and its .fcv twin in the family
+     row, which is where the rival's hand lives since P670 */
   var chip=document.querySelector('#oppCards .mcard[data-cid="'+cid+'"]');
   if(chip&&G.npcCardState.npcActiveUses[cid]<=0)chip.classList.add('used');
+  var _fc=document.querySelector('#famRowO .fcv[data-cid="'+cid+'"]');
+  if(_fc&&G.npcCardState.npcActiveUses[cid]<=0)_fc.classList.add('spent');
 }
 
 /* ═══════ PLAYER-SIDE NPC-CARD ACTIVATORS
@@ -36739,8 +36859,15 @@ var _rdTs=params._resumeData._tradeSwaps;
   /* Boss edict lightning-bolt icon removed — edict system is gone. */
   oppEl.innerHTML=rung.name+(G._practice?' <span style="font-size:9px;color:var(--textdim);opacity:.6">PRACTICE</span>':'');
   // Build card bars
-  buildCBar('oppCards',G.oCards,true,rung.name);
+  /* P670: the rival's .mcard bar is GONE - buildCBar('oppCards',...) was the
+     second renderer behind the doubled cards. G.oCards now renders into the
+     family row below, in the family row's look. The player bar keeps its
+     builder (two live mid-match callers, and it is empty in real runs). */
   buildCBar('playerCards',G.pCards,false,'YOU');
+  /* P670: and the row renders NOW rather than at the first turnStart -
+     before this, a resumed match sat ~200ms (a fresh one ~800ms) with the
+     rival's hand missing or holding the previous match's markup. */
+  try{if(typeof famRenderRow==='function')famRenderRow();}catch(e){}
   _updateNpcCardVisuals();_updatePlayerCardVisuals();_applyMetaBoostVisuals();
   /* Synergies removed in tier restructure */
   G.activeSynergies=[];
