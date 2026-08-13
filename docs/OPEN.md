@@ -620,3 +620,22 @@ you play on, which is why it wasn't fixed with the rest.
 Fixing it means dropping the activation zone there too, and card clearance is
 already only 50px at that size — so it trades one tight number for another.
 *My recommendation: leave it until someone reports it on a real short phone.*
+
+---
+
+## 12. THE ENCHANT-PAGE CRASH — cannot reproduce, need one thing from you
+
+Five probes drove the full route (fresh run → shop → ENCHANTS tab → every
+plaque → every die, all 8 enchants, fully-branded rack into a boss match,
+12 tab flips, shop re-entries, quicksilver, the legacy sheet path) on BOTH
+the current build and the pre-session build, headless AND in a real Chrome
+tab, with error listeners armed. **Zero exceptions anywhere.**
+
+The one input that couldn't be replayed is **your actual save** — a mid-run
+save with fields a fresh run never produces is the remaining suspect.
+
+**What I need, either one:**
+- the red error text from the browser console when it crashes (F12 → Console), or
+- your save: F12 → Console → `localStorage.getItem('fark_save')` → copy → paste to me.
+
+With either in hand the stack names the line in minutes.

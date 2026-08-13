@@ -1210,8 +1210,13 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 #famRowP{position:absolute;left:50%;
   bottom:calc(env(safe-area-inset-bottom,0px) + 34cqw);
   /* P591: the near row leans into the same plane - see the note on #famRowO. */
-  transform:translateX(-50%) perspective(900px) rotateX(13deg);
-  display:flex;gap:1.1cqw;z-index:41}
+  /* P683: REVERSED for the near hand - Denis: "same for mine but the other
+     way around". Positive rotateX made both rows taper the same way; the
+     player's cards now pivot at their bottom edge (so they stay planted on
+     their line) and tilt toward the viewer: wider at the top. */
+  transform-origin:50% 100%;
+  transform:translateX(-50%) perspective(900px) rotateX(-9deg);
+  display:flex;gap:1.1cqw;z-index:42}/* P683: above the dice canvas at 41 */
 /* P580: the player's fan. Same `rotate`-not-`transform` reasoning as the rival's
    row: .fcv's spent/armed/sealed states all declare `filter` and none declare
    `transform`, and the bob lives on .fcvIn, so an angle here collides with
@@ -1417,7 +1422,8 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
      a hand lying on a surface, not four independently skewed cards.
      A positive rotateX leans the far edge away, the same way the near row's
      13deg does - which is now the whole of it. */
-  transform:translateX(-50%) perspective(900px) rotateX(15deg);
+  /* P683: 15 -> 19deg - "a touch wider at the bottom", per Denis */
+  transform:translateX(-50%) perspective(900px) rotateX(19deg);
   display:flex;gap:0.6cqw;z-index:40}
 /* P580: THE FAN, ON `rotate` RATHER THAN `transform`, and that is the point.
    The row's own plane lives on `transform`; the standalone `rotate` property
@@ -1798,6 +1804,7 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 #selTotal.zero{color:#9a8f7a;text-shadow:0 2px 0 rgba(20,12,6,.6);animation:none}
 /* a name, not a number: smaller, spaced, and still - the shake belongs to a
    score that is climbing, and nothing here is climbing */
+#selTotal.off{display:none}/* P683: scored state - the tags + turn total say it */
 #selTotal.cast{font-size:4.4cqw;letter-spacing:.08em;color:#e0cfa4;animation:none;
   text-shadow:0 0 10px rgba(255,214,150,.4),0 2px 0 rgba(38,20,6,.9)}
 /* The rival's numbers: the same two elements, flipped to the other side of
@@ -1865,7 +1872,11 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
   /* P677: the text sinks a couple of pixels (25/19 top-heavy padding), the
      sides breathe (20 -> 26), and the width the sides eat comes back at the
      cap (96 -> 99%) so the two-line fit survives - re-measured upright. */
-  box-shadow:none;padding:25px 26px 19px;max-width:99%;margin:0 0 0 3cqw;flex:0 1 auto;
+  /* P682: container-relative - the fixed 25/26/19px was over HALF the
+     bubble on a phone while everything else scaled, which is why the text
+     sat low there and not on desktop. Same numbers at the 430 design width,
+     sink trimmed to ~2px. */
+  box-shadow:none;padding:5.4cqw 6cqw 4.6cqw;max-width:99%;margin:0 0 0 3cqw;flex:0 1 auto;
   /* and it GROWS from that corner rather than fading in place */
   transform-origin:0% 0%}
 /* behind the text, and allowed out of the box: the tail lives out here.
@@ -2499,7 +2510,9 @@ body.dlg-speaking #screen-match #tellBadge{opacity:0;pointer-events:none}
    the match brief requires (players track curses and Preserve by looking). */
 #screen-match .kept-row .die-wrap+.die-wrap{margin-left:0;margin-top:-1.9cqw}
 #screen-match .kept-row .die{width:10.4cqw;height:10.4cqw}
-#screen-match .kept-total{font-size:5.2cqw;margin-top:0.6cqw;margin-left:0.6cqw}
+/* P683: THE turn-total number now - it inherits the prominence (and the
+   gold) of the selection sum it replaced */
+#screen-match .kept-total{font-size:6.2cqw;margin-top:0.6cqw;margin-left:0.6cqw;color:#ffd98a}
 /* a kept die is out of play: no tap pop, no float, no selection anything */
 #screen-match .kept-row .die{cursor:default!important;animation:none!important}
 html.fk3d #screen-match .kept-row .die-wrap::before,
@@ -2590,7 +2603,11 @@ html.fk3d #screen-match .die.d3on.selected::after,
 html.fk3d #screen-match .die-wrap:has(.die.d3on.selected)::before,
 html.fk3d #screen-match .die-wrap:has(.die.d3on.selected)::after{
   display:none !important;content:none !important}
-#screen-match #d3xCanvas{z-index:2}
+/* P683: 2 -> 41. At 2 the one shared dice canvas painted UNDER both card
+   rows (famRowO 40, famRowP 42) - a rival die crossing their hand vanished
+   behind the cards. 41 puts dice over the rival's row; the player's hand
+   stays above at 42. */
+#screen-match #d3xCanvas{z-index:41}
 #d3xCanvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;
   z-index:2}
 #ptPanelSheet #d3xCanvas{z-index:2}
@@ -3504,7 +3521,10 @@ html.fk3d #screen-match .die-wrap:has(.die.d3on.selected)::after{
   top:calc(var(--hud-h) + var(--dlg-y,184px));
   left:0;right:0;
   z-index:90;display:flex;justify-content:center;
-  pointer-events:none;opacity:0;transition:opacity .5s ease;
+  /* P682: .5s -> .34s, matching the scroll's scale - they were mismatched
+     durations on different elements, which is the scale-stops-then-
+     crossfade wonk Denis described */
+  pointer-events:none;opacity:0;transition:opacity .34s ease;
   height:0;overflow:visible;padding:0;
 }
 @media (max-height:700px){.dlg-box{--dlg-y:128px}}
@@ -3513,7 +3533,9 @@ html.fk3d #screen-match .die-wrap:has(.die.d3on.selected)::after{
    the patron portrait rather than a fade". The origin is the bubble's own
    top-left - the corner the tail is on - so it reads as coming out of them.
    The opacity fade stays underneath; what changed is that something moves. */
-#screen-match .dlg-scroll{scale:.72;transition:scale .34s cubic-bezier(.2,1.3,.35,1),opacity .3s ease}
+/* P682: .72 -> .55 so the motion carries the entrance; the dead `opacity
+   .3s` term went with it (nothing ever changes the scroll's own opacity) */
+#screen-match .dlg-scroll{scale:.55;transition:scale .34s cubic-bezier(.2,1.3,.35,1)}
 #screen-match .dlg-box.show .dlg-scroll{scale:1}
 .dlg-box.show{opacity:1}
 .dlg-inner{display:flex;align-items:center;gap:8px;padding:2px 4px;width:100%;max-width:100vw;justify-content:flex-start}
@@ -15683,6 +15705,9 @@ function famRunDraftShow(){
          tile's own opacity ramp - nrFloat reaches full opacity at 22% of 1.5s -
          because a 3D die cannot fade with its tile the way a DOM one does, so
          it would have popped in at full strength over a translucent tile. */
+      /* P682: the offer is the one dice surface that could never boot D3X -
+         the first dice a player ever sees were the old CSS cubes every time */
+      try{if(window.D3X&&D3X.boot)D3X.boot();}catch(e){}
       if(window.D3X&&D3X.chipAnim)D3X.chipAnim(hd,{delay:i*200+330,dur:1000,roll:20,breathe:true});
       var nd=hd.parentNode;
       setTimeout(function(){nd.style.animation='none';nd._floatDone=true;},i*200+1620);
@@ -27072,7 +27097,14 @@ function _placeTurnText(){
      so the rival's line was written across dice still in the air. */
   var edge=_diceEdge(document.getElementById('oppDiceRow'))
         || _diceEdge(document.getElementById('playerDiceRow'));
-  var hiY=edge?edge.top:rr.top, loY=edge?edge.bottom:rr.bottom;
+  var hiY=edge?edge.top:rr.top;
+  /* P683: loY is set from the FIXED throw line further down - the dice-edge
+     reading is dropped for the bottom strip. Measured: placing it off the
+     live dice put ~80px of jitter into the player's own status line and
+     once teleported it to -1215px, because the 3D layer rewrites the dice
+     translates every frame and 'ROLLING...' lands mid-flight. The top strip
+     was cured of exactly this with the 0.223 reserve; this is its mirror. */
+  var loY=rr.bottom;
   /* THE RIVAL'S LINE GETS ONE PLACE. It used to stack above whatever was on the
      table - the dice edge, or the tags and total once they existed - so it sat
      at y=410 while the rival was rolling and at y=314 once they were scoring,
@@ -27089,9 +27121,10 @@ function _placeTurnText(){
   var _tl=document.getElementById('throwLine');
   var _rowTop=_tl?_tl.getBoundingClientRect().top:rr.top;
   if(_rowTop)hiY=_rowTop-_mw*0.223;
-  document.querySelectorAll('.selTag,#selTotal').forEach(function(e){
-    var b=e.getBoundingClientRect().bottom;if(b>loY)loY=b;
-  });
+  /* P683: a fixed reserve below the throw line instead of chasing the tag
+     rects - same datum the top strip anchors to (it measured constant
+     through 15s of live rolling), sized to clear the per-die tag band. */
+  if(_tl)loY=_tl.getBoundingClientRect().bottom+_mw*0.10;
   top.style.bottom=(zr.bottom-hiY+_STACK_GAP)+'px';
   top.style.top='';
   bot.style.top=(loY-zr.top+_STACK_GAP)+'px';
@@ -29817,8 +29850,12 @@ function _renderSelTags(selD,total,valid){
     });
   }
   var _isCast=_cast.length>0;
-  tot.className=_scored?'':(_isCast?'cast':'zero');
-  tot.textContent=_scored?('+'+total.toLocaleString())
+  /* P683: the scored '+N' state is GONE - it duplicated the per-die tags'
+     sum right above the turn total (Denis's screenshot). The cast state
+     (enchant names) and the zero state keep the element alive: they carry
+     information nothing else shows. */
+  tot.className=_scored?'off':(_isCast?'cast':'zero');
+  tot.textContent=_scored?''
     :(_isCast?_cast.join(' + ').toUpperCase():'0');
   /* excitement ramp: ~200 is calm, ~2000 is full glow + shake */
   var ex=_scored?Math.max(0,Math.min(1,(total-200)/1800)):0;
@@ -29893,6 +29930,11 @@ function refreshSelUI(){
      whenever a brand was in the selection - and the press then refused it.
      The anchor is already folded into pts above, so false is correct here. */
   const ok=_keepIsLegal(pts,_pvIcons.length,false);G.turnPts=locked+(pts>0?pts:0)+(G._turnBonusPot||0);updHUD();
+  /* P683: the bottom gold number IS the live turn total now - written here
+     because this line already computes it. visibility cleared so it shows
+     before the first keep too. */
+  try{var _kt=document.getElementById('keptTotal');
+    if(_kt){_kt.textContent=G.turnPts?G.turnPts.toLocaleString():'';if(G.turnPts)_kt.style.visibility='';}}catch(e){}
   /* Die effect visuals */
   _clearDieEffects();
   if(ok&&_sr.effects&&_sr.effects.length){_showDieEffects(selD,_sr.effects);}
@@ -34013,7 +34055,10 @@ function endMatch(win){
      lift are all down by 1300ms and the coins carry on behind the offer
      perfectly well. The loss keeps a longer beat: its heart drain is the
      content of that screen rather than a flourish over it. */
-  var _DRAFT_DELAY={bossWin:1300,patronWin:1300,loss:1800};
+  /* P682: third complaint about this number. Measured end-to-end: 700-900ms
+   bank beat + this = 2.0-2.2s to an actionable bottom. 500 puts the cards
+   inside the same breath as the scores fading in. */
+var _DRAFT_DELAY={bossWin:500,patronWin:500,loss:900};
   var _draftDelay=win?(isBoss?_DRAFT_DELAY.bossWin:_DRAFT_DELAY.patronWin):_DRAFT_DELAY.loss;
 
   /* Delayed content — appears after animation sequence */
@@ -34837,7 +34882,10 @@ function _bbFitWidth(textEl) {
   textEl.style.whiteSpace = '';
   var maxW = textEl.clientWidth;
   if (!(maxW > 0)) return 0;
-  if (natural <= maxW) return natural;
+  /* P682: scrollWidth rounds a fractional width UP and clientWidth rounds
+     it DOWN, so a 190.4px line read as 191>190 and wrapped. One px of
+     slack ends the coin-flip for every short line. */
+  if (natural <= maxW + 1) return natural;
   var minH = textEl.scrollHeight;
   /* P660: 0.3 -> 0.12. The floor was the width wobble Denis is describing: at
      the shipped 349px cap, lo started at 105px, so any line whose tightest
@@ -35161,6 +35209,12 @@ const LEDGER_LINES={
   (function(){
     var _orig=DLG.getLine.bind(DLG);
     DLG.getLine=function(cat){
+      /* P682: A BOSS IS NOT A PATRON. Measured: in a GROG match this wrapper
+         served the PREVIOUS patron's lines - _lastSeatArt/_lastSeatTrait are
+         written only by launchSeat and were never cleared - and the
+         _DLG_PERSONAL branch even advanced that absent patron's story arc
+         and saved it. Bosses go straight to their own bespoke barks. */
+      if(typeof G!=='undefined'&&G&&G._isBoss)return _orig(cat);
       try{
         /* BOSSES GO THROUGH THIS TOO. P392 sent them to their own hand-written
            pools instead, which was correct while those pools existed - they
@@ -35186,6 +35240,17 @@ const LEDGER_LINES={
     };
   })();
   window.DLG=DLG;
+})();
+/* P682: WARM BOOT for the real dice. D3X loaded lazily and nothing booted it
+   until the first match roll, so the old CSS cubes always rendered first and
+   the swap popped mid-roll. boot() is idempotent, and its failure path is
+   the deliberate DOM-dice fallback, so a bad device loses nothing. */
+(function(){
+  function warm(){try{if(window.D3X&&D3X.boot)D3X.boot();}catch(e){}}
+  window.addEventListener('load',function(){
+    if(window.requestIdleCallback)requestIdleCallback(warm,{timeout:2500});
+    else setTimeout(warm,600);
+  });
 })();
 
 /* ═══════ LOADOUT PANEL ═══════ */
@@ -40450,6 +40515,8 @@ function launchPatronMatch(isHandicap){
 
 function launchBossMatch(){
   _getS();
+  /* P682: the stale-seat hygiene half of the same fix */
+  window._lastSeatArt=null;window._lastSeatTrait=null;
   var tier=TIERS[S.run.tier]||TIERS[0];
   var boss=tier.boss;
   var pCards=(S.run.cards||[]).filter(function(c){return !!c;});
@@ -40728,8 +40795,13 @@ function _setMusicLayer(layer){
        was kept playing (so the crossfade has something to ramp into) but
        resetting currentTime gives the track its proper intro. */
     try{if(BG_BOSS.audio){BG_BOSS.audio.currentTime=0;}}catch(e){}
-    _fadeGain(BG_TAVERN.gain,0,BG_FADE_MS);
-    _fadeGain(BG_BOSS.gain,BG_BOSS_VOL,BG_FADE_MS);
+    /* P682: fade the tavern out ONLY if the boss layer can come up - with
+       BG_BOSS.gain unattached (autoplay refusal) the old order faded the
+       tavern to zero against silence: total music dropout at boss entry. */
+    if(BG_BOSS.gain){
+      _fadeGain(BG_TAVERN.gain,0,BG_FADE_MS);
+      _fadeGain(BG_BOSS.gain,BG_BOSS_VOL,BG_FADE_MS);
+    }
   }else{
     _fadeGain(BG_BOSS.gain,0,BG_FADE_MS);
     _fadeGain(BG_TAVERN.gain,BG_TAVERN_VOL,BG_FADE_MS);
@@ -40793,7 +40865,12 @@ function _setDeadAir(on){
   if(ms)ms.classList.toggle('dead-air',on);
   /* Duck (or restore) music + ambience */
   try{
-    var duck=on?0.22:1;
+    /* P682: NO MUSIC DUCK. The 22% cut fired when EITHER side hit 85% of
+       target and never restored until the match ended - measured 0.07 ->
+       0.0154 for the rest of the match, which is Denis's "volume drops for
+       no reason". The vignette and the drone stay; they read as tension.
+       A permanent volume cut does not. */
+    var duck=1;
     if(!S||!S.settings||S.settings.music!==false){
       if(typeof _bgCurrentLayer!=='undefined'&&_bgCurrentLayer==='boss'){if(BG_BOSS.gain)_fadeGain(BG_BOSS.gain,BG_BOSS_VOL*duck,1100);}
       else{if(BG_TAVERN.gain)_fadeGain(BG_TAVERN.gain,BG_TAVERN_VOL*duck,1100);}
