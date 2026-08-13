@@ -19983,17 +19983,26 @@ function _diceShadowPaint(pts,scx,scy,size,d){
     x.closePath();x.fill();
     x.filter='none';
   }else{
-    var _d=1;try{var _t=x.getTransform&&x.getTransform();if(_t&&_t.a)_d=_t.a;}catch(e){}
-    var _off=(x.canvas.height/_d)+80;
-    x.shadowColor=_col;x.shadowBlur=_bl*2;
-    x.shadowOffsetX=0;x.shadowOffsetY=_off*_d;
+    /* P694: NO cast-shadow trick. The old fallback drew the hull wholly
+       off-canvas and let only its shadow land - WebKit's accelerated
+       canvas culls offscreen primitives WITH their shadows, so iPhones
+       (pre-Safari-18, no ctx.filter either) painted nothing at all while
+       Chromium painted the detached shadow. Denis's phone screenshot vs
+       the emulation measurements were exactly that split. Three
+       concentric fills fake the blur from primitives every canvas
+       rasterises identically. */
     x.fillStyle=_col;
-    x.beginPath();
-    hull.forEach(function(p2,i3){
-      var hx=scx+p2[0],hy=scy+p2[1]-_off;
-      if(i3)x.lineTo(hx,hy);else x.moveTo(hx,hy);
-    });
-    x.closePath();x.fill();
+    var _passes=[[1.0,0.55],[1.14,0.30],[1.30,0.15]];
+    for(var _pi=0;_pi<3;_pi++){
+      var _sc2=_passes[_pi][0];
+      x.globalAlpha=(a>1?1:a)*_passes[_pi][1];
+      x.beginPath();
+      hull.forEach(function(p2,i3){
+        var hx=scx+p2[0]*_sc2,hy=scy+p2[1]*_sc2;
+        if(i3)x.lineTo(hx,hy);else x.moveTo(hx,hy);
+      });
+      x.closePath();x.fill();
+    }
     x.shadowColor='transparent';x.shadowBlur=0;x.shadowOffsetY=0;
   }
   x.restore();
@@ -20046,7 +20055,7 @@ function _drawDiceShadows(tSec){
      exact trap); the dice painter now does the same, through the one
      dirty mark. */
   if(!_tblImg.complete||!_tblImg.naturalWidth){
-    if(!_tblImg.complete)_tblImg.addEventListener('load',function(){_dsDirty();},{once:true});
+    if(!_tblImg.complete)_tblImg.addEventListener('load',function(){_dsDirty();try{_candleLoop();}catch(e){}},{once:true});/* P696 */
     return;
   }
   var C=[[-1,-1,-1],[1,-1,-1],[-1,1,-1],[1,1,-1],[-1,-1,1],[1,-1,1],[-1,1,1],[1,1,1]];
@@ -25247,6 +25256,11 @@ var D3X={
     if(this._shDirty){
       this._shDirty=false;
       try{_mLightCalc();_drawDiceShadows(performance.now()/1000);}catch(e){}
+      /* P696: a dirty mark with the breathing loop dead revives it - the
+         loop dies whenever it ticks before the plate is ready (slow first
+         image load) and nothing else restarts it. _candleOn makes this a
+         boolean test per repaint, not a second loop. */
+      if(!window._candleOn)try{_candleLoop();}catch(e){}
     }
     try{this._drawGlow();}catch(e){}
   },
@@ -40578,24 +40592,13 @@ function closePeek(){
 /* P692: NEVER BURN A SAVED MATCH SILENTLY. The heart charge itself stays in
    initMatchScreen (single enforcement site); this only makes sure it is a
    choice. The flag is consumed by the relaunch. */
-function _confirmDiscardPending(onYes){
-  var pm=S&&S.pendingMatch;
-  var nm=(pm&&pm.rung&&pm.rung.name)||'a match';
-  var boss=!!(pm&&pm.isBoss);
-  _gbModalOpen('<div style="font-size:15px;text-align:center">A game against '+nm+' is waiting.</div>'
-    +'<div style="font-size:12px;text-align:center;opacity:.85">Starting another one abandons it'
-    +(boss?' \u2014 and walking from a boss costs a heart.':'.')+'</div>'
-    +'<div class="gbx-btn primary" style="height:46px" id="pdResume">RESUME IT</div>'
-    +'<div class="gbx-btn" style="height:42px" id="pdDiscard">PLAY THIS ONE INSTEAD</div>');
-  var r=document.getElementById('pdResume'),d=document.getElementById('pdDiscard');
-  if(r)r.onclick=function(){_gbModalClose();try{SFX.nav();}catch(e){}resumeMatch();};
-  if(d)d.onclick=function(){_gbModalClose();try{SFX.nav();}catch(e){}onYes();};
-}
+/* P693: _confirmDiscardPending removed - launching over a pending match
+   RESUMES it now, per Denis. Abandoning is Settings' job. */
 function launchSeat(seatIdx){
-  if(S&&S.pendingMatch&&!window._fkDiscardOk){
-    _confirmDiscardPending(function(){window._fkDiscardOk=true;try{launchSeat(seatIdx);}finally{window._fkDiscardOk=false;}});
-    return;
-  }
+  /* P693: a waiting match takes precedence - straight back to the table,
+     no modal (Denis: "bring me to the match automatically"). Probes and
+     the deliberate-abandon path can set _fkDiscardOk to launch anyway. */
+  if(S&&S.pendingMatch&&!window._fkDiscardOk){resumeMatch();return;}
   _getS();_ensureNight();
   var night=S.run.night;
   if(!night||seatIdx<0||seatIdx>=night.roster.length)return;
@@ -40668,10 +40671,7 @@ function launchPatronMatch(isHandicap){
 
 function launchBossMatch(){
   _getS();
-  if(S&&S.pendingMatch&&!window._fkDiscardOk){
-    _confirmDiscardPending(function(){window._fkDiscardOk=true;try{launchBossMatch();}finally{window._fkDiscardOk=false;}});
-    return;
-  }
+  if(S&&S.pendingMatch&&!window._fkDiscardOk){resumeMatch();return;}/* P693 */
   /* P682: the stale-seat hygiene half of the same fix */
   window._lastSeatArt=null;window._lastSeatTrait=null;
   var tier=TIERS[S.run.tier]||TIERS[0];
@@ -41742,7 +41742,14 @@ function _applyDebugUrlTriggers(){
 /* ═══════ BOOTSTRAP ═══════ */
 document.addEventListener('DOMContentLoaded', function(){
   _getS();
-  try{showScreen('menu');}catch(e){console.error('showScreen failed:',e);}
+  /* P695: a waiting match outranks the menu - open the app, be at the
+     table (Denis: "so I don't have to click anything"). One resume path:
+     the same resumeMatch Settings and the room banner use. */
+  var _booted=false;
+  if(S&&S.pendingMatch){
+    try{resumeMatch();_booted=true;}catch(e){console.error('boot resume failed:',e);}
+  }
+  if(!_booted){try{showScreen('menu');}catch(e){console.error('showScreen failed:',e);}}
   setupDiceLongPress();
   _applyDebugUrlTriggers();
   /* Sync body.reduced-motion class from stored settings so idle-breath animation

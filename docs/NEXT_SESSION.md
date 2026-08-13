@@ -228,3 +228,52 @@ cache from device-specific. Enchant-crash save/console text still wanted
 (OPEN.md #12). The launch-to-idle headless stall remains a probe-environment
 flake (it also manufactured tonight's false "adoption race"): if a probe
 reports no idle, retry the launch once before believing anything.
+
+---
+
+## 2026-08-13, fourth stretch
+
+ONE-TAP RETURN (P693+P695, Denis's ask): a waiting match now takes you
+straight back. Tapping any seat resumes it instead of asking - the P692
+confirm modal lived exactly one stretch, _confirmDiscardPending is deleted -
+and OPENING THE APP boots directly into the pending match, menu only as the
+no-match/failed-resume fallback. Verified: seat-tap over a pending boss match
+lands back in that same match; a scheduled location.reload landed on the
+match screen with zero taps (the screenshot is the proof - a probe cannot
+return a value across a reload).
+
+PROBE CONTRACT CHANGE (supersedes the modal note in the stretch above):
+relaunching over a live S.pendingMatch now RESUMES silently. A probe that
+wants a genuine relaunch must set window._fkDiscardOk=true.
+
+PHONE SHADOWS, the real split (P694): pre-Safari-18 has no ctx.filter, so
+the fallback drew the hull fully OFF-canvas and let only its cast shadow
+land in place - and WebKit's accelerated canvas culls offscreen primitives
+WITH their shadows. Chromium paints the detached shadow (hence "full ink in
+emulation"), the iPhone paints nothing. Exactly the reported split. Replaced
+with three concentric hull fills (scale 1.0/1.14/1.30, alpha .55/.30/.15 of
+base) - nothing offscreen, no cast shadows, rasterised identically
+everywhere. Forced-fallback probe (window.__cfBlur=false):
+ink 14090 / 95 paints / 0 errors - tools/apv_p694_fallback.js. DENIS MUST
+CONFIRM ON THE PHONE: no local instrument runs real WebKit.
+
+THE BREATHING LOOP COULD DIE AT LAUNCH (P696 - found by P694's control leg
+reading zero): _candleLoop's tick exits whenever it runs before matchPlate
+is ready, and the plate waits on the table image. On a slow first load BOTH
+of _matchDress's restarts (+0ms, +900ms) hit that window and nothing ever
+revived the loop - candle static, prop shadows frozen, dice shadows only on
+discrete dirty marks (and the first roll's mid-fade marks all abort at the
+not-yet-adopted D3X._tbl gate, so: no shadows until the first keep).
+Measured: settled patron match, painter called 0 times in 2.8s. Two one-line
+revivals through the loop's own _candleOn guard (D3X's dirty consumer + the
+P687 image-load listener); the same control now reads 23 calls / ink 11887.
+
+INSTRUMENT NOTE, refined: a STRAIGHT-TO-BOSS headless launch can reach idle,
+roll 6 dice, and still never adopt 3D match dice (D3X._tbl false, the three
+'loose' draft dice only) - three runs in a row did this. Patron-first is the
+reliable probe path for anything that needs the shadow painter
+(tools/apv_p694_fallback.js is the template).
+
+STILL WITH DENIS: dice shadows on the actual iPhone, post-deploy. Enchant
+crash save/console (OPEN.md #12). Suite baseline still stale
+(node tools/run_probes.js --record on a quiet build).
