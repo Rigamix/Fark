@@ -196,3 +196,35 @@ instrument note is in _diag_shadows.js.
 Suite baseline still stale (run `node tools/run_probes.js --record` on a
 quiet build). Dev server: worktree on 8085 (python http.server, restart if
 dead); probes need FARK_URL=http://localhost:8085/fark_proto.html.
+
+---
+
+## 2026-08-13, third stretch (deployed: ba0cc35)
+
+Book + trophy shelf REMOVED (P690 - book had zero callers; shelf contradicted
+the brief's no-shelf ruling, TO THE SHELF button gone with it). The dice-lane
+defect list is CLOSED: nine parallel re-derivations, three real fixes shipped
+(P691 - D25 seventh-seat push -> P522-style swap; D10b dead-loans by stash
+index; D6a the amber preserves the SEAT), the rest confirmed closed at their
+recorded patches; the plan doc's status tables now match their own entries.
+
+SAVE SYSTEM (P692, from a measured audit - report in the agent transcript,
+probes tools/apv_save_cost*.js): saving costs 0.03ms on a 5.3KB payload =
+free. Fixes: a second snapshot boundary at endPTurn (a bank can never be
+lost), the resume banner is back on the room screen, and launching over a
+pending match asks first (RESUME IT / PLAY THIS ONE INSTEAD). Full
+per-action saving NOT done deliberately: it flips the resume-replay contract
+that every rollback (P511/P536/P537/P539) depends on - see the audit before
+attempting.
+
+PROBE-BREAKING CHANGE: relaunching a match over a live S.pendingMatch now
+opens the confirm modal. Probes must set window._fkDiscardOk=true before a
+mid-state relaunch, or finish/exit the match first.
+
+STILL WITH DENIS: phone shows no dice shadows while the live build measures
+full ink in emulation (patron 108 / boss 118-130, lifecycle deltas correct)
+- need a full phone screenshot or a clear-site-data reload to split stale
+cache from device-specific. Enchant-crash save/console text still wanted
+(OPEN.md #12). The launch-to-idle headless stall remains a probe-environment
+flake (it also manufactured tonight's false "adoption race"): if a probe
+reports no idle, retry the launch once before believing anything.
