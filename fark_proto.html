@@ -19993,6 +19993,10 @@ function _dsClear(){
   x.clearRect(0,0,cv.width,cv.height);
   return x;
 }
+/* P686: THE one way to say 'a die's state changed, repaint the shadows'.
+   Same mark-dirty idiom the shadow tick already runs on; calling it twice
+   costs one boolean write. */
+function _dsDirty(){try{if(window.D3X)D3X._shDirty=true;}catch(e){}}
 function _drawDiceShadows(tSec){
   var cv=document.getElementById('dsCanvas'),ml=window._mLight;
   if(!cv){_dsClear();return;}
@@ -20009,7 +20013,16 @@ function _drawDiceShadows(tSec){
   var x=cv.getContext('2d');x.setTransform(dpr,0,0,dpr,0,0);
   x.clearRect(0,0,W,H);
   /* already cleared above, so this one may simply leave */
-  if(!_tblImg.complete||!_tblImg.naturalWidth)return;
+  /* P687: ...but not silently forever. The settle marks have already
+     passed by the time a slow table image arrives, so a fresh match
+     painted NO dice shadows until some unrelated dirty event. The prop
+     painter re-queues itself on the image's load (its own copy of this
+     exact trap); the dice painter now does the same, through the one
+     dirty mark. */
+  if(!_tblImg.complete||!_tblImg.naturalWidth){
+    if(!_tblImg.complete)_tblImg.addEventListener('load',function(){_dsDirty();},{once:true});
+    return;
+  }
   var C=[[-1,-1,-1],[1,-1,-1],[-1,1,-1],[1,1,-1],[-1,-1,1],[1,-1,1],[-1,1,1],[1,1,1]];
   window._dsState={x:x,sc:sc,ml:ml,dpr:dpr,f:f,alphaB:alphaB};
   /* the 3D dice: project the real cube through the live camera and hand
@@ -20032,6 +20045,14 @@ function _drawDiceShadows(tSec){
         /* Denis: keep the tray simple - the kept dice are out of the light,
            so a cast shadow under them reads as a second light source */
         if(D3X._rowKey(dd)==='keptRow')return;
+        /* P686: the STATE test the row test was standing in for - kept dice
+           stay on the throw line now, so the row never changes and a kept
+           die kept its shadow forever. A committed die casts nothing. */
+        try{
+          if(G&&G.pool&&G.pool.some(function(p){
+            return p.committed&&p.el&&(p.el===dd.chip||p.el.contains(dd.chip));
+          }))return;
+        }catch(eC){}
         dd.obj.updateMatrixWorld(true);
         var pts=[],L=[[-.5,-.5,-.5],[.5,-.5,-.5],[-.5,.5,-.5],[.5,.5,-.5],
                       [-.5,-.5,.5],[.5,-.5,.5],[-.5,.5,.5],[.5,.5,.5]];
@@ -20161,7 +20182,11 @@ function _matchDress(isBoss){
     if(scEl2){if(!isBoss&&window._lastSeatColor)scEl2.style.setProperty('--patCol',pcol);
       else scEl2.style.removeProperty('--patCol');}
   }
-  if(isBoss){window._mLight={on:false};return;}
+  /* P685: bosses used to skip the whole dressing pass here (no candle, no
+     props, no shadows) - and the off-flag it left was overwritten by
+     _mLightCalc on every shadow tick anyway, so boss shadows flickered
+     between sessions depending on which ran last. Denis: one setting for
+     all matches. The gate goes; bosses dress like everyone else. */
   if(!G._propSeed)G._propSeed=1+((Math.random()*1e9)|0);
   var a0=G._propSeed;
   var rnd=function(){a0|=0;a0=a0+0x6D2B79F5|0;var t=Math.imul(a0^a0>>>15,1|a0);
@@ -22162,6 +22187,11 @@ function _removeDieAt(lane,opts){
      turn dealt zero dice: a match that looks live and cannot be won, with
      nothing on screen ever saying so. Reject a malformed lane at the door. */
   if(!G||typeof lane!=='number'||!isFinite(lane)||lane<0)return false;
+  /* P686: every removal - shatter, steal, sacrifice, vanish, trade-out -
+     already funnels through here (the one-exit-path rule), so this ONE mark
+     covers them all. A mark on a removal that later rejects costs nothing:
+     the repaint just redraws the same shadows. */
+  _dsDirty();
   /* P519: AND A FLOOR OF ONE LANE, which is the floor Break has always had -
      _breakBegin requires a live target other than the committed source. There
      was no reason for the other removers to be allowed past it. If Obsidian
@@ -23114,6 +23144,7 @@ var D3X={
   shatter:function(el){
     var d=null;this.dice.forEach(function(q){if(q.chip===el)d=q;});
     if(!d||d.burst||!window.THREE)return;
+    _dsDirty();/* P686: the shadow tracks the burst instead of outliving it */
     d.burst={t0:performance.now(),
       ax:new THREE.Vector3(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5)
            .normalize()};
@@ -28862,7 +28893,8 @@ function handleRoll(){
       _cfHit=true;pts=Math.floor(pts/2);spawnPop('💀 −HALF');
       try{SFX.err&&SFX.err();}catch(e){}
     }
-    selDice.forEach(d=>{d.committed=true;d._frozen=false;d.el.classList.remove('selected','die-frozen');d.el.classList.add('committed');d.el.onclick=null;d.el.style.cursor='default';if(d.el._d3)D3.draw(d.el._d3);});
+    selDice.forEach(d=>{d.committed=true;d._frozen=false;d.el.classList.remove('selected','die-frozen');
+      _dsDirty();/* P686: its shadow goes with the keep */d.el.classList.add('committed');d.el.onclick=null;d.el.style.cursor='default';if(d.el._d3)D3.draw(d.el._d3);});
     SFX.commit();Haptic.commit();
     /* AN ICON-ONLY KEEP LEAVES NO GROUP BEHIND. It has no scoring dice and no
        points, so this pushed {vals:[],pts:0} - the empty row handleBank already
@@ -29483,7 +29515,7 @@ function _afterRollImpl(){
      so without this guard Last Stand banked 600 for a die that must bank
      zero AND skipped its effect. */
   if(G.pCards.includes('last_stand')&&free.length===1&&(freeV[0]===1||freeV[0]===5)&&!_dieIsIcon(free[0])){
-    const d=free[0];d.committed=true;if(d.el){d.el.classList.add('committed');d.el.onclick=null;if(d.el._d3)D3.draw(d.el._d3);}
+    const d=free[0];d.committed=true;_dsDirty();/* P686 */if(d.el){d.el.classList.add('committed');d.el.onclick=null;if(d.el._d3)D3.draw(d.el._d3);}
     /* P560: `d` is a live pool die and carries d.ench - the same object
        _rollD and _dieIsIcon read. The gate above is !_dieIsIcon(free[0]),
        so this die is NOT on its brand face, which is precisely the case
@@ -30922,7 +30954,7 @@ function handleBank(){
       if(G._breakPending&&G._breakPending.length){/* P526 */
         var _bkBp=_shiftBreak();/* P526: leaves the rest queued */
         if(!_bkBp)_bkBp={src:null};
-        selD.forEach(function(d){d.committed=true;d.sel=false;
+        selD.forEach(function(d){d.committed=true;d.sel=false;_dsDirty();/* P686 */
           if(d.el){d.el.classList.remove('selected');d.el.classList.add('committed');d.el.onclick=null;}});
         G._breakThenBank=true;/* _breakDie finishes the bank once a die is tapped */
         /* THE KEEP IS BANKED ONLY ON THE PATH THAT RETURNS. This push used to
@@ -30967,7 +30999,7 @@ function handleBank(){
       pts=_applyCommitBonuses(_bkScore,pts,cards);
       var _cfBank=false;
       if(false&&selD.some(function(d){return d.cursed;})){_cfBank=true;pts=Math.floor(pts/2);spawnPop('💀 −HALF');try{SFX.err&&SFX.err();}catch(e){}}
-      selD.forEach(d=>{d.committed=true;d._frozen=false;if(d.el){d.el.classList.remove('selected','die-frozen');d.el.classList.add('committed');d.el.onclick=null;if(d.el._d3)D3.draw(d.el._d3);}});
+      selD.forEach(d=>{_dsDirty();d.committed=true;d._frozen=false;if(d.el){d.el.classList.remove('selected','die-frozen');d.el.classList.add('committed');d.el.onclick=null;if(d.el._d3)D3.draw(d.el._d3);}});
       /* An icon-only keep has no scoring dice and no points, so this entry was
          `{vals:[],pts:0}` - an empty group in the kept tray that also counted
          as zero dice in the committed count Half Measure reads. The die itself
