@@ -277,3 +277,73 @@ reliable probe path for anything that needs the shadow painter
 STILL WITH DENIS: dice shadows on the actual iPhone, post-deploy. Enchant
 crash save/console (OPEN.md #12). Suite baseline still stale
 (node tools/run_probes.js --record on a quiet build).
+
+---
+
+## 2026-08-13, fifth stretch
+
+SHADOWS CONFIRMED ON DEVICE (P694 worked). P699 raises the base band
+0.45 -> 0.58, both blur and concentric paths.
+
+WIN-SCREEN CARD FOCUS = THE SHELF TREATMENT (P697b/c/d). First shipped as
+the match grow+stagger; Denis: that state is MATCH-ONLY - "other focus
+states should all match the same style between dice, cards, etc." So the
+match-focus extensions were reverted verbatim and the win screen got the
+FIFTH near-copy of the shop/shelf focus by the P609 ruling (fly to centre +
+scrim + #foFocusPanel joining the grouped panel selectors). Offer panel
+carries CLAIM (the shop BUY plaque relabelled); deck row inspect-only;
+drag-to-slot untouched, guarded against starting under an open focus.
+Scrim lives INSIDE .res-card (giant-inset #loFocusScrim trick) because the
+overlay chrome above z1 (win-board z3, skip z6) is instead hidden
+instantly by .fo-focus rules.
+
+P698: the offer block gets a floor as well as a ceiling - res-card top
+49.5% + bottom above the SKIP pill, .fo-wrap flexes across the span,
+.fo-deck margin-top:auto pins the slots to the bottom. The tall-phone dead
+band is spent on every device; P643's 5vh counterweight retired.
+
+INSTRUMENT TRAP, NEW AND NASTY: on a STATIC surface this headless browser
+produces no frames on demand, so a CSS transition never resolves its start
+time - computed value pinned at the FROM state, playState 'running',
+currentTime 0 forever, and it OUTRANKS !important (transitions sit above
+everything in the cascade). An injected opacity:1 !important could not move
+the scrim. The shelf only measures clean because its dice canvas demands
+frames continuously. Probe pattern: inject transition:none on the pieces
+under test (apv_p697_698.js header), and treat screenshots - which force
+BeginFrames - as the visual truth.
+
+P700: a RESUMED PATRON KEEPS FACE AND VOICE. The seat identity is three
+window globals (_lastSeatArt/_lastSeatTrait/_lastSeatColor); only
+launchSeat wrote them, and P693's guard returns into resumeMatch before the
+stamping lines - so every resume dressed a faceless, silent patron (the bug
+Denis hit). One stamper (_stampSeatIdentity), three callers; resume
+restamps from the snapshot's deep-cloned rung. Verified: wipe globals,
+resumeMatch -> art matches launch, portrait url back, _dlgSay(art) works.
+
+P701: THE BUBBLE STOPS MOVING. #dlgBox lived inside #diceArea; the bust
+shake's transform made #diceArea its containing block (the documented
+#tellBadge mechanism, never applied to the bubble) and overflow:hidden
+clipped it mid-shake. Now a direct child of #screen-match,
+position:absolute, z 9500 (over focus 9000/9001, under #end-ov by DOM
+order). The second mover: height:0 box + centred content = top edge moved
+with the bubble's own line count; a fixed 24cqw .dlg-inner centres 1-line
+and 3-line bubbles identically, --dlg-y 25 -> 13cqw keeps the old centre.
+Measured: centre drift 0.0 short vs long vs mid-shake.
+
+P702: SCORING FACE BRIGHT, SIDES IN SHADOW (Denis's ask). Not lights - one
+scene serves shelf and table, ambient floors the dark, and the 42deg tilt
+misaligns any down-light. _dimMap bakes the composed atlas with every cell
+multiplied by SIDEDIM ('#5a3d24', the one tunable) except the scoring
+value's; hard-swapped while d.phys holds (tray swap-don't-fade rule),
+restored in the air and at table changes BEFORE _trayTint can cache a
+dimmed base. Value rides d.roll.val -> d.phys.v. Cache keys on the
+composed map object + value, so {mat, ench} travel together. Verified: 6/6
+settled dice dimmed, phys.v === chip._trueVal; A/B with near-black SIDEDIM
+shows every top lit, every side black, enchanted die included.
+KNOWN SCOPES: a resumed never-rolled die rests bright (no phys.v - mixed
+look after resume, accepted for now); an enchant brand on a side face keeps
+its emissive glow through the dim (reads as glowing in shadow, deliberate).
+If Denis wants the dim stronger: D3X.SIDEDIM, one line.
+
+STILL WITH DENIS: enchant crash save/console (OPEN.md #12); suite baseline
+re-record; SIDEDIM strength + the resumed-dice bright rest, on device.
