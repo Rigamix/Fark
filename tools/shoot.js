@@ -117,6 +117,13 @@ const FLAGS = [
   /* WebGL in headless falls back to SwiftShader; without these the dice
      canvas comes back as a blank rectangle and the shot lies by omission. */
   '--enable-unsafe-swiftshader',
+  /* headless counts as hidden: without these, page setTimeouts get batched
+     to ~1s+ alignment and every timing measurement measures the throttle,
+     not the game (seen 2026-08-13: five timers due 500-1300ms all fired at
+     6851ms). */
+  '--disable-background-timer-throttling',
+  '--disable-renderer-backgrounding',
+  '--disable-backgrounding-occluded-windows',
   '--use-gl=angle', '--use-angle=swiftshader',
   '--window-size=' + VW + ',' + VH,
   'about:blank',
