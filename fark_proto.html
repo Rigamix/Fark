@@ -9797,6 +9797,16 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
   60%  {transform:scale(1);opacity:1}
   100% {transform:scale(.85);opacity:0}
 }
+/* P716: the row shield - one bloom around the dice row when a save eats
+   a bust. Colour rides --shc: amber, ward ink, or card gold. */
+.bust-shield-row{position:absolute;z-index:95;pointer-events:none;
+  border-radius:18px;border:2px solid var(--shc,#9ab0d0);
+  animation:rowShield 1.25s ease-out forwards}
+@keyframes rowShield{
+  0%{opacity:0;box-shadow:0 0 0 0 var(--shc,#9ab0d0);transform:scale(.92)}
+  22%{opacity:.95;box-shadow:0 0 34px 10px color-mix(in srgb,var(--shc,#9ab0d0) 55%,transparent)}
+  70%{opacity:.6;box-shadow:0 0 20px 6px color-mix(in srgb,var(--shc,#9ab0d0) 35%,transparent)}
+  100%{opacity:0;box-shadow:0 0 0 0 transparent;transform:scale(1.02)}}
 
 /* ── Counterfeit dice — purple smoke + skull overlay ── */
 .die.die-kindred{position:relative}
@@ -14209,9 +14219,9 @@ var FAM_CARDS=[
         'While trailing by 1000 or more, your banks TAKE their points instead of just gaining. Two fifths of each bank is stolen from them.',
         'While trailing by 1000 or more, your banks TAKE their points instead of just gaining. Three fifths of each bank is stolen from them.']},
  {id:'fair_trade',fam:'silver',kind:'active',name:'Fair Trade',charges:[1,1,2],
-  text:['Before you roll, swap one of your six dice for another from your stash. For this roll only.',
-        'Before you roll, swap one of your six dice for another from your stash. The swap lasts the whole turn.',
-        'Before you roll, swap one of your six dice for another from your stash. The swap lasts the whole turn. Twice a match.']},
+  text:['Before you roll, your weakest die makes way for the best die you have won off another table. For this turn only.',
+        'Before you roll, your weakest die makes way for the best die you have won off another table. For this turn only.',
+        'Before you roll, your weakest die makes way for the best die you have won off another table. For this turn only. Twice a match.']},
  /* OBSIDIAN */
  {id:'powder_keg',fam:'obsidian',kind:'active',name:'Powder Keg',charges:[1,2,2],
   text:['Blow up your whole roll: every die rerolls, kept ones included. Once per match.',
@@ -16495,6 +16505,7 @@ function famFoolsGold(free){
   var fv=free.map(function(d){return d.val;}),fm=free.map(function(d){return d.mat;});
   if(anyScoring(fv,effectiveCards(),fm,free)){
     _steadyDisarm();/* these dice are new - the arm was about the old ones */
+    try{_bustShieldFX('#ffd98a');}catch(e){}/* P716: the gamble held - shield, not bust */
     free.forEach(function(d){if(d.el)d.el.onclick=function(){toggleDie(d);};});
     G.phase='choosing';try{refreshSelUI();}catch(e){}
     return true;
@@ -23389,6 +23400,26 @@ var D3X={
       ax:new THREE.Vector3(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5)
            .normalize()};
   },
+  /* P716: THE BUST SCATTER. A planar kick on every settled die in the
+     row - outward from the lane centre, decaying slide + tabletop spin
+     over the frozen phys pose (the burst's idiom). The dice END
+     displaced; the wipe collects them. dist is in die-widths. */
+  KICK:{ms:620,dist:1.5,spin:4.5},
+  scatterRow:function(sel){
+    if(!this.ready||this.fail||!this.PHYS||!this.PHYS.on)return 0;
+    var self=this,n2=0,t0=performance.now();
+    this.dice.forEach(function(d){
+      if(!d.match||!d.phys||d.burst||d.kick)return;
+      if(!d.chip||!d.chip.closest||!d.chip.closest(sel))return;
+      d.kick={t0:t0,
+        vx:((d.phys.x>=0?1:-1)*(0.55+Math.random()*0.9)+((Math.random()-0.5)*0.4))*self.KICK.dist,
+        vz:(Math.random()-0.35)*self.KICK.dist*0.8,
+        sp:(Math.random()<0.5?-1:1)*(2+Math.random()*3)};
+      n2++;
+    });
+    if(n2)this._shDirty=true;
+    return n2;
+  },
   _burstPose:function(d){
     var B=this.BURST,t=(performance.now()-d.burst.t0)/B.ms;
     if(t<0)t=0;
@@ -24875,7 +24906,7 @@ var D3X={
     /* one playback per die: two throws can be in the air at once without
        either being dropped */
     var t0=performance.now();
-    mine.forEach(function(d,i){d.roll={sol:sol,i:i,t0:t0,val:b.vals[i]};d.phys=null;});/* P702: val rides along */
+    mine.forEach(function(d,i){d.roll={sol:sol,i:i,t0:t0,val:b.vals[i]};d.phys=null;d.kick=null;});/* P702 val rides; P716 kick clears with the pose */
   },
   /* untransformed centre of every tracked match die, in mount space */
   /* A die's home is where its box sits with no transform. Clearing the
@@ -25831,7 +25862,7 @@ var D3X={
            some dice in the row and not others. */
         if(d.rk===undefined){d.rk=rkNow;}
         else if(d.rk!==rkNow){
-          d.rk=rkNow;d.phys=null;d.roll=null;
+          d.rk=rkNow;d.phys=null;d.roll=null;d.kick=null;/* P716 */
           d.w0=cr.width;d.hx=undefined;d.tx=0;d.ty=0;
           if(d.obj.parent&&d.obj.parent!==D3X.scene)D3X.scene.add(d.obj);
           d.chip.style.translate='';
@@ -25890,6 +25921,20 @@ var D3X={
           d.obj.visible=true;d.obj.scale.setScalar(1);
           d.obj.position.set(d.phys.x,d.phys.y,d.phys.z);
           d.obj.quaternion.copy(d.phys.q);
+          /* P716: the bust kick rides ON TOP of the frozen pose - ease-out
+             to its displaced rest, spinning about the die's own up axis so
+             the scoring face stays up. Shadows track while it moves. */
+          if(d.kick){
+            var _kt2=(performance.now()-d.kick.t0)/D3X.KICK.ms;
+            if(_kt2>1)_kt2=1;
+            var _ke2=1-Math.pow(1-_kt2,2.4);
+            d.obj.position.x+=d.kick.vx*_ke2;
+            d.obj.position.z+=d.kick.vz*_ke2;
+            var _kq2=(D3X._kq||(D3X._kq=new THREE.Quaternion()));
+            _kq2.setFromAxisAngle(D3X._kup||(D3X._kup=new THREE.Vector3(0,1,0)),d.kick.sp*_ke2*0.3);
+            d.obj.quaternion.multiply(_kq2);
+            if(_kt2<1)D3X._shDirty=true;
+          }
           /* P702: scoring face bright, sides in shadow - derived from
              map identity every frame, so a reskin/rebrand self-heals on
              the next one (the spent-look lesson; no flags). P703: the
@@ -28389,6 +28434,36 @@ function _bankCelebrate(amount){
   if(sc){sc.classList.remove('bank-pop');void sc.offsetWidth;sc.classList.add('bank-pop');setTimeout(()=>sc.classList.remove('bank-pop'),550);}
 }
 /* ── Bust impact: vignette + table shake + scatter ── */
+/* P716: THE SHIELD. A save reads as protection AROUND THE ROW, not a
+   bust: one bloom ring over the dice row (the orphaned Silver shieldFire
+   look re-homed row-wide, no emoji - P684's rule), an FX diamond ring
+   pushed outward, SFX.shield - in the saver's own colour. */
+function _bustShieldFX(color){
+  try{
+    var row=document.getElementById('playerDiceRow');if(!row)return;
+    var r=row.getBoundingClientRect();if(!r.width)return;
+    var ms=document.getElementById('screen-match')||document.body;
+    var sr=ms.getBoundingClientRect();
+    var ov=document.createElement('div');ov.className='bust-shield-row';
+    ov.style.setProperty('--shc',color||'#9ab0d0');
+    ov.style.left=(r.left-sr.left-14)+'px';ov.style.top=(r.top-sr.top-16)+'px';
+    ov.style.width=(r.width+28)+'px';ov.style.height=(r.height+32)+'px';
+    ms.appendChild(ov);
+    setTimeout(function(){try{ov.remove();}catch(e){}},1300);
+    try{SFX.shield&&SFX.shield();}catch(e){}
+    if(window.FX&&FX.emit){
+      var cx=r.left+r.width/2,cy=r.top+r.height/2;
+      for(var i2=0;i2<22;i2++){
+        var an=(i2/22)*Math.PI*2;
+        FX.emit({x:cx+Math.cos(an)*r.width*0.5,y:cy+Math.sin(an)*r.height*0.62,
+          vx:Math.cos(an)*42,vy:Math.sin(an)*30-12,g:60,
+          life:520+Math.random()*260,size:3+Math.random()*3,
+          rot:Math.random()*6.28,vr:2,shape:(i2%3)?'diamond':'star',
+          color:color||'#9ab0d0'});
+      }
+    }
+  }catch(e){}
+}
 function _bustImpact(){
   const area=document.getElementById('diceArea');
   area.classList.remove('bust-shake');void area.offsetWidth;
@@ -28399,6 +28474,10 @@ function _bustImpact(){
   /* Scatter dice with CSS animation */
   const row=document.getElementById('playerDiceRow');
   if(row)row.querySelectorAll('.die').forEach(el=>{el.classList.add('scatter');if(el._d3)D3.draw(el._d3);});
+  /* P716: the REAL scatter - a physical kick across the table. The class
+     above stays: it dims the 3D dice and pauses idles, and its CSS
+     nudges are the no-physics fallback. */
+  try{if(window.D3X)D3X.scatterRow('#playerDiceRow');}catch(e){}
 }
 /* Align overlay word element to vertical centre of the dice area, not screen centre */
 function _alignOverlayWord(wordEl){
@@ -30404,6 +30483,7 @@ function _tryBustSave(free){
   var _bankable=G.kept.length>0||(G._turnBonusPot||0)>0;
   if(_drillCapped&&!_bankable)return false;
   function _runSave(label,text){
+    try{_bustShieldFX('#ffd98a');}catch(e){}/* P716: every card save shields */
     free.forEach(d=>{if(d.el){d.el.classList.add('bust');if(d.el._d3)D3.draw(d.el._d3);setTimeout(()=>{if(d.el)d.el.remove();},380);}});
     G.pool=G.pool.filter(d=>d.committed);G.phase='idle';
     /* Flag the turn as a bust-save turn. Subsequent dialogue triggers
@@ -30572,6 +30652,7 @@ function doBust(){
        save used, so no route out of here still owes the player one. */
     G._bustImmuneTurn=false;
     try{setStatusMsg('AMBER HOLDS — THAT SAVE IS SPENT','gold');famLog('AMBER HOLDS — ONE BUST EATEN, THE NEXT ONE LANDS');}catch(e){}
+    try{_bustShieldFX('#e8a23c');}catch(e){}/* P716: amber's shield */
     var _amFree=G.pool.filter(function(d){return !d.committed;});
     /* Keep rerolling until the hand can actually be played. Without this the
        reroll could land dead and leave the player with no legal move and no
@@ -30650,6 +30731,7 @@ function doBust(){
     var _half=Math.floor(_wardTotal*(_wardBoosted?2/3:1/2));
     try{setStatusMsg('WARD HOLDS — '+(_wardBoosted?'TWO-THIRDS':'HALF')+' SURVIVES: '+_half,'gold');
       famLog('WARD — '+(_wardBoosted?'TWO-THIRDS':'HALF')+' THE TURN SURVIVES ('+_half+')');}catch(e){}
+    try{_bustShieldFX('#9ab0d0');}catch(e){}/* P716: the ward's shield */
     G.pPts=(G.pPts||0)+_half;
     /* AFTER the half lands and BEFORE G.kept is emptied. Both tolls read
        G.pPts and one of them reads G.kept, so this is the only point in the
@@ -30693,6 +30775,7 @@ function doBust(){
      wind card works?" — now it's a clean, predictable one-shot rescue. */
   if(G.activeCardState&&G.activeCardState.secondWindActive){
     G.activeCardState.secondWindActive=false;clearCardLabel('second_wind');
+    try{_bustShieldFX('#ffd98a');}catch(e){}/* P716: the points survive - it reads as a save */
     /* Apply bust to all visible dice in the row (not just G.pool — see comment in main bust path) */
     (function(){var _r=document.getElementById('playerDiceRow');if(_r)Array.prototype.forEach.call(_r.querySelectorAll('.die'),function(el){el.style.opacity='';el.style.filter='';el.classList.add('bust');if(el._d3)D3.draw(el._d3);});})();
     setStatusMsg('SECOND WIND — 3-DICE RESCUE!','gold');triggerCard('second_wind','RESCUE ROLL!',true);
@@ -30762,6 +30845,7 @@ function doBust(){
           _kt.querySelectorAll('.die').forEach(function(el){if(el._d3)D3.draw(el._d3);});},900);}}catch(e){}
     _bustImpact();
     if(window.DLG)DLG.trigger('PLAYER_BUST');
+    setTimeout(function(){try{_bustShieldFX('#ffd98a');}catch(e){}},1000);/* P716: bust lands, the card catches it (B1) */
     /* Save fires AFTER the bust beat (~1s) so the relief reads clearly */
     setTimeout(function(){
       if(_tsSaved>0){G.pPts+=_tsSaved;spawnPop('+'+_tsSaved+' THICK SKIN');}
@@ -30807,6 +30891,7 @@ function doBust(){
     _bustImpact();
     if(window.DLG)DLG.trigger('PLAYER_BUST');
     setTimeout(function(){
+      try{_bustShieldFX('#ffd98a');}catch(e){}/* P716: same beat as Thick Skin (B1) */
       if(_lsSaved>0){G.pPts+=_lsSaved;spawnPop('+'+_lsSaved+' LAST STITCH');}
       triggerCard(_lsCid,'STITCHED '+_lsSaved,true);
       setStatusMsg('THE LAST STITCH SAVED '+_lsSaved+'!','gold');
@@ -30825,6 +30910,7 @@ function doBust(){
      decisive use of the one charge. */
   if(G.activeCardState&&G.activeCardState.stitchActive){
     G.activeCardState.stitchActive=false;clearCardLabel('mabels_stitch');
+    try{_bustShieldFX('#ffd98a');}catch(e){}/* P716 */
     const saved=G.kept.reduce((a,k)=>a+k.pts,0)+(G._turnBonusPot||0);
     G._turnBonusPot=0;
     /* Apply bust to all visible dice in the row */

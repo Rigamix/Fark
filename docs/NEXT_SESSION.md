@@ -417,8 +417,57 @@ single soft shadow read as nothing under a card in hand); spent cards stop
 bobbing and take no tap-scale. NOT probe-verified (night-1 run holds no
 family cards - the probe's card block skipped); cascade reviewed instead.
 
-STILL OPEN: bust scatter + shield (OPEN.md #14 holds the design questions;
-the full implementation map lives in the workflow journal - see
-wf_58c2953d-b65/journal.jsonl, 'bustFlow/d3xTools/plan'). Fair Trade ruling
-(OPEN.md #13). The dead screens (screen-draft, screen-bossreward - zero
-showScreen callers) can be excised next pass.
+STILL OPEN at the time: bust scatter + shield and the Fair Trade ruling -
+both landed below.
+
+---
+
+## 2026-08-14, second stretch (P714-P717)
+
+P714 THE LEGACY-ART PURGE (Denis: nothing in assets/ should ever load).
+Measured first: the live room is ENTIRELY the new pt-stage painting - every
+old-layer piece invisible beneath it, still fetching at parse or on room
+entry. All removed: 4 room statics + 4 nav icons, five dead CSS urls, the
+8 per-boss ::before match skins, both legacy portrait maps (bosses resolve
+through their OLD keys - GROG is 'drunkard' - to previous-game busts; maps
+emptied, readers guard), the hidden roster renderer + innkeep builder. JMH
+Beda moved out of assets/_mockups. Kept and named: cards/, win/, loss/,
+Audio/, vendor/, models/, Macondo, table_commoner.webp (current art, old
+folder). Room verified pixel-identical.
+
+P715 per Denis: boss SPLASH removed (its boss-music cue moved to both
+launch and resume paths - it lived inside the splash); the POUCH removed
+entirely (not part of the new system, even with renown) - the last legacy
+image load went with it; the shop-door note withdrawn.
+
+P716 BUST SCATTER + SHIELD (the last playthrough note). Scatter =
+D3X.scatterRow: a planar kick per settled die - outward slide + tabletop
+spin over the frozen phys pose (the burst idiom), dice END displaced, the
+wipe collects them; kick clears wherever the pose clears. The CSS .scatter
+class stays as the 3D dim + no-physics fallback. Shield = _bustShieldFX:
+row-rect bloom ring (the orphaned Silver shieldFire look re-homed, no
+emoji) + FX diamond ring + SFX.shield, coloured per saver (amber / ward
+ink / card gold). Wired at: the _runSave funnel, Amber, Ward, Fool's Gold
+claim, Second Wind + Mabel's Stitch (shield at trigger), Thick Skin + Last
+Stitch (full bust THEN shield at the +1s save beat, per the B1 ruling).
+Verified: 6/6 dice kicked and displaced >0.3 die-widths, displacement
+holds, ring mounts/leaves; screenshot shows the thrown-apart table.
+
+P717 Fair Trade wears the stopgap wording from OPEN.md #13's rec (no
+stash, no false one-roll promise, no implied choice). The deeper ruling -
+reword-only vs retire vs surface-the-reserve - is still Denis's.
+
+INSTRUMENT NOTE: CSS ANIMATIONS freeze like transitions do in starved
+headless (the shield ring measured opacity 0 mid-animation; the end-of-run
+screenshot rendered it fine). Probes should assert mount/geometry/removal
+and leave animated opacity to screenshots.
+
+PROCESS NOTE, again and enforced: the bash-heredoc backslash trap struck a
+THIRD time writing a patch tail - \\n collapsed to a real newline inside a
+python source string. Patch scripts are written by the Write/Edit tools
+ONLY, never assembled through a heredoc.
+
+STILL WITH DENIS: enchant crash (OPEN.md #12); Fair Trade deep ruling
+(#13); boss-peek/end-screen busts or name-only (#15); git-rm of the
+unreferenced legacy files; suite baseline re-record; on-device checks of
+the scatter feel, shield colours, dim ramp, halved SIDEDIM.
