@@ -789,7 +789,7 @@ body{letter-spacing:.045em}
 #nrChalk .nrN{color:#ffd98a;letter-spacing:.06em;font-size:6.3cqh;line-height:1.25;
   text-shadow:0 2px 0 rgba(58,32,8,.85),0 4px 14px rgba(0,0,0,.75)}
 #famRunDraft.focus #nrChalk{opacity:0}
-#nrDice{position:absolute;left:0;right:0;top:47%;z-index:3;display:flex;gap:6%;
+#nrDice{position:absolute;left:0;right:0;top:47%;z-index:3;display:flex;gap:10%;/* P720: spread out, per Denis */
   justify-content:center}
 #nrDice .nrdie{position:relative;width:20%;aspect-ratio:1/1.5;display:flex;flex-direction:column;align-items:center;
   justify-content:flex-start;color:#f0e3c6;cursor:pointer;font-size:2.1cqh;text-align:center;
@@ -799,7 +799,14 @@ body{letter-spacing:.045em}
 #nrDice .nrdie:active{transform:scale(.94)}
 #nrDice .nrdie .d3host{width:100%;aspect-ratio:1;position:relative;display:flex;
   align-items:center;justify-content:center}
-#nrDice .nrdie .sub{margin-top:10%;text-shadow:0 2px 4px rgba(0,0,0,.7)}
+/* P720: the name does not ride the entrance scale - it FADES IN at its
+   final position once its die has landed, and sits lower off the die. */
+#nrDice .nrdie .sub{margin-top:24%;text-shadow:0 2px 4px rgba(0,0,0,.7);
+  opacity:0;animation:nrSubIn .45s ease-out forwards}
+#nrDice .nrdie:nth-child(1) .sub{animation-delay:1.5s}
+#nrDice .nrdie:nth-child(2) .sub{animation-delay:1.7s}
+#nrDice .nrdie:nth-child(3) .sub{animation-delay:1.9s}
+@keyframes nrSubIn{from{opacity:0}to{opacity:1}}
 /* ── die focus: fly to camera, glow + sparks, white read-out ── */
 #nrScrim{position:absolute;inset:0;z-index:5;opacity:0;pointer-events:none;transition:opacity .35s;
   background:radial-gradient(ellipse at 50% 28%,rgba(10,6,2,.22),rgba(10,6,2,.6) 78%)}
@@ -10979,6 +10986,20 @@ function _getS(){
     if(S.run.night===undefined)S.run.night=null;
     /* P718: fair_trade retired - a held copy vanishes from the deck */
     if(Array.isArray(S.run.fcards))S.run.fcards=S.run.fcards.filter(function(c){return !c||c.id!=='fair_trade';});
+    /* P720b: the SAME scrub for what the deck migration missed - roster
+       patrons dealt fair_trade before P718, and a pending snapshot's
+       family-card layer. A dormant CFX with a live orphan inst is the
+       half-retired state this file keeps warning about. */
+    if(S.run.night&&Array.isArray(S.run.night.roster))S.run.night.roster.forEach(function(p){
+      if(p&&Array.isArray(p.fcards))p.fcards=p.fcards.filter(function(c){return !c||c.id!=='fair_trade';});
+    });
+    if(S.pendingMatch&&S.pendingMatch.famState){
+      var _fs=S.pendingMatch.famState;
+      Object.keys(_fs).forEach(function(kk){
+        if(Array.isArray(_fs[kk])&&_fs[kk].some(function(c){return c&&c.id==='fair_trade';}))
+          _fs[kk]=_fs[kk].filter(function(c){return !c||c.id!=='fair_trade';});
+      });
+    }
     /* chalkboard meta: rebuild plain faces for any points earned pre-board */
     if(!Array.isArray(S.run._chalkMeta)){S.run._chalkMeta=[];for(var _cm=0;_cm<(S.run.points||0);_cm++)S.run._chalkMeta.push('face');}
     /* P541: an existing save can already be short - the pre-P541 3-point win
@@ -11823,6 +11844,10 @@ famState:{
 }
 function resumeMatch(){
   var snap=S&&S.pendingMatch;if(!snap)return;
+  /* P720: warm the 3D stack NOW - a resumed turn rolls almost on arrival,
+     and the first roll used to pay script-load + first-solve right while
+     the player was trying to tap (Denis: "couldn't click anything"). */
+  try{if(window.D3X){D3X.boot&&D3X.boot();D3X._warmCannon&&D3X._warmCannon();}}catch(e){}
   /* P700: restamp the identity the launcher never got to write - the
      snapshot's rung IS the deep-cloned patron, art and persona included.
      Boot, Settings, banner and both launch redirects all pass here. */
@@ -15876,8 +15901,9 @@ function _fkSeatDo(si){
   var rc=document.querySelector('#end-ov .res-card');
   if(rc)rc.innerHTML='<div style="font-family:'+"'JMH Beda'"+',serif;font-size:15px;color:#3a2812;padding:30px 12px;text-align:center;line-height:1.5">'
     +getDie(t.mat).name.toUpperCase()+' TAKES THE SEAT — '+getDie(out).name.toUpperCase()+' RETIRES'
-    +(outE?'<div style="font-size:11px;color:#8a4a18;margin-top:6px">its brand goes with it</div>':'')
-    +(t.persona?'<div style="font-size:11px;color:#6a5238;margin-top:6px">its owner will remember</div>':'')+'</div>';
+    +(outE?'<div style="font-size:11px;color:#8a4a18;margin-top:6px">its brand goes with it</div>':'')+'</div>';
+  /* P720: no caption about remembering - the patron SAYS so at the
+     rematch (the grudge moment below). */
   _famEndReady();
 }
 function _fkSeatSkip(){
@@ -18265,7 +18291,8 @@ function _dlgOutcome(won){
 /* the moments these answer, and which side each belongs to */
 var _DLG_MOMENT={OPP_BUST:'bust',PLAYER_BUST:'yourBust',
                  OPP_BIG_BANK:'bank',BIG_BANK:'yourBank',
-                 OPP_HESITATE_PUSH:'push',OPP_HESITATE_BANK:'banksafe'};
+                 OPP_HESITATE_PUSH:'push',OPP_HESITATE_BANK:'banksafe',
+                 GRUDGE_TAKEN:'grudge'/* P720: you kept a die of theirs */};
 /* sitting down opposite them is where a patron's OWN voice belongs, and it
    routes through _dlgSay so their stage advances and the arc moves */
 var _DLG_PERSONAL={MATCH_START:1,REMATCH_START:1};
@@ -18391,6 +18418,21 @@ var PATRON_LINES=[
      Barks are blurts in each voice, 5+5 (Golgoth 2+2 - near-silence IS his
      design). Slang sparing, per the doc: Fark! once, Roller/bust-hand/
      born-rolling-ones only where a trait or theme earns them. ═══ */
+  /* P720: the grudge barks - a patron of an archetype you took a die
+     from opens the rematch with it. Two voices per trait; Denis may
+     reword in his own pass. */
+  {p:'trait:steady:grudge',s:0,g:'v0',t:"That die in your hand was ours."},
+  {p:'trait:steady:grudge',s:0,g:'v1',t:"We remember what you took."},
+  {p:'trait:strong:grudge',s:0,g:'v0',t:"My die. Your hand. We settle that tonight."},
+  {p:'trait:strong:grudge',s:0,g:'v1',t:"You took from us. Sit down."},
+  {p:'trait:orderly:grudge',s:0,g:'v0',t:"One die short since you last sat here. Noted."},
+  {p:'trait:orderly:grudge',s:0,g:'v1',t:"The ledger says you owe us a die."},
+  {p:'trait:reckless:grudge',s:0,g:'v0',t:"Ha! The die thief returns!"},
+  {p:'trait:reckless:grudge',s:0,g:'v1',t:"Roll it. The one you stole. I dare you."},
+  {p:'trait:greedy:grudge',s:0,g:'v0',t:"You cost us a die. Tonight it comes back with interest."},
+  {p:'trait:greedy:grudge',s:0,g:'v1',t:"That was a GOOD die you walked off with."},
+  {p:'trait:cunning:grudge',s:0,g:'v0',t:"I remember what left with you last time."},
+  {p:'trait:cunning:grudge',s:0,g:'v1',t:"Still carrying it? Thought so."},
   {p:'trait:steady:bust',s:0,g:'v0',t:"Ah, well."},
   {p:'trait:steady:bust',s:0,g:'v1',t:"That's that, then."},
   {p:'trait:steady:bust',s:0,g:'v2',t:"Meh. Happens."},
@@ -23887,7 +23929,7 @@ var D3X={
       b.linearDamping=.02;b.angularDamping=.06;
       world.add(b);bodies.push(b);
     }
-    var frames=[],it=0,over=0,boostFrom=-1,still=0;
+    var frames=[],it=0,over=0,boostFrom=-1,still=0,_cockedFor=[];/* P720 */
     var settled=function(){
       for(var k=0;k<N;k++){
         if(bodies[k].velocity.norm()>P.stopV||bodies[k].angularVelocity.norm()>P.stopW)return false;
@@ -23900,7 +23942,11 @@ var D3X={
         var b2=bodies[k];
         /* grip belongs to the CONTACT, not to the air: friction on the desk
            is what stops a landed die, and it is 0.42. */
-        b2.linearDamping=hot?.55:.02;b2.angularDamping=hot?.5:.06;
+        b2.linearDamping=hot?.55:.02;
+        /* P720: a die mid-TIP is exempt from the settle damping - the
+           heavy value is for skating, and it turned every topple into
+           slow-motion jelly. */
+        b2.angularDamping=(hot&&!this._cocked(b2.quaternion))?.5:.06;
         /* The lane spring is gone. It pulled every die toward its slot for the
            whole flight with a gain that ROSE from 1.0 to 2.2 as the die slowed -
            strongest exactly while it was being watched settle, which is what
@@ -23953,6 +23999,20 @@ var D3X={
         }
         still=(mvx<P.stillEps)?still+1:0;
         if(still>=14&&it>36)break;
+      }
+      /* P720: a die balanced on its edge earns its tip after ten still
+         frames of ITS OWN - the old gate waited for the whole pile, and
+         the tape faithfully recorded the wait as a die hanging on its
+         edge for seconds. */
+      for(var kc=0;kc<N;kc++){
+        var bkc=bodies[kc];
+        if(bkc.velocity.norm()<=P.stopV&&bkc.angularVelocity.norm()<=P.stopW&&this._cocked(bkc.quaternion)){
+          _cockedFor[kc]=(_cockedFor[kc]||0)+1;
+          if(_cockedFor[kc]>=10){
+            _cockedFor[kc]=0;
+            bkc.angularVelocity.set((Math.random()*2-1)*2.6,0,(Math.random()*2-1)*2.6);
+          }
+        }else _cockedFor[kc]=0;
       }
       if(settled()){
         var anyCocked=false;
@@ -24675,7 +24735,7 @@ var D3X={
      two maps, so gradual = QUANTIZED BAKES: steps of ~4%% walked on a
      smoothstepped ramp, each cached per composed map + value + step. */
   SIDEDIM_MAX:0.5,
-  SIDEDIM_RAMP:{delay:150,dur:700,steps:8},
+  SIDEDIM_RAMP:{delay:0,dur:350,steps:8},/* P720: twice as fast, lands WITH the die */
   _dimMap:function(tex,v,k){
     if(!tex||!tex.image||!v||!k)return null;
     if(!tex.userData)tex.userData={};
@@ -25937,12 +25997,26 @@ var D3X={
           d.obj.position.set(pose.x,pose.y,pose.z);
           d.obj.quaternion.copy(pose.q);
           D3X._airTint(d,pose.y);
-          /* P702 mirror: back in the air, back to the authored map */
-          d.obj.traverse(function(o){
-            if(!o.isMesh||!o.material||o.userData.outline)return;
-            var m=o.material;
-            if(m.userData&&m.userData.liveMap&&m.map!==m.userData.liveMap){m.map=m.userData.liveMap;m.needsUpdate=true;}
-          });
+          /* P702 mirror / P720: the sides fall into shadow AS THE DIE
+             LANDS - the landing value rides the tape (d.roll.val) and the
+             tape's end is a known moment, so the ramp finishes exactly at
+             touchdown. Early flight restores the authored map, which is
+             also what un-dims a rerolled die. */
+          (function(){
+            var R2=d.roll,_lt=(R2&&R2.sol&&R2.sol.frames)?R2.t0+R2.sol.frames.length*(D3X.PHYS.dt*1000):0;
+            var _kL=_lt?(performance.now()-(_lt-D3X.SIDEDIM_RAMP.dur))/D3X.SIDEDIM_RAMP.dur:0;
+            if(_kL<0)_kL=0;if(_kL>1)_kL=1;
+            _kL=_kL*_kL*(3-2*_kL);
+            var _kkL=(Math.round(_kL*D3X.SIDEDIM_RAMP.steps)/D3X.SIDEDIM_RAMP.steps)*D3X.SIDEDIM_MAX;
+            d.obj.traverse(function(o){
+              if(!o.isMesh||!o.material||o.userData.outline)return;
+              var m=o.material;
+              if(!m.userData)m.userData={};
+              if(!m.userData.liveMap)m.userData.liveMap=m.map;
+              var want=(_kkL>0&&R2&&R2.val?D3X._dimMap(m.userData.liveMap,R2.val,_kkL):null)||m.userData.liveMap;
+              if(m.map!==want){m.map=want;m.needsUpdate=true;}
+            });
+          })();
           D3X._weightOutline(d);
           if(d.burst)D3X._burstPose(d);
           e._d3xOwned=true;
@@ -35644,7 +35718,7 @@ const LEDGER_LINES={
      5-9s) and were too tightly spaced. trigger() now blocks until
      busyUntil + gap. */
   const DLG={lastTime:0,cooldown:4000,busyUntil:0,gap:1400,hideTimer:null,active:false,oppKey:null,usedLines:{},cardFiredThisMatch:{},
-    prob:{MATCH_START:1,REMATCH_START:1,CARD_EFFECT:.8,RISKY_REROLL:.5,GREEDY_REROLL:.5,EARLY_BANK:.3,BIG_BANK:.6,PLAYER_BUST:.85,PLAYER_HOT_DICE:1,PLAYER_TRIPLE:.4,PLAYER_STRAIGHT:1,PLAYER_SIX_KIND:1,PLAYER_TAKES_LEAD:.45,PLAYER_NEAR_WIN:.7,OPP_BUST:.8,OPP_BIG_BANK:.6,OPP_TAKES_LEAD:.45,OPP_NEAR_WIN:.7,MATCH_CLOSE:.4,LOSING_BADLY:.35,WINNING_BADLY:.35,OPP_WINS:1,CARD_FIRE:1,PLAYER_CARD_REACT:1,TELL:1,/* P632: low on purpose. A rival turn holds three or four decisions, so a
+    prob:{MATCH_START:1,REMATCH_START:1,GRUDGE_TAKEN:1,CARD_EFFECT:.8,RISKY_REROLL:.5,GREEDY_REROLL:.5,EARLY_BANK:.3,BIG_BANK:.6,PLAYER_BUST:.85,PLAYER_HOT_DICE:1,PLAYER_TRIPLE:.4,PLAYER_STRAIGHT:1,PLAYER_SIX_KIND:1,PLAYER_TAKES_LEAD:.45,PLAYER_NEAR_WIN:.7,OPP_BUST:.8,OPP_BIG_BANK:.6,OPP_TAKES_LEAD:.45,OPP_NEAR_WIN:.7,MATCH_CLOSE:.4,LOSING_BADLY:.35,WINNING_BADLY:.35,OPP_WINS:1,CARD_FIRE:1,PLAYER_CARD_REACT:1,TELL:1,/* P632: low on purpose. A rival turn holds three or four decisions, so a
        high number stops the pause reading as a pause; and these share the
        spacing gate with OPP_BUST and OPP_BIG_BANK, which are the payoff
        beats. This is the dial - there is no other. */OPP_HESITATE_PUSH:.3,OPP_HESITATE_BANK:.3},
@@ -37610,6 +37684,8 @@ var _rdTs=params._resumeData._tradeSwaps;
       return;
     }
     DLG.trigger('MATCH_START');
+    /* P720: the archetype you robbed says so at the rematch */
+    if(G.rung&&G.rung.grudge){setTimeout(function(){if(window.DLG)DLG.trigger('GRUDGE_TAKEN');},2000);}
     /* NPC rivalry dialogue based on streak history */
     var _rivalNs=rung.key&&S.npcState&&S.npcState[rung.key]?S.npcState[rung.key]:null;
     if(_rivalNs){

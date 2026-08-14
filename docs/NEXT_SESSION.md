@@ -467,7 +467,44 @@ THIRD time writing a patch tail - \\n collapsed to a real newline inside a
 python source string. Patch scripts are written by the Write/Edit tools
 ONLY, never assembled through a heredoc.
 
-STILL WITH DENIS: enchant crash (OPEN.md #12); Fair Trade deep ruling
-(#13); boss-peek/end-screen busts or name-only (#15); git-rm of the
-unreferenced legacy files; suite baseline re-record; on-device checks of
-the scatter feel, shield colours, dim ramp, halved SIDEDIM.
+STILL WITH DENIS at the time: most landed below.
+
+---
+
+## 2026-08-14, third stretch (P718-P720b)
+
+P718 FAIR TRADE RETIRED (Denis's ruling a) - For Keeps seats its prize on
+the spot: the taken die asks WHICH SEAT it takes on the win-card surface,
+the outgoing die retires WITH its brand, or leave it on their table. The
+invisible reserve is dead; relic spoils still feed it - OPEN.md #13 asks
+seats-or-trophies (rec: trophies).
+P719 the LUCKY-DIE TAKE retired (census first: the die itself is every
+patron's first die and STAYS; what went is the collecting - off the For
+Keeps table, luckyNames + three_lucky with it).
+P720 five notes: (1) the grudge SPEAKS - _DLG_MOMENT 'grudge', two lines
+per trait, fired 2s into a rematch vs a grudge patron; the seat-screen
+caption is gone. Grudge now plants on SEATING any For Keeps die. (2) the
+first-night draft: dice gap 10%, labels drop lower and FADE IN at final
+position after their die lands. (3) the side-face dim lands WITH the die -
+the tape's end is a known moment and the value rides it, ramp 350ms.
+(4) the jelly edge: per-die cocked dice earn their tip after ten still
+frames of their own (the old gate waited for the whole pile - the tape
+recorded the wait), and a tipping die is exempt from the heavy settle
+damping. (5) resumeMatch warms D3X.boot + cannon so the resumed turn's
+first roll stops paying script-load + first-solve mid-tap.
+P720b the P718 migration's missing half: roster patrons and pending
+snapshots dealt fair_trade before P718 are scrubbed at load.
+
+INSTRUMENT LESSONS, two: the 'Cannot read text of null' page-crash chased
+across three runs WAS THE PROBE - apv_p716_scatter still asserted the
+P717-era famDef('fair_trade').text after P718 retired the card (assert
+against the code as it IS, not as the probe remembers). And the draft
+label-fade probe measured after the animation delay had passed - subEarly
+must be sampled <1.5s from the draft appearing.
+
+STILL WITH DENIS: enchant crash (OPEN.md #12); relic spoils destination
+(#13); boss-peek/end-screen busts or name-only (#15); git-rm of the dead
+legacy files; suite baseline re-record; ON DEVICE: the resume unlock feel
+(the warm shipped - if it still sticks, the next suspect is the first
+synchronous solve itself), the dim-lands-with-the-die look, the edge-tip
+speed, grudge barks at a rematch.

@@ -1,5 +1,6 @@
 /* P716: the kick displaces settled dice and holds; the shield ring mounts
  * and leaves; the full impact wires both. P717 text check. SUITE: exclude */
+window.__errs=window.__errs||[];window.addEventListener('error',e=>{window.__errs.push((e.message||'')+' @L'+e.lineno+' | '+String(e.error&&e.error.stack||'').slice(0,500));});
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const until=async(fn,ms)=>{const t0=Date.now();while(Date.now()-t0<ms){try{if(fn())return true;}catch(e){}await sleep(60);}return false;};
 const vis=el=>{if(!el||!el.isConnected)return false;const s=getComputedStyle(el),r=el.getBoundingClientRect();
@@ -49,10 +50,12 @@ out.shield={mounted:!!sh,visible:vis(sh)};
 await sleep(1400);
 out.shield.gone=!document.querySelector('.bust-shield-row');
 
-/* P717 */
-out.ftText=famDef('fair_trade').text[0].indexOf('weakest die')>=0
- &&famDef('fair_trade').text[0].indexOf('stash')<0;
+/* P717 -> P718: the card is RETIRED now; the old .text read was this
+ * probe's own crash ("reading 'text' of null" - the instrument, not the
+ * game). */
+out.ftGone=!famDef('fair_trade');
 
+out.errs=window.__errs.slice(0,3);
 out.verdict=out.kicked>=3&&out.moved>=3&&out.holds&&out.scatterClass>0
- &&out.shield.mounted&&out.shield.visible&&out.shield.gone&&out.ftText;
+ &&out.shield.mounted&&out.shield.visible&&out.shield.gone&&out.ftGone;
 return out;
