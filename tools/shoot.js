@@ -69,9 +69,12 @@ if (!EDGE) { console.error('no Edge/Chrome found'); process.exit(2); }
       tree is still alive — ~30 orphaned headless msedge.exe accumulated
       this way (2026-08-14). A live orphan also keeps its profile dir
       locked, which starved the directory pass below. Ours are picked out
-      by command line: --headless plus a [\/]shoot- user-data-dir, which
-      matches the current layout (tmp/shoot-profiles/shoot-*) AND legacy
-      tmp/shoot-* leftovers, and nothing else. Whether the run that made
+      by the [\/]shoot- user-data-dir marker ALONE - not --headless, because
+      Edge's crashpad-handler and utility children carry the profile path
+      but NOT the headless flag, and a crashpad orphan sat at 45% CPU after
+      its parent died (2026-08-14, second incident). The marker matches the
+      current layout (tmp/shoot-profiles/shoot-*) AND legacy tmp/shoot-*
+      leftovers, and nothing else. Whether the run that made
       a candidate is still alive comes from its profile's .shoot-owner
       marker, so a concurrent shoot and a --keep browser are skipped.
 
@@ -88,7 +91,7 @@ var PROFILE_ROOT = path.join(os.tmpdir(), 'shoot-profiles');
   try {
     /* -EncodedCommand sidesteps the cmd/PS double-quoting swamp entirely */
     var ps = 'Get-CimInstance Win32_Process -Filter "Name=\'msedge.exe\' or Name=\'chrome.exe\'" | ' +
-             "Where-Object { $_.CommandLine -match '--headless' -and $_.CommandLine -match '[\\\\/]shoot-' } | " +
+             "Where-Object { $_.CommandLine -match '[\\\\/]shoot-' } | " +
              'ForEach-Object { "$($_.ProcessId)`t$($_.CommandLine)" }';
     rows = execFileSync('powershell.exe',
       ['-NoProfile', '-NonInteractive', '-EncodedCommand',
