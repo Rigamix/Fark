@@ -11915,7 +11915,56 @@ _getS(); // Initialize on load
 
 /* ═══════ NAVIGATION SYSTEM ═══════ */
 let _currentScreen = 'menu';
+/* P723: THE LOAD VEIL. A screen change goes black instantly and fades
+   back once every image the arriving screen holds has loaded or errored
+   - art never pops in piece by piece (Denis). Inline styles on purpose:
+   they read back reliably and no cascade can fight them. */
+var _veilEl=null,_veilTok=0;
+function _loadVeilShow(){
+  if(!_veilEl){
+    _veilEl=document.createElement('div');_veilEl.id='loadVeil';
+    _veilEl.style.cssText='position:fixed;inset:0;background:#000;z-index:2147480000;display:none;opacity:0';
+    document.body.appendChild(_veilEl);
+  }
+  _veilEl.style.transition='none';
+  _veilEl.style.opacity='1';
+  _veilEl.style.display='block';
+  _veilEl.style.pointerEvents='auto';
+}
+function _loadVeilRelease(scope){
+  var tok=++_veilTok;
+  /* one beat so the arriving screen's init has injected its DOM */
+  setTimeout(function(){
+    if(tok!==_veilTok)return;
+    var imgs=[];
+    try{imgs=[].slice.call((scope||document).querySelectorAll('img'))
+      .filter(function(i){return i.src&&!i.complete;});}catch(e){}
+    var left=imgs.length,done=false;
+    function go(){
+      if(done||tok!==_veilTok)return;done=true;
+      requestAnimationFrame(function(){
+        if(!_veilEl||tok!==_veilTok)return;
+        _veilEl.style.transition='opacity .3s ease';
+        _veilEl.style.opacity='0';
+        _veilEl.style.pointerEvents='none';
+        setTimeout(function(){if(tok===_veilTok&&_veilEl)_veilEl.style.display='none';},380);
+      });
+    }
+    function one(){if(--left<=0)go();}
+    if(!left){go();return;}
+    imgs.forEach(function(i){
+      i.addEventListener('load',one,{once:true});
+      i.addEventListener('error',one,{once:true});
+    });
+    /* the cap: a 404 or stalled fetch must never wedge the game */
+    setTimeout(go,2500);
+  },60);
+}
+var _veilFirstNav=true;/* boot's first showScreen veils too - black into the title */
 function showScreen(name, data) {
+  var _veilOn=(_currentScreen!==name)||_veilFirstNav;
+  _veilFirstNav=false;
+  if(_veilOn)_loadVeilShow();
   document.querySelectorAll('.screen.active').forEach(s => s.classList.remove('active'));
   document.getElementById('screen-' + name).classList.add('active');
   _currentScreen = name;
@@ -11932,6 +11981,7 @@ function showScreen(name, data) {
     case 'match': initMatchScreen(data); break;
     case 'gameover': initGameOverScreen(); break;
   }
+  if(_veilOn)_loadVeilRelease(document.getElementById('screen-'+name));/* P723 */
 }
 
 
