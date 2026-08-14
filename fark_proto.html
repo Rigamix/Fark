@@ -20699,7 +20699,7 @@ function _matchDress(isBoss){
   placed.forEach(function(q){
     var w=q.w;
     var img=document.createElement('img');
-    img.src=PP+q.n+'.png?v=2';
+    img.src=PP+'optimized/'+q.n+'_opt.webp';/* P721: the webps existed, unreferenced */
     img.style.cssText='left:'+q.x.toFixed(1)+'%;top:'+q.y.toFixed(1)+'%;width:'+w.toFixed(1)+'%;'
       +'transform:rotate('+q.rot+'deg) scale('+(q.fx||1)+','+(q.fy||1)+')';
     pr.appendChild(img);
@@ -20717,7 +20717,7 @@ function _matchDress(isBoss){
     var flat=_flatOf(q.n);
     var mag=Math.max(0.7,len*0.045)*flat;
     var ox=dx/len*mag,oy=(dy/len*mag)/1.9;
-    _jobs.push({src:PP+q.n+'.png?v=2',x:+(q.x+ox).toFixed(2),y:+(q.y+oy).toFixed(2),
+    _jobs.push({src:PP+'optimized/'+q.n+'_opt.webp',/* P721 */x:+(q.x+ox).toFixed(2),y:+(q.y+oy).toFixed(2),
       /* P592: THE SILHOUETTE'S INFLATION SCALES WITH `flat` TOO. This was a flat
          w*1.1 for every prop - a shadow 10% wider than its object, sticking out
          on EVERY side including the one facing the light. That is what Denis
@@ -35882,9 +35882,31 @@ const LEDGER_LINES={
    the deliberate DOM-dice fallback, so a bad device loses nothing. */
 (function(){
   function warm(){try{if(window.D3X&&D3X.boot)D3X.boot();}catch(e){}}
+  /* P721: the prop kit rides the same idle beat - by the first match the
+     dress finds every silhouette in cache instead of fetching the picked
+     set while the player watches a bare table. ~38 small webps, trickled
+     two at a time so the preload never competes with anything urgent. */
+  function warmProps(){
+    try{
+      var PPw=(window.FK_ART&&FK_ART.props)||'Art/Assets/Match/Commoner/Props/';
+      var names=['bag','bottle','bottle01','bottle02','bowl_dirty','bowl_full',
+        'bread','candle','cauldron','cheese','coins','cork','fork','grapes',
+        'jug','key','knife','lantern','loaf','mug01','mug_empty','olives',
+        'package','plank','plateMetal','plateWood','pouch','pouch02','pouch03',
+        'sausages','singleCoin','singleCoin_02','spoon','towel','towel01',
+        'towel02','ustensils','wine'];
+      var qi=0;
+      (function next(){
+        for(var b=0;b<2&&qi<names.length;b++,qi++){
+          var im=new Image();im.src=PPw+'optimized/'+names[qi]+'_opt.webp';
+        }
+        if(qi<names.length)setTimeout(next,120);
+      })();
+    }catch(e){}
+  }
   window.addEventListener('load',function(){
-    if(window.requestIdleCallback)requestIdleCallback(warm,{timeout:2500});
-    else setTimeout(warm,600);
+    if(window.requestIdleCallback){requestIdleCallback(warm,{timeout:2500});requestIdleCallback(warmProps,{timeout:4000});}
+    else{setTimeout(warm,600);setTimeout(warmProps,1500);}
   });
 })();
 
