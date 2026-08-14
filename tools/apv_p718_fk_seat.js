@@ -48,16 +48,13 @@ out.swap={seated:S.run.dice[2]==='iron',othersHeld:S.run.dice.every((m,i)=>i===2
  msg:rc.innerHTML.indexOf('TAKES THE SEAT')>=0,brandNote:rc.innerHTML.indexOf('brand goes with it')>=0,
  taken:window._fkTaken===null||window._fkTaken===undefined};
 
-/* the lucky path stays a trophy */
-window._fkPool=['lucky'];window._fkLucky='Old Bess';window._fkPersona='sly';
-famFkTake(0);
-await sleep(200);
-out.lucky={msg:rc.innerHTML.indexOf('OLD BESS')>=0||rc.innerHTML.indexOf('Old Bess')>=0,
- named:(S.run.luckyNames||[]).indexOf('Old Bess')>=0,
- notSeated:S.run.dice.indexOf('lucky')<0};
+/* P719: keeping his die plants the grudge; the lucky ledger has no writer */
+out.grudge={set:!!(S.run._grudges&&S.run._grudges.aggro),
+ remembered:rc.innerHTML.indexOf('its owner will remember')>=0,
+ noLuckyLedger:!(S.run.luckyNames||[]).length};
 
 out.verdict=out.ftGone.def&&out.ftGone.live&&out.ftGone.neverDealt
  &&out.offer.shown&&out.offer.seats===S.run.dice.length
  &&out.swap.seated&&out.swap.othersHeld&&out.swap.enchCleared&&out.swap.msg
- &&out.swap.brandNote&&out.lucky.msg&&out.lucky.named&&out.lucky.notSeated;
+ &&out.swap.brandNote&&out.grudge.set&&out.grudge.remembered&&out.grudge.noLuckyLedger;
 return out;

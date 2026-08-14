@@ -15822,7 +15822,8 @@ function _famFeats(win){
   /* never_small RETIRED HERE: it is TEETOTALLER now, in FEATS, with the
      brief's 500 and a painting. Keeping both paid renown twice for one act
      and only one of them could ever be seen. */
-  if((S.run.luckyNames||[]).length>=3)grant('three_lucky','THREE LUCKY DICE IN ONE RUN',25);
+  /* P719: three_lucky retired with the lucky-die take - luckyNames has no
+     writer any more. */
   if(G._sleeve==='reckoning')grant('own_reckoning','WON UNDER YOUR OWN RECKONING',30);
   /* ember_night RETIRED HERE: it is THREE TORCHES now, in FEATS, with a
      painting. Same condition, same act, one grant. */
@@ -15832,22 +15833,11 @@ function famFkTake(i){
   var pool=window._fkPool;if(!pool)return;
   var m=pool[i];if(!m)return;
   _getS();_enchInit();
-  /* P718: THE PRIZE SEATS IMMEDIATELY. The invisible reserve retired with
-     Fair Trade (Denis: only the six exist) - a real die now asks which
-     seat it takes; the lucky die stays a trophy (names + grudges), it was
-     never a playable material. */
-  if(m==='lucky'){
-    S.run.luckyNames=S.run.luckyNames||[];S.run.luckyNames.push(window._fkLucky);
-    S.run._grudges=S.run._grudges||{};
-    if(window._fkPersona)S.run._grudges[window._fkPersona]=true;/* the archetype remembers */
-    window._fkPool=null;save();
-    var rc=document.querySelector('#end-ov .res-card');
-    if(rc)rc.innerHTML='<div style="font-family:'+"'JMH Beda'"+',serif;font-size:15px;color:#3a2812;padding:30px 12px;text-align:center;line-height:1.5">'
-      +'✦ '+window._fkLucky+' IS YOURS — ITS OWNER WILL REMEMBER</div>';
-    _famEndReady();
-    return;
-  }
-  window._fkTaken={mat:m};
+  /* P718/P719: THE PRIZE SEATS IMMEDIATELY. The invisible reserve retired
+     with Fair Trade; the lucky-die take retired with luckyNames (Denis) -
+     the pool only ever holds real materials now, and the persona rides to
+     the seat so the grudge lands on the act of KEEPING his die. */
+  window._fkTaken={mat:m,persona:window._fkPersona||null};
   window._fkPool=null;save();
   _fkSeatOffer();
 }
@@ -15878,11 +15868,16 @@ function _fkSeatDo(si){
   /* the pair travels together: the outgoing die takes its brand with it,
      the incoming die arrives unbranded - both stated on screen */
   S.run.dice[si]=t.mat;S.run.dieEnch[si]=null;
+  /* P719: you KEPT his die - the archetype remembers. The grudge's old
+     only trigger was the retired lucky take; this is the act it was
+     always about. */
+  if(t.persona){S.run._grudges=S.run._grudges||{};S.run._grudges[t.persona]=true;}
   window._fkTaken=null;save();
   var rc=document.querySelector('#end-ov .res-card');
   if(rc)rc.innerHTML='<div style="font-family:'+"'JMH Beda'"+',serif;font-size:15px;color:#3a2812;padding:30px 12px;text-align:center;line-height:1.5">'
     +getDie(t.mat).name.toUpperCase()+' TAKES THE SEAT — '+getDie(out).name.toUpperCase()+' RETIRES'
-    +(outE?'<div style="font-size:11px;color:#8a4a18;margin-top:6px">its brand goes with it</div>':'')+'</div>';
+    +(outE?'<div style="font-size:11px;color:#8a4a18;margin-top:6px">its brand goes with it</div>':'')
+    +(t.persona?'<div style="font-size:11px;color:#6a5238;margin-top:6px">its owner will remember</div>':'')+'</div>';
   _famEndReady();
 }
 function _fkSeatSkip(){
@@ -34694,19 +34689,19 @@ var _DRAFT_DELAY={bossWin:500,patronWin:500,loss:900};
 
   /* For patron wins: family draft, greybox (P1 cutover) */
   if(win&&!isBoss&&G&&G._forKeeps){
-    var _fkDice=(G.rung&&G.rung.dice)||[];
-    var _fkName=(G.rung&&G.rung.lucky&&G.rung.lucky.name)||'their lucky die';
+    /* P719: the lucky die is the patron's own - it stays in their hand.
+       Only the mundane five are on the table at For Keeps. */
+    var _fkDice=((G.rung&&G.rung.dice)||[]).filter(function(m){return m!=='lucky';});
     var fkh='<div style="font-family:monospace;color:#eee;padding:10px 6px">'
       +'<div style="font-size:12px;letter-spacing:2px;color:#f8a;margin-bottom:10px">FOR KEEPS — TAKE ONE OF THEIRS</div>'
       +'<div style="display:flex;gap:6px;flex-wrap:wrap">';
     _fkDice.forEach(function(m,i){
-      var nm=m==='lucky'?('✦ '+_fkName):getDie(m).name;
       fkh+='<div onclick="famFkTake('+i+')" style="cursor:pointer;width:64px;height:64px;background:#191919;'
-        +'border:2px solid '+(m==='lucky'?'#dd6':'#777')+';display:flex;align-items:center;justify-content:center;'
-        +'font-size:9px;color:#ddd;text-align:center">'+nm+'</div>';
+        +'border:2px solid #777;display:flex;align-items:center;justify-content:center;'
+        +'font-size:9px;color:#ddd;text-align:center">'+getDie(m).name+'</div>';
     });
     fkh+='</div></div>';
-    window._fkPool=_fkDice.slice();window._fkLucky=_fkName;window._fkPersona=G.rung&&G.rung.persona;
+    window._fkPool=_fkDice.slice();window._fkPersona=G.rung&&G.rung.persona;
     if(resCard){resCard.innerHTML=fkh;resCard.classList.add('show');}
     if(endBtns)endBtns.style.display='none';
   }
