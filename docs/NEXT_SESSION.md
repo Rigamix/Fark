@@ -369,3 +369,56 @@ riding through a starved one.
 STILL WITH DENIS: enchant crash save/console (OPEN.md #12); suite baseline
 re-record; ramp feel + halved SIDEDIM on device; the resumed-dice bright
 rest.
+
+---
+
+## 2026-08-14, the playthrough-notes + load-pass batch (P704-P713)
+
+Denis's eleven notes, plus his HAR trace. Everything below is applied,
+gated, and verified by ONE consolidated probe (tools/apv_p704_713.js -
+every assert green) + the post-reload title screenshot. CPU DISCIPLINE IS
+NOW A CONSTRAINT: no parallel agent fleets, one probe run per batch, sweep
+orphaned headless browsers after every run (the harness leaked 30 - Denis's
+machine crawled; a spawned task hardens shoot.js cleanup separately).
+
+P704 win-focus panel: the flown card's caption yields while zoomed (the
+doubled ENCORE), fname band -46cqh, K 1.9 @ 0.34.
+P705 Denis REVERSED P695: boot lands on the TITLE; CONTINUE resumes a
+pending match (_hsContinueTap). Verified by planted-snapshot reload.
+P706 bubble: fit slack on the RETURNED width (scrollWidth rounds short -
+'Fine, fine.' measured 1 line now), padding 4.7/5.3 bottom-heavy for the
+iOS hhea metric sink, Raritas Regular registered + weight 400, metric
+overrides pinned, strokeW 1.5.
+P707 _rowMid refuses partial populations (the rival-reroll sideways
+glitch - kept-dice span used to centre the whole settled group).
+P708 Ill Omen: right call pays the FULL tier reward over any board (the
+capped transfer was Denis's 'no points'), unread omen refunds its charge
+at endMatch, activation line + card text name THEIR NEXT TURN, Stargazer
+renamed out of the OMEN namespace. Verified: 800 paid over an empty board.
+P709/P710 a survived boss loss = LAST ORDERS beat + _heartLossReset (one
+reset for all four heart sites: points 0 relocks the derived boss gate,
+chalk wiped, night re-rolled immediately). Verified: coins-1, points 0,
+flag set, fresh roster.
+P711 a resumed boss match replays the boss splash (the 'grog picture' -
+and the boss MUSIC starts inside it, so resumes also kept tavern music).
+P712 THE LOAD PASS: dead parse-time fetches removed (main_04 962K,
+settings.png 767K, Loadout FAB icon, hidden Innkeeper portrait, menu
+gauntlet icon); title masters -> existing optimized copies (bg 758K,
+logo 875K, buttons, book, cog - also Last Orders + gameover buttons);
+matchPlate joins the ?v=1 URL (the table loaded TWICE as two cache
+entries); levelUp_opt.webp (461K->18K) + iOS_icon_180.png (373K->54K)
+generated and swapped. HAR false alarms, checked: win/ and loss/ share
+banner/hands/panel FILENAMES (different files, no dup); bg.png-vs-bg.webp
+was Homescreen-vs-win (different assets); table_commoner.webp is the live
+body backdrop. The 25s/44s HAR gaps are BY-DESIGN lazy loads (3D engine on
+first need, audio on first tap) - menu-browsing time, not stalls.
+P713 armed glow doubles up (hot core + wide halo + brightness - the old
+single soft shadow read as nothing under a card in hand); spent cards stop
+bobbing and take no tap-scale. NOT probe-verified (night-1 run holds no
+family cards - the probe's card block skipped); cascade reviewed instead.
+
+STILL OPEN: bust scatter + shield (OPEN.md #14 holds the design questions;
+the full implementation map lives in the workflow journal - see
+wf_58c2953d-b65/journal.jsonl, 'bustFlow/d3xTools/plan'). Fair Trade ruling
+(OPEN.md #13). The dead screens (screen-draft, screen-bossreward - zero
+showScreen callers) can be excised next pass.
