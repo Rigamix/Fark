@@ -26056,7 +26056,25 @@ var D3X={
              touchdown. Early flight restores the authored map, which is
              also what un-dims a rerolled die. */
           (function(){
-            var R2=d.roll,_lt=(R2&&R2.sol&&R2.sol.frames)?R2.t0+R2.sol.frames.length*(D3X.PHYS.dt*1000):0;
+            var R2=d.roll,_lt=0;
+            if(R2&&R2.sol&&R2.sol.frames){
+              /* P724: THIS die's own settle frame, not the tape's end -
+                 found once by walking its track backward until position
+                 or orientation moved (the solver's stillness epsilon),
+                 cached on the roll. Early settlers dim while their
+                 neighbours are still in the air. */
+              if(R2._setF===undefined){
+                var _fr=R2.sol.frames,_i0=R2.i,_li=_fr.length-1;
+                while(_li>1){
+                  var _a=_fr[_li-1][_i0],_b=_fr[_li][_i0];
+                  if(Math.abs(_b.x-_a.x)+Math.abs(_b.y-_a.y)+Math.abs(_b.z-_a.z)
+                    +Math.abs(_b.qx-_a.qx)+Math.abs(_b.qy-_a.qy)+Math.abs(_b.qz-_a.qz)>0.006)break;
+                  _li--;
+                }
+                R2._setF=_li;
+              }
+              _lt=R2.t0+R2._setF*(D3X.PHYS.dt*1000);
+            }
             var _kL=_lt?(performance.now()-(_lt-D3X.SIDEDIM_RAMP.dur))/D3X.SIDEDIM_RAMP.dur:0;
             if(_kL<0)_kL=0;if(_kL>1)_kL=1;
             _kL=_kL*_kL*(3-2*_kL);
