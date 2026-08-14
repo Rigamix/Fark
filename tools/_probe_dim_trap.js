@@ -36,12 +36,21 @@ const trap=(d,idx)=>{d.obj.traverse(o=>{
    const live=m.userData&&m.userData.liveMap;
    const toBright=!!(live&&v===live);
    const fromDim=!!(live&&cur&&cur!==live);
+   /* dim strength of a texture = its kq in the live map's bake cache */
+   const kOf=tx=>{if(!tx||!live)return null;if(tx===live)return 0;
+    const dm=live.userData&&live.userData.dimMaps;if(!dm)return null;
+    for(const k in dm)if(dm[k]===tx)return parseFloat(k.split('|')[1]);
+    return null;};
+   const kNew=kOf(v),kOld=kOf(cur);
+   const regress=kOld!==null&&kNew!==null&&kNew<kOld;
    /* the stack line IS the writer: F:line:col inside fark_proto.html */
    const st=((new Error().stack)||'').split('\n').slice(2,5)
      .map(x=>x.replace(/^\s*at /,'').replace(/https?:\/\/\S*?fark_proto\.html/g,'F'))
      .join(' | ');
    if(rec.log.length<80)rec.log.push({t:Date.now()-t0,
-    toBright,fromDim,settled:!!(d.phys&&d.phys.v),rolling:!!d.roll,st});
+    toBright,fromDim,kOld,kNew,regress,
+    freshRoll:!!(d.roll&&performance.now()-d.roll.t0<300),
+    settled:!!(d.phys&&d.phys.v),rolling:!!d.roll,st});
    cur=v;}});
  });};
 handleRoll();
@@ -77,7 +86,8 @@ const bad=[],census={};
 recs.forEach(r=>r.log.forEach(e=>{
   const key=(e.toBright?'BRIGHT ':'dim ')+e.st.slice(0,110);
   census[key]=(census[key]||0)+1;
-  if(e.toBright&&e.fromDim&&e.settled)bad.push({die:r.idx,t:e.t,st:e.st.slice(0,160)});
+  if((e.toBright&&e.fromDim&&e.settled)||(e.regress&&!e.freshRoll))
+    bad.push({die:r.idx,t:e.t,kOld:e.kOld,kNew:e.kNew,settled:e.settled,st:e.st.slice(0,120)});
 }));
 return {phase1,chose,rerolled,phase2:G&&G.phase,
  badCount:bad.length,bad:bad.slice(0,10),
