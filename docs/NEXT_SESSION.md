@@ -1,8 +1,9 @@
 # NEXT SESSION — start here
 
-Tree is clean. Worktree, root `fark` and `origin/fark` are all at **28ebaea**.
-Everything below is deployed and verified live by grepping a marker on the
-served file, never by a green build.
+Worktree, root `fark` and `origin/fark` are all at **bd18aaf** (2026-08-14,
+P725b). Everything below is deployed and verified live by grepping a marker
+on the served file, never by a green build. Newest stretch is at the BOTTOM
+— read "2026-08-14, fourth stretch" first.
 
 ---
 
@@ -502,9 +503,58 @@ against the code as it IS, not as the probe remembers). And the draft
 label-fade probe measured after the animation delay had passed - subEarly
 must be sampled <1.5s from the draft appearing.
 
+## 2026-08-14, fourth stretch (P721-P725b) — deployed: bd18aaf
+
+P721 MATCH PROPS INSTANT: the table props load their optimized webps and
+idle-preload two-at-a-time, so match entry stops waiting on raw PNGs.
+P722 THE ROOM JOINS THE OPTIMIZED WORLD (the P712/P721 bug class, third
+sighting): Grog's env BG + foreground stages fetched ~5MB of raw painting
+per visit while the optimized webps sat beside them unreferenced; the
+bg3/fg3 fallbacks got optimized copies generated (197KB+134KB); the room/
+shelf/shop hearts joined the Art/Assets/Hearts/optimized set Last Orders
+already used. THE CLASS: whenever anything is slow, FIRST check whether a
+raw master is referenced while an `optimized/*_opt.webp` sibling exists.
+P723 THE LOAD VEIL: showScreen (the one navigation funnel) drops an
+instant black cover on every REAL screen change and fades it once every
+<img> in the arriving screen has loaded or errored - 2.5s cap so a stall
+can't wedge the game, token-guarded against double-navs, inline styles.
+Same-screen re-calls (the room's chips) never flash.
+P724 the side dim goes PER DIE: each die's settle frame is found once by
+walking its own track backward (position+quaternion, epsilon 0.006),
+cached as `R._setF` on the roll; its ramp ends at ITS moment, so early
+settlers dim while neighbours tumble.
+P725/P725b THE FLICKER ("appears then off then back on, as if other dice
+was still influencing it") was TWO mechanisms, both timed to OTHER dice:
+- P725: `d.phys.t` stamped the TAPE's end (the last die's settle), so an
+  early settler's finished dim re-ramped from zero at the rolling→settled
+  handoff. Both settle writers (physPose done branch + P703b watchdog)
+  now backdate t to the die's own `_setF` moment → settled ramp computes
+  k=1 instantly, map identity no-ops. ONE PAYLOAD at both sites, still.
+- P725b: the rebuild paths (_rebrand at enchant-apply, _reskin at texture
+  arrival) re-dress every material authored-bright and restamp liveMap;
+  nothing re-dimmed until the next painted frame = one full bright flash
+  per dimmed die. The settled dim is now ONE function `_settleDim` -
+  frame()'s settled branch delegates, both rebuild paths call it
+  synchronously. Probe: six dice, one dim transition each, zero flaps,
+  then a FORCED _reskin()+_rebrand() mid-dim both hold every die dim.
+
+INSTRUMENT LESSONS: the first flap probe sampled 6.5s but the tape hadn't
+ended - zero flaps over a window with no handoff proves nothing (extend
+until the event you're testing actually happens). The map-uuid tagging
+(per-die T0/T1/T2 labels) is what separated "ramp restarted" from
+"material rebuilt" - log IDENTITY, not just state. And a clean run whose
+trigger counters read zero didn't exercise the fix - the forced-rebuild
+call did (prove the hook fires).
+
 STILL WITH DENIS: enchant crash (OPEN.md #12); relic spoils destination
 (#13); boss-peek/end-screen busts or name-only (#15); git-rm of the dead
-legacy files; suite baseline re-record; ON DEVICE: the resume unlock feel
-(the warm shipped - if it still sticks, the next suspect is the first
-synchronous solve itself), the dim-lands-with-the-die look, the edge-tip
-speed, grudge barks at a rematch.
+legacy files; suite baseline re-record; ON DEVICE: the dim through a full
+roll (both flicker mechanisms fixed - watch an early settler), the veil
+feel on slow connections, the resume unlock feel (the warm shipped - if
+it still sticks, the next suspect is the first synchronous solve itself),
+the edge-tip speed, grudge barks at a rematch.
+
+HOUSEKEEPING CANDIDATES: room art still lives in assets/_mockups/new_main/
+(deserves an Art/Assets home); dead screens (screen-draft,
+screen-bossreward) excisable; tools/_p7*.py + probe scratch files could be
+tidied into a patches/ dir.
