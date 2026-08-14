@@ -554,6 +554,24 @@ bright writes left are the reroll's early-flight un-dims (by design).
 The trap probe is tools/_probe_dim_trap.js - reuse it for ANY "who
 touched this material" question.
 
+P725d (deployed eb61e04) THE FOURTH AND SUBTLEST - Denis on the P725c
+build: "still happens. Subtle but still there." Subtle was the tell: a
+PARTIAL REWIND, not a bright restore. The flight ramp ends AT the die's
+settle moment (k=1 at _lt, P720's lands-WITH-the-die); _settleDim still
+carried the pre-P720 catch-up semantic (k=0 AT phys.t, ramp after). A
+die settling within 350ms of the tape's end was rewound to partial dim
+at the handoff and re-ramped - always the last dice to land. Invisible
+to the toBright filter AND to any poll. One line: the settled ramp ends
+at phys.t too - both formulas anchor the same end moment, so they agree
+at every possible handoff. The trap now resolves every assigned texture
+to its bake strength (kq via the live map's dimMaps cache) and flags ANY
+k-regression outside a fresh throw's un-dim - zero across
+roll -> choose -> reroll. IF A SUBTLE FLICKER SOMEHOW SURVIVES on
+device: next suspects, in order - (1) first-session bake/upload hitches
+(the 8 ramp steps bake+upload lazily per value; pre-bake at match start
+would kill it), (2) the 2D drop-shadow canvas under the dice (a
+different system entirely - confirm WHICH shadow Denis means).
+
 INSTRUMENT LESSONS: the first flap probe sampled 6.5s but the tape hadn't
 ended - zero flaps over a window with no handoff proves nothing (extend
 until the event you're testing actually happens). The map-uuid tagging
