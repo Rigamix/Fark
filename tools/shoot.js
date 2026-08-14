@@ -61,50 +61,112 @@ const EDGE = [
 if (!EDGE) { console.error('no Edge/Chrome found'); process.exit(2); }
 
 /* ── startup sweep — the backstop ──────────────────────────────────
-   Signal handlers cannot run on SIGKILL or Task Manager "End task", so a
-   sweep at launch is the only thing that ever collects those. Age-gated at
-   30 minutes so a concurrently running shoot is never deleted out from
-   under itself, and fully guarded: a failure to sweep must never stop a
-   run from starting. */
+   Signal handlers cannot run on SIGKILL, Task Manager "End task", or the
+   harness timeout's TerminateProcess, so a sweep at launch is the only
+   thing that ever collects those. Two passes, in this order:
+
+   1. PROCESSES. cleanup()'s tree-kill never ran, so the whole browser
+      tree is still alive — ~30 orphaned headless msedge.exe accumulated
+      this way (2026-08-14). A live orphan also keeps its profile dir
+      locked, which starved the directory pass below. Ours are picked out
+      by command line: --headless plus a [\/]shoot- user-data-dir, which
+      matches the current layout (tmp/shoot-profiles/shoot-*) AND legacy
+      tmp/shoot-* leftovers, and nothing else. Whether the run that made
+      a candidate is still alive comes from its profile's .shoot-owner
+      marker, so a concurrent shoot and a --keep browser are skipped.
+
+   2. DIRECTORIES, now unlockable.
+
+   Age-gated / owner-gated so a concurrently running shoot is never killed
+   out from under itself, and fully guarded: a failure to sweep must never
+   stop a run from starting. */
+var PROFILE_ROOT = path.join(os.tmpdir(), 'shoot-profiles');
+
+(function sweepOrphanBrowsers(){
+  if (process.platform !== 'win32') return;
+  var rows;
+  try {
+    /* -EncodedCommand sidesteps the cmd/PS double-quoting swamp entirely */
+    var ps = 'Get-CimInstance Win32_Process -Filter "Name=\'msedge.exe\' or Name=\'chrome.exe\'" | ' +
+             "Where-Object { $_.CommandLine -match '--headless' -and $_.CommandLine -match '[\\\\/]shoot-' } | " +
+             'ForEach-Object { "$($_.ProcessId)`t$($_.CommandLine)" }';
+    rows = execFileSync('powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-EncodedCommand',
+       Buffer.from(ps, 'utf16le').toString('base64')],
+      { encoding: 'utf8', timeout: 20000 }).split(/\r?\n/).filter(Boolean);
+  } catch (e) { return; }                       /* no PowerShell, no sweep */
+  var killed = 0;
+  for (var i = 0; i < rows.length; i++) {
+    var tab = rows[i].indexOf('\t');
+    if (tab < 0) continue;
+    var pid = parseInt(rows[i].slice(0, tab), 10);
+    if (!pid) continue;
+    var m = /--user-data-dir=(?:"([^"]+)"|(\S+))/.exec(rows[i].slice(tab + 1));
+    var udd = m && (m[1] || m[2]);
+    var owner = null;
+    if (udd) {
+      try { owner = parseInt(fs.readFileSync(path.join(udd, '.shoot-owner'), 'utf8').trim(), 10); }
+      catch (e) {}                /* profile already swept - orphan for sure */
+    }
+    if (owner) {
+      var alive = true;
+      /* sends no signal - throws if the process is gone. PID reuse reads as
+         "alive", which fails SAFE: the browser lives until that pid frees. */
+      try { process.kill(owner, 0); } catch (e) { alive = false; }
+      if (alive) continue;           /* a concurrent run, or a --keep browser */
+    }
+    try { execFileSync('taskkill', ['/F', '/T', '/PID', String(pid)], { stdio: 'ignore' }); killed++; }
+    catch (e) { /* already collapsed with an earlier row's tree-kill */ }
+  }
+  if (killed) console.log('swept ' + killed + ' orphaned headless browser(s)');
+})();
+
 (function sweepStaleProfiles(){
   var STALE_MS = 30 * 60 * 1000, n = 0;
-  try {
-    var tmp = os.tmpdir();
-    for (var _i = 0, names = fs.readdirSync(tmp); _i < names.length; _i++) {
-      var name = names[_i];
-      if (!/^shoot-/.test(name)) continue;
-      var p = path.join(tmp, name);
-      try {
-        var st = fs.statSync(p);
-        if (!st.isDirectory()) continue;
+  var roots = [os.tmpdir(), PROFILE_ROOT];
+  for (var r = 0; r < roots.length; r++) {
+    try {
+      for (var _i = 0, names = fs.readdirSync(roots[r]); _i < names.length; _i++) {
+        var name = names[_i];
+        if (!/^shoot-/.test(name)) continue;
+        if (name === 'shoot-profiles') continue;  /* the parent, not a profile */
+        var p = path.join(roots[r], name);
+        try {
+          var st = fs.statSync(p);
+          if (!st.isDirectory()) continue;
 
-        /* WHO OWNS THIS? A dir whose owner process is gone is an orphan and
-           can go immediately - waiting on an age gate is what let a week of
-           runs pile up. Measured: a terminate on Windows is not catchable,
-           so cleanup() does not always get to run and this is the real bound. */
-        var owner = null;
-        try { owner = parseInt(fs.readFileSync(path.join(p, '.shoot-owner'), 'utf8').trim(), 10); }
-        catch (e) { owner = null; }
+          /* WHO OWNS THIS? A dir whose owner process is gone is an orphan and
+             can go immediately - waiting on an age gate is what let a week of
+             runs pile up. Measured: a terminate on Windows is not catchable,
+             so cleanup() does not always get to run and this is the real bound. */
+          var owner = null;
+          try { owner = parseInt(fs.readFileSync(path.join(p, '.shoot-owner'), 'utf8').trim(), 10); }
+          catch (e) { owner = null; }
 
-        if (owner) {
-          var alive = true;
-          /* sends no signal - throws ESRCH if the process is gone. PID reuse
-             reads as "alive", which fails SAFE: the age gate gets it later. */
-          try { process.kill(owner, 0); } catch (e) { alive = false; }
-          if (alive) continue;                                 /* in use */
-        } else if (Date.now() - st.mtimeMs < STALE_MS) {
-          continue;                        /* no marker - fall back to age */
-        }
+          if (owner) {
+            var alive = true;
+            /* sends no signal - throws ESRCH if the process is gone. PID reuse
+               reads as "alive", which fails SAFE: the age gate gets it later. */
+            try { process.kill(owner, 0); } catch (e) { alive = false; }
+            if (alive) continue;                                 /* in use */
+          } else if (Date.now() - st.mtimeMs < STALE_MS) {
+            continue;                        /* no marker - fall back to age */
+          }
 
-        fs.rmSync(p, { recursive: true, force: true });
-        n++;
-      } catch (e) { /* locked or vanished - the next run will get it */ }
-    }
-  } catch (e) {}
+          fs.rmSync(p, { recursive: true, force: true });
+          n++;
+        } catch (e) { /* locked or vanished - the next run will get it */ }
+      }
+    } catch (e) {}
+  }
   if (n) console.log('swept ' + n + ' stale shoot-* profile(s)');
 })();
 
-const PROFILE = fs.mkdtempSync(path.join(os.tmpdir(), 'shoot-'));
+/* A FIXED root, not the per-session scratchpad: the sweep above has to be
+   able to recognise last week's orphans, and a path that changes every
+   session cannot be a marker. */
+try { fs.mkdirSync(PROFILE_ROOT, { recursive: true }); } catch (e) {}
+const PROFILE = fs.mkdtempSync(path.join(PROFILE_ROOT, 'shoot-'));
 /* claim it, so a later run can tell "still running" from "abandoned" without
    guessing from a timestamp */
 try { fs.writeFileSync(path.join(PROFILE, '.shoot-owner'), String(process.pid)); } catch (e) {}
@@ -359,7 +421,8 @@ async function evaluate(cdp, expr, awaitPromise) {
   if (missing.length) console.log('missing (' + missing.length + '):\n  ' + missing.slice(0, 12).join('\n  '));
   console.log('wrote:\n' + shots.join('\n'));
 
-  if (!KEEP) { cdp.close(); proc.kill(); }
+  /* the kill itself belongs to cleanup(), which process.exit reaches */
+  if (!KEEP) cdp.close();
   else console.log('browser asked to stay on port ' + PORT +
                    '\n  profile at ' + PROFILE +
                    '\n  NOTE: measured - the browser is spawned as a child of this' +
@@ -370,6 +433,5 @@ async function evaluate(cdp, expr, awaitPromise) {
   process.exit(0);
 })().catch(err => {
   console.error('FAILED:', err.message);
-  try { proc.kill(); } catch (e) {}
-  process.exit(1);
+  process.exit(1);                       /* cleanup() runs on 'exit' */
 });
