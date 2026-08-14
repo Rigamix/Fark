@@ -538,13 +538,31 @@ was still influencing it") was TWO mechanisms, both timed to OTHER dice:
   synchronously. Probe: six dice, one dim transition each, zero flaps,
   then a FORCED _reskin()+_rebrand() mid-dim both hold every die dim.
 
+P725c (deployed 6570a23) THE THIRD WRITER - Denis retested (on the
+pre-P725 cached build, max-age=600, but the report was still true): the
+50ms flap sampler can't see a 16ms flash. A SETTER TRAP on every die
+material's map (Object.defineProperty, logs every assignment with the
+writer's stack line = file:line in the inline script) through a real
+roll -> choose -> reroll run caught it: the rolling branch calls
+_physPose FIRST, which on the tape's last frame settles the die
+MID-FRAME (d.roll=null, d.phys set), and the flight-dim IIFE below reads
+R2=d.roll -> null -> k=0 -> restores the bright map. One full bright
+frame on every dimmed die at the LAST die's settle; the next frame
+re-dimmed (P725's backdate), so it read as a blink. Fix: tape-just-ended
+dice go straight to _settleDim. Trap re-run: zero bad writes; the only
+bright writes left are the reroll's early-flight un-dims (by design).
+The trap probe is tools/_probe_dim_trap.js - reuse it for ANY "who
+touched this material" question.
+
 INSTRUMENT LESSONS: the first flap probe sampled 6.5s but the tape hadn't
 ended - zero flaps over a window with no handoff proves nothing (extend
 until the event you're testing actually happens). The map-uuid tagging
 (per-die T0/T1/T2 labels) is what separated "ramp restarted" from
-"material rebuilt" - log IDENTITY, not just state. And a clean run whose
+"material rebuilt" - log IDENTITY, not just state. A clean run whose
 trigger counters read zero didn't exercise the fix - the forced-rebuild
-call did (prove the hook fires).
+call did (prove the hook fires). And a POLLING probe can never rule out
+a one-frame event - only an assignment-level trap can (P725c hid from
+two clean polling verdicts).
 
 STILL WITH DENIS: enchant crash (OPEN.md #12); relic spoils destination
 (#13); boss-peek/end-screen busts or name-only (#15); git-rm of the dead
