@@ -435,7 +435,16 @@ html.fkSA #gbSheet,html.fkSA #peekSheet{padding-bottom:env(safe-area-inset-botto
    (no italic file exists in the folder), so italic is synthesized by the
    browser. Loaded from Art/Assets/Fonts/ where he put it. */
 @font-face{font-family:'Raritas';src:url('Art/Assets/Fonts/fonnts.com-Raritas-Semi-Bold.otf') format('opentype');
-  font-weight:600;font-display:swap}
+  font-weight:600;font-display:swap;
+  /* P706: pin the typo metrics (hhea says 0.96em ascent, OS/2 typo says
+     0.76 with USE_TYPO_METRICS - desktop honours it, Android reads hhea;
+     the overrides make them agree where supported) */
+  ascent-override:76%;descent-override:24%;line-gap-override:20%}
+/* P706: the REGULAR cut - already in the folder, never registered - so
+   the bubble can stop borrowing Semi-Bold (Denis: "don't make it bold") */
+@font-face{font-family:'Raritas';src:url('Art/Assets/Fonts/fonnts.com-Raritas-.otf') format('opentype');
+  font-weight:400;font-display:swap;
+  ascent-override:76%;descent-override:24%;line-gap-override:20%}
 /* CAPITAL F. The tree is assets/Fonts; these two asked for assets/fonts and
    so 404'd on GitHub Pages, which is case-sensitive, while working fine on
    Windows and macOS, which are not. */
@@ -1340,6 +1349,13 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 #end-ov>#foFocusPanel{position:absolute;z-index:55}
 #foFocusPanel .ffaces{white-space:normal}
 #end-ov .fo-card,#end-ov .fo-slot{transition:transform .18s ease,opacity .3s ease}
+/* P704: the flown card's own caption (famCardHtml's name line) rode the
+   zoom up into the panel - the doubled name in Denis's screenshot. The
+   panel's fname IS the name now; the caption yields while zoomed. */
+#end-ov .fo-card .fcv+div{transition:opacity .25s}
+#end-ov .fo-card.zoom .fcv+div{opacity:0}
+/* and the name band rises clear of the big card */
+#end-ov #foFocusPanel .fname{top:-46cqh}
 #end-ov .fo-card.zoom,#end-ov .fo-slot.zoom{z-index:60}
 #end-ov.fo-focus .fo-card:not(.zoom),#end-ov.fo-focus .fo-slot:not(.zoom){opacity:0;pointer-events:none}
 /* instant, no fade: the board is z3 - ABOVE the card's stacking context -
@@ -1914,7 +1930,10 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
      bubble on a phone while everything else scaled, which is why the text
      sat low there and not on desktop. Same numbers at the 430 design width,
      sink trimmed to ~2px. */
-  box-shadow:none;padding:5.4cqw 6cqw 4.6cqw;max-width:99%;margin:0 0 0 3cqw;flex:0 1 auto;
+  /* P706: the P677 top-heavy sink retired; slightly BOTTOM-heavy now to
+     offset the ~1.6px hhea-metric drop on mobile text stacks (Safari
+     ignores the @font-face metric overrides, so padding carries it). */
+  box-shadow:none;padding:4.7cqw 6cqw 5.3cqw;max-width:99%;margin:0 0 0 3cqw;flex:0 1 auto;
   /* and it GROWS from that corner rather than fading in place */
   transform-origin:0% 0%}
 /* behind the text, and allowed out of the box: the tail lives out here.
@@ -1962,7 +1981,7 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
    not understand color-mix keeps today's colour rather than losing the rule. */
 /* P677: upright, to try - Denis: "use the non italic version ... just to
    see if it works better". One property back if it does not. */
-#screen-match .dlg-text{font-family:var(--font-dlg);font-style:normal;font-weight:600;font-size:3.8cqw;
+#screen-match .dlg-text{font-family:var(--font-dlg);font-style:normal;font-weight:400;/* P706 */font-size:3.8cqw;
   color:var(--patCol,#3a2812);
   color:color-mix(in srgb, var(--patCol,#3a2812) 78%, #14100a);
   /* P654: .2px -> .6px. Measured over all 1075 lines: 0.2 costs nothing,
@@ -11817,6 +11836,7 @@ function abandonMatch(){
     if(_abSnap.isBoss){
       S.run.coins=Math.max(0,(S.run.coins||0)-1);
       if(S.run.coins<=0){S.run._died=true;save();showScreen('gameover');return;}
+      _heartLossReset();S.run._lastOrders=true;/* P710: abandon = the same beat */
     }else{
       /* Patron seat abandoned: it was consumed (and the buy-in paid) at
          launch — no refunds, no re-rolls. The night may now be over. */
@@ -14215,9 +14235,9 @@ var FAM_CARDS=[
         'Peek at your next roll before deciding to take it. Twice per match.',
         'Peek at your next roll before deciding to take it. Three times per match.']},
  {id:'ill_omen',fam:'starstone',kind:'active',name:'Ill Omen',charges:[1,1,1],p:[[800,400],[1200,400],[1600,300]],
-  text:["At your turn's end, declare they will bust this turn. Right: take 800 from them. Wrong: they gain 400.",
-        "At your turn's end, declare they will bust this turn. Right: take 1200 from them. Wrong: they gain 400.",
-        "At your turn's end, declare they will bust this turn. Right: take 1600 from them. Wrong: they gain 300."]},
+  text:["Declare their next turn a bust. Right: take 800. Wrong: they gain 400.",
+        "Declare their next turn a bust. Right: take 1200. Wrong: they gain 400.",
+        "Declare their next turn a bust. Right: take 1600. Wrong: they gain 300."]},
  {id:'falling_star',fam:'starstone',kind:'passive',name:'Falling Star',p:[1500,1200,1000],
   text:['Bank 1500 or more in a single turn and take another full turn immediately, opponent skipped.',
         'Bank 1200 or more in a single turn and take another full turn immediately, opponent skipped.',
@@ -15130,10 +15150,13 @@ function _foCardFocus(el,d,tier,opts){
     +'<div id="foFBack" onclick="_foUnfocus()"><img src="Art/Assets/Icons/optimized/close_opt.webp" alt="close"></div>';
   window._foFocIdx=(opts&&opts.claim!=null)?opts.claim:null;
   var gr=ov.getBoundingClientRect(),nr=el.getBoundingClientRect();
-  /* K and the landing height are _loCardFocus's numbers - one look */
-  var K=2.05,wr=(Math.random()<0.5?-1:1)*(0.6+Math.random()*1.0);
+  /* P704: NOT _loCardFocus's numbers after all - the offer card is twice
+     the shelf card's size, so 2.05 @ .365 overlapped the name above and
+     the panel below on a real phone. 1.9 @ .34 stacks name / card /
+     panel clear on both aspects. */
+  var K=1.9,wr=(Math.random()<0.5?-1:1)*(0.6+Math.random()*1.0);
   var ncx=nr.left+nr.width/2,ncy=nr.top+nr.height/2;
-  var dx=(gr.left+gr.width/2)-ncx,dy=(gr.top+gr.height*0.365)-ncy;
+  var dx=(gr.left+gr.width/2)-ncx,dy=(gr.top+gr.height*0.34)-ncy;
   el.style.transition='transform .55s cubic-bezier(.3,1.35,.35,1)';
   el.style.transform='translate('+dx.toFixed(1)+'px, '+dy.toFixed(1)+'px) rotate('+wr.toFixed(1)+'deg) scale('+K+')';
   el.classList.add('zoom');
@@ -16444,7 +16467,7 @@ function famApplyRollForces(){
   var free=G.pool.filter(function(d){return !d.committed&&!d._frozen;});
   if(G._famPeekVals&&G._famPeekVals.length===free.length){
     free.forEach(function(d,i){d.val=G._famPeekVals[i];try{reDrawDieFace(d);}catch(e){}});
-    famLog('THE OMEN HOLDS');
+    famLog('THE STARS HOLD');/* P708 */
   }
   /* honeytrap runs SECOND and overwrites lane 0 even when the peek just set
      it. Left that way on purpose: its promise is the stronger of the two
@@ -16679,7 +16702,7 @@ CFX.stargazer={
     var free=G.pool.filter(function(d){return !d.committed&&!d._frozen;});
     if(!free.length)return false;
     G._famPeekVals=free.map(function(d){return _rollD(d);});
-    famLog('OMEN — NEXT ROLL: '+G._famPeekVals.join(' · '));
+    famLog('STARGAZER — NEXT ROLL: '+G._famPeekVals.join(' · '));/* P708: only Ill Omen says OMEN */
     return true;
   }
 };
@@ -16704,9 +16727,13 @@ CFX.ill_omen={
   /* declared on `use`, paid here, one rival turn later */
   rivalTurn:function(ev){if(!_fxMine(ev)||!G._famIllOmen)return;
     var _ioT=G._famIllOmen.tier||1,_ioP=famDef('ill_omen').p[_ioT-1];
-    if(ev.pts<=0){var take=Math.min(_ioP[0],G.oPts);G.oPts-=take;G.pPts+=take;
+    if(ev.pts<=0){var take=Math.min(_ioP[0],G.oPts);G.oPts-=take;
+      /* P708: a right call pays the FULL tier reward - what their board
+         cannot fund is minted, exactly as the miss branch mints theirs.
+         'YOU TAKE 0' on a first-turn bust was Denis's missing points. */
+      G.pPts+=_ioP[0];
       G._featOmenTrue=true;/* OMENS TRUE */
-      famLog('THE OMEN LANDS — YOU TAKE '+take);
+      famLog('THE OMEN LANDS — YOU TAKE '+_ioP[0]);
       cardFx('steal',{row:'oppDice'},{to:{row:'score'}});}
     else{G.oPts+=_ioP[1];famLog('THE OMEN MISSES — THEY GAIN '+_ioP[1]);
       cardFx('hit',{row:'score'});}
@@ -16714,7 +16741,10 @@ CFX.ill_omen={
   canUse:function(){return G&&G.phase!=='opp'&&!G._famIllOmen;},
   use:function(inst){
     G._famIllOmen={tier:inst.tier};
-    famLog('ILL OMEN DECLARED — THEY BUST THIS TURN, OR PAY YOU DO');
+    /* P708: name the RIGHT turn and both outcomes plainly - the old line
+       said 'THIS TURN, OR PAY YOU DO', which was wrong twice over. */
+    var _ioPu=famDef('ill_omen').p[inst.tier-1];
+    famLog('ILL OMEN — THEY BUST THEIR NEXT TURN: YOU TAKE '+_ioPu[0]+'. THEY SCORE: THEY GAIN '+_ioPu[1]);
     return true;
   }
 };
@@ -17786,6 +17816,9 @@ function _hsNewRunTap(){
 function _hsContinueTap(){
   var stg=document.getElementById('hsStage');
   if(stg&&stg.classList.contains('confirming'))return;/* it's on its way out */
+  /* P705: CONTINUE means "back to where I was" - a waiting match
+     outranks the tavern floor. */
+  if(S&&S.pendingMatch){SFX.nav();resumeMatch();return;}
   SFX.nav();showScreen('gauntlet');
 }
 function _hsKeepDrinking(){
@@ -24930,7 +24963,15 @@ var D3X={
     this.dice.forEach(function(d){
       if(d.match&&d.hx!==undefined&&(!key||self._rowKey(d)===key))xs.push(d.hx);
     });
-    if(xs.length>1)return (Math.min.apply(null,xs)+Math.max.apply(null,xs))/2;
+    /* P707: a PARTIAL population must not centre the row. During the
+       rival's subset reroll the rethrown chips leave the DOM for a few
+       frames, so only the KEPT dice carry hx - their span midpoint
+       yanked the whole settled group sideways (shadows in lockstep)
+       until _measureHomes caught up. The DOM row is the authority on
+       the count (_laneGrid's rule); short of it, fall through to the
+       row-rect fallback that already serves the N==1 case. */
+    var _n=0;try{var _dom=document.getElementById(key);if(_dom)_n=_dom.querySelectorAll('.die').length;}catch(e){}
+    if(xs.length>1&&(!_n||xs.length>=_n))return (Math.min.apply(null,xs)+Math.max.apply(null,xs))/2;
     /* ONE tracked die cannot tell you where its row is - the midpoint comes back
        as that die's own position, at whichever end of the table it happens to
        sit. limitX is derived from this, so it then collapsed to its floor and the
@@ -33955,6 +33996,16 @@ function _spawnCoinParticles(coinEl,goldAmt,gravDir){
   }
 }
 function endMatch(win){
+  /* P708: an omen still armed when the match ends judged nothing - the
+     charge comes home. Self-guarding: the flag nulls right here. */
+  try{
+    if(G&&G._famIllOmen&&G.pF){
+      var _ioBack=G.pF.find(function(c){return c&&c.id==='ill_omen';});
+      if(_ioBack)_ioBack.charges=(_ioBack.charges||0)+1;
+      G._famIllOmen=null;
+      famLog('THE OMEN GOES UNREAD — THE CHARGE RETURNS');
+    }
+  }catch(e){}
   if(G&&win&&G._arrearsPot>0){
     _getS();S.run.gold=(S.run.gold||0)+G._arrearsPot;
     famLog('IN ARREARS — THEIR ROLLS FED THE POT: +'+G._arrearsPot+'g');
@@ -34853,7 +34904,14 @@ function _settleEndRoute(route){
     /* Boss loss — the boss eats a heart; at 0 the run dies. */
     S.run.coins=Math.max(0,(S.run.coins||0)-1);
     if(S.run.coins<=0)S.run._died=true;
-    else route._heartAnim='lose';
+    else{
+      /* P709/P710: a survived boss loss is a LAST ORDERS beat - the
+         heart is mourned on that screen (initTierScreen consumes the
+         flag, same as a failed night), the boss locks again and the
+         crowd re-rolls. The sign's NEW ROSTER line is true here. */
+      _heartLossReset();
+      S.run._lastOrders=true;
+    }
   }else if(!route.win&&route.isHandicap){
     /* CURSED TABLE now cuts BOTH ways. It used to amplify only the win side
        (3 circles instead of 2) while the loss stayed at the baseline 1 - a
@@ -34945,7 +35003,7 @@ function exitMatch(){
       /* Out of hearts — the run is over. Renown persists. */
       showScreen('gameover');
     }else{
-      showScreen('gauntlet',{heartAnim:route._heartAnim||'lose'});
+      showScreen('gauntlet');/* P709: Last Orders mourns the heart - no second animation */
     }
   }else{
     /* Handicap/patron loss or fallback — back to tier */
@@ -35194,7 +35252,7 @@ function buildBubblePoints(w, h, opts) {
 var DLG_BUBBLE = {
   jitter: 1, deformScale: 2,
   notchCount: 3, notchDepth: 4, notchWidth: 3.5,
-  strokeW: 2.5, cornerRadius: 37,
+  strokeW: 1.5, cornerRadius: 37,/* P706: outline 1px thinner, per Denis */
   taperV: 0, taperH: -2, skew: -3,
   grainScale: 3.1, grainFreq: 0.2, grainSmooth: 1.9,
   tailLength: 21, tailWidth: 17, tailCurvature: -2, tailPos: 0.99,
@@ -35257,7 +35315,10 @@ function _bbFitWidth(textEl) {
   /* P682: scrollWidth rounds a fractional width UP and clientWidth rounds
      it DOWN, so a 190.4px line read as 191>190 and wrapped. One px of
      slack ends the coin-flip for every short line. */
-  if (natural <= maxW + 1) return natural;
+  /* P706: scrollWidth rounds to NEAREST - it can be half a pixel SHORT
+     of the true line, and a pin that exact wraps the line it measured.
+     P682 put the slack on the comparison; it belongs on the width. */
+  if (natural <= maxW + 1) return natural + 1;
   var minH = textEl.scrollHeight;
   /* P660: 0.3 -> 0.12. The floor was the width wobble Denis is describing: at
      the shipped 349px cap, lo started at 105px, so any line whose tightest
@@ -36955,6 +37016,7 @@ function initMatchScreen(data){
     if(S.pendingMatch.isBoss){
       S.run.coins=Math.max(0,(S.run.coins||0)-1);
       if(S.run.coins<=0)S.run._died=true;/* surfaces at the next tier screen */
+      else{_heartLossReset();S.run._lastOrders=true;}/* P710 */
     }
     delete S.pendingMatch;save();
   }
@@ -40648,11 +40710,19 @@ function _checkNightFail(){
   for(var i=0;i<n.seatsPlayed.length;i++)if(!n.seatsPlayed[i])return;
   S.run.coins=Math.max(0,(S.run.coins||0)-1);
   if(S.run.coins<=0)S.run._died=true;
-  S.run.points=0;S.run._chalkMeta=[];S.run.night=null;S.run._lastOrders=true;
+  _heartLossReset();S.run._lastOrders=true;/* P710: one reset path */
   /* SECOND WIND reads this. Stamped with the TIER rather than set to true
      so it expires on its own when the run advances: there is no "clear the
      flag" path that a future edit can forget to call. */
   S.run._loNight=S.run.tier;
+}
+/* P710: ONE reset for every heart loss. Points to zero re-locks the boss
+   (the gate is derived, nothing stored), the chalk wipes, and the night
+   re-rolls IMMEDIATELY - a lazily-null night made the title's live-run
+   check read false until the next tier render. */
+function _heartLossReset(){
+  S.run.points=0;S.run._chalkMeta=[];S.run.night=null;
+  try{_ensureNight();}catch(e){}
 }
 function _showLastOrders(){
   /* addendum-locked: near-dark, one heart visibly breaking, NEXT NIGHT
@@ -41990,14 +42060,10 @@ function _applyDebugUrlTriggers(){
 /* ═══════ BOOTSTRAP ═══════ */
 document.addEventListener('DOMContentLoaded', function(){
   _getS();
-  /* P695: a waiting match outranks the menu - open the app, be at the
-     table (Denis: "so I don't have to click anything"). One resume path:
-     the same resumeMatch Settings and the room banner use. */
-  var _booted=false;
-  if(S&&S.pendingMatch){
-    try{resumeMatch();_booted=true;}catch(e){console.error('boot resume failed:',e);}
-  }
-  if(!_booted){try{showScreen('menu');}catch(e){console.error('showScreen failed:',e);}}
+  /* P705: Denis reversed P695 after playing it - boot lands on the TITLE,
+     and CONTINUE carries you into a waiting match (_hsContinueTap). Boot
+     itself never jumps into play. */
+  try{showScreen('menu');}catch(e){console.error('showScreen failed:',e);}
   setupDiceLongPress();
   _applyDebugUrlTriggers();
   /* Sync body.reduced-motion class from stored settings so idle-breath animation

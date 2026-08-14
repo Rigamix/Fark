@@ -623,6 +623,58 @@ already only 50px at that size — so it trades one tight number for another.
 
 ---
 
+## 13. FAIR TRADE — you're right, and here is exactly how
+
+You asked: *"Does Fair Trade make sense? We don't have a stash so..."*
+
+The mechanic **runs and is maintained** — but three claims in its text are
+stale:
+
+- **"your stash"** is `S.run.diceInv`, a real data store with **no player-facing
+  surface anywhere** — the loadout shows only your equipped six, and the
+  stash/equip handlers have zero callers. Dice get in only by winning a For
+  Keeps match or taking a boss relic as spoils.
+- **T1 says "for this roll only" — unimplemented.** The loan lasts the whole
+  turn at every tier, so T1 and T2 are mechanically identical (a dead upgrade
+  rung).
+- **"swap one of your six"** implies a choice; the code auto-picks
+  weakest-seat-out / best-reserve-in, and refuses unless the reserve die
+  *strictly* outranks your worst — and relics/lucky dice rank 0, so they can
+  **never** be lent. In practice the card is grey for most of a run.
+
+**Three ways out:**
+- **(a) Reword to the truth** — *"Before you roll, your weakest die makes way
+  for the best die you've won off another table. For this turn only."* (T3 adds
+  "Twice a match.") Cheapest; keeps the mechanic. **My rec, as the stopgap.**
+- **(b) Retire it** — remove the def + FAM_LIVE entry; all the loan plumbing
+  no-ops safely.
+- **(c) Make the reserve visible** — surface won dice on the shelf screen (the
+  caller-less stash/equip pair is already written) and the card becomes
+  legible. Best long-term, real UI work.
+
+---
+
+## 14. BUST PROTECTION FX — one design call before I build it
+
+Your note: scatter on bust; a shield around the dice row when something saves
+you. Building it is clear for the main paths (Ward, Amber, the save-card
+chain). Two cards are ambiguous:
+
+- **Second Wind** and **Mabel's Stitch** currently play *neither* bust FX nor
+  a save beat — they quietly re-roll/bank. **My rec: shield on both** (points
+  survive, so it reads as a save).
+- **Thick Skin / The Last Stitch** deliberately play the FULL bust first, then
+  save half (your earlier B1 ruling: "bust animation BEFORE saving"). **My
+  rec: scatter first, then the shield at the save beat** — reads as "the bust
+  lands, the card catches it".
+
+Also: should **Second Wind (the feat)** count a heart lost to a *boss* the way
+it counts one lost to a failed night? Boss losses now show Last Orders and
+reset the night (shipped), but the feat still keys on night-fail only. My rec:
+yes, count both — same beat now. One line either way.
+
+---
+
 ## 12. THE ENCHANT-PAGE CRASH — cannot reproduce, need one thing from you
 
 Five probes drove the full route (fresh run → shop → ENCHANTS tab → every
