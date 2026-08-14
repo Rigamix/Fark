@@ -10977,6 +10977,8 @@ function _getS(){
     /* P1 migration: pre-Nights saves get a lazy night — the roster is built
        on the next tier-screen render, current points are kept. */
     if(S.run.night===undefined)S.run.night=null;
+    /* P718: fair_trade retired - a held copy vanishes from the deck */
+    if(Array.isArray(S.run.fcards))S.run.fcards=S.run.fcards.filter(function(c){return !c||c.id!=='fair_trade';});
     /* chalkboard meta: rebuild plain faces for any points earned pre-board */
     if(!Array.isArray(S.run._chalkMeta)){S.run._chalkMeta=[];for(var _cm=0;_cm<(S.run.points||0);_cm++)S.run._chalkMeta.push('face');}
     /* P541: an existing save can already be short - the pre-P541 3-point win
@@ -14218,10 +14220,9 @@ var FAM_CARDS=[
   text:['While trailing by 1000 or more, your banks TAKE their points instead of just gaining. A quarter of each bank is stolen from them.',
         'While trailing by 1000 or more, your banks TAKE their points instead of just gaining. Two fifths of each bank is stolen from them.',
         'While trailing by 1000 or more, your banks TAKE their points instead of just gaining. Three fifths of each bank is stolen from them.']},
- {id:'fair_trade',fam:'silver',kind:'active',name:'Fair Trade',charges:[1,1,2],
-  text:['Before you roll, your weakest die makes way for the best die you have won off another table. For this turn only.',
-        'Before you roll, your weakest die makes way for the best die you have won off another table. For this turn only.',
-        'Before you roll, your weakest die makes way for the best die you have won off another table. For this turn only. Twice a match.']},
+ /* P718: fair_trade RETIRED (Denis's ruling a). Its whole premise was the
+    invisible dice reserve; For Keeps seats its prize directly now, so
+    there is nothing left for it to lend. CFX.fair_trade stays dormant. */
  /* OBSIDIAN */
  {id:'powder_keg',fam:'obsidian',kind:'active',name:'Powder Keg',charges:[1,2,2],
   text:['Blow up your whole roll: every die rerolls, kept ones included. Once per match.',
@@ -14303,7 +14304,7 @@ var _FAM_ALIAS={anchor_f:'vanguard_f',bookends_f:'vanguard_f'};/* vanguard colla
 function famDef(id){id=_FAM_ALIAS[id]||id;
   for(var i=0;i<FAM_CARDS.length;i++)if(FAM_CARDS[i].id===id)return FAM_CARDS[i];return null;}
 /* implemented set — only these are offered/equipped-usable (grows per phase) */
-var FAM_LIVE={slow_cook:1,steady_hand:1,fair_trade:1,retort:1,reprisal:1,pickpocket:1,falling_star:1,
+var FAM_LIVE={slow_cook:1,steady_hand:1,retort:1,reprisal:1,pickpocket:1,falling_star:1,/* P718: fair_trade out */
               encore:1,double_or_nothing:1};
 var BOSS_FAM={grog:'obsidian',mabel:'amber',finnick:'vagabond',corvus:'starstone',
   brutus:'silver',aldric:'jade',whisper:'vagabond',ambrose:'amber'};
@@ -15830,20 +15831,64 @@ function _famFeats(win){
 function famFkTake(i){
   var pool=window._fkPool;if(!pool)return;
   var m=pool[i];if(!m)return;
-  _getS();S.run.diceInv=S.run.diceInv||[];
-  S.run.diceInv.push(m);
-  _enchInit();
-  var msg;
+  _getS();_enchInit();
+  /* P718: THE PRIZE SEATS IMMEDIATELY. The invisible reserve retired with
+     Fair Trade (Denis: only the six exist) - a real die now asks which
+     seat it takes; the lucky die stays a trophy (names + grudges), it was
+     never a playable material. */
   if(m==='lucky'){
     S.run.luckyNames=S.run.luckyNames||[];S.run.luckyNames.push(window._fkLucky);
     S.run._grudges=S.run._grudges||{};
     if(window._fkPersona)S.run._grudges[window._fkPersona]=true;/* the archetype remembers */
-    msg='✦ '+window._fkLucky+' IS YOURS — ITS OWNER WILL REMEMBER';
-  }else msg=getDie(m).name+' IS YOURS';
+    window._fkPool=null;save();
+    var rc=document.querySelector('#end-ov .res-card');
+    if(rc)rc.innerHTML='<div style="font-family:'+"'JMH Beda'"+',serif;font-size:15px;color:#3a2812;padding:30px 12px;text-align:center;line-height:1.5">'
+      +'✦ '+window._fkLucky+' IS YOURS — ITS OWNER WILL REMEMBER</div>';
+    _famEndReady();
+    return;
+  }
+  window._fkTaken={mat:m};
   window._fkPool=null;save();
+  _fkSeatOffer();
+}
+/* P718: the seat choice, on the same win-card surface the pick used -
+   the win-screen trade decision's shape, no sheet, no new state. */
+function _fkSeatOffer(){
+  var t=window._fkTaken;if(!t)return;
+  var rc=document.querySelector('#end-ov .res-card');if(!rc)return;
+  var h='<div style="font-family:'+"'JMH Beda'"+',serif;color:#3a2812;padding:14px 10px;text-align:center">'
+    +'<div style="font-size:15px;letter-spacing:.06em;margin-bottom:4px">'+getDie(t.mat).name.toUpperCase()+' IS YOURS</div>'
+    +'<div style="font-size:11px;color:#6a5238;margin-bottom:10px">tap the die it replaces — that one leaves the table</div>'
+    +'<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">';
+  (S.run.dice||[]).forEach(function(mm,si){
+    h+='<div onclick="_fkSeatDo('+si+')" style="cursor:pointer;text-align:center">'
+      +'<span class="seat-die dtype-'+mm+'" style="width:32px;height:32px;display:block;margin:0 auto"></span>'
+      +'<div style="font-size:9px;color:#6a5238;margin-top:3px">'+getDie(mm).name+'</div></div>';
+  });
+  h+='</div>'
+    +'<div style="font-size:11px;color:#8a6a3c;margin-top:12px;cursor:pointer;text-decoration:underline" onclick="_fkSeatSkip()">leave it on their table</div>'
+    +'</div>';
+  rc.innerHTML=h;rc.classList.add('show');
+}
+function _fkSeatDo(si){
+  var t=window._fkTaken;if(!t)return;
+  _getS();_enchInit();
+  if(!S.run.dice||si<0||si>=S.run.dice.length)return;
+  var out=S.run.dice[si],outE=S.run.dieEnch[si]||null;
+  /* the pair travels together: the outgoing die takes its brand with it,
+     the incoming die arrives unbranded - both stated on screen */
+  S.run.dice[si]=t.mat;S.run.dieEnch[si]=null;
+  window._fkTaken=null;save();
   var rc=document.querySelector('#end-ov .res-card');
-  /* P689: the last debug-styled injection - monospace pink on the win card */
-  if(rc)rc.innerHTML='<div style="font-family:'+"'JMH Beda'"+',serif;font-size:15px;color:#3a2812;padding:30px 12px;text-align:center;line-height:1.5">'+msg+'</div>';
+  if(rc)rc.innerHTML='<div style="font-family:'+"'JMH Beda'"+',serif;font-size:15px;color:#3a2812;padding:30px 12px;text-align:center;line-height:1.5">'
+    +getDie(t.mat).name.toUpperCase()+' TAKES THE SEAT — '+getDie(out).name.toUpperCase()+' RETIRES'
+    +(outE?'<div style="font-size:11px;color:#8a4a18;margin-top:6px">its brand goes with it</div>':'')+'</div>';
+  _famEndReady();
+}
+function _fkSeatSkip(){
+  window._fkTaken=null;save();
+  var rc=document.querySelector('#end-ov .res-card');
+  if(rc)rc.innerHTML='<div style="font-family:'+"'JMH Beda'"+',serif;font-size:15px;color:#3a2812;padding:30px 12px;text-align:center">LEFT ON THEIR TABLE</div>';
   _famEndReady();
 }
 function _gbSpoilsConfirm(kind){
