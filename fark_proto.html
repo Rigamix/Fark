@@ -23469,6 +23469,7 @@ var D3X={
       self._dress(o.material,d.mat,sk);
       self._faceLayers(o.material,d.mat,ench);/* P552 */
     });
+    this._settleDim(d);/* P725b: never leave a rebuilt die bright */
   },
   _idQ:function(){return this.__idq||(this.__idq=new THREE.Quaternion());},
   /* rebuild the materials of dice already on screen */
@@ -23485,6 +23486,7 @@ var D3X={
            never survive the one event meant to apply it. */
         self._faceLayers(o.material,d.mat,ench);/* P552 */
       });
+      self._settleDim(d);/* P725b: never leave a rebuilt die bright */
     });
     this.frame();
   },
@@ -24822,6 +24824,28 @@ var D3X={
     dm[key]=out;
     return out;
   },
+  /* P725b: THE SETTLED DIM, ONE EXIT PATH. frame() applies it every
+     frame, and the material-rebuild paths (_rebrand, _reskin) call it
+     synchronously after restamping liveMap - a rebuild used to land
+     authored-bright maps that no code re-dimmed until the next painted
+     frame, one full bright flash on every dimmed die (Denis's
+     'appears then off then back on'). */
+  _settleDim:function(d){
+    if(!d||!d.obj||!d.phys||!d.phys.v)return;
+    var self=this,_R=this.SIDEDIM_RAMP;
+    var _k=(performance.now()-(d.phys.t||0)-_R.delay)/_R.dur;
+    _k=_k<0?0:(_k>1?1:_k);
+    _k=_k*_k*(3-2*_k);/* smoothstep: no visible start, no visible stop */
+    var _kk=(Math.round(_k*_R.steps)/_R.steps)*this.SIDEDIM_MAX;
+    d.obj.traverse(function(o){
+      if(!o.isMesh||!o.material||o.userData.outline)return;
+      var m=o.material;
+      if(!m.userData)m.userData={};
+      if(!m.userData.liveMap)m.userData.liveMap=m.map;
+      var want=(_kk>0?self._dimMap(m.userData.liveMap,d.phys.v,_kk):null)||m.userData.liveMap;
+      if(m.map!==want){m.map=want;m.needsUpdate=true;}
+    });
+  },
   /* k=0 is the die as painted, k=1 is fully in shadow, k>1 is the bust wipe
      pushing it past that into the dark. The map is swapped at the halfway
      point of the drop rather than cross-faded: two maps cannot be blended in
@@ -25204,7 +25228,13 @@ var D3X={
       q.slerp(r.home,e);
     }
     if(done){
-      d.phys={x:f.x,y:f.y,z:f.z,q:q.clone(),v:(d.roll&&d.roll.val)||null,t:performance.now()};d.roll=null;/* P702/P703 */
+      /* P725: t is the die's OWN settle moment (the flight ramp's _setF),
+         not the tape's end - or an early settler's dim snapped bright at
+         the LAST die's settle and re-ramped (Denis's flicker). */
+      d.phys={x:f.x,y:f.y,z:f.z,q:q.clone(),v:(d.roll&&d.roll.val)||null,
+        t:(d.roll&&d.roll.sol&&d.roll.sol.frames)
+          ?d.roll.t0+((d.roll._setF!==undefined?d.roll._setF:d.roll.sol.frames.length))*(this.PHYS.dt*1000)
+          :performance.now()};d.roll=null;/* P702/P703/P725 */
       if(!this._rolling())this._shDirty=true;/* they have landed: draw them */
     }
     return {x:f.x,y:f.y,z:f.z,q:q,done:done};
@@ -25658,7 +25688,8 @@ var D3X={
          die silently never dimmed (two exits, one payload - the rule). */
       d.phys={x:lf.x,y:lf.y,z:lf.z,
         q:rr.flat.clone().multiply(new THREE.Quaternion(lf.qx,lf.qy,lf.qz,lf.qw)).multiply(rr.fix),
-        v:(R&&R.val)||null,t:performance.now()};
+        v:(R&&R.val)||null,
+        t:(R&&R.sol&&R.sol.frames)?R.t0+((R._setF!==undefined?R._setF:R.sol.frames.length))*(D3X.PHYS.dt*1000):performance.now()};/* P725 */
       d.roll=null;
     });
     /* SYNC BEFORE STARTING A DEFERRED THROW. This was the other way round,
@@ -26125,21 +26156,7 @@ var D3X={
              the next one (the spent-look lesson; no flags). P703: the
              shadow ARRIVES on a smoothstepped ramp in quantized baked
              steps - ~4%% a swap, below noticing, per Denis. */
-          if(d.phys.v){
-            var _R=D3X.SIDEDIM_RAMP;
-            var _k=(performance.now()-(d.phys.t||0)-_R.delay)/_R.dur;
-            _k=_k<0?0:(_k>1?1:_k);
-            _k=_k*_k*(3-2*_k);/* smoothstep: no visible start, no visible stop */
-            var _kk=(Math.round(_k*_R.steps)/_R.steps)*D3X.SIDEDIM_MAX;
-            d.obj.traverse(function(o){
-              if(!o.isMesh||!o.material||o.userData.outline)return;
-              var m=o.material;
-              if(!m.userData)m.userData={};
-              if(!m.userData.liveMap)m.userData.liveMap=m.map;
-              var want=(_kk>0?D3X._dimMap(m.userData.liveMap,d.phys.v,_kk):null)||m.userData.liveMap;
-              if(m.map!==want){m.map=want;m.needsUpdate=true;}
-            });
-          }
+          D3X._settleDim(d);/* P725b: the one settled-dim path */
           D3X._weightOutline(d);
           if(d.burst)D3X._burstPose(d);
           else if(d.pulseOn)D3X._pulsePose(d);
