@@ -675,6 +675,34 @@ yes, count both — same beat now. One line either way.
 
 ---
 
+## 15. THE LEGACY-ART PURGE (P714) — three surfaces now wait on new art
+
+Your rule — nothing from the old `assets/` tree loads — is in. The room was
+already 100% the new pt-stage painting (measured: every old-layer piece
+invisible), so most of this was deleting invisible fetches. But three
+things were LIVE users of old art and now show a graceful fallback:
+
+- **Boss splash / boss peek / end-screen portrait** — these resolved
+  through the bosses' legacy keys (GROG → 'drunkard') to the old Drunkard
+  bust etc. Now name-only. They want **8 boss busts** in the new style
+  (the room's env paintings are full scenes, not croppable busts).
+- **The pouch icon** (`assets/Menu_Art/pouch.png`) — still loading, kept
+  deliberately: it's the live icon on the win-draft pouch button, the
+  pouch modal, and the loadout chip. Wants one new pouch icon.
+- **The old shop entrance** (the innkeep sprite at the bar) was invisible
+  under the pt stage and is retired — meaning THE BAR/shop screen has no
+  visible door right now unless something else opens it. If the shop
+  should be reachable from the room, the pt stage needs a door.
+
+Also kept, named plainly: `assets/cards/`, `win/`, `loss/`, `Audio/`,
+`vendor/`, `models/`, Macondo, and `table_commoner.webp` (the 07-27 table
+plate — current art in the old folder). Those are current infrastructure;
+relocating them out of `assets/` is quiet housekeeping if you want the
+folder to die completely. The now-unreferenced legacy FILES are still on
+disk/repo — say the word and I git-rm them.
+
+---
+
 ## 12. THE ENCHANT-PAGE CRASH — cannot reproduce, need one thing from you
 
 Five probes drove the full route (fresh run → shop → ENCHANTS tab → every
