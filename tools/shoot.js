@@ -235,6 +235,23 @@ function cleanup(){
       }
     }
   } catch (e) {}
+  /* PARENTAGE-IMMUNE second pass. Edge can re-exec past the pid node
+     spawned, so the tree-kill above can hit a corpse while the real browser
+     lives on - a NORMAL completed run left a 10-process tree exactly this
+     way (2026-08-14, third incident; the startup sweep only collects it on
+     the NEXT run, which is the gap the user kept seeing). Everything
+     wearing THIS run's profile path dies here, whatever its ancestry. */
+  if (process.platform === 'win32') {
+    try {
+      var _psk = "Get-CimInstance Win32_Process -Filter \"Name='msedge.exe' or Name='chrome.exe'\" | " +
+                 "Where-Object { $_.CommandLine -like '*" + PROFILE + "*' } | " +
+                 "ForEach-Object { taskkill /F /T /PID $_.ProcessId } | Out-Null";
+      execFileSync('powershell.exe',
+        ['-NoProfile', '-NonInteractive', '-EncodedCommand',
+         Buffer.from(_psk, 'utf16le').toString('base64')],
+        { stdio: 'ignore', timeout: 15000 });
+    } catch (e) {}
+  }
   /* The directory only unlocks once those children are actually gone, so
      retry. process.on('exit') must be synchronous - Atomics.wait is a real
      blocking sleep, not a busy-wait that would burn the CPU this patch is
