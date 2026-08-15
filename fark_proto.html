@@ -2095,6 +2095,13 @@ body.dlg-speaking #screen-match #tellBadge{opacity:0;pointer-events:none}
    darkness, pool to 48%). Same z:0 band as the art it darkens; every
    later sibling (pause, HUD, rows, the appended canvas) paints above
    by DOM order. NOT #matchVignette - that is the red danger pulse. */
+/* P733: the bust's red breath over the ROOM ART - same z:0 band as
+   the look vignette, so the dice, HUD and buttons stay clean. */
+#matchBustRed{position:absolute;inset:0;z-index:0;pointer-events:none;
+  mix-blend-mode:multiply;opacity:0;background:radial-gradient(ellipse at 50% 46%,
+  rgba(192,56,24,.55) 0%, rgba(120,24,10,.85) 100%);
+  transition:opacity .16s ease-out}
+#matchBustRed.on{opacity:1}
 #matchLookVig{position:absolute;inset:0;z-index:0;pointer-events:none;
   mix-blend-mode:multiply;
   background:radial-gradient(ellipse at 50% 46%, rgba(16,10,4,0) 48%, rgba(16,10,4,.61) 100%)}
@@ -10211,6 +10218,7 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
 <div id="matchShadows"><canvas id="shCanvas"></canvas><canvas id="dsCanvas"></canvas></div>
 <div id="matchProps"></div>
 <div id="matchLookVig"></div><!-- P732: the approved look's vignette - art band, under everything interactive -->
+<div id="matchBustRed"></div><!-- P733: the bust flinch, same band -->
 <div id="matchPause" onclick="SFX.nav();showQuitConfirm()"><img src="Art/Assets/Match/optimized/pause_new_opt.webp" alt="pause"></div>
 <div id="matchVignette"></div>
 <!-- SVG filter -->
@@ -23618,18 +23626,66 @@ var D3X={
   KICK:{ms:620,dist:1.5,spin:4.5},
   scatterRow:function(sel){
     if(!this.ready||this.fail||!this.PHYS||!this.PHYS.on)return 0;
-    var self=this,n2=0,t0=performance.now();
+    var self=this,t0=performance.now();
+    /* P733: CHAOS IS VARIANCE. The old kick read its direction off the
+       die's SIGN - left of centre went left, right went right, with a
+       whisker of jitter - so the row PARTED and bunched, which is what
+       Denis saw. Each die now gets its own angle (outward bias, wide
+       spread), its own magnitude, and two of them are picked for a hard
+       hit. Same one impulse, applied unevenly. */
+    var hit=[];
     this.dice.forEach(function(d){
       if(!d.match||!d.phys||d.burst||d.kick)return;
       if(!d.chip||!d.chip.closest||!d.chip.closest(sel))return;
-      d.kick={t0:t0,
-        vx:((d.phys.x>=0?1:-1)*(0.55+Math.random()*0.9)+((Math.random()-0.5)*0.4))*self.KICK.dist,
-        vz:(Math.random()-0.35)*self.KICK.dist*0.8,
-        sp:(Math.random()<0.5?-1:1)*(2+Math.random()*3)};
-      n2++;
+      hit.push(d);
     });
-    if(n2)this._shDirty=true;
-    return n2;
+    if(!hit.length)return 0;
+    /* the two unlucky ones */
+    var hard={},picks=Math.min(2,hit.length);
+    while(Object.keys(hard).length<picks)hard[Math.floor(Math.random()*hit.length)]=1;
+    hit.forEach(function(d,i){
+      /* outward from the row's middle, then thrown off by up to 42 degrees */
+      var base=Math.atan2((Math.random()-0.5)*0.6,(d.phys.x>=0?1:-1));
+      var ang=base+(Math.random()-0.5)*1.47;
+      var mag=(hard[i]?1.5+Math.random()*0.6:0.65+Math.random()*0.8)*self.KICK.dist;
+      d.kick={t0:t0,
+        vx:Math.cos(ang)*mag,
+        vz:Math.sin(ang)*mag*0.7-0.1*self.KICK.dist,
+        sp:(Math.random()<0.5?-1:1)*(hard[i]?4+Math.random()*3:1.5+Math.random()*3)};
+    });
+    this._shDirty=true;
+    return hit.length;
+  },
+  /* P733: THE ROOM FLINCHES. The rig's lights lerp toward the bust red
+     and ease back; the art's red wash is done in _bustCandle beside it.
+     Reserved for the bust - a world response that fires often means
+     nothing (docs/VFX_LANGUAGE.md E1). */
+  /* NO RAMP IN: an impact is a FIRST-FRAME event (the hit-frame rule,
+     docs/VFX_LANGUAGE.md section 10). Full red on the same frame as the
+     kick, hold, then ease back over most of a second. */
+  BUSTLIGHT:{col:0xc03818, mix:0.72, holdMs:260, outMs:900},
+  bustFlare:function(){
+    if(!this.ready||this.fail||!this.scene)return false;
+    var B=this.BUSTLIGHT,ls=[];
+    this.scene.traverse(function(o){if(o.isLight)ls.push(o);});
+    if(!ls.length)return false;
+    var red=new THREE.Color(B.col);
+    ls.forEach(function(l){if(!l.userData._bcBase)l.userData._bcBase=l.color.clone();});
+    var t0=performance.now();
+    var step=function(){
+      var t=performance.now()-t0;
+      var k=t<B.holdMs?1:Math.max(0,1-(t-B.holdMs)/B.outMs);
+      var m=k*B.mix;
+      ls.forEach(function(l){
+        var b=l.userData._bcBase;
+        l.color.setRGB(b.r*(1-m)+red.r*m,b.g*(1-m)+red.g*m,b.b*(1-m)+red.b*m);
+      });
+      if(t<B.holdMs+B.outMs)requestAnimationFrame(step);
+      else ls.forEach(function(l){if(l.userData._bcBase)l.color.copy(l.userData._bcBase);});
+    };
+    step();/* the first frame IS the impact - no waiting on rAF */
+    requestAnimationFrame(step);
+    return true;
   },
   _burstPose:function(d){
     var B=this.BURST,t=(performance.now()-d.burst.t0)/B.ms;
@@ -28820,6 +28876,20 @@ function _bustImpact(){
      above stays: it dims the 3D dice and pauses idles, and its CSS
      nudges are the no-physics fallback. */
   try{if(window.D3X)D3X.scatterRow('#playerDiceRow');}catch(e){}
+  /* P733: and the room flinches red - the rig's lights and the art's
+     wash together, so dice and table agree about what just happened. */
+  try{if(window.D3X&&D3X.bustFlare)D3X.bustFlare();}catch(e){}
+  try{
+    var _br=document.getElementById('matchBustRed');
+    if(_br){
+      _br.style.transition='none';/* the flash is instant; only the fade eases */
+      _br.classList.add('on');
+      setTimeout(function(){
+        _br.style.transition='opacity .9s ease-in';
+        _br.classList.remove('on');
+      },380);
+    }
+  }catch(e){}
 }
 /* Align overlay word element to vertical centre of the dice area, not screen centre */
 function _alignOverlayWord(wordEl){
