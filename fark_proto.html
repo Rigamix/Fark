@@ -24519,7 +24519,11 @@ var D3X={
        fbA0/A1 the alpha ramp, 0.09..0.32 -> 0.11..0.41, so the accumulated
                rim survives the punch-out that throws away its inner half. */
   GLOW:{soft:10, rim:3.5, rimPasses:5, softPasses:1, line:2.4, grow:1.004, clear:0.7, strength:0.78,
-        fbWide:1.35, fbCross:0.40, fbA0:0.11, fbA1:0.30},
+        fbWide:1.35, fbCross:0.40, fbA0:0.11, fbA1:0.30,
+        /* P731: the SOFT pass can stretch and lean - sx/sy scale the
+           silhouette, dy biases it vertically. 1/1/0 = today's look
+           exactly; the rim, line and punch-out stay hull-true. */
+        sx:1, sy:1, dy:0},
   /* ctx.filter is the only thing that spreads the halo, and WebKit shipped it
      in Safari 18 - before that the assignment is a silent no-op. See
      window._cfBlur, tested once and shared with the dice shadows. */
@@ -24679,7 +24683,7 @@ var D3X={
     gx.setTransform(dpr,0,0,dpr,0,0);
     gx.globalCompositeOperation='source-over';
     gx.clearRect(0,0,sc.width,sc.height);
-    var trace=function(ctx,hull,shrink,dy){
+    var trace=function(ctx,hull,shrink,dy,sx,sy){
       var cx=0,cy=0;
       hull.forEach(function(p){cx+=p[0];cy+=p[1];});
       cx/=hull.length;cy/=hull.length;
@@ -24687,7 +24691,8 @@ var D3X={
       hull.forEach(function(p,i){
         var dx=p[0]-cx,dyy=p[1]-cy,L=Math.sqrt(dx*dx+dyy*dyy)||1;
         var k=shrink?Math.max(0,(L-shrink))/L:1;
-        var px=cx+dx*k,py=cy+dyy*k+(dy||0);
+        /* P731: sx/sy stretch, dy leans - undefined means 1/1/0 */
+        var px=cx+dx*k*(sx||1),py=cy+dyy*k*(sy||1)+(dy||0);
         if(i)ctx.lineTo(px,py);else ctx.moveTo(px,py);
       });
       ctx.closePath();
@@ -24697,10 +24702,10 @@ var D3X={
     gx.fillStyle=SOFT;
     gx.globalAlpha=1;
     if(self._cf){
-      /* the wide, soft falloff */
+      /* the wide, soft falloff - P731: this pass alone stretches/leans */
       gx.filter='blur('+G.soft+'px)';
       for(var sp=0;sp<(G.softPasses||1);sp++)
-        sel.forEach(function(h){trace(gx,h,0);gx.fill();});
+        sel.forEach(function(h){trace(gx,h,0,G.dy,G.sx,G.sy);gx.fill();});
       /* then the bright rim, stacked - the punch-out below throws away the
          inner half of every blur, so a single pass never reads as strong */
       gx.fillStyle=COL;
@@ -24727,7 +24732,9 @@ var D3X={
         gx.strokeStyle=(f<(G.fbCross===undefined?0.55:G.fbCross))?SOFT:COL;
         gx.lineWidth=widest*(1-f)+2;
         gx.globalAlpha=(G.fbA0===undefined?0.09:G.fbA0)+(G.fbA1===undefined?0.23:G.fbA1)*f;
-        sel.forEach(function(h){trace(gx,h,0);gx.stroke();});
+        /* P731: the widest rings stretch fully, the tight ones stay
+           hull-true - the fallback's version of soft-only leaning */
+        sel.forEach(function(h){trace(gx,h,0,(G.dy||0)*(1-f),1+((G.sx||1)-1)*(1-f),1+((G.sy||1)-1)*(1-f));gx.stroke();});
       }
       gx.globalAlpha=1;
     }
