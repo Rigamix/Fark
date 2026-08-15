@@ -1288,17 +1288,23 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
    in hand, so the glow is already visible on the way up rather than
    arriving in one frame at the line. .armed below is the full state. */
 #famRowP .fcv.fcv-drag{--arm:0}
-#famRowP .fcv.fcv-drag:not(.fcv-blocked):not(.spent){
+#famRowP .fcv.fcv-drag:not(.fcv-cant):not(.spent){
   scale:calc(1 + 0.09*var(--arm));
-  filter:drop-shadow(0 0 calc(0.8cqw*var(--arm)) rgba(255,236,170,var(--arm)))
-    drop-shadow(0 0 calc(3.4cqw*var(--arm)) rgba(255,200,85,calc(0.95*var(--arm))))
+  /* P746b: A FLOOR ON THE HALO. Measured, the ramp was linear from
+     alpha 0 - so at a fifth of the way up the glow was 0.15 opaque gold
+     on a warm table, which is invisible (Denis, three times). A playable
+     card in hand now lights the moment it leaves the row - 0.45 at the
+     first pixel, full at the line - and the radius starts wide rather
+     than growing from nothing. */
+  filter:drop-shadow(0 0 calc(0.35cqw + 0.55cqw*var(--arm)) rgba(255,240,190,calc(0.45 + 0.55*var(--arm))))
+    drop-shadow(0 0 calc(1.6cqw + 2.2cqw*var(--arm)) rgba(255,200,85,calc(0.5 + 0.5*var(--arm))))
     drop-shadow(0 0.9cqw 1.3cqw rgba(10,6,2,.5))
-    brightness(calc(1 + 0.22*var(--arm)))}
-/* blocked greys IN, on the same value */
-#famRowP .fcv.fcv-drag.fcv-blocked{
+    brightness(calc(1.06 + 0.18*var(--arm)))}
+/* cannot-play greys IN from the first pixel, on the same value */
+#famRowP .fcv.fcv-drag.fcv-cant{
   filter:saturate(calc(1 - 0.82*var(--arm))) brightness(calc(1 - 0.5*var(--arm)))
     drop-shadow(0 0.25cqw 0.3cqw rgba(10,6,2,.5))}
-#famWhyNot{transition:opacity .22s ease}
+#famWhyNot.on,#famWhyNot{transition:opacity .12s linear}
 #famRowP .fcv.armed,#screen-match #famRowO .fcv.armed{
   /* P713: Denis could not see the old single soft shadow under a card in
      hand - a tight hot core plus a wide halo reads as ARMED at a glance.
@@ -15061,9 +15067,16 @@ function _famDragInit(el,i){
        sixty events a second. Neither number can change mid-drag: the row is
        not being relaid out and the strut's height is a CSS constant. */
     var r0=el.getBoundingClientRect();
+    /* P746: WHY IT CANNOT PLAY IS KNOWN NOW, not at the line. The state
+       was decided when the card crossed the threshold, so the grey (and
+       the glow) began at ~100% progress - which is a switch however
+       smoothly it then scales. The verdict holds for the gesture; only
+       the AMOUNT rides --arm. */
+    var _why0=_famWhyNot(G&&G.pF&&G.pF[i]);
+    el.classList.toggle('fcv-cant',!!_why0);
     _famDrag={el:el,i:i,x0:t.clientX,y0:t.clientY,live:false,
               cy0:r0.top+r0.height/2,line:_famThresholdY(),
-              dx:0,dy:0,armed:false};
+              dx:0,dy:0,armed:false,why:_why0||''};
   }
   function move(e){
     if(!_famDrag||_famDrag.el!==el)return;
@@ -15096,22 +15109,20 @@ function _famDragInit(el,i){
     /* P737: past the line is not the same as PLAYABLE. A card that
        cannot fire greys and says why, up where the player is looking -
        and releasing it does nothing at all. */
-    var why=_famWhyNot(G&&G.pF&&G.pF[_famDrag.i]);
+    var why=_famDrag.why;
+    /* P746: the CLASSES no longer flip at the line - the look is the
+       gradient, and `armed` is only the endpoint state for the release
+       test. The reason line fades in on the same progress value. */
     var armed=past&&!why;
     if(armed!==_famDrag.armed){_famDrag.armed=armed;el.classList.toggle('armed',armed);}
-    var blocked=past&&!!why;
-    if(blocked!==_famDrag.blocked){
-      _famDrag.blocked=blocked;
-      el.classList.toggle('fcv-blocked',blocked);
+    if(why){
       var lbl=document.getElementById('famWhyNot');
-      if(blocked){
-        if(!lbl){lbl=document.createElement('div');lbl.id='famWhyNot';
-          (document.getElementById('screen-match')||document.body).appendChild(lbl);}
-        lbl.textContent=why;
-        var r2=el.getBoundingClientRect(),sr=(document.getElementById('screen-match')||document.body).getBoundingClientRect();
-        lbl.style.top=(r2.top-sr.top-30)+'px';
-        lbl.classList.add('on');
-      }else if(lbl)lbl.classList.remove('on');
+      if(!lbl){lbl=document.createElement('div');lbl.id='famWhyNot';
+        (document.getElementById('screen-match')||document.body).appendChild(lbl);}
+      if(lbl.textContent!==why)lbl.textContent=why;
+      var r2=el.getBoundingClientRect(),sr=(document.getElementById('screen-match')||document.body).getBoundingClientRect();
+      lbl.style.top=(r2.top-sr.top-30)+'px';
+      lbl.style.opacity=String(_k);/* fades in WITH the drag */
     }
     if(e.cancelable)e.preventDefault();
   }
@@ -15119,11 +15130,12 @@ function _famDragInit(el,i){
     if(!_famDrag||_famDrag.el!==el)return;
     var live=_famDrag.live,idx=_famDrag.i;_famDrag=null;
     var armed=el.classList.contains('armed');
-    el.classList.remove('fcv-drag','armed','fcv-blocked');
+    el.classList.remove('fcv-drag','armed','fcv-blocked','fcv-cant');
+    el.style.removeProperty('--arm');
     el.style.transform='';
     /* P737: the reason clears with the gesture */
     try{var _l=document.getElementById('famWhyNot');
-      if(_l){_l.classList.remove('on');setTimeout(function(){if(_l&&!_l.classList.contains('on'))_l.textContent='';},400);}}catch(e){}
+      if(_l){_l.style.opacity='0';setTimeout(function(){if(_l&&_l.style.opacity==='0')_l.textContent='';},400);}}catch(e){}
     if(!live)return;/* a tap - famCardTap's onclick still has it */
     if(!armed)return;/* released short of the line, or blocked - nothing
       fires and nothing apologises: the reason was already on screen */
