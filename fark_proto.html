@@ -29493,7 +29493,8 @@ function _amberReturnWhenSettled(){
     var elapsed=performance.now()-t0;
     if(!started&&elapsed<2000){setTimeout(wait,60);return;}
     if(started&&rolling&&elapsed<9000){setTimeout(wait,80);return;}
-    /* it comes home: rise, pop, crack */
+    /* P744: the die is a REAL die in its lane now - there is nothing to
+       move back. The wrap branch stays for the 2D fallback's tray chip. */
     try{
       if(wrap){wrap.style.transition='translate .45s cubic-bezier(.3,1.35,.4,1),scale .45s cubic-bezier(.3,1.35,.4,1)';
         wrap.style.translate='0 0';wrap.style.scale='1';}
@@ -29904,8 +29905,15 @@ function startPTurn(){
        - it covers the 2D fallback too - and D3X needs no telling, because its
        sync ADOPTS any chip in the host carrying data-mat/data-val. still=true
        because a preserved die is at rest in its casing, not mid-throw. */
+    /* P744: REMEMBER, do not decorate. The deal builds the real die at
+       this lane on the throw line - see _pvDie there. The old mint into
+       #keptRow made a chip on a surface the 3D layer retired: no lane,
+       no pool entry, no click handler, small and grey by class. */
+    G._pvDie={val:_fp.val,mat:_fp.mat||'bone',ench:_fp.ench||null,
+      lane:(typeof _fp.lane==='number')?_fp.lane:null,crack:_fp.crack||0};
     try{
-      var _kr=document.getElementById('keptRow');
+      var _kr=(!document.documentElement.classList.contains('fk3d'))
+        ?document.getElementById('keptRow'):null;/* 2D fallback only */
       if(_kr&&typeof mkDie==='function'){
         /* P559 (D6b): the fifth argument is the enchant, and it was a hardcoded
            null - so even once the record carried the brand, the die on the
@@ -30677,6 +30685,37 @@ G.numDice=Math.min((G.matchDice?G.matchDice.length:6),(G.numDice||(G.matchDice?G
   }
   /* Also force-reset any wrap-level styles that might have leaked in. */
   row.querySelectorAll('.die-wrap').forEach(function(w){w.style.visibility='visible';w.style.opacity='1';});
+  /* P744: THE PRESERVED DIE, BUILT LIKE EVERY OTHER DIE. Its lane was
+     already held free (P691's _occLane reservation), so it drops into
+     its own seat on the throw line: same factory, same row, same pool
+     entry - full size, in colour, and selectable by the same rules as
+     the rest, except that it arrives already committed because it was
+     scored last turn. The amber comes off when this throw settles. */
+  try{
+    var _pv=G._pvDie;
+    if(_pv&&typeof _pv.lane==='number'
+      &&!G.pool.some(function(d){return d.lane===_pv.lane;})
+      &&!newEntries.some(function(d){return d.lane===_pv.lane;})){
+      var _pel=mkDie(_pv.val,_pv.mat,null,true,_pv.ench);
+      _pel.classList.add('committed');
+      _pel.style.visibility='visible';_pel.style.opacity='1';
+      _appendDie(row,_pel);
+      newEntries.push({val:_pv.val,mat:_pv.mat,ench:_pv.ench,sel:false,
+        committed:true,el:_pel,lane:_pv.lane,_preserved:true});
+      /* the amber holds until this throw is done, then cracks */
+      (function _shell(t){
+        var dd=window.D3X&&D3X._dieOfChip&&D3X._dieOfChip(_pel);
+        if(dd&&D3X.amberShell){
+          D3X.amberShell(dd,true);
+          window._fkAmberChip=_pel;window._fkAmberWrap=null;
+          try{_amberReturnWhenSettled();}catch(e){}
+          return;
+        }
+        if((t||0)<40)setTimeout(function(){_shell((t||0)+1);},60);
+      })(0);
+      G._pvDie=null;
+    }
+  }catch(e){}
   G.pool=[...G.pool,...newEntries];
   /* Roll animation duration — uniform 480ms. Earlier experiments at
      700ms / 1200ms for first roll didn't fix the dice-invisible bug
