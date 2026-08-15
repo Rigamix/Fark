@@ -2084,13 +2084,20 @@ body.dlg-speaking #screen-match #tellBadge{opacity:0;pointer-events:none}
    INSIDE its own context - so a multiplying #dsCanvas would have found
    nothing behind it but its own container. With auto it still paints in DOM
    order, after #matchDark and before #matchProps, exactly as before. */
-#matchShadows{position:absolute;inset:0;z-index:auto;pointer-events:none}
+#matchShadows{filter:brightness(.96);/* P732: shadow depth, per the lab */position:absolute;inset:0;z-index:auto;pointer-events:none}
 #matchShadows canvas{position:absolute;inset:0;width:100%;height:100%}
 /* the dice shadows darken the table rather than painting over it: the grain
    stays visible through them and they can never come out lighter than the
    wood, which is what the masked-table trick was for the long way round */
 #dsCanvas{mix-blend-mode:multiply}
 #matchProps{position:absolute;inset:0;z-index:0;pointer-events:none}
+/* P732: THE LOOK's vignette, from Denis's lab numbers (61% edge
+   darkness, pool to 48%). Same z:0 band as the art it darkens; every
+   later sibling (pause, HUD, rows, the appended canvas) paints above
+   by DOM order. NOT #matchVignette - that is the red danger pulse. */
+#matchLookVig{position:absolute;inset:0;z-index:0;pointer-events:none;
+  mix-blend-mode:multiply;
+  background:radial-gradient(ellipse at 50% 46%, rgba(16,10,4,0) 48%, rgba(16,10,4,.61) 100%)}
 #matchProps img{position:absolute;transition:filter .12s linear}
 /* clears ROLL, which is the tall plate and now sits on this side - 29cqw
    cleared BANK but ROLL reaches 20px higher */
@@ -10203,6 +10210,7 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
 <canvas id="matchDark"></canvas>
 <div id="matchShadows"><canvas id="shCanvas"></canvas><canvas id="dsCanvas"></canvas></div>
 <div id="matchProps"></div>
+<div id="matchLookVig"></div><!-- P732: the approved look's vignette - art band, under everything interactive -->
 <div id="matchPause" onclick="SFX.nav();showQuitConfirm()"><img src="Art/Assets/Match/optimized/pause_new_opt.webp" alt="pause"></div>
 <div id="matchVignette"></div>
 <!-- SVG filter -->
@@ -24518,12 +24526,13 @@ var D3X={
                which would have brightened desktop too.
        fbA0/A1 the alpha ramp, 0.09..0.32 -> 0.11..0.41, so the accumulated
                rim survives the punch-out that throws away its inner half. */
-  GLOW:{soft:10, rim:3.5, rimPasses:5, softPasses:1, line:2.4, grow:1.004, clear:0.7, strength:0.78,
+  /* P732: the approved numbers - stronger, taller, wider soft halo */
+  GLOW:{soft:11, rim:3, rimPasses:5, softPasses:1, line:3.2, grow:1.004, clear:0.7, strength:0.91,
         fbWide:1.35, fbCross:0.40, fbA0:0.11, fbA1:0.30,
         /* P731: the SOFT pass can stretch and lean - sx/sy scale the
            silhouette, dy biases it vertically. 1/1/0 = today's look
            exactly; the rim, line and punch-out stay hull-true. */
-        sx:1, sy:1, dy:0},
+        sx:1.14, sy:1.24, dy:0},/* P732 */
   /* ctx.filter is the only thing that spreads the halo, and WebKit shipped it
      in Safari 18 - before that the assignment is a silent no-op. See
      window._cfBlur, tested once and shared with the dice shadows. */
@@ -24862,8 +24871,12 @@ var D3X={
      must be 'very gradual and unnoticeable'. Lambert still cannot blend
      two maps, so gradual = QUANTIZED BAKES: steps of ~4%% walked on a
      smoothstepped ramp, each cached per composed map + value + step. */
-  SIDEDIM_MAX:0.5,
+  SIDEDIM_MAX:0.82,/* P732: 0.5 -> 0.82, masked by SIDEDIM_GRAD */
   SIDEDIM_RAMP:{delay:0,dur:350,steps:8},/* P720: twice as fast, lands WITH the die */
+  /* P732: the dim is STRONGER but fades ACROSS each face - Denis's final
+     numbers went horizontal and subtler. GRAD is the fraction of the dim
+     masked away at the right edge of each cell (all dice). */
+  SIDEDIM_GRAD:0.14,
   _dimMap:function(tex,v,k){
     if(!tex||!tex.image||!v||!k)return null;
     if(!tex.userData)tex.userData={};
@@ -24884,8 +24897,21 @@ var D3X={
     var cx=cv.getContext('2d');
     cx.drawImage(im,0,0,w,h);
     cx.globalCompositeOperation='multiply';
-    cx.fillStyle=col;
-    cx.fillRect(0,0,w,h);
+    /* P732: the dim fades toward each face's BASE (SIDEDIM_GRAD masks
+       that fraction of it) - a per-cell vertical gradient of the multiply
+       colour rather than one flat fill. The scoring cell is repainted
+       bright below exactly as before, so top faces are untouched. */
+    var _gd=this.SIDEDIM_GRAD||0;
+    var _colAt=function(kk){return 'rgb('+fc.map(function(f){
+      return Math.round(255*(1-(1-f)*kk));}).join(',')+')';};
+    var _cw=w/3,_ch=h/2;
+    for(var _cy=0;_cy<2;_cy++)for(var _cx2=0;_cx2<3;_cx2++){
+      var _x0=_cx2*_cw,_y0=_cy*_ch;
+      var _gr=cx.createLinearGradient(0,_y0,0,_y0+_ch);
+      _gr.addColorStop(0,_colAt(kq));
+      _gr.addColorStop(1,_colAt(kq*(1-_gd)));
+      cx.fillStyle=_gr;cx.fillRect(_x0,_y0,_cw,_ch);
+    }
     cx.globalCompositeOperation='source-over';
     /* the scoring face, back at its authored brightness - same cell
        geometry as _brandedMap: 3x2, col (v-1)%3, row (v-1)/3 */
@@ -25436,8 +25462,11 @@ var D3X={
        brightest, lifted darkest, less contrast between adjacent faces.
        This is a DELIBERATE departure from "match D3's constant", not a drift:
        the constant was right for a renderer that showed one face. */
-    var key=new THREE.DirectionalLight(0xffffff,0.38);key.position.set(0,0.33,0.94);sc.add(key);
+    /* P732: key 0.38 -> 0.524 and a warm bounce fill from below, per
+       Denis's approved lab numbers. Ambient stays 0.72 (matched). */
+    var key=new THREE.DirectionalLight(0xffffff,0.524);key.position.set(0,0.33,0.94);sc.add(key);
     sc.add(new THREE.AmbientLight(0xffffff,0.72));
+    var bounce=new THREE.DirectionalLight(0xffe8c8,0.12);bounce.position.set(0,-1,0.6);sc.add(bounce);
     this.cam=new THREE.PerspectiveCamera(this.FOV,1,1,20000);
     var onModel=function(g){
       var proto=g.scene;

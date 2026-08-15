@@ -984,7 +984,7 @@ function buildCatalogue(){
       +'<span class="dot">'+(ns[id]?'● noted':'')+'</span></summary>'
       +'<div class="rules">'+rules+'</div>'
       +'<textarea placeholder="what must HAPPEN, step by step — timings, where the die goes, what the player must understand. Claude implements from THIS." '
-      +'onchange="saveNote('+JSON.stringify(id)+',this.value)">'+(ns[id]||'')+'</textarea>'
+      +'onchange="saveNote(&quot;'+id+'&quot;,this.value)">'+(ns[id]||'')+'</textarea>'
       +'</details>';
   });
   /* dice materials and enchants join the catalogue with the same
@@ -995,7 +995,7 @@ function buildCatalogue(){
       +'<span class="dot">'+nsv+'</span></summary>'
       +(extra?'<div class="rules">'+extra+'</div>':'')
       +'<textarea placeholder="what must HAPPEN, step by step. Claude implements from THIS." '
-      +'onchange="saveNote('+JSON.stringify(idp)+',this.value)">'+(ns[idp]||'')+'</textarea>'
+      +'onchange="saveNote(&quot;'+idp+'&quot;,this.value)">'+(ns[idp]||'')+'</textarea>'
       +'</details>';};
   h+='<div class="grp">die materials</div>';
   ['lucky','bone','iron','flint','lead','amber','jade','jade2','jade3',
@@ -1338,12 +1338,29 @@ function _dressSlot(){
 function applyMat(){
   var i=_dressSlot();if(i<0)return;
   var m=document.getElementById('dressMat').value;
-  E('S.run.dice['+i+']='+JSON.stringify(m));
-  E('G&&G.matchDice&&(G.matchDice['+i+']='+JSON.stringify(m)+')');
   var dx=E('window.D3X');var ds=dx.dice.filter(function(d){return d.match&&d.chip;});
-  if(ds[i]){ds[i].mat=m;try{ds[i].chip._trueMat=m;}catch(e){}}
-  E('D3X._reskin&&D3X._reskin()');
-  log('die '+i+' is now '+m);
+  var d=ds[i];if(!d)return log('no die '+i+' on the table');
+  /* the REAL lane, from the pool die that owns this chip - the
+     registration index is not the lane */
+  var lane=(function(){
+    var g=E('G');if(!g||!g.pool)return i;
+    for(var p=0;p<g.pool.length;p++){var pd=g.pool[p];
+      if(pd&&pd.el&&(pd.el===d.chip||pd.el.contains(d.chip)||d.chip.contains(pd.el)))
+        return (typeof pd.lane==='number')?pd.lane:i;}
+    return i;})();
+  E('S.run.dice['+lane+']='+JSON.stringify(m));
+  E('G&&G.matchDice&&(G.matchDice['+lane+']='+JSON.stringify(m)+')');
+  E('G&&G.pool&&G.pool.forEach(function(pd){if(pd&&pd.lane==='+lane+')pd.mat='+JSON.stringify(m)+';})');
+  /* tint materials bake their pip sheet AT CREATION - a live _reskin
+     cannot rebuild it (bones stayed bones). Retag the chip, DROP the 3D
+     die, remove its record: the next sync re-adopts the chip and builds
+     the new material through the creation path. */
+  d.chip._trueMat=m;
+  d.chip.className=d.chip.className.replace(/dtype-[a-z0-9]+/,'dtype-'+m);
+  var ix=dx.dice.indexOf(d);
+  try{dx._drop(d);}catch(e){}
+  if(ix>=0)dx.dice.splice(ix,1);
+  log('die '+i+' (lane '+lane+') is now '+m+' - rebuilding\u2026');
 }
 function applyEnch(){
   var i=_dressSlot();if(i<0)return;
@@ -1352,7 +1369,11 @@ function applyEnch(){
   var ench=(k==='quicksilver')?{t:k}:{t:k,face:face};
   E('S.run.dieEnch=S.run.dieEnch||[];S.run.dieEnch['+i+']='+JSON.stringify(ench));
   E('G&&(G._enchArr=G._enchArr||[null,null,null,null,null,null],G._enchArr['+i+']='+JSON.stringify(ench)+')');
-  E('D3X._reskin&&D3X._reskin()');
+  /* the brand rides _rebrand on THIS die (dress + faceLayers + settle
+     dim), and the chip carries it for rebuild paths */
+  var dx2=E('window.D3X');var ds2=dx2.dice.filter(function(d){return d.match&&d.chip;});
+  if(ds2[i]){ds2[i].chip._ench=ench;
+    try{dx2._rebrand(ds2[i]);}catch(e){E('D3X._reskin&&D3X._reskin()');}}
   log('die '+i+' branded: '+k+(ench.face?(' on its '+face):''));
 }
 function clearEnch(){
@@ -1374,19 +1395,19 @@ function buildGallery(){
   var h='';
   Object.keys(live).forEach(function(id){
     var d=E('famDef('+JSON.stringify(id)+')');if(!d)return;
-    h+='<div class="gcard" onclick="openStudio('+JSON.stringify(id)+')">'
+    h+='<div class="gcard" onclick="openStudio(&quot;'+id+'&quot;)">'
       +'<img src="assets/cards/'+id+'.webp" onerror="this.style.display=&quot;none&quot;">'
       +'<div class="gname">'+d.name+'</div>'
       +'<div class="gnote">'+(ns[id]?'\u25cf':'')+'</div></div>';
   });
   _MATS.forEach(function(m){
-    h+='<div class="gcard" onclick="openStudio('+JSON.stringify('mat:'+m)+')">'
+    h+='<div class="gcard" onclick="openStudio(&quot;mat:'+m+'&quot;)">'
       +'<div class="swatch" style="background:'+(_MATCOLS[m]||'#888')+'"></div>'
       +'<div class="gname">'+m+' die</div>'
       +'<div class="gnote">'+(ns['mat:'+m]?'\u25cf':'')+'</div></div>';
   });
   _ENCHS.forEach(function(e2){
-    h+='<div class="gcard" onclick="openStudio('+JSON.stringify('ench:'+e2)+')">'
+    h+='<div class="gcard" onclick="openStudio(&quot;ench:'+e2+'&quot;)">'
       +'<div class="swatch" style="background:#241a0e;display:flex;align-items:center;justify-content:center;color:#ffd98a;font-size:22px">\u2726</div>'
       +'<div class="gname">'+e2+'</div>'
       +'<div class="gnote">'+(ns['ench:'+e2]?'\u25cf':'')+'</div></div>';
