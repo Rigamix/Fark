@@ -1287,22 +1287,27 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 /* P743: the gradient arm - the halo grows with --arm while the card is
    in hand, so the glow is already visible on the way up rather than
    arriving in one frame at the line. .armed below is the full state. */
+/* P747: EVERY var(--arm,0) CARRIES A FALLBACK. An unset custom property
+   makes the whole declaration invalid at computed-value time - so for any
+   frame where --arm is missing the browser threw away the filter AND the
+   scale together: the card silently dropped to base size and lost its
+   glow, which is exactly what Denis described. */
 #famRowP .fcv.fcv-drag{--arm:0}
 #famRowP .fcv.fcv-drag:not(.fcv-cant):not(.spent){
-  scale:calc(1 + 0.09*var(--arm));
+  scale:calc(1 + 0.09*var(--arm,0));
   /* P746b: A FLOOR ON THE HALO. Measured, the ramp was linear from
      alpha 0 - so at a fifth of the way up the glow was 0.15 opaque gold
      on a warm table, which is invisible (Denis, three times). A playable
      card in hand now lights the moment it leaves the row - 0.45 at the
      first pixel, full at the line - and the radius starts wide rather
      than growing from nothing. */
-  filter:drop-shadow(0 0 calc(0.35cqw + 0.55cqw*var(--arm)) rgba(255,240,190,calc(0.45 + 0.55*var(--arm))))
-    drop-shadow(0 0 calc(1.6cqw + 2.2cqw*var(--arm)) rgba(255,200,85,calc(0.5 + 0.5*var(--arm))))
+  filter:drop-shadow(0 0 calc(0.35cqw + 0.55cqw*var(--arm,0)) rgba(255,240,190,calc(0.45 + 0.55*var(--arm,0))))
+    drop-shadow(0 0 calc(1.6cqw + 2.2cqw*var(--arm,0)) rgba(255,200,85,calc(0.5 + 0.5*var(--arm,0))))
     drop-shadow(0 0.9cqw 1.3cqw rgba(10,6,2,.5))
-    brightness(calc(1.06 + 0.18*var(--arm)))}
+    brightness(calc(1.06 + 0.18*var(--arm,0)))}
 /* cannot-play greys IN from the first pixel, on the same value */
 #famRowP .fcv.fcv-drag.fcv-cant{
-  filter:saturate(calc(1 - 0.82*var(--arm))) brightness(calc(1 - 0.5*var(--arm)))
+  filter:saturate(calc(1 - 0.82*var(--arm,0))) brightness(calc(1 - 0.5*var(--arm,0)))
     drop-shadow(0 0.25cqw 0.3cqw rgba(10,6,2,.5))}
 #famWhyNot.on,#famWhyNot{transition:opacity .12s linear}
 #famRowP .fcv.armed,#screen-match #famRowO .fcv.armed{
@@ -1355,11 +1360,8 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
    sits above the card where the eye already is */
 #famRowP .fcv.fcv-blocked{filter:saturate(.18) brightness(.5)
   drop-shadow(0 0.25cqw 0.3cqw rgba(10,6,2,.5))}
-#famWhyNot{position:absolute;left:0;right:0;text-align:center;z-index:9600;
-  font-family:'JMH Beda',serif;font-size:3.6cqw;letter-spacing:.04em;
-  color:#e8c9a0;text-shadow:0 0.2cqw 0.4cqw rgba(8,4,2,.9);
-  pointer-events:none;opacity:0;transition:opacity .16s ease}
-#famWhyNot.on{opacity:1}
+/* P747: #famWhyNot retired - the refusal speaks on the status strip */
+
 /* the fire flash, on the family card too - one selector rather than a second
    set of keyframes */
 .fcv.card-fired{animation:cardFired .42s ease-out}
@@ -15115,14 +15117,15 @@ function _famDragInit(el,i){
        test. The reason line fades in on the same progress value. */
     var armed=past&&!why;
     if(armed!==_famDrag.armed){_famDrag.armed=armed;el.classList.toggle('armed',armed);}
-    if(why){
-      var lbl=document.getElementById('famWhyNot');
-      if(!lbl){lbl=document.createElement('div');lbl.id='famWhyNot';
-        (document.getElementById('screen-match')||document.body).appendChild(lbl);}
-      if(lbl.textContent!==why)lbl.textContent=why;
-      var r2=el.getBoundingClientRect(),sr=(document.getElementById('screen-match')||document.body).getBoundingClientRect();
-      lbl.style.top=(r2.top-sr.top-30)+'px';
-      lbl.style.opacity=String(_k);/* fades in WITH the drag */
+    /* P747: THE SAME SURFACE A CARD'S OWN EFFECT SPEAKS ON. Denis: 'the
+       text that tells me why I cannot play a card should be positioned
+       and scaled the same way the card effect is, just red.' That
+       surface is the status strip - setStatusMsg, where every announce
+       lands - so the bespoke #famWhyNot div is gone and the refusal
+       reads exactly like the rest of the table's voice. */
+    if(why&&!_famDrag.said&&_k>0.35){
+      _famDrag.said=1;
+      try{setStatusMsg(why,'red');}catch(e){}
     }
     if(e.cancelable)e.preventDefault();
   }
@@ -15134,8 +15137,8 @@ function _famDragInit(el,i){
     el.style.removeProperty('--arm');
     el.style.transform='';
     /* P737: the reason clears with the gesture */
-    try{var _l=document.getElementById('famWhyNot');
-      if(_l){_l.style.opacity='0';setTimeout(function(){if(_l&&_l.style.opacity==='0')_l.textContent='';},400);}}catch(e){}
+    /* P747: the strip clears itself on the next announce; nothing to
+       tear down here any more */
     if(!live)return;/* a tap - famCardTap's onclick still has it */
     if(!armed)return;/* released short of the line, or blocked - nothing
       fires and nothing apologises: the reason was already on screen */
