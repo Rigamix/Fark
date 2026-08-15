@@ -1377,11 +1377,14 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 /* P673: justified both sides with a touch of tracking; the LAST line
    centres because a justified final line of two words is a chasm */
 #cardFocusTip .cft-body{font-family:var(--font-dlg);font-size:3.4cqw;/* P728: the dialogue font (Denis) */
-  color:#f2e6c8;line-height:1.4;margin-top:1.1cqw;letter-spacing:.075em;
-  /* P679: justify WAS the word gaps - it stretches every non-final line's
-     spaces to both edges, and no box width stops that. Balanced centred
-     text instead: natural spaces, near-even lines. */
-  text-align:center;text-wrap:balance}
+  color:#f2e6c8;line-height:1.28;margin-top:1.1cqw;letter-spacing:.05em;
+  /* P679 justified and got chasms, so it centred instead. P737b: JUSTIFY
+     AGAIN, per Denis - the box is 74cqw now rather than 50, and a wide
+     measure is exactly what justification needs (the chasms were the
+     narrow column, not the alignment). The last line still centres.
+     line-height 1.4 -> 1.28 and tracking eased, also per Denis. */
+  text-align:justify;text-align-last:center;text-wrap:pretty;
+  hyphens:auto;-webkit-hyphens:auto}
 /* the words arrive one after another - delay is written inline per word */
 #cardFocusTip span.w{display:inline-block;opacity:0;
   animation:cftWord .32s ease-out forwards}
@@ -17061,9 +17064,27 @@ CFX.sleight={
 function _keptScorers(k){
   return ((k&&k.dice)||[]).filter(function(dd){return dd&&!_dieIsIcon(dd);});
 }
+/* P737c: THE SAME BUG HONEYTRAP HAD, found by auditing the other cards
+   for it (Denis: 'check other cards'). A 1 or 5 the player has SELECTED
+   but not yet committed is on the table and visible - it just was not in
+   G.kept, so Preserve answered NOT NOW while the player was looking at
+   the die it wanted. Selection counts now, in both the gate and the
+   picker, and it is preferred: it is what the player is pointing at. */
+function _preserveCands(){
+  var out=[];
+  try{
+    (G.pool||[]).forEach(function(d){
+      if(d.sel&&!d.committed&&!d._frozen&&(d.val===1||d.val===5)&&!_dieIsIcon(d))
+        out.push({val:d.val,mat:d.mat,ench:d.ench||null,
+          lane:(typeof d.lane==='number')?d.lane:null});
+    });
+  }catch(e){}
+  return out;
+}
 CFX.preserve={
   canUse:function(){
     if(!G||G.phase==='opp')return false;
+    if(_preserveCands().length)return true;
     return (G.kept||[]).some(function(k){return (k.vals||[]).some(function(v){return v===1||v===5;});});
   },
   use:function(inst){
@@ -17092,7 +17113,12 @@ CFX.preserve={
        looks for). P559 still holds: the brand travels with the material -
        the kept group's dice entries are {val,mat,ench,lane}, exactly what
        the record carries forward. */
+    /* P737c: the selection first - the die under the player's finger -
+       then the kept groups, still preferring the 1 (100 over 50). */
     [1,5].some(function(want){
+      var _sc=_preserveCands().filter(function(c){return c.val===want;})[0];
+      if(_sc){found=_sc.val;foundMat=_sc.mat||'bone';foundEnch=_sc.ench||null;
+        foundLane=_sc.lane;return true;}
       return (G.kept||[]).some(function(k){
         var _pd=_keptScorers(k).filter(function(dd){return dd&&dd.val===want;})[0];
         if(_pd){found=_pd.val;foundMat=_pd.mat||k.mat||'bone';foundEnch=_pd.ench||null;
