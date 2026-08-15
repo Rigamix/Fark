@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Fark VFX Lab</title>
+<style>
+  body{margin:0;display:flex;height:100vh;background:#14100a;color:#e8d9b8;
+    font-family:Georgia,serif}
+  #stage{flex:none;width:430px;height:100vh;display:flex;align-items:center;
+    justify-content:center;background:#000}
+  #game{width:430px;height:900px;border:0;transform-origin:top center}
+  #panel{flex:1;overflow-y:auto;padding:18px 22px;border-left:2px solid #3a2c18}
+  h1{font-size:18px;color:#ffd98a;letter-spacing:.06em;margin:0 0 4px}
+  .sub{font-size:12px;color:#9a8a68;margin-bottom:14px}
+  .grp{margin:14px 0 4px;font-size:13px;color:#c8a45c;letter-spacing:.08em;
+    text-transform:uppercase;border-bottom:1px solid #3a2c18;padding-bottom:3px}
+  button{display:inline-block;margin:4px 6px 4px 0;padding:7px 12px;background:#2a2012;
+    color:#e8d9b8;border:1px solid #5a4626;border-radius:4px;cursor:pointer;
+    font-family:inherit;font-size:13px}
+  button:hover{background:#3a2c18;border-color:#8a6a36}
+  button:disabled{opacity:.4;cursor:default}
+  #log{margin-top:14px;font-size:11px;color:#8a7a5a;white-space:pre-wrap;
+    max-height:30vh;overflow-y:auto;border-top:1px solid #3a2c18;padding-top:8px}
+  .note{font-size:11px;color:#9a8a68;margin:2px 0 8px;line-height:1.5}
+</style>
+</head>
+<body>
+<div id="stage"><iframe id="game" src="fark_proto.html"></iframe></div>
+<div id="panel">
+  <h1>FARK VFX LAB</h1>
+  <div class="sub">The frame runs the REAL game — every recipe calls the game's own
+    functions. Approve here, then port the recipe into fark_proto.html.
+    Designs: docs/CARD_VFX.md</div>
+
+  <div class="grp">Setup</div>
+  <button onclick="setup()">Boot into a match</button>
+  <button onclick="dealCards()">Deal preserve + honeytrap</button>
+  <button onclick="roll()">Roll</button>
+  <div class="note">Boot walks the same draft → seat path the probes use (~15s).</div>
+
+  <div class="grp">Preserve — the amber lifecycle (A1b)</div>
+  <button onclick="r_amberSet()">1. amber sets on a die</button>
+  <button onclick="r_amberPark()">2. bank: slide down its lane</button>
+  <button onclick="r_amberReturn()">3. return + crack</button>
+
+  <div class="grp">Card beats (existing pipe, aimed at card 0)</div>
+  <button onclick="beat('gain')">gain</button>
+  <button onclick="beat('hit')">hit</button>
+  <button onclick="beat('churn')">churn</button>
+  <button onclick="beat('steal')">steal → HUD</button>
+
+  <div class="grp">Table moments</div>
+  <button onclick="r_laneGlow()">positional lane glow</button>
+  <button onclick="r_redCandle()">bust: red candle (C14)</button>
+  <button onclick="r_shield()">amber bust shield (exists)</button>
+
+  <div class="grp">A3b — the accidental look</div>
+  <button onclick="r_dimmerRoom()">darker room (score-scaled)</button>
+  <button onclick="r_softerKey()">softer key light</button>
+  <button onclick="r_resetLook()">reset look</button>
+
+  <div id="log"></div>
+</div>
+<script>
+var W=null;
+function log(m){var el=document.getElementById('log');
+  el.textContent=(new Date).toTimeString().slice(0,8)+'  '+m+'\n'+el.textContent;}
+function gw(){W=document.getElementById('game').contentWindow;
+  /* the game's S/G are top-level let/const - script scope, invisible as
+     W.S from outside. A script injected INTO the frame evaluates in the
+     game's global lexical environment and sees them; __labEval is that
+     one bridge, everything else goes through E(). */
+  try{if(!W.__labEval){var sc=W.document.createElement('script');
+    sc.textContent='window.__labEval=function(c){return eval(c)};';
+    W.document.head.appendChild(sc);}}catch(e){}
+  return W;}
+function E(code){gw();try{return W.__labEval(code);}catch(e){log('E: '+code.slice(0,40)+' -> '+e);}}
+function sleep(ms){return new Promise(function(r){setTimeout(r,ms);});}
+async function until(fn,ms){var t0=Date.now();
+  while(Date.now()-t0<ms){try{if(fn())return true;}catch(e){}await sleep(80);}return false;}
+function tap(el){if(!el)return false;var r=el.getBoundingClientRect();
+  var o={bubbles:true,cancelable:true,clientX:r.left+r.width/2,clientY:r.top+r.height/2};
+  try{el.dispatchEvent(new W.PointerEvent('pointerdown',o));
+    el.dispatchEvent(new W.PointerEvent('pointerup',o));}catch(e){}
+  try{el.dispatchEvent(new W.MouseEvent('click',o));}catch(e){}
+  try{el.click();}catch(e){}
+  return true;}
+
+async function setup(){
+  gw();
+  log('waiting for the game to boot…');
+  var booted=await until(function(){var D=W.document;
+    var b=D&&D.getElementById('hsBtnBottom');
+    return b&&b.getBoundingClientRect().width>1;},25000);
+  if(!booted){log('game never booted in the frame');return;}
+  var D=W.document;
+  log('booting into a match…');
+  tap(D.getElementById('hsBtnBottom'));await sleep(2000);
+  var draft=await until(function(){return D.querySelector('.nrdie');},15000);
+  if(!draft){log('the draft never appeared - title tap did not take');return;}
+  await sleep(500);
+  log('draft up - taking a die');
+  tap(D.querySelector('.nrdie'));await sleep(1200);
+  tap(D.getElementById('nrTakeBtn'));await sleep(2400);
+  var sOk=await until(function(){var st=E('S');return st&&st.run;},9000);
+  log('run state: '+(sOk?'ok':'MISSING'));
+  E('_getS()');E('G=null');
+  W._fkDiscardOk=true;
+  try{E('launchSeat(0)');log('launchSeat called');}catch(e){log('launchSeat THREW: '+e);}
+  var ok=await until(function(){var g=E('G');return g&&g.phase==='idle';},16000);
+  log(ok?'match ready':'boot FAILED - '+JSON.stringify({g:!!E('G')}));
+}
+function dealCards(){
+  var g=E('G');if(!g)return log('no match - setup first');
+  g.pF=[{id:'preserve',tier:1,charges:1,state:{}},{id:'honeytrap',tier:2,charges:2,state:{}}];
+  E('famRenderRow()');log('cards dealt');}
+function roll(){try{E('handleRoll()');log('rolled');}catch(e){log('roll: '+e);}}
+function die(i){var dx=E('window.D3X');if(!dx)return null;
+  var ds=dx.dice.filter(function(d){return d.match&&d.chip;});
+  return ds[i||0]&&ds[i||0].chip;}
+
+/* ── Preserve amber lifecycle ───────────────────────────────────── */
+function amberOverlay(chip){
+  var w=chip.closest('.die-wrap')||chip.parentElement||chip;
+  var ov=w.querySelector('.labAmber');
+  if(!ov){ov=W.document.createElement('div');ov.className='labAmber';
+    ov.style.cssText='position:absolute;inset:-6%;border-radius:18%;pointer-events:none;z-index:5;'
+      +'background:radial-gradient(circle at 38% 30%, rgba(255,200,90,.28) 0%, rgba(216,138,32,.34) 55%, rgba(122,74,10,.55) 100%);'
+      +'box-shadow:inset 0 0 10px rgba(122,74,10,.8), 0 0 8px rgba(232,162,60,.5);'
+      +'scale:1.35;opacity:0;transition:scale .28s cubic-bezier(.3,1.3,.4,1),opacity .28s';
+    w.style.position=w.style.position||'relative';w.appendChild(ov);}
+  requestAnimationFrame(function(){ov.style.scale='1';ov.style.opacity='1';});
+  return ov;}
+function r_amberSet(){var c=die(0);if(!c)return log('no die — setup+roll first');
+  amberOverlay(c);
+  try{W.__labEval("_fxSpray")(c,'#e8a23c',12,{speed:70,g:110,size:7,spread:2});}catch(e){}
+  try{E("SFX.bank()");}catch(e){}
+  try{E("famLog('PRESERVED — A DIE WAITS IN AMBER')");}catch(e){}
+  log('amber set on die 0');}
+function r_amberPark(){var c=die(0);if(!c)return log('no die');
+  var w=c.closest('.die-wrap')||c;
+  w.style.transition='translate .6s cubic-bezier(.4,.9,.3,1), scale .6s';
+  w.style.translate='0 26cqw';w.style.scale='0.8';
+  log('parked down its lane (translate only — set, not thrown)');}
+function r_amberReturn(){var c=die(0);if(!c)return log('no die');
+  var w=c.closest('.die-wrap')||c;
+  w.style.translate='0 0';w.style.scale='1';
+  setTimeout(function(){
+    var ov=w.querySelector('.labAmber');
+    if(ov){ov.style.transition='scale .22s,opacity .22s';ov.style.scale='1.5';ov.style.opacity='0';
+      setTimeout(function(){ov.remove();},240);}
+    try{W.__labEval("_fxSpray")(c,'#ffd98a',16,{speed:95,g:90,size:7,spread:2.4});}catch(e){}
+    try{E("famLog('THE AMBER CRACKS — A 1 ALREADY KEPT')");}catch(e){}
+  },620);
+  log('returning + crack');}
+
+/* ── card beats ─────────────────────────────────────────────────── */
+function beat(kind){gw();var fc=W.document.querySelector('#famRowP .fcv');
+  if(!fc)return log('no card — deal first');
+  try{W.__labEval('cardFx')(kind,fc,kind==='steal'?{to:W.document.getElementById('hud')}:{});
+    log('beat: '+kind);}catch(e){log('beat: '+e);}}
+
+/* ── table moments ──────────────────────────────────────────────── */
+function r_laneGlow(){gw();var c=die(2);if(!c)return log('no die');
+  var w=c.closest('.die-wrap')||c;var r=w.getBoundingClientRect();
+  var g=W.document.createElement('div');
+  g.style.cssText='position:fixed;left:'+(r.left-8)+'px;top:'+(r.top-30)+'px;width:'+(r.width+16)
+    +'px;height:'+(r.height+60)+'px;pointer-events:none;z-index:4;border-radius:12px;'
+    +'box-shadow:inset 0 0 22px rgba(255,217,138,.55);opacity:0;transition:opacity .25s';
+  W.document.body.appendChild(g);
+  requestAnimationFrame(function(){g.style.opacity='1';});
+  setTimeout(function(){g.style.opacity='0';setTimeout(function(){g.remove();},300);},700);
+  log('lane glow on lane 2');}
+function r_redCandle(){var dx=E('window.D3X');if(!dx||!dx.scene)return log('no 3D scene');
+  var lights=[];dx.scene.traverse(function(o){if(o.isLight)lights.push(o);});
+  if(!lights.length)return log('no lights');
+  var orig=lights.map(function(l){return l.color.getHex();});
+  lights.forEach(function(l){l.color.setHex(0xc03818);});
+  log('candle RED ('+lights.length+' lights) — restoring in 650ms');
+  setTimeout(function(){lights.forEach(function(l,i){l.color.setHex(orig[i]);});log('candle restored');},650);}
+function r_shield(){try{E("_bustShieldFX('#e8a23c')");log('shield fired');}catch(e){log('shield: '+e);}}
+
+/* ── A3b look experiments ───────────────────────────────────────── */
+function r_dimmerRoom(){gw();var ms=W.document.getElementById('screen-match');
+  if(!ms)return log('no match screen');
+  ms.style.filter='brightness(.84)';log('room at 84% (score-scaled idea: 1.0→0.82 as pPts→target)');}
+function r_softerKey(){var dx=E('window.D3X');if(!dx||!dx.scene)return log('no scene');
+  dx.scene.traverse(function(o){if(o.isDirectionalLight)o.intensity*=0.85;});
+  log('key light −15%');}
+function r_resetLook(){gw();var ms=W.document.getElementById('screen-match');
+  if(ms)ms.style.filter='';
+  log('reset (reload the frame for exact original lights)');}
+</script>
+</body>
+</html>
