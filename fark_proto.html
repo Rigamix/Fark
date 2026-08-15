@@ -1328,6 +1328,15 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 #famRowP .fcv.fcv-drag{transition:none;z-index:9500;pointer-events:none;
   will-change:transform}
 #famRowP .fcv.fcv-drag .fcvIn{animation:none}
+/* P737: dragged past the line but unplayable - grey, and the reason
+   sits above the card where the eye already is */
+#famRowP .fcv.fcv-blocked{filter:saturate(.18) brightness(.5)
+  drop-shadow(0 0.25cqw 0.3cqw rgba(10,6,2,.5))}
+#famWhyNot{position:absolute;left:0;right:0;text-align:center;z-index:9600;
+  font-family:'JMH Beda',serif;font-size:3.6cqw;letter-spacing:.04em;
+  color:#e8c9a0;text-shadow:0 0.2cqw 0.4cqw rgba(8,4,2,.9);
+  pointer-events:none;opacity:0;transition:opacity .16s ease}
+#famWhyNot.on{opacity:1}
 /* the fire flash, on the family card too - one selector rather than a second
    set of keyframes */
 .fcv.card-fired{animation:cardFired .42s ease-out}
@@ -1351,7 +1360,9 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
   /* P677: 60 -> 50cqw. The wide word gaps WERE this box: justify pads the
      spaces to fill whatever width it is given, so the narrower box closes
      the gaps at the source. */
-  max-width:50cqw;width:50cqw;text-align:center}
+  /* P737b: WIDER, per Denis - 50cqw was a column; the justified body
+     reads badly in a narrow measure and the box crowded the card. */
+  max-width:74cqw;width:74cqw;text-align:center}
 #cardFocusTip .cft-name{font-family:'JMH Beda',serif;font-size:3.9cqw;
   letter-spacing:.09em;
   /* P673: LIFTED toward cream, not darkened - the ground is the near-black
@@ -14956,6 +14967,34 @@ function famRenderRow(){
    active kind, a use handler, charges left, its own canUse - is decided in
    exactly one place, and this only asks whether it is worth starting a drag. */
 var _famDrag=null;
+/* P737: WHY NOT, in one line. A card that cannot fire should say so
+   BEFORE the player commits to the gesture, not apologise after. */
+function _famWhyNot(inst){
+  try{
+    if(!inst)return '';
+    var d=famDef(inst.id),fx=CFX[inst.id];
+    if(!d)return '';
+    if(d.kind!=='active')return 'PASSIVE — IT WORKS ON ITS OWN';
+    if(!fx||!fx.use)return 'NOT WIRED UP YET';
+    if(inst.charges<=0)return 'SPENT FOR THIS MATCH';
+    if(G&&G.phase==='opp')return 'WAIT FOR YOUR TURN';
+    if(fx.canUse&&!fx.canUse(inst)){
+      var why={
+        honeytrap:'KEEP OR SELECT A PAIR FIRST',
+        preserve:'KEEP A 1 OR A 5 FIRST',
+        transmute:'ROLL FIRST — IT NEEDS A DIE TO CHANGE',
+        powder_keg:'ROLL FIRST',
+        sacrifice:'ROLL FIRST — IT NEEDS A DIE TO SPEND',
+        stargazer:'ROLL FIRST',
+        sleight:'ROLL FIRST',
+        tamper:'THE RIVAL HAS NOTHING TO TAMPER WITH YET',
+        ill_omen:'NOT THIS MOMENT — IT FIRES ON THEIR TURN'
+      }[inst.id];
+      return why||'NOT RIGHT NOW';
+    }
+  }catch(e){}
+  return '';
+}
 function _famCanPlay(i){
   if(!G||!G.pF||!G.pF[i])return false;
   var inst=G.pF[i],d=famDef(inst.id),fx=CFX[inst.id];
@@ -15001,18 +15040,41 @@ function _famDragInit(el,i){
        because cy0 and line were measured once at start. */
     _famDrag.dx=dx;_famDrag.dy=dy;
     el.style.transform='translate('+dx.toFixed(1)+'px,'+dy.toFixed(1)+'px)';
-    var armed=(_famDrag.cy0+dy)<_famDrag.line;
+    var past=(_famDrag.cy0+dy)<_famDrag.line;
+    /* P737: past the line is not the same as PLAYABLE. A card that
+       cannot fire greys and says why, up where the player is looking -
+       and releasing it does nothing at all. */
+    var why=_famWhyNot(G&&G.pF&&G.pF[_famDrag.i]);
+    var armed=past&&!why;
     if(armed!==_famDrag.armed){_famDrag.armed=armed;el.classList.toggle('armed',armed);}
+    var blocked=past&&!!why;
+    if(blocked!==_famDrag.blocked){
+      _famDrag.blocked=blocked;
+      el.classList.toggle('fcv-blocked',blocked);
+      var lbl=document.getElementById('famWhyNot');
+      if(blocked){
+        if(!lbl){lbl=document.createElement('div');lbl.id='famWhyNot';
+          (document.getElementById('screen-match')||document.body).appendChild(lbl);}
+        lbl.textContent=why;
+        var r2=el.getBoundingClientRect(),sr=(document.getElementById('screen-match')||document.body).getBoundingClientRect();
+        lbl.style.top=(r2.top-sr.top-30)+'px';
+        lbl.classList.add('on');
+      }else if(lbl)lbl.classList.remove('on');
+    }
     if(e.cancelable)e.preventDefault();
   }
   function end(){
     if(!_famDrag||_famDrag.el!==el)return;
     var live=_famDrag.live,idx=_famDrag.i;_famDrag=null;
     var armed=el.classList.contains('armed');
-    el.classList.remove('fcv-drag','armed');
+    el.classList.remove('fcv-drag','armed','fcv-blocked');
     el.style.transform='';
+    /* P737: the reason clears with the gesture */
+    try{var _l=document.getElementById('famWhyNot');
+      if(_l){_l.classList.remove('on');setTimeout(function(){if(_l&&!_l.classList.contains('on'))_l.textContent='';},400);}}catch(e){}
     if(!live)return;/* a tap - famCardTap's onclick still has it */
-    if(!armed)return;/* released short of the line - it just goes home */
+    if(!armed)return;/* released short of the line, or blocked - nothing
+      fires and nothing apologises: the reason was already on screen */
     /* P658: THE GAME'S OWN FIRE, not new effects. All four of these were
        written for the legacy row's activation in P617/P619 and none of them
        knows or cares which row the card came from. The plume goes BEFORE the
@@ -16895,17 +16957,36 @@ CFX.stargazer={
     return true;
   }
 };
+/* P737: THE PAIR THE PLAYER MEANS. Two bugs lived here: only COMMITTED
+   dice counted (so a pair you had just selected did not exist), and the
+   winner was Object.keys' last match - ascending numeric order, i.e.
+   always the HIGHEST pair on the table, never the one you just made.
+   Recency decides now: the live selection first, then the most recent
+   kept group, then anything else that pairs. */
+function _honeyPairs(){
+  var out=[];
+  try{
+    var sel=(G.pool||[]).filter(function(d){return d.sel&&!d.committed;});
+    var sv={};sel.forEach(function(d){sv[d.val]=(sv[d.val]||0)+1;});
+    Object.keys(sv).forEach(function(v){if(sv[v]>=2)out.push(Number(v));});
+    for(var i=(G.kept||[]).length-1;i>=0;i--){
+      var kv={};((G.kept[i]||{}).vals||[]).forEach(function(v){kv[v]=(kv[v]||0)+1;});
+      Object.keys(kv).forEach(function(v){if(kv[v]>=2&&out.indexOf(Number(v))<0)out.push(Number(v));});
+    }
+    /* last resort: a pair spread across groups */
+    var all={};
+    (G.kept||[]).forEach(function(k){(k.vals||[]).forEach(function(v){all[v]=(all[v]||0)+1;});});
+    Object.keys(all).forEach(function(v){if(all[v]>=2&&out.indexOf(Number(v))<0)out.push(Number(v));});
+  }catch(e){}
+  return out;
+}
 CFX.honeytrap={
   canUse:function(){
     if(!G||G.phase==='opp')return false;
-    var vals={};var ok=false;
-    (G.kept||[]).forEach(function(k){(k.vals||[]).forEach(function(v){vals[v]=(vals[v]||0)+1;if(vals[v]>=2)ok=true;});});
-    return ok;
+    return _honeyPairs().length>0;
   },
   use:function(inst){
-    var vals={},pairVal=0;
-    (G.kept||[]).forEach(function(k){(k.vals||[]).forEach(function(v){vals[v]=(vals[v]||0)+1;});});
-    Object.keys(vals).forEach(function(v){if(vals[v]>=2)pairVal=Number(v);});
+    var pairVal=_honeyPairs()[0]||0;
     if(!pairVal)return false;
     G._famHoneyVal=pairVal;
     famLog('HONEYTRAP SET — THE NEXT ROLL PULLS A '+pairVal);
@@ -24004,6 +24085,13 @@ var D3X={
        Lower thresholds let the tail of the motion play out; `cap` bounds how
        long that can take, so a stubborn die still ends. */
     on:true, gravity:-50, dt:1/60, cap:700, stopV:.09, stopW:.14,
+    /* P736: THE CREEP BAND. A die under both of these for creepFrames
+       consecutive frames, resting low, is finished - its velocity is
+       zeroed rather than left to ooze toward zero. Measured: the tail
+       (frames after the last clearly-moving one) ran 183-650ms per
+       throw before this. Well above stopV on purpose: it has to catch
+       the ooze, not the stop. */
+    creepV:.5, creepW:.85, creepFrames:6, creepY:1.25,
     /* the depth lane is much stiffer than the lab's: the table is seen from
        58 degrees here, so wander in z reads as vertical jumble rather than
        as depth. x stays loose - that is where the rough line lives. */
@@ -24388,14 +24476,45 @@ var D3X={
          term was added. */
       if(P.lanePull>0){
         var _K=P.lanePull,_C=2*Math.sqrt(_K);
+        /* P736b: THE PULL IS SELF-SUSTAINING, and that is the drag. A
+           critically damped spring approaches its target asymptotically:
+           at K=37 a die 0.3 off-centre settles into a terminal creep of
+           K*dx/C ~ 0.9 units/s - ABOVE any speed gate, so the gate never
+           fires and the die is walked into its lane over half a second.
+           That is Denis's 'sliding against an invisible wall'. The lane
+           is an AREA (laneRadius), so once the die is inside it, stop
+           pulling: it is already where it belongs. */
+        var _pitch=(N>1&&slotC.length>1)?Math.abs(slotC[1]-slotC[0]):1.6;
+        var _laneR=_pitch*(P.laneRadius||0.54);
         for(var kp=0;kp<N;kp++){
           var bp=bodies[kp];
-          if(bp.velocity.norm()<=P.stopV&&bp.angularVelocity.norm()<=P.stopW)continue;
+          if(Math.abs(slotC[kp]-bp.position.x)<_laneR
+            &&Math.abs(bp.position.z)<_laneR*0.6)continue;
+          /* P736: and nothing pulls a die that is merely OOZING either -
+             the old gate was stopV (0.09), so a die creeping at 0.3 was
+             still being drawn toward its lane at walking pace, which is
+             the slow drag Denis reported twice. */
+          if(bp.velocity.norm()<=P.creepV&&bp.angularVelocity.norm()<=P.creepW)continue;
           bp.velocity.x+=((slotC[kp]-bp.position.x)*_K-bp.velocity.x*_C)*P.dt;
           bp.velocity.z+=((0-bp.position.z)*_K-bp.velocity.z*_C)*P.dt;
         }
       }
       world.step(P.dt);
+      /* P736: THE REST SNAP. Damping and friction only approach zero;
+         a die can ooze for half a second under the still-frame test's
+         nose. Six consecutive frames inside the creep band, low enough
+         to be on the table, means finished - so end it, and let the
+         still counter and the tape cut do the rest. */
+      for(var ks=0;ks<N;ks++){
+        var bs=bodies[ks];
+        if(bs.velocity.norm()<P.creepV&&bs.angularVelocity.norm()<P.creepW
+          &&bs.position.y<P.creepY){
+          bs._creep=(bs._creep||0)+1;
+          if(bs._creep>=P.creepFrames){
+            bs.velocity.set(0,0,0);bs.angularVelocity.set(0,0,0);
+          }
+        }else bs._creep=0;
+      }
       var fr=[];
       for(var k2=0;k2<N;k2++)fr.push({
         x:bodies[k2].position.x,y:bodies[k2].position.y,z:bodies[k2].position.z,
