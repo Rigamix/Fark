@@ -1331,6 +1331,11 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 #screen-match #famRowO .fcv.focus{scale:1.24}
 /* P681: the strips give way to an open tip */
 #screen-match.tip-open .status-strip{opacity:0;transition:opacity .18s ease}
+/* P728: and the floating score numbers - they overlapped the tip's text
+   (Denis's HONEYTRAP screenshot) */
+#screen-match.tip-open .selTag,#screen-match.tip-open #selTotal,
+#screen-match.tip-open .oppTag,#screen-match.tip-open #oppTotal{
+  opacity:0;transition:opacity .18s ease}
 #screen-match .status-strip{transition:opacity .18s ease}
 #cardFocusTip{position:absolute;z-index:9001;pointer-events:none;
   /* P677: 60 -> 50cqw. The wide word gaps WERE this box: justify pads the
@@ -1350,7 +1355,7 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
   color:#c9b490;opacity:.9;margin-top:0.4cqw;letter-spacing:.06em}
 /* P673: justified both sides with a touch of tracking; the LAST line
    centres because a justified final line of two words is a chasm */
-#cardFocusTip .cft-body{font-family:'JMH Beda',serif;font-size:3.5cqw;
+#cardFocusTip .cft-body{font-family:var(--font-dlg);font-size:3.4cqw;/* P728: the dialogue font (Denis) */
   color:#f2e6c8;line-height:1.4;margin-top:1.1cqw;letter-spacing:.075em;
   /* P679: justify WAS the word gaps - it stretches every non-final line's
      spaces to both edges, and no box width stops that. Balanced centred
@@ -1632,7 +1637,13 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 #loCardPlane .loSlot{position:absolute;width:21.5%;aspect-ratio:911/1298;
   transform:translate(-50%,-50%);pointer-events:none;
   border:0.5cqw dashed rgba(214,176,96,.38);border-radius:6%;
-  background:rgba(26,15,6,.26)}
+  background:rgba(26,15,6,.26);transition:opacity .25s ease}
+/* P728: the dotted slots read as clutter behind an open card focus -
+   .flat is the class _loCardFocus already sets for exactly that state */
+#loCardPlane.flat .loSlot{opacity:0}
+/* P728: the shelf hides the run HUD - hearts and gold belong to the room
+   (Denis). #loHud is built by famLoadoutShow only. */
+#gbLoadout #loHud{display:none}
 .loCard .fcvTier{font-size:1.9cqw}
 #loStage .loDie{position:absolute !important;left:0;top:82.6%;width:13.6%;aspect-ratio:1;
   transform:translate(-50%,-50%);display:block}
@@ -1913,7 +1924,7 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
    bubble sits exactly where it did - it just stops moving. z 9500: over
    the card focus (9000/9001) and the dice; the end overlay (same 9500,
    later in DOM) still covers it. */
-#screen-match .dlg-box{--dlg-y:13cqw;z-index:9500}
+#screen-match .dlg-box{--dlg-y:10cqw;z-index:9500}/* P728: a bit higher (Denis) */
 /* the anchor is the BOX, not the text's own midpoint: with a fixed-height
    inner, a one-liner and a three-liner centre on the same line instead of
    raising the top edge a line-height per message */
@@ -5035,15 +5046,15 @@ body.crit-dilate{animation:critDilate .55s ease-out both}
    The 14px of vertical differential is the arch itself - that is the part
    that makes it a curve rather than three tilted rectangles. */
 .fo-slot+.fo-slot{margin-left:-1%}
-.fo-slot:first-child{transform:rotate(-8deg) translateY(8px)}
+.fo-slot:first-child{transform:rotate(-8deg) translateY(14px)}/* P728: slots only, cards stay */
 /* z-index:2 was inert while they were apart. Overlapping, it is what makes
    the row an arch with its outer cards tucked BEHIND the middle, instead
    of a left-to-right shingle.
    P648: -6px -> -2px, "a touch lower". The arch is the DIFFERENCE between
    this and the outer slots' +8px, so it goes 14px -> 10px - still a curve,
    just a shallower one. */
-.fo-slot:nth-child(2){transform:translateY(-2px);z-index:2}
-.fo-slot:last-child{transform:rotate(8deg) translateY(8px)}
+.fo-slot:nth-child(2){transform:translateY(4px);z-index:2}/* P728 */
+.fo-slot:last-child{transform:rotate(8deg) translateY(14px)}/* P728 */
 .fo-slot.filled{cursor:pointer}
 .fo-slot.filled:active{transform:translateY(-4px) scale(1.04);z-index:3}
 /* the shelf's own empty slot, value for value - see #loCardPlane .loSlot.
@@ -15136,7 +15147,7 @@ function _cardFocusClose(){
 function _cftWords(txt,t0){
   var i=0;
   return String(txt).split(' ').map(function(w){
-    return '<span class="w" style="animation-delay:'+(t0+(i++)*38)+'ms">'+w+'</span>';
+    return '<span class="w" style="animation-delay:'+(t0+(i++)*20)+'ms">'+w+'</span>';/* P728: faster */
   }).join(' ');
 }
 function _cardFocusToggle(el,o){
@@ -15153,8 +15164,8 @@ function _cardFocusToggle(el,o){
      outranks every stylesheet rule, so the darkening step below it could
      never have applied */
   tip.innerHTML='<div class="cft-name" style="--cft-a:'+(o.col||'#f0c860')+'">'+_cftWords(o.title,0)+'</div>'
-    +(o.sub?'<div class="cft-sub">'+_cftWords(o.sub,140)+'</div>':'')
-    +'<div class="cft-body">'+_cftWords(_noOrphan(o.body||''),240)+'</div>';
+    +(o.sub?'<div class="cft-sub">'+_cftWords(o.sub,70)+'</div>':'')
+    +'<div class="cft-body">'+_cftWords(_noOrphan(o.body||''),110)+'</div>';/* P728: faster */
   ms.appendChild(tip);
   /* placed off the CARD's box, clamped to the screen; the tip is
      position:absolute in #screen-match, so rects convert through its box */
@@ -27663,6 +27674,7 @@ function setBtns(r,b){
     var _verb=document.getElementById('bankVerb'),_cap=document.getElementById('bankCap');
     var _bpts=_projectedBank();
     var _wins=!!(G&&b&&_bpts>0&&(G.pPts+_bpts)>=G.target);
+    if(G&&G._bankedToWin)_wins=true;/* P728: latched at the winning press */
     /* Nothing to bank and only branded faces picked: the one thing this
        button does is fire them, so it says so. Guarded on _bpts, because
        with points already on the line it really is a bank - that just also
@@ -27789,8 +27801,13 @@ function _placeTurnText(){
   if(_tl)loY=_tl.getBoundingClientRect().bottom+_mw*0.10;
   top.style.bottom=(zr.bottom-hiY+_STACK_GAP)+'px';
   top.style.top='';
-  bot.style.top=(loY-zr.top+_STACK_GAP)+'px';
-  bot.style.bottom='';
+  /* P728: the player's line moves ABOVE the dice, into the same measured
+     reserve the rival's line uses - that slot is empty on the player's
+     turn (the strips swap visibility), and the card-effect announces
+     were landing across the dice and the hand (Denis's screenshot).
+     loY stays computed above: the tag band still reads it. */
+  bot.style.bottom=(zr.bottom-hiY+_STACK_GAP)+'px';
+  bot.style.top='';
 }
 /* P669: THE SIZE STEP LIVES HERE, once, rather than at 105 famLog call sites.
    Every card, die, enchant and rule announcement reaches the table through
@@ -32281,6 +32298,10 @@ function showYieldButton(){
 }
 function handleYield(){
   SFX.nav();
+  /* P728: the bank-to-win scale must not snap back on the press - latch
+     it for the rest of this match (the flag dies with G). */
+  try{var _bw=document.getElementById('btnBank');
+    if(G&&_bw&&_bw.classList.contains('bank-to-win'))G._bankedToWin=true;}catch(e){}
   if(window.DLG&&G._lastBankForDlg){
     if(G._lastBankForDlg>=800)DLG.trigger('BIG_BANK');
     else if(G._lastBankForDlg<=200)DLG.trigger('EARLY_BANK');
@@ -39065,7 +39086,10 @@ var _stEnchK=null;
 function _stEnchTap(k){
   _getS();_enchInit();
   var e=_enchDef(k);if(!e)return;
-  if((S.run.gold||0)<e.price){try{famLog('NOT ENOUGH GOLD');}catch(x){}return;}
+  /* P728: window-shopping allowed - the pick panel opens either way, so
+     the player learns what to save for (Denis). The apply path stays
+     gated: without the tray there is nothing to tap. */
+  var _afford=(S.run.gold||0)>=e.price;
   _stEnchK=k;
   /* Built ONCE, on the shop itself. It used to live in the tab's markup,
      which _gbShop rebuilds on every repaint - so any hoist left a second
@@ -39101,6 +39125,13 @@ function _stEnchTap(k){
     ? 'pick a die to apply the enchant \u2014 the brand lands on its 1 or its 5'
     : 'pick a die to apply the enchant \u2014 this one works the whole die';
   var row=document.getElementById('stEnchPickTray');
+  if(!_afford){
+    /* P728: the dice focus's NOT-ENOUGH plaque instead of the die tray */
+    if(_hint)_hint.textContent='';
+    row.innerHTML='<div id="stBuyBtn" class="off" style="position:relative;margin:10px auto 0">'
+      +'<img class="plq" src="Art/Assets/Buttons/optimized/Button_new_02_opt.webp" alt=""><span>'
+      +'<img class="pcoin" src="Art/Assets/Icons/optimized/coin_opt.webp" alt="gold">'+e.price+' — NOT ENOUGH</span></div>';
+  }else{
   /* the same six painted bays the BUY tray drops into */
   var SLX=[13.3,27.8,42.3,56.8,71.3,85.8];
   var h='<img src="Art/Assets/Store/optimized/dice_row_opt.webp" alt="">';
@@ -39117,6 +39148,7 @@ function _stEnchTap(k){
   });
   row.innerHTML=h;
   if(typeof _d3ChipScan==='function')try{_d3ChipScan(row);}catch(x){}
+  }/* P728: end afford branch */
   var host=document.getElementById('gbShop');
   if(host)host.classList.add('st-epick');/* lifts #d3xCanvas over the scrim */
   box.classList.add('on');
