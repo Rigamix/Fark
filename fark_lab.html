@@ -302,28 +302,57 @@ function tap(el){if(!el)return false;var r=el.getBoundingClientRect();
 function reloadFrame(){document.getElementById('game').src='fark_proto.html?lab='+Date.now();log('frame reloading');}
 
 /* ── boot ─────────────────────────────────────────────────────────── */
+function attach(){
+  fillCards();buildTargets();buildLights();muteGame(_gameMuted);
+  fillDresser();buildGallery();
+  log('ATTACHED - the lab is driving the live match');
+}
 async function setup(){
   gw();
+  /* THE LAB ATTACHES TO WHATEVER STATE THE GAME IS IN. Denis's browser
+     carries his real save, so the title's bottom button is CONTINUE
+     (with a save) or NEW RUN (without) - the old walker assumed the
+     fresh-profile draft path and locked everything when it didn't come. */
+  if(await until(function(){var g=E('G');return g&&g.phase;},1500)){
+    log('a match is already live - attaching');attach();return;
+  }
   log('waiting for the game to boot…');
   var booted=await until(function(){var D=W.document;
     var b=D&&D.getElementById('hsBtnBottom');
     return b&&b.getBoundingClientRect().width>1;},25000);
   if(!booted){log('game never booted in the frame');return;}
   var D=W.document;
-  log('booting into a match…');
-  tap(D.getElementById('hsBtnBottom'));await sleep(2000);
-  var draft=await until(function(){return D.querySelector('.nrdie');},15000);
-  if(!draft){log('the draft never appeared - title tap did not take');return;}
-  await sleep(500);
-  tap(D.querySelector('.nrdie'));await sleep(1200);
-  tap(D.getElementById('nrTakeBtn'));await sleep(2400);
-  await until(function(){var st=E('S');return st&&st.run;},9000);
-  E('_getS()');E('G=null');
-  W._fkDiscardOk=true;
-  E('launchSeat(0)');
-  var ok=await until(function(){var g=E('G');return g&&g.phase==='idle';},16000);
+  log('leaving the title (CONTINUE or NEW RUN, whichever it is)…');
+  tap(D.getElementById('hsBtnBottom'));await sleep(1500);
+  /* race: fresh profile -> the draft; a save -> straight into the match
+     or into the room */
+  var state=null;
+  await until(function(){
+    if(D.querySelector('.nrdie')){state='draft';return true;}
+    var g=E('G');if(g&&g.phase){state='match';return true;}
+    var st=E('S');
+    if(st&&st.run&&typeof W.__labEval('typeof launchSeat')==='string'
+      &&E('typeof launchSeat')==='function'&&E('_currentScreen')==='gauntlet'){state='room';return true;}
+    return false;},18000);
+  if(state==='draft'){
+    log('fresh run - walking the draft…');
+    await sleep(500);
+    tap(D.querySelector('.nrdie'));await sleep(1200);
+    tap(D.getElementById('nrTakeBtn'));await sleep(2400);
+    await until(function(){var st=E('S');return st&&st.run;},9000);
+    E('_getS()');E('G=null');
+    W._fkDiscardOk=true;
+    E('launchSeat(0)');
+  }else if(state==='room'){
+    log('your run, at the room - seating at patron 0…');
+    E('_getS()');E('G=null');W._fkDiscardOk=true;
+    E('launchSeat(0)');
+  }else if(state==='match'){
+    log('CONTINUE resumed your match');
+  }else{log('could not reach a match - is a dialog up in the frame? tap through it and press boot again');return;}
+  var ok=await until(function(){var g=E('G');return g&&g.phase;},16000);
   log(ok?'match ready':'boot FAILED');
-  if(ok){fillCards();buildTargets();buildLights();muteGame(_gameMuted);fillDresser();buildGallery();}
+  if(ok)attach();
 }
 function roll(){try{E('handleRoll()');log('rolled');}catch(e){log('roll: '+e);}}
 
