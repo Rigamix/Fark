@@ -14982,14 +14982,13 @@ function _famWhyNot(inst){
     if(inst.charges<=0)return 'SPENT FOR THIS MATCH';
     if(G&&G.phase==='opp')return 'WAIT FOR YOUR TURN';
     if(fx.canUse&&!fx.canUse(inst)){
+      /* P738: the sentence comes from the card's declared NEED, so the
+         gate and the explanation can never drift apart. Cards with a
+         genuinely bespoke condition keep a line of their own below. */
+      var need=FAM_NEEDS[inst.id];
+      if(need&&FAM_NEED_TEXT[need])return FAM_NEED_TEXT[need];
+      if(!(G.pool||[]).some(function(d){return !d.committed;}))return FAM_NEED_TEXT.free;
       var why={
-        honeytrap:'KEEP OR SELECT A PAIR FIRST',
-        preserve:'KEEP A 1 OR A 5 FIRST',
-        transmute:'ROLL FIRST — IT NEEDS A DIE TO CHANGE',
-        powder_keg:'ROLL FIRST',
-        sacrifice:'ROLL FIRST — IT NEEDS A DIE TO SPEND',
-        stargazer:'ROLL FIRST',
-        sleight:'ROLL FIRST',
         tamper:'THE RIVAL HAS NOTHING TO TAMPER WITH YET',
         ill_omen:'NOT THIS MOMENT — IT FIRES ON THEIR TURN'
       }[inst.id];
@@ -16960,36 +16959,73 @@ CFX.stargazer={
     return true;
   }
 };
-/* P737: THE PAIR THE PLAYER MEANS. Two bugs lived here: only COMMITTED
-   dice counted (so a pair you had just selected did not exist), and the
-   winner was Object.keys' last match - ascending numeric order, i.e.
-   always the HIGHEST pair on the table, never the one you just made.
-   Recency decides now: the live selection first, then the most recent
-   kept group, then anything else that pairs. */
-function _honeyPairs(){
+/* ═══ P738: ONE VIEW OF THE PLAYER'S DICE ═══
+   Every card used to ask G.kept directly. G.kept is the COMMITTED
+   record; the dice a player is pointing at - selected, not yet
+   committed - live in G.pool, so a card reading one and not the other
+   is blind to half the table BY CONSTRUCTION. That single fact was
+   honeytrap's 'NOT NOW' and preserve's, and would have been the next
+   card's. Ask this instead.
+
+   ORDER IS INTENT: the live selection first (what the finger is on),
+   then kept groups newest-first, then anything older. Entries are
+   normalised, so a consumer never has to know which shape it came
+   from. `src` says where it came from for the callers that care. */
+function _tableDice(){
   var out=[];
   try{
-    var sel=(G.pool||[]).filter(function(d){return d.sel&&!d.committed;});
-    var sv={};sel.forEach(function(d){sv[d.val]=(sv[d.val]||0)+1;});
-    Object.keys(sv).forEach(function(v){if(sv[v]>=2)out.push(Number(v));});
+    (G.pool||[]).forEach(function(d){
+      if(d.sel&&!d.committed&&!d._frozen)
+        out.push({val:d.val,mat:d.mat,ench:d.ench||null,
+          lane:(typeof d.lane==='number')?d.lane:null,src:'sel',die:d});
+    });
     for(var i=(G.kept||[]).length-1;i>=0;i--){
-      var kv={};((G.kept[i]||{}).vals||[]).forEach(function(v){kv[v]=(kv[v]||0)+1;});
-      Object.keys(kv).forEach(function(v){if(kv[v]>=2&&out.indexOf(Number(v))<0)out.push(Number(v));});
+      var k=G.kept[i]||{};
+      var ds=k.dice||((k.vals||[]).map(function(v){return {val:v,mat:k.mat};}));
+      ds.forEach(function(dd){
+        out.push({val:dd.val,mat:dd.mat||k.mat,ench:dd.ench||null,
+          lane:(typeof dd.lane==='number')?dd.lane:null,src:'kept'});
+      });
     }
-    /* last resort: a pair spread across groups */
-    var all={};
-    (G.kept||[]).forEach(function(k){(k.vals||[]).forEach(function(v){all[v]=(all[v]||0)+1;});});
-    Object.keys(all).forEach(function(v){if(all[v]>=2&&out.indexOf(Number(v))<0)out.push(Number(v));});
   }catch(e){}
   return out;
+}
+/* values that appear at least twice, in intent order - a pair the
+   player MADE beats an older one that merely exists */
+function _tablePairs(){
+  var seen={},out=[],all=_tableDice();
+  ['sel','kept'].forEach(function(src){
+    var c={};
+    all.forEach(function(e){if(e.src===src)c[e.val]=(c[e.val]||0)+1;});
+    Object.keys(c).forEach(function(v){
+      if(c[v]>=2&&!seen[v]){seen[v]=1;out.push(Number(v));}});
+  });
+  return out;
+}
+/* WHAT A CARD NEEDS, as data. The gate, the sentence and the picker all
+   read this - so a new card is a table entry, not a new helper. */
+var FAM_NEEDS={honeytrap:'pair',preserve:'scorer'};
+var FAM_NEED_TEXT={
+  pair:'KEEP OR SELECT A PAIR FIRST',
+  scorer:'KEEP OR SELECT A 1 OR A 5 FIRST',
+  free:'ROLL FIRST'
+};
+function _famNeedMet(need){
+  try{
+    if(need==='pair')return _tablePairs().length>0;
+    if(need==='scorer')return _tableDice().some(function(e){
+      return (e.val===1||e.val===5)&&!(e.die&&_dieIsIcon(e.die));});
+    if(need==='free')return (G.pool||[]).some(function(d){return !d.committed;});
+  }catch(e){}
+  return true;
 }
 CFX.honeytrap={
   canUse:function(){
     if(!G||G.phase==='opp')return false;
-    return _honeyPairs().length>0;
+    return _famNeedMet('pair');/* P738: the shared view */
   },
   use:function(inst){
-    var pairVal=_honeyPairs()[0]||0;
+    var pairVal=_tablePairs()[0]||0;/* P738: intent order */
     if(!pairVal)return false;
     G._famHoneyVal=pairVal;
     famLog('HONEYTRAP SET — THE NEXT ROLL PULLS A '+pairVal);
@@ -17064,28 +17100,10 @@ CFX.sleight={
 function _keptScorers(k){
   return ((k&&k.dice)||[]).filter(function(dd){return dd&&!_dieIsIcon(dd);});
 }
-/* P737c: THE SAME BUG HONEYTRAP HAD, found by auditing the other cards
-   for it (Denis: 'check other cards'). A 1 or 5 the player has SELECTED
-   but not yet committed is on the table and visible - it just was not in
-   G.kept, so Preserve answered NOT NOW while the player was looking at
-   the die it wanted. Selection counts now, in both the gate and the
-   picker, and it is preferred: it is what the player is pointing at. */
-function _preserveCands(){
-  var out=[];
-  try{
-    (G.pool||[]).forEach(function(d){
-      if(d.sel&&!d.committed&&!d._frozen&&(d.val===1||d.val===5)&&!_dieIsIcon(d))
-        out.push({val:d.val,mat:d.mat,ench:d.ench||null,
-          lane:(typeof d.lane==='number')?d.lane:null});
-    });
-  }catch(e){}
-  return out;
-}
 CFX.preserve={
   canUse:function(){
     if(!G||G.phase==='opp')return false;
-    if(_preserveCands().length)return true;
-    return (G.kept||[]).some(function(k){return (k.vals||[]).some(function(v){return v===1||v===5;});});
+    return _famNeedMet('scorer');/* P738: the shared view, same as honeytrap */
   },
   use:function(inst){
     /* CAPTURE THE MATERIAL, NOT JUST THE NUMBER. The old version stored a bare
@@ -17113,10 +17131,13 @@ CFX.preserve={
        looks for). P559 still holds: the brand travels with the material -
        the kept group's dice entries are {val,mat,ench,lane}, exactly what
        the record carries forward. */
-    /* P737c: the selection first - the die under the player's finger -
-       then the kept groups, still preferring the 1 (100 over 50). */
+    /* P738: ONE filter over the shared view - selection first because
+       that is intent order, still preferring the 1 (100 over the 5's 50).
+       P534's law holds: a BRANDED face banks zero, so it is never a
+       candidate. */
     [1,5].some(function(want){
-      var _sc=_preserveCands().filter(function(c){return c.val===want;})[0];
+      var _sc=_tableDice().filter(function(e){
+        return e.val===want&&!(e.die&&_dieIsIcon(e.die));})[0];
       if(_sc){found=_sc.val;foundMat=_sc.mat||'bone';foundEnch=_sc.ench||null;
         foundLane=_sc.lane;return true;}
       return (G.kept||[]).some(function(k){
@@ -24959,8 +24980,16 @@ var D3X={
        fbA0/A1 the alpha ramp, 0.09..0.32 -> 0.11..0.41, so the accumulated
                rim survives the punch-out that throws away its inner half. */
   /* P732: the approved numbers - stronger, taller, wider soft halo */
+  /* P739: the glow paints at up to this device ratio (the other canvases
+     cap at 2 - a soft shadow can afford it, a crisp rim cannot) */
+  GLOW_DPR_MAX:3,
   GLOW:{soft:11, rim:3, rimPasses:5, softPasses:1, line:3.2, grow:1.004, clear:0.7, strength:0.91,
-        fbWide:1.35, fbCross:0.40, fbA0:0.11, fbA1:0.30,
+        /* P739: MEASURED against the blur branch in the same browser -
+           same reach (mass ratio 1.01) but 1.67x the BRIGHT area, so the
+           stroked fallback read heavier and flatter wherever ctx.filter
+           is missing. The ramp is divided by that measured factor, so
+           both painters lay down the same light. */
+        fbWide:1.35, fbCross:0.40, fbA0:0.051, fbA1:0.139,
         /* P731: the SOFT pass can stretch and lean - sx/sy scale the
            silhouette, dy biases it vertically. 1/1/0 = today's look
            exactly; the rim, line and punch-out stay hull-true. */
@@ -25091,7 +25120,16 @@ var D3X={
     var scEl=document.getElementById('screen-match');
     var sc=scEl.getBoundingClientRect();
     if(sc.width<10)return;
-    var dpr=Math.min(devicePixelRatio||1,2);
+    /* P739: THE GLOW PAINTS AT THE DISPLAY'S RESOLUTION. Every canvas in
+       this file caps at 2x, which is right for a soft, wide thing like a
+       shadow - but the selection glow is a THIN CRISP RIM, and on a 3x
+       phone a 2x canvas is stretched 1.5x by the compositor: every edge
+       enlarged and blurred. That is Denis's 'much softer and wider on my
+       phone', and no dial could have fixed it because the numbers were
+       never what differed - the raster was. The cost is bounded: this
+       canvas is only painted while dice are selected, and it is one thin
+       shape on an otherwise empty surface. */
+    var dpr=Math.min(devicePixelRatio||1,this.GLOW_DPR_MAX||3);
     if(cv.width!==Math.round(sc.width*dpr)||cv.height!==Math.round(sc.height*dpr)){
       cv.width=Math.round(sc.width*dpr);cv.height=Math.round(sc.height*dpr);
     }
