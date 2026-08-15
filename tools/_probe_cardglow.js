@@ -67,6 +67,16 @@ await sleep(220);
 out.why=(typeof _famWhyNot==='function')?(_famWhyNot(G.pF[0])||''):'(no _famWhyNot)';
 out.canPlay=(typeof _famCanPlay==='function')?_famCanPlay(0):null;
 if(out.why||out.canPlay===false)return Object.assign(out,{err:'card not playable: '+out.why});
+/* P749: the UNPLAYABLE branch is the one Denis actually drags - it must
+   light too, in the refusal colour, or "no glow" is the honest report */
+const dragOnce=async(el)=>{
+  const rq=el.getBoundingClientRect(),ax=rq.left+rq.width/2,ay=rq.top+rq.height/2;
+  const m2=(t,x,y)=>{const tc=new Touch({identifier:1,target:el,clientX:x,clientY:y});
+    return new TouchEvent(t,{touches:t==='touchend'?[]:[tc],bubbles:true,cancelable:true});};
+  el.dispatchEvent(m2('touchstart',ax,ay));
+  for(let dy=8;dy<=200;dy+=8){document.dispatchEvent(m2('touchmove',ax,ay-dy));await sleep(16);}
+  await sleep(120);
+};
 const fcv=document.querySelector('#famRowP .fcv');
 if(!fcv)return Object.assign(out,{err:'no card in hand'});
 const r0=fcv.getBoundingClientRect(),x0=r0.left+r0.width/2,y0=r0.top+r0.height/2;
@@ -83,4 +93,32 @@ const rr=fcv.getBoundingClientRect();
 out.card={x:Math.round(rr.left),y:Math.round(rr.top),w:Math.round(rr.width),h:Math.round(rr.height)};
 out.dpr=window.devicePixelRatio||1;
 out.filter=getComputedStyle(fcv).filter.slice(0,90);
+document.dispatchEvent(new TouchEvent('touchend',{touches:[],bubbles:true}));
+await sleep(150);
+out.cleared=litOf('dgCanvasHi').lit;
+
+/* the first drag RELEASED ARMED, so powder_keg fired and rerolled the
+   table - let that finish, or the row re-renders under the next card and
+   I drag a DETACHED element (which is what `cant:true, lit:0` meant: the
+   classes landed on a node no longer in the document, and cardGlow's
+   isConnected guard correctly dropped it) */
+await until(()=>window.D3X&&D3X.dice.filter(d=>d.match).every(d=>!d.roll),20000);
+await until(()=>G&&(G.phase==='choosing'||G.phase==='idle'),8000);
+await sleep(700);
+G.pool.forEach(d=>{d.sel=false;d.committed=false;});G.kept=[];
+G.phase='choosing';
+G.pF=[{id:'honeytrap',tier:2,charges:2,state:{}}];
+famRenderRow();await sleep(400);
+const c2=document.querySelector('#famRowP .fcv');
+out.why2=_famWhyNot(G.pF[0])||'';
+out.c2live=!!(c2&&c2.isConnected);
+if(!out.why2)return Object.assign(out,{err:'wanted an UNPLAYABLE card, got a playable one'});
+if(!out.c2live)return Object.assign(out,{err:'card detached before the drag'});
+await dragOnce(c2);
+out.c2liveAfter=c2.isConnected;
+out.arm2=c2.style.getPropertyValue('--arm');
+out.keys=Object.keys(D3X._cardGlows||{});
+out.cantGlow=litOf('dgCanvasHi');
+out.cantClass=c2.classList.contains('fcv-cant');
+out.verdict=(out.cardGlow.lit>2000)&&(out.cleared<500)&&(out.cantGlow.lit>2000);
 return out;

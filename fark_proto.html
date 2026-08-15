@@ -14920,7 +14920,19 @@ CFX.double_or_nothing={
 };
 
 /* ── bare match UI: chip row (B&W, family colour accent) ── */
+var _famRowDirty=0;
 function famRenderRow(){
+  /* P750: A DRAG IS A LIVE GESTURE AND THE REBUILD WAS DELETING IT. This
+     replaces hostP.innerHTML wholesale, so a card the player is holding
+     becomes a detached node: _famDrag.el points at something no longer on
+     screen, the visible card is a fresh element at rest with no fcv-drag
+     and no --arm, and the halo is dropped because its element left the
+     document. That is "it scales back down to base size", "the grey
+     switches in one frame" and "no glow" - one cause, reported as three
+     symptoms across four attempts, none of which was about the look at
+     all. The row is deferred while a hand is closed on a card and runs
+     once at the end of the gesture. */
+  if(_famDrag&&_famDrag.live){_famRowDirty=1;return;}
   var ms=document.getElementById('screen-match')||document.body;
   var old=document.getElementById('famRow');if(old)old.remove();/* pre-P132 text column */
   var hostP=document.getElementById('famRowP');
@@ -15132,7 +15144,14 @@ function _famDragInit(el,i){
        screen-space canvas nothing can clip. Written here beside the
        transform for the same reason that one is: the card only moves when
        the finger moves it. */
-    try{if(window.D3X&&D3X.cardGlow)D3X.cardGlow('drag',_famDrag.why?null:el,_k);}catch(e){}
+    /* P749: IT ALWAYS LIGHTS. This passed null for a card that cannot
+       be played, so the one gesture Denis kept testing - the one that
+       greys, which is by definition the unplayable one - drew nothing at
+       all, and "no glow" was the correct outcome of a bad decision. The
+       halo is now the drag's own feedback and its COLOUR is the verdict:
+       gold if releasing fires the card, the refusal red if it will not. */
+    try{if(window.D3X&&D3X.cardGlow)
+      D3X.cardGlow('drag',el,_k,_famDrag.why?(window.OPP_INK||'#d94c3d'):null);}catch(e){}
     var past=(_famDrag.cy0+dy)<_famDrag.line;
     /* P737: past the line is not the same as PLAYABLE. A card that
        cannot fire greys and says why, up where the player is looking -
@@ -15166,6 +15185,10 @@ function _famDragInit(el,i){
     /* P737: the reason clears with the gesture */
     /* P747: the strip clears itself on the next announce; nothing to
        tear down here any more */
+    /* P750: whatever the row wanted to say while the hand was busy, it
+       says now - one rebuild, after the gesture, not none. */
+    if(_famRowDirty){_famRowDirty=0;setTimeout(function(){
+      if(!(_famDrag&&_famDrag.live))famRenderRow();},0);}
     if(!live)return;/* a tap - famCardTap's onclick still has it */
     if(!armed)return;/* released short of the line, or blocked - nothing
       fires and nothing apologises: the reason was already on screen */
@@ -25242,8 +25265,14 @@ var D3X={
      nowhere else. `sel` is a list of screen-space hulls; a die hands
      over its projected corners and a card hands over its rounded
      rect, and neither knows anything about the other. */
-  _paintHalo:function(cv,x,sc,dpr,sel,COL,SOFT,alphaMul){
+  _paintHalo:function(cv,x,sc,dpr,sel,COL,SOFT,alphaMul,lineW){
     var self=this,G=this.GLOW;
+    /* P749: the rim width is the CALLER's, never GLOW's. The card
+       painter used to assign G.line and put it back afterwards -
+       borrowing the dice's own dial object to draw something that is
+       not a die, which is one re-entrant call away from leaving the
+       selection glow with a width nobody chose. */
+    var LINE=(lineW===undefined)?G.line:lineW;
     /* build the halo on its own surface: blur the silhouettes, then PUNCH
        THE DICE BACK OUT. Filling the silhouette and blurring it in place
        is what put the glow inside the die instead of around it. */
@@ -25317,7 +25346,7 @@ var D3X={
     /* the line goes on the SAME surface as the halo, after the cut-out, so
        the two composite as one glow - stroking onto the main canvas
        afterwards left a hairline of bare table between them */
-    gx.strokeStyle=COL;gx.lineWidth=G.line;gx.lineJoin='round';
+    gx.strokeStyle=COL;gx.lineWidth=LINE;gx.lineJoin='round';
     gx.globalAlpha=1;
     sel.forEach(function(h){trace(gx,h,0);gx.stroke();});
     /* additive, so it reads as light rather than paint */
@@ -25388,21 +25417,19 @@ var D3X={
     x.clearRect(0,0,sc.width,sc.height);
     if(!live)return;
     var self=this,CG=this.CARD_GLOW;
-    /* the rim line would trace the bounding box rather than the card's
-       own angle, so it is off for cards - the halo carries it */
-    var G=this.GLOW,keepLine=G.line;G.line=CG.line;
-    try{
-      Object.keys(this._cardGlows).forEach(function(kk){
-        var e=self._cardGlows[kk];
-        if(!e.el||!e.el.isConnected){delete self._cardGlows[kk];return;}
-        var r=e.el.getBoundingClientRect();
-        if(r.width<4)return;
-        var hull=self._rectHull(r.left-sc.left,r.top-sc.top,r.width,r.height,
-          Math.min(r.width,r.height)*CG.round);
-        self._paintHalo(cv,x,sc,dpr,[hull],e.col||CG.col,e.col||CG.soft,
-          CG.floor+(1-CG.floor)*Math.min(1,e.k));
-      });
-    }finally{G.line=keepLine;}
+    Object.keys(this._cardGlows).forEach(function(kk){
+      var e=self._cardGlows[kk];
+      if(!e.el||!e.el.isConnected){delete self._cardGlows[kk];return;}
+      var r=e.el.getBoundingClientRect();
+      if(r.width<4)return;
+      var hull=self._rectHull(r.left-sc.left,r.top-sc.top,r.width,r.height,
+        Math.min(r.width,r.height)*CG.round);
+      /* P749: the card's own rim width goes in as an argument - the rim
+         would trace the bounding box rather than the card's angle, so it
+         stays off, and GLOW is left alone. */
+      self._paintHalo(cv,x,sc,dpr,[hull],e.col||CG.col,e.col||CG.soft,
+        CG.floor+(1-CG.floor)*Math.min(1,e.k),CG.line);
+    });
   },
   _drawGlow:function(){
     var cv=document.getElementById('dgCanvas');
