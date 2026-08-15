@@ -5,59 +5,139 @@
 <title>Fark VFX Lab</title>
 <style>
   body{margin:0;display:flex;height:100vh;background:#14100a;color:#e8d9b8;
-    font-family:Georgia,serif}
-  #stage{flex:none;width:430px;height:100vh;display:flex;align-items:center;
-    justify-content:center;background:#000}
-  #game{width:430px;height:900px;border:0;transform-origin:top center}
-  #panel{flex:1;overflow-y:auto;padding:18px 22px;border-left:2px solid #3a2c18}
-  h1{font-size:18px;color:#ffd98a;letter-spacing:.06em;margin:0 0 4px}
-  .sub{font-size:12px;color:#9a8a68;margin-bottom:14px}
-  .grp{margin:14px 0 4px;font-size:13px;color:#c8a45c;letter-spacing:.08em;
+    font-family:Georgia,serif;font-size:13px}
+  #stage{flex:none;width:430px;height:100vh;display:flex;align-items:flex-start;
+    justify-content:center;background:#000;overflow:hidden}
+  #game{width:430px;height:900px;border:0}
+  #panel{flex:1;overflow-y:auto;padding:14px 20px 40px;border-left:2px solid #3a2c18;min-width:520px}
+  h1{font-size:17px;color:#ffd98a;letter-spacing:.06em;margin:0 0 2px}
+  .sub{font-size:11px;color:#9a8a68;margin-bottom:10px;line-height:1.5}
+  .grp{margin:16px 0 6px;font-size:12px;color:#c8a45c;letter-spacing:.08em;
     text-transform:uppercase;border-bottom:1px solid #3a2c18;padding-bottom:3px}
-  button{display:inline-block;margin:4px 6px 4px 0;padding:7px 12px;background:#2a2012;
-    color:#e8d9b8;border:1px solid #5a4626;border-radius:4px;cursor:pointer;
-    font-family:inherit;font-size:13px}
+  button{margin:3px 5px 3px 0;padding:6px 10px;background:#2a2012;color:#e8d9b8;
+    border:1px solid #5a4626;border-radius:4px;cursor:pointer;font-family:inherit;font-size:12px}
   button:hover{background:#3a2c18;border-color:#8a6a36}
-  button:disabled{opacity:.4;cursor:default}
-  #log{margin-top:14px;font-size:11px;color:#8a7a5a;white-space:pre-wrap;
-    max-height:30vh;overflow-y:auto;border-top:1px solid #3a2c18;padding-top:8px}
-  .note{font-size:11px;color:#9a8a68;margin:2px 0 8px;line-height:1.5}
+  button.on{background:#4a3418;border-color:#ffd98a;color:#ffd98a}
+  select,input[type=text],input[type=number]{background:#1e160c;color:#e8d9b8;
+    border:1px solid #5a4626;border-radius:3px;padding:4px 6px;font-family:inherit;font-size:12px}
+  input[type=number]{width:64px}
+  input[type=color]{width:34px;height:26px;padding:0;border:1px solid #5a4626;background:none;vertical-align:middle}
+  input[type=range]{width:130px;vertical-align:middle}
+  label{font-size:11px;color:#b8a67e;margin-right:4px}
+  .row{margin:4px 0;display:flex;align-items:center;flex-wrap:wrap;gap:4px}
+  table{border-collapse:collapse;margin:6px 0;font-size:11px}
+  th,td{border:1px solid #3a2c18;padding:3px 6px;text-align:center}
+  th{color:#c8a45c;font-weight:normal}
+  td input[type=number]{width:52px;font-size:11px;padding:2px 3px}
+  #log{margin-top:12px;font-size:11px;color:#8a7a5a;white-space:pre-wrap;
+    max-height:20vh;overflow-y:auto;border-top:1px solid #3a2c18;padding-top:6px}
+  #exportBox{width:100%;height:110px;background:#1a130a;color:#c8b890;
+    border:1px solid #5a4626;font-family:monospace;font-size:10px}
+  .del{color:#c05a3a;cursor:pointer;padding:0 4px}
+  #catalogue details{border:1px solid #3a2c18;border-radius:4px;margin:4px 0;padding:4px 8px}
+  #catalogue summary{cursor:pointer;color:#e8d9b8;font-size:12px}
+  #catalogue summary .dot{color:#7ac06a;margin-left:6px}
+  #catalogue .rules{font-size:11px;color:#9a8a68;margin:6px 0;line-height:1.5}
+  #catalogue textarea{width:100%;height:64px;background:#1a130a;color:#d8c9a0;
+    border:1px solid #5a4626;font-family:inherit;font-size:12px;padding:5px}
 </style>
 </head>
 <body>
 <div id="stage"><iframe id="game" src="fark_proto.html"></iframe></div>
 <div id="panel">
   <h1>FARK VFX LAB</h1>
-  <div class="sub">The frame runs the REAL game — every recipe calls the game's own
-    functions. Approve here, then port the recipe into fark_proto.html.
-    Designs: docs/CARD_VFX.md</div>
+  <div class="sub">The frame runs the REAL game — FX call the game's own functions.
+    Author a recipe (keyframes + FX events on a target), SAVE it under a card + moment,
+    EXPORT the JSON — that JSON is the implementation spec Claude wires into the
+    pipeline, respecting the established gates. Designs: docs/CARD_VFX.md</div>
 
   <div class="grp">Setup</div>
-  <button onclick="setup()">Boot into a match</button>
-  <button onclick="dealCards()">Deal preserve + honeytrap</button>
-  <button onclick="roll()">Roll</button>
-  <div class="note">Boot walks the same draft → seat path the probes use (~15s).</div>
+  <div class="row">
+    <button onclick="setup()">Boot into a match</button>
+    <button onclick="roll()">Roll</button>
+    <button onclick="reloadFrame()">Reload frame</button>
+  </div>
+  <div class="row">
+    <select id="cardPick"></select>
+    <select id="tierPick"><option value="1">tier I</option><option value="2">II</option><option value="3">III</option></select>
+    <button onclick="addCard()">add to hand</button>
+    <button onclick="clearHand()">clear hand</button>
+  </div>
 
-  <div class="grp">Preserve — the amber lifecycle (A1b)</div>
-  <button onclick="r_amberSet()">1. amber sets on a die</button>
-  <button onclick="r_amberPark()">2. bank: slide down its lane</button>
-  <button onclick="r_amberReturn()">3. return + crack</button>
+  <div class="grp">Target <span style="text-transform:none;color:#9a8a68">(pick, then the sliders move IT — live)</span></div>
+  <div class="row" id="targetRow"><i style="color:#9a8a68">boot first</i></div>
+  <div class="row">
+    <label>dx <input type="range" id="pDx" min="-220" max="220" value="0" oninput="applyProps()"></label>
+    <label>dy <input type="range" id="pDy" min="-320" max="320" value="0" oninput="applyProps()"></label>
+    <label>scale <input type="range" id="pSc" min="0" max="300" value="100" oninput="applyProps()"></label>
+  </div>
+  <div class="row">
+    <label>opacity <input type="range" id="pOp" min="0" max="100" value="100" oninput="applyProps()"></label>
+    <label>rotate <input type="range" id="pRt" min="-180" max="180" value="0" oninput="applyProps()"></label>
+    <button onclick="resetProps()">reset target</button>
+  </div>
 
-  <div class="grp">Card beats (existing pipe, aimed at card 0)</div>
-  <button onclick="beat('gain')">gain</button>
-  <button onclick="beat('hit')">hit</button>
-  <button onclick="beat('churn')">churn</button>
-  <button onclick="beat('steal')">steal → HUD</button>
+  <div class="grp">FX palette <span style="text-transform:none;color:#9a8a68">(fires on the target with the params below)</span></div>
+  <div class="row">
+    <label>colour <input type="color" id="fxCol" value="#ffd98a"></label>
+    <label>count <input type="number" id="fxCount" value="16"></label>
+    <label>speed <input type="number" id="fxSpeed" value="85"></label>
+    <label>gravity <input type="number" id="fxG" value="110"></label>
+    <label>size <input type="number" id="fxSize" value="7"></label>
+    <label>spread <input type="number" id="fxSpread" value="2.2" step="0.2"></label>
+    <label>ms <input type="number" id="fxMs" value="600"></label>
+  </div>
+  <div class="row" id="fxRow"></div>
+  <div class="row">
+    <input type="text" id="annText" value="THE AMBER CRACKS — A 1 ALREADY KEPT" size="38">
+    <select id="annCol"><option>gold</option><option>red</option><option>green</option></select>
+    <button onclick="fire('announce')">announce</button>
+  </div>
 
-  <div class="grp">Table moments</div>
-  <button onclick="r_laneGlow()">positional lane glow</button>
-  <button onclick="r_redCandle()">bust: red candle (C14)</button>
-  <button onclick="r_shield()">amber bust shield (exists)</button>
+  <div class="grp">Keyframes <span style="text-transform:none;color:#9a8a68">(t in ms · ease is INTO that key · edit cells directly)</span></div>
+  <div class="row">
+    <label>t(ms) <input type="number" id="keyT" value="0" step="50"></label>
+    <button onclick="captureKey()">capture sliders @ t</button>
+    <select id="fxKeyPick"></select>
+    <button onclick="addFxKey()">add FX @ t</button>
+  </div>
+  <table id="keyTable"></table>
+  <table id="fxTable"></table>
+  <div class="row">
+    <button onclick="playRecipe()">▶ play</button>
+    <button onclick="stopRecipe()">■ stop</button>
+    <label>scrub <input type="range" id="scrub" min="0" max="2000" value="0" oninput="scrubTo(+this.value)"></label>
+    <span id="scrubT" style="font-size:11px;color:#9a8a68">0ms</span>
+  </div>
 
-  <div class="grp">A3b — the accidental look</div>
-  <button onclick="r_dimmerRoom()">darker room (score-scaled)</button>
-  <button onclick="r_softerKey()">softer key light</button>
-  <button onclick="r_resetLook()">reset look</button>
+  <div class="grp">Recipe <span style="text-transform:none;color:#9a8a68">(saved per card + moment, in this browser)</span></div>
+  <div class="row">
+    <select id="recCard"></select>
+    <select id="recMoment">
+      <option>cast</option><option>resolve</option><option>park</option>
+      <option>return</option><option>opp-fire</option><option>passive-glint</option>
+    </select>
+    <button onclick="saveRecipe()">save</button>
+    <button onclick="loadRecipe()">load</button>
+    <button onclick="exportAll()">export ALL ↓</button>
+  </div>
+  <div class="row"><input type="text" id="recNotes" size="60" placeholder="intent notes — what should this READ as?"></div>
+  <textarea id="exportBox" spellcheck="false" placeholder="exported JSON lands here — copy it into chat; it also persists in this browser"></textarea>
+
+  <div class="grp">Card catalogue + notes <span style="text-transform:none;color:#9a8a68">(your written spec per card — the authoritative channel; notes persist + export)</span></div>
+  <div id="catalogue"><i style="color:#9a8a68">loading from the game frame…</i></div>
+
+  <div class="grp">Presets (curated compositions)</div>
+  <div class="row">
+    <button onclick="r_amberSet()">amber sets</button>
+    <button onclick="r_amberPark()">amber parks</button>
+    <button onclick="r_amberReturn()">amber returns</button>
+    <button onclick="r_redCandle()">red candle</button>
+    <button onclick="r_shield()">bust shield</button>
+    <button onclick="r_dimmerRoom()">darker room</button>
+    <button onclick="r_softerKey()">softer key</button>
+    <button onclick="r_resetLook()">reset look</button>
+  </div>
 
   <div id="log"></div>
 </div>
@@ -66,10 +146,9 @@ var W=null;
 function log(m){var el=document.getElementById('log');
   el.textContent=(new Date).toTimeString().slice(0,8)+'  '+m+'\n'+el.textContent;}
 function gw(){W=document.getElementById('game').contentWindow;
-  /* the game's S/G are top-level let/const - script scope, invisible as
-     W.S from outside. A script injected INTO the frame evaluates in the
-     game's global lexical environment and sees them; __labEval is that
-     one bridge, everything else goes through E(). */
+  /* the game's S/G are top-level let/const - script scope, invisible as W.S
+     from outside. A script injected INTO the frame evaluates in the game's
+     global lexical environment; __labEval is that one bridge. */
   try{if(!W.__labEval){var sc=W.document.createElement('script');
     sc.textContent='window.__labEval=function(c){return eval(c)};';
     W.document.head.appendChild(sc);}}catch(e){}
@@ -85,7 +164,9 @@ function tap(el){if(!el)return false;var r=el.getBoundingClientRect();
   try{el.dispatchEvent(new W.MouseEvent('click',o));}catch(e){}
   try{el.click();}catch(e){}
   return true;}
+function reloadFrame(){document.getElementById('game').src='fark_proto.html?lab='+Date.now();log('frame reloading');}
 
+/* ── boot ─────────────────────────────────────────────────────────── */
 async function setup(){
   gw();
   log('waiting for the game to boot…');
@@ -99,97 +180,303 @@ async function setup(){
   var draft=await until(function(){return D.querySelector('.nrdie');},15000);
   if(!draft){log('the draft never appeared - title tap did not take');return;}
   await sleep(500);
-  log('draft up - taking a die');
   tap(D.querySelector('.nrdie'));await sleep(1200);
   tap(D.getElementById('nrTakeBtn'));await sleep(2400);
-  var sOk=await until(function(){var st=E('S');return st&&st.run;},9000);
-  log('run state: '+(sOk?'ok':'MISSING'));
+  await until(function(){var st=E('S');return st&&st.run;},9000);
   E('_getS()');E('G=null');
   W._fkDiscardOk=true;
-  try{E('launchSeat(0)');log('launchSeat called');}catch(e){log('launchSeat THREW: '+e);}
+  E('launchSeat(0)');
   var ok=await until(function(){var g=E('G');return g&&g.phase==='idle';},16000);
-  log(ok?'match ready':'boot FAILED - '+JSON.stringify({g:!!E('G')}));
+  log(ok?'match ready':'boot FAILED');
+  if(ok){fillCards();buildTargets();}
 }
-function dealCards(){
-  var g=E('G');if(!g)return log('no match - setup first');
-  g.pF=[{id:'preserve',tier:1,charges:1,state:{}},{id:'honeytrap',tier:2,charges:2,state:{}}];
-  E('famRenderRow()');log('cards dealt');}
 function roll(){try{E('handleRoll()');log('rolled');}catch(e){log('roll: '+e);}}
-function die(i){var dx=E('window.D3X');if(!dx)return null;
-  var ds=dx.dice.filter(function(d){return d.match&&d.chip;});
-  return ds[i||0]&&ds[i||0].chip;}
 
-/* ── Preserve amber lifecycle ───────────────────────────────────── */
-function amberOverlay(chip){
-  var w=chip.closest('.die-wrap')||chip.parentElement||chip;
-  var ov=w.querySelector('.labAmber');
+/* ── all cards, straight from the game's own tables ───────────────── */
+function fillCards(){
+  var live=E('FAM_LIVE')||{};
+  var opts='';
+  Object.keys(live).forEach(function(id){
+    var d=E('famDef('+JSON.stringify(id)+')');
+    if(d)opts+='<option value="'+id+'">'+d.name+' ('+d.fam+', '+d.kind+')</option>';
+  });
+  document.getElementById('cardPick').innerHTML=opts;
+  document.getElementById('recCard').innerHTML=opts;
+  log('card list filled from FAM_LIVE');
+}
+function addCard(){
+  var g=E('G');if(!g)return log('no match');
+  var id=document.getElementById('cardPick').value;
+  var tier=+document.getElementById('tierPick').value;
+  var d=E('famDef('+JSON.stringify(id)+')');
+  var ch=(d&&d.charges&&d.charges[tier-1])||1;
+  g.pF=g.pF||[];g.pF.push({id:id,tier:tier,charges:ch,state:{}});
+  E('famRenderRow()');buildTargets();log('dealt '+id+' t'+tier);
+}
+function clearHand(){var g=E('G');if(!g)return;g.pF=[];E('famRenderRow()');buildTargets();log('hand cleared');}
+
+/* ── targets ──────────────────────────────────────────────────────── */
+var target=null;
+function buildTargets(){
+  var h='';
+  for(var i=0;i<6;i++)h+='<button onclick="pickT(\'die\','+i+',this)">die '+i+'</button>';
+  var g=E('G')||{};
+  (g.pF||[]).forEach(function(inst,i){h+='<button onclick="pickT(\'card\','+i+',this)">'+inst.id+'</button>';});
+  h+='<button onclick="pickT(\'row\',0,this)">dice row</button>';
+  document.getElementById('targetRow').innerHTML=h;
+}
+function tEl(){
+  if(!target)return null;
+  gw();var D=W.document;
+  if(target.k==='die'){var dx=E('window.D3X');if(!dx)return null;
+    var ds=dx.dice.filter(function(d){return d.match&&d.chip;});
+    var c=ds[target.i]&&ds[target.i].chip;
+    return c?(c.closest('.die-wrap')||c):null;}
+  if(target.k==='card')return D.querySelectorAll('#famRowP .fcv')[target.i]||null;
+  if(target.k==='row')return D.getElementById('playerDiceRow');
+  return null;
+}
+function pickT(k,i,btn){target={k:k,i:i};
+  document.querySelectorAll('#targetRow button').forEach(function(b){b.classList.remove('on');});
+  if(btn)btn.classList.add('on');
+  var el=tEl();
+  if(el)el.animate([{outline:'3px solid #ffd98a',outlineOffset:'3px'},{outline:'3px solid transparent'}],{duration:700});
+  log('target: '+k+' '+i+(el?'':' (NOT ON SCREEN yet)'));}
+function props(){return {
+  dx:+document.getElementById('pDx').value, dy:+document.getElementById('pDy').value,
+  sc:+document.getElementById('pSc').value, op:+document.getElementById('pOp').value,
+  rt:+document.getElementById('pRt').value};}
+function setProps(el,p){
+  el.style.translate=Math.round(p.dx)+'px '+Math.round(p.dy)+'px';
+  el.style.scale=String(p.sc/100);
+  el.style.opacity=String(p.op/100);
+  el.style.rotate=Math.round(p.rt)+'deg';}
+function applyProps(){var el=tEl();if(el)setProps(el,props());}
+function resetProps(){var el=tEl();if(!el)return;
+  ['pDx','pDy','pRt'].forEach(function(id){document.getElementById(id).value=0;});
+  document.getElementById('pSc').value=100;document.getElementById('pOp').value=100;
+  el.style.translate='';el.style.scale='';el.style.opacity='';el.style.rotate='';}
+
+/* ── FX palette ───────────────────────────────────────────────────── */
+var FXDEFS=['spray','glow','amberOverlay','clearOverlay','break','shield','candle','beat-gain','beat-hit','beat-churn','beat-steal'];
+(function(){
+  var h='';FXDEFS.forEach(function(f){h+='<button onclick="fire(\''+f+'\')">'+f+'</button>';});
+  document.getElementById('fxRow').innerHTML=h;
+  document.getElementById('fxKeyPick').innerHTML=
+    FXDEFS.concat(['announce']).map(function(f){return '<option>'+f+'</option>';}).join('');
+})();
+function fxParams(){return {
+  col:document.getElementById('fxCol').value,
+  count:+document.getElementById('fxCount').value,
+  speed:+document.getElementById('fxSpeed').value,
+  g:+document.getElementById('fxG').value,
+  size:+document.getElementById('fxSize').value,
+  spread:+document.getElementById('fxSpread').value,
+  ms:+document.getElementById('fxMs').value,
+  text:document.getElementById('annText').value,
+  annCol:document.getElementById('annCol').value};}
+function fire(fx,p){
+  p=p||fxParams();var el=tEl();
+  try{
+    if(fx==='spray'){if(!el)return log('no target');
+      W.__labEval('_fxSpray')(el,p.col,p.count,{speed:p.speed,g:p.g,size:p.size,spread:p.spread});}
+    else if(fx==='glow'){if(!el)return log('no target');
+      el.animate([{filter:'drop-shadow(0 0 0 transparent)'},
+        {filter:'drop-shadow(0 0 '+(p.size*2)+'px '+p.col+') brightness(1.2)'},
+        {filter:'drop-shadow(0 0 2px transparent)'}],{duration:p.ms,easing:'ease-out'});}
+    else if(fx==='amberOverlay'){if(!el)return log('no target');amberOverlay(el,p.col);}
+    else if(fx==='clearOverlay'){if(!el)return log('no target');
+      var ov=el.querySelector('.labAmber');
+      if(ov){ov.style.transition='scale .22s,opacity .22s';ov.style.scale='1.5';ov.style.opacity='0';
+        setTimeout(function(){ov.remove();},240);}}
+    else if(fx==='break'){if(!el)return log('no target');
+      W.__labEval('_fxSpray')(el,p.col,Math.max(22,p.count),{speed:p.speed*1.6,g:p.g*1.6,size:p.size,spread:3});
+      el.animate([{scale:'1',opacity:1},{scale:'1.18',opacity:1,offset:.25},
+        {scale:'0.4',opacity:0}],{duration:p.ms,easing:'ease-in',fill:'forwards'});}
+    else if(fx==='shield'){E("_bustShieldFX('"+p.col+"')");}
+    else if(fx==='candle'){
+      var dx=E('window.D3X');if(!dx||!dx.scene)return log('no scene');
+      var lights=[];dx.scene.traverse(function(o){if(o.isLight)lights.push(o);});
+      var orig=lights.map(function(l){return l.color.getHex();});
+      lights.forEach(function(l){l.color.set(p.col);});
+      setTimeout(function(){lights.forEach(function(l,i){l.color.setHex(orig[i]);});},p.ms);}
+    else if(fx.slice(0,5)==='beat-'){
+      var fc=(el&&el.classList&&el.classList.contains('fcv'))?el:W.document.querySelector('#famRowP .fcv');
+      if(!fc)return log('beats need a card');
+      W.__labEval('cardFx')(fx.slice(5),fc,fx==='beat-steal'?{to:W.document.getElementById('hud')}:{});}
+    else if(fx==='announce'){E('famLog('+JSON.stringify(p.text)+','+JSON.stringify(p.annCol)+')');}
+    log('fx: '+fx);
+  }catch(e){log('fx '+fx+': '+e);}
+}
+function amberOverlay(el,col){
+  var ov=el.querySelector('.labAmber');
   if(!ov){ov=W.document.createElement('div');ov.className='labAmber';
     ov.style.cssText='position:absolute;inset:-6%;border-radius:18%;pointer-events:none;z-index:5;'
-      +'background:radial-gradient(circle at 38% 30%, rgba(255,200,90,.28) 0%, rgba(216,138,32,.34) 55%, rgba(122,74,10,.55) 100%);'
-      +'box-shadow:inset 0 0 10px rgba(122,74,10,.8), 0 0 8px rgba(232,162,60,.5);'
+      +'background:radial-gradient(circle at 38% 30%, '+col+'44 0%, '+col+'66 55%, '+col+'99 100%);'
+      +'box-shadow:inset 0 0 10px '+col+'cc, 0 0 8px '+col+'88;'
       +'scale:1.35;opacity:0;transition:scale .28s cubic-bezier(.3,1.3,.4,1),opacity .28s';
-    w.style.position=w.style.position||'relative';w.appendChild(ov);}
+    el.style.position=el.style.position||'relative';el.appendChild(ov);}
   requestAnimationFrame(function(){ov.style.scale='1';ov.style.opacity='1';});
-  return ov;}
-function r_amberSet(){var c=die(0);if(!c)return log('no die — setup+roll first');
-  amberOverlay(c);
-  try{W.__labEval("_fxSpray")(c,'#e8a23c',12,{speed:70,g:110,size:7,spread:2});}catch(e){}
-  try{E("SFX.bank()");}catch(e){}
-  try{E("famLog('PRESERVED — A DIE WAITS IN AMBER')");}catch(e){}
-  log('amber set on die 0');}
-function r_amberPark(){var c=die(0);if(!c)return log('no die');
-  var w=c.closest('.die-wrap')||c;
-  w.style.transition='translate .6s cubic-bezier(.4,.9,.3,1), scale .6s';
-  w.style.translate='0 26cqw';w.style.scale='0.8';
-  log('parked down its lane (translate only — set, not thrown)');}
-function r_amberReturn(){var c=die(0);if(!c)return log('no die');
-  var w=c.closest('.die-wrap')||c;
-  w.style.translate='0 0';w.style.scale='1';
+}
+
+/* ── keyframing ───────────────────────────────────────────────────── */
+var rec={keys:[],fx:[]};
+var EASES={linear:function(k){return k;},
+  'ease-out':function(k){return 1-Math.pow(1-k,3);},
+  'ease-in':function(k){return k*k*k;},
+  'back-out':function(k){var c=1.70158;k-=1;return 1+((c+1)*k*k*k+c*k*k);}};
+function captureKey(){
+  var t=+document.getElementById('keyT').value;
+  var p=props();p.t=t;p.ease='ease-out';
+  rec.keys=rec.keys.filter(function(k){return k.t!==t;});
+  rec.keys.push(p);rec.keys.sort(function(a,b){return a.t-b.t;});
+  renderTables();log('key @ '+t+'ms');}
+function addFxKey(){
+  var t=+document.getElementById('keyT').value;
+  var name=document.getElementById('fxKeyPick').value;
+  rec.fx.push({t:t,fx:name,p:fxParams()});
+  rec.fx.sort(function(a,b){return a.t-b.t;});
+  renderTables();log('fx key '+name+' @ '+t+'ms');}
+function renderTables(){
+  var kt=document.getElementById('keyTable');
+  kt.innerHTML='<tr><th>t</th><th>dx</th><th>dy</th><th>scale%</th><th>op%</th><th>rot</th><th>ease</th><th></th></tr>'
+    +rec.keys.map(function(k,i){
+      return '<tr><td>'+k.t+'</td>'
+        +['dx','dy','sc','op','rt'].map(function(f){
+          return '<td><input type="number" value="'+k[f]+'" onchange="rec.keys['+i+'].'+f+'=+this.value"></td>';}).join('')
+        +'<td><select onchange="rec.keys['+i+'].ease=this.value">'
+        +Object.keys(EASES).map(function(e){return '<option'+(k.ease===e?' selected':'')+'>'+e+'</option>';}).join('')
+        +'</select></td>'
+        +'<td class="del" onclick="rec.keys.splice('+i+',1);renderTables()">✕</td></tr>';}).join('');
+  var ft=document.getElementById('fxTable');
+  ft.innerHTML='<tr><th>t</th><th>fx</th><th>params</th><th></th></tr>'
+    +rec.fx.map(function(f,i){
+      return '<tr><td>'+f.t+'</td><td>'+f.fx+'</td><td style="text-align:left">'
+        +f.p.col+' n'+f.p.count+' v'+f.p.speed+' g'+f.p.g+'</td>'
+        +'<td class="del" onclick="rec.fx.splice('+i+',1);renderTables()">✕</td></tr>';}).join('');
+  var maxT=Math.max(2000,rec.keys.concat(rec.fx).reduce(function(a,k){return Math.max(a,k.t);},0)+300);
+  document.getElementById('scrub').max=maxT;
+}
+function lerpAt(t){
+  var ks=rec.keys;if(!ks.length)return null;
+  if(t<=ks[0].t)return ks[0];
+  for(var i=0;i<ks.length-1;i++){
+    var a=ks[i],b=ks[i+1];
+    if(t>=a.t&&t<=b.t){
+      var k=(t-a.t)/Math.max(1,b.t-a.t);k=(EASES[b.ease]||EASES.linear)(k);
+      var o={};['dx','dy','sc','op','rt'].forEach(function(f){o[f]=a[f]+(b[f]-a[f])*k;});
+      return o;}}
+  return ks[ks.length-1];
+}
+var playing=null;
+function playRecipe(){
+  var el=tEl();if(!el&&rec.keys.length)return log('pick a target first');
+  stopRecipe();
+  var fired={};var t0=performance.now();
+  log('▶ playing '+rec.keys.length+' keys, '+rec.fx.length+' fx');
+  var step=function(now){
+    var t=now-t0;
+    if(el){var p=lerpAt(t);if(p)setProps(el,p);}
+    rec.fx.forEach(function(f,i){if(!fired[i]&&t>=f.t){fired[i]=1;fire(f.fx,f.p);}});
+    document.getElementById('scrub').value=Math.min(t,+document.getElementById('scrub').max);
+    document.getElementById('scrubT').textContent=Math.round(t)+'ms';
+    var endT=Math.max(rec.keys.length?rec.keys[rec.keys.length-1].t:0,
+                      rec.fx.length?rec.fx[rec.fx.length-1].t:0);
+    if(t<endT+120&&playing===step)requestAnimationFrame(step);
+    else if(playing===step){playing=null;log('■ done');}
+  };
+  playing=step;
+  requestAnimationFrame(step);
+}
+function stopRecipe(){playing=null;}
+function scrubTo(t){stopRecipe();
+  document.getElementById('scrubT').textContent=t+'ms';
+  var el=tEl();if(!el)return;
+  var p=lerpAt(t);if(p)setProps(el,p);}
+
+/* ── recipes: save / load / export ────────────────────────────────── */
+function store(){try{return JSON.parse(localStorage.fkLabRecipes||'{}');}catch(e){return {};}}
+function saveRecipe(){
+  var id=document.getElementById('recCard').value,mo=document.getElementById('recMoment').value;
+  var all=store();all[id]=all[id]||{};
+  all[id][mo]={target:target,keys:rec.keys,fx:rec.fx,
+    notes:document.getElementById('recNotes').value,saved:new Date().toISOString()};
+  localStorage.fkLabRecipes=JSON.stringify(all);
+  log('saved '+id+' / '+mo);}
+function loadRecipe(){
+  var id=document.getElementById('recCard').value,mo=document.getElementById('recMoment').value;
+  var r=(store()[id]||{})[mo];
+  if(!r)return log('nothing saved for '+id+' / '+mo);
+  rec={keys:r.keys||[],fx:r.fx||[]};if(r.target)target=r.target;
+  document.getElementById('recNotes').value=r.notes||'';
+  renderTables();log('loaded '+id+' / '+mo);}
+function exportAll(){
+  document.getElementById('exportBox').value=JSON.stringify(
+    {recipes:store(),cardNotes:noteStore()},null,1);
+  log('exported recipes + card notes — copy the box into chat');}
+
+/* ── the catalogue: every live card + Denis's written spec ────────── */
+function noteStore(){try{return JSON.parse(localStorage.fkLabCardNotes||'{}');}catch(e){return {};}}
+function saveNote(id,txt){
+  var ns=noteStore();
+  if(txt&&txt.trim())ns[id]=txt;else delete ns[id];
+  localStorage.fkLabCardNotes=JSON.stringify(ns);
+  var dot=document.querySelector('#catalogue summary[data-cid='+JSON.stringify(id)+'] .dot');
+  if(dot)dot.textContent=(txt&&txt.trim())?'● noted':'';}
+function buildCatalogue(){
+  var live=E('FAM_LIVE');if(!live)return false;
+  var ns=noteStore(),h='';
+  Object.keys(live).forEach(function(id){
+    var d=E('famDef('+JSON.stringify(id)+')');
+    if(!d)return;
+    var rules=(d.text||[]).map(function(t,i){return '<b>'+['I','II','III'][i]+'.</b> '+t;}).join('<br>');
+    h+='<details><summary data-cid='+JSON.stringify(id)+'>'+d.name
+      +' <span style="color:#9a8a68">('+d.fam+', '+d.kind+')</span>'
+      +'<span class="dot">'+(ns[id]?'● noted':'')+'</span></summary>'
+      +'<div class="rules">'+rules+'</div>'
+      +'<textarea placeholder="what must HAPPEN, step by step — timings, where the die goes, what the player must understand. Claude implements from THIS." '
+      +'onchange="saveNote('+JSON.stringify(id)+',this.value)">'+(ns[id]||'')+'</textarea>'
+      +'</details>';
+  });
+  document.getElementById('catalogue').innerHTML=h||'<i>FAM_LIVE empty?</i>';
+  return true;
+}
+/* the catalogue needs only the game's tables, not a match - build it as
+   soon as the frame's scripts are up */
+(async function(){
+  var ok=await until(function(){return !!E('window.FAM_LIVE?FAM_LIVE:null');},30000);
+  if(ok){fillCards();buildCatalogue();log('catalogue ready — notes save as you type away');}
+  else log('catalogue: the frame never exposed FAM_LIVE');
+})();
+
+/* ── presets ──────────────────────────────────────────────────────── */
+function die0(){var dx=E('window.D3X');if(!dx)return null;
+  var ds=dx.dice.filter(function(d){return d.match&&d.chip;});
+  return ds[0]&&(ds[0].chip.closest('.die-wrap')||ds[0].chip);}
+function r_amberSet(){var el=die0();if(!el)return log('no die — setup+roll');
+  amberOverlay(el,'#d88a20');
+  W.__labEval('_fxSpray')(el,'#e8a23c',12,{speed:70,g:110,size:7,spread:2});
+  E("SFX.bank()");E("famLog('PRESERVED — A DIE WAITS IN AMBER')");log('amber set');}
+function r_amberPark(){var el=die0();if(!el)return log('no die');
+  el.style.transition='translate .6s cubic-bezier(.4,.9,.3,1), scale .6s';
+  el.style.translate='0 26cqw';el.style.scale='0.8';log('parked');}
+function r_amberReturn(){var el=die0();if(!el)return log('no die');
+  el.style.translate='0 0';el.style.scale='1';
   setTimeout(function(){
-    var ov=w.querySelector('.labAmber');
+    var ov=el.querySelector('.labAmber');
     if(ov){ov.style.transition='scale .22s,opacity .22s';ov.style.scale='1.5';ov.style.opacity='0';
       setTimeout(function(){ov.remove();},240);}
-    try{W.__labEval("_fxSpray")(c,'#ffd98a',16,{speed:95,g:90,size:7,spread:2.4});}catch(e){}
-    try{E("famLog('THE AMBER CRACKS — A 1 ALREADY KEPT')");}catch(e){}
-  },620);
-  log('returning + crack');}
-
-/* ── card beats ─────────────────────────────────────────────────── */
-function beat(kind){gw();var fc=W.document.querySelector('#famRowP .fcv');
-  if(!fc)return log('no card — deal first');
-  try{W.__labEval('cardFx')(kind,fc,kind==='steal'?{to:W.document.getElementById('hud')}:{});
-    log('beat: '+kind);}catch(e){log('beat: '+e);}}
-
-/* ── table moments ──────────────────────────────────────────────── */
-function r_laneGlow(){gw();var c=die(2);if(!c)return log('no die');
-  var w=c.closest('.die-wrap')||c;var r=w.getBoundingClientRect();
-  var g=W.document.createElement('div');
-  g.style.cssText='position:fixed;left:'+(r.left-8)+'px;top:'+(r.top-30)+'px;width:'+(r.width+16)
-    +'px;height:'+(r.height+60)+'px;pointer-events:none;z-index:4;border-radius:12px;'
-    +'box-shadow:inset 0 0 22px rgba(255,217,138,.55);opacity:0;transition:opacity .25s';
-  W.document.body.appendChild(g);
-  requestAnimationFrame(function(){g.style.opacity='1';});
-  setTimeout(function(){g.style.opacity='0';setTimeout(function(){g.remove();},300);},700);
-  log('lane glow on lane 2');}
-function r_redCandle(){var dx=E('window.D3X');if(!dx||!dx.scene)return log('no 3D scene');
-  var lights=[];dx.scene.traverse(function(o){if(o.isLight)lights.push(o);});
-  if(!lights.length)return log('no lights');
-  var orig=lights.map(function(l){return l.color.getHex();});
-  lights.forEach(function(l){l.color.setHex(0xc03818);});
-  log('candle RED ('+lights.length+' lights) — restoring in 650ms');
-  setTimeout(function(){lights.forEach(function(l,i){l.color.setHex(orig[i]);});log('candle restored');},650);}
-function r_shield(){try{E("_bustShieldFX('#e8a23c')");log('shield fired');}catch(e){log('shield: '+e);}}
-
-/* ── A3b look experiments ───────────────────────────────────────── */
+    W.__labEval('_fxSpray')(el,'#ffd98a',16,{speed:95,g:90,size:7,spread:2.4});
+    E("famLog('THE AMBER CRACKS — A 1 ALREADY KEPT')");
+  },620);log('returning + crack');}
+function r_redCandle(){var p=fxParams();p.col='#c03818';p.ms=650;fire('candle',p);}
+function r_shield(){E("_bustShieldFX('#e8a23c')");log('shield fired');}
 function r_dimmerRoom(){gw();var ms=W.document.getElementById('screen-match');
-  if(!ms)return log('no match screen');
-  ms.style.filter='brightness(.84)';log('room at 84% (score-scaled idea: 1.0→0.82 as pPts→target)');}
+  if(ms){ms.style.filter='brightness(.84)';log('room at 84%');}}
 function r_softerKey(){var dx=E('window.D3X');if(!dx||!dx.scene)return log('no scene');
-  dx.scene.traverse(function(o){if(o.isDirectionalLight)o.intensity*=0.85;});
-  log('key light −15%');}
+  dx.scene.traverse(function(o){if(o.isDirectionalLight)o.intensity*=0.85;});log('key −15%');}
 function r_resetLook(){gw();var ms=W.document.getElementById('screen-match');
-  if(ms)ms.style.filter='';
-  log('reset (reload the frame for exact original lights)');}
+  if(ms)ms.style.filter='';log('reset (reload frame for exact lights)');}
 </script>
 </body>
 </html>
