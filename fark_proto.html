@@ -16932,6 +16932,7 @@ CFX.preserve={
        plain die back. The kept entry it came from already carries `mat`. */
     var found=null,foundMat=null;
     var foundEnch=null;/* P559 - the brand, captured with the material */
+    var foundLane=null;/* P726 - see the capture below */
     /* P514: take the material of the DIE that carries the 1 or the 5, not
        k.mat - which is selDice[0].mat, the first die of the whole commit
        (built at the G.kept.push). Keep a triple of 3s on bone/iron/flint
@@ -16941,22 +16942,27 @@ CFX.preserve={
        selDice - so this searches k.dice BY VALUE and never by position.
        The old vals scan stays as the fallback for entries with no dice
        array, which is also what canUse tests against. */
-    (G.kept||[]).some(function(k){
-      /* P534: through _keptScorers, so a BRANDED face can never be chosen.
-         It banks zero by law - _splitIcons holds those dice out of scoring -
-         and brands live on faces 1 and 5, which are the only faces this
-         looks for, so every brand was a candidate and worth 100 or 50. */
-      var _pd=_keptScorers(k).filter(function(dd){return dd&&(dd.val===1||dd.val===5);})[0];
-      /* P559 (D6b): TAKE THE BRAND WITH THE MATERIAL. P514 added mat to this
-         capture and did not add ench beside it, so the die came back the right
-         material wearing nothing. Everywhere else in the file the two travel
-         together - the kept group's own dice entries are {val,mat,ench}, which
-         is exactly where _pd comes from, and _removeDieAt's _diceOut record is
-         {lane,mat,ench}. */
-      if(_pd){found=_pd.val;foundMat=_pd.mat||k.mat||'bone';foundEnch=_pd.ench||null;return true;}
-      return (k.vals||[]).some(function(v){
-        if(v===1||v===5){found=v;foundMat=k.mat||'bone';return true;}
-        return false;
+    /* P726/P726b: prefer the 1 - it pays 100 against the 5's 50, and a
+       player who kept both means the better one (Denis preserved 'a 1').
+       TWO PASSES ACROSS ALL GROUPS: a single scan stopped at the first
+       group holding any scorer, so a first-kept 5 shadowed a later-kept 1.
+       P534 still holds: _keptScorers, so a BRANDED face can never be
+       chosen (it banks zero by law and brands live on the very faces this
+       looks for). P559 still holds: the brand travels with the material -
+       the kept group's dice entries are {val,mat,ench,lane}, exactly what
+       the record carries forward. */
+    [1,5].some(function(want){
+      return (G.kept||[]).some(function(k){
+        var _pd=_keptScorers(k).filter(function(dd){return dd&&dd.val===want;})[0];
+        if(_pd){found=_pd.val;foundMat=_pd.mat||k.mat||'bone';foundEnch=_pd.ench||null;
+          foundLane=(typeof _pd.lane==='number')?_pd.lane:null;/* P726: the stash line
+             read foundLane but nothing ever assigned it - P691 was stillborn */
+          return true;}
+        /* the vals fallback for entries with no dice array - what canUse tests */
+        return (k.vals||[]).some(function(v){
+          if(v===want){found=v;foundMat=k.mat||'bone';return true;}
+          return false;
+        });
       });
     });
     if(!found)return false;
@@ -26203,7 +26209,12 @@ var D3X={
            used to sit in, and the tray's is smaller */
         var tS=(inTray?cr.width:(d.w0||cr.width))*D3X.MSCALE;
         var tX=cr.left-mr.left+cr.width/2,tY=-(cr.top-mr.top+cr.height/2);
-        var tQ=D3X._isoQ(val,D3X.TILT_MATCH);
+        /* P726: LAY - value face UP then tipped toward the viewer, the
+           same reading a settled die gives the high table camera. The
+           no-lay contract (value AT the camera) is the eye-level shelf's;
+           here it showed a neighbour face on every kept, preserved and
+           pre-roll die (Denis's 'preserved a 1 but it kept a 5'). */
+        var tQ=D3X._isoQ(val,D3X.TILT_MATCH,true);
         if(d.drop){
           var dk=(now-d.drop.t0)/D3X.TRAY.ms;
           if(dk>=1){d.drop=null;}
