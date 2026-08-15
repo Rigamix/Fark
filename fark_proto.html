@@ -1215,6 +1215,16 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
   transition:transform .18s,filter .18s,opacity .35s;
   filter:drop-shadow(0.7cqw 0.9cqw 0 rgba(15,9,4,.45))}
 .loFeat:active{transform:var(--jt,translate(-50%,-50%)) scale(1.12)}
+/* P730: the fresh pin's landing - standalone scale composes with the
+   --jt transform, so the drop keeps the pin's jitter angle. Glow via
+   filter; the spray fires from JS at the thump. */
+.loFeat.pin-land{animation:loPinLand .85s cubic-bezier(.3,1.4,.4,1) both;z-index:16}
+@keyframes loPinLand{
+  0%{scale:3.2;opacity:0;filter:drop-shadow(0 0 0 rgba(255,217,138,0))}
+  45%{opacity:1}
+  62%{scale:.92;filter:drop-shadow(0 0 14px rgba(255,217,138,.95))}
+  80%{scale:1.06}
+  100%{scale:1;filter:drop-shadow(0 0 5px rgba(255,217,138,.45))}}
 
 .loBadge:active{transform:translate(-50%,-50%) scale(1.15)}
 /* P576 (note 6): RAISED FIRST, THEN GROWN - in that order, because the row
@@ -17257,6 +17267,29 @@ function famLoadoutShow(){
     var _fs=_pend.map(function(id){return FEATS.find(function(x){return x.id===id;});}).filter(Boolean);
     if(_fs.length)_featCeremony(_fs);
   }
+  /* P730: THE LANDING. Feats award silently mid-match (the loud overlay
+     interrupted, P338/P667) - so the MOMENT lives here, where the board
+     is: each fresh pin drops in large-to-place under a gold glow with a
+     spray at the thump, one fanfare for the batch (Denis: audio + pin
+     animation with glow and particles). Fresh rides the save, so a feat
+     earned just before quitting still lands next session. */
+  try{
+    var _frsh=Object.keys(S.featsFresh||{}).filter(function(id){return FEAT_ART[id];});
+    if(_frsh.length){
+      try{SFX.hotDice&&SFX.hotDice();}catch(e){}
+      _frsh.forEach(function(id,ix){
+        var el=ov.querySelector('.loFeat[data-png="'+FEAT_ART[id]+'"]');
+        if(!el)return;
+        el.classList.remove('unpinned');
+        setTimeout(function(){
+          el.classList.add('pin-land');
+          setTimeout(function(){try{_fxSpray(el,'#ffd98a',18,{speed:85,g:130,size:7,spread:2.2});}catch(e){}},420);
+          setTimeout(function(){el.classList.remove('pin-land');},1700);
+        },350+ix*450);
+      });
+      S.featsFresh={};try{save();}catch(e){}
+    }
+  }catch(e){}
   /* convert chips POST-layout; rebuild any that converted at zero size
      (Firefox could size them off a 0-width host: present but invisible) */
   var _scanLo=function(){
@@ -17286,7 +17319,9 @@ function _featCeremony(list){
   if(!Array.isArray(list))list=[list];
   try{
     _getS();S.featsPinned=S.featsPinned||{};
-    (list||[]).forEach(function(f){if(f&&f.id)S.featsPinned[f.id]=1;});
+    (list||[]).forEach(function(f){if(f&&f.id){S.featsPinned[f.id]=1;
+      /* P730: the shelf owes this one its landing moment */
+      (S.featsFresh=S.featsFresh||{})[f.id]=1;}});
     save();
   }catch(e){}
   return Promise.resolve();
