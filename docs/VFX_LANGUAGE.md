@@ -187,6 +187,58 @@ same synthesis, one owner. Master gain low (0.4): tavern, not arcade.
   honeytrap's buzzing lap, fool's gold's lying glint, stargazer's
   constellation lines, the tab's chalk tallies, lucky's clover.
 
+## 10. THE DESIGNER'S SECOND PASS (2026-08-15, after Denis's amber note)
+
+"Encased, ok — but boring." Correct. The first pass proved the VERB;
+this pass makes the MATERIAL. The method, per effect: name the physical
+material the effect pretends to be, list what light does to that
+material, then fake each behaviour with the cheapest trick that reads.
+
+**Amber, the case study** (all five now in the lab, each with a slider):
+- Amber is GLOSSY → a hard off-white specular hot-spot (Phong shell,
+  `specular` slider). One highlight sells "polished surface" instantly.
+- Amber is DEEP → light attenuates with path length. Real refraction is
+  a shader; the fake is NESTED RIM SHELLS (1-3 layers): at grazing
+  angles you see through more layers, so edges read denser — the classic
+  cheap Fresnel. `rim layers` slider.
+- Amber BLURS what it holds → a GHOST PASS: a 1.035-scale clone of the
+  die's own textured mesh, amber-tinted, low opacity. The doubled faces
+  read as refraction blur, one extra draw call. `ghost blur` slider.
+- Amber has INCLUSIONS → 3-5 tiny pale bubbles drifting slowly inside.
+  Bubbles also tell SCALE (small bubbles = big die). `bubbles` slider.
+- Amber is VISCOUS → the outer particles become DRIPS: fewer, larger,
+  slower, heavy gravity, narrow spread — sliding off, not popping.
+- The trap SNAPS → a 200ms rotation jitter as the shell closes. A trap
+  that doesn't twitch is a display case.
+
+**The same interrogation, per family:**
+- **STRIKE** — impacts are about the FIRST FRAME: a 60ms white flash on
+  the victim before the shake (the hit-frame every fighting game uses),
+  then dust: grey, large, slow, drifting UP. Force reads from the flash;
+  weight reads from the dust.
+- **BREAK** — destruction has an ORDER: flash → crack sound → shards
+  OUT + smoke puff hanging. Smoke is what makes a break feel physical;
+  shards alone are confetti.
+- **PAY** — gold should HANG: sparks decelerate (low negative gravity)
+  and linger at the top of their arc; at power 2+ a faint vertical light
+  column lifts off the target. Money rises and pauses; it never pops.
+- **TRANSFORM** — change needs an AFTERIMAGE: the die's tinted ghost
+  lags 200ms behind the spin and fades — the eye keeps the old identity
+  on screen while the new one arrives. Swap hidden at the spin peak.
+- **FATE** — fate is SLOW: the bell, a faint beam rising off the target,
+  then two delayed twinkles (250ms, 500ms). Nothing moves fast; that is
+  what separates it from PAY.
+- **ARM** — the heartbeat stays; at power 2+ a rim-light sweep crosses
+  the card once (light moving across a surface = "charged", cheaply).
+- **SET (ward variant)** — same shell language but a FLASH, not a hold:
+  200ms specular ping in silver-blue. Defence is a reflex, not a home.
+- **LEDGER** — pushed by NOT pushing. The scratch tick and the line.
+
+Every new ingredient is a slider in the lab (Shell studio group), and
+every one is built from the existing pool: Phong material on the same
+rounded geometry, mesh clones, sphere primitives, `_fxSpray` params,
+overlay divs. No new systems.
+
 ## Sources
 
 - [How to Make Your Game Feel Good: A Guide to Game Feel and Juice](https://egmatic.com/blog/how-to-make-your-game-feel-good)

@@ -34,7 +34,19 @@ const dx=E('window.D3X');
 const d0=dx.dice.filter(d=>d.match&&d.chip)[0];
 const sh=d0&&d0.obj.getObjectByName('labShell');
 out.shell=!!sh;
-out.shellRounded=!!(sh&&sh.geometry.attributes.position.count>=100); /* seg-4 rounded box = 150 verts; the flat clone path no longer exists */
+/* v4: the shell is a GROUP - rims (Phong), ghost, bubbles */
+if(sh){
+  let rims=0,ghost=0,bubbles=0,phong=0;
+  sh.traverse(o=>{if(!o.isMesh)return;
+    if(o.geometry.type==='SphereGeometry')bubbles++;
+    else if(o.scale.x>1.02&&o.scale.x<1.05)ghost++;
+    else rims++;
+    if(o.material&&o.material.type==='MeshPhongMaterial')phong++;});
+  out.v4={rims,ghost,bubbles,phong};
+}
+out.shellRounded=(()=>{let ok=false;
+  sh&&sh.traverse(o=>{if(o.isMesh&&o.geometry.type==='BoxGeometry'&&o.geometry.attributes.position.count>=100)ok=true;});
+  return ok;})(); /* a rim mesh carries the seg-4 rounded box (150 verts) */
 out.verdict=out.catCount>50&&out.pCard&&out.pMat&&out.pEnch&&out.pFallback
   &&out.loadedKeys>=3&&out.loadedFx>=3&&out.movedMidPlay&&out.shell&&out.shellRounded;
 return out;
