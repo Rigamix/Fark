@@ -1301,9 +1301,13 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
      card in hand now lights the moment it leaves the row - 0.45 at the
      first pixel, full at the line - and the radius starts wide rather
      than growing from nothing. */
-  filter:drop-shadow(0 0 calc(0.35cqw + 0.55cqw*var(--arm,0)) rgba(255,240,190,calc(0.45 + 0.55*var(--arm,0))))
-    drop-shadow(0 0 calc(1.6cqw + 2.2cqw*var(--arm,0)) rgba(255,200,85,calc(0.5 + 0.5*var(--arm,0))))
-    drop-shadow(0 0.9cqw 1.3cqw rgba(10,6,2,.5))
+  /* P748: THE GOLD DROP-SHADOWS ARE GONE. They were the glow, and in
+     this row they were never painted on WebKit - a filter on a child of a
+     3D-transformed parent is clipped to the child's own box, and a halo
+     is by definition outside it. D3X.cardGlow paints it on a canvas now.
+     What stays is what works IN bounds: the contact shadow and the lift
+     in brightness. */
+  filter:drop-shadow(0 0.9cqw 1.3cqw rgba(10,6,2,.5))
     brightness(calc(1.06 + 0.18*var(--arm,0)))}
 /* cannot-play greys IN from the first pixel, on the same value */
 #famRowP .fcv.fcv-drag.fcv-cant{
@@ -1317,10 +1321,15 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
      THUMB (the drag probe photographed it working; a finger covers it),
      so armed also POPS - standalone scale composes with the drag's
      inline translate - and the halo doubles. */
+  /* P748b: THE HALO LEFT THIS RULE. These gold drop-shadows are in the
+     same 3D-transformed row as the drag's were, so WebKit clips them to
+     the card's own box and a phone sees nothing - and on desktop they
+     would now stack on top of the canvas halo, so the two platforms
+     would disagree about what armed looks like. D3X.cardGlow paints it
+     for both. The lift and the warmth stay: neither is a filter that
+     needs to reach outside the card. */
   scale:1.09;
-  filter:drop-shadow(0 0 0.8cqw rgba(255,236,170,1))
-  drop-shadow(0 0 3.4cqw rgba(255,200,85,.95))
-  drop-shadow(0 0.9cqw 1.3cqw rgba(10,6,2,.5))
+  filter:drop-shadow(0 0.9cqw 1.3cqw rgba(10,6,2,.5))
   brightness(1.22)}/* P576: third of the three */
 /* P576: THE BOB. fcvFloat was checked first and rejected with a reason: it
    exists, but it is already bound to `#ptvFan .fcv.zoom .fcvIn`, so redefining
@@ -14980,6 +14989,16 @@ function famRenderRow(){
                           onclick:"npcOppTap('"+cid+"')"});
   });
   hostO.innerHTML=ho;
+  /* P748: THE RIVAL'S ARMED CARD GLOWS THE SAME WAY. It was a gold
+     drop-shadow on .fcv.armed in #famRowO - the same 3D-transformed row,
+     so just as clipped and just as invisible on a phone. Denis: the
+     mechanics are shared, so the visual is too. Their accent, not gold. */
+  try{
+    if(window.D3X&&D3X.cardGlow){
+      var _oa=hostO.querySelector('.fcv.armed');
+      D3X.cardGlow('opp',_oa||null,_oa?1:0,window.OPP_INK||'#d94c3d');
+    }
+  }catch(e){}
   /* aux chips: quicksilver reroll + the sleeved rule */
   var ha='';
   if(G&&(G.pool||[]).some(function(x){return x.ench&&x.ench.t==='quicksilver'&&!x.committed&&!x._frozen;})){
@@ -15107,6 +15126,13 @@ function _famDragInit(el,i){
     var _k=(_famDrag.cy0-(_famDrag.cy0+dy)-0)/_span;
     if(_k<0)_k=0;if(_k>1)_k=1;
     el.style.setProperty('--arm',_k.toFixed(3));
+    /* P748: THE GLOW IS PAINTED, NOT FILTERED. A drop-shadow on this card
+       is clipped away by WebKit because the row is a 3D-transformed
+       context - so the halo goes through the dice's own painter, on a
+       screen-space canvas nothing can clip. Written here beside the
+       transform for the same reason that one is: the card only moves when
+       the finger moves it. */
+    try{if(window.D3X&&D3X.cardGlow)D3X.cardGlow('drag',_famDrag.why?null:el,_k);}catch(e){}
     var past=(_famDrag.cy0+dy)<_famDrag.line;
     /* P737: past the line is not the same as PLAYABLE. A card that
        cannot fire greys and says why, up where the player is looking -
@@ -15135,6 +15161,7 @@ function _famDragInit(el,i){
     var armed=el.classList.contains('armed');
     el.classList.remove('fcv-drag','armed','fcv-blocked','fcv-cant');
     el.style.removeProperty('--arm');
+    try{if(window.D3X&&D3X.cardGlow)D3X.cardGlow('drag',null,0);}catch(e){}
     el.style.transform='';
     /* P737: the reason clears with the gesture */
     /* P747: the strip clears itself on the next announce; nothing to
@@ -25096,6 +25123,11 @@ var D3X={
   /* P739: the glow paints at up to this device ratio (the other canvases
      cap at 2 - a soft shadow can afford it, a crisp rim cannot) */
   GLOW_DPR_MAX:3,
+  /* P748: the CARD halo's dials, beside the dice's on purpose - one glow
+     language, two shapes. `floor` is why a card lights the moment it
+     leaves the row instead of ramping up from invisible; `line:0` keeps
+     the crisp rim off a bounding-box hull. */
+  CARD_GLOW:{col:'#ffe6a4', soft:'#ffa93a', round:0.075, line:0, floor:0.42},
   GLOW:{soft:11, rim:3, rimPasses:5, softPasses:1, line:3.2, grow:1.004, clear:0.7, strength:0.91,
         /* P739: MEASURED against the blur branch in the same browser -
            same reach (mass ratio 1.01) but 1.67x the BRIGHT area, so the
@@ -25204,69 +25236,14 @@ var D3X={
     return k;
   },
   _amberTick:function(){try{this._amberDrift();}catch(e){}},
-  _drawGlow:function(){
-    var cv=document.getElementById('dgCanvas');
-    /* clear-and-leave: no selection, mid-roll, or no dice at all */
-    /* not _matchOn: that is turned off whenever ANY sized .d3chip exists
-       anywhere in the document, which is a statement about the shop and the
-       loadout, not about whether there are match dice to draw around. */
-    var anyMatch=false;
-    for(var mi=0;mi<this.dice.length;mi++)if(this.dice[mi].match){anyMatch=true;break;}
-    var skip=!anyMatch||this._rolling();
-    if(!skip){
-      skip=true;
-      for(var i=0;i<this.dice.length;i++){
-        var q=this.dice[i];
-        if(q.match&&q.obj.visible&&q.chip.classList.contains('selected')){skip=false;break;}
-      }
-    }
-    if(skip){
-      if(cv&&this._glowInk){
-        var c0=cv.getContext('2d');
-        c0.setTransform(1,0,0,1,0,0);c0.clearRect(0,0,cv.width,cv.height);
-        this._glowInk=false;
-      }
-      return;
-    }
-    cv=this._glowCv();if(!cv)return;
-    this._glowInk=true;
-    var scEl=document.getElementById('screen-match');
-    var sc=scEl.getBoundingClientRect();
-    if(sc.width<10)return;
-    /* P739: THE GLOW PAINTS AT THE DISPLAY'S RESOLUTION. Every canvas in
-       this file caps at 2x, which is right for a soft, wide thing like a
-       shadow - but the selection glow is a THIN CRISP RIM, and on a 3x
-       phone a 2x canvas is stretched 1.5x by the compositor: every edge
-       enlarged and blurred. That is Denis's 'much softer and wider on my
-       phone', and no dial could have fixed it because the numbers were
-       never what differed - the raster was. The cost is bounded: this
-       canvas is only painted while dice are selected, and it is one thin
-       shape on an otherwise empty surface. */
-    var dpr=Math.min(devicePixelRatio||1,this.GLOW_DPR_MAX||3);
-    if(cv.width!==Math.round(sc.width*dpr)||cv.height!==Math.round(sc.height*dpr)){
-      cv.width=Math.round(sc.width*dpr);cv.height=Math.round(sc.height*dpr);
-    }
-    var x=cv.getContext('2d');
-    x.setTransform(dpr,0,0,dpr,0,0);
-    x.clearRect(0,0,sc.width,sc.height);
+  /* P748: THE ONE HALO PAINTER. Lifted verbatim out of _drawGlow so
+     the dice glow is unchanged - the blur pass, the iOS stroke-ring
+     fallback, the punch-out and the rim line all still live here and
+     nowhere else. `sel` is a list of screen-space hulls; a die hands
+     over its projected corners and a card hands over its rounded
+     rect, and neither knows anything about the other. */
+  _paintHalo:function(cv,x,sc,dpr,sel,COL,SOFT,alphaMul){
     var self=this,G=this.GLOW;
-    var sel=[],oppSel=false;
-    this.dice.forEach(function(d){
-      if(!d.match||!d.obj.visible)return;
-      if(!d.chip.classList.contains('selected'))return;
-      if(d.chip.classList.contains('oppkeep'))oppSel=true;
-      var hull=self._hullOf(d,sc,G.grow);
-      if(hull)sel.push(hull);
-    });
-    if(!sel.length)return;
-    /* gold is the PLAYER's colour. A rival keep glows in their patron accent
-       instead, which is the same --patCol the portrait disc and the DOM
-       fallback rim already use - so the three readings of a rival agree. */
-    var SOFT=self.SEL_SOFT,COL=self.SEL_COL;
-    /* one red for the rival, every seat - see OPP_INK. This used to read
-       --patCol, so their keep glowed a different colour at every table and
-       no colour at all against a boss. */
-    if(oppSel)COL=SOFT=(window.OPP_INK||'#d94c3d');
     /* build the halo on its own surface: blur the silhouettes, then PUNCH
        THE DICE BACK OUT. Filling the silhouette and blurring it in place
        is what put the glow inside the die instead of around it. */
@@ -25346,9 +25323,152 @@ var D3X={
     /* additive, so it reads as light rather than paint */
     x.save();
     x.globalCompositeOperation='lighter';
-    x.globalAlpha=G.strength;
+    x.globalAlpha=G.strength*(alphaMul===undefined?1:alphaMul);
     x.drawImage(g,0,0,sc.width,sc.height);
     x.restore();
+  },
+  /* the canvas the CARD glow paints on. #dgCanvas sits at z-index 3,
+     under the dice and far under the hand - right for dice, useless
+     for a card at z 42. This one sits just under the dragged card
+     (9500) and above everything else it must not hide behind. */
+  _glowHiCv:function(){
+    var sc=document.getElementById('screen-match');
+    if(!sc)return null;
+    var cv=document.getElementById('dgCanvasHi');
+    if(!cv){
+      cv=document.createElement('canvas');cv.id='dgCanvasHi';
+      cv.style.cssText='position:absolute;inset:0;width:100%;height:100%;'
+        +'pointer-events:none;z-index:9400';
+      sc.appendChild(cv);
+    }
+    return cv;
+  },
+  /* a card's silhouette as a hull the painter understands: a rounded
+     rect, corners sampled so the halo follows the card's shape rather
+     than a hard box. The row's few degrees of rotation are inside the
+     blur, so the bounding rect is close enough - and CARD_GLOW.line
+     keeps the crisp rim off, which is the part that would show it. */
+  _rectHull:function(L,T,W,H,rad){
+    var pts=[],r=Math.min(rad,W/2,H/2),SEG=4;
+    var cs=[[L+W-r,T+r,-Math.PI/2],[L+W-r,T+H-r,0],
+            [L+r,T+H-r,Math.PI/2],[L+r,T+r,Math.PI]];
+    cs.forEach(function(c){
+      for(var k=0;k<=SEG;k++){
+        var a=c[2]+(Math.PI/2)*(k/SEG);
+        pts.push([c[0]+Math.cos(a)*r,c[1]+Math.sin(a)*r]);
+      }
+    });
+    return pts;
+  },
+  /* THE CARD GLOW, THROUGH THE DICE'S PAINTER. Keyed, so the player's
+     drag and the rival's armed telegraph are two entries in one list
+     rather than two effects - k<=0 removes an entry. Painted on
+     demand: a card only moves when something moves it, so there is no
+     per-frame cost while the hand sits still. */
+  cardGlow:function(key,el,k,col){
+    this._cardGlows=this._cardGlows||{};
+    if(!el||!(k>0))delete this._cardGlows[key];
+    else this._cardGlows[key]={el:el,k:k,col:col||null};
+    this._drawCardGlows();
+  },
+  _drawCardGlows:function(){
+    var sc0=document.getElementById('screen-match');
+    var cv=document.getElementById('dgCanvasHi');
+    var live=this._cardGlows&&Object.keys(this._cardGlows).length;
+    if(!sc0||(!live&&!cv))return;
+    cv=this._glowHiCv();if(!cv)return;
+    var sc=sc0.getBoundingClientRect();
+    if(sc.width<10)return;
+    var dpr=Math.min(devicePixelRatio||1,this.GLOW_DPR_MAX||3);
+    if(cv.width!==Math.round(sc.width*dpr)||cv.height!==Math.round(sc.height*dpr)){
+      cv.width=Math.round(sc.width*dpr);cv.height=Math.round(sc.height*dpr);
+    }
+    var x=cv.getContext('2d');
+    x.setTransform(dpr,0,0,dpr,0,0);
+    x.clearRect(0,0,sc.width,sc.height);
+    if(!live)return;
+    var self=this,CG=this.CARD_GLOW;
+    /* the rim line would trace the bounding box rather than the card's
+       own angle, so it is off for cards - the halo carries it */
+    var G=this.GLOW,keepLine=G.line;G.line=CG.line;
+    try{
+      Object.keys(this._cardGlows).forEach(function(kk){
+        var e=self._cardGlows[kk];
+        if(!e.el||!e.el.isConnected){delete self._cardGlows[kk];return;}
+        var r=e.el.getBoundingClientRect();
+        if(r.width<4)return;
+        var hull=self._rectHull(r.left-sc.left,r.top-sc.top,r.width,r.height,
+          Math.min(r.width,r.height)*CG.round);
+        self._paintHalo(cv,x,sc,dpr,[hull],e.col||CG.col,e.col||CG.soft,
+          CG.floor+(1-CG.floor)*Math.min(1,e.k));
+      });
+    }finally{G.line=keepLine;}
+  },
+  _drawGlow:function(){
+    var cv=document.getElementById('dgCanvas');
+    /* clear-and-leave: no selection, mid-roll, or no dice at all */
+    /* not _matchOn: that is turned off whenever ANY sized .d3chip exists
+       anywhere in the document, which is a statement about the shop and the
+       loadout, not about whether there are match dice to draw around. */
+    var anyMatch=false;
+    for(var mi=0;mi<this.dice.length;mi++)if(this.dice[mi].match){anyMatch=true;break;}
+    var skip=!anyMatch||this._rolling();
+    if(!skip){
+      skip=true;
+      for(var i=0;i<this.dice.length;i++){
+        var q=this.dice[i];
+        if(q.match&&q.obj.visible&&q.chip.classList.contains('selected')){skip=false;break;}
+      }
+    }
+    if(skip){
+      if(cv&&this._glowInk){
+        var c0=cv.getContext('2d');
+        c0.setTransform(1,0,0,1,0,0);c0.clearRect(0,0,cv.width,cv.height);
+        this._glowInk=false;
+      }
+      return;
+    }
+    cv=this._glowCv();if(!cv)return;
+    this._glowInk=true;
+    var scEl=document.getElementById('screen-match');
+    var sc=scEl.getBoundingClientRect();
+    if(sc.width<10)return;
+    /* P739: THE GLOW PAINTS AT THE DISPLAY'S RESOLUTION. Every canvas in
+       this file caps at 2x, which is right for a soft, wide thing like a
+       shadow - but the selection glow is a THIN CRISP RIM, and on a 3x
+       phone a 2x canvas is stretched 1.5x by the compositor: every edge
+       enlarged and blurred. That is Denis's 'much softer and wider on my
+       phone', and no dial could have fixed it because the numbers were
+       never what differed - the raster was. The cost is bounded: this
+       canvas is only painted while dice are selected, and it is one thin
+       shape on an otherwise empty surface. */
+    var dpr=Math.min(devicePixelRatio||1,this.GLOW_DPR_MAX||3);
+    if(cv.width!==Math.round(sc.width*dpr)||cv.height!==Math.round(sc.height*dpr)){
+      cv.width=Math.round(sc.width*dpr);cv.height=Math.round(sc.height*dpr);
+    }
+    var x=cv.getContext('2d');
+    x.setTransform(dpr,0,0,dpr,0,0);
+    x.clearRect(0,0,sc.width,sc.height);
+    var self=this,G=this.GLOW;
+    var sel=[],oppSel=false;
+    this.dice.forEach(function(d){
+      if(!d.match||!d.obj.visible)return;
+      if(!d.chip.classList.contains('selected'))return;
+      if(d.chip.classList.contains('oppkeep'))oppSel=true;
+      var hull=self._hullOf(d,sc,G.grow);
+      if(hull)sel.push(hull);
+    });
+    if(!sel.length)return;
+    /* gold is the PLAYER's colour. A rival keep glows in their patron accent
+       instead, which is the same --patCol the portrait disc and the DOM
+       fallback rim already use - so the three readings of a rival agree. */
+    var SOFT=self.SEL_SOFT,COL=self.SEL_COL;
+    /* one red for the rival, every seat - see OPP_INK. This used to read
+       --patCol, so their keep glowed a different colour at every table and
+       no colour at all against a boss. */
+    if(oppSel)COL=SOFT=(window.OPP_INK||'#d94c3d');
+    /* P748: the painter is shared with the cards now - see _paintHalo */
+    this._paintHalo(cv,x,sc,dpr,sel,COL,SOFT,1);
   },
   /* ONE GROUP PER ROW. This used to be a single shared group whose position
      and scale were written per die inside the frame loop, so with two rows
