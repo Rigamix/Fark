@@ -74,6 +74,7 @@
   <div class="row">
     <label>opacity <input type="range" id="pOp" min="0" max="100" value="100" oninput="applyProps()"></label>
     <label>rotate <input type="range" id="pRt" min="-180" max="180" value="0" oninput="applyProps()"></label>
+    <label>shell corner% <input type="range" id="pCr" min="0" max="30" value="12"></label>
     <button onclick="resetProps()">reset target</button>
   </div>
 
@@ -92,6 +93,14 @@
     <input type="text" id="annText" value="THE AMBER CRACKS — A 1 ALREADY KEPT" size="38">
     <select id="annCol"><option>gold</option><option>red</option><option>green</option></select>
     <button onclick="fire('announce')">announce</button>
+  </div>
+
+  <div class="grp">Sound bank <span style="text-transform:none;color:#9a8a68">(synthesized — same family = same instrument; power adds voices)</span></div>
+  <div class="row" id="sndRow"></div>
+  <div class="row">
+    <label>pitch <input type="range" id="sndPitch" min="50" max="200" value="100"></label>
+    <label>voices <select id="sndLayers"><option>1</option><option>2</option><option>3</option></select></label>
+    <button onclick="addSndKey()">add sound @ t</button>
   </div>
 
   <div class="grp">Keyframes <span style="text-transform:none;color:#9a8a68">(t in ms · ease is INTO that key · edit cells directly)</span></div>
@@ -118,7 +127,7 @@
       <option>return</option><option>opp-fire</option><option>passive-glint</option>
     </select>
     <button onclick="saveRecipe()">save</button>
-    <button onclick="loadRecipe()">load</button>
+    <button onclick="loadRecipe()">load / base preset</button>
     <button onclick="exportAll()">export ALL ↓</button>
   </div>
   <div class="row"><input type="text" id="recNotes" size="60" placeholder="intent notes — what should this READ as?"></div>
@@ -201,7 +210,16 @@ function fillCards(){
     if(d)opts+='<option value="'+id+'">'+d.name+' ('+d.fam+', '+d.kind+')</option>';
   });
   document.getElementById('cardPick').innerHTML=opts;
-  document.getElementById('recCard').innerHTML=opts;
+  /* the recipe selector holds cards AND materials AND enchants */
+  var mats=['lucky','bone','iron','flint','lead','amber','jade','jade2','jade3',
+    'brass','silver','crystal','ruby','obsidian','starstone','vagabond'];
+  var enchs=['tithe','ward','snare','trade','snuff','quicksilver'];
+  document.getElementById('recCard').innerHTML=
+    '<optgroup label="cards">'+opts+'</optgroup>'
+    +'<optgroup label="die materials">'+mats.map(function(m){
+      return '<option value="mat:'+m+'">'+m+'</option>';}).join('')+'</optgroup>'
+    +'<optgroup label="enchants">'+enchs.map(function(e2){
+      return '<option value="ench:'+e2+'">'+e2+'</option>';}).join('')+'</optgroup>';
   log('card list filled from FAM_LIVE');
 }
 function addCard(){
@@ -257,6 +275,87 @@ function resetProps(){var el=tEl();if(!el)return;
   document.getElementById('pSc').value=100;document.getElementById('pOp').value=100;
   el.style.translate='';el.style.scale='';el.style.opacity='';el.style.rotate='';}
 
+/* ── THE SOUND BANK — nine families, one AudioContext, synthesized.
+   Same action family = same instrument; power adds VOICES (octave
+   layers), never a different sound. Porting = folding into the game's
+   SFX object, same synthesis. See docs/VFX_LANGUAGE.md §8. ── */
+var _AC=null,_MG=null;
+function ac(){if(!_AC){_AC=new (window.AudioContext||window.webkitAudioContext)();
+  _MG=_AC.createGain();_MG.gain.value=0.4;_MG.connect(_AC.destination);}return _AC;}
+function _tone(f0,t0,dur,type,peak,f1){
+  var o=ac().createOscillator(),g=ac().createGain();
+  o.type=type||'sine';o.frequency.setValueAtTime(f0,t0);
+  if(f1)o.frequency.exponentialRampToValueAtTime(Math.max(20,f1),t0+dur*0.8);
+  g.gain.setValueAtTime(0,t0);g.gain.linearRampToValueAtTime(peak,t0+0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001,t0+dur);
+  o.connect(g);g.connect(_MG);o.start(t0);o.stop(t0+dur+0.05);}
+function _noise(t0,dur,ftype,freq,peak){
+  var nz=ac().createBufferSource(),b=ac().createBuffer(1,Math.floor(ac().sampleRate*0.25),ac().sampleRate);
+  var d=b.getChannelData(0);for(var i=0;i<d.length;i++)d[i]=Math.random()*2-1;
+  nz.buffer=b;var f=ac().createBiquadFilter();f.type=ftype;f.frequency.value=freq;
+  var g=ac().createGain();g.gain.setValueAtTime(0,t0);
+  g.gain.linearRampToValueAtTime(peak,t0+0.008);
+  g.gain.exponentialRampToValueAtTime(0.0001,t0+dur);
+  nz.connect(f);f.connect(g);g.connect(_MG);nz.start(t0);nz.stop(t0+dur+0.05);}
+var SND={
+  families:['chime','coin','thud','crack','set','shimmer','bell','drum','scratch'],
+  play:function(fam,o){
+    o=o||{};var p=o.pitch||1,L=o.layers||1;
+    var t=ac().currentTime+0.01;
+    try{
+    if(fam==='chime'){_tone(660*p,t,0.35,'sine',0.25);_tone(990*p,t+0.06,0.4,'sine',0.16);
+      if(L>1)_tone(1320*p,t+0.1,0.45,'sine',0.1);if(L>2)_tone(1980*p,t+0.16,0.5,'sine',0.06);}
+    else if(fam==='coin'){_tone(1568*p,t,0.09,'triangle',0.2);_tone(2093*p,t+0.07,0.12,'triangle',0.16);
+      if(L>1){_tone(1568*p,t+0.16,0.09,'triangle',0.13);_tone(2093*p,t+0.22,0.12,'triangle',0.1);}}
+    else if(fam==='thud'){_tone(120*p,t,0.18,'sine',0.5,55*p);_noise(t,0.08,'lowpass',300,0.2);
+      if(L>1)_tone(90*p,t+0.09,0.16,'sine',0.3,45*p);}
+    else if(fam==='crack'){_noise(t,0.06,'highpass',2500,0.4);_tone(140*p,t+0.03,0.14,'sine',0.3,60*p);
+      if(L>1)_noise(t+0.06,0.05,'highpass',3200,0.25);if(L>2)_noise(t+0.11,0.05,'highpass',1800,0.2);}
+    else if(fam==='set'){_tone(440*p,t,0.2,'sine',0.3,220*p);_tone(880*p,t,0.3,'sine',0.07);
+      if(L>1)_tone(1760*p,t+0.05,0.3,'sine',0.05);}
+    else if(fam==='shimmer'){[523,587,659,784,880].forEach(function(f,i){
+        _tone(f*p,t+i*0.05,0.3,'sine',0.07);
+        if(L>1)_tone(f*2*p,t+0.12+i*0.05,0.25,'sine',0.04);});}
+    else if(fam==='bell'){_tone(660*p,t,0.9,'sine',0.2);_tone(990*p,t,0.9,'sine',0.09);
+      if(L>1)_tone(1320*p,t+0.04,1.0,'sine',0.05);}
+    else if(fam==='drum'){_tone(55*p,t,0.16,'sine',0.5,40*p);_tone(55*p,t+0.25,0.16,'sine',0.4,40*p);
+      if(L>1)_tone(110*p,t+0.02,0.1,'sine',0.15);}
+    else if(fam==='scratch'){_noise(t,0.07,'bandpass',900*p,0.18);
+      if(L>1)_noise(t+0.09,0.05,'bandpass',1100*p,0.12);}
+    }catch(e){log('snd: '+e);}
+  }};
+var _sndFam='chime';
+(function(){var h='';SND.families.forEach(function(f){
+  h+='<button id="snd_'+f+'" onclick="pickSnd(&quot;'+f+'&quot;)">'+f+'</button>';});
+  document.getElementById('sndRow').innerHTML=h;})();
+function pickSnd(f){_sndFam=f;
+  document.querySelectorAll('#sndRow button').forEach(function(b){b.classList.remove('on');});
+  var b=document.getElementById('snd_'+f);if(b)b.classList.add('on');
+  SND.play(f,sndOpts());}
+function sndOpts(){return {pitch:(+document.getElementById('sndPitch').value)/100,
+  layers:+document.getElementById('sndLayers').value};}
+function addSndKey(){
+  var t=+document.getElementById('keyT').value;
+  var o=sndOpts();o.snd=_sndFam;
+  rec.fx.push({t:t,fx:'sound',p:o});
+  rec.fx.sort(function(a,b){return a.t-b.t;});
+  renderTables();log('sound '+_sndFam+' @ '+t+'ms');}
+
+/* rounded-box geometry: clamp each vertex to an inner box, push out by r —
+   gives the shell its rounded corners; the slider picks r as % of size */
+function roundedBoxGeo(T,size,rPct,seg){
+  var r=size*Math.max(0.001,rPct)/100;
+  var g=new T.BoxGeometry(size,size,size,seg||4,seg||4,seg||4);
+  var pos=g.attributes.position,h=size/2-r;
+  for(var i=0;i<pos.count;i++){
+    var x=pos.getX(i),y=pos.getY(i),z=pos.getZ(i);
+    var cx=Math.max(-h,Math.min(h,x)),cy=Math.max(-h,Math.min(h,y)),cz=Math.max(-h,Math.min(h,z));
+    var dx=x-cx,dy=y-cy,dz=z-cz,l=Math.sqrt(dx*dx+dy*dy+dz*dz)||1;
+    pos.setXYZ(i,cx+dx/l*r,cy+dy/l*r,cz+dz/l*r);
+  }
+  g.computeVertexNormals();return g;
+}
+
 /* ── FX palette ───────────────────────────────────────────────────── */
 var FXDEFS=['spray','glow','amberShell','clearShell','break','shield','candle','beat-gain','beat-hit','beat-churn','beat-steal'];
 (function(){
@@ -301,6 +400,7 @@ function fire(fx,p){
       var fc=(el&&el.classList&&el.classList.contains('fcv'))?el:W.document.querySelector('#famRowP .fcv');
       if(!fc)return log('beats need a card');
       W.__labEval('cardFx')(fx.slice(5),fc,fx==='beat-steal'?{to:W.document.getElementById('hud')}:{});}
+    else if(fx==='sound'){SND.play(p.snd||_sndFam,{pitch:p.pitch||1,layers:p.layers||1});}
     else if(fx==='announce'){E('famLog('+JSON.stringify(p.text)+','+JSON.stringify(p.annCol)+')');}
     log('fx: '+fx);
   }catch(e){log('fx '+fx+': '+e);}
@@ -326,10 +426,12 @@ function amberShell(col){
   d.obj.traverse(function(o){if(!body&&o.isMesh&&!o.userData.outline)body=o;});
   if(!body)return log('no body mesh');
   var c=new T.Color(col);
-  var sh=new T.Mesh(body.geometry,new T.MeshBasicMaterial({
+  body.geometry.computeBoundingBox();
+  var bb=body.geometry.boundingBox,sz=(bb.max.x-bb.min.x)*1.16;
+  var rPct=+((document.getElementById('pCr')||{}).value||12);
+  var sh=new T.Mesh(roundedBoxGeo(T,sz,rPct,4),new T.MeshBasicMaterial({
     color:c,transparent:true,opacity:0.5,depthWrite:false}));
   sh.name='labShell';sh.userData.outline=true;/* every die pass skips it */
-  sh.scale.setScalar(1.16);
   d.obj.add(sh);
   /* the faces take the amber light: lerp material colour toward it */
   d.obj.traverse(function(o){
@@ -424,6 +526,102 @@ function scrubTo(t){stopRecipe();
   var el=tEl();if(!el)return;
   var p=lerpAt(t);if(p)setProps(el,p);}
 
+/* ── THE PRESET BIBLE. docs/VFX_LANGUAGE.md is the prose and the
+   reasoning; THIS is the executable data. Nine family templates build
+   every base recipe; ID_META assigns family/colour/power/notes per id.
+   Anything not listed takes its family default - coverage by
+   construction, future cards included. ── */
+function K(t,p,ease){return Object.assign({t:t,dx:0,dy:0,sc:100,op:100,rt:0,ease:ease||'ease-out'},p||{});}
+function F(t,fx,p){return {t:t,fx:fx,p:Object.assign({col:'#ffd98a',count:16,speed:85,g:110,size:7,spread:2.2,ms:600,text:'',annCol:'gold'},p||{})};}
+function SN(t,fam,P,pitch){return {t:t,fx:'sound',p:{snd:fam,pitch:pitch||1,layers:P||1}};}
+var FAM_T={
+  SET:function(c,P){return {keys:[K(0,{}),K(160,{sc:93},'ease-out'),K(340,{sc:100},'back-out')],
+    fx:[SN(0,'set',P),F(60,'amberShell',{col:c}),F(90,'spray',{col:c,count:8+4*P,speed:65,g:110,size:6,spread:1.8})]};},
+  PAY:function(c,P){return {keys:[],
+    fx:[SN(0,'chime',P),F(0,'spray',{col:c,count:10+5*P,speed:60,g:-40,size:7,spread:1.2}),
+        F(0,'glow',{col:c,size:6+2*P,ms:500})]};},
+  COIN:function(c,P){return {keys:[],
+    fx:[SN(0,'coin',P),F(0,'spray',{col:c,count:6+3*P,speed:90,g:60,size:6,spread:0.9})]};},
+  STRIKE:function(c,P){return {keys:[K(0,{}),K(60,{dx:-7},'ease-in'),K(120,{dx:7}),K(180,{dx:-3}),K(240,{dx:0},'back-out')],
+    fx:[SN(0,'thud',P),F(20,'spray',{col:c,count:10+4*P,speed:70,g:220,size:6,spread:2.6})]};},
+  TRANSFORM:function(c,P){return {keys:[K(0,{}),K(300,{rt:180,sc:108},'ease-out'),K(620,{rt:360,sc:100},'back-out')],
+    fx:[SN(0,'shimmer',P),F(150,'spray',{col:c,count:12+4*P,speed:55,g:-10,size:6,spread:3})]};},
+  FATE:function(c,P){return {keys:[K(0,{}),K(450,{op:78},'ease-out'),K(900,{op:100},'ease-out')],
+    fx:[SN(0,'bell',P),F(0,'glow',{col:c,size:8+2*P,ms:900})]};},
+  BREAK:function(c,P){return {keys:[],
+    fx:[SN(0,'crack',P),F(40,'break',{col:c,count:22+6*P,speed:110,g:180,size:6,ms:520})]};},
+  ARM:function(c,P){return {keys:[K(0,{}),K(140,{sc:108},'back-out'),K(300,{sc:100}),K(440,{sc:105},'back-out'),K(600,{sc:100})],
+    fx:[SN(0,'drum',P),F(120,'glow',{col:c,size:5+2*P,ms:400})]};},
+  LEDGER:function(c,P){return {keys:[],
+    fx:[SN(0,'scratch',P),F(0,'announce',{text:'THE LEDGER NOTES IT',annCol:'gold'})]};}
+};
+/* per-id: f=family c=colour p=power(voices/layers) n=the intent note.
+   Families per fam-colour rules in VFX_LANGUAGE.md §4-5. */
+var ID_META={
+  /* cards */
+  preserve:{f:'SET',c:'#d88a20',p:1,n:'Shell closes rounded; die parks DOWN ITS LANE at 0.8. Tier III: a tiny fly sits in the amber. Return: clearShell + PAY sparks.'},
+  honeytrap:{f:'SET',c:'#e8b040',p:1,n:'Glaze the kept pair (shell 0.35). The pulled die gets an aimed golden thread when it joins. Fun: two flies buzz one lap on cast.'},
+  slow_cook:{f:'PAY',c:'#e8a23c',p:1,n:'Pot-bubble: 1-2 slow rising blobs per payout tick. Quiet.'},
+  powder_keg:{f:'ARM',c:'#e2582f',p:2,n:'Pulse each charging roll; fuse underline shortens. Payoff = BREAK L2 + candle flicker (the logged E1 exception - it IS an explosion).'},
+  sacrifice:{f:'BREAK',c:'#e2582f',p:2,n:'SEQUENCE, never blend: darken (bust-wipe ramp) then crack, shards fly INTO the card, THEN the PAY chime.'},
+  short_fuse:{f:'STRIKE',c:'#c05a3a',p:1,n:'Fuse underline burns per turn on the card; STRIKE thud when it fires.'},
+  transmute:{f:'TRANSFORM',c:'#46c46e',p:2,n:'The re-dress hides inside the swirl peak (map-swap trick).'},
+  bloom:{f:'TRANSFORM',c:'#46c46e',p:1,n:'A leaf: low-count jade spray, rising, when it pays.'},
+  cultivate:{f:'TRANSFORM',c:'#46c46e',p:1,n:'Same leaf language as bloom, one voice.'},
+  stargazer:{f:'FATE',c:'#8fa8ff',p:2,n:'Three lay-posed preview dice fade in staggered with faint constellation lines between them.'},
+  ill_omen:{f:'FATE',c:'#8fa8ff',p:2,n:'Bell + violet glow when armed; the FIRE beat is a STRIKE on the RIVAL row (direction rule).'},
+  sleight:{f:'STRIKE',c:'#c4404f',p:1,n:'Points AT the victim die/card.'},
+  tamper:{f:'STRIKE',c:'#c4404f',p:2,n:'Rival card shakes + rust burst; keep the red ARMED rise.'},
+  for_keeps:{f:'ARM',c:'#c8a45c',p:2,n:'Drum on seating; PAY when the wager pays.'},
+  fools_gold_f:{f:'PAY',c:'#e8c874',p:1,n:'THE LIE: gold glint, then the die desaturates over 400ms. The joke is the fade.'},
+  vanguard_f:{f:'LEDGER',c:'#c4404f',p:1,n:'Lane floor-glow shows WHICH lane on arm (E4); LEDGER when it pays.'},
+  anchor_f:{f:'LEDGER',c:'#c4404f',p:1,n:'Same lane floor-glow language as vanguard.'},
+  bookends_f:{f:'LEDGER',c:'#c4404f',p:1,n:'Floor-glow BOTH row ends.'},
+  double_stakes:{f:'ARM',c:'#c8a45c',p:1,n:'Wager pulse on arm; nothing else - restraint (E5).'},
+  the_tab:{f:'LEDGER',c:'#d8c9a0',p:1,n:'Chalk tally strokes build in the announce.'},
+  hair_of_the_dog:{f:'LEDGER',c:'#d8c9a0',p:1,n:'Announce only; red when the hangover bites.'},
+  marked_table:{f:'LEDGER',c:'#a06aa0',p:1,n:'Announce in curse-violet.'},
+  high_table:{f:'LEDGER',c:'#d8c9a0',p:1,n:'Announce only.'},
+  /* die materials - their SCORING/trait moment (mat: prefix) */
+  'mat:bone':{f:'LEDGER',c:'#f3e7c8',p:1,n:'SILENT by design (E6): commons do not sparkle, so amber can.'},
+  'mat:iron':{f:'LEDGER',c:'#b8c0d0',p:1,n:'Silent (E6).'},
+  'mat:flint':{f:'LEDGER',c:'#9e9e9e',p:1,n:'Silent (E6).'},
+  'mat:lead':{f:'LEDGER',c:'#a0a8c0',p:1,n:'Silent (E6).'},
+  'mat:amber':{f:'PAY',c:'#ffd870',p:1,n:'Triple bonus: chime + amber glint on the THREE dice of the triple.'},
+  'mat:jade':{f:'TRANSFORM',c:'#70d898',p:1,n:'Wild face counts: one shimmer on that die.'},
+  'mat:jade2':{f:'TRANSFORM',c:'#70d898',p:2,n:'Jade + one voice.'},
+  'mat:jade3':{f:'TRANSFORM',c:'#70d898',p:3,n:'Jade + two voices.'},
+  'mat:brass':{f:'COIN',c:'#e8b860',p:1,n:'Coin blip on its gold trait.'},
+  'mat:silver':{f:'FATE',c:'#e0e8f0',p:1,n:'Soft fate tick when its save matters.'},
+  'mat:crystal':{f:'FATE',c:'#a8e8ff',p:2,n:'Glass ring.'},
+  'mat:ruby':{f:'PAY',c:'#ff7888',p:2,n:'Aggressive gain - PAY in red.'},
+  'mat:obsidian':{f:'BREAK',c:'#c8a0e8',p:2,n:'Its break-trigger: crack flash, +1000 chime after.'},
+  'mat:starstone':{f:'PAY',c:'#b0b8ff',p:2,n:'Pays at BANK: sparks arc toward the score.'},
+  'mat:vagabond':{f:'STRIKE',c:'#ff7888',p:1,n:'The steal beat, pointed at the victim.'},
+  'mat:lucky':{f:'COIN',c:'#dddd66',p:1,n:'Coin + a tiny green clover particle.'},
+  /* enchants - the brand fires (ench: prefix) */
+  'ench:tithe':{f:'COIN',c:'#d8b054',p:1,n:'Coin sparks arc from the die to the gold counter.'},
+  'ench:ward':{f:'SET',c:'#9ab0d0',p:1,n:'Defensive: silver-blue rounded shell FLASH (200ms, not a hold) + the existing bust shield when it saves.'},
+  'ench:snare':{f:'SET',c:'#c05a3a',p:1,n:'Hostile set: the enclose verb in rust - a trap laid ON the rival (E3 direction).'},
+  'ench:trade':{f:'TRANSFORM',c:'#46c46e',p:1,n:'Two dice swap-swirl toward each other.'},
+  'ench:snuff':{f:'BREAK',c:'#4a4060',p:1,n:'A pinch of dark shards. No candle - it is small.'},
+  'ench:quicksilver':{f:'TRANSFORM',c:'#dfe8f2',p:1,n:'Mercury: fast silver shimmer, low gravity, on the free reroll.'}
+};
+var FAM_DEFAULT={amber:'SET',jade:'TRANSFORM',obsidian:'BREAK',starstone:'FATE',
+  vagabond:'STRIKE',silver:'FATE',tavern:'LEDGER'};
+function labPreset(id){
+  var m=ID_META[id];
+  if(!m&&id.indexOf(':')<0){
+    var d=E('famDef('+JSON.stringify(id)+')');
+    var fam=(d&&FAM_DEFAULT[d.fam])||'PAY';
+    var famc=E('(FAMILIES['+JSON.stringify(d&&d.fam)+']||{}).color')||'#ffd98a';
+    m={f:fam,c:famc,p:1,n:'(family default - no bespoke preset yet)'};
+  }
+  if(!m)return null;
+  var built=FAM_T[m.f](m.c,m.p);
+  return {keys:built.keys,fx:built.fx,notes:'['+m.f+' · power '+m.p+'] '+m.n};
+}
+
 /* ── recipes: save / load / export ────────────────────────────────── */
 function store(){try{return JSON.parse(localStorage.fkLabRecipes||'{}');}catch(e){return {};}}
 function saveRecipe(){
@@ -436,7 +634,15 @@ function saveRecipe(){
 function loadRecipe(){
   var id=document.getElementById('recCard').value,mo=document.getElementById('recMoment').value;
   var r=(store()[id]||{})[mo];
-  if(!r)return log('nothing saved for '+id+' / '+mo);
+  if(!r){
+    /* nothing saved: the BASE PRESET loads so nobody starts from scratch */
+    var pr=labPreset(id);
+    if(!pr)return log('nothing saved and no preset for '+id);
+    rec={keys:pr.keys,fx:pr.fx};
+    document.getElementById('recNotes').value=pr.notes;
+    renderTables();log('BASE PRESET loaded for '+id+' - modify away, then save');
+    return;
+  }
   rec={keys:r.keys||[],fx:r.fx||[]};if(r.target)target=r.target;
   document.getElementById('recNotes').value=r.notes||'';
   renderTables();log('loaded '+id+' / '+mo);}
@@ -467,6 +673,27 @@ function buildCatalogue(){
       +'<textarea placeholder="what must HAPPEN, step by step — timings, where the die goes, what the player must understand. Claude implements from THIS." '
       +'onchange="saveNote('+JSON.stringify(id)+',this.value)">'+(ns[id]||'')+'</textarea>'
       +'</details>';
+  });
+  /* dice materials and enchants join the catalogue with the same
+     notes-per-id channel; their ids wear mat:/ench: prefixes */
+  var _cat=function(idp,label,extra){
+    var nsv=ns[idp]?'● noted':'';
+    return '<details><summary data-cid='+JSON.stringify(idp)+'>'+label
+      +'<span class="dot">'+nsv+'</span></summary>'
+      +(extra?'<div class="rules">'+extra+'</div>':'')
+      +'<textarea placeholder="what must HAPPEN, step by step. Claude implements from THIS." '
+      +'onchange="saveNote('+JSON.stringify(idp)+',this.value)">'+(ns[idp]||'')+'</textarea>'
+      +'</details>';};
+  h+='<div class="grp">die materials</div>';
+  ['lucky','bone','iron','flint','lead','amber','jade','jade2','jade3',
+   'brass','silver','crystal','ruby','obsidian','starstone','vagabond'].forEach(function(m){
+    var meta=ID_META['mat:'+m];
+    h+=_cat('mat:'+m,m,meta?('base: '+meta.n):'');
+  });
+  h+='<div class="grp">enchants</div>';
+  ['tithe','ward','snare','trade','snuff','quicksilver'].forEach(function(e2){
+    var meta=ID_META['ench:'+e2];
+    h+=_cat('ench:'+e2,e2,meta?('base: '+meta.n):'');
   });
   document.getElementById('catalogue').innerHTML=h||'<i>FAM_LIVE empty?</i>';
   return true;
