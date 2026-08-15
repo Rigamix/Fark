@@ -1,0 +1,43 @@
+/* SUITE: exclude. v8: full-screen vignette under UI, mesh-driven die
+ * sliders, dresser reskin verified, copyLook dump. */
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const until=async(fn,ms)=>{const t0=Date.now();while(Date.now()-t0<ms){try{if(fn())return true;}catch(e){}await sleep(100);}return false;};
+const out={};
+await setup();
+if(!await until(()=>{const g=E('G');return g&&g.phase;},4000))return {err:'no match'};
+roll();
+if(!await until(()=>E('window.D3X').dice.some(d=>d.match&&d.roll),15000))return {err:'no roll'};
+await until(()=>{const dx=E('window.D3X');
+  return dx.dice.filter(d=>d.match).every(d=>!d.roll)&&dx.dice.some(d=>d.match&&d.phys);},20000);
+await sleep(500);
+document.getElementById('vgA').value=50;document.getElementById('vgR').value=42;
+document.getElementById('vgC').value=20;vigSet();
+gw();
+const vig=W.document.getElementById('labVig');
+out.vigBeforeCanvas=(()=>{const c=W.document.getElementById('d3xCanvas');
+  return !!(vig&&c&&vig.parentElement===c.parentElement
+    &&vig.compareDocumentPosition(c)&Node.DOCUMENT_POSITION_FOLLOWING);})();
+out.hudAbove=(()=>{const h=W.document.getElementById('hud')||W.document.querySelector('.hud-score');
+  if(!h)return 'no-hud-el';const z=getComputedStyle(h).zIndex;
+  return z!=='auto'&&+z>=2;})();
+pickT('die',0,null);
+document.getElementById('pDy').value=-80;
+document.getElementById('pSc').value=140;
+applyProps();
+await sleep(400);
+const dx=E('window.D3X');
+const d0=dx.dice.filter(d=>d.match&&d.chip)[0];
+out.dieFx=E('window.__labDieFx&&window.__labDieFx[0]');
+out.hooked=E('window.__labFrameHook');
+out.meshScaled=d0&&d0.obj.scale.x>1.1;
+const mapBefore=(()=>{let m=null;d0.obj.traverse(o=>{if(!m&&o.isMesh&&!o.userData.outline)m=o.material.map;});return m&&m.uuid;})();
+document.getElementById('dressMat').value='jade';
+applyMat();
+await sleep(1500);
+const mapAfter=(()=>{let m=null;d0.obj.traverse(o=>{if(!m&&o.isMesh&&!o.userData.outline)m=o.material.map;});return m&&m.uuid;})();
+out.matSet=d0.mat;
+out.mapChanged=mapBefore!==mapAfter;
+copyLook();
+out.lookDump=/GLOW/.test(document.getElementById('exportBox').value)&&/vignette/.test(document.getElementById('exportBox').value);
+out.verdict=out.vigBeforeCanvas&&!!out.dieFx&&out.meshScaled&&out.matSet==='jade'&&out.lookDump;
+return out;

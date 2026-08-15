@@ -434,10 +434,47 @@ function setProps(el,p){
   el.style.scale=String(p.sc/100);
   el.style.opacity=String(p.op/100);
   el.style.rotate=Math.round(p.rt)+'deg';}
-function applyProps(){var el=tEl();if(el)setProps(el,props());}
-function resetProps(){var el=tEl();if(!el)return;
+function _dieHook(){
+  /* settled 3D dice ignore CSS on their chip slot (homes are measured
+     and cached) - so die offsets apply to the MESH, after the game's
+     own frame, through one injected wrapper. */
+  gw();
+  if(W.__labEval('window.__labFrameHook'))return;
+  W.__labEval("window.__labFrameHook=1;window.__labDieFx={};"
+    +"var _lf=D3X.frame.bind(D3X);"
+    +"D3X.frame=function(){_lf();"
+    +"var L=window.__labDieFx;"
+    +"var ds=D3X.dice.filter(function(x){return x.match&&x.chip;});"
+    +"Object.keys(L).forEach(function(i){var o=L[i],d=ds[+i];if(!d||!o)return;"
+    +"var ps=(d.obj.parent&&d.obj.parent.scale.x)||1;"
+    +"if(o.dx)d.obj.position.x+=o.dx/ps;"
+    +"if(o.dy)d.obj.position.y-=o.dy/ps;"
+    +"if(o.sc!==1)d.obj.scale.multiplyScalar(o.sc);"
+    +"if(o.rt)d.obj.rotateZ(o.rt);"
+    +"d.obj.traverse(function(m){if(!m.isMesh||!m.material)return;"
+    +"if(o.op<1){m.material.transparent=true;m.material.opacity=o.op;m.userData._labOp=1;}"
+    +"else if(m.userData._labOp){m.material.opacity=1;delete m.userData._labOp;}});"
+    +"});};");
+}
+function applyProps(){
+  var p=props();
+  if(target&&target.k==='die'){
+    _dieHook();
+    var cfg={dx:p.dx,dy:p.dy,sc:p.sc/100,op:p.op/100,rt:p.rt*Math.PI/180};
+    E('window.__labDieFx['+target.i+']='+JSON.stringify(cfg));
+    return;
+  }
+  var el=tEl();if(el)setProps(el,p);
+}
+function resetProps(){
   ['pDx','pDy','pRt'].forEach(function(id){document.getElementById(id).value=0;});
   document.getElementById('pSc').value=100;document.getElementById('pOp').value=100;
+  if(target&&target.k==='die'){
+    E('window.__labDieFx&&delete window.__labDieFx['+target.i+']');
+    E('window.__labDieFx&&Object.keys(window.__labDieFx).length===0&&D3X.dice.forEach(function(d){d.obj&&d.obj.traverse(function(m){if(m.isMesh&&m.material&&m.userData._labOp){m.material.opacity=1;delete m.userData._labOp;}});})');
+    return;
+  }
+  var el=tEl();if(!el)return;
   el.style.translate='';el.style.scale='';el.style.opacity='';el.style.rotate='';}
 
 /* ── THE SOUND BANK — nine families, one AudioContext, synthesized.
@@ -749,14 +786,24 @@ function lerpAt(t){
   return ks[ks.length-1];
 }
 var playing=null;
+function _setTargetProps(p){
+  if(target&&target.k==='die'){
+    _dieHook();
+    E('window.__labDieFx['+target.i+']='+JSON.stringify(
+      {dx:p.dx,dy:p.dy,sc:p.sc/100,op:p.op/100,rt:p.rt*Math.PI/180}));
+    return true;
+  }
+  var el=tEl();if(el){setProps(el,p);return true;}
+  return false;
+}
 function playRecipe(){
-  var el=tEl();if(!el&&rec.keys.length)return log('pick a target first');
+  var el=tEl();if(!el&&rec.keys.length&&!(target&&target.k==='die'))return log('pick a target first');
   stopRecipe();
   var fired={};var t0=performance.now();
   log('▶ playing '+rec.keys.length+' keys, '+rec.fx.length+' fx');
   var step=function(now){
     var t=now-t0;
-    if(el){var p=lerpAt(t);if(p)setProps(el,p);}
+    var p=lerpAt(t);if(p)_setTargetProps(p);
     rec.fx.forEach(function(f,i){if(!fired[i]&&t>=f.t){fired[i]=1;fire(f.fx,f.p);}});
     document.getElementById('scrub').value=Math.min(t,+document.getElementById('scrub').max);
     document.getElementById('scrubT').textContent=Math.round(t)+'ms';
@@ -771,8 +818,7 @@ function playRecipe(){
 function stopRecipe(){playing=null;}
 function scrubTo(t){stopRecipe();
   document.getElementById('scrubT').textContent=t+'ms';
-  var el=tEl();if(!el)return;
-  var p=lerpAt(t);if(p)setProps(el,p);}
+  var p=lerpAt(t);if(p)_setTargetProps(p);}
 
 /* ── THE PRESET BIBLE. docs/VFX_LANGUAGE.md is the prose and the
    reasoning; THIS is the executable data. Nine family templates build
@@ -1049,6 +1095,7 @@ function buildLights(){
   h+='<br><label>shadow mask <input type="range" min="-100" max="100" value="0" oninput="gradeDice(this.value)" id="dgAmt"> <span id="lvG">off</span></label>';
   h+='<label>mask axis <select id="dgAxis" onchange="gradeDice(document.getElementById(&quot;dgAmt&quot;).value)"><option value="y">vertical</option><option value="x">horizontal</option></select></label>';
   h+='<button onclick="lightsReset()" style="margin-left:8px">reset look</button>';
+  h+='<button onclick="copyLook()">copy look numbers \u2193</button>';
   h+='<div style="margin-top:8px;border-top:1px dashed #3a2c18;padding-top:6px">'
     +'<b style="color:#c8a45c;font-size:11px;margin-right:6px">GLOW STUDIO</b>'
     +'<span style="font-size:10px;color:#9a8a68">(the REAL selection glow - D3X.GLOW)</span> '
@@ -1075,27 +1122,56 @@ function bounceSet(v){
   _bounce.intensity=v/100*0.8;
   var sp=document.getElementById('lvB');if(sp)sp.textContent=v>0?(_bounce.intensity.toFixed(2)):'off';}
 function vigSet(){
-  /* VIGNETTE, not a wash: radial darkness with the centre kept bright,
-     living in the DICE AREA so the HUD and buttons never darken. The
-     centre pool is its own screen-blend layer with its own slider. */
+  /* VIGNETTE, full screen, UNDER the UI: both layers insert right after
+     #matchShadows in DOM ORDER - room art and shadows sit below them,
+     the dice canvas / rows / HUD / buttons come later in the DOM and
+     paint above. Denis: 'full screen, just under the UI elements'. */
   gw();
-  var host=W.document.querySelector('#screen-match .dice-area')
-        ||W.document.getElementById('screen-match');
-  if(!host)return;
+  var ms=W.document.getElementById('screen-match');if(!ms)return;
+  var after=W.document.getElementById('matchShadows');
   var a=(+document.getElementById('vgA').value)/100;
   var r=+document.getElementById('vgR').value;
   var c=(+document.getElementById('vgC').value)/100;
+  /* deterministic sandwich: the vignette sits at z:1 (above every z-auto
+     art layer, wherever it is in the DOM), and everything that must stay
+     bright is lifted to z:2 when it was on auto - dice canvas, shadows'
+     sibling glow canvases, rows, HUD, strips, cards, buttons. */
+  var raise=function(){
+    ['d3xCanvas','dgCanvas','hud','topStrip','botStrip','keptRow',
+     'playerDiceRow','oppDiceRow','famRowP','famRowO','famAux','playerCards','oppCards',
+     'turnNum','pScore','oScore'].forEach(function(id){
+      var el2=W.document.getElementById(id);
+      if(el2&&getComputedStyle(el2).zIndex==='auto'){
+        el2.style.position=getComputedStyle(el2).position==='static'?'relative':'';
+        el2.style.zIndex='2';}
+    });
+    ms.querySelectorAll('.controls,.status-strip,.hud-score,.dlg-box').forEach(function(el2){
+      if(getComputedStyle(el2).zIndex==='auto'){
+        el2.style.position=getComputedStyle(el2).position==='static'?'relative':'';
+        el2.style.zIndex='2';}
+    });
+  };
+  /* the match content lives inside a wrapper that is its own stacking
+     context, so a screen-level z overlay buries EVERYTHING in it (dice
+     included - measured). The honest place is inside the CANVAS'S OWN
+     PARENT, immediately before the canvas: art and props before it
+     darken, the canvas and all later content paint above, no z games. */
   var cvs=W.document.getElementById('d3xCanvas');
-  var z=cvs?(parseInt(getComputedStyle(cvs).zIndex)||0):0;
+  var host=(cvs&&cvs.parentElement)||ms;
+  var place=function(el){
+    if(cvs&&cvs.parentElement===host)host.insertBefore(el,cvs);
+    else host.appendChild(el);
+  };
   var vg=W.document.getElementById('labVig');
   if(!vg){vg=W.document.createElement('div');vg.id='labVig';
-    vg.style.cssText='position:absolute;inset:0;pointer-events:none;mix-blend-mode:multiply;z-index:'+(z-1);
-    host.style.position=host.style.position||'relative';host.appendChild(vg);}
+    vg.style.cssText='position:absolute;inset:0;pointer-events:none;mix-blend-mode:multiply';
+    host.style.position=getComputedStyle(host).position==='static'?'relative':host.style.position;
+    place(vg);raise();}
   vg.style.background='radial-gradient(ellipse at 50% 46%, rgba(16,10,4,0) '+r+'%, rgba(16,10,4,'+a.toFixed(2)+') 100%)';
   var cl=W.document.getElementById('labCenter');
   if(!cl){cl=W.document.createElement('div');cl.id='labCenter';
-    cl.style.cssText='position:absolute;inset:0;pointer-events:none;mix-blend-mode:screen;z-index:'+(z-1);
-    host.appendChild(cl);}
+    cl.style.cssText='position:absolute;inset:0;pointer-events:none;mix-blend-mode:screen';
+    place(cl);}
   cl.style.background='radial-gradient(ellipse at 50% 46%, rgba(255,214,150,'+c.toFixed(2)+') 0%, rgba(255,214,150,0) '+Math.max(20,r-5)+'%)';
   var sp=document.getElementById('lvE');if(sp)sp.textContent=a>0?Math.round(a*100)+'%':'off';}
 function roomSet(v){/* superseded by vigSet - kept for old saved calls */vigSet();}
@@ -1176,6 +1252,21 @@ function glowSelAll(on){
 }
 function sideSet(v){E('D3X.SIDEDIM_MAX='+(v/100));
   var sp=document.getElementById('lvS');if(sp)sp.textContent=(v/100).toFixed(2);}
+function copyLook(){
+  var v=function(id){var e2=document.getElementById(id);return e2?+e2.value:null;};
+  var lookNums={
+    vignette:v('vgA'),vignetteSize:v('vgR'),centreLight:v('vgC'),
+    shadowDepth:(document.getElementById('lvSh')||{}).textContent,
+    sideShadowMax:E('D3X.SIDEDIM_MAX'),
+    shadowMask:E('window.__labDimGrad'),
+    lights:_lights.map(function(l){return {type:l.type,intensity:+l.intensity.toFixed(3)};}),
+    bounce:_bounce?+_bounce.intensity.toFixed(3):0,
+    GLOW:E('JSON.parse(JSON.stringify(D3X.GLOW))')
+  };
+  document.getElementById('exportBox').value=JSON.stringify(lookNums,null,1);
+  showTab(2);
+  log('look numbers in the export box (Advanced tab) - copy them into chat');
+}
 function lightsReset(){
   _lights.forEach(function(l){if(l.userData._lab0!==undefined)l.intensity=l.userData._lab0;});
   if(_bounce)_bounce.intensity=0;
