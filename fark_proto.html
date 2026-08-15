@@ -1274,7 +1274,9 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 /* P576: ALL THREE filter declarations move together or none do - a filter
    REPLACES the property, so leaving this one behind would snap a spent card back
    to the old hard offset the moment it greyed out. */
-#famRowP .fcv.spent{filter:saturate(.25) brightness(.55)
+/* P743: spent WINS over the drag's own filters - a card with no uses
+   left must read spent in the hand at all times (Denis) */
+#famRowP .fcv.spent,#famRowP .fcv.spent.fcv-drag{filter:saturate(.18) brightness(.48)
   drop-shadow(0 0.25cqw 0.3cqw rgba(10,6,2,.5)) drop-shadow(0 0.9cqw 1.3cqw rgba(10,6,2,.4))}
 #famRowP .fcv.sealed::after{content:'';position:absolute;inset:0;background:rgba(24,12,34,.58);border-radius:7%}
 /* P633: BOTH ROWS. The rival's armed telegraph was .mcBack.armed, and P591
@@ -1282,6 +1284,21 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
    adding `armed` to a .fcv that only #famRowP styled, and a rival card arming
    showed nothing at all. The brief's section 6 gives the player that tell.
    Widened rather than duplicated: one armed look, and it cannot drift. */
+/* P743: the gradient arm - the halo grows with --arm while the card is
+   in hand, so the glow is already visible on the way up rather than
+   arriving in one frame at the line. .armed below is the full state. */
+#famRowP .fcv.fcv-drag{--arm:0}
+#famRowP .fcv.fcv-drag:not(.fcv-blocked):not(.spent){
+  scale:calc(1 + 0.09*var(--arm));
+  filter:drop-shadow(0 0 calc(0.8cqw*var(--arm)) rgba(255,236,170,var(--arm)))
+    drop-shadow(0 0 calc(3.4cqw*var(--arm)) rgba(255,200,85,calc(0.95*var(--arm))))
+    drop-shadow(0 0.9cqw 1.3cqw rgba(10,6,2,.5))
+    brightness(calc(1 + 0.22*var(--arm)))}
+/* blocked greys IN, on the same value */
+#famRowP .fcv.fcv-drag.fcv-blocked{
+  filter:saturate(calc(1 - 0.82*var(--arm))) brightness(calc(1 - 0.5*var(--arm)))
+    drop-shadow(0 0.25cqw 0.3cqw rgba(10,6,2,.5))}
+#famWhyNot{transition:opacity .22s ease}
 #famRowP .fcv.armed,#screen-match #famRowO .fcv.armed{
   /* P713: Denis could not see the old single soft shadow under a card in
      hand - a tight hot core plus a wide halo reads as ARMED at a glance.
@@ -1372,10 +1389,12 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
   max-width:62cqw;width:62cqw;text-align:center}
 #cardFocusTip .cft-name{font-family:'JMH Beda',serif;font-size:4.1cqw;
   letter-spacing:.09em;
-  /* P741: brighter, with the ink outline the game's own headings wear -
-     stroke first so the letterform stays crisp on the dark wood */
-  -webkit-text-stroke:0.55cqw #1a1008;paint-order:stroke fill;
-  text-shadow:0 0.35cqw 0.5cqw rgba(8,4,2,.85);
+  /* P741/P743: thinner, and the outline is the TITLE'S OWN colour taken
+     darker and more saturated rather than black (Denis) - so a jade card
+     is outlined in deep jade, an amber one in burnt amber. */
+  -webkit-text-stroke:0.3cqw color-mix(in srgb,var(--cft-a,#f0c860) 62%,#1a0d02);
+  paint-order:stroke fill;
+  text-shadow:0 0.3cqw 0.45cqw rgba(8,4,2,.8);
   /* P673: LIFTED toward cream, not darkened - the ground is the near-black
      table and Denis asked for contrast against THAT, with no text-shadow
      doing the work. (Darker-than-accent serves light grounds; here the mix
@@ -15014,6 +15033,9 @@ function _famWhyNot(inst){
 }
 function _famCanPlay(i){
   if(!G||!G.pF||!G.pF[i])return false;
+  /* P743: a spent card cannot even start a drag - it is out of uses and
+     the hand says so */
+  if(G.pF[i].charges<=0)return false;
   var inst=G.pF[i],d=famDef(inst.id),fx=CFX[inst.id];
   if(!d||d.kind!=='active'||!fx||!fx.use)return false;
   return inst.charges>0;
@@ -15057,6 +15079,13 @@ function _famDragInit(el,i){
        because cy0 and line were measured once at start. */
     _famDrag.dx=dx;_famDrag.dy=dy;
     el.style.transform='translate('+dx.toFixed(1)+'px,'+dy.toFixed(1)+'px)';
+    /* P743: PROGRESS, not a switch. 0 at rest, 1 at the line - the
+       glow, the lift, the grey and the reason all ride this one value,
+       so nothing appears in a single frame. */
+    var _span=Math.max(40,_famDrag.cy0-_famDrag.line);
+    var _k=(_famDrag.cy0-(_famDrag.cy0+dy)-0)/_span;
+    if(_k<0)_k=0;if(_k>1)_k=1;
+    el.style.setProperty('--arm',_k.toFixed(3));
     var past=(_famDrag.cy0+dy)<_famDrag.line;
     /* P737: past the line is not the same as PLAYABLE. A card that
        cannot fire greys and says why, up where the player is looking -
@@ -24046,7 +24075,11 @@ var D3X={
      row - outward from the lane centre, decaying slide + tabletop spin
      over the frozen phys pose (the burst's idiom). The dice END
      displaced; the wipe collects them. dist is in die-widths. */
-  KICK:{ms:620,dist:1.5,spin:4.5},
+  /* P743: dist 1.5 -> 0.85 (Denis: 'too strong - dice should not
+     leave the screen but they can bounce off it') and every kick is
+     clamped below so a hard hit cannot carry a die past the row's
+     own span; a die that would pass the edge bounces off it. */
+  KICK:{ms:620,dist:0.85,spin:4.5,edge:2.6},
   scatterRow:function(sel){
     if(!this.ready||this.fail||!this.PHYS||!this.PHYS.on)return 0;
     var self=this,t0=performance.now();
@@ -24071,13 +24104,41 @@ var D3X={
       var base=Math.atan2((Math.random()-0.5)*0.6,(d.phys.x>=0?1:-1));
       var ang=base+(Math.random()-0.5)*1.47;
       var mag=(hard[i]?1.5+Math.random()*0.6:0.65+Math.random()*0.8)*self.KICK.dist;
-      d.kick={t0:t0,
-        vx:Math.cos(ang)*mag,
-        vz:Math.sin(ang)*mag*0.7-0.1*self.KICK.dist,
+      var vx=Math.cos(ang)*mag,vz=Math.sin(ang)*mag*0.7-0.1*self.KICK.dist;
+      /* P743: THE TABLE HAS EDGES. The kick was unbounded, so a hard hit
+         carried a die off screen. Anything that would end past the edge
+         bounces off it - the sign flips and the overshoot is what is
+         left of the travel, which is what a wall does. */
+      var edge=self.KICK.edge||2.6,endX=d.phys.x+vx;
+      if(endX>edge)vx=(edge-d.phys.x)-(endX-edge)*0.45;
+      else if(endX<-edge)vx=(-edge-d.phys.x)-(endX+edge)*0.45;
+      if(Math.abs(vz)>edge*0.5)vz=(vz>0?1:-1)*edge*0.5;
+      d.kick={t0:t0,vx:vx,vz:vz,
         sp:(Math.random()<0.5?-1:1)*(hard[i]?4+Math.random()*3:1.5+Math.random()*3)};
     });
     this._shDirty=true;
     return hit.length;
+  },
+  /* P743: THE BUST BEAT, ONE FUNCTION, EITHER SIDE. Denis: 'it should
+     happen the same exact way for the NPC - the dice mechanic should be
+     shared'. The row is the only thing that differs; the scatter, the
+     flare and the red are identical, so the rival's bust can never drift
+     from the player's or be forgotten again. */
+  bustBeat:function(side){
+    var row=(side==='o')?'#oppDiceRow':'#playerDiceRow';
+    var kicked=0;
+    try{kicked=this.scatterRow(row);}catch(e){}
+    try{this.bustFlare();}catch(e){}
+    try{
+      var br=document.getElementById('matchBustRed');
+      if(br){
+        br.style.transition='none';br.classList.add('on');
+        setTimeout(function(){
+          br.style.transition='opacity .9s ease-in';br.classList.remove('on');
+        },380);
+      }
+    }catch(e){}
+    return kicked;
   },
   /* P733: THE ROOM FLINCHES. The rig's lights lerp toward the bust red
      and ease back; the art's red wash is done in _bustCandle beside it.
@@ -29462,21 +29523,8 @@ function _bustImpact(){
   /* P716: the REAL scatter - a physical kick across the table. The class
      above stays: it dims the 3D dice and pauses idles, and its CSS
      nudges are the no-physics fallback. */
-  try{if(window.D3X)D3X.scatterRow('#playerDiceRow');}catch(e){}
-  /* P733: and the room flinches red - the rig's lights and the art's
-     wash together, so dice and table agree about what just happened. */
-  try{if(window.D3X&&D3X.bustFlare)D3X.bustFlare();}catch(e){}
-  try{
-    var _br=document.getElementById('matchBustRed');
-    if(_br){
-      _br.style.transition='none';/* the flash is instant; only the fade eases */
-      _br.classList.add('on');
-      setTimeout(function(){
-        _br.style.transition='opacity .9s ease-in';
-        _br.classList.remove('on');
-      },380);
-    }
-  }catch(e){}
+  /* P743: the shared beat - the rival's bust runs the identical one */
+  try{if(window.D3X&&D3X.bustBeat)D3X.bustBeat('p');}catch(e){}
 }
 /* Align overlay word element to vertical centre of the dice area, not screen centre */
 function _alignOverlayWord(wordEl){
@@ -34153,6 +34201,10 @@ function runOppTurn(){
            Every bust exit funnels through this function, so one call covers
            all four of its call sites. */
         try{famFire('bust',{actor:'o'});}catch(e){}
+        /* P743: THE RIVAL'S BUST LOOKS LIKE A BUST. It had no visual at
+           all - the scatter and the flinch were wired to the player's
+           path only. Same function, their row. */
+        try{if(window.D3X&&D3X.bustBeat)D3X.bustBeat('o');}catch(e){}
         /* AEGIS (guardian) — mirror for NPC. NPC keeps half their oppBank
            on bust instead of losing it all. */
         if(G.oCards.includes('aegis')&&oppBank>0){
