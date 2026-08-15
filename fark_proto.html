@@ -1352,26 +1352,37 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 #screen-match.tip-open .status-strip{opacity:0;transition:opacity .18s ease}
 /* P728: and the floating score numbers - they overlapped the tip's text
    (Denis's HONEYTRAP screenshot) */
+/* P741: !important, because _renderSelTags and _renderOppTags write
+   INLINE styles on these elements - and an inline style beats any
+   stylesheet rule without it. That is why the scores never went away
+   however many selectors P728 listed. visibility goes with it so a tag
+   written FRESH while the tip is open cannot appear either. */
 #screen-match.tip-open .selTag,#screen-match.tip-open #selTotal,
-#screen-match.tip-open .oppTag,#screen-match.tip-open #oppTotal{
-  opacity:0;transition:opacity .18s ease}
+#screen-match.tip-open .oppTag,#screen-match.tip-open #oppTotal,
+#screen-match.tip-open .kept-total,#screen-match.tip-open #turnPts{
+  opacity:0 !important;visibility:hidden !important;
+  transition:opacity .18s ease}
 #screen-match .status-strip{transition:opacity .18s ease}
 #cardFocusTip{position:absolute;z-index:9001;pointer-events:none;
   /* P677: 60 -> 50cqw. The wide word gaps WERE this box: justify pads the
      spaces to fill whatever width it is given, so the narrower box closes
      the gaps at the source. */
-  /* P737b: WIDER, per Denis - 50cqw was a column; the justified body
-     reads badly in a narrow measure and the box crowded the card. */
-  max-width:74cqw;width:74cqw;text-align:center}
-#cardFocusTip .cft-name{font-family:'JMH Beda',serif;font-size:3.9cqw;
+  /* P737b: 50cqw was a column and justification could not work in it.
+     P741: 74 was too wide - 62 is the in-between Denis asked for. */
+  max-width:62cqw;width:62cqw;text-align:center}
+#cardFocusTip .cft-name{font-family:'JMH Beda',serif;font-size:4.1cqw;
   letter-spacing:.09em;
+  /* P741: brighter, with the ink outline the game's own headings wear -
+     stroke first so the letterform stays crisp on the dark wood */
+  -webkit-text-stroke:0.55cqw #1a1008;paint-order:stroke fill;
+  text-shadow:0 0.35cqw 0.5cqw rgba(8,4,2,.85);
   /* P673: LIFTED toward cream, not darkened - the ground is the near-black
      table and Denis asked for contrast against THAT, with no text-shadow
      doing the work. (Darker-than-accent serves light grounds; here the mix
      direction inverts or a dark family's title vanishes into the wood.) */
   /* P677: saturate - 55% accent was a pale wash; 82% toward a warm gold
      keeps the chroma while still lifting off the dark wood */
-  color:color-mix(in srgb,var(--cft-a,#f0c860) 82%,#ffdf9e)}
+  color:color-mix(in srgb,var(--cft-a,#f0c860) 55%,#fff2cf)}/* P741: lifted */
 #cardFocusTip .cft-sub{font-family:'JMH Beda',serif;font-size:2.7cqw;
   color:#c9b490;opacity:.9;margin-top:0.4cqw;letter-spacing:.06em}
 /* P673: justified both sides with a touch of tracking; the LAST line
@@ -1383,8 +1394,12 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
      measure is exactly what justification needs (the chasms were the
      narrow column, not the alignment). The last line still centres.
      line-height 1.4 -> 1.28 and tracking eased, also per Denis. */
-  text-align:justify;text-align-last:center;text-wrap:pretty;
-  hyphens:auto;-webkit-hyphens:auto}
+  /* P741: JUSTIFIED means both edges line up. text-wrap:pretty fights
+     that (it re-balances lines), so it goes; the last line stays centred
+     because a justified two-word final line is a chasm, and hyphenation
+     is what keeps a long word from forcing a ragged edge. */
+  text-align:justify;text-align-last:center;
+  hyphens:auto;-webkit-hyphens:auto;overflow-wrap:break-word}
 /* the words arrive one after another - delay is written inline per word */
 #cardFocusTip span.w{display:inline-block;opacity:0;
   animation:cftWord .32s ease-out forwards}
@@ -15262,8 +15277,17 @@ function _cardFocusToggle(el,o){
   var cr=el.getBoundingClientRect(),sr=ms.getBoundingClientRect();
   var cx=cr.left+cr.width/2-sr.left;
   tip.style.left=Math.max(sr.width*0.04,Math.min(sr.width*0.96-tip.offsetWidth,cx-tip.offsetWidth/2))+'px';
-  if(o.below){tip.style.top=(cr.bottom-sr.top+sr.width*0.045)+'px';}
-  else{tip.style.top=(cr.top-sr.top-tip.offsetHeight-sr.width*0.045)+'px';}
+  /* P741: a real gap off the card (0.045 of the width was ~19px and the
+     taller box ate it, so the text sat on the card's top edge), and
+     clamped inside the screen so a long rule text cannot ride off the
+     top and land back on the art. */
+  var _gap=sr.width*0.075;
+  if(o.below){tip.style.top=(cr.bottom-sr.top+_gap)+'px';}
+  else{
+    var _t=cr.top-sr.top-tip.offsetHeight-_gap;
+    if(_t<sr.height*0.02)_t=sr.height*0.02;
+    tip.style.top=_t+'px';
+  }
 }
 function famCardTap(i){
   if(!G||!G.pF||!G.pF[i])return;
@@ -24132,13 +24156,6 @@ var D3X={
        Lower thresholds let the tail of the motion play out; `cap` bounds how
        long that can take, so a stubborn die still ends. */
     on:true, gravity:-50, dt:1/60, cap:700, stopV:.09, stopW:.14,
-    /* P736: THE CREEP BAND. A die under both of these for creepFrames
-       consecutive frames, resting low, is finished - its velocity is
-       zeroed rather than left to ooze toward zero. Measured: the tail
-       (frames after the last clearly-moving one) ran 183-650ms per
-       throw before this. Well above stopV on purpose: it has to catch
-       the ooze, not the stop. */
-    creepV:.5, creepW:.85, creepFrames:6, creepY:1.25,
     /* the depth lane is much stiffer than the lab's: the table is seen from
        58 degrees here, so wander in z reads as vertical jumble rather than
        as depth. x stays loose - that is where the rough line lives. */
@@ -24523,45 +24540,19 @@ var D3X={
          term was added. */
       if(P.lanePull>0){
         var _K=P.lanePull,_C=2*Math.sqrt(_K);
-        /* P736b: THE PULL IS SELF-SUSTAINING, and that is the drag. A
-           critically damped spring approaches its target asymptotically:
-           at K=37 a die 0.3 off-centre settles into a terminal creep of
-           K*dx/C ~ 0.9 units/s - ABOVE any speed gate, so the gate never
-           fires and the die is walked into its lane over half a second.
-           That is Denis's 'sliding against an invisible wall'. The lane
-           is an AREA (laneRadius), so once the die is inside it, stop
-           pulling: it is already where it belongs. */
-        var _pitch=(N>1&&slotC.length>1)?Math.abs(slotC[1]-slotC[0]):1.6;
-        var _laneR=_pitch*(P.laneRadius||0.54);
+        /* P736 REVERTED (P740): releasing the pull inside the lane
+           radius meant the dice were never centred - they bundled, which
+           is exactly what Denis saw - and the seeded A/B put the drag
+           WORSE with it (573ms vs 498ms over the same eight throws). The
+           pull runs to rest again, as it always did. */
         for(var kp=0;kp<N;kp++){
           var bp=bodies[kp];
-          if(Math.abs(slotC[kp]-bp.position.x)<_laneR
-            &&Math.abs(bp.position.z)<_laneR*0.6)continue;
-          /* P736: and nothing pulls a die that is merely OOZING either -
-             the old gate was stopV (0.09), so a die creeping at 0.3 was
-             still being drawn toward its lane at walking pace, which is
-             the slow drag Denis reported twice. */
-          if(bp.velocity.norm()<=P.creepV&&bp.angularVelocity.norm()<=P.creepW)continue;
+          if(bp.velocity.norm()<=P.stopV&&bp.angularVelocity.norm()<=P.stopW)continue;
           bp.velocity.x+=((slotC[kp]-bp.position.x)*_K-bp.velocity.x*_C)*P.dt;
           bp.velocity.z+=((0-bp.position.z)*_K-bp.velocity.z*_C)*P.dt;
         }
       }
       world.step(P.dt);
-      /* P736: THE REST SNAP. Damping and friction only approach zero;
-         a die can ooze for half a second under the still-frame test's
-         nose. Six consecutive frames inside the creep band, low enough
-         to be on the table, means finished - so end it, and let the
-         still counter and the tape cut do the rest. */
-      for(var ks=0;ks<N;ks++){
-        var bs=bodies[ks];
-        if(bs.velocity.norm()<P.creepV&&bs.angularVelocity.norm()<P.creepW
-          &&bs.position.y<P.creepY){
-          bs._creep=(bs._creep||0)+1;
-          if(bs._creep>=P.creepFrames){
-            bs.velocity.set(0,0,0);bs.angularVelocity.set(0,0,0);
-          }
-        }else bs._creep=0;
-      }
       var fr=[];
       for(var k2=0;k2<N;k2++)fr.push({
         x:bodies[k2].position.x,y:bodies[k2].position.y,z:bodies[k2].position.z,
