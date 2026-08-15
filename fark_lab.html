@@ -654,6 +654,20 @@ function d3die(){
   var dx=E('window.D3X');if(!dx)return null;
   var ds=dx.dice.filter(function(d){return d.match&&d.chip;});
   return ds[target.i]||null;}
+/* P745: the lab mirrors the GAME's amber timing (D3X.AMBER holdMs/fadeMs)
+   so what is authored here is what ships - clearShell dissolves the same
+   way rather than blinking out. */
+function _labFade(grp,ms,done){
+  var t0=performance.now(),op=[];
+  grp.traverse&&grp.traverse(function(o){if(o.isMesh&&o.material)op.push([o,o.material.opacity]);});
+  (function step(){
+    var k=(performance.now()-t0)/(ms||520);
+    if(k>=1){done&&done();return;}
+    op.forEach(function(b){b[0].material.opacity=b[1]*(1-k);});
+    grp.scale&&grp.scale.setScalar(1+0.14*k);
+    requestAnimationFrame(step);
+  })();
+}
 function shellOpts(){var v=function(id,dflt){var e2=document.getElementById(id);return e2?+e2.value:dflt;};
   return {corner:v('pCr',12),op:v('shOp',42)/100,spec:v('shSpec',45),
     rims:v('shRims',2),bub:v('shBub',4),ghost:v('shGhost',25)/100};}
@@ -732,6 +746,21 @@ function _driftOn(){
 function clearShell(){
   var d=d3die();if(!d||!d.obj)return log('clearShell needs a DIE target');
   var sh=d.obj.getObjectByName('labShell');
+  /* P745: dissolve, like the game does */
+  if(sh&&!sh.userData._dying){
+    sh.userData._dying=1;
+    var fadeMs=(E('D3X.AMBER&&D3X.AMBER.fadeMs')||520);
+    _labFade(sh,fadeMs,function(){
+      d.obj.remove(sh);
+      sh.traverse&&sh.traverse(function(o){if(o.material&&o.material.dispose)o.material.dispose();});
+      d.obj.traverse(function(o){
+        if(o.isMesh&&o.userData._labCol&&o.material){
+          o.material.color.copy(o.userData._labCol);delete o.userData._labCol;}
+      });
+    });
+    log('shell dissolving ('+fadeMs+'ms, the game’s own fadeMs)');
+    return;
+  }
   if(sh){d.obj.remove(sh);
     sh.traverse&&sh.traverse(function(o){if(o.material&&o.material.dispose)o.material.dispose();});
     if(sh.material&&sh.material.dispose)sh.material.dispose();}

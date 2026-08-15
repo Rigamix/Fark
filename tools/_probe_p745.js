@@ -1,0 +1,27 @@
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const until=async(fn,ms)=>{const t0=Date.now();while(Date.now()-t0<ms){try{if(fn())return true;}catch(e){}await sleep(60);}return false;};
+const out={};
+await setup();
+if(!await until(()=>{const g=E('G');return g&&g.phase;},4000))return {err:'no match'};
+roll();
+if(!await until(()=>E('window.D3X').dice.some(d=>d.match&&d.roll),12000))return {err:'no roll'};
+await until(()=>{const dx=E('window.D3X');return dx.dice.filter(d=>d.match).every(d=>!d.roll);},22000);
+await sleep(400);
+out.hold=E('D3X.AMBER.holdMs');out.fade=E('D3X.AMBER.fadeMs');
+E("window.__d0=D3X.dice.filter(function(x){return x.match&&x.obj;})[0];D3X.amberShell(window.__d0,true)");
+const has=()=>E("!!(window.__d0&&window.__d0.obj.getObjectByName('fkAmber'))");
+out.on=has();
+E("D3X.amberShell(window.__d0,false)");
+out.stillThere=has();
+await sleep(180);
+out.mid=E(`(function(){var g=window.__d0.obj.getObjectByName('fkAmber');if(!g)return null;
+ var o=null;g.traverse(function(m){if(o===null&&m.isMesh)o=+m.material.opacity.toFixed(3);});
+ return {op:o,sc:+g.scale.x.toFixed(3)};})()`);
+const t0=Date.now();
+await until(()=>!has(),2500);
+out.goneMs=Date.now()-t0;
+gw();
+const tipBody=null;
+out.verdict=out.hold===1400&&out.fade===520&&out.on&&out.stillThere
+  &&!!out.mid&&out.mid.op<0.42&&out.mid.sc>1&&out.goneMs<900;
+return out;

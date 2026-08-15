@@ -1392,7 +1392,10 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
   /* P741/P743: thinner, and the outline is the TITLE'S OWN colour taken
      darker and more saturated rather than black (Denis) - so a jade card
      is outlined in deep jade, an amber one in burnt amber. */
-  -webkit-text-stroke:0.3cqw color-mix(in srgb,var(--cft-a,#f0c860) 62%,#1a0d02);
+  /* P745: 62% mixed toward near-black still read black. 82% of the
+     title's own colour against a warm brown - a deep version of the
+     hue, not a shadow of it - and thinner again. */
+  -webkit-text-stroke:0.22cqw color-mix(in srgb,var(--cft-a,#f0c860) 82%,#5a2f08);
   paint-order:stroke fill;
   text-shadow:0 0.3cqw 0.45cqw rgba(8,4,2,.8);
   /* P673: LIFTED toward cream, not darkened - the ground is the near-black
@@ -1406,7 +1409,10 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
   color:#c9b490;opacity:.9;margin-top:0.4cqw;letter-spacing:.06em}
 /* P673: justified both sides with a touch of tracking; the LAST line
    centres because a justified final line of two words is a chasm */
-#cardFocusTip .cft-body{font-family:var(--font-dlg);font-size:3.4cqw;/* P728: the dialogue font (Denis) */
+/* P745: the BODY narrows inside the box (Denis) - the title keeps the
+   full width, the prose gets a shorter measure to read down. */
+#cardFocusTip .cft-body{width:84%;margin-left:auto;margin-right:auto;
+  font-family:var(--font-dlg);font-size:3.4cqw;/* P728: the dialogue font (Denis) */
   color:#f2e6c8;line-height:1.28;margin-top:1.1cqw;letter-spacing:.05em;
   /* P679 justified and got chasms, so it centred instead. P737b: JUSTIFY
      AGAIN, per Denis - the box is 74cqw now rather than 50, and a wide
@@ -25493,7 +25499,12 @@ var D3X={
      glaze, Ward's flash and Snare's rust trap are the same verb in
      other colours. userData.outline keeps every die pass (dim, tint,
      reskin) off it. */
-  AMBER:{col:0xd88a20, corner:12, rims:2, op:0.42, spec:45, ghost:0.25, bub:4},
+  /* P745: holdMs is how long the amber STAYS once the throw has landed
+     (Denis: 'make amber return longer'); fadeMs is the crack itself,
+     which dissolves rather than vanishing. Beside the shell, so every
+     user of amberShell inherits the same timing. */
+  AMBER:{col:0xd88a20, corner:12, rims:2, op:0.42, spec:45, ghost:0.25, bub:4,
+    holdMs:1400, fadeMs:520},
   _roundBox:function(size,rPct,seg){
     var r=size*Math.max(0.001,rPct)/100;
     var g=new THREE.BoxGeometry(size,size,size,seg||4,seg||4,seg||4);
@@ -25510,6 +25521,35 @@ var D3X={
     if(!d||!d.obj)return false;
     var have=d.obj.getObjectByName('fkAmber');
     if(!on){
+      /* P745: THE CRACK DISSOLVES. Removing the group outright made the
+         amber blink out; it swells a little and fades over fadeMs while
+         the die's own colour returns on the same curve, so the die
+         EMERGES rather than being uncovered. colOverride===0 forces the
+         old instant path for teardown (a die leaving the table). */
+      var _A=this.AMBER,_fade=(colOverride===0)?0:(_A.fadeMs||520);
+      if(have&&_fade>0&&!have.userData._dying){
+        have.userData._dying=1;
+        var _t0=performance.now(),_op=[],_cols=[];
+        have.traverse(function(o){if(o.isMesh&&o.material)_op.push([o,o.material.opacity]);});
+        d.obj.traverse(function(o){
+          if(o.isMesh&&o.material&&o.userData._ambCol)
+            _cols.push([o,o.material.color.clone(),o.userData._ambCol]);
+        });
+        (function _step(){
+          var k=(performance.now()-_t0)/_fade;
+          if(k>=1){
+            d.obj.remove(have);
+            have.traverse(function(o){if(o.material&&o.material.dispose)o.material.dispose();});
+            _cols.forEach(function(c){c[0].material.color.copy(c[2]);delete c[0].userData._ambCol;});
+            return;
+          }
+          _op.forEach(function(b){b[0].material.opacity=b[1]*(1-k);});
+          have.scale.setScalar(1+0.14*k);
+          _cols.forEach(function(c){c[0].material.color.lerpColors(c[1],c[2],k);});
+          requestAnimationFrame(_step);
+        })();
+        return true;
+      }
       if(have){d.obj.remove(have);
         have.traverse(function(o){if(o.material&&o.material.dispose)o.material.dispose();});}
       d.obj.traverse(function(o){
@@ -29507,7 +29547,9 @@ function _amberReturnWhenSettled(){
         SFX.cardFire&&SFX.cardFire();
       }catch(e){}
       window._fkAmberChip=window._fkAmberWrap=null;
-    },430);
+    },(window.D3X&&D3X.AMBER&&D3X.AMBER.holdMs)||1400);/* P745: the amber HOLDS
+       once the dice have landed, so the die that waited is actually seen
+       before it is freed (Denis: 'make amber return longer'). */
   };
   wait();
 }
