@@ -1,0 +1,20 @@
+/* SUITE: exclude. The amber SHELL hugs the die silhouette. */
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const until=async(fn,ms)=>{const t0=Date.now();while(Date.now()-t0<ms){try{if(fn())return true;}catch(e){}await sleep(100);}return false;};
+const out={};
+await setup();
+out.matchReady=await until(()=>{const g=E('G');return g&&g.phase==='idle';},4000);
+if(!out.matchReady)return out;
+roll();
+await until(()=>{const dx=E('window.D3X');
+  return dx.dice.filter(d=>d.match).every(d=>!d.roll)&&dx.dice.some(d=>d.match&&d.phys);},20000);
+await sleep(600);
+pickT('die',0,null);
+fire('amberShell');
+await sleep(600);
+const dx=E('window.D3X');
+const d0=dx.dice.filter(d=>d.match&&d.chip)[0];
+out.shell=!!(d0&&d0.obj.getObjectByName('labShell'));
+out.tinted=(()=>{let t=false;d0.obj.traverse(o=>{if(o.userData&&o.userData._labCol)t=true;});return t;})();
+out.verdict=out.shell&&out.tinted;
+return out;
