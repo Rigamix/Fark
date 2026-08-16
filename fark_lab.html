@@ -1156,7 +1156,7 @@ function buildLights(){
        retired hull fallback and floor is invisible at the demo's k=1 */
     +'<br><label>reach <input type="range" id="cgSoft" min="2" max="30" value="6" oninput="cardDial(&quot;soft&quot;,+this.value)"></label>'
     +'<label>core <input type="range" id="cgRim" min="1" max="10" value="2.5" step="0.5" oninput="cardDial(&quot;rim&quot;,+this.value)"></label>'
-    +'<label>drop <input type="range" id="cgDy" min="0" max="25" value="10" oninput="cardDial(&quot;dyF&quot;,this.value/100)"></label>'
+    +'<label>drop <input type="range" id="cgDy" min="0" max="25" value="0" oninput="cardDial(&quot;dyF&quot;,this.value/100)"></label>'
     +'<label>strength <input type="range" id="cgStr" min="10" max="100" value="91" oninput="cardDial(&quot;strength&quot;,this.value/100)"></label>'
     +'<label>floor <input type="range" id="cgFloor" min="0" max="100" value="42" oninput="cardDial(&quot;floor&quot;,this.value/100)"></label>'
     +'</div>';
@@ -1236,15 +1236,57 @@ function shadowSet(v){
   _lastShadow=+v;
   var sp=document.getElementById('lvSh');if(sp)sp.textContent=v>0?('-'+v+'%'):'normal';saveLook();}
 function gradeDice(amt){
-  /* P752: the mask is the GAME's own world-space term now (D3X.setGrad) -
-     the old _dimMap override baked it into the die's UV space, which is
-     why the axis slider pointed a different way on every settled die. */
+  /* P756: back to the ORIGINAL override - Denis: the dice were fine as
+     they were. The side-dim itself fades along an axis, baked per cell;
+     caches are busted so settled dice rebake on the next frame. */
   amt=+amt;
   var axis=(document.getElementById('dgAxis')||{}).value||'y';
   gw();
-  E('D3X.setGrad&&D3X.setGrad("'+axis+'",'+(amt/100)+')');
+  if(!W.__labDimOrig){
+    W.__labEval("window.__labDimOrig=D3X._dimMap.bind(D3X);"
+      +"D3X._dimMap=function(tex,v,k){"
+      +"var g=window.__labDimGrad;"
+      +"if(!g||!g.amt)return window.__labDimOrig(tex,v,k);"
+      +"if(!tex||!tex.image||!v||!k)return null;"
+      +"if(!tex.userData)tex.userData={};"
+      +"var dm=tex.userData.dimMaps||(tex.userData.dimMaps={});"
+      +"var kq=Math.round(k*1000)/1000,key=v+'|'+kq+'|'+g.axis+g.amt;"
+      +"if(dm[key])return dm[key];"
+      +"var im=tex.image,w=im.width||im.naturalWidth,h=im.height||im.naturalHeight;"
+      +"if(!w||!h)return null;"
+      +"var hx=D3X.SIDEDIM.replace('#',''),fc=[0,1,2].map(function(i){return parseInt(hx.substr(i*2,2),16)/255;});"
+      +"var col=function(kk){return 'rgb('+fc.map(function(f){return Math.round(255*(1-(1-f)*kk));}).join(',')+')';};"
+      +"var cv=document.createElement('canvas');cv.width=w;cv.height=h;"
+      +"var cx=cv.getContext('2d');cx.drawImage(im,0,0,w,h);"
+      +"cx.globalCompositeOperation='multiply';"
+      +"var cw=w/3,ch=h/2,am=Math.abs(g.amt),sgn=g.amt>0?1:-1;"
+      +"for(var cy=0;cy<2;cy++)for(var cxx=0;cxx<3;cxx++){"
+      +"var x0=cxx*cw,y0=cy*ch;"
+      +"var gr=g.axis==='x'?cx.createLinearGradient(x0,0,x0+cw,0):cx.createLinearGradient(0,y0,0,y0+ch);"
+      +"var kFull=kq,kMasked=kq*(1-am);"
+      +"gr.addColorStop(sgn>0?0:1,col(kFull));gr.addColorStop(sgn>0?1:0,col(kMasked));"
+      +"cx.fillStyle=gr;cx.fillRect(x0,y0,cw,ch);}"
+      +"cx.globalCompositeOperation='source-over';"
+      +"var cw2=w/3,ch2=h/2,cxp=((v-1)%3)*cw2,cyp=Math.floor((v-1)/3)*ch2;"
+      +"cx.drawImage(im,cxp,cyp,cw2,ch2,cxp,cyp,cw2,ch2);"
+      +"var out=new THREE.CanvasTexture(cv);"
+      +"out.flipY=tex.flipY;out.wrapS=tex.wrapS;out.wrapT=tex.wrapT;"
+      +"out.encoding=tex.encoding;out.needsUpdate=true;"
+      +"dm[key]=out;return out;};");
+  }
+  E('window.__labDimGrad='+JSON.stringify(amt===0?null:{axis:axis,amt:amt/100}));
+  /* bust the caches so settled dice rebake with the new mask */
+  var dx=E('window.D3X');
+  if(dx)dx.dice.forEach(function(d){
+    if(!d.match||!d.obj)return;
+    d.obj.traverse(function(o){
+      if(!o.isMesh||!o.material||o.userData.outline)return;
+      var lm=o.material.userData&&o.material.userData.liveMap;
+      if(lm&&lm.userData)lm.userData.dimMaps={};
+    });
+  });
   var sp=document.getElementById('lvG');
-  if(sp)sp.textContent=amt?(amt+'% '+(axis==='x'?'horizontal':'vertical')):'off';
+  if(sp)sp.textContent=amt===0?'off':((amt>0?'+':'')+amt+' '+axis);
   saveLook();
 }
 function glowDial(field,v){

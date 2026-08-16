@@ -25144,7 +25144,7 @@ var D3X={
      the card's height, so the silhouette stays the card's own and the
      level badge at the top corner sits over clean table. */
   CARD_GLOW:{col:'#ffe6a4', softCol:'#ffa93a', soft:6, rim:2.5, strength:0.91,
-    dyF:0.10, round:0.075, line:0, floor:0.42},
+    dyF:0, round:0.075, line:0, floor:0.42},/* P756: hugging, not dropped */
   GLOW:{soft:11, rim:3, rimPasses:5, softPasses:1, line:3.2, grow:1.004, clear:0.7, strength:0.91,
         /* P731: the SOFT pass can stretch and lean - sx/sy scale the
            silhouette, dy biases it vertically. 1/1/0 = today's look
@@ -25370,24 +25370,22 @@ var D3X={
     /* cut the subject back out EXACTLY on its painted edge: everything
        left is outside the shape, which is the whole point. clear widens
        the cut a hair past the edge - see the note above GLOW. */
-    gx.globalCompositeOperation='destination-out';
-    gx.globalAlpha=1;
-    sel.forEach(function(sh){
-      if(sh&&sh.stamp){
-        var _pm={scaleMul:1+(2*G.clear)/Math.max(8,Math.min(sh.stamp.w,sh.stamp.h))};
-        lay(gx,sh,null,_pm);
-        /* P755b: a DROPPED halo needs a SWEPT punch - cutting only the
-           true position left a detached band below the card with the
-           punch's own hard edge across it. The cut walks the drop. */
-        if(DY){
-          lay(gx,sh,null,{scaleMul:_pm.scaleMul,dy:DY/2});
-          lay(gx,sh,null,{scaleMul:_pm.scaleMul,dy:DY});
+    /* P756: no punch when the subject itself covers the middle - the
+       card halo paints UNDER the card layer now, so cutting it out only
+       manufactured a visible gap. The dice keep their punch: their glow
+       canvas sits above the painted table and must not wash the die. */
+    if(!(opts&&opts.noPunch)){
+      gx.globalCompositeOperation='destination-out';
+      gx.globalAlpha=1;
+      sel.forEach(function(sh){
+        if(sh&&sh.stamp){
+          lay(gx,sh,null,{scaleMul:1+(2*G.clear)/Math.max(8,Math.min(sh.stamp.w,sh.stamp.h))});
+        }else{
+          lay(gx,sh,null,{shrink:-G.clear});
         }
-      }else{
-        lay(gx,sh,null,{shrink:-G.clear});
-      }
-    });
-    gx.globalCompositeOperation='source-over';
+      });
+      gx.globalCompositeOperation='source-over';
+    }
     /* the line goes on the SAME surface as the halo, after the cut-out,
        so the two composite as one glow. Hulls only: a stamp's crisp edge
        is the subject's own art. */
@@ -25430,8 +25428,14 @@ var D3X={
     var cv=document.getElementById('dgCanvasHi');
     if(!cv){
       cv=document.createElement('canvas');cv.id='dgCanvasHi';
+      /* P756: UNDER the card layer (Denis's call, and the better
+         architecture): rows sit at 42 and a dragged card at 9500, so at
+         41 the card body hides the halo's middle by being on top, the
+         badge sits over the glow for free, and no punch-out is needed -
+         which is what removed the visible gap the cut used to make.
+         Appended after the dice canvas, so the same z paints above it. */
       cv.style.cssText='position:absolute;inset:0;width:100%;height:100%;'
-        +'pointer-events:none;z-index:9400';
+        +'pointer-events:none;z-index:41';
       sc.appendChild(cv);
     }
     return cv;
@@ -25509,7 +25513,8 @@ var D3X={
       }
       self._paintHalo(cv,x,sc,dpr,[shape],e.col||CG.col,e.col||CG.softCol,
         CG.floor+(1-CG.floor)*Math.min(1,e.k),CG.line,
-        {soft:CG.soft,rim:CG.rim,strength:CG.strength,dy:r.height*(CG.dyF||0)});
+        {soft:CG.soft,rim:CG.rim,strength:CG.strength,dy:r.height*(CG.dyF||0),
+         noPunch:true});/* P756: the card body covers the middle */
     });
   },
   _drawGlow:function(){
@@ -25683,37 +25688,15 @@ var D3X={
      must be 'very gradual and unnoticeable'. Lambert still cannot blend
      two maps, so gradual = QUANTIZED BAKES: steps of ~4%% walked on a
      smoothstepped ramp, each cached per composed map + value + step. */
-  SIDEDIM_MAX:0.82,/* P732: 0.5 -> 0.82, relit along GRAD's axis (P752) */
+  SIDEDIM_MAX:0.82,/* P732: 0.5 -> 0.82, masked by SIDEDIM_GRAD */
   /* P720 landed the ramp WITH the die; P753 leads it - the shadow is
      fully on `lead` ms before the die rests (Denis: 'a bit earlier
      still'). */
   SIDEDIM_RAMP:{delay:0,dur:350,steps:8,lead:140},
-  /* P752: the mask is WORLD-SPACE now. P732 baked it into each face's
-     atlas cell - the die's own UV space, which rotates with the die, so
-     the axis slider chose directions in a space no two settled dice
-     share. ax 'x' = the table's left-to-right, 'y' = top-to-bottom
-     (world Z); amt is the fraction of the dim relit at the bright end,
-     signed to flip ends. Applied in the material as a per-pixel term -
-     see _gradHook - so setGrad is uniforms only, no rebake. */
-  GRAD:{ax:'x', amt:0.14},
-  setGrad:function(ax,amt){
-    this.GRAD.ax=ax||this.GRAD.ax;
-    if(amt!==undefined)this.GRAD.amt=+amt;
-    var self=this;
-    this.dice.forEach(function(d){
-      if(!d.obj)return;
-      d.obj.traverse(function(o){
-        if(o.isMesh&&o.material&&o.material.userData.fkG)
-          self._syncGrad(o.material.userData.fkG);
-      });
-    });
-  },
-  _syncGrad:function(u){
-    var g=this.GRAD;
-    u.uAmt.value=g.amt||0;
-    /* P753: a selector between the two SCREEN ramps, not a world vector */
-    u.uAxSel.value=(g.ax==='y')?1:0;
-  },
+  /* P732: the dim is STRONGER but fades ACROSS each face - Denis's final
+     numbers went horizontal and subtler. GRAD is the fraction of the dim
+     masked away at the right edge of each cell (all dice). */
+  SIDEDIM_GRAD:0.14,
   /* P754: THE APPROVED LOOK IS THE GAME'S LOOK. The lab saves every
      number Denis signs off to localStorage.fkLabLook (same origin); the
      game applies the same record at boot, so standalone play looks like
@@ -25726,8 +25709,8 @@ var D3X={
     var self=this;
     try{
       if(lk.sd!==null&&lk.sd!==undefined)this.SIDEDIM_MAX=+lk.sd;
-      if(lk.maskAmt!==null&&lk.maskAmt!==undefined)
-        this.setGrad(lk.maskAxis||this.GRAD.ax,(+lk.maskAmt)/100);
+      /* P756: the mask went back to the lab's own _dimMap override -
+         nothing to apply here */
       /* known keys only: old records carry retired dials (fb*) */
       var KG=['soft','rim','rimPasses','softPasses','line','grow','clear',
               'strength','sx','sy','dy'];
@@ -25779,68 +25762,6 @@ var D3X={
       place(cl);}
     cl.style.background='radial-gradient(ellipse at 50% 46%, rgba(255,214,150,'+cc.toFixed(2)+') 0%, rgba(255,214,150,0) '+Math.max(20,r-5)+'%)';
   },
-  /* P752: the world-space mask, injected into the die's Lambert. The
-     bake dims every side face FLAT at strength k; this term relights
-     each pixel toward the mask's bright end along a WORLD axis, and the
-     top face is excluded by world normal exactly as the bake excludes
-     the scoring cell. uK rides the same settle ramp the bake steps
-     through, written wherever _dimMap is applied. */
-  _gradHook:function(o){
-    var m=o.material;
-    if(!m||m.userData.fkG)return;
-    var u={uK:{value:0},uAmt:{value:0},uAxSel:{value:0},
-           uSpan:{value:1},uDim:{value:new THREE.Color(this.SIDEDIM)}};
-    m.userData.fkG=u;
-    try{
-      if(!o.geometry.boundingBox)o.geometry.computeBoundingBox();
-      var bb=o.geometry.boundingBox;
-      u.uSpan.value=Math.max(0.2,bb.max.x-bb.min.x);
-    }catch(e){}
-    this._syncGrad(u);
-    m.onBeforeCompile=function(sh){
-      sh.uniforms.fkK=u.uK;sh.uniforms.fkAmt=u.uAmt;sh.uniforms.fkAxSel=u.uAxSel;
-      sh.uniforms.fkSpanV=u.uSpan;sh.uniforms.fkDim=u.uDim;
-      /* P753: CLIP SPACE - the fragment's ndc against the die's
-         projected centre over its projected width, so every die wears
-         the same screen direction.
-         P755: the top face is excluded by HEIGHT, not by normal. The
-         authored die is softly bevelled, so its top-face normals
-         spread - and wherever a normal threshold lands, it draws a
-         line across the face (Denis's seam, zoomed and confirmed).
-         World height is continuous over the whole mesh: the relight
-         fades out between 0.15 and 0.42 die-heights above centre,
-         side faces in, top face out, no crease anywhere. */
-      sh.vertexShader=sh.vertexShader
-        .replace('#include <common>',
-          '#include <common>\nuniform float fkSpanV;varying vec4 vFkClip;varying vec2 vFkC2;varying vec2 vFkSp;varying float vFkHy;')
-        .replace('#include <worldpos_vertex>',
-          '#include <worldpos_vertex>\n'
-          +'vFkClip=projectionMatrix*modelViewMatrix*vec4(position,1.0);\n'
-          +'vec4 fkCv=modelViewMatrix*vec4(0.0,0.0,0.0,1.0);\n'
-          +'vec4 fkCc=projectionMatrix*fkCv;\n'
-          +'vFkC2=fkCc.xy/fkCc.w;\n'
-          +'vec4 fkPx=projectionMatrix*(fkCv+viewMatrix*vec4(fkSpanV,0.0,0.0,0.0));\n'
-          +'vec4 fkPy=projectionMatrix*(fkCv+viewMatrix*vec4(0.0,0.0,fkSpanV,0.0));\n'
-          +'vFkSp=vec2(max(abs(fkPx.x/fkPx.w-vFkC2.x),1e-4),max(abs(fkPy.y/fkPy.w-vFkC2.y),1e-4));\n'
-          +'vFkHy=((modelMatrix*vec4(position,1.0)).y-modelMatrix[3][1])/max(length(modelMatrix[1].xyz),1e-4);');
-      sh.fragmentShader=sh.fragmentShader
-        .replace('#include <common>',
-          '#include <common>\nvarying vec4 vFkClip;varying vec2 vFkC2;varying vec2 vFkSp;varying float vFkHy;\n'
-          +'uniform float fkK;uniform float fkAmt;uniform float fkAxSel;uniform vec3 fkDim;')
-        .replace('#include <map_fragment>',
-          '#include <map_fragment>\n'
-          +'if(fkK>0.001&&abs(fkAmt)>0.0001){\n'
-          +'  vec2 fkD=vFkClip.xy/vFkClip.w-vFkC2;\n'
-          +'  float fkT=clamp(0.5+mix(fkD.x/vFkSp.x,-fkD.y/vFkSp.y,fkAxSel),0.0,1.0);\n'
-          +'  float fkM=1.0-smoothstep(0.15,0.42,vFkHy);\n'
-          +'  float fkKt=fkK*(1.0-abs(fkAmt)*(fkAmt>0.0?fkT:(1.0-fkT)));\n'
-          +'  vec3 fkA=vec3(1.0)-(vec3(1.0)-fkDim)*fkKt;\n'
-          +'  vec3 fkF=vec3(1.0)-(vec3(1.0)-fkDim)*fkK;\n'
-          +'  diffuseColor.rgb*=mix(vec3(1.0),fkA/max(fkF,vec3(0.02)),fkM);\n'
-          +'}');
-    };
-    m.needsUpdate=true;
-  },
   _dimMap:function(tex,v,k){
     if(!tex||!tex.image||!v||!k)return null;
     if(!tex.userData)tex.userData={};
@@ -25861,11 +25782,21 @@ var D3X={
     var cx=cv.getContext('2d');
     cx.drawImage(im,0,0,w,h);
     cx.globalCompositeOperation='multiply';
-    /* P752: FLAT again. P732's per-cell gradient was the mask baked into
-       the die's own UV space, which rotates with the die - the world-space
-       version lives in _gradHook's shader term now, so the bake carries
-       only the strength and the caches never depend on the mask. */
-    cx.fillStyle=col;cx.fillRect(0,0,w,h);
+    /* P732: the dim fades toward each face's BASE (SIDEDIM_GRAD masks
+       that fraction of it) - a per-cell vertical gradient of the multiply
+       colour rather than one flat fill. The scoring cell is repainted
+       bright below exactly as before, so top faces are untouched. */
+    var _gd=this.SIDEDIM_GRAD||0;
+    var _colAt=function(kk){return 'rgb('+fc.map(function(f){
+      return Math.round(255*(1-(1-f)*kk));}).join(',')+')';};
+    var _cw=w/3,_ch=h/2;
+    for(var _cy=0;_cy<2;_cy++)for(var _cx2=0;_cx2<3;_cx2++){
+      var _x0=_cx2*_cw,_y0=_cy*_ch;
+      var _gr=cx.createLinearGradient(0,_y0,0,_y0+_ch);
+      _gr.addColorStop(0,_colAt(kq));
+      _gr.addColorStop(1,_colAt(kq*(1-_gd)));
+      cx.fillStyle=_gr;cx.fillRect(_x0,_y0,_cw,_ch);
+    }
     cx.globalCompositeOperation='source-over';
     /* the scoring face, back at its authored brightness - same cell
        geometry as _brandedMap: 3x2, col (v-1)%3, row (v-1)/3 */
@@ -26034,7 +25965,6 @@ var D3X={
       if(!m.userData.liveMap)m.userData.liveMap=m.map;
       var want=(_kk>0?self._dimMap(m.userData.liveMap,d.phys.v,_kk):null)||m.userData.liveMap;
       if(m.map!==want){m.map=want;m.needsUpdate=true;}
-      if(m.userData.fkG)m.userData.fkG.uK.value=_kk;/* P752 */
     });
   },
   /* k=0 is the die as painted, k=1 is fully in shadow, k>1 is the bust wipe
@@ -26798,7 +26728,6 @@ var D3X={
         o.material.userData.baseMap=_pipTex;
         self._dress(o.material,mat,sk);
         self._faceLayers(o.material,mat,ench,col);/* P552 */
-        self._gradHook(o);/* P752: the world-space shadow mask */
       }
     });
     g.add(m);
@@ -27268,7 +27197,6 @@ var D3X={
              poisoning _airTint's comment warns about). */
           try{d.obj.traverse(function(o){var m=o.isMesh&&o.material;
             if(m&&m.userData&&m.userData.liveMap&&m.map!==m.userData.liveMap){m.map=m.userData.liveMap;m.needsUpdate=true;}
-            if(m&&m.userData&&m.userData.fkG)m.userData.fkG.uK.value=0;/* P752 */
           });}catch(e){}
           D3X._shDirty=true;
         }
@@ -27338,7 +27266,6 @@ var D3X={
               if(!m.userData.liveMap)m.userData.liveMap=m.map;
               var want=(_kkL>0&&R2&&R2.val?D3X._dimMap(m.userData.liveMap,R2.val,_kkL):null)||m.userData.liveMap;
               if(m.map!==want){m.map=want;m.needsUpdate=true;}
-              if(m.userData.fkG)m.userData.fkG.uK.value=_kkL;/* P752 */
             });
           })();
           D3X._weightOutline(d);
