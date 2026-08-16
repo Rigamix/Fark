@@ -1115,8 +1115,13 @@ function buildLights(){
   _lights=[];
   dx.scene.traverse(function(o){if(o.isLight&&o!==_bounce)_lights.push(o);});
   var h='';
+  /* P754: the game may have applied the saved ratios at boot already -
+     divide them back out so _lab0 is the AUTHORED base and the sliders
+     do not double-scale */
+  var _gr=E('D3X._lookLights')||[];
   _lights.forEach(function(l,i){
-    l.userData._lab0=l.userData._lab0===undefined?l.intensity:l.userData._lab0;
+    if(l.userData._lab0===undefined)
+      l.userData._lab0=l.intensity/((typeof _gr[i]==='number'&&_gr[i]>0)?_gr[i]:1);
     var nm=l.type.replace('Light','').toLowerCase();
     h+='<label>'+nm+' light <input type="range" min="0" max="220" value="'+Math.round(l.intensity/(l.userData._lab0||1)*100)+'" oninput="lightSet('+i+',this.value)"> <span id="lv'+i+'">'+Math.round(l.intensity*100)/100+'</span></label>';
   });
@@ -1163,7 +1168,10 @@ function lightSet(i,v){var l=_lights[i];if(!l)return;
 function bounceSet(v){
   var dx=E('window.D3X');if(!dx||!dx.scene)return;
   var T=W.__labEval('THREE');
-  if(!_bounce){_bounce=new T.DirectionalLight(0xffe8c8,0);
+  /* P754: adopt the game's own boot-applied fill rather than adding a
+     second sun on top of it */
+  if(!_bounce)_bounce=dx.scene.getObjectByName('fkBounce')||null;
+  if(!_bounce){_bounce=new T.DirectionalLight(0xffe8c8,0);_bounce.name='fkBounce';
     _bounce.position.set(0,-1,0.6);dx.scene.add(_bounce);}
   _bounce.intensity=v/100*0.8;
   var sp=document.getElementById('lvB');if(sp)sp.textContent=v>0?(_bounce.intensity.toFixed(2)):'off';saveLook();}
@@ -1282,7 +1290,8 @@ function saveLook(){
       maskAmt:v('dgAmt'),maskAxis:(document.getElementById('dgAxis')||{}).value,
       bounce:_bounce?+_bounce.intensity.toFixed(3):0,
       lights:_lights.map(function(l){return +(l.intensity/(l.userData._lab0||1)).toFixed(3);}),
-      GLOW:E('JSON.parse(JSON.stringify(D3X.GLOW))')};
+      GLOW:E('JSON.parse(JSON.stringify(D3X.GLOW))'),
+      CG:E('JSON.parse(JSON.stringify(D3X.CARD_GLOW))')};/* P754 */
     try{localStorage.fkLabLook=JSON.stringify(lk);}catch(e){}
   },400);
 }
@@ -1307,6 +1316,12 @@ function applyLook(){
     Object.keys(map).forEach(function(k){
       if(lk.GLOW[k]!==undefined)set(map[k][0],lk.GLOW[k]*map[k][1]);});
     E('D3X._drawGlow&&D3X._drawGlow()');}
+  /* P754: the card halo's own dials ride the same record */
+  if(lk.CG){Object.keys(lk.CG).forEach(function(k){
+      E('D3X.CARD_GLOW.'+k+'='+JSON.stringify(lk.CG[k]));});
+    var cmap={soft:['cgSoft',1],rim:['cgRim',1],strength:['cgStr',100],floor:['cgFloor',100]};
+    Object.keys(cmap).forEach(function(k){
+      if(lk.CG[k]!==undefined)set(cmap[k][0],lk.CG[k]*cmap[k][1]);});}
   log('saved look applied - this browser remembers it');
 }
 function copyLook(){

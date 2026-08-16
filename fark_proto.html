@@ -25700,6 +25700,71 @@ var D3X={
     /* P753: a selector between the two SCREEN ramps, not a world vector */
     u.uAxSel.value=(g.ax==='y')?1:0;
   },
+  /* P754: THE APPROVED LOOK IS THE GAME'S LOOK. The lab saves every
+     number Denis signs off to localStorage.fkLabLook (same origin); the
+     game applies the same record at boot, so standalone play looks like
+     the lab session did. The lab compensates when it attaches on top -
+     see _lookLights below and buildLights in the lab. */
+  _applyLabLook:function(){
+    if(this._lookApplied)return;this._lookApplied=1;
+    var lk=null;try{lk=JSON.parse(localStorage.fkLabLook||'null');}catch(e){}
+    if(!lk)return;
+    var self=this;
+    try{
+      if(lk.sd!==null&&lk.sd!==undefined)this.SIDEDIM_MAX=+lk.sd;
+      if(lk.maskAmt!==null&&lk.maskAmt!==undefined)
+        this.setGrad(lk.maskAxis||this.GRAD.ax,(+lk.maskAmt)/100);
+      /* known keys only: old records carry retired dials (fb*) */
+      var KG=['soft','rim','rimPasses','softPasses','line','grow','clear',
+              'strength','sx','sy','dy'];
+      if(lk.GLOW)KG.forEach(function(k){
+        if(lk.GLOW[k]!==undefined)self.GLOW[k]=lk.GLOW[k];});
+      var KC=['soft','rim','strength','floor','round','line','col','softCol'];
+      if(lk.CG)KC.forEach(function(k){
+        if(lk.CG[k]!==undefined)self.CARD_GLOW[k]=lk.CG[k];});
+      /* lights: ratios in scene traverse order - the lab's own order */
+      if(lk.lights&&lk.lights.length&&this.scene){
+        var Ls=[];this.scene.traverse(function(o){if(o.isLight)Ls.push(o);});
+        this._lookLights=[];
+        lk.lights.forEach(function(r,i){
+          if(Ls[i]&&typeof r==='number'&&r>0){
+            Ls[i].intensity*=r;self._lookLights[i]=r;}});
+      }
+      if(lk.bounce&&this.scene&&!this.scene.getObjectByName('fkBounce')){
+        var b=new THREE.DirectionalLight(0xffe8c8,+lk.bounce);
+        b.name='fkBounce';b.position.set(0,-1,0.6);this.scene.add(b);
+      }
+      this._applyLookDom(lk);
+    }catch(e){try{console.warn('[D3X] look apply failed:',e);}catch(e2){}}
+  },
+  /* the DOM half: vignette, centre light, shadow depth - ported from the
+     lab's vigSet, SAME element ids so an attached lab edits these very
+     overlays instead of stacking its own */
+  _applyLookDom:function(lk){
+    var a=(+lk.vgA||0)/100,r=(+lk.vgR||45),cc=(+lk.vgC||0)/100;
+    var msd=document.getElementById('matchShadows');
+    if(msd)msd.style.filter=(lk.sh>0)?('brightness('+(1-lk.sh/100)+')'):'';
+    if(!(a>0)&&!(cc>0))return;
+    var cvs=document.getElementById('d3xCanvas');
+    var ms=document.getElementById('screen-match');
+    var host=(cvs&&cvs.parentElement)||ms;
+    if(!host)return;
+    if(getComputedStyle(host).position==='static')host.style.position='relative';
+    var place=function(el){
+      if(cvs&&cvs.parentElement===host)host.insertBefore(el,cvs);
+      else host.appendChild(el);
+    };
+    var vg=document.getElementById('labVig');
+    if(!vg){vg=document.createElement('div');vg.id='labVig';
+      vg.style.cssText='position:absolute;inset:0;pointer-events:none;mix-blend-mode:multiply';
+      place(vg);}
+    vg.style.background='radial-gradient(ellipse at 50% 46%, rgba(16,10,4,0) '+r+'%, rgba(16,10,4,'+a.toFixed(2)+') 100%)';
+    var cl=document.getElementById('labCenter');
+    if(!cl){cl=document.createElement('div');cl.id='labCenter';
+      cl.style.cssText='position:absolute;inset:0;pointer-events:none;mix-blend-mode:screen';
+      place(cl);}
+    cl.style.background='radial-gradient(ellipse at 50% 46%, rgba(255,214,150,'+cc.toFixed(2)+') 0%, rgba(255,214,150,0) '+Math.max(20,r-5)+'%)';
+  },
   /* P752: the world-space mask, injected into the die's Lambert. The
      bake dims every side face FLAT at strength k; this term relights
      each pixel toward the mask's bright end along a WORLD axis, and the
@@ -26494,6 +26559,7 @@ var D3X={
       var q=self._need;self._need=[];
       q.forEach(function(f){f&&f();});
       self.frame();
+      try{self._applyLabLook();}catch(e){}/* P754: the approved look */
     };
     /* P551: THE SECOND HALF-RECORDED FAILURE, and the one I did not know was
        here - the gate on the first patch found it. A model that fails to load
