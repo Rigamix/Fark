@@ -1307,12 +1307,14 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
      is by definition outside it. D3X.cardGlow paints it on a canvas now.
      What stays is what works IN bounds: the contact shadow and the lift
      in brightness. */
-  filter:drop-shadow(0 0.9cqw 1.3cqw rgba(10,6,2,.5))
-    brightness(calc(1.06 + 0.18*var(--arm,0)))}
+  /* P757: NO dark drop-shadow here - the halo canvas under the card is
+     the card's grounding now, and this shadow painted OVER it, which is
+     the dark ring Denis circled. brightness alone still overrides the
+     resting card's shadow pair, because a filter REPLACES the property. */
+  filter:brightness(calc(1.06 + 0.18*var(--arm,0)))}
 /* cannot-play greys IN from the first pixel, on the same value */
 #famRowP .fcv.fcv-drag.fcv-cant{
-  filter:saturate(calc(1 - 0.82*var(--arm,0))) brightness(calc(1 - 0.5*var(--arm,0)))
-    drop-shadow(0 0.25cqw 0.3cqw rgba(10,6,2,.5))}
+  filter:saturate(calc(1 - 0.82*var(--arm,0))) brightness(calc(1 - 0.5*var(--arm,0)))}/* P757: no dark ring over the halo */
 #famWhyNot.on,#famWhyNot{transition:opacity .12s linear}
 #famRowP .fcv.armed,#screen-match #famRowO .fcv.armed{
   /* P713: Denis could not see the old single soft shadow under a card in
@@ -1329,8 +1331,8 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
      for both. The lift and the warmth stay: neither is a filter that
      needs to reach outside the card. */
   scale:1.09;
-  filter:drop-shadow(0 0.9cqw 1.3cqw rgba(10,6,2,.5))
-  brightness(1.22)}/* P576: third of the three */
+  filter:brightness(1.22)}/* P576: third of the three; P757: the halo
+  grounds an armed card - its dark shadow painted over the glow */
 /* P576: THE BOB. fcvFloat was checked first and rejected with a reason: it
    exists, but it is already bound to `#ptvFan .fcv.zoom .fcvIn`, so redefining
    it would silently change the peek fan. This one lives on .fcvIn rather than
@@ -25688,15 +25690,16 @@ var D3X={
      must be 'very gradual and unnoticeable'. Lambert still cannot blend
      two maps, so gradual = QUANTIZED BAKES: steps of ~4%% walked on a
      smoothstepped ramp, each cached per composed map + value + step. */
-  SIDEDIM_MAX:0.82,/* P732: 0.5 -> 0.82, masked by SIDEDIM_GRAD */
+  SIDEDIM_MAX:0.86,/* P757: 0.82 -> 0.86, Denis's numbers; masked by SIDEDIM_MASK */
   /* P720 landed the ramp WITH the die; P753 leads it - the shadow is
      fully on `lead` ms before the die rests (Denis: 'a bit earlier
      still'). */
   SIDEDIM_RAMP:{delay:0,dur:350,steps:8,lead:140},
-  /* P732: the dim is STRONGER but fades ACROSS each face - Denis's final
-     numbers went horizontal and subtler. GRAD is the fraction of the dim
-     masked away at the right edge of each cell (all dice). */
-  SIDEDIM_GRAD:0.14,
+  /* P757: the mask carries Denis's approved axis and amount - the exact
+     per-cell gradient the lab override bakes (axis picks the cell's UV
+     direction, the sign flips which end holds full shadow), so what he
+     tuned in the lab IS the shipped bake. */
+  SIDEDIM_MASK:{axis:'x', amt:0.3},
   /* P754: THE APPROVED LOOK IS THE GAME'S LOOK. The lab saves every
      number Denis signs off to localStorage.fkLabLook (same origin); the
      game applies the same record at boot, so standalone play looks like
@@ -25705,7 +25708,12 @@ var D3X={
   _applyLabLook:function(){
     if(this._lookApplied)return;this._lookApplied=1;
     var lk=null;try{lk=JSON.parse(localStorage.fkLabLook||'null');}catch(e){}
-    if(!lk)return;
+    /* P757: no lab save means the APPROVED DEFAULTS, not nothing - the
+       phone and the Pages build have no localStorage record, and the
+       room Denis signed off (vignette 72/48, no centre boost, shadows
+       at normal) must not depend on one. Dials and lights are already
+       authored values above; only the DOM half needs the record. */
+    if(!lk)lk={vgA:72,vgR:48,vgC:0,sh:0};
     var self=this;
     try{
       if(lk.sd!==null&&lk.sd!==undefined)this.SIDEDIM_MAX=+lk.sd;
@@ -25766,7 +25774,8 @@ var D3X={
     if(!tex||!tex.image||!v||!k)return null;
     if(!tex.userData)tex.userData={};
     var dm=tex.userData.dimMaps||(tex.userData.dimMaps={});
-    var kq=Math.round(k*1000)/1000,key=v+'|'+kq;
+    var _mkk=this.SIDEDIM_MASK||{};
+    var kq=Math.round(k*1000)/1000,key=v+'|'+kq+'|'+(_mkk.axis||'')+(_mkk.amt||0);
     if(dm[key])return dm[key];
     var im=tex.image;
     var w=im.width||im.naturalWidth,h=im.height||im.naturalHeight;
@@ -25782,19 +25791,21 @@ var D3X={
     var cx=cv.getContext('2d');
     cx.drawImage(im,0,0,w,h);
     cx.globalCompositeOperation='multiply';
-    /* P732: the dim fades toward each face's BASE (SIDEDIM_GRAD masks
-       that fraction of it) - a per-cell vertical gradient of the multiply
-       colour rather than one flat fill. The scoring cell is repainted
-       bright below exactly as before, so top faces are untouched. */
-    var _gd=this.SIDEDIM_GRAD||0;
+    /* P732/P757: the dim fades ACROSS each cell along the mask's axis -
+       the same math as the lab's override (sgn flips which end holds the
+       full shadow), so the shipped bake and the tuning surface agree. */
+    var _mk=this.SIDEDIM_MASK||{axis:'y',amt:0};
+    var _gd=Math.abs(_mk.amt||0),_sgn=(_mk.amt||0)>0?1:-1;
     var _colAt=function(kk){return 'rgb('+fc.map(function(f){
       return Math.round(255*(1-(1-f)*kk));}).join(',')+')';};
     var _cw=w/3,_ch=h/2;
     for(var _cy=0;_cy<2;_cy++)for(var _cx2=0;_cx2<3;_cx2++){
       var _x0=_cx2*_cw,_y0=_cy*_ch;
-      var _gr=cx.createLinearGradient(0,_y0,0,_y0+_ch);
-      _gr.addColorStop(0,_colAt(kq));
-      _gr.addColorStop(1,_colAt(kq*(1-_gd)));
+      var _gr=(_mk.axis==='x')
+        ?cx.createLinearGradient(_x0,0,_x0+_cw,0)
+        :cx.createLinearGradient(0,_y0,0,_y0+_ch);
+      _gr.addColorStop(_sgn>0?0:1,_colAt(kq));
+      _gr.addColorStop(_sgn>0?1:0,_colAt(kq*(1-_gd)));
       cx.fillStyle=_gr;cx.fillRect(_x0,_y0,_cw,_ch);
     }
     cx.globalCompositeOperation='source-over';
@@ -26480,11 +26491,14 @@ var D3X={
        brightest, lifted darkest, less contrast between adjacent faces.
        This is a DELIBERATE departure from "match D3's constant", not a drift:
        the constant was right for a renderer that showed one face. */
-    /* P732: key 0.38 -> 0.524 and a warm bounce fill from below, per
-       Denis's approved lab numbers. Ambient stays 0.72 (matched). */
-    var key=new THREE.DirectionalLight(0xffffff,0.524);key.position.set(0,0.33,0.94);sc.add(key);
-    sc.add(new THREE.AmbientLight(0xffffff,0.72));
-    var bounce=new THREE.DirectionalLight(0xffe8c8,0.12);bounce.position.set(0,-1,0.6);sc.add(bounce);
+    /* P732 set the first approved rig; P757 bakes the second: key 0.998,
+       ambient 0.533, bounce 0.296. His export carried THREE stacked warm
+       fills (the game's, P754's fkBounce, the lab's own) - same colour,
+       same direction, so they sum linearly into this one light. Named,
+       so the lab adopts it instead of adding another. */
+    var key=new THREE.DirectionalLight(0xffffff,0.998);key.position.set(0,0.33,0.94);sc.add(key);
+    sc.add(new THREE.AmbientLight(0xffffff,0.533));
+    var bounce=new THREE.DirectionalLight(0xffe8c8,0.296);bounce.name='fkBounce';bounce.position.set(0,-1,0.6);sc.add(bounce);
     this.cam=new THREE.PerspectiveCamera(this.FOV,1,1,20000);
     var onModel=function(g){
       var proto=g.scene;
