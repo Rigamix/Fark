@@ -59,9 +59,14 @@ G.phase='choosing';
 /* powder_keg has no FAM_NEEDS entry, so it is playable whenever the
    phase allows - honeytrap needed a pair my rigging never really made,
    and the last run silently measured the fcv-cant branch instead */
-G.pF=[{id:'powder_keg',tier:2,charges:2,state:{}}];
+/* P751: THREE cards, so the first carries the fan's rotate:-6.5deg -
+   a single card is :only-child at 0deg and cannot show whether the halo
+   follows rotation */
+G.pF=[{id:'powder_keg',tier:2,charges:2,state:{}},
+      {id:'stargazer',tier:1,charges:1,state:{}},
+      {id:'transmute',tier:1,charges:1,state:{}}];
 famRenderRow();
-await sleep(220);
+await sleep(300);
 /* PROVE THE PRECONDITION. A glow is correctly absent on a card that
    cannot be played, so a zero here means nothing unless this is empty. */
 out.why=(typeof _famWhyNot==='function')?(_famWhyNot(G.pF[0])||''):'(no _famWhyNot)';
@@ -88,6 +93,20 @@ await sleep(120);
 out.arm=fcv.style.getPropertyValue('--arm');
 out.cardGlow=litOf('dgCanvasHi');
 out.cant=fcv.classList.contains('fcv-cant');
+/* the halo's principal axis, from second moments of its lit pixels: an
+   axis-aligned box reads ~0deg; a halo that follows the card's own
+   rotate:-6.5deg tilts with it */
+out.tilt=(()=>{
+  const c=document.getElementById('dgCanvasHi');if(!c)return null;
+  const d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;
+  let n=0,sx=0,sy=0;
+  for(let i=3;i<d.length;i+=4)if(d[i]>40){const px=(i>>2)%c.width,py=(i>>2)/c.width|0;n++;sx+=px;sy+=py;}
+  if(n<100)return null;
+  const mx=sx/n,my=sy/n;let xx=0,yy=0,xy=0;
+  for(let i=3;i<d.length;i+=4)if(d[i]>40){const px=(i>>2)%c.width-mx,py=((i>>2)/c.width|0)-my;xx+=px*px;yy+=py*py;xy+=px*py;}
+  return +(0.5*Math.atan2(2*xy,xx-yy)*180/Math.PI).toFixed(2);
+})();
+out.fcvRotate=getComputedStyle(fcv).rotate;
 /* held, so the screenshot catches it mid-air; rect is page coords - no iframe */
 const rr=fcv.getBoundingClientRect();
 out.card={x:Math.round(rr.left),y:Math.round(rr.top),w:Math.round(rr.width),h:Math.round(rr.height)};
