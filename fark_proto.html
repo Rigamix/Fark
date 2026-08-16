@@ -25642,12 +25642,81 @@ var D3X={
      must be 'very gradual and unnoticeable'. Lambert still cannot blend
      two maps, so gradual = QUANTIZED BAKES: steps of ~4%% walked on a
      smoothstepped ramp, each cached per composed map + value + step. */
-  SIDEDIM_MAX:0.82,/* P732: 0.5 -> 0.82, masked by SIDEDIM_GRAD */
+  SIDEDIM_MAX:0.82,/* P732: 0.5 -> 0.82, relit along GRAD's axis (P752) */
   SIDEDIM_RAMP:{delay:0,dur:350,steps:8},/* P720: twice as fast, lands WITH the die */
-  /* P732: the dim is STRONGER but fades ACROSS each face - Denis's final
-     numbers went horizontal and subtler. GRAD is the fraction of the dim
-     masked away at the right edge of each cell (all dice). */
-  SIDEDIM_GRAD:0.14,
+  /* P752: the mask is WORLD-SPACE now. P732 baked it into each face's
+     atlas cell - the die's own UV space, which rotates with the die, so
+     the axis slider chose directions in a space no two settled dice
+     share. ax 'x' = the table's left-to-right, 'y' = top-to-bottom
+     (world Z); amt is the fraction of the dim relit at the bright end,
+     signed to flip ends. Applied in the material as a per-pixel term -
+     see _gradHook - so setGrad is uniforms only, no rebake. */
+  GRAD:{ax:'x', amt:0.14},
+  setGrad:function(ax,amt){
+    this.GRAD.ax=ax||this.GRAD.ax;
+    if(amt!==undefined)this.GRAD.amt=+amt;
+    var self=this;
+    this.dice.forEach(function(d){
+      if(!d.obj)return;
+      d.obj.traverse(function(o){
+        if(o.isMesh&&o.material&&o.material.userData.fkG)
+          self._syncGrad(o.material.userData.fkG);
+      });
+    });
+  },
+  _syncGrad:function(u){
+    var g=this.GRAD;
+    u.uAmt.value=g.amt||0;
+    if(g.ax==='y')u.uAx.value.set(0,0,1);
+    else u.uAx.value.set(1,0,0);
+  },
+  /* P752: the world-space mask, injected into the die's Lambert. The
+     bake dims every side face FLAT at strength k; this term relights
+     each pixel toward the mask's bright end along a WORLD axis, and the
+     top face is excluded by world normal exactly as the bake excludes
+     the scoring cell. uK rides the same settle ramp the bake steps
+     through, written wherever _dimMap is applied. */
+  _gradHook:function(o){
+    var m=o.material;
+    if(!m||m.userData.fkG)return;
+    var u={uK:{value:0},uAmt:{value:0},uAx:{value:new THREE.Vector3(1,0,0)},
+           uSpan:{value:1},uDim:{value:new THREE.Color(this.SIDEDIM)}};
+    m.userData.fkG=u;
+    try{
+      if(!o.geometry.boundingBox)o.geometry.computeBoundingBox();
+      var bb=o.geometry.boundingBox;
+      u.uSpan.value=Math.max(0.2,bb.max.x-bb.min.x);
+    }catch(e){}
+    this._syncGrad(u);
+    m.onBeforeCompile=function(sh){
+      sh.uniforms.fkK=u.uK;sh.uniforms.fkAmt=u.uAmt;sh.uniforms.fkAx=u.uAx;
+      sh.uniforms.fkSpan=u.uSpan;sh.uniforms.fkDim=u.uDim;
+      sh.vertexShader=sh.vertexShader
+        .replace('#include <common>',
+          '#include <common>\nvarying vec3 vFkW;varying vec3 vFkC;varying vec3 vFkN;')
+        .replace('#include <worldpos_vertex>',
+          '#include <worldpos_vertex>\n'
+          +'vFkW=(modelMatrix*vec4(position,1.0)).xyz;\n'
+          +'vFkC=(modelMatrix*vec4(0.0,0.0,0.0,1.0)).xyz;\n'
+          +'vFkN=normalize(mat3(modelMatrix[0].xyz,modelMatrix[1].xyz,modelMatrix[2].xyz)*normal);');
+      sh.fragmentShader=sh.fragmentShader
+        .replace('#include <common>',
+          '#include <common>\nvarying vec3 vFkW;varying vec3 vFkC;varying vec3 vFkN;\n'
+          +'uniform float fkK;uniform float fkAmt;uniform vec3 fkAx;'
+          +'uniform float fkSpan;uniform vec3 fkDim;')
+        .replace('#include <map_fragment>',
+          '#include <map_fragment>\n'
+          +'if(fkK>0.001&&abs(fkAmt)>0.0001){\n'
+          +'  float fkT=clamp(0.5+dot(vFkW-vFkC,fkAx)/fkSpan,0.0,1.0);\n'
+          +'  float fkM=1.0-smoothstep(0.55,0.85,dot(normalize(vFkN),vec3(0.0,1.0,0.0)));\n'
+          +'  float fkKt=fkK*(1.0-abs(fkAmt)*(fkAmt>0.0?fkT:(1.0-fkT)));\n'
+          +'  vec3 fkA=vec3(1.0)-(vec3(1.0)-fkDim)*fkKt;\n'
+          +'  vec3 fkF=vec3(1.0)-(vec3(1.0)-fkDim)*fkK;\n'
+          +'  diffuseColor.rgb*=mix(vec3(1.0),fkA/max(fkF,vec3(0.02)),fkM);\n'
+          +'}');
+    };
+    m.needsUpdate=true;
+  },
   _dimMap:function(tex,v,k){
     if(!tex||!tex.image||!v||!k)return null;
     if(!tex.userData)tex.userData={};
@@ -25668,21 +25737,11 @@ var D3X={
     var cx=cv.getContext('2d');
     cx.drawImage(im,0,0,w,h);
     cx.globalCompositeOperation='multiply';
-    /* P732: the dim fades toward each face's BASE (SIDEDIM_GRAD masks
-       that fraction of it) - a per-cell vertical gradient of the multiply
-       colour rather than one flat fill. The scoring cell is repainted
-       bright below exactly as before, so top faces are untouched. */
-    var _gd=this.SIDEDIM_GRAD||0;
-    var _colAt=function(kk){return 'rgb('+fc.map(function(f){
-      return Math.round(255*(1-(1-f)*kk));}).join(',')+')';};
-    var _cw=w/3,_ch=h/2;
-    for(var _cy=0;_cy<2;_cy++)for(var _cx2=0;_cx2<3;_cx2++){
-      var _x0=_cx2*_cw,_y0=_cy*_ch;
-      var _gr=cx.createLinearGradient(0,_y0,0,_y0+_ch);
-      _gr.addColorStop(0,_colAt(kq));
-      _gr.addColorStop(1,_colAt(kq*(1-_gd)));
-      cx.fillStyle=_gr;cx.fillRect(_x0,_y0,_cw,_ch);
-    }
+    /* P752: FLAT again. P732's per-cell gradient was the mask baked into
+       the die's own UV space, which rotates with the die - the world-space
+       version lives in _gradHook's shader term now, so the bake carries
+       only the strength and the caches never depend on the mask. */
+    cx.fillStyle=col;cx.fillRect(0,0,w,h);
     cx.globalCompositeOperation='source-over';
     /* the scoring face, back at its authored brightness - same cell
        geometry as _brandedMap: 3x2, col (v-1)%3, row (v-1)/3 */
@@ -25851,6 +25910,7 @@ var D3X={
       if(!m.userData.liveMap)m.userData.liveMap=m.map;
       var want=(_kk>0?self._dimMap(m.userData.liveMap,d.phys.v,_kk):null)||m.userData.liveMap;
       if(m.map!==want){m.map=want;m.needsUpdate=true;}
+      if(m.userData.fkG)m.userData.fkG.uK.value=_kk;/* P752 */
     });
   },
   /* k=0 is the die as painted, k=1 is fully in shadow, k>1 is the bust wipe
@@ -26613,6 +26673,7 @@ var D3X={
         o.material.userData.baseMap=_pipTex;
         self._dress(o.material,mat,sk);
         self._faceLayers(o.material,mat,ench,col);/* P552 */
+        self._gradHook(o);/* P752: the world-space shadow mask */
       }
     });
     g.add(m);
@@ -27082,6 +27143,7 @@ var D3X={
              poisoning _airTint's comment warns about). */
           try{d.obj.traverse(function(o){var m=o.isMesh&&o.material;
             if(m&&m.userData&&m.userData.liveMap&&m.map!==m.userData.liveMap){m.map=m.userData.liveMap;m.needsUpdate=true;}
+            if(m&&m.userData&&m.userData.fkG)m.userData.fkG.uK.value=0;/* P752 */
           });}catch(e){}
           D3X._shDirty=true;
         }
@@ -27151,6 +27213,7 @@ var D3X={
               if(!m.userData.liveMap)m.userData.liveMap=m.map;
               var want=(_kkL>0&&R2&&R2.val?D3X._dimMap(m.userData.liveMap,R2.val,_kkL):null)||m.userData.liveMap;
               if(m.map!==want){m.map=want;m.needsUpdate=true;}
+              if(m.userData.fkG)m.userData.fkG.uK.value=_kkL;/* P752 */
             });
           })();
           D3X._weightOutline(d);
