@@ -25137,7 +25137,11 @@ var D3X={
      language, two shapes. `floor` is why a card lights the moment it
      leaves the row instead of ramping up from invisible; `line:0` keeps
      the crisp rim off a bounding-box hull. */
-  CARD_GLOW:{col:'#ffe6a4', soft:'#ffa93a', round:0.075, line:0, floor:0.42},
+  /* P753: the stamp's real knobs - reach/core/strength were GLOW's
+     before, so the lab's card sliders drove nothing the card halo read.
+     softCol is the outer wash colour (soft is now the blur reach). */
+  CARD_GLOW:{col:'#ffe6a4', softCol:'#ffa93a', soft:11, rim:3, strength:0.91,
+    round:0.075, line:0, floor:0.42},
   GLOW:{soft:11, rim:3, rimPasses:5, softPasses:1, line:3.2, grow:1.004, clear:0.7, strength:0.91,
         /* P731: the SOFT pass can stretch and lean - sx/sy scale the
            silhouette, dy biases it vertically. 1/1/0 = today's look
@@ -25252,8 +25256,13 @@ var D3X={
      A shape is a hull (array of screen-space points, the dice) or
      {stamp:{img,cx,cy,w,h,rot}} - the subject's own image drawn at its
      screen position, rotation and scale (the cards). */
-  _paintHalo:function(cv,x,sc,dpr,sel,COL,SOFT,alphaMul,lineW){
+  _paintHalo:function(cv,x,sc,dpr,sel,COL,SOFT,alphaMul,lineW,opts){
     var self=this,G=this.GLOW;
+    /* P753: reach/core/strength are the CALLER's when given - the card
+       halo tunes independently of the dice without borrowing dials */
+    var SOFTR=(opts&&opts.soft!==undefined)?opts.soft:G.soft;
+    var RIMR=(opts&&opts.rim!==undefined)?opts.rim:G.rim;
+    var STR=(opts&&opts.strength!==undefined)?opts.strength:G.strength;
     var LINE=(lineW===undefined)?G.line:lineW;
     var g=this._glowTmp||(this._glowTmp=document.createElement('canvas'));
     if(g.width!==cv.width||g.height!==cv.height){g.width=cv.width;g.height=cv.height;}
@@ -25317,6 +25326,23 @@ var D3X={
         mx.drawImage(cur,0,0,cw,ch,0,0,nw,nh);
         cur=m;cw=nw;ch=nh;
       }
+      /* P753: BACK UP IN 2x STEPS. One bilinear jump from 1/16 scale is
+         the stair-step Denis photographed - each halving step down gets a
+         matching doubling step up, and every step is another smoothing
+         tap. A second canvas set, because a canvas cannot cleanly scale
+         into itself. */
+      self._mups=self._mups||[];
+      for(var ui=n-2;ui>=0;ui--){
+        var um=self._mups[ui]||(self._mups[ui]=document.createElement('canvas'));
+        var uw=self._mips[ui].width,uh=self._mips[ui].height;
+        if(um.width!==uw||um.height!==uh){um.width=uw;um.height=uh;}
+        var ux=um.getContext('2d');
+        ux.setTransform(1,0,0,1,0,0);
+        ux.clearRect(0,0,uw,uh);
+        ux.imageSmoothingEnabled=true;
+        ux.drawImage(cur,0,0,cw,ch,0,0,uw,uh);
+        cur=um;cw=uw;ch=uh;
+      }
       dst.save();
       dst.setTransform(1,0,0,1,0,0);
       dst.imageSmoothingEnabled=true;
@@ -25328,13 +25354,13 @@ var D3X={
     sxc.globalCompositeOperation='source-over';
     sxc.clearRect(0,0,sc.width,sc.height);
     sel.forEach(function(sh){lay(sxc,sh,SOFT,{dy:G.dy,sx:G.sx,sy:G.sy});});
-    blurOnto(gx,G.soft,G.softPasses||1);
+    blurOnto(gx,SOFTR,G.softPasses||1);
     /* then the bright rim, stacked - the punch-out below throws away the
        inner half of every blur, so a single pass never reads as strong */
     sxc.setTransform(dpr,0,0,dpr,0,0);
     sxc.clearRect(0,0,sc.width,sc.height);
     sel.forEach(function(sh){lay(sxc,sh,COL,{});});
-    blurOnto(gx,G.rim,G.rimPasses||1);
+    blurOnto(gx,RIMR,G.rimPasses||1);
     /* cut the subject back out EXACTLY on its painted edge: everything
        left is outside the shape, which is the whole point. clear widens
        the cut a hair past the edge - see the note above GLOW. */
@@ -25362,7 +25388,7 @@ var D3X={
     /* additive, so it reads as light rather than paint */
     x.save();
     x.globalCompositeOperation='lighter';
-    x.globalAlpha=G.strength*(alphaMul===undefined?1:alphaMul);
+    x.globalAlpha=STR*(alphaMul===undefined?1:alphaMul);
     x.drawImage(g,0,0,sc.width,sc.height);
     x.restore();
   },
@@ -25467,8 +25493,9 @@ var D3X={
         shape={hull:self._rectHull(r.left-sc.left,r.top-sc.top,r.width,r.height,
           Math.min(r.width,r.height)*CG.round)};
       }
-      self._paintHalo(cv,x,sc,dpr,[shape],e.col||CG.col,e.col||CG.soft,
-        CG.floor+(1-CG.floor)*Math.min(1,e.k),CG.line);
+      self._paintHalo(cv,x,sc,dpr,[shape],e.col||CG.col,e.col||CG.softCol,
+        CG.floor+(1-CG.floor)*Math.min(1,e.k),CG.line,
+        {soft:CG.soft,rim:CG.rim,strength:CG.strength});
     });
   },
   _drawGlow:function(){
@@ -25643,7 +25670,10 @@ var D3X={
      two maps, so gradual = QUANTIZED BAKES: steps of ~4%% walked on a
      smoothstepped ramp, each cached per composed map + value + step. */
   SIDEDIM_MAX:0.82,/* P732: 0.5 -> 0.82, relit along GRAD's axis (P752) */
-  SIDEDIM_RAMP:{delay:0,dur:350,steps:8},/* P720: twice as fast, lands WITH the die */
+  /* P720 landed the ramp WITH the die; P753 leads it - the shadow is
+     fully on `lead` ms before the die rests (Denis: 'a bit earlier
+     still'). */
+  SIDEDIM_RAMP:{delay:0,dur:350,steps:8,lead:140},
   /* P752: the mask is WORLD-SPACE now. P732 baked it into each face's
      atlas cell - the die's own UV space, which rotates with the die, so
      the axis slider chose directions in a space no two settled dice
@@ -25667,8 +25697,8 @@ var D3X={
   _syncGrad:function(u){
     var g=this.GRAD;
     u.uAmt.value=g.amt||0;
-    if(g.ax==='y')u.uAx.value.set(0,0,1);
-    else u.uAx.value.set(1,0,0);
+    /* P753: a selector between the two SCREEN ramps, not a world vector */
+    u.uAxSel.value=(g.ax==='y')?1:0;
   },
   /* P752: the world-space mask, injected into the die's Lambert. The
      bake dims every side face FLAT at strength k; this term relights
@@ -25679,7 +25709,7 @@ var D3X={
   _gradHook:function(o){
     var m=o.material;
     if(!m||m.userData.fkG)return;
-    var u={uK:{value:0},uAmt:{value:0},uAx:{value:new THREE.Vector3(1,0,0)},
+    var u={uK:{value:0},uAmt:{value:0},uAxSel:{value:0},
            uSpan:{value:1},uDim:{value:new THREE.Color(this.SIDEDIM)}};
     m.userData.fkG=u;
     try{
@@ -25689,26 +25719,48 @@ var D3X={
     }catch(e){}
     this._syncGrad(u);
     m.onBeforeCompile=function(sh){
-      sh.uniforms.fkK=u.uK;sh.uniforms.fkAmt=u.uAmt;sh.uniforms.fkAx=u.uAx;
+      sh.uniforms.fkK=u.uK;sh.uniforms.fkAmt=u.uAmt;sh.uniforms.fkAxSel=u.uAxSel;
       sh.uniforms.fkSpan=u.uSpan;sh.uniforms.fkDim=u.uDim;
+      /* P753: CLIP SPACE, not world space. World X is one direction in
+         the world but each face shows its own foreshortened projection
+         of it - which is exactly 'a different axis per die'. The ramp
+         is the fragment's ndc against the die's projected centre,
+         normalised by the die's projected width, so every die wears
+         the same screen direction by construction. */
       sh.vertexShader=sh.vertexShader
         .replace('#include <common>',
-          '#include <common>\nvarying vec3 vFkW;varying vec3 vFkC;varying vec3 vFkN;')
+          '#include <common>\nvarying vec4 vFkClip;varying vec2 vFkC2;varying vec2 vFkSp;varying vec3 vFkN;')
         .replace('#include <worldpos_vertex>',
           '#include <worldpos_vertex>\n'
-          +'vFkW=(modelMatrix*vec4(position,1.0)).xyz;\n'
-          +'vFkC=(modelMatrix*vec4(0.0,0.0,0.0,1.0)).xyz;\n'
-          +'vFkN=normalize(mat3(modelMatrix[0].xyz,modelMatrix[1].xyz,modelMatrix[2].xyz)*normal);');
+          +'vFkClip=projectionMatrix*modelViewMatrix*vec4(position,1.0);\n'
+          +'vec4 fkCv=modelViewMatrix*vec4(0.0,0.0,0.0,1.0);\n'
+          +'vec4 fkCc=projectionMatrix*fkCv;\n'
+          +'vFkC2=fkCc.xy/fkCc.w;\n'
+          +'vec4 fkPx=projectionMatrix*(fkCv+viewMatrix*vec4(fkSpanV,0.0,0.0,0.0));\n'
+          +'vec4 fkPy=projectionMatrix*(fkCv+viewMatrix*vec4(0.0,0.0,fkSpanV,0.0));\n'
+          +'vFkSp=vec2(max(abs(fkPx.x/fkPx.w-vFkC2.x),1e-4),max(abs(fkPy.y/fkPy.w-vFkC2.y),1e-4));\n'
+          +'vFkN=normalize(mat3(modelMatrix[0].xyz,modelMatrix[1].xyz,modelMatrix[2].xyz)*normal);')
+        .replace('#include <common>',
+          '#include <common>\nuniform float fkSpanV;')
+      ;
+      /* the vertex shader sees the span as fkSpanV; the fragment keeps
+         fkSpan as its own name - same uniform value, declared twice
+         under two names would collide, so vertex gets its own */
+      sh.uniforms.fkSpanV=u.uSpan;
       sh.fragmentShader=sh.fragmentShader
         .replace('#include <common>',
-          '#include <common>\nvarying vec3 vFkW;varying vec3 vFkC;varying vec3 vFkN;\n'
-          +'uniform float fkK;uniform float fkAmt;uniform vec3 fkAx;'
+          '#include <common>\nvarying vec4 vFkClip;varying vec2 vFkC2;varying vec2 vFkSp;varying vec3 vFkN;\n'
+          +'uniform float fkK;uniform float fkAmt;uniform float fkAxSel;'
           +'uniform float fkSpan;uniform vec3 fkDim;')
         .replace('#include <map_fragment>',
           '#include <map_fragment>\n'
           +'if(fkK>0.001&&abs(fkAmt)>0.0001){\n'
-          +'  float fkT=clamp(0.5+dot(vFkW-vFkC,fkAx)/fkSpan,0.0,1.0);\n'
-          +'  float fkM=1.0-smoothstep(0.55,0.85,dot(normalize(vFkN),vec3(0.0,1.0,0.0)));\n'
+          +'  vec2 fkD=vFkClip.xy/vFkClip.w-vFkC2;\n'
+          +'  float fkT=clamp(0.5+mix(fkD.x/vFkSp.x,-fkD.y/vFkSp.y,fkAxSel),0.0,1.0);\n'
+          /* P753: the fade spans the WHOLE corner arc - the old
+             0.55..0.85 band was two triangle-rows wide and read as a
+             seam under the top rim */
+          +'  float fkM=1.0-smoothstep(0.18,0.92,dot(normalize(vFkN),vec3(0.0,1.0,0.0)));\n'
           +'  float fkKt=fkK*(1.0-abs(fkAmt)*(fkAmt>0.0?fkT:(1.0-fkT)));\n'
           +'  vec3 fkA=vec3(1.0)-(vec3(1.0)-fkDim)*fkKt;\n'
           +'  vec3 fkF=vec3(1.0)-(vec3(1.0)-fkDim)*fkK;\n'
@@ -25899,7 +25951,7 @@ var D3X={
        treats the settle moment (P720: the shadow lands WITH the die) -
        treating it as the START rewound any die that settled within
        350ms of the tape's end to partial dim at the handoff. */
-    var _k=(performance.now()-((d.phys.t||0)-_R.dur)-_R.delay)/_R.dur;
+    var _k=(performance.now()-((d.phys.t||0)-(_R.lead||0)-_R.dur)-_R.delay)/_R.dur;/* P753: leads the rest */
     _k=_k<0?0:(_k>1?1:_k);
     _k=_k*_k*(3-2*_k);/* smoothstep: no visible start, no visible stop */
     var _kk=(Math.round(_k*_R.steps)/_R.steps)*this.SIDEDIM_MAX;
@@ -27202,7 +27254,7 @@ var D3X={
               }
               _lt=R2.t0+R2._setF*(D3X.PHYS.dt*1000);
             }
-            var _kL=_lt?(performance.now()-(_lt-D3X.SIDEDIM_RAMP.dur))/D3X.SIDEDIM_RAMP.dur:0;
+            var _kL=_lt?(performance.now()-(_lt-(D3X.SIDEDIM_RAMP.lead||0)-D3X.SIDEDIM_RAMP.dur))/D3X.SIDEDIM_RAMP.dur:0;/* P753 */
             if(_kL<0)_kL=0;if(_kL>1)_kL=1;
             _kL=_kL*_kL*(3-2*_kL);
             var _kkL=(Math.round(_kL*D3X.SIDEDIM_RAMP.steps)/D3X.SIDEDIM_RAMP.steps)*D3X.SIDEDIM_MAX;
