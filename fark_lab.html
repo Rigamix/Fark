@@ -1126,13 +1126,20 @@ function buildLights(){
     h+='<label>'+nm+' light <input type="range" min="0" max="220" value="'+Math.round(l.intensity/(l.userData._lab0||1)*100)+'" oninput="lightSet('+i+',this.value)"> <span id="lv'+i+'">'+Math.round(l.intensity*100)/100+'</span></label>';
   });
   h+='<label>bounce fill <input type="range" min="0" max="120" value="0" oninput="bounceSet(this.value)"> <span id="lvB">off</span></label>';
-  h+='<br><label>vignette <input type="range" min="0" max="80" value="0" oninput="vigSet()" id="vgA"> <span id="lvE">off</span></label>';
-  h+='<label>vignette size <input type="range" min="15" max="75" value="45" oninput="vigSet()" id="vgR"></label>';
-  h+='<label>centre light <input type="range" min="0" max="60" value="0" oninput="vigSet()" id="vgC"></label>';
-  h+='<br><label>shadow depth <input type="range" min="0" max="70" value="0" oninput="shadowSet(this.value)"> <span id="lvSh">normal</span></label>';
+  /* P759: the game BOOTS with the baked look applied (P757) - these
+     sliders must open at the live values or the first touch stomps the
+     room back to zero. D3X._lookRec is what the game actually applied. */
+  var _rec=E('D3X._lookRec')||{};
+  h+='<br><label>vignette <input type="range" min="0" max="80" value="'+(+_rec.vgA||0)+'" oninput="vigSet()" id="vgA"> <span id="lvE">'+(_rec.vgA>0?_rec.vgA+'%':'off')+'</span></label>';
+  h+='<label>vignette size <input type="range" min="15" max="75" value="'+(+_rec.vgR||45)+'" oninput="vigSet()" id="vgR"></label>';
+  h+='<label>centre light <input type="range" min="0" max="60" value="'+(+_rec.vgC||0)+'" oninput="vigSet()" id="vgC"></label>';
+  h+='<br><label>shadow depth <input type="range" min="0" max="70" value="'+(+_rec.sh||0)+'" oninput="shadowSet(this.value)"> <span id="lvSh">'+(_rec.sh>0?('-'+_rec.sh+'%'):'normal')+'</span></label>';
   h+='<label>dice side-shadow <input type="range" min="0" max="90" value="'+Math.round((E('D3X.SIDEDIM_MAX')||0.5)*100)+'" oninput="sideSet(this.value)"> <span id="lvS"></span></label>';
-  h+='<br><label>shadow mask <input type="range" min="-100" max="100" value="0" oninput="gradeDice(this.value)" id="dgAmt"> <span id="lvG">off</span></label>';
-  h+='<label>mask axis <select id="dgAxis" onchange="gradeDice(document.getElementById(&quot;dgAmt&quot;).value)"><option value="y">vertical</option><option value="x">horizontal</option></select></label>';
+  /* P759: the mask ships baked (SIDEDIM_MASK) - open at its live value */
+  var _mk=E('D3X.SIDEDIM_MASK')||{axis:'y',amt:0};
+  var _mkV=Math.round((_mk.amt||0)*100);
+  h+='<br><label>shadow mask <input type="range" min="-100" max="100" value="'+_mkV+'" oninput="gradeDice(this.value)" id="dgAmt"> <span id="lvG">'+(_mkV?((_mkV>0?'+':'')+_mkV+' '+_mk.axis):'off')+'</span></label>';
+  h+='<label>mask axis <select id="dgAxis" onchange="gradeDice(document.getElementById(&quot;dgAmt&quot;).value)"><option value="y"'+(_mk.axis!=='x'?' selected':'')+'>vertical</option><option value="x"'+(_mk.axis==='x'?' selected':'')+'>horizontal</option></select></label>';
   h+='<button onclick="lightsReset()" style="margin-left:8px">reset look</button>';
   h+='<button onclick="copyLook()">copy look numbers \u2193</button>';
   h+='<div style="margin-top:8px;border-top:1px dashed #3a2c18;padding-top:6px">'
@@ -1171,8 +1178,11 @@ function bounceSet(v){
   var T=W.__labEval('THREE');
   /* P754: adopt the game's own boot-applied fill rather than adding a
      second sun on top of it */
-  if(!_bounce)_bounce=dx.scene.getObjectByName('fkBounce')||null;
+  if(!_bounce){_bounce=dx.scene.getObjectByName('fkBounce')||null;
+    if(_bounce&&_bounce.userData._lab0===undefined)
+      _bounce.userData._lab0=_bounce.intensity;/* P759: authored base */}
   if(!_bounce){_bounce=new T.DirectionalLight(0xffe8c8,0);_bounce.name='fkBounce';
+    _bounce.userData._lab0=0;
     _bounce.position.set(0,-1,0.6);dx.scene.add(_bounce);}
   _bounce.intensity=v/100*0.8;
   var sp=document.getElementById('lvB');if(sp)sp.textContent=v>0?(_bounce.intensity.toFixed(2)):'off';saveLook();}
@@ -1386,15 +1396,32 @@ function copyLook(){
   log('look numbers in the export box (Advanced tab) - copy them into chat');
 }
 function lightsReset(){
+  /* P759: reset means THE AUTHORED LOOK (P757 baked Denis's numbers as
+     the game's defaults) - the old body restored pre-P757 values and
+     zeroed the mask, so the reset button un-approved the approved look. */
   try{delete localStorage.fkLabLook;}catch(e){}
   _lights.forEach(function(l){if(l.userData._lab0!==undefined)l.intensity=l.userData._lab0;});
-  if(_bounce)_bounce.intensity=0;
-  ['vgA','vgC'].forEach(function(id){var e2=document.getElementById(id);if(e2)e2.value=0;});
-  vigSet();shadowSet(0);gradeDice(0);
-  ['strength',0.78,'soft',10,'rim',3.5,'line',2.4,'sx',1,'sy',1,'dy',0].forEach(function(v,i,arr){
-    if(i%2===0)E('D3X.GLOW.'+arr[i]+'='+arr[i+1]);});
+  if(_bounce)_bounce.intensity=_bounce.userData._lab0||0;
+  var set=function(id,v){var e2=document.getElementById(id);if(e2)e2.value=v;};
+  set('vgA',72);set('vgR',48);set('vgC',0);
+  vigSet();shadowSet(0);
+  E('D3X.SIDEDIM_MAX=0.86');
+  var spS=document.getElementById('lvS');if(spS)spS.textContent='0.86';
+  set('dgAmt',30);var ax=document.getElementById('dgAxis');if(ax)ax.value='x';
+  gradeDice(30);
+  [['strength',0.91],['soft',11],['rim',3],['rimPasses',5],['softPasses',1],
+   ['line',3.2],['grow',1.004],['clear',0.7],['sx',1.14],['sy',1.24],['dy',0]]
+    .forEach(function(p){E('D3X.GLOW.'+p[0]+'='+p[1]);});
+  [['soft',6],['rim',2.5],['strength',0.91],['floor',0.42],['dyF',0],
+   ['grow',1.05],['round',0.075],['line',0]]
+    .forEach(function(p){E('D3X.CARD_GLOW.'+p[0]+'='+p[1]);});
+  set('gStr',91);set('gSoft',11);set('gRim',3);set('gLine',3.2);
+  set('gSx',114);set('gSy',124);set('gDy',0);
+  set('cgSoft',6);set('cgRim',2.5);set('cgStr',91);set('cgFloor',42);set('cgDy',0);
+  E('D3X._drawGlow&&D3X._drawGlow()');E('D3X._drawCardGlows&&D3X._drawCardGlows()');
   glowSelAll(false);
-  buildLights();}
+  buildLights();
+  log('reset to the AUTHORED look - the baked P757 numbers');}
 
 /* ═══ v5: DIE DRESSER - click a die target, give it a material/brand ═══ */
 var _MATS=['lucky','bone','iron','flint','lead','amber','jade','jade2','jade3',
