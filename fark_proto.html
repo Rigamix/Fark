@@ -25140,8 +25140,11 @@ var D3X={
   /* P753: the stamp's real knobs - reach/core/strength were GLOW's
      before, so the lab's card sliders drove nothing the card halo read.
      softCol is the outer wash colour (soft is now the blur reach). */
-  CARD_GLOW:{col:'#ffe6a4', softCol:'#ffa93a', soft:11, rim:3, strength:0.91,
-    round:0.075, line:0, floor:0.42},
+  /* P755: a thin UNDER-glow - dyF drops the halo by that fraction of
+     the card's height, so the silhouette stays the card's own and the
+     level badge at the top corner sits over clean table. */
+  CARD_GLOW:{col:'#ffe6a4', softCol:'#ffa93a', soft:6, rim:2.5, strength:0.91,
+    dyF:0.10, round:0.075, line:0, floor:0.42},
   GLOW:{soft:11, rim:3, rimPasses:5, softPasses:1, line:3.2, grow:1.004, clear:0.7, strength:0.91,
         /* P731: the SOFT pass can stretch and lean - sx/sy scale the
            silhouette, dy biases it vertically. 1/1/0 = today's look
@@ -25353,13 +25356,16 @@ var D3X={
     sxc.setTransform(dpr,0,0,dpr,0,0);
     sxc.globalCompositeOperation='source-over';
     sxc.clearRect(0,0,sc.width,sc.height);
-    sel.forEach(function(sh){lay(sxc,sh,SOFT,{dy:G.dy,sx:G.sx,sy:G.sy});});
+    /* P755: a caller-given dy drops the whole halo (the card's
+       under-glow); the dice keep G.dy on the soft pass as before */
+    var DY=(opts&&opts.dy!==undefined)?opts.dy:null;
+    sel.forEach(function(sh){lay(sxc,sh,SOFT,{dy:(DY!==null)?DY:G.dy,sx:G.sx,sy:G.sy});});
     blurOnto(gx,SOFTR,G.softPasses||1);
     /* then the bright rim, stacked - the punch-out below throws away the
        inner half of every blur, so a single pass never reads as strong */
     sxc.setTransform(dpr,0,0,dpr,0,0);
     sxc.clearRect(0,0,sc.width,sc.height);
-    sel.forEach(function(sh){lay(sxc,sh,COL,{});});
+    sel.forEach(function(sh){lay(sxc,sh,COL,(DY!==null)?{dy:DY}:{});});
     blurOnto(gx,RIMR,G.rimPasses||1);
     /* cut the subject back out EXACTLY on its painted edge: everything
        left is outside the shape, which is the whole point. clear widens
@@ -25368,7 +25374,15 @@ var D3X={
     gx.globalAlpha=1;
     sel.forEach(function(sh){
       if(sh&&sh.stamp){
-        lay(gx,sh,null,{scaleMul:1+(2*G.clear)/Math.max(8,Math.min(sh.stamp.w,sh.stamp.h))});
+        var _pm={scaleMul:1+(2*G.clear)/Math.max(8,Math.min(sh.stamp.w,sh.stamp.h))};
+        lay(gx,sh,null,_pm);
+        /* P755b: a DROPPED halo needs a SWEPT punch - cutting only the
+           true position left a detached band below the card with the
+           punch's own hard edge across it. The cut walks the drop. */
+        if(DY){
+          lay(gx,sh,null,{scaleMul:_pm.scaleMul,dy:DY/2});
+          lay(gx,sh,null,{scaleMul:_pm.scaleMul,dy:DY});
+        }
       }else{
         lay(gx,sh,null,{shrink:-G.clear});
       }
@@ -25495,7 +25509,7 @@ var D3X={
       }
       self._paintHalo(cv,x,sc,dpr,[shape],e.col||CG.col,e.col||CG.softCol,
         CG.floor+(1-CG.floor)*Math.min(1,e.k),CG.line,
-        {soft:CG.soft,rim:CG.rim,strength:CG.strength});
+        {soft:CG.soft,rim:CG.rim,strength:CG.strength,dy:r.height*(CG.dyF||0)});
     });
   },
   _drawGlow:function(){
@@ -25719,7 +25733,7 @@ var D3X={
               'strength','sx','sy','dy'];
       if(lk.GLOW)KG.forEach(function(k){
         if(lk.GLOW[k]!==undefined)self.GLOW[k]=lk.GLOW[k];});
-      var KC=['soft','rim','strength','floor','round','line','col','softCol'];
+      var KC=['soft','rim','strength','floor','round','line','col','softCol','dyF'];
       if(lk.CG)KC.forEach(function(k){
         if(lk.CG[k]!==undefined)self.CARD_GLOW[k]=lk.CG[k];});
       /* lights: ratios in scene traverse order - the lab's own order */
@@ -25785,16 +25799,20 @@ var D3X={
     this._syncGrad(u);
     m.onBeforeCompile=function(sh){
       sh.uniforms.fkK=u.uK;sh.uniforms.fkAmt=u.uAmt;sh.uniforms.fkAxSel=u.uAxSel;
-      sh.uniforms.fkSpan=u.uSpan;sh.uniforms.fkDim=u.uDim;
-      /* P753: CLIP SPACE, not world space. World X is one direction in
-         the world but each face shows its own foreshortened projection
-         of it - which is exactly 'a different axis per die'. The ramp
-         is the fragment's ndc against the die's projected centre,
-         normalised by the die's projected width, so every die wears
-         the same screen direction by construction. */
+      sh.uniforms.fkSpanV=u.uSpan;sh.uniforms.fkDim=u.uDim;
+      /* P753: CLIP SPACE - the fragment's ndc against the die's
+         projected centre over its projected width, so every die wears
+         the same screen direction.
+         P755: the top face is excluded by HEIGHT, not by normal. The
+         authored die is softly bevelled, so its top-face normals
+         spread - and wherever a normal threshold lands, it draws a
+         line across the face (Denis's seam, zoomed and confirmed).
+         World height is continuous over the whole mesh: the relight
+         fades out between 0.15 and 0.42 die-heights above centre,
+         side faces in, top face out, no crease anywhere. */
       sh.vertexShader=sh.vertexShader
         .replace('#include <common>',
-          '#include <common>\nvarying vec4 vFkClip;varying vec2 vFkC2;varying vec2 vFkSp;varying vec3 vFkN;')
+          '#include <common>\nuniform float fkSpanV;varying vec4 vFkClip;varying vec2 vFkC2;varying vec2 vFkSp;varying float vFkHy;')
         .replace('#include <worldpos_vertex>',
           '#include <worldpos_vertex>\n'
           +'vFkClip=projectionMatrix*modelViewMatrix*vec4(position,1.0);\n'
@@ -25804,28 +25822,17 @@ var D3X={
           +'vec4 fkPx=projectionMatrix*(fkCv+viewMatrix*vec4(fkSpanV,0.0,0.0,0.0));\n'
           +'vec4 fkPy=projectionMatrix*(fkCv+viewMatrix*vec4(0.0,0.0,fkSpanV,0.0));\n'
           +'vFkSp=vec2(max(abs(fkPx.x/fkPx.w-vFkC2.x),1e-4),max(abs(fkPy.y/fkPy.w-vFkC2.y),1e-4));\n'
-          +'vFkN=normalize(mat3(modelMatrix[0].xyz,modelMatrix[1].xyz,modelMatrix[2].xyz)*normal);')
-        .replace('#include <common>',
-          '#include <common>\nuniform float fkSpanV;')
-      ;
-      /* the vertex shader sees the span as fkSpanV; the fragment keeps
-         fkSpan as its own name - same uniform value, declared twice
-         under two names would collide, so vertex gets its own */
-      sh.uniforms.fkSpanV=u.uSpan;
+          +'vFkHy=((modelMatrix*vec4(position,1.0)).y-modelMatrix[3][1])/max(length(modelMatrix[1].xyz),1e-4);');
       sh.fragmentShader=sh.fragmentShader
         .replace('#include <common>',
-          '#include <common>\nvarying vec4 vFkClip;varying vec2 vFkC2;varying vec2 vFkSp;varying vec3 vFkN;\n'
-          +'uniform float fkK;uniform float fkAmt;uniform float fkAxSel;'
-          +'uniform float fkSpan;uniform vec3 fkDim;')
+          '#include <common>\nvarying vec4 vFkClip;varying vec2 vFkC2;varying vec2 vFkSp;varying float vFkHy;\n'
+          +'uniform float fkK;uniform float fkAmt;uniform float fkAxSel;uniform vec3 fkDim;')
         .replace('#include <map_fragment>',
           '#include <map_fragment>\n'
           +'if(fkK>0.001&&abs(fkAmt)>0.0001){\n'
           +'  vec2 fkD=vFkClip.xy/vFkClip.w-vFkC2;\n'
           +'  float fkT=clamp(0.5+mix(fkD.x/vFkSp.x,-fkD.y/vFkSp.y,fkAxSel),0.0,1.0);\n'
-          /* P753: the fade spans the WHOLE corner arc - the old
-             0.55..0.85 band was two triangle-rows wide and read as a
-             seam under the top rim */
-          +'  float fkM=1.0-smoothstep(0.18,0.92,dot(normalize(vFkN),vec3(0.0,1.0,0.0)));\n'
+          +'  float fkM=1.0-smoothstep(0.15,0.42,vFkHy);\n'
           +'  float fkKt=fkK*(1.0-abs(fkAmt)*(fkAmt>0.0?fkT:(1.0-fkT)));\n'
           +'  vec3 fkA=vec3(1.0)-(vec3(1.0)-fkDim)*fkKt;\n'
           +'  vec3 fkF=vec3(1.0)-(vec3(1.0)-fkDim)*fkK;\n'
