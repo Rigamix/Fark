@@ -264,3 +264,40 @@ does) or first teach `simTurn` to call it.
 **Next: phase 2** (fold oppShouldBank's context into the candidate
 evaluation; personas as weights), then the action layer (§4/§5).
 
+---
+
+## 7. The pipe - migration inventory (P761/P762)
+
+Denis's ruling: **ALL of it - cards, enchants, special dice - through the
+same pipe.** `NPC_FAM_READY` in the code is the registry and the honest
+tracker: a card is offered to the rival only when its effect is truly
+actor-symmetric.
+
+### Through the pipe now
+| thing | how |
+|---|---|
+| `famUse(i, actor)` | one entry point; owner resolves the list, same CFX effect, same charges, FKFX on the owner's own card element |
+| **preserve** | full loop: their kept scorer captured {val, mat, ench, lane} -> real die redealt in its lane, amber shell + settle crack, priced credit. The fake (`G._oPreserve=100`) is dead |
+| **slow_cook** | one accumulator, either seat (rival's roll seam now carries its roll count) |
+| **pickpocket** | whoever banks lifts from the other purse |
+| **double_or_nothing** | armed via famUse('o') when trailing 1000+; the same flip resolves at their bank, pool by owner |
+| **enchants** | their deal carries ench per seat (rung.dieEnch), every scoring call on their path passes it (fog/encore/rescue/QH/GB/slippery incl.) |
+| **materials** | already flowed (starstone, tint sheets); unchanged |
+| bankBonus seam | FIXED: the rival's seam consumed no delta (fired after the add, return discarded) - every rival bankBonus card was silently void |
+
+### Still bespoke or inert - the remaining sweep, in order
+1. `honeytrap` / `encore` / `stargazer` - bespoke in the roll loop; each needs
+   its CFX actor branch + bespoke removal (same recipe as preserve).
+2. `sleight` / `ill_omen` - bespoke, working, and sleight's PLAYER side is
+   inert (retired); migrating means implementing the player half too or
+   retiring both ways. Ruling per card.
+3. The commit-seam passives (bloom, cultivate, vanguard_f) - ungate on
+   ev.mine once verified their state is per-instance; their seam already
+   fires for the rival via famCommitBonus.
+4. `retort`, `short_fuse`, `fools_gold_f`, `falling_star` - need the bust
+   and deadRoll seams raised in the rival turn (they exist only on the
+   player's), then the same ungate recipe.
+5. The npc legacy actives (`getNpcCard` mechanics: second_wind,
+   double_down, bust saves...) - migrate onto CFX rails card by card,
+   deleting each inline handler in the same move.
+

@@ -238,3 +238,15 @@ watching for consequences.
 and 12 sites across 425, 229 and 885 lines) and need the "which moment is the
 seam" decision; `deadRoll` has no counterpart at all; `rivalTurn` means the
 player's turn when a boss holds the card.
+
+---
+
+## 2026-08-18: THE RULING LANDED (P761/P762)
+
+Denis: "they should be able to use ALL of the same things I can use."
+famUse(i, actor) + NPC_FAM_READY are the pipe and the tracker; preserve,
+slow_cook, pickpocket and double_or_nothing are through it with their
+bespoke copies deleted (the double-fire this doc warned about). The
+rival bankBonus seam also consumed no delta - fixed. Remaining sweep
+order: docs/NPC_AI_BRIEF.md section 7.
+
