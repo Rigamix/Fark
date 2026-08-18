@@ -34425,6 +34425,22 @@ function runOppTurn(){
   }
   function step(){
     if(G!==_matchG||!G||G._endMatchFired)return;/* ghost-timer guard */
+    /* P770: THE ONE RESCORE. Every mid-roll dice mutation (encore, the
+       rescue table, quick hands, grog's bump, slippery table) needs the
+       same tail: rescore the unkept dice through the real scorer, then
+       let the persona re-pick. This was copied five times; hoisted here
+       it reads oppBank and crowsCtx at call time. */
+    function _oppRescore(){
+      var _f=G.oppDice.filter(function(d){return !d.kept;});
+      var _r=_scoreRollBest(
+        _f.map(function(d){return d.val;}),G.oCards,oppBank,crowsCtx,
+        _f.map(function(d){return d.mat;}),
+        _f.map(function(d){return d.ench||null;}));
+      var _t=_r.total,_u=_r.used;
+      var _p=_oppChooseFrom(_f,_t,oppBank);
+      if(_p){_t=_p.pts;_u=_f.map(function(d){return _p.sel.indexOf(d)>=0;});}
+      return {total:_t,used:_u};
+    }
     /* P567 (D22): THE LITERAL IS GONE. This was `oppRollNum>=3` against a
        player side that derived its cap from the rule's record, so a retune
        would have capped the two sides differently under one rule. */
@@ -34705,17 +34721,8 @@ function runOppTurn(){
            peek) lives at the push decision now. */
         /* the continuation below reads _encFree - the same objects the
            reroll just mutated, so mapping now reads the NEW faces */
-        var _encFree=G.oppDice.filter(function(d){return !d.kept;});
         if(_oEnc){
-          var _encV=_encFree.map(function(d){return d.val;}),_encM=_encFree.map(function(d){return d.mat;});
-          var _encE=_encFree.map(function(d){return d.ench||null;});/* P762 */
-          var _encRs=_scoreRollBest(_encV,G.oCards,oppBank,crowsCtx,_encM,_encE);
-          total=_encRs.total;used=_encRs.used;
-          /* P494: the persona chooses. Fog only clouds the FIRST reckoning of a
-             turn, so here the rival sees every free seat. */
-          var _pk_encRs=G.oppDice.filter(function(d){return !d.kept;});
-          var _pc_encRs=_oppChooseFrom(_pk_encRs,total,oppBank);
-          if(_pc_encRs){total=_pc_encRs.pts;used=_pk_encRs.map(function(d){return _pc_encRs.sel.indexOf(d)>=0;});}
+          var _rrE=_oppRescore();total=_rrE.total;used=_rrE.used;/* P770 */
           try{famRenderRow();}catch(e){}
         }
       }
@@ -34740,17 +34747,7 @@ function runOppTurn(){
             npcUseActive(_rescueCid);
             triggerCard(_rescueCid,_rescueLabel,false);
             setStatusMsg(G.rung.name+': '+_rescueLabel,'gold');
-            /* Rescore with mutated dice */
-            var _resFV=G.oppDice.filter(function(d){return !d.kept;}).map(function(d){return d.val;});
-            var _resFM=G.oppDice.filter(function(d){return !d.kept;}).map(function(d){return d.mat;});
-            var _resFE=G.oppDice.filter(function(d){return !d.kept;}).map(function(d){return d.ench||null;});/* P762 */
-            var _resR=_scoreRollBest(_resFV,G.oCards,oppBank,crowsCtx,_resFM,_resFE);
-            total=_resR.total;used=_resR.used;
-          /* P494: the persona chooses. Fog only clouds the FIRST reckoning of a
-             turn, so here the rival sees every free seat. */
-          var _pk_resR=G.oppDice.filter(function(d){return !d.kept;});
-          var _pc_resR=_oppChooseFrom(_pk_resR,total,oppBank);
-          if(_pc_resR){total=_pc_resR.pts;used=_pk_resR.map(function(d){return _pc_resR.sel.indexOf(d)>=0;});}
+            var _rrR=_oppRescore();total=_rrR.total;used=_rrR.used;/* P770 */
           }
         }
       }
@@ -34921,17 +34918,7 @@ function runOppTurn(){
           _qhVics.forEach(function(_qhVic){_qhVic.val=2;reDrawDieFace(_qhVic);});
           triggerCard('quick_hands','QUICK HANDS → 2',true);
           setStatusMsg("QUICK HANDS — "+G.rung.name+"'S "+(_qhVics.length>1?_qhVics.length+" DICE → 2":"DIE → 2"),'gold');
-          /* Recompute scoring after swap */
-          var _qhFV=G.oppDice.filter(function(d){return !d.kept;}).map(function(d){return d.val;});
-          var _qhFM=G.oppDice.filter(function(d){return !d.kept;}).map(function(d){return d.mat;});
-          var _qhFE=G.oppDice.filter(function(d){return !d.kept;}).map(function(d){return d.ench||null;});/* P761 */
-          var _qhR=_scoreRollBest(_qhFV,G.oCards,oppBank,crowsCtx,_qhFM,_qhFE);
-          total=_qhR.total;used=_qhR.used;
-          /* P494: the persona chooses. Fog only clouds the FIRST reckoning of a
-             turn, so here the rival sees every free seat. */
-          var _pk_qhR=G.oppDice.filter(function(d){return !d.kept;});
-          var _pc_qhR=_oppChooseFrom(_pk_qhR,total,oppBank);
-          if(_pc_qhR){total=_pc_qhR.pts;used=_pk_qhR.map(function(d){return _pc_qhR.sel.indexOf(d)>=0;});}
+          var _rrQ=_oppRescore();total=_rrQ.total;used=_rrQ.used;/* P770 */
         }
       }
       /* Player-armed Grog's Bump: knock the opp's TWO scoring dice (1s/5s) → 3s.
@@ -34945,16 +34932,7 @@ function runOppTurn(){
           _gbVics.forEach(function(_gbVic){_gbVic.val=3;reDrawDieFace(_gbVic);});
           triggerCard('grogs_bump',"GROG'S BUMP → 3",true);
           setStatusMsg("GROG'S BUMP — "+G.rung.name+"'S "+(_gbVics.length>1?_gbVics.length+" DICE → 3":"DIE → 3"),'gold');
-          var _gbFV=G.oppDice.filter(function(d){return !d.kept;}).map(function(d){return d.val;});
-          var _gbFM=G.oppDice.filter(function(d){return !d.kept;}).map(function(d){return d.mat;});
-          var _gbFE=G.oppDice.filter(function(d){return !d.kept;}).map(function(d){return d.ench||null;});/* P761 */
-          var _gbR=_scoreRollBest(_gbFV,G.oCards,oppBank,crowsCtx,_gbFM,_gbFE);
-          total=_gbR.total;used=_gbR.used;
-          /* P494: the persona chooses. Fog only clouds the FIRST reckoning of a
-             turn, so here the rival sees every free seat. */
-          var _pk_gbR=G.oppDice.filter(function(d){return !d.kept;});
-          var _pc_gbR=_oppChooseFrom(_pk_gbR,total,oppBank);
-          if(_pc_gbR){total=_pc_gbR.pts;used=_pk_gbR.map(function(d){return _pc_gbR.sel.indexOf(d)>=0;});}
+          var _rrG=_oppRescore();total=_rrG.total;used=_rrG.used;/* P770 */
         }
       }
       /* Player disruption (Quick Hands / Grog's Bump) zeroed the roll → it's
@@ -35008,18 +34986,11 @@ function runOppTurn(){
              kept from this roll. G.oppDice is per-roll, so the full set is
              exactly "this roll". */
           G.oppDice.forEach(function(d){d.kept=false;if(d.el){d.el.classList.remove('selected','oppkeep');if(d.el._d3)D3.draw(d.el._d3);}});
-          var _stFV=G.oppDice.map(function(d){return d.val;});
-          var _stFM=G.oppDice.map(function(d){return d.mat;});
-          var _stFE=G.oppDice.map(function(d){return d.ench||null;});/* P761 */
-          var _stR=_scoreRollBest(_stFV,G.oCards,oppBank,crowsCtx,_stFM,_stFE);
-          total=_stR.total;used=_stR.used;
-          /* P494: the persona chooses. Fog only clouds the FIRST reckoning of a
-             turn, so here the rival sees every free seat. */
-          var _pk_stR=G.oppDice.filter(function(d){return !d.kept;});
-          var _pc_stR=_oppChooseFrom(_pk_stR,total,oppBank);
-          if(_pc_stR){total=_pc_stR.pts;used=_pk_stR.map(function(d){return _pc_stR.sel.indexOf(d)>=0;});}
+          /* P770: the slip un-kept everything above, so the unkept set IS
+             the full roll - the one rescore covers it */
+          var _rrS=_oppRescore();total=_rrS.total;used=_rrS.used;
           /* Re-keep based on new scoring */
-          G.oppDice.forEach(function(d,i){if(_stR.used[i]){d.kept=true;if(d.el){d.el.classList.add('selected','oppkeep');if(d.el._d3)D3.draw(d.el._d3);}}});
+          G.oppDice.forEach(function(d,i){if(used[i]){d.kept=true;if(d.el){d.el.classList.add('selected','oppkeep');if(d.el._d3)D3.draw(d.el._d3);}}});
           triggerCard('slippery_table','SLIPPED!',true);
           /* The slip turned this roll scoreless → bust (see the swap zero-check) */
           if(total===0){_oppBustOut();return;}
@@ -35358,13 +35329,8 @@ function runOppTurn(){
         G._silverTongueUsed=true;pts=Math.floor(pts/2);spawnPop('\uD83D\uDDE3 HALVED!');
         setStatusMsg('SILVER TONGUE — bank halved!','gold');
       }
-      /* NPC Corvus's Ledger: activate for +75% on large banks */
-      if(npcHasActive('corvus_ledger')&&pts>=400){
-        npcUseActive('corvus_ledger');
-        var _npcLedgerBonus=Math.floor(pts*0.75);pts+=_npcLedgerBonus;
-        triggerCard('corvus_ledger','+'+_npcLedgerBonus+' LEDGER',false);
-        setStatusMsg(G.rung.name+": CORVUS'S LEDGER +"+_npcLedgerBonus,'red');
-      }
+      /* P770: corvus_ledger arms through NPC_ARMS' bank moment */
+      pts=_npcRunArms('bank',{pts:pts}).pts;
       /* NPC on-bank bonuses */
       /* _oppFxOwnA - extracted verbatim so the sim can run it too (P470) */
       pts=_oppFxOwnA(pts);
@@ -38567,6 +38533,12 @@ var NPC_ARMS=[
     G._oAllInArmed=true;
     triggerCard('all_in','ALL IN ARMED',false);
     setStatusMsg(G.rung.name+': ALL IN — NEXT BANK 2× (OR −500)','red');}},
+  {id:'corvus_ledger',moment:'bank',try:function(ctx){
+    if(!(ctx.pts>=400))return;
+    npcUseActive('corvus_ledger');
+    var _b=Math.floor(ctx.pts*0.75);ctx.pts+=_b;
+    triggerCard('corvus_ledger','+'+_b+' LEDGER',false);
+    setStatusMsg(G.rung.name+": CORVUS'S LEDGER +"+_b,'red');}},
   {id:'twinning_charm',moment:'roll',try:function(ctx){
     var _f=G.oppDice.filter(function(d){return !d.kept;});
     var _src=_f.filter(function(d){return d.val===1;})[0]||_f.filter(function(d){return d.val===5;})[0];

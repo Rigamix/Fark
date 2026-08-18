@@ -363,8 +363,12 @@ smoke + resume check after every one):
    P521's seat cap - preserved, ruling in OPEN.md. (whispers_hex arms
    through the generic yielding path, not these blocks; double_down
    moved in P762.)
-3. **Bank riders** (corvus_ledger, the_audit, interest_due, the_skim...)
-   - the bankBonus seam already exists and consumes deltas (P762).
+3. **Bank riders** DONE (P770): the mechanic-driven riders were already
+   tabled by P470 (_oppFxOwnA/B + BANK_FX, extracted for the sim);
+   corvus_ledger's inline active joined NPC_ARMS at a 'bank' moment.
+   FOUND AND DELETED on the way: the rescore-and-repick tail existed
+   FIVE times (encore, rescue, quick hands, grog's bump, slippery
+   table) - _oppRescore() is the one copy now, hoisted in step().
 4. **Roll/keep modifiers** (quick_hands, grogs_bump, pocket_sand,
    sticky_fingers_die...) - these are PLAYER-armed cards acting on the
    rival's roll; they stay player-side but move onto the same dispatch.
