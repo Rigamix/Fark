@@ -676,3 +676,14 @@ save with fields a fresh run never produces is the remaining suspect.
 - your save: F12 → Console → `localStorage.getItem('fark_save')` → copy → paste to me.
 
 With either in hand the stack names the line in minutes.
+
+## NPC AI rework (see docs/NPC_AI_BRIEF.md) - 2026-08-18
+- The brief proposes personas become WEIGHTS on one EV core (slack capped
+  ~10-15%), replacing the pure style rules. aggro keeps its identity
+  (minimal keeps, more rerolls) but only among sanity-checked options.
+  OK to proceed on phase 1 (guardrails + delete the release block +
+  bank-implies-max-keep)?
+- Phase 3 migrates NPC legacy actives (second_wind, double_down, bust
+  saves...) onto the family-card CFX rails one at a time. That will
+  touch boss fights - want it gated behind a specific night for testing?
+
