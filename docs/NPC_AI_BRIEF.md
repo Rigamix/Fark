@@ -355,8 +355,14 @@ smoke + resume check after every one):
    scorer' seed contained a 2-3-4-5-6 straight - the bank was 750, not
    50, and the expected numbers were wrong, not the mechanics.
    NEXT: cluster 2, the turn-start arms.
-2. **Turn-start arms** (loan, seven_dice, all_in, the_tab, aldrics_vow,
-   whispers_hex, double_down) - the lever shapes P761 established.
+2. **Turn-start arms** DONE (P769): NPC_ARMS - the_tab, loan,
+   seven_dice, all_in at turn start; twinning_charm, aldrics_vow at the
+   roll moment; one walker per moment, ctx carrying `left`. Driven live:
+   loan +1500 with its same-turn -200 tick, the_tab armed at 80% target,
+   twinning fired mid-roll. FOUND DORMANT: seven_dice has dealt 6 since
+   P521's seat cap - preserved, ruling in OPEN.md. (whispers_hex arms
+   through the generic yielding path, not these blocks; double_down
+   moved in P762.)
 3. **Bank riders** (corvus_ledger, the_audit, interest_due, the_skim...)
    - the bankBonus seam already exists and consumes deltas (P762).
 4. **Roll/keep modifiers** (quick_hands, grogs_bump, pocket_sand,

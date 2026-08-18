@@ -34274,12 +34274,10 @@ function runOppTurn(){
      ahead, the rival puts YOU on the tab so your next (possibly lethal) bank
      is held a turn — buying itself one more turn. Armed on the NPC's turn so
      it bites your following bank. */
-  if(npcHasActive('the_tab')&&!G._tabArmedVsPlayer&&!(G._tabHeldPlayer>0)&&G.target&&G.pPts>=G.target*0.8&&G.pPts>G.oPts){
-    npcUseActive('the_tab');
-    G._tabArmedVsPlayer=true;
-    triggerCard('the_tab','RIVAL PUTS YOU ON THE TAB',false);
-    setStatusMsg((G.rung?G.rung.name:'RIVAL')+": YOU'RE ON THE TAB — NEXT BANK HELD",'red');
-  }
+  /* P769: the turn-start arms are the TABLE now (NPC_ARMS) - the_tab,
+     loan, seven_dice, all_in in the same order, seven_dice widening the
+     hand through the ctx. */
+  left=_npcRunArms('turnStart',{left:left}).left;
   /* stakes_rising NPC seed: previous turn banked 500+ → start with +300 turn pts.
      Mirrors player startPTurn at line ~10940. */
   G._oStakesRisingBonus=0;
@@ -34300,29 +34298,7 @@ function runOppTurn(){
   }
   /* LOAN activation: take the +1500 on NPC's first turn if available
      (matches player heuristic of using big-tempo cards early). */
-  if(npcHasActive('loan')&&G.npcCardState.oppTurnCount===0){
-    npcUseActive('loan');
-    G.oPts+=1500;G._oLoanRemaining=5;updHUD();
-    triggerCard('loan','+1500 LOAN',false);
-    setStatusMsg(G.rung.name+': LOAN +1500 (−200/TURN)','red');
-  }
-  /* SEVEN DICE: NPC's next roll uses 7 dice. Use it on turn 1 for max value. */
-  if(npcHasActive('seven_dice')&&G.npcCardState.oppTurnCount===0){
-    npcUseActive('seven_dice');
-    left=7;
-    triggerCard('seven_dice','7 DICE!',false);
-    setStatusMsg(G.rung.name+': SEVEN DICE — 7 DICE!','red');
-  }
-  /* ALL IN: arm next-bank doubling when NPC could win the match in one big bank.
-     Heuristic: if oPts is within striking distance (≤target/2 from win) and
-     NPC has 1+ score-multiplying cards stacking. Use it on turn ≥3 once
-     enough state is built. */
-  if(npcHasActive('all_in')&&G.oPts*2>=G.target&&G.oPts<G.target&&G.npcCardState.oppTurnCount>=2){
-    npcUseActive('all_in');
-    G._oAllInArmed=true;
-    triggerCard('all_in','ALL IN ARMED',false);
-    setStatusMsg(G.rung.name+': ALL IN — NEXT BANK 2× (OR −500)','red');
-  }
+  /* P769: loan, seven_dice and all_in moved to NPC_ARMS with the_tab. */
   /* Cold Shoulder: fire any deferred opp start_bonus cards once the 2-turn
      delay has elapsed (matches the once-per-match-card delay at line ~10575
      which gates on turnNum<(2+_csDelay) → turnNum>=4). If the player ends
@@ -34611,29 +34587,9 @@ function runOppTurn(){
       /* TWINNING CHARM NPC AI: if there's an existing 1 or 5 in the unkept
          pool plus a non-scoring die, mirror the 1/5 to the non-scoring die
          (gain 100/50 pts). Fires before scoreRoll so the new value scores. */
-      if(npcHasActive('twinning_charm')){
-        var _otcFree=G.oppDice.filter(function(d){return !d.kept;});
-        var _otcSrc=_otcFree.filter(function(d){return d.val===1;})[0]||_otcFree.filter(function(d){return d.val===5;})[0];
-        var _otcTgt=_otcFree.filter(function(d){return d.val!==1&&d.val!==5;})[0];
-        if(_otcSrc&&_otcTgt){
-          npcUseActive('twinning_charm');
-          _otcTgt.val=_otcSrc.val;reDrawDieFace(_otcTgt);
-          if(_otcTgt.el){_otcTgt.el.classList.add('eff-glow-blue');spawnPixelSparks(_otcTgt.el,6);setTimeout(function(){if(_otcTgt.el)_otcTgt.el.classList.remove('eff-glow-blue');},_oppDelay(700));}
-          triggerCard('twinning_charm','TWINNING → '+_otcSrc.val,false);
-        }
-      }
-      /* ALDRIC'S VOW NPC AI: arm before scoring on a "good odds" roll —
-         when there are 4+ unkept dice (high chance of 300+ score) and
-         oppBank is moderate (200-500). Effect applied after scoreRoll. */
-      if(npcHasActive('aldrics_vow')&&!G._oVowArmed){
-        var _ovFreeCount=G.oppDice.filter(function(d){return !d.kept;}).length;
-        if(_ovFreeCount>=4&&oppBank>=200&&oppBank<=500){
-          npcUseActive('aldrics_vow');
-          G._oVowArmed=true;
-          triggerCard('aldrics_vow','VOW ARMED',false);
-          setStatusMsg(G.rung.name+': VOW — 300+ DOUBLES, ELSE LOSE PTS','red');
-        }
-      }
+      /* P769: twinning_charm and aldrics_vow arm through NPC_ARMS'
+         roll moment - same conditions, same spends, one walker. */
+      _npcRunArms('roll',{oppBank:oppBank});
       const _oFree=G.oppDice.filter(d=>!d.kept);
       const fV=_oFree.map(d=>d.val);
       const fMats=_oFree.map(d=>d.mat);
@@ -38579,6 +38535,66 @@ var NPC_BUST_SAVES=[
       label:G.rung.name+' SECOND WIND!'};
   }}
 ];
+/* P769: THE ARM TABLE (legacy cluster 2). Each entry answers 'is now
+   my moment?' and arms itself - spend inside, like the bust-save
+   table's entries. moment 'turnStart' runs once at the head of the
+   rival's turn; 'roll' runs in step() after the deal. ctx carries
+   `left` (seven_dice widens the hand through it) and, for roll
+   entries, oppBank (aldrics_vow's odds test). */
+var NPC_ARMS=[
+  {id:'the_tab',moment:'turnStart',try:function(ctx){
+    if(G._tabArmedVsPlayer||(G._tabHeldPlayer>0)||!G.target)return;
+    if(!(G.pPts>=G.target*0.8&&G.pPts>G.oPts))return;
+    npcUseActive('the_tab');
+    G._tabArmedVsPlayer=true;
+    triggerCard('the_tab','RIVAL PUTS YOU ON THE TAB',false);
+    setStatusMsg((G.rung?G.rung.name:'RIVAL')+": YOU'RE ON THE TAB — NEXT BANK HELD",'red');}},
+  {id:'loan',moment:'turnStart',try:function(ctx){
+    if(G.npcCardState.oppTurnCount!==0)return;
+    npcUseActive('loan');
+    G.oPts+=1500;G._oLoanRemaining=5;updHUD();
+    triggerCard('loan','+1500 LOAN',false);
+    setStatusMsg(G.rung.name+': LOAN +1500 (−200/TURN)','red');}},
+  {id:'seven_dice',moment:'turnStart',try:function(ctx){
+    if(G.npcCardState.oppTurnCount!==0)return;
+    npcUseActive('seven_dice');
+    ctx.left=7;
+    triggerCard('seven_dice','7 DICE!',false);
+    setStatusMsg(G.rung.name+': SEVEN DICE — 7 DICE!','red');}},
+  {id:'all_in',moment:'turnStart',try:function(ctx){
+    if(!(G.oPts*2>=G.target&&G.oPts<G.target&&G.npcCardState.oppTurnCount>=2))return;
+    npcUseActive('all_in');
+    G._oAllInArmed=true;
+    triggerCard('all_in','ALL IN ARMED',false);
+    setStatusMsg(G.rung.name+': ALL IN — NEXT BANK 2× (OR −500)','red');}},
+  {id:'twinning_charm',moment:'roll',try:function(ctx){
+    var _f=G.oppDice.filter(function(d){return !d.kept;});
+    var _src=_f.filter(function(d){return d.val===1;})[0]||_f.filter(function(d){return d.val===5;})[0];
+    var _tgt=_f.filter(function(d){return d.val!==1&&d.val!==5;})[0];
+    if(!_src||!_tgt)return;
+    npcUseActive('twinning_charm');
+    _tgt.val=_src.val;reDrawDieFace(_tgt);
+    if(_tgt.el){_tgt.el.classList.add('eff-glow-blue');spawnPixelSparks(_tgt.el,6);
+      setTimeout(function(){if(_tgt.el)_tgt.el.classList.remove('eff-glow-blue');},_oppDelay(700));}
+    triggerCard('twinning_charm','TWINNING → '+_src.val,false);}},
+  {id:'aldrics_vow',moment:'roll',try:function(ctx){
+    if(G._oVowArmed)return;
+    var _fc=G.oppDice.filter(function(d){return !d.kept;}).length;
+    if(!(_fc>=4&&ctx.oppBank>=200&&ctx.oppBank<=500))return;
+    npcUseActive('aldrics_vow');
+    G._oVowArmed=true;
+    triggerCard('aldrics_vow','VOW ARMED',false);
+    setStatusMsg(G.rung.name+': VOW — 300+ DOUBLES, ELSE LOSE PTS','red');}}
+];
+function _npcRunArms(moment,ctx){
+  for(var _ai=0;_ai<NPC_ARMS.length;_ai++){
+    var _A=NPC_ARMS[_ai];
+    if(_A.moment!==moment)continue;
+    if(!npcHasActive(_A.id))continue;
+    try{_A.try(ctx);}catch(e){}
+  }
+  return ctx;
+}
 function npcHasActive(cid){
   if(!G||!G.oCards.includes(cid))return false;
   var uses=G.npcCardState&&G.npcCardState.npcActiveUses?G.npcCardState.npcActiveUses[cid]:0;

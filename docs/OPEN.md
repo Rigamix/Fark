@@ -700,3 +700,10 @@ With either in hand the stack names the line in minutes.
    player ever be able to draft/win these? If yes they need two-seat
    effects from the start.
 
+## SEVEN DICE is a dormant no-op (found by P769's probe, 2026-08-19)
+The card sets left=7 but P521's seat-join caps every deal at the 6 free
+seats - it has dealt 6 dice since the seat model landed, silently. The
+refactor preserved the behaviour (a refactor is not the place to invent
+a 7th seat). Ruling wanted: give the table a 7th lane for this card, or
+retire/redesign it (e.g. '+1 die' becomes 'reroll one die free')?
+
