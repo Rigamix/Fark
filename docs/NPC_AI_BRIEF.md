@@ -369,9 +369,21 @@ smoke + resume check after every one):
    FOUND AND DELETED on the way: the rescore-and-repick tail existed
    FIVE times (encore, rescue, quick hands, grog's bump, slippery
    table) - _oppRescore() is the one copy now, hoisted in step().
-4. **Roll/keep modifiers** (quick_hands, grogs_bump, pocket_sand,
-   sticky_fingers_die...) - these are PLAYER-armed cards acting on the
-   rival's roll; they stay player-side but move onto the same dispatch.
+4. **Roll/keep modifiers** DONE (P771): quick_hands and grogs_bump -
+   twin blocks - are one _playerKnock (face + name as data). The
+   remaining player-armed disruptions (hot_streak, crown_authority/
+   blessed_dice, pocket_sand, snake_oil...) are genuinely DISTINCT
+   one-offs: no shared body to extract, documented as such rather than
+   tabled for the table's sake.
+
+**CLUSTERS 1-4 COMPLETE (P767-P771).** Full regression battery green
+2026-08-19: actor pipe, phase-1 decisions, the four rulings, rescues,
+arms, knocks, five-turn smoke, card + dice glow. One scripted-roller
+probe flaked once and passed on rerun against the identical build -
+instrument variance, recorded. Remaining arcs: cluster 5 (two-seat
+re-audit, awaits Denis's play knowledge), phase 2 (personas as weights
+on the EV core, sim-tuned), and the deep seam unification
+(handleBank/finOpp, the two deal loops).
 5. Re-audit for two-seat candidates once the table exists - Denis
    revisits with concrete card knowledge (Q5's second half).
 
