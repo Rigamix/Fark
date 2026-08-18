@@ -296,9 +296,20 @@ actor-symmetric.
    from _tablePairs('o') arms it at the push decision, their deal pulls
    the die, mirror of the player's consumption. `encore` / `stargazer`
    still bespoke in the roll loop.
-2. `sleight` (Q1) / `stargazer` (Q2) / `ill_omen` (Q3) /
-   `falling_star` (Q4) / the rival-only legacy roster (Q5) - the five
-   ruling questions, asked in chat 2026-08-18 and mirrored in OPEN.md.
+2. ~~sleight / stargazer / ill_omen / falling_star~~ RULED AND BUILT
+   (P766): sleight resurrected BOTH ways (player half built, card
+   un-retired, rival arm through the pipe); stargazer is the faithful
+   peek both seats - the AI reads its next roll and banks a foreseen
+   dead roll in the open, the bust-dodge deleted; ill_omen is one hook
+   on the rivalTurn seams, exactly the player's numbers upside down
+   (minting included - the bespoke's capped-only was drift); falling
+   star grants THEM the extra turn - RETUNE FLAG per Denis: measure the
+   difficulty once live.
+3. The rival-only legacy roster (Q5 ruled): migrate rival-only FIRST
+   onto CFX rails (cheap path), revisit two-seat when there is a
+   concrete reason - Denis leans parity-first but wants to see what
+   second_wind / double_down / the bust saves actually do before paying
+   for two-seat builds.
 3. ~~bloom / cultivate / vanguard_f~~ MIGRATED (P764) - ev.mine, growth
    store per seat (G._oCultArr), feats stay the player's ledger.
    Verified numerically symmetric: 600/750 both seats.
