@@ -339,10 +339,14 @@ with `npcCardState` kept as-is (no save-format change in this pass).
 
 Batch order (each cluster lands alone, bespoke deleted with it,
 smoke + resume check after every one):
-1. **Bust rescues** (old_bones, ambrose_grace, wild_die, brutus_fist,
-   finnicks_palm, grogs_flask, second_wind + the bust_survive /
-   bust_immune_turns / bust_bank_half mechanics) - the biggest cluster,
-   one moment, one table.
+1. **Bust rescues** - 1a DONE (P767): the eight dead-roll rescue cards
+   (old_bones, ambrose_grace, wild_die, brutus_fist, finnicks_palm,
+   grogs_flask, coin_flip, the_nudge) are one table (NPC_RESCUES), one
+   consumer, ladder quirk preserved and flagged (an entered-but-useless
+   card stops the chain - ruling wanted on fall-through). Driven with a
+   scripted roller: rescue fires once, quirk busts, control clean.
+   1b NEXT: the bust-mitigation blocks (bust_survive, bust_immune_turns,
+   bust_bank_half, mabels_stitch, second_wind) - same table treatment.
 2. **Turn-start arms** (loan, seven_dice, all_in, the_tab, aldrics_vow,
    whispers_hex, double_down) - the lever shapes P761 established.
 3. **Bank riders** (corvus_ledger, the_audit, interest_due, the_skim...)
