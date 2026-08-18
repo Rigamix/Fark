@@ -286,14 +286,19 @@ actor-symmetric.
 | bankBonus seam | FIXED: the rival's seam consumed no delta (fired after the add, return discarded) - every rival bankBonus card was silently void |
 
 ### Still bespoke or inert - the remaining sweep, in order
+0. ~~retort / reprisal / short_fuse / encore~~ MIGRATED (P765) - bust and
+   bank passives symmetric (numerically verified both directions); the
+   rival's bust seam carries `lost` now; encore rerolls THEIR free dice
+   through famUse('o') at their dead roll, the turn code keeping its
+   local rescore. stargazer's bespoke dodge remains pending Q2.
 1. ~~honeytrap~~ MIGRATED (P764) - the bespoke was a DIFFERENT effect
    (random modal pull, no pair); they play the player's card now: pair
    from _tablePairs('o') arms it at the push decision, their deal pulls
    the die, mirror of the player's consumption. `encore` / `stargazer`
    still bespoke in the roll loop.
-2. `sleight` / `ill_omen` - bespoke, working, and sleight's PLAYER side is
-   inert (retired); migrating means implementing the player half too or
-   retiring both ways. Ruling per card.
+2. `sleight` (Q1) / `stargazer` (Q2) / `ill_omen` (Q3) /
+   `falling_star` (Q4) / the rival-only legacy roster (Q5) - the five
+   ruling questions, asked in chat 2026-08-18 and mirrored in OPEN.md.
 3. ~~bloom / cultivate / vanguard_f~~ MIGRATED (P764) - ev.mine, growth
    store per seat (G._oCultArr), feats stay the player's ledger.
    Verified numerically symmetric: 600/750 both seats.

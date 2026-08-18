@@ -687,3 +687,16 @@ With either in hand the stack names the line in minutes.
   saves...) onto the family-card CFX rails one at a time. That will
   touch boss fights - want it gated behind a specific night for testing?
 
+## The five parity rulings (asked in chat 2026-08-18)
+1. SLEIGHT: (a) build the player half too (un-retire), (b) retire both
+   ways, or (c) rival-only but through the one pipe?
+2. STARGAZER: replace the rival's bespoke bust-dodge with the faithful
+   card - they PEEK their next roll and the AI banks if it sees a bust?
+3. ILL OMEN mirrored: they declare; you bust next turn -> you pay the
+   tier reward; you score -> you gain the consolation. Confirm?
+4. FALLING STAR for the rival = extra-turn support in their turn
+   machine (they can double-turn like you). Build it?
+5. Rival-only roster (second_wind, double_down, bust saves): should the
+   player ever be able to draft/win these? If yes they need two-seat
+   effects from the start.
+

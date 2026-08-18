@@ -14857,16 +14857,26 @@ CFX.fair_trade={
     return true;
   }
 };
+/* P765: SYMMETRIC - the owner's bust makes the OTHER side pay. */
 CFX.retort={
-  bust:function(ev){if(!_fxMine(ev))return;
-    G.oPts=Math.max(0,G.oPts-ev.P);famLog('RETORT — THEY LOSE '+ev.P);try{updHUD();}catch(e){}}
+  bust:function(ev){if(!ev.mine)return;
+    if(ev.owner==='p'){G.oPts=Math.max(0,G.oPts-ev.P);famLog('RETORT — THEY LOSE '+ev.P);}
+    else{G.pPts=Math.max(0,G.pPts-ev.P);setStatusMsg('THEIR RETORT — YOU LOSE '+ev.P,'red');}
+    try{updHUD();}catch(e){}}
 };
+/* P765: SYMMETRIC - the owner banks while trailing, the leader bleeds. */
 CFX.reprisal={
-  bank:function(ev){if(!_fxMine(ev))return;
-    var trailing=(G.oPts-(G.pPts-ev.amt))>=1000; /* judged before this bank landed */
+  bank:function(ev){if(!ev.mine)return;
+    var _meP=(ev.owner==='p');
+    /* judged before this bank landed, from the owner's side of the table */
+    var trailing=_meP?((G.oPts-(G.pPts-ev.amt))>=1000)
+                     :((G.pPts-(G.oPts-ev.amt))>=1000);
     if(!trailing)return;
-    var steal=Math.min(Math.round(ev.amt*ev.P),G.oPts);
-    if(steal>0){G.oPts-=steal;famLog('REPRISAL TAKES '+steal+' FROM THEM');try{updHUD();}catch(e){}}}
+    var steal=Math.min(Math.round(ev.amt*ev.P),_meP?G.oPts:G.pPts);
+    if(steal>0){
+      if(_meP){G.oPts-=steal;G.pPts+=steal;famLog('REPRISAL TAKES '+steal+' FROM THEM');}
+      else{G.pPts-=steal;G.oPts+=steal;setStatusMsg('THEIR REPRISAL — '+steal+' TAKEN FROM YOU','red');}
+      try{updHUD();}catch(e){}}}
 };
 /* P762: SYMMETRIC - whoever banks, their fingers find the OTHER purse.
    The bespoke finOpp copy is deleted in this patch. */
@@ -14893,9 +14903,23 @@ CFX.encore={
      canUse said yes again and a second play queued a SECOND check against the
      same dice: doBust ran twice, famFire('bust') twice, two of the player's
      eight turns burned in one go, and Retort fired twice off the one bust. */
-  canUse:function(inst){return G&&G.phase==='choosing'&&!G._encorePending
+  canUse:function(inst,actor){
+    /* P765: the rival's reading - free dice on their table. The LEVER
+       decides the moment (their dead roll); this only says it is legal. */
+    if(actor==='o')return !!(G&&(G.oppDice||[]).some(function(d){return !d.kept;}));
+    return G&&G.phase==='choosing'&&!G._encorePending
     &&G.pool&&G.pool.some(function(d){return !d.committed;});},
-  use:function(inst){
+  use:function(inst,actor){
+    /* P765: THE SAME EFFECT - reroll the owner's free dice. The rival's
+       continuation (rescore, persona re-pick) lives with their turn
+       code, exactly as the player's bust-check lives with theirs. */
+    if(actor==='o'){
+      var _oFree2=(G.oppDice||[]).filter(function(d){return !d.kept;});
+      if(!_oFree2.length)return false;
+      _oFree2.forEach(function(d){d.val=rollFace(d.mat);try{reDrawDieFace(d);}catch(e){}});
+      setStatusMsg((G.rung&&G.rung.name||'RIVAL')+': ENCORE — THEY ROLL AGAIN','red');
+      return true;
+    }
     var free=G.pool.filter(function(d){return !d.committed&&!d._frozen;});
     if(!free.length)return false;
     free.forEach(function(d){
@@ -15558,7 +15582,7 @@ function _foDeckTap(ci){
    an un-migrated card to the rival would run player-global code against
    the wrong seat. Grown card by card as effects migrate; the registry
    is the honest inventory of what is truly symmetric so far. */
-var NPC_FAM_READY={preserve:1,double_or_nothing:1,honeytrap:1};
+var NPC_FAM_READY={preserve:1,double_or_nothing:1,honeytrap:1,encore:1};
 function famUse(i,actor){
   /* P761: ONE ENTRY POINT, TWO ACTORS - Denis: "the same code bit with
      just the actor being different". 'p' is the default so every
@@ -16900,16 +16924,26 @@ function famCommitBonus(selD,pts,actor){
    NOT here: the relic commit effects (finnicks_palm, whispers_fang). Those are
    dice MATERIALS, not equipped cards - famFire walks G.pF and would never see
    them. They stay in famCommitBonus. */
+/* P765: SYMMETRIC. The fuse lights from the OWNER's third roll (the
+   rival's count is published as G._oRollNum), doubles their commits
+   through the same ev.mul, and a lit bust burns the OWNER's own bank. */
 CFX.short_fuse={
   /* THE ONLY MULTIPLIER IN THE GAME so far, and the reason ev.mul exists. */
-  commit:function(ev){if(!_fxMine(ev)||(G.turnRollCount||0)<3)return;
-    ev.mul(2);ev.me.state.lit=true;_famPop('x2 SHORT FUSE');},
-  turnStart:function(ev){if(ev.owner==='p')ev.me.state.lit=false;},
+  commit:function(ev){if(!ev.mine)return;
+    var rc=(ev.owner==='p')?(G.turnRollCount||0):(G._oRollNum||0);
+    if(rc<3)return;
+    ev.mul(2);ev.me.state.lit=true;
+    if(ev.owner==='p')_famPop('x2 SHORT FUSE');
+    else setStatusMsg('THEIR FUSE BURNS — x2','red');},
+  turnStart:function(ev){if(ev.mine)ev.me.state.lit=false;},
   /* the three jade/positional adders that used to sit in famCommitBonus.
      Each keeps its own gate verbatim - they are NOT one condition. */
-  bust:function(ev){if(!_fxMine(ev)||!ev.me.state.lit)return;
+  bust:function(ev){if(!ev.mine||!ev.me.state.lit)return;
     var burn=ev.lost||0;
-    if(burn>0){G.pPts=Math.max(0,G.pPts-burn);famLog('THE FIRE SPREADS — '+burn+' BURNS OFF YOUR BANK');try{updHUD();}catch(e){}}
+    if(burn>0){
+      if(ev.owner==='p'){G.pPts=Math.max(0,G.pPts-burn);famLog('THE FIRE SPREADS — '+burn+' BURNS OFF YOUR BANK');}
+      else{G.oPts=Math.max(0,G.oPts-burn);setStatusMsg('THE FIRE SPREADS — '+burn+' BURNS OFF THEIR BANK','gold');}
+      try{updHUD();}catch(e){}}
     ev.me.state.lit=false;}
 };
 /* forces applied to a fresh roll (stargazer peek, honeytrap pull) */
@@ -34358,7 +34392,7 @@ function runOppTurn(){
        player side that derived its cap from the rule's record, so a retune
        would have capped the two sides differently under one rule. */
     if(_ruleActive('drill_order','o')&&oppRollNum>=_drillMax()){finOpp(oppBank);return;}
-    _oppHoldKept();oppRollNum++;
+    _oppHoldKept();oppRollNum++;G._oRollNum=oppRollNum;/* P765: short_fuse reads the owner's count */
     /* THE OPPONENT'S roll SEAM, after the counter advances, same reason. */
     try{famFire('roll',{actor:'o',rollNum:oppRollNum});}catch(e){}/* P762 */
     /* (In Arrears' pot retired with the rule) */
@@ -34616,12 +34650,31 @@ function runOppTurn(){
       /* ── NPC bust-prevention via active cards (mirror-match loadouts) ──
          If the roll would score 0, try converting blanks to scorers before resolving the bust. */
       if(total===0){
-        var _oEnc=_npcFamCard('encore')||_npcFamCard('stargazer');
-        if(_oEnc){
+        /* P765: ENCORE THROUGH THE PIPE - the lever is 'my roll died',
+           famUse('o') is the how, the reroll is CFX.encore's own body.
+           stargazer's dodge stays bespoke pending Denis's Q2 ruling
+           (the faithful version is the peek, a different build). */
+        var _oEnc=null,_encIx=-1;
+        (G.oF||[]).some(function(o,ix){
+          if(o.id==='encore'&&!o.broken&&o.charges>0){_encIx=ix;_oEnc=o;return true;}
+          return false;
+        });
+        if(_encIx>=0){
+          var _encB4=_oEnc.charges;
+          famUse(_encIx,'o');
+          if(_oEnc.charges===_encB4)_oEnc=null;/* refused - fall through */
+        }
+        if(!_oEnc)_oEnc=_npcFamCard('stargazer');
+        if(_oEnc&&_oEnc.id==='stargazer'){
           _oEnc.charges--;
-          var _encFree=G.oppDice.filter(function(d){return !d.kept;});
-          _encFree.forEach(function(d){d.val=rollFace(d.mat);try{reDrawDieFace(d);}catch(e){}});
-          setStatusMsg(G.rung.name+': '+(_oEnc.id==='encore'?'ENCORE':'THE OMEN')+' — THEY ROLL AGAIN','red');
+          G.oppDice.filter(function(d){return !d.kept;})
+            .forEach(function(d){d.val=rollFace(d.mat);try{reDrawDieFace(d);}catch(e){}});
+          setStatusMsg(G.rung.name+': THE OMEN — THEY ROLL AGAIN','red');
+        }
+        /* the continuation below reads _encFree - the same objects the
+           reroll just mutated, so mapping now reads the NEW faces */
+        var _encFree=G.oppDice.filter(function(d){return !d.kept;});
+        if(_oEnc){
           var _encV=_encFree.map(function(d){return d.val;}),_encM=_encFree.map(function(d){return d.mat;});
           var _encE=_encFree.map(function(d){return d.ench||null;});/* P762 */
           var _encRs=_scoreRollBest(_encV,G.oCards,oppBank,crowsCtx,_encM,_encE);
@@ -34823,7 +34876,7 @@ function runOppTurn(){
            not "and here is what survived".
            Every bust exit funnels through this function, so one call covers
            all four of its call sites. */
-        try{famFire('bust',{actor:'o'});}catch(e){}
+        try{famFire('bust',{actor:'o',lost:oppBank});}catch(e){}/* P765: lost, like the player's seam */
         /* P743: THE RIVAL'S BUST LOOKS LIKE A BUST. It had no visual at
            all - the scatter and the flinch were wired to the player's
            path only. Same function, their row. */
