@@ -435,3 +435,20 @@ onPick tap's picks:0 was the only tell. Measured taps are now a
 standing assertion of the harness: picks>0 per persona or the run is
 void.
 
+---
+
+## 10. The flow-shell audit opens (2026-08-19)
+
+mirror_diff re-scoped to follow P470's extractions (it had been scanning
+finOpp's emptied body and reporting every mechanic 'one side only').
+True state of the bank seam's mechanics layer: **4 clean mirrors**
+(double_first_bank, flat_bonus, steal_pct, steal_low_bank - direction
+only), **3 ruling questions** (gain_when_ahead's ahead-test timing,
+halve_first_bank's first-vs-once guard, challenge's arm conditions - in
+OPEN.md, one-line fixes once ruled), **periodic_drain** mirrors fine
+(tool scope gap on the player side), **block_low_bank** confirmed dead
+(zero sites - the backlog entry is stale in the other direction).
+
+The remaining handleBank/finOpp twin is the FLOW SHELL - step order,
+guards, timers - and that audit follows the rulings.
+

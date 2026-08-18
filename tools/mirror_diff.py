@@ -50,7 +50,14 @@ def fnbody(name):
         j += 1
     return ''
 
-PB, OB = fnbody('handleBank'), fnbody('finOpp')
+PB = fnbody('handleBank')
+# 2026-08-19: P470 EXTRACTED the rival's mechanic branches out of finOpp
+# into named helpers so the sim could share them - scanning finOpp's body
+# alone reported every mechanic 'one side only', which was the scanner's
+# boundary lying, not the code diverging. The rival's scope is the flow
+# shell PLUS its extractions.
+OB = (fnbody('finOpp') + fnbody('_oppFxOwnA') + fnbody('_oppFxOwnB')
+      + fnbody('_oppFxPlayer'))
 
 def branch(body, mech):
     """The if-block guarding this mechanic."""
