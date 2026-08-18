@@ -390,3 +390,48 @@ on the EV core, sim-tuned), and the deep seam unification
 Falling Star (rival half) is LIVE and flagged: Denis plays nights before
 the retune batch touches its numbers.
 
+---
+
+## 9. Phase 2 - the calibration baseline (P772/P773, 2026-08-19)
+
+The sim runs the LIVE chooser now (_npcDecide, the G-free core; the sim
+was silently degrading to maximal-keep through a swallowed throw - see
+the instrument note). _runPersonaSim({turns:800}) per persona, bone
+gear, agg .6 / minBank 300 / diceStop 2, mid-match score context:
+
+| persona | banked/turn | bust | rolls | kept/pick | EV given up |
+|---|---|---|---|---|---|
+| ones | 501 | .193 | 1.80 | 2.25 | 16 |
+| triples | 500 | .274 | 2.01 | 2.33 | 23 |
+| straights | 491 | .259 | 2.04 | 2.34 | 18 |
+| aggro | 530 | .196 | 2.15 | **1.41** | **30** |
+| hoard | 529 | .184 | **1.76** | 2.31 | 15 |
+| combo | 513 | .211 | 2.07 | 1.80 | **0** |
+
+Readings:
+- **Identity is visible in numbers**: aggro keeps 1.41 dice and rolls
+  deepest; hoard keeps most and stops earliest; combo gives up exactly 0
+  EV by construction (internal validity check - it IS the argmax).
+- **The floor works**: mean give-up runs 0-30 against the 500 cap; the
+  chasers (triples/straights) pay ~.26-.27 bust rate for their chase and
+  land ~30-40 under the top earners - in-character, bounded.
+- **The spread is tight** (491-530, ~8%): personas are flavour, not
+  traps. Nobody is suicidal; nobody is strictly dominant.
+
+**Calibration verdict: the multiplicative weights sketched in section 3
+are NOT needed at these numbers.** The style rules over EV-floored
+candidates already deliver distinct, bounded, competitive personas. The
+weights stay in the toolbox for the retune batch if Denis's nights (or
+the Falling Star data) say a persona needs moving - tune what the
+numbers say, not what the plan predicted.
+
+**Instrument note (the catch of the day):** before the fix, the sim's
+_npcDecide returned null on 65 of 65 calls - an unused, unguarded `var
+row=(G.oppDice...)` threw on the match-less sim page and the defensive
+try/catch ate it. The personas still showed DIFFERENT numbers (through
+oppShouldBank's behaviour term alone), so the output looked plausible -
+a convergence artifact that would have validated a broken sim. The
+onPick tap's picks:0 was the only tell. Measured taps are now a
+standing assertion of the harness: picks>0 per persona or the run is
+void.
+

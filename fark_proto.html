@@ -16638,7 +16638,16 @@ function _npcDecide(freeD,total,bank,ctx){
   }catch(e){}
   var pick;
   try{ pick=_npcChooseKeep(cands,ctx.rung||null,{evTable:ctx.evTable,hotHand:ctx.hotHand}); }catch(e){ return null; }
-  return (pick&&pick.sel&&pick.sel.length)?{pick:pick,bank:false}:null;
+  if(!(pick&&pick.sel&&pick.sel.length))return null;
+  /* P773: a listening caller (the persona sim) reads what the choice
+     cost - zero work when nobody listens */
+  if(ctx.onPick){
+    var _bev=-Infinity;
+    for(var _pi=0;_pi<cands.length;_pi++)if(cands[_pi].ev>_bev)_bev=cands[_pi].ev;
+    try{ctx.onPick({give:(isFinite(_bev)&&pick.ev!==undefined)?(_bev-pick.ev):0,
+      kept:pick.sel.length,left:pick.left});}catch(e){}
+  }
+  return {pick:pick,bank:false};
 }
 /* the live-match wrapper: same behaviour P760 shipped, one caller of
    the core */
@@ -16864,7 +16873,11 @@ function _legalKeeps(free,actor,locked,cardsOverride){/* P772 */
      G.oCards would score sim dice with real-match rules */
   var cards=(cardsOverride!==undefined&&cardsOverride!==null)?cardsOverride
     :(_lkO?(G.oCards||[]):(typeof effectiveCards==='function'?effectiveCards():(G.pCards||[])));
-  var row=(_lkO?(G.oppDice||[]):(G.pool||[]));
+  /* P773: the unused `row` declaration is DELETED - never consumed
+     (the P492 note's sibling), and its unguarded G read was the throw
+     that silently degraded the SIM's chooser to null on a page with no
+     live match. The try/catch above _npcDecide ate it - 65 calls, 65
+     nulls, found only because the onPick tap measured zero picks. */
   for(var m=1;m<(1<<n);m++){
     var sel=[];
     for(var i=0;i<n;i++) if(m&(1<<i)) sel.push(free[i]);
@@ -44188,8 +44201,44 @@ function _runCowardiceGate(iters){
   res.verdict=res.margin>=5?'PUSH PAYS — gate passes':'COWARDICE DOMINATES — gate fails; raise per-turn incentives';
   return res;
 }
+/* P773: PER-PERSONA TURN STATS - delegates into the sim closure where
+   npcTurn and friends live. Run from the ?sim=1 console:
+   _runPersonaSim({turns:600}) */
+function _runPersonaSim(cfg){return _runBalanceSim({personaStats:cfg||{}});}
 function _runBalanceSim(cfg){
   cfg=cfg||{};
+  /* P773: PERSONA-STATS MODE - N turns of npcTurn per persona, fixed
+     conditions; the onPick tap (threaded through simTurn) reads what
+     each keep gave up vs the best candidate. */
+  if(cfg.personaStats){
+    var _ps=cfg.personaStats;
+    var _psTurns=_ps.turns||600;
+    var _psDice=_ps.dice||['bone','bone','bone','bone','bone','bone'];
+    var _psTarget=_ps.target||6800;
+    var _psKeys=_ps.personas||Object.keys(PERSONAS);
+    var _psRows=[];
+    _psKeys.forEach(function(pk){
+      var rung={name:'SIM',persona:pk,agg:(_ps.agg!=null)?_ps.agg:0.6,
+        minBank:(_ps.minBank!=null)?_ps.minBank:300,
+        diceStop:(_ps.diceStop!=null)?_ps.diceStop:2,
+        dice:_psDice};
+      var banked=0,busts=0,rolls=0,gives=[],kepts=[];
+      var oc={ids:{},charges:{},tiers:{}};
+      rung._onPick=function(info){gives.push(info.give);kepts.push(info.kept);};
+      for(var t=0;t<_psTurns;t++){
+        var r=npcTurn(rung,2000,2000,_psTarget,false,oc);
+        banked+=r.banked;rolls+=r.rolls;
+        if(r.busted)busts++;
+      }
+      var giveMean=gives.length?Math.round(gives.reduce(function(a,b){return a+b;},0)/gives.length):0;
+      var keptMean=kepts.length?+(kepts.reduce(function(a,b){return a+b;},0)/kepts.length).toFixed(2):0;
+      _psRows.push({persona:pk,meanBanked:Math.round(banked/_psTurns),
+        bustRate:+(busts/_psTurns).toFixed(3),meanRolls:+(rolls/_psTurns).toFixed(2),
+        evGiveMean:giveMean,keptMean:keptMean,picks:gives.length});
+    });
+    try{console.table(_psRows);}catch(e){}
+    return _psRows;
+  }
   var ITERS=cfg.iters||150;
   var TIERS_TO_RUN=cfg.tiers||[0,1,2,3,4,5,6,7];
   var TURN_CAP=(cfg.turnCap!=null)?cfg.turnCap:TURN_CAP_PATRON; /* defaults to LIVE rules (8 patron / 10 boss); pass 0 to A/B uncapped */
@@ -44305,7 +44354,8 @@ function _runBalanceSim(cfg){
           rung:rung,
           evTable:_npcEvTable(dice6),
           hotHand:dice6.length,
-          bankFn:function(p,l){return !!bankFn(p,l);}
+          bankFn:function(p,l){return !!bankFn(p,l);},
+          onPick:rung._onPick||null/* P773: the persona sim listens */
         });
         if(_decided&&_decided.pick){
           _keptPts=_decided.pick.pts;
