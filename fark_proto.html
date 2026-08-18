@@ -34909,32 +34909,23 @@ function runOppTurn(){
       /* (handled in NPC bust path above — no forced bust, just extra penalty on natural bust) */
       /* Player-armed Quick Hands: swap opp's TWO highest scoring dice down
          to 2s (buffed from one die → 3). */
-      if(G._playerQuickHandsArmed){
-        G._playerQuickHandsArmed=false;
-        var _qhScoring=G.oppDice.filter(function(d){return !d.kept&&(d.val===1||d.val===5);});
-        if(_qhScoring.length>0){
-          /* Highest-value first, take up to 2. */
-          var _qhVics=_qhScoring.slice().sort(function(a,b){return(b.val===1?100:50)-(a.val===1?100:50);}).slice(0,2);
-          _qhVics.forEach(function(_qhVic){_qhVic.val=2;reDrawDieFace(_qhVic);});
-          triggerCard('quick_hands','QUICK HANDS → 2',true);
-          setStatusMsg("QUICK HANDS — "+G.rung.name+"'S "+(_qhVics.length>1?_qhVics.length+" DICE → 2":"DIE → 2"),'gold');
-          var _rrQ=_oppRescore();total=_rrQ.total;used=_rrQ.used;/* P770 */
-        }
+      /* P771: ONE KNOCK, TWO CARDS. Quick Hands (→2) and Grog's Bump
+         (→3) were twin blocks - same victims, same sort, same cap, same
+         announce shape, same rescore. The face and the name are the
+         only data. Both auto-fire here on the rival's roll; the player
+         armed them while yielding. */
+      function _playerKnock(cid,face,name){
+        var _sc=G.oppDice.filter(function(d){return !d.kept&&(d.val===1||d.val===5);});
+        if(!_sc.length)return;
+        /* highest-value first, take up to 2 */
+        var _v=_sc.slice().sort(function(a,b){return(b.val===1?100:50)-(a.val===1?100:50);}).slice(0,2);
+        _v.forEach(function(d){d.val=face;reDrawDieFace(d);});
+        triggerCard(cid,name+' → '+face,true);
+        setStatusMsg(name+" — "+G.rung.name+"'S "+(_v.length>1?_v.length+" DICE → "+face:"DIE → "+face),'gold');
+        var _rr=_oppRescore();total=_rr.total;used=_rr.used;
       }
-      /* Player-armed Grog's Bump: knock the opp's TWO scoring dice (1s/5s) → 3s.
-         Mirrors Quick Hands (which swaps to 2s); auto-fires here on the NPC roll
-         so the player only had to arm it while yielding. */
-      if(G._playerGrogsBumpArmed){
-        G._playerGrogsBumpArmed=false;
-        var _gbScoring=G.oppDice.filter(function(d){return !d.kept&&(d.val===1||d.val===5);});
-        if(_gbScoring.length>0){
-          var _gbVics=_gbScoring.slice().sort(function(a,b){return(b.val===1?100:50)-(a.val===1?100:50);}).slice(0,2);
-          _gbVics.forEach(function(_gbVic){_gbVic.val=3;reDrawDieFace(_gbVic);});
-          triggerCard('grogs_bump',"GROG'S BUMP → 3",true);
-          setStatusMsg("GROG'S BUMP — "+G.rung.name+"'S "+(_gbVics.length>1?_gbVics.length+" DICE → 3":"DIE → 3"),'gold');
-          var _rrG=_oppRescore();total=_rrG.total;used=_rrG.used;/* P770 */
-        }
-      }
+      if(G._playerQuickHandsArmed){G._playerQuickHandsArmed=false;_playerKnock('quick_hands',2,'QUICK HANDS');}
+      if(G._playerGrogsBumpArmed){G._playerGrogsBumpArmed=false;_playerKnock('grogs_bump',3,"GROG'S BUMP");}
       /* Player disruption (Quick Hands / Grog's Bump) zeroed the roll → it's
          a BUST. The main bust resolution already ran above, so without this
          the NPC neither busted nor lost oppBank and freely rerolled — the
