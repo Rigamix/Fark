@@ -17191,8 +17191,27 @@ CFX.stargazer={
    then kept groups newest-first, then anything older. Entries are
    normalised, so a consumer never has to know which shape it came
    from. `src` says where it came from for the callers that care. */
-function _tableDice(){
+function _tableDice(actor){
   var out=[];
+  /* P763: THE VIEW TAKES THE ACTOR. The seats store their dice
+     differently (pool/kept vs oppDice/_oppHeld) - this is the one place
+     that difference is absorbed, so every effect that asks "what is on
+     the table" reads the same shape for either owner. 'o': this roll's
+     keeps first (intent order, like the player's selection-first), then
+     the held dice from earlier rolls. */
+  if(actor==='o'){
+    try{
+      (G.oppDice||[]).forEach(function(d){
+        if(d.kept)out.push({val:d.val,mat:d.mat,ench:d.ench||null,
+          lane:(typeof d.lane==='number')?d.lane:null,src:'sel',el:d.el});
+      });
+      (G._oppHeld||[]).forEach(function(d){
+        out.push({val:d.val,mat:d.mat,ench:d.ench||null,
+          lane:(typeof d.lane==='number')?d.lane:null,src:'kept',el:d.el});
+      });
+    }catch(e){}
+    return out;
+  }
   try{
     (G.pool||[]).forEach(function(d){
       if(d.sel&&!d.committed&&!d._frozen)
@@ -17361,8 +17380,8 @@ CFX.preserve={
     /* P761: the rival's reading of the same rule - a kept scorer on
        THEIR table, and no die already in amber */
     if(actor==='o'){
-      return !!(G&&!G._ovDie&&(G.oppDice||[]).some(function(d){
-        return d.kept&&(d.val===1||d.val===5);}));
+      return !!(G&&!G._ovDie&&_tableDice('o').some(function(e){
+        return e.val===1||e.val===5;}));
     }
     if(!G||G.phase==='opp')return false;
     return _famNeedMet('scorer');/* P738: the shared view, same as honeytrap */
@@ -17376,13 +17395,18 @@ CFX.preserve={
        'preserve' was G._oPreserve=100: a flat token, no die, no amber,
        wrong price for a trapped 5. It is gone. */
     if(actor==='o'){
+      /* P763: the SAME preference loop over the SAME view the player's
+         capture below runs - _tableDice absorbs the seat difference.
+         And the trap closes visually where the die is standing, exactly
+         as it does for the player. */
       var _kd=null;
       [1,5].some(function(w){
-        _kd=(G.oppDice||[]).filter(function(d){return d.kept&&d.val===w;})[0];
+        _kd=_tableDice('o').filter(function(e){return e.val===w;})[0];
         return !!_kd;
       });
       if(!_kd)return false;
       G._ovDie={val:_kd.val,mat:_kd.mat||'bone',ench:_kd.ench||null,lane:_kd.lane};
+      if(_kd.el)_amberRide(_kd.el,{spray:true});
       setStatusMsg((G.rung&&G.rung.name||'RIVAL')+' TRAPS A DIE IN AMBER FOR NEXT TURN','red');
       return true;
     }
@@ -17456,18 +17480,7 @@ CFX.preserve={
       var _kr2=document.getElementById('keptRow');
       var _cands=(!_hit&&_kr2)?[].slice.call(_kr2.querySelectorAll('.die')):[];
       _cands.forEach(function(el){if(!_hit&&el._trueVal===found)_hit=el;});
-      if(_hit&&window.D3X&&D3X.amberShell){
-        /* the 3D layer adopts chips on ITS tick, so a chip minted or
-           re-rendered this frame has no die yet - retry briefly rather
-           than shelling nothing (the same wait the payout uses) */
-        (function _try(t){
-          var _dd=D3X._dieOfChip(_hit);
-          if(_dd){D3X.amberShell(_dd,true);
-            try{_fxSpray(_hit,'#e8a23c',12,{speed:28,g:170,size:10,spread:0.6});}catch(e){}
-            return;}
-          if(t<40)setTimeout(function(){_try(t+1);},60);
-        })(0);
-      }
+      if(_hit)_amberRide(_hit,{spray:true});/* P763: the one rider */
       SFX.bank&&SFX.bank();
     }catch(e){}
     famLog('PRESERVED — A '+found+' WAITS IN AMBER FOR NEXT TURN');
@@ -29966,6 +29979,29 @@ function _bustShieldFX(color){
    it only does something while a preserved die is parked. The wait is
    on the DICE, not a timer - Denis: 'only after the rolled dice have
    settled so it's visible'. */
+/* P763: THE ONE AMBER RIDER. The 3D layer adopts chips on ITS tick, so
+   a chip minted this frame has no die yet - every amber site was
+   carrying its own copy of this retry loop (player trap-close, player
+   deal, rival return: three, about to be four). One copy. watch=true
+   stashes the chip for _amberReturnWhenSettled (the shell cracks when
+   the next throw lands); spray=true is the trap-closing flourish. */
+function _amberRide(el,o){
+  o=o||{};
+  if(!el)return;
+  (function _try(t){
+    var dd=window.D3X&&D3X._dieOfChip&&D3X._dieOfChip(el);
+    if(dd&&D3X.amberShell){
+      D3X.amberShell(dd,true);
+      if(o.spray)try{_fxSpray(el,'#e8a23c',12,{speed:28,g:170,size:10,spread:0.6});}catch(e){}
+      if(o.watch){
+        window._fkAmberChip=el;window._fkAmberWrap=null;
+        try{_amberReturnWhenSettled();}catch(e){}
+      }
+      return;
+    }
+    if((t||0)<40)setTimeout(function(){_try((t||0)+1);},60);
+  })(0);
+}
 function _amberReturnWhenSettled(){
   var chip=window._fkAmberChip,wrap=window._fkAmberWrap;
   if(!chip||!chip.isConnected){window._fkAmberChip=window._fkAmberWrap=null;return;}
@@ -31198,16 +31234,7 @@ G.numDice=Math.min((G.matchDice?G.matchDice.length:6),(G.numDice||(G.matchDice?G
       newEntries.push({val:_pv.val,mat:_pv.mat,ench:_pv.ench,sel:false,
         committed:true,el:_pel,lane:_pv.lane,_preserved:true});
       /* the amber holds until this throw is done, then cracks */
-      (function _shell(t){
-        var dd=window.D3X&&D3X._dieOfChip&&D3X._dieOfChip(_pel);
-        if(dd&&D3X.amberShell){
-          D3X.amberShell(dd,true);
-          window._fkAmberChip=_pel;window._fkAmberWrap=null;
-          try{_amberReturnWhenSettled();}catch(e){}
-          return;
-        }
-        if((t||0)<40)setTimeout(function(){_shell((t||0)+1);},60);
-      })(0);
+      _amberRide(_pel,{watch:true});/* P763: the one rider */
       G._pvDie=null;
     }
   }catch(e){}
@@ -34251,16 +34278,7 @@ function runOppTurn(){
       _seatDie(_ovRow,_ovEl,_ov.lane);
       G._oppHeld=G._oppHeld||[];
       G._oppHeld.push({val:_ov.val,el:_ovEl,kept:true,mat:_ov.mat,ench:_ov.ench,lane:_ov.lane});
-      (function _oShell(t){
-        var dd=window.D3X&&D3X._dieOfChip&&D3X._dieOfChip(_ovEl);
-        if(dd&&D3X.amberShell){
-          D3X.amberShell(dd,true);
-          window._fkAmberChip=_ovEl;window._fkAmberWrap=null;
-          try{_amberReturnWhenSettled();}catch(e){}
-          return;
-        }
-        if((t||0)<40)setTimeout(function(){_oShell((t||0)+1);},60);
-      })(0);
+      _amberRide(_ovEl,{watch:true});/* P763: the one rider */
     }catch(e){}
   }
   /* P521: THE SEATS AND THE COUNT, FROM ONE PLACE.

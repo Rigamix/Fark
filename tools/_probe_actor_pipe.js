@@ -91,7 +91,17 @@ out.preserveReturn.amber=shell;
 /* let the turn finish so nothing leaks into verdicts */
 await until(()=>G.oPts>0||((G._oppHeld||[]).length===0&&(G.oppDice||[]).length===0),45000);
 
+/* ── 5. player preserve capture, unchanged through the shared view ── */
+G.pF=[inst('preserve')];G.oF=[];
+G._famPreserve=null;G.phase='choosing';
+G.pool=[{val:1,mat:'jade',ench:null,sel:true,committed:false,lane:1,el:null}];
+G.kept=[];
+famUse(0,'p');
+out.playerPreserve={captured:G._famPreserve?{val:G._famPreserve.val,mat:G._famPreserve.mat}:null};
+
 out.verdicts={
+  playerPreserve:!!(out.playerPreserve.captured&&out.playerPreserve.captured.val===1
+    &&out.playerPreserve.captured.mat==='jade'),
   slowCookRival:out.slowCook.acc>0&&out.slowCook.delta===out.slowCook.acc&&out.slowCook.drained,
   slowCookPlayer:out.slowCookPlayer.acc>0&&out.slowCookPlayer.delta===out.slowCookPlayer.acc,
   pickpocketBoth:out.pickpocket.lifted&&out.pickpocketPlayer.lifted,
