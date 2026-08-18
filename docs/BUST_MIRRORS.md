@@ -58,3 +58,25 @@ numbers as `||` fallbacks while the player side had none.
 The boss's `gain_pts` **message** repeated the expression a third time, caught by
 the patch's own old-form assert — a message computing its number from a second
 copy is the `challenge` pattern in miniature, so both messages now read the row.
+
+---
+
+## 2026-08-19 status check (verified against live code, not this doc)
+
+The 'worth doing' list above SHIPPED in later sessions:
+- gain_pts and punish_busts route through BUST_FX rows that carry the
+  defaults (||500, ||2/||1500) - both seats inherit. Verified at the
+  BUST_FX literal and both call sites.
+- bust_immune_turns: BOTH sites read `<=` with the same `||2` now (the
+  P768 comment records the Law-6 alignment). The off-by-one is closed.
+- bust_survive stays deliberately apart, as ruled above.
+
+INSTRUMENT NOTE: tools/mirror_diff.py now reports every bank mechanic as
+'one side only' - FALSE. It scans finOpp's function body, and P470
+extracted the mechanic branches into _oppFxOwnA/B/_oppFxPlayer, so the
+scanner's boundary no longer matches the code's. The mechanics layer is
+converged; what remains of the handleBank/finOpp twin is the FLOW SHELL
+(order of steps, guards, timers), and auditing that needs the tool's
+scan scope widened to follow the extractions first. Do not act on
+mirror_diff output until then.
+

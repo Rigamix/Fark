@@ -1,44 +1,45 @@
 # Next session - start here
 
-## Where things stand (2026-08-18, end of the parity sessions)
+## Where things stand (2026-08-19, end of the phase-2 sessions)
 
-The NPC play rework and the one-pipe card parity program are live
-through P766. Read docs/NPC_AI_BRIEF.md sections 6-8 for the full state;
-the short version:
+Read docs/NPC_AI_BRIEF.md sections 6-9. Short version:
+- Decisions: EV floor + bank plan (P760). Pipe: famUse(i,actor), seven
+  actives + nine symmetric passives, bespoke twins deleted (P761-766).
+- Legacy roster clusters 1-4 done as tables (P767-771): NPC_RESCUES,
+  NPC_BUST_SAVES, NPC_ARMS, _oppRescore, _playerKnock.
+- Phase 2 done (P772-773): _npcDecide is the G-free core; the sim runs
+  the REAL chooser; _runPersonaSim({turns:800}) is the calibration
+  instrument. VERDICT: no persona weights needed at current numbers -
+  the baseline table is in the brief section 9.
+- Standing assertion: the harness voids any run with picks:0 (the
+  execution-witness rule - see the P773 instrument note; the sim once
+  produced plausible persona tables with the chooser never running).
 
-- Decisions: EV floor + bank plan + release block deleted (P760). The
-  three reported idiocies are impossible by construction.
-- The pipe: famUse(i, actor), NPC_FAM_READY registry. Seven actives
-  (preserve, double_or_nothing, honeytrap, encore, sleight, stargazer,
-  ill_omen) + nine symmetric passives through it, every bespoke twin
-  deleted. Enchant thread live on the rival path.
-- Two parity bugs fixed on the way: the rival bankBonus seam consumed no
-  delta; the rival bust seam carried no `lost`.
-- Falling Star's rival half is LIVE and retune-flagged - Denis is
-  playing nights to feel it before numbers move.
+## Waiting on Denis
+- Night reports: Falling Star feel, patron table manners (retune input).
+- Rulings: rescue-chain fall-through, seven_dice's dead 7th die,
+  cluster 5 (two-seat re-audit of the rival roster).
+- Backlog design calls: type:'once' decorative, block_low_bank undealt.
 
-## THE NEXT BATCH, ready to start: legacy roster cluster 1
+## Next constructive arc (when taken up): the flow shells
+handleBank vs finOpp as FLOWS. The mechanics layer is already converged
+(BUST_FX/BANK_FX/BANK_TAKE + P470 extractions) - what remains twinned is
+step order, guards and timers. FIRST re-scope tools/mirror_diff.py to
+follow the P470 extractions (it currently reports every mechanic 'one
+side only', which is false - its scan boundary predates the extraction);
+THEN audit the shells, THEN design. Do not act on current mirror_diff
+output.
 
-docs/NPC_AI_BRIEF.md section 8 has the measured map (42 cards, 21
-levers, 19 mechanics). Cluster 1 = the bust rescues (old_bones,
-ambrose_grace, wild_die, brutus_fist, finnicks_palm, grogs_flask,
-second_wind + bust_survive/bust_immune_turns/bust_bank_half +
-mabels_stitch): one moment, one dispatch table, npcCardState UNTOUCHED
-(it is saved - resume risk).
-
-Before writing anything: read the full bust path (~34700-34900) cold.
-Verification plan: stub rollFace in a probe to force a dead first roll,
-assert exactly one rescue fires and the bespoke double-fire is gone;
-then a resume check (save mid-match with uses spent, reload, verify
-npcCardState survived).
-
-## Standing traps (all bit this session)
-- Patch scripts: Write-tool .py only, NEVER bash heredocs (backslash
-  trap ate shader strings again). Index cuts: compute lengths from the
-  MATCHED variant (CRLF cut left a stray brace - parse gate caught it).
-- The ?sim=1 harness does NOT run the persona chooser (simTurn keeps
-  maximal always) - drive the live functions.
-- Probes: out-of-band runOppTurn during the match-init window loses
-  state to startPTurn's row clear - wait ~3.5s after launch.
-- Port 8085 is Denis's server; probes use 8086 and sweep their python
-  after.
+## Standing traps (all bit recently)
+- Patch scripts: Write-tool .py only, never bash heredocs. Anchors:
+  newline = ?
+ (regions mix per-line endings); re.escape escapes the
+  newline char itself. Index cuts: compute lengths from the MATCHED
+  variant.
+- The ?sim=1 page has no live match: unguarded G.member reads throw and
+  defensive try/catch turns that into silent fallback. Execution
+  witnesses on anything the sim claims to test.
+- Probes: wait ~3.5s after launch (startPTurn's init clear); rival
+  effects fire in the roll RESOLUTION, seconds after the deal - watch
+  for mutations, don't sample once.
+- Port 8085 is Denis's server; probes use 8086 and sweep their python.
