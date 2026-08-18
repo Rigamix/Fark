@@ -16588,38 +16588,47 @@ function _handShape(selD){
    below any catastrophe (a discarded straight is 1400+). One number,
    sim-tunable. */
 var NPC_MAX_GIVE=500;
-function _oppChooseFrom(freeD,total,bank){
-  if(typeof G!=='undefined'&&G)G._oPlannedBank=null;/* P760: never stale */
+/* P772: THE DECISION CORE, G-FREE. Everything P760 built - candidate
+   pricing, the bank plan, the floor, the persona pick - with every
+   outside fact arriving in ctx:
+     cards    scoring rules for the candidate enumeration
+     rung     the persona owner
+     evTable  the measured bust/gain table for THESE dice
+     hotHand  what a sweep re-deals (seats minus snuff)
+     bankFn   (ptsAfterKeep, diceLeft) -> bank? - the caller's banking
+   _oppChooseFrom wraps it with the live match; simTurn calls it with
+   sim-local state, which is what finally lets the sim run the REAL
+   chooser instead of keeping the maximal set. Returns
+   {pick, bank, base} or null. */
+function _npcDecide(freeD,total,bank,ctx){
   if(!freeD||!freeD.length)return null;
   if(!total||total<=0)return null;/* bust: there is nothing to keep */
+  ctx=ctx||{};
   var cands;
-  try{ cands=_legalKeeps(freeD,'o',bank||0); }catch(e){ return null; }
+  try{ cands=_legalKeeps(freeD,'o',bank||0,ctx.cards); }catch(e){ return null; }
   if(!cands||!cands.length)return null;
   /* P760: PRICE EVERY CANDIDATE ONCE - pts + survival x expected gain,
      off the same measured table combo already used. Hot dice (left 0)
      prices the hand a sweep actually deals. */
   try{
-    var _evT=_npcEvTable((G&&G.matchOppDice)||(G&&G.oppDice||[]).map(function(d){return d.mat;}));
+    var _evT=ctx.evTable||_npcEvTable((G&&G.matchOppDice)||(G&&G.oppDice||[]).map(function(d){return d.mat;}));
+    var _hot=ctx.hotHand||((typeof _oHandAfterSweep==='function')?_oHandAfterSweep():6);
     var _bestEV=-Infinity;
     cands.forEach(function(k){
-      var _L=(k.left===0)?_oHandAfterSweep():k.left;
+      var _L=(k.left===0)?_hot:k.left;
       k.ev=k.pts+((_L>=1&&_L<=6)?(1-(_evT.bust[_L]||0))*(_evT.gain[_L]||0):0);
       if(k.ev>_bestEV)_bestEV=k.ev;
     });
     /* P760: THE BANK PLAN. Keep and bank are ONE decision (every Farkle
        solver couples them): ask the bank question FIRST, against the
        max-pts keep - and if the answer is bank, take everything
-       scoring. The verdict is stashed with the base it priced, so the
-       bank site reuses it rather than re-rolling its dice. */
-    if(typeof oppShouldBank==='function'&&G&&G.rung){
+       scoring. */
+    if(ctx.bankFn){
       var _c0=cands[0];/* _legalKeeps sorts by pts desc */
-      var _l0=(_c0.left===0)?_oHandAfterSweep():_c0.left;
+      var _l0=(_c0.left===0)?_hot:_c0.left;
       var _plan=false;
-      try{_plan=oppShouldBank(G.rung,(bank||0)+_c0.pts,_l0,G.oPts,G.pPts,G.target);}catch(e){}
-      if(_plan){
-        G._oPlannedBank={verdict:true,base:(bank||0)+_c0.pts};
-        return _c0;
-      }
+      try{_plan=!!ctx.bankFn((bank||0)+_c0.pts,_l0);}catch(e){}
+      if(_plan)return {pick:_c0,bank:true,base:(bank||0)+_c0.pts};
     }
     /* P760: THE FLOOR. Personas choose freely among candidates within
        NPC_MAX_GIVE of the best - style decides WHICH good option, never
@@ -16628,8 +16637,28 @@ function _oppChooseFrom(freeD,total,bank){
     if(_sane.length)cands=_sane;
   }catch(e){}
   var pick;
-  try{ pick=_npcChooseKeep(cands,(typeof G!=='undefined'&&G)?G.rung:null); }catch(e){ return null; }
-  return (pick&&pick.sel&&pick.sel.length)?pick:null;
+  try{ pick=_npcChooseKeep(cands,ctx.rung||null,{evTable:ctx.evTable,hotHand:ctx.hotHand}); }catch(e){ return null; }
+  return (pick&&pick.sel&&pick.sel.length)?{pick:pick,bank:false}:null;
+}
+/* the live-match wrapper: same behaviour P760 shipped, one caller of
+   the core */
+function _oppChooseFrom(freeD,total,bank){
+  if(typeof G!=='undefined'&&G)G._oPlannedBank=null;/* P760: never stale */
+  var ctx={
+    cards:(typeof G!=='undefined'&&G&&G.oCards)||[],
+    rung:(typeof G!=='undefined'&&G)?G.rung:null,
+    evTable:null,/* the core falls back to the live table */
+    hotHand:null,
+    bankFn:(typeof oppShouldBank==='function'&&G&&G.rung)?function(p,l){
+      var v=false;
+      try{v=oppShouldBank(G.rung,p,l,G.oPts,G.pPts,G.target);}catch(e){}
+      return v;
+    }:null
+  };
+  var d=_npcDecide(freeD,total,bank,ctx);
+  if(!d)return null;
+  if(d.bank&&typeof G!=='undefined'&&G)G._oPlannedBank={verdict:true,base:d.base};
+  return d.pick;
 }
 
 /* _npcEvTable - what is a live die actually worth, for THESE dice?
@@ -16673,7 +16702,7 @@ function _npcEvTable(mats){
   return tab;
 }
 
-function _npcChooseKeep(keeps,rung){
+function _npcChooseKeep(keeps,rung,ctx){/* P772: ctx carries evTable/hotHand for G-free callers */
   if(!keeps||!keeps.length)return null;
   var key=(typeof _npcPersonaKey==='function')
     ? _npcPersonaKey(rung||(typeof G!=='undefined'&&G?G.rung:null)) : 'ones';
@@ -16759,7 +16788,7 @@ function _npcChooseKeep(keeps,rung){
        will actually receive, which is six unless a seat is snuffed. The
        guaranteed continuation is worth more still, but pricing that needs
        oppShouldBank modelled, so six is the honest floor. */
-    var _evT=_npcEvTable((G&&G.matchOppDice)||(G&&G.oppDice||[]).map(function(d){return d.mat;}));
+    var _evT=(ctx&&ctx.evTable)||_npcEvTable((G&&G.matchOppDice)||(G&&G.oppDice||[]).map(function(d){return d.mat;}));
     var _best=null,_bestV=-Infinity;
     for(var _ci=0;_ci<c.length;_ci++){
       var _k=c[_ci],_L=_k.left|0;
@@ -16768,7 +16797,7 @@ function _npcChooseKeep(keeps,rung){
          snuff, so the rival can get five - and pricing a five-die roll off
          bust[6]/gain[6] reads the wrong row of a measured table, in the one
          persona that actually calculates. */
-      var _hotL=(_L===0)?_oHandAfterSweep():_L;
+      var _hotL=(_L===0)?((ctx&&ctx.hotHand)||_oHandAfterSweep()):_L;
       if(_hotL>=1&&_hotL<=6)_v+=(1-(_evT.bust[_hotL]||0))*(_evT.gain[_hotL]||0);
       if(_v>_bestV){_bestV=_v;_best=_k;}
     }
@@ -16813,7 +16842,7 @@ function _keepIsLegal(pts,iconCount,anchorLegal){
   if(pts>0)return true;
   return !!((iconCount||0)>0||anchorLegal);
 }
-function _legalKeeps(free,actor,locked){
+function _legalKeeps(free,actor,locked,cardsOverride){/* P772 */
   var out=[];
   var n=(free||[]).length; if(!n) return out;
   var _lkO=(actor==='o');
@@ -16831,7 +16860,10 @@ function _legalKeeps(free,actor,locked){
      rivalSeatWorks:true was not hiding a defect here. If `locked` is ever
      given a consumer, this is already correct rather than quietly wrong. */
   if(locked==null)locked=_lkO?0:((G&&G.kept)?G.kept.reduce(function(a,k){return a+(k.pts||0);},0):0);
-  var cards=_lkO?(G.oCards||[]):(typeof effectiveCards==='function'?effectiveCards():(G.pCards||[]));
+  /* P772: the SIM passes its own cards - inheriting a stale live match's
+     G.oCards would score sim dice with real-match rules */
+  var cards=(cardsOverride!==undefined&&cardsOverride!==null)?cardsOverride
+    :(_lkO?(G.oCards||[]):(typeof effectiveCards==='function'?effectiveCards():(G.pCards||[])));
   var row=(_lkO?(G.oppDice||[]):(G.pool||[]));
   for(var m=1;m<(1<<n);m++){
     var sel=[];
@@ -44218,7 +44250,7 @@ function _runBalanceSim(cfg){
     return jadeUsed&&(maxC>=3||uniq>=5);
   }
   /* One turn, either side. Returns {banked,busted,rolls,oppDelta,selfBurn,extra}. */
-  function simTurn(side,dice6,bankAdd,cs,bankFn,myTotal,oppTotal,target,oppDone,pushHot){
+  function simTurn(side,dice6,bankAdd,cs,bankFn,myTotal,oppTotal,target,oppDone,pushHot,rung){/* P772: rung threads to the chooser */
     var mats=dice6.slice(),turn=0,rolls=0;
     var out={banked:0,busted:false,rolls:0,oppDelta:0,selfBurn:0,extra:false};
     var saves=(dice6.indexOf('silver')>=0?1:0)+(cs.charges.ward||0);
@@ -44260,11 +44292,31 @@ function _runBalanceSim(cfg){
         else if(saves>0){saves--;return bank();/* ward / silver: the bust is absorbed, the turn stands */}
         else return bust();
       }
-      var gain=r.total*(lit()?2:1);
+      /* P772: THE SIM RUNS THE REAL CHOOSER for the rival. The old line
+         kept the maximal set (r.used) always - which is why the sim was
+         structurally blind to every persona bug this program fixed. The
+         player side keeps its policy-driven maximal keep: player
+         policies are the sim's independent variable, not the chooser's. */
+      var _keptPts=r.total,_usedMask=r.used,_decided=null;
+      if(side==='o'&&rung&&typeof _npcDecide==='function'){
+        var _freeObjs=mats.map(function(m,i){return {val:vals[i],mat:m,ench:null,lane:i};});
+        _decided=_npcDecide(_freeObjs,r.total,turn,{
+          cards:[],/* the sim scores bare - same as its scoreRoll calls */
+          rung:rung,
+          evTable:_npcEvTable(dice6),
+          hotHand:dice6.length,
+          bankFn:function(p,l){return !!bankFn(p,l);}
+        });
+        if(_decided&&_decided.pick){
+          _keptPts=_decided.pick.pts;
+          _usedMask=_freeObjs.map(function(o){return _decided.pick.sel.indexOf(o)>=0;});
+        }
+      }
+      var gain=_keptPts*(lit()?2:1);
       turn+=gain;
       if(cs.ids.slow_cook&&rolls>2)turn+=cardP(cs,'slow_cook');
-      if(cs.ids.bloom&&bloomHit(vals,mats,r.used))turn+=cardP(cs,'bloom');
-      var left=[];for(var i=0;i<mats.length;i++)if(!r.used[i])left.push(mats[i]);
+      if(cs.ids.bloom&&bloomHit(vals,mats,_usedMask))turn+=cardP(cs,'bloom');
+      var left=[];for(var i=0;i<mats.length;i++)if(!_usedMask[i])left.push(mats[i]);
       if(!left.length){mats=dice6.slice();if(pushHot&&turn<3000)continue;}
       else mats=left;
       if((myTotal+turn+bankAdd)>=target)return bank();
@@ -44272,7 +44324,9 @@ function _runBalanceSim(cfg){
         if(myTotal+turn+bankAdd>oppTotal)return bank();
         continue;/* last licks */
       }
-      if(bankFn(turn,mats.length))return bank();
+      /* the core already answered the bank question for the rival */
+      if(_decided){if(_decided.bank)return bank();}
+      else if(bankFn(turn,mats.length))return bank();
     }
   }
   function playerTurn(gear,policy,myTotal,oppTotal,target,oppDone,pc){
@@ -44288,7 +44342,7 @@ function _runBalanceSim(cfg){
     var bankAdd=500*dice6.filter(function(m){return m==='starstone';}).length;
     return simTurn('o',dice6,bankAdd,oc,function(turn,diceLeft){
       return oppShouldBank(rung,turn,diceLeft,myTotal,playerTotal,target);
-    },myTotal,playerTotal,target,playerDone,false);
+    },myTotal,playerTotal,target,playerDone,false,rung);/* P772 */
   }
   /* One full match. playerFirst alternates per iter. Returns stats. */
   function playMatch(gear,policy,rung,target,playerFirst,cap){
