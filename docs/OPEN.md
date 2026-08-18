@@ -707,18 +707,17 @@ refactor preserved the behaviour (a refactor is not the place to invent
 a 7th seat). Ruling wanted: give the table a 7th lane for this card, or
 retire/redesign it (e.g. '+1 die' becomes 'reroll one die free')?
 
-## Bank-seam mirror rulings (found by the re-scoped mirror_diff, 2026-08-19)
-Three mirrored cards where the two seats read DIFFERENT rules - intent
-questions, not merges (each fix is one line once ruled):
-1. GAIN_WHEN_AHEAD: the rival's ahead-test counts the incoming bank
-   ((oPts+pts)>pPts); the player's does not (pPts>oPts, total excluded).
-   Bank-inclusive is more generous. Which reading is the card?
-2. HALVE_FIRST_BANK: one seat gates on firstBankDone (literally the
-   FIRST bank), the other on a once-per-match use counter (once, ANY
-   bank). Which is the card's rule?
-3. CHALLENGE (arm conditions): rival arms at turn>=3 AND pPts>=threshold
-   AND 40%; player-owned arms at oppTurnCount>=2 AND pts>0 AND 40% - the
-   threshold is read on one side only. Align to which?
+## Bank-seam mirror rulings - RULED AND SHIPPED (P774, 2026-08-19)
+1. GAIN_WHEN_AHEAD: bank-inclusive both seats (Denis: evaluated on the
+   result of the banking action). Player test now (pPts+total)>oPts.
+2. HALVE_FIRST_BANK: the FIRST bank specifically, both seats (the card's
+   own text). oppFirstBankDone latch mirrors firstBankDone.
+3. CHALLENGE: gut-check confirmed missing-check-not-design (the turn
+   gates were already equivalent per the init offset); the player-owned
+   arm reads oPts>=threshold, mirroring the rival's. NOTE for the
+   flow-shell audit: the rival's challenge pre-arms with an announce,
+   the player-owned resolves inline against the judged bank - both
+   match their card texts; telegraph asymmetry recorded, not changed.
 Also confirmed: block_low_bank now has ZERO implementation sites (the
 backlog's 'implemented both seats' is stale - fully undealt AND gone);
 periodic_drain mirrors correctly (per-owner turn counters) - the tool's

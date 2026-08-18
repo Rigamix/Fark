@@ -33057,7 +33057,11 @@ function _oppFxPlayer(pts){
           triggerCard(cid,npc.name+' STOLE!',true);spawnPop('STOLEN!');
         }
                 /* Challenge opp: if their bank is below threshold, they lose penalty (steady_hands / the_verdict_npc) */
-        if(eff.type==='once'&&eff.mechanic==='challenge'&&(G.npcCardState.playerOnce[cid]||0)<_useCap(cid)&&G.oppTurnCount>=2&&pts>0&&Math.random()<0.4){
+        /* P774 RULING (gut-check confirmed missing-check-not-design):
+           the arm requires the rival to be scoring at challenge scale -
+           the exact mirror of the rival-owned arm's pPts>=threshold.
+           The turn gates were already equivalent (init offset, P768). */
+        if(eff.type==='once'&&eff.mechanic==='challenge'&&(G.npcCardState.playerOnce[cid]||0)<_useCap(cid)&&G.oppTurnCount>=2&&pts>0&&G.oPts>=(eff.threshold||0)&&Math.random()<0.4){
           G.npcCardState.playerOnce[cid]=(G.npcCardState.playerOnce[cid]||0)+1;
           if(pts<eff.threshold){
             var penalty=Math.min(eff.penalty,G.oPts+pts);
@@ -33075,8 +33079,12 @@ function _oppFxPlayer(pts){
             setStatusMsg(npc.name+' — '+G.rung.name+' LOST '+penalty+'!','gold');
           }else{triggerCard(cid,npc.name+' MET',true);}
         }
-        /* Halve first bank (fine_print) */
-        if(eff.type==='on_player_bank'&&eff.mechanic==='halve_first_bank'&&(G.npcCardState.playerOnce[cid]||0)<_useCap(cid)&&pts>0){
+        /* Halve first bank (fine_print). P774 RULING: 'the opponent's
+           VERY FIRST bank' - the card's own text - so the gate is the
+           first-bank latch (the mirror of firstBankDone), not the
+           once-per-match counter. The counter still increments for
+           bookkeeping parity; the flag decides. */
+        if(eff.type==='on_player_bank'&&eff.mechanic==='halve_first_bank'&&!G.npcCardState.oppFirstBankDone&&pts>0){
           G.npcCardState.playerOnce[cid]=(G.npcCardState.playerOnce[cid]||0)+1;
           var half=pts-BANK_FX.halve_first_bank(pts,eff);pts-=half;
           triggerCard(cid,npc.name+' −'+half,true);
@@ -33422,7 +33430,10 @@ function handleBank(){
     }
     /* Player-owned The Audit: banking while AHEAD pays +500. Same dead-card
        gap as the badge above. */
-    if(eff&&eff.mechanic==='gain_when_ahead'&&G.pPts>G.oPts){
+    /* P774 RULING: 'ahead' counts the incoming bank on both seats -
+       evaluated on the result of the banking action, matching the
+       rival's reading at _oppFxOwnB. */
+    if(eff&&eff.mechanic==='gain_when_ahead'&&(G.pPts+total)>G.oPts){
       total=BANK_FX.gain_when_ahead(total,eff);
       bonusMsg+=' +'+(eff.amount||500)+' '+npc.name;
       triggerCard(cid,npc.name+' +'+(eff.amount||500),true);
@@ -35657,7 +35668,8 @@ function runOppTurn(){
            rival-owned bankBonus card (slow_cook's simmer, any future one)
            was silently void. Delta first, then the bank. */
         pts+=famFire('bankBonus',{actor:'o',amt:pts,total:pts});
-        G.oPts+=pts;_npcActuallyBanked=true;setStatusMsg((G.rung?G.rung.name:'RIVAL')+' BANKED '+pts.toLocaleString(),'active');if(window.DLG&&pts>=600)DLG.trigger('OPP_BIG_BANK');}
+        G.oPts+=pts;_npcActuallyBanked=true;
+        G.npcCardState.oppFirstBankDone=true;/* P774: the mirror of firstBankDone */setStatusMsg((G.rung?G.rung.name:'RIVAL')+' BANKED '+pts.toLocaleString(),'active');if(window.DLG&&pts>=600)DLG.trigger('OPP_BIG_BANK');}
       famFire('bank',{actor:'o',amt:pts});
       /* WHAT THE RIVAL KEPT, for Vagabond's Break row to take off them. Every
          badge and card adjustment to `pts` has landed by here, so this is the
