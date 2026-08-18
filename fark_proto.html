@@ -34832,67 +34832,36 @@ function runOppTurn(){
          re-rolls, which would discard whatever the hook just did. Nothing can
          claim it today; every consumer gates on _fxMine. */
       try{famFire('deadRoll',{actor:'o',free:(G.oppDice||[]).filter(function(d){return !d.kept;})});}catch(e){}
-      /* NPC bust immunity (hold_the_line, sundays_rest, one_more_round) */
-        var bustSaved=false,bustSavedCid=null;
-        G.oCards.forEach(function(cid){
-          if(bustSaved)return;
-          var npc=getNpcCard(cid);if(!npc)return;var eff=npc.effect;
-          /* LAW 6: matches the player's copy exactly - `<=` and the same ||2
-             default. Both counters read 1 on their first turn (turnNum inits
-             1 and bumps at turn END; oppTurnCount inits 0 and bumps at turn
-             START), so `<` really did give the boss one turn against the
-             player's two. */
-            if(eff.mechanic==='bust_immune_turns'&&G.npcCardState.oppTurnCount<=(eff.turns||2)){bustSaved=true;bustSavedCid=cid;}
-          if(eff.mechanic==='bust_survive'&&(G.npcCardState.usedOnce[cid]||0)<_useCap(cid)&&Math.random()<eff.chance){
-            G.npcCardState.usedOnce[cid]=(G.npcCardState.usedOnce[cid]||0)+1;bustSaved=true;bustSavedCid=cid;
-            /* Halve NPC's accumulated turn points as cost of survival.
-               Was incorrectly halving G.turnPts (the PLAYER's turn points)
-               instead of oppBank (the NPC's). Card description: "Grog
-               survives a bust... his turn points are halved but not lost." */
-            oppBank=Math.floor(oppBank/2);
-          }
-        });
-        /* NPC bust → bank half (the_last_stitch_npc) */
-        var bustBankHalf=false;
-        G.oCards.forEach(function(cid){
-          if(bustSaved||bustBankHalf)return;
-          var npc=getNpcCard(cid);if(!npc)return;
-          if(npc.effect.mechanic==='bust_bank_half'&&(G.npcCardState.usedOnce[cid]||0)<_useCap(cid)&&oppBank>0){
-            G.npcCardState.usedOnce[cid]=(G.npcCardState.usedOnce[cid]||0)+1;bustBankHalf=true;
-            var halfBank=Math.floor(oppBank/2);
-            setStatusMsg(npc.name+'! '+G.rung.name+' SAVES '+halfBank,'red');
-            setTimeout(function(){clearRow('oppDiceRow');finOpp(halfBank);},_oppDelay(900));
-          }
-        });
-        if(bustBankHalf)return;
-        /* Player active cards ending up in NPC hand (via mirror_match) — auto-trigger
-           the ones that don't need timing choices. Mabel's Stitch: banks turn pts on bust. */
-        if(!bustSaved&&G.oCards.includes('mabels_stitch')&&(G.npcCardState.usedOnce['mabels_stitch']||0)<_useCap('mabels_stitch')&&oppBank>0){
-          G.npcCardState.usedOnce['mabels_stitch']=(G.npcCardState.usedOnce['mabels_stitch']||0)+1;bustBankHalf=true;
-          setStatusMsg("MABEL'S STITCH — "+G.rung.name+' SAVES '+oppBank,'red');
-          triggerCard('mabels_stitch','STITCH +'+oppBank,false);
-          setTimeout(function(){clearRow('oppDiceRow');finOpp(oppBank);},_oppDelay(900));
+      /* P768: the mitigation chain is a TABLE now (NPC_BUST_SAVES,
+         beside the rescue table) - one walk, first answer wins, same
+         priority: survive/immune (card order) > bank-half > stitch >
+         second wind > the real bust. The outcomes keep their exact
+         plumbing: survive resumes the turn, bank rides the finOpp
+         timer, and _oppBustOut stays the one true exit. */
+      {
+        var _bsCtx={oppBank:oppBank};
+        var _bsOut=null;
+        for(var _bsI=0;_bsI<NPC_BUST_SAVES.length&&!_bsOut;_bsI++){
+          try{_bsOut=NPC_BUST_SAVES[_bsI].try(_bsCtx);}catch(e){_bsOut=null;}
         }
-        if(bustBankHalf)return;
-        if(bustSaved){
+        oppBank=_bsCtx.oppBank;/* bust_survive halves what survives */
+        if(_bsOut&&_bsOut.kind==='survive'){
           setStatusMsg(G.rung.name+' SURVIVES BUST!','red');
-          if(bustSavedCid){var _bsCid=bustSavedCid;triggerCard(_bsCid,getNpcCard(_bsCid).name+'!',false);
+          if(_bsOut.cid){var _bsCid=_bsOut.cid;triggerCard(_bsCid,getNpcCard(_bsCid).name+'!',false);
             setTimeout(function(){if(window.DLG)DLG.triggerCard(_bsCid,false);},_oppDelay(700));}
           setTimeout(function(){_oResumeAfterBustSave();/* P524 */},_oppDelay(900));return;
         }
-        /* NPC Second Wind: bust rescue — roll 3 dice, whatever scores is banked */
-        if(npcHasActive('second_wind')){
-          npcUseActive('second_wind');
-          triggerCard('second_wind',G.rung.name+' SECOND WIND!',false);
-          setStatusMsg(G.rung.name+' — SECOND WIND! ROLLING 3 DICE','red');
-          var _swRoll=[],_swMats=[];
-          for(var _swi=0;_swi<3;_swi++){var _swM=(G.matchOppDice&&G.matchOppDice[_swi])||'bone';_swRoll.push(rollFace(_swM));_swMats.push(_swM);}
-          var _swR=_scoreRollBest(_swRoll,G.oCards,0,{crowsLuck:false,crowsLuckRemaining:0},_swMats);
-          var _swPts=_swR.total||0;
-          setTimeout(function(){clearRow('oppDiceRow');finOpp(_swPts);},_oppDelay(900));return;
+        if(_bsOut&&_bsOut.kind==='bank'){
+          if(_bsOut.msg)setStatusMsg(_bsOut.msg,'red');
+          if(_bsOut.label)triggerCard(_bsOut.cid,_bsOut.label,false);
+          var _bsPts=_bsOut.pts;
+          setTimeout(function(){clearRow('oppDiceRow');finOpp(_bsPts);},_oppDelay(900));
+          return;
         }
         _oppBustOut();return;
       }
+      }
+      /* P768: sentinel comment anchor (consumer inserted above) */
       /* Final bust-out: NPC aegis save, the player's on-bust card payouts,
          streak resets, and the scatter visuals → finOpp(0). Extracted so the
          post-resolution zero-checks below (player disruption that zeroes a
@@ -38546,6 +38515,69 @@ var NPC_RESCUES=[
     if(!p)bl.some(function(d){if(d.val===4){p=d;return true;}return false;});
     if(!p)return null;
     _npcRescueSet(p,p.val>=6?1:p.val+1);return 'THE NUDGE → '+p.val;}}
+];
+/* P768: THE BUST-SAVE TABLE (legacy cluster 1b). Each entry answers
+   'can you soften this bust?' with {kind:'survive'} (the turn continues
+   via _oResumeAfterBustSave), {kind:'bank',pts,label,cid} (the turn
+   ends, pts banked through the finOpp timer), or null (pass). ctx
+   carries oppBank in and OUT - bust_survive halves what survives.
+   Entry 1 is the survive/immune walker EXACTLY as the old loop was:
+   both mechanics in one pass over G.oCards, so a boss holding both
+   resolves by card order. bust_immune spends no use (a turn window,
+   not a charge). */
+var NPC_BUST_SAVES=[
+  {name:'surviveOrImmune',try:function(ctx){
+    var hit=null;
+    (G.oCards||[]).some(function(cid){
+      var npc=getNpcCard(cid);if(!npc||!npc.effect)return false;
+      var eff=npc.effect;
+      if(eff.mechanic==='bust_immune_turns'&&G.npcCardState.oppTurnCount<=(eff.turns||2)){
+        hit={cid:cid};return true;
+      }
+      if(eff.mechanic==='bust_survive'&&(G.npcCardState.usedOnce[cid]||0)<_useCap(cid)&&Math.random()<eff.chance){
+        G.npcCardState.usedOnce[cid]=(G.npcCardState.usedOnce[cid]||0)+1;
+        /* survival costs half the turn's points - see the card text */
+        ctx.oppBank=Math.floor(ctx.oppBank/2);
+        hit={cid:cid};return true;
+      }
+      return false;
+    });
+    return hit?{kind:'survive',cid:hit.cid}:null;
+  }},
+  {name:'bankHalf',try:function(ctx){
+    var out=null;
+    (G.oCards||[]).some(function(cid){
+      var npc=getNpcCard(cid);if(!npc)return false;
+      if(npc.effect.mechanic==='bust_bank_half'&&(G.npcCardState.usedOnce[cid]||0)<_useCap(cid)&&ctx.oppBank>0){
+        G.npcCardState.usedOnce[cid]=(G.npcCardState.usedOnce[cid]||0)+1;
+        var half=Math.floor(ctx.oppBank/2);
+        out={kind:'bank',pts:half,cid:cid,
+          msg:npc.name+'! '+G.rung.name+' SAVES '+half};
+        return true;
+      }
+      return false;
+    });
+    return out;
+  }},
+  {name:'stitch',try:function(ctx){
+    if(!G.oCards.includes('mabels_stitch'))return null;
+    if((G.npcCardState.usedOnce['mabels_stitch']||0)>=_useCap('mabels_stitch'))return null;
+    if(ctx.oppBank<=0)return null;
+    G.npcCardState.usedOnce['mabels_stitch']=(G.npcCardState.usedOnce['mabels_stitch']||0)+1;
+    return {kind:'bank',pts:ctx.oppBank,cid:'mabels_stitch',
+      msg:"MABEL'S STITCH — "+G.rung.name+' SAVES '+ctx.oppBank,
+      label:'STITCH +'+ctx.oppBank};
+  }},
+  {name:'secondWind',try:function(ctx){
+    if(!npcHasActive('second_wind'))return null;
+    npcUseActive('second_wind');
+    var vals=[],mats=[];
+    for(var i=0;i<3;i++){var m=(G.matchOppDice&&G.matchOppDice[i])||'bone';mats.push(m);vals.push(rollFace(m));}
+    var r=_scoreRollBest(vals,G.oCards,0,{crowsLuck:false,crowsLuckRemaining:0},mats);
+    return {kind:'bank',pts:(r&&r.total)||0,cid:'second_wind',
+      msg:G.rung.name+' — SECOND WIND! ROLLING 3 DICE',
+      label:G.rung.name+' SECOND WIND!'};
+  }}
 ];
 function npcHasActive(cid){
   if(!G||!G.oCards.includes(cid))return false;

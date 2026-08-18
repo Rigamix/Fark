@@ -345,8 +345,16 @@ smoke + resume check after every one):
    consumer, ladder quirk preserved and flagged (an entered-but-useless
    card stops the chain - ruling wanted on fall-through). Driven with a
    scripted roller: rescue fires once, quirk busts, control clean.
-   1b NEXT: the bust-mitigation blocks (bust_survive, bust_immune_turns,
-   bust_bank_half, mabels_stitch, second_wind) - same table treatment.
+   1b DONE (P768): NPC_BUST_SAVES - survive/immune (one walker, CARD
+   order preserved), bank-half, stitch, second wind; outcomes keep their
+   exact plumbing (survive resumes, bank rides the finOpp timer,
+   _oppBustOut stays the one exit). Driven with scripted dead rolls:
+   survive fired and continued; bank-half banked exactly floor(bank/2)
+   =375 against stitch's full 750 on identical scripts; second wind
+   spent its charge cleanly. Instrument note: the first probe's 'one
+   scorer' seed contained a 2-3-4-5-6 straight - the bank was 750, not
+   50, and the expected numbers were wrong, not the mechanics.
+   NEXT: cluster 2, the turn-start arms.
 2. **Turn-start arms** (loan, seven_dice, all_in, the_tab, aldrics_vow,
    whispers_hex, double_down) - the lever shapes P761 established.
 3. **Bank riders** (corvus_ledger, the_audit, interest_due, the_skim...)
