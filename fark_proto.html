@@ -16497,12 +16497,51 @@ function _handShape(selD){
    mask here would have quietly let the chooser use the die fog hides.
    Null means "nothing to choose" - a bust, or no legal keep - and every caller
    leaves total and used exactly as they were. */
+/* P760: the most a persona may give up against the best candidate, in
+   EV. Wide enough for every signature move (the straights persona's
+   run-gamble costs ~450; aggro's minimal keeps usually 200-400), far
+   below any catastrophe (a discarded straight is 1400+). One number,
+   sim-tunable. */
+var NPC_MAX_GIVE=500;
 function _oppChooseFrom(freeD,total,bank){
+  if(typeof G!=='undefined'&&G)G._oPlannedBank=null;/* P760: never stale */
   if(!freeD||!freeD.length)return null;
   if(!total||total<=0)return null;/* bust: there is nothing to keep */
   var cands;
   try{ cands=_legalKeeps(freeD,'o',bank||0); }catch(e){ return null; }
   if(!cands||!cands.length)return null;
+  /* P760: PRICE EVERY CANDIDATE ONCE - pts + survival x expected gain,
+     off the same measured table combo already used. Hot dice (left 0)
+     prices the hand a sweep actually deals. */
+  try{
+    var _evT=_npcEvTable((G&&G.matchOppDice)||(G&&G.oppDice||[]).map(function(d){return d.mat;}));
+    var _bestEV=-Infinity;
+    cands.forEach(function(k){
+      var _L=(k.left===0)?_oHandAfterSweep():k.left;
+      k.ev=k.pts+((_L>=1&&_L<=6)?(1-(_evT.bust[_L]||0))*(_evT.gain[_L]||0):0);
+      if(k.ev>_bestEV)_bestEV=k.ev;
+    });
+    /* P760: THE BANK PLAN. Keep and bank are ONE decision (every Farkle
+       solver couples them): ask the bank question FIRST, against the
+       max-pts keep - and if the answer is bank, take everything
+       scoring. The verdict is stashed with the base it priced, so the
+       bank site reuses it rather than re-rolling its dice. */
+    if(typeof oppShouldBank==='function'&&G&&G.rung){
+      var _c0=cands[0];/* _legalKeeps sorts by pts desc */
+      var _l0=(_c0.left===0)?_oHandAfterSweep():_c0.left;
+      var _plan=false;
+      try{_plan=oppShouldBank(G.rung,(bank||0)+_c0.pts,_l0,G.oPts,G.pPts,G.target);}catch(e){}
+      if(_plan){
+        G._oPlannedBank={verdict:true,base:(bank||0)+_c0.pts};
+        return _c0;
+      }
+    }
+    /* P760: THE FLOOR. Personas choose freely among candidates within
+       NPC_MAX_GIVE of the best - style decides WHICH good option, never
+       whether to take a bad one. */
+    var _sane=cands.filter(function(k){return k.ev>=_bestEV-NPC_MAX_GIVE;});
+    if(_sane.length)cands=_sane;
+  }catch(e){}
   var pick;
   try{ pick=_npcChooseKeep(cands,(typeof G!=='undefined'&&G)?G.rung:null); }catch(e){ return null; }
   return (pick&&pick.sel&&pick.sel.length)?pick:null;
@@ -34769,72 +34808,13 @@ function runOppTurn(){
          Same function the player commits through, with actor 'o' - the payload
          is derived once rather than twice. */
       if(_oSel.length&&total>0){ try{ total=famCommitBonus(_oSel,total,'o'); }catch(e){} }
-      /* ── NPC strategic dice keeping ──
-         Like a human player, the NPC sometimes keeps fewer scoring dice
-         to reroll more for better combos (triples, straights).
-         Only applies to "optional" singles (1s and 5s not part of a triple/straight).
-         The NPC weighs: more unkept dice = better odds, but loses guaranteed points.
-         Coward's Bell raises diceStop, which REDUCES the chance to release dice. */
-      var _skKept=G.oppDice.filter(function(d){return d.kept;});
-      var _skUnkept=G.oppDice.filter(function(d){return !d.kept;});
-      /* Identify which kept dice are "optional singles" — individual 1s or 5s.
-         Triples are never optional (too valuable). We detect singles by value count. */
-      var _skValCounts={};
-      _skKept.forEach(function(d){_skValCounts[d.val]=(_skValCounts[d.val]||0)+1;});
-      var _optionalSingles=_skKept.filter(function(d){
-        return (d.val===1||d.val===5)&&_skValCounts[d.val]<3;
-      });
-      /* The release below refunds a FLAT 100/50 per die — only safe when the
-         singles really scored at base value. With singles-modifying cards in
-         the NPC's hand (Copper Pincher 200/100, Blood Tithe 150, Miller's
-         Toll 75) or combo cards that consume 1s/5s (Scavenger, Odd Row,
-         Bookends, Full House, Seven's Gift, Twin Fury), or single-bonus die
-         materials, the flat refund drifted oppBank (phantom points that then
-         re-scored on the reroll — double counting). Skip releasing then. */
-      if(_optionalSingles.length>0){
-        var _relMods=['copper_pincher','blood_tithe','millers_toll','scavenger','odd_row','bookends','full_house','sevens_gift','twin_fury'];
-        var _relUnsafe=_relMods.some(function(c){return G.oCards.includes(c);})||
-          _skKept.some(function(d){var dt=getDie(d.mat);return dt&&dt.effect&&(dt.effect.mechanic==='single1_bonus'||dt.effect.mechanic==='single5_bonus');});
-        if(_relUnsafe)_optionalSingles=[];
-      }
-      /* Only consider releasing if we'd gain meaningful reroll dice (want 4+ total unkept) */
-      if(_optionalSingles.length>0&&_skKept.length>1){
-        var _wantUnkept=4;/* ideal minimum unkept dice for good combo odds */
-        var _minUsefulReroll=4;/* fewer than 4 reroll dice rarely forms a new triple — don't discard guaranteed points */
-        var _currentUnkept=_skUnkept.length;
-        var _deficit=_wantUnkept-_currentUnkept;/* how many more unkept dice we want */
-        if(_deficit>0){
-          /* Sort: release 5s first (50 pts), then 1s (100 pts) — sacrifice cheapest first */
-          _optionalSingles.sort(function(a,b){return a.val===5?-1:b.val===5?1:0;});
-          var _canRelease=Math.min(_optionalSingles.length,_skKept.length-1,_deficit);
-          /* Gate: released-plus-current must reach the useful-reroll floor, otherwise there's
-             no combo to reach for and we'd just be discarding guaranteed points. */
-          if(_currentUnkept+_canRelease<_minUsefulReroll)_canRelease=0;
-          /* Gate: don't release when the keep-everything path would trigger hot dice
-             (all 6 dice scored). Hot dice is always the stronger play. */
-          if(_skKept.length===G.oppDice.length&&_skUnkept.length===0)_canRelease=0;
-          /* Release chance: base 50%, scales with aggression.
-             Coward's Bell (higher diceStop) makes NPC more cautious = less releasing.
-             Low bank = more willing to gamble, high bank = keep what you have. */
-          var _npcDs=G.rung.diceStop||2;
-          var _releaseBase=0.50+(G.rung.agg||0.5)*0.2;
-          /* diceStop penalty: each point above 2 reduces chance by 20% */
-          _releaseBase-=(_npcDs-2)*0.20;
-          /* High bank discourages releasing (already have good points) */
-          if(oppBank>400)_releaseBase-=0.15;
-          else if(oppBank>200)_releaseBase-=0.08;
-          if(_releaseBase>0&&_canRelease>0){
-            for(var _ri2=0;_ri2<_canRelease;_ri2++){
-              if(Math.random()<_releaseBase){
-                var _rd=_optionalSingles[_ri2];
-                _rd.kept=false;
-                if(_rd.el){_rd.el.classList.remove('selected','oppkeep');if(_rd.el._d3)D3.draw(_rd.el._d3);}
-                total-=(_rd.val===1?100:50);
-              }
-            }
-          }
-        }
-      }
+      /* P760: the 'strategic dice keeping' release block is DELETED.
+         It was a second chooser re-litigating the persona's pick with
+         its own randomness; it broke straights (its comment promised
+         'not part of a triple/straight' while the code checked only
+         triples) and refunded flat 100/50 against dice that had scored
+         as combo parts, drifting oppBank. Its job - keep fewer, reroll
+         more - is priced soundly by the EV floor in _oppChooseFrom. */
       /* Slippery Table: 25% chance one kept die slips back */
       if(G.pCards.includes('slippery_table')&&Math.random()<(G._fenceActive?0.375:0.30)){
         var _stKept=G.oppDice.filter(function(d){return d.kept;});
@@ -35012,7 +34992,13 @@ function runOppTurn(){
         G.oppDice.forEach(function(d){if(d.el){d.el.classList.add('opp-scatter');if(d.el._d3)D3.draw(d.el._d3);}});
         setTimeout(function(){clearRow('oppDiceRow');G.oppDice=[];left=_oFullHand;setTimeout(step,_oppDelay(200));},_oppDelay(900));return;
       }
-      const bank=oppShouldBank(G.rung,oppBank,left,G.oPts,G.pPts,G.target);
+      /* P760: the plan made at keep time is the decision - reused only
+         when nothing (Quick Hands, snare, anchor, triple hunter...)
+         changed the numbers it priced; else decided fresh. */
+      var _pl=G._oPlannedBank;G._oPlannedBank=null;
+      const bank=(_pl&&_pl.verdict===true&&_pl.base===oppBank)
+        ?true
+        :oppShouldBank(G.rung,oppBank,left,G.oPts,G.pPts,G.target);
       /* P632: the hesitation beat goes in the pause that was ALREADY here -
          _oppDelay(1900) exists so the rival's decision does not land instantly
          - but it goes through DLG like every other beat, so it lands in the

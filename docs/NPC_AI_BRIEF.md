@@ -238,3 +238,29 @@ POLICY (the only place 'p' and 'o' differ):
    CFX rails one card at a time.
 4. **Card policy levers** — per-card `wantCard` heuristics for the NPC
    (only after 3, so each lever is one function, not a subsystem).
+
+---
+
+## 6. Status
+
+**Phase 1 SHIPPED (P760)** - verified against the live decision layer:
+- EV floor (NPC_MAX_GIVE=500) over `_legalKeeps` in `_oppChooseFrom`:
+  all six personas now keep a rolled straight (give-up 0); aggro still
+  keeps 1 die vs hoard's 2 on a singles roll (identity intact).
+- Bank plan: the bank question is asked FIRST against the max-pts keep;
+  verdict stashed with its base and reused at the bank site when nothing
+  changed the numbers. Probe: near target, aggro's pick was the max keep.
+- Release block deleted (the straight-breaker with the flat-refund
+  drift).
+- Full-route smoke: five runOppTurn turns - 4 banks (2050/400/1650/850),
+  1 bust, no page errors.
+
+**Finding for the record:** the `?sim=1` harness never runs the persona
+chooser - `simTurn` always keeps the maximal scoring set - so the sim
+was structurally blind to every bug in this brief. Phase 2's acceptance
+runs must either drive the live `_oppChooseFrom` (as the P760 probe
+does) or first teach `simTurn` to call it.
+
+**Next: phase 2** (fold oppShouldBank's context into the candidate
+evaluation; personas as weights), then the action layer (§4/§5).
+
