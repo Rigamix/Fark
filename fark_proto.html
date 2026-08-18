@@ -15558,7 +15558,7 @@ function _foDeckTap(ci){
    an un-migrated card to the rival would run player-global code against
    the wrong seat. Grown card by card as effects migrate; the registry
    is the honest inventory of what is truly symmetric so far. */
-var NPC_FAM_READY={preserve:1,double_or_nothing:1};
+var NPC_FAM_READY={preserve:1,double_or_nothing:1,honeytrap:1};
 function famUse(i,actor){
   /* P761: ONE ENTRY POINT, TWO ACTORS - Denis: "the same code bit with
      just the actor being different". 'p' is the default so every
@@ -16987,10 +16987,14 @@ CFX.fools_gold_f={
     if(burn>0){G.pPts=Math.max(0,G.pPts-burn);famLog("FOOL'S GOLD BURNS "+burn+' MORE FROM YOUR BANK');try{updHUD();}catch(e){}}
     ev.me.state.burn=false;}
 };
+/* P764: SYMMETRIC - the seam already derives the payload per seat;
+   only the gate was player-only. Feats stay the player's ledger. */
 CFX.bloom={
-  commit:function(ev){if(!_fxMine(ev)||!(ev.isTriple||ev.isStraight)||!ev.jade.length)return;
-    ev.add(ev.P);_famPop('+'+ev.P+' BLOOM');
-    G._featBloom=(G._featBloom||0)+1;/* FULL BLOOM */}
+  commit:function(ev){if(!ev.mine||!(ev.isTriple||ev.isStraight)||!ev.jade.length)return;
+    ev.add(ev.P);
+    if(ev.owner==='p'){_famPop('+'+ev.P+' BLOOM');
+      G._featBloom=(G._featBloom||0)+1;/* FULL BLOOM */}
+    else setStatusMsg('THEIR JADE BLOOMS — +'+ev.P,'red');}
 };
 CFX.cultivate={
   /* the jade wild fired: those dice grow, and their growth pays now. The
@@ -17002,28 +17006,36 @@ CFX.cultivate={
      practice not even that, because a committed die is never selectable again
      and only powder_keg un-commits one in place. A lane is the only per-die
      identity that outlives the pool. */
-  commit:function(ev){if(!_fxMine(ev)||!(ev.isTriple||ev.isStraight)||!ev.jade.length)return;
+  commit:function(ev){if(!ev.mine||!(ev.isTriple||ev.isStraight)||!ev.jade.length)return;
+    /* P764: the growth store is PER SEAT - lanes are per-seat identities,
+       so one array would grow the player's dice off the rival's jade */
     var grown=0;
-    G._cultArr=G._cultArr||[];
+    var _arr=(ev.owner==='p')?(G._cultArr=G._cultArr||[]):(G._oCultArr=G._oCultArr||[]);
     ev.jade.forEach(function(d){
       var L=d.lane;
       if(typeof L!=='number'||!(L>=0))return;/* NaN fails >=0, unlike <0 */
-      grown+=(G._cultArr[L]||0);
-      G._cultArr[L]=(G._cultArr[L]||0)+50;
+      grown+=(_arr[L]||0);
+      _arr[L]=(_arr[L]||0)+50;
     });
-    if(grown>0){ev.add(grown);_famPop('+'+grown+' CULTIVATE');}
-    else _famPop('CULTIVATE GROWS');}
+    if(ev.owner==='p'){
+      if(grown>0){ev.add(grown);_famPop('+'+grown+' CULTIVATE');}
+      else _famPop('CULTIVATE GROWS');
+    }else{
+      if(grown>0){ev.add(grown);setStatusMsg('THEIR JADE GROWS — +'+grown,'red');}
+    }}
 };
 CFX.vanguard_f={
   /* collapsed positional card: I first spot; II both ends; III adds
      the full-bookends payoff when both ends score. Tier-shaped rather than
      ev.P-shaped, so it reads ev.me.tier directly. */
-  commit:function(ev){if(!_fxMine(ev))return;
+  commit:function(ev){if(!ev.mine)return;/* P764: either seat */
     var vb=0,t=ev.me.tier;
     if(t===1){if(ev.hitFirst)vb=200;}
     else if(t===2){if(ev.hitFirst)vb+=350;if(ev.hitLast)vb+=350;}
     else{if(ev.hitFirst&&ev.hitLast)vb=1200;else if(ev.hitFirst||ev.hitLast)vb=350;}
-    if(vb>0){ev.add(vb);_famPop('+'+vb+' VANGUARD');}}
+    if(vb>0){ev.add(vb);
+      if(ev.owner==='p')_famPop('+'+vb+' VANGUARD');
+      else setStatusMsg('THEIR VANGUARD — +'+vb,'red');}}
 };
 CFX.transmute={
   canUse:function(){return G&&G.phase==='choosing';},
@@ -17231,8 +17243,8 @@ function _tableDice(actor){
 }
 /* values that appear at least twice, in intent order - a pair the
    player MADE beats an older one that merely exists */
-function _tablePairs(){
-  var seen={},out=[],all=_tableDice();
+function _tablePairs(actor){
+  var seen={},out=[],all=_tableDice(actor);
   ['sel','kept'].forEach(function(src){
     var c={};
     all.forEach(function(e){if(e.src===src)c[e.val]=(c[e.val]||0)+1;});
@@ -17294,16 +17306,27 @@ function _famNeedMet(need){
   }catch(e){}
   return true;
 }
+/* P764: ONE CARD, TWO SEATS. The rival's old version was a different
+   effect entirely (a random modal-face pull, no pair needed) - under
+   the ruling they play the PLAYER'S card: a pair from the shared view
+   arms it, the next deal pulls a die to the pair value. Same rule, the
+   slot and the announce are the only per-seat parts. */
 CFX.honeytrap={
-  canUse:function(){
+  canUse:function(inst,actor){
+    if(actor==='o')return !!(G&&!G._oHoneyVal&&_tablePairs('o')[0]);
     if(!G||G.phase==='opp')return false;
     return _famNeedMet('pair');/* P738: the shared view */
   },
-  use:function(inst){
-    var pairVal=_tablePairs()[0]||0;/* P738: intent order */
+  use:function(inst,actor){
+    var pairVal=_tablePairs(actor)[0]||0;/* P738: intent order */
     if(!pairVal)return false;
-    G._famHoneyVal=pairVal;
-    famLog('HONEYTRAP SET — THE NEXT ROLL PULLS A '+pairVal);
+    if(actor==='o'){
+      G._oHoneyVal=pairVal;
+      setStatusMsg((G.rung&&G.rung.name||'RIVAL')+': HONEYTRAP — THEIR NEXT ROLL PULLS A '+pairVal,'red');
+    }else{
+      G._famHoneyVal=pairVal;
+      famLog('HONEYTRAP SET — THE NEXT ROLL PULLS A '+pairVal);
+    }
     return true;
   }
 };
@@ -34417,23 +34440,26 @@ function runOppTurn(){
         ench:(((G.rung||{}).dieEnch)||[])[_seat]||null,/* P761: the brand travels */
         lane:_seat});}
     sootyActive=false;
+    /* P764: HONEYTRAP LANDS - the mirror of the player's consumption
+       (handleRoll ~16948): one fresh die is pulled to the armed value.
+       Spent by this roll either way, exactly like the player's. */
+    if(G._oHoneyVal){
+      var _htFresh=G.oppDice.filter(function(d){return !d.kept;});
+      if(_htFresh.length){
+        var _htD=_htFresh[0];_htD.val=G._oHoneyVal;
+        try{reDrawDieFace(_htD);}catch(e){}
+        setStatusMsg(G.rung.name+': HONEYTRAP → '+G._oHoneyVal,'red');
+      }
+      G._oHoneyVal=null;
+    }
     /* Say whose turn it is, at the moment the dice land. setStatusMsg routes
        to the TOP strip while G.phase==='opp', which is where the player is
        already looking during a rival turn. */
     try{setStatusMsg(((G&&G.rung&&G.rung.name)||'RIVAL').toUpperCase()+' IS ROLLING…','active');}catch(e){}
-    /* BULLISH honeytrap: pull one fresh die into the modal face (P5/P9) */
-    (function(){
-      var c=_npcFamCard('honeytrap');
-      if(!c||oppRollNum<2||Math.random()>=0.5)return;
-      var fresh=G.oppDice.filter(function(d){return !d.kept;});
-      if(fresh.length<3)return;
-      var cnt={};fresh.forEach(function(d){cnt[d.val]=(cnt[d.val]||0)+1;});
-      var modal=Object.keys(cnt).sort(function(a,b){return cnt[b]-cnt[a];})[0];
-      var vic=fresh.filter(function(d){return d.val!==Number(modal);})[0];
-      if(!vic)return;
-      c.charges--;vic.val=Number(modal);try{reDrawDieFace(vic);}catch(e){}
-      setStatusMsg(G.rung.name+': HONEYTRAP — A DIE IS PULLED TO '+modal,'red');
-    })();
+    /* P764: the bespoke 'modal-face pull' honeytrap is DELETED - it was
+       a different card wearing the same name. The rival plays the
+       player's honeytrap now: armed at the push decision (the lever,
+       below in step()), consumed by the deal above. */
     /* HOT STREAK NPC mirror: after 2 safe banked turns, NPC's next first-roll
        gets one die forced to 1 and another to 5. Consume the armed flag here. */
     if(G._oHotStreakReady&&oppRollNum===1&&G.oCards.includes('hot_streak')){
@@ -35151,6 +35177,21 @@ function runOppTurn(){
          hesitated on every roll. Denis's notes 5 and 6, one line apart.
          Still the in-match call, so FSIM's own caller never speaks. */
       try{if(window.DLG)DLG.trigger(bank?'OPP_HESITATE_BANK':'OPP_HESITATE_PUSH');}catch(e){}
+      /* P764: THE HONEYTRAP LEVER - pushing with a pair on the table is
+         the card's moment (the player's rule: pair armed, next roll
+         pulls the third). famUse('o') is the how. */
+      if(!bank&&!G._oHoneyVal){
+        try{
+          if(_tablePairs('o')[0]){
+            var _htIx=-1;
+            (G.oF||[]).some(function(o,ix){
+              if(o.id==='honeytrap'&&!o.broken&&o.charges>0){_htIx=ix;return true;}
+              return false;
+            });
+            if(_htIx>=0)famUse(_htIx,'o');
+          }
+        }catch(e){}
+      }
       setTimeout(()=>{if(bank)finOpp(oppBank);else step();},_oppDelay(1900));
     });
   }

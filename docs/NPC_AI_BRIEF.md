@@ -286,14 +286,17 @@ actor-symmetric.
 | bankBonus seam | FIXED: the rival's seam consumed no delta (fired after the add, return discarded) - every rival bankBonus card was silently void |
 
 ### Still bespoke or inert - the remaining sweep, in order
-1. `honeytrap` / `encore` / `stargazer` - bespoke in the roll loop; each needs
-   its CFX actor branch + bespoke removal (same recipe as preserve).
+1. ~~honeytrap~~ MIGRATED (P764) - the bespoke was a DIFFERENT effect
+   (random modal pull, no pair); they play the player's card now: pair
+   from _tablePairs('o') arms it at the push decision, their deal pulls
+   the die, mirror of the player's consumption. `encore` / `stargazer`
+   still bespoke in the roll loop.
 2. `sleight` / `ill_omen` - bespoke, working, and sleight's PLAYER side is
    inert (retired); migrating means implementing the player half too or
    retiring both ways. Ruling per card.
-3. The commit-seam passives (bloom, cultivate, vanguard_f) - ungate on
-   ev.mine once verified their state is per-instance; their seam already
-   fires for the rival via famCommitBonus.
+3. ~~bloom / cultivate / vanguard_f~~ MIGRATED (P764) - ev.mine, growth
+   store per seat (G._oCultArr), feats stay the player's ledger.
+   Verified numerically symmetric: 600/750 both seats.
 4. `retort`, `short_fuse`, `fools_gold_f`, `falling_star` - need the bust
    and deadRoll seams raised in the rival turn (they exist only on the
    player's), then the same ungate recipe.
