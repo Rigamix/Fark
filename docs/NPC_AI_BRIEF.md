@@ -320,3 +320,39 @@ actor-symmetric.
    double_down, bust saves...) - migrate onto CFX rails card by card,
    deleting each inline handler in the same move.
 
+---
+
+## 8. The legacy roster migration - the map (batch staged 2026-08-18)
+
+Measured: **42 NPC_CARDS** (9 actives, 11 passives, the rest
+boss-special), **21 `npcHasActive` lever sites**, **19
+`effect.mechanic` branches** inlined through runOppTurn/finOpp - plus
+`npcCardState` (usedOnce / npcActiveUses) which is **saved**, so any
+state move is a resume-risk change and gets its own verification.
+
+Denis's Q5 ruling: rival-only first, the cheap path; two-seat builds
+only with a concrete reason. These cards have no player twin, so 'one
+pipe' here means ONE DISPATCH, not actor symmetry: a mechanics->handler
+table (the CFX shape, same event vocabulary: turnStart / roll / keep /
+bank / bust / rescue) replacing the inline blocks one cluster at a time,
+with `npcCardState` kept as-is (no save-format change in this pass).
+
+Batch order (each cluster lands alone, bespoke deleted with it,
+smoke + resume check after every one):
+1. **Bust rescues** (old_bones, ambrose_grace, wild_die, brutus_fist,
+   finnicks_palm, grogs_flask, second_wind + the bust_survive /
+   bust_immune_turns / bust_bank_half mechanics) - the biggest cluster,
+   one moment, one table.
+2. **Turn-start arms** (loan, seven_dice, all_in, the_tab, aldrics_vow,
+   whispers_hex, double_down) - the lever shapes P761 established.
+3. **Bank riders** (corvus_ledger, the_audit, interest_due, the_skim...)
+   - the bankBonus seam already exists and consumes deltas (P762).
+4. **Roll/keep modifiers** (quick_hands, grogs_bump, pocket_sand,
+   sticky_fingers_die...) - these are PLAYER-armed cards acting on the
+   rival's roll; they stay player-side but move onto the same dispatch.
+5. Re-audit for two-seat candidates once the table exists - Denis
+   revisits with concrete card knowledge (Q5's second half).
+
+Falling Star (rival half) is LIVE and flagged: Denis plays nights before
+the retune batch touches its numbers.
+
