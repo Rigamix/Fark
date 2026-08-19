@@ -25672,7 +25672,27 @@ var D3X={
     /* the mip blur: halve until the step reaches ~r user px, then one
        smooth upscale. The falloff width tracks r, so the lab's soft and
        rim numbers keep their meaning. */
-    var blurOnto=function(dst,r,passes){
+    var blurOnto=function(dst,r,passes,hqCol){
+      /* P788: opts.hq = a TRUE gaussian via canvas shadowBlur (core
+         canvas2d, every engine - no ctx.filter gate). The pass's shape
+         is drawn fully off-canvas and only its shadow lands, in the
+         pass's colour. For subjects the card's size the mip chain's
+         bilinear facets read as 'incredibly low res' (Denis); the dice
+         pass no hq and keep the mip look their dials were tuned on.
+         Identity transform: the _sos shadow-offset quirk needs none. */
+      if(hqCol&&opts&&opts.hq){
+        dst.save();
+        dst.setTransform(1,0,0,1,0,0);
+        dst.shadowColor=hqCol;
+        /* shadowBlur is sigma-ish: x2 so a dial 'reach' of r reads as
+           ~r user px of visible falloff, matching the mip semantics */
+        dst.shadowBlur=Math.max(1,r*dpr*2);
+        dst.shadowOffsetX=S.width;
+        dst.shadowOffsetY=0;
+        for(var hp=0;hp<(passes||1);hp++)dst.drawImage(S,-S.width,0);
+        dst.restore();
+        return;
+      }
       var F=Math.max(2,r*dpr);
       var n=Math.max(1,Math.min(5,Math.round(Math.log(F)/Math.LN2)));
       var cur=S,cw=S.width,ch=S.height;
@@ -25726,19 +25746,14 @@ var D3X={
        Denis's 'too tall'. Dice pass nothing and keep G's lean. */
     var SX=(opts&&opts.sx!==undefined)?opts.sx:G.sx;
     var SY=(opts&&opts.sy!==undefined)?opts.sy:G.sy;
-    /* P786: lineOnly skips the body - the card's line pass paints on
-       its own over-card canvas, where it can light the art's pencil
-       ink. Everything else about the call is unchanged. */
-    if(!(opts&&opts.lineOnly)){
     sel.forEach(function(sh){lay(sxc,sh,SOFT,{dy:(DY!==null)?DY:G.dy,sx:SX,sy:SY});});
-    blurOnto(gx,SOFTR,G.softPasses||1);
+    blurOnto(gx,SOFTR,G.softPasses||1,SOFT);
     /* then the bright rim, stacked - the punch-out below throws away the
        inner half of every blur, so a single pass never reads as strong */
     sxc.setTransform(dpr,0,0,dpr,0,0);
     sxc.clearRect(0,0,sc.width,sc.height);
     sel.forEach(function(sh){lay(sxc,sh,COL,(DY!==null)?{dy:DY}:{});});
-    blurOnto(gx,RIMR,G.rimPasses||1);
-    }
+    blurOnto(gx,RIMR,G.rimPasses||1,COL);
     /* cut the subject back out EXACTLY on its painted edge: everything
        left is outside the shape, which is the whole point. clear widens
        the cut a hair past the edge - see the note above GLOW. */
@@ -25754,7 +25769,7 @@ var D3X={
        subject's true edge, G.clear tucks it a hair further in, and the
        card body covers the join. What survives is the grow ring (the
        crisp rim core) plus the blur tails - the dice's grammar. */
-    if(!(opts&&opts.noPunch)&&!(opts&&opts.lineOnly)){
+    if(!(opts&&opts.noPunch)){
       gx.globalCompositeOperation='destination-out';
       gx.globalAlpha=1;
       sel.forEach(function(sh){
@@ -25782,7 +25797,7 @@ var D3X={
           if(sh&&sh.stamp)return;
           trace(sxc,sh&&sh.hull||sh,0);sxc.stroke();
         });
-        blurOnto(gx,opts.lineBlur,2);
+        blurOnto(gx,opts.lineBlur,2,COL);
       }else{
       gx.strokeStyle=COL;gx.lineWidth=LINE;gx.lineJoin='round';
       gx.globalAlpha=1;
@@ -25817,23 +25832,6 @@ var D3X={
      under the dice and far under the hand - right for dice, useless
      for a card at z 42. This one sits just under the dragged card
      (9500) and above everything else it must not hide behind. */
-  /* P786: the card line's canvas - ABOVE the card layer (rows 42,
-     dragged card 9500), because the card's edge is opaque pencil ink
-     and light from underneath can never brighten ink. Holds ONLY the
-     blurred line pass. */
-  _glowLineCv:function(){
-    var sc=document.getElementById('screen-match');
-    if(!sc)return null;
-    var cv=document.getElementById('dgCanvasLine');
-    if(!cv){
-      this._glowHiCv();
-      cv=document.createElement('canvas');cv.id='dgCanvasLine';
-      cv.style.cssText='position:absolute;inset:0;width:100%;height:100%;'
-        +'pointer-events:none;z-index:9600';
-      sc.appendChild(cv);
-    }
-    return cv;
-  },
   _glowHiCv:function(){
     var sc=document.getElementById('screen-match');
     if(!sc)return null;
@@ -25902,19 +25900,16 @@ var D3X={
     /* P784: the core canvas is retired - clear a stale one if this
        session predates the retirement */
     var _stale=document.getElementById('dgCanvasCore');if(_stale)_stale.remove();
-    var cvL=this._glowLineCv();
+    var _staleL=document.getElementById('dgCanvasLine');if(_staleL)_staleL.remove();/* P788 */
     var sc=sc0.getBoundingClientRect();
     if(sc.width<10)return;
     var dpr=Math.min(devicePixelRatio||1,this.GLOW_DPR_MAX||3);
     if(cv.width!==Math.round(sc.width*dpr)||cv.height!==Math.round(sc.height*dpr)){
       cv.width=Math.round(sc.width*dpr);cv.height=Math.round(sc.height*dpr);
     }
-    if(cvL&&(cvL.width!==cv.width||cvL.height!==cv.height)){cvL.width=cv.width;cvL.height=cv.height;}
     var x=cv.getContext('2d');
     x.setTransform(dpr,0,0,dpr,0,0);
     x.clearRect(0,0,sc.width,sc.height);
-    var xL=cvL?cvL.getContext('2d'):null;
-    if(xL){xL.setTransform(dpr,0,0,dpr,0,0);xL.clearRect(0,0,sc.width,sc.height);}
     if(!live)return;
     var self=this,CG=this.CARD_GLOW;
     Object.keys(this._cardGlows).forEach(function(kk){
@@ -25947,13 +25942,11 @@ var D3X={
           return [ccx+dx*cr-dy*sr,ccy+dx*sr+dy*cr];});
       }
       var _am=CG.floor+(1-CG.floor)*Math.min(1,e.k);
-      /* P786: the body glows from UNDER the card (line suppressed)... */
+      /* P788: ONE call, ALL of it under the card (Denis), gaussian-
+         blurred (hq) - the breathed line included. The card's pencil
+         border reads as the object's silhouette against the light. */
       self._paintHalo(cv,x,sc,dpr,[hull],e.col||self.SEL_COL,e.col||self.SEL_SOFT,
-        _am,0,{sx:1,sy:1});
-      /* ...and the breathed line rides ABOVE it, lighting the art's
-         pencil ink the way a die's ivory edge never needed. */
-      if(xL)self._paintHalo(cvL,xL,sc,dpr,[hull],e.col||self.SEL_COL,e.col||self.SEL_SOFT,
-        _am,undefined,{lineOnly:true,lineBlur:CG.lineBlur});
+        _am,undefined,{sx:1,sy:1,lineBlur:CG.lineBlur,hq:true});
     });
   },
   _drawGlow:function(){
