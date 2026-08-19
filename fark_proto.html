@@ -25690,7 +25690,12 @@ var D3X={
     /* P755: a caller-given dy drops the whole halo (the card's
        under-glow); the dice keep G.dy on the soft pass as before */
     var DY=(opts&&opts.dy!==undefined)?opts.dy:null;
-    sel.forEach(function(sh){lay(sxc,sh,SOFT,{dy:(DY!==null)?DY:G.dy,sx:G.sx,sy:G.sy});});
+    /* P777: opts-aware stretch - the dice keep G.sx/G.sy, the cards
+       pass 1/1. The borrowed 1.24 was a 15px top/bottom smear on a
+       card (dyF, the card's own vertical dial, is authored at 0). */
+    var SX=(opts&&opts.sx!==undefined)?opts.sx:G.sx;
+    var SY=(opts&&opts.sy!==undefined)?opts.sy:G.sy;
+    sel.forEach(function(sh){lay(sxc,sh,SOFT,{dy:(DY!==null)?DY:G.dy,sx:SX,sy:SY});});
     blurOnto(gx,SOFTR,G.softPasses||1);
     /* then the bright rim, stacked - the punch-out below throws away the
        inner half of every blur, so a single pass never reads as strong */
@@ -25705,7 +25710,27 @@ var D3X={
        card halo paints UNDER the card layer now, so cutting it out only
        manufactured a visible gap. The dice keep their punch: their glow
        canvas sits above the painted table and must not wash the die. */
-    if(!(opts&&opts.noPunch)){
+    /* P777: punchUnder cuts INWARD - for a canvas that sits UNDER its
+       subject. The dice's cut widens by G.clear (their canvas is over
+       the table, a wash on the die is the failure); widening under a
+       card is P756's manufactured seam. Here the cut shrinks instead:
+       punchScaleMul unwinds the stamp's baked-in grow back to the
+       subject's true edge, G.clear tucks it a hair further in, and the
+       card body covers the join. What survives is the grow ring (the
+       crisp rim core) plus the blur tails - the dice's grammar. */
+    if(opts&&opts.punchUnder){
+      gx.globalCompositeOperation='destination-out';
+      gx.globalAlpha=1;
+      sel.forEach(function(sh){
+        if(sh&&sh.stamp){
+          lay(gx,sh,null,{scaleMul:(opts.punchScaleMul||1)
+            *(1-(2*G.clear)/Math.max(8,Math.min(sh.stamp.w,sh.stamp.h)))});
+        }else{
+          lay(gx,sh,null,{shrink:G.clear});
+        }
+      });
+      gx.globalCompositeOperation='source-over';
+    }else if(!(opts&&opts.noPunch)){
       gx.globalCompositeOperation='destination-out';
       gx.globalAlpha=1;
       sel.forEach(function(sh){
@@ -25845,7 +25870,8 @@ var D3X={
       self._paintHalo(cv,x,sc,dpr,[shape],e.col||CG.col,e.col||CG.softCol,
         CG.floor+(1-CG.floor)*Math.min(1,e.k),CG.line,
         {soft:CG.soft,rim:CG.rim,strength:CG.strength,dy:r.height*(CG.dyF||0),
-         noPunch:true});/* P756: the card body covers the middle */
+         sx:1,sy:1,/* P777: the card does not lean like a die */
+         punchUnder:true,punchScaleMul:1/(CG.grow||1)});/* P777: tail-only, tucked under the card */
     });
   },
   _drawGlow:function(){
