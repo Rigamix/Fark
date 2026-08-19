@@ -25766,14 +25766,19 @@ var D3X={
        card body covers the join. What survives is the grow ring (the
        crisp rim core) plus the blur tails - the dice's grammar. */
     if(opts&&opts.punchUnder){
+      /* P782: the inset is the caller's - the rim-bloom core cuts ~3px
+         deep so its inner ring washes OVER the card's own dark outline
+         (its canvas sits above the card layer); the spill keeps the
+         default hair-inside cut. */
+      var PCL=(opts.punchClear!==undefined)?opts.punchClear:G.clear;
       gx.globalCompositeOperation='destination-out';
       gx.globalAlpha=1;
       sel.forEach(function(sh){
         if(sh&&sh.stamp){
           lay(gx,sh,null,{scaleMul:(opts.punchScaleMul||1)
-            *(1-(2*G.clear)/Math.max(8,Math.min(sh.stamp.w,sh.stamp.h)))});
+            *(1-(2*PCL)/Math.max(8,Math.min(sh.stamp.w,sh.stamp.h)))});
         }else{
-          lay(gx,sh,null,{shrink:G.clear});
+          lay(gx,sh,null,{shrink:PCL});
         }
       });
       gx.globalCompositeOperation='source-over';
@@ -25836,8 +25841,12 @@ var D3X={
     if(!cv){
       this._glowHiCv();/* the spill canvas first, so core lands above it */
       cv=document.createElement('canvas');cv.id='dgCanvasCore';
+      /* P782: ABOVE the card layer (rows 42, dragged card 9500) - rim
+         light BLOOMS over an object's edge. The card art carries an
+         opaque black pencil outline, and a light from underneath can
+         never brighten ink; from above, the border catches the gold. */
       cv.style.cssText='position:absolute;inset:0;width:100%;height:100%;'
-        +'pointer-events:none;z-index:41';
+        +'pointer-events:none;z-index:9600';
       sc.appendChild(cv);
     }
     return cv;
@@ -25967,8 +25976,12 @@ var D3X={
       var _am=CG.floor+(1-CG.floor)*Math.min(1,e.k);
       if(_spill.length)self._paintHalo(cv,x,sc,dpr,[shape],e.col||CG.col,e.col||CG.softCol,
         _am,CG.line,_opts(_spill));
-      if(_core.length&&x2)self._paintHalo(cv2,x2,sc,dpr,[shape],e.col||CG.col,e.col||CG.softCol,
-        _am,CG.line,_opts(_core));
+      if(_core.length&&x2){
+        var _co=_opts(_core);
+        _co.punchClear=(CG.bloomPx!==undefined)?CG.bloomPx:3;/* P782: the rim-bloom depth */
+        self._paintHalo(cv2,x2,sc,dpr,[shape],e.col||CG.col,e.col||CG.softCol,
+          _am,CG.line,_co);
+      }
     });
   },
   _drawGlow:function(){
