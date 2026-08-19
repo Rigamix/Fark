@@ -1271,6 +1271,12 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
    In cqw, so it scales with the card; the old 2px/3px did not. */
 #famRowP .fcv{width:20cqw;cursor:pointer;transition:transform .18s ease,filter .18s ease;
   filter:drop-shadow(0 0.25cqw 0.3cqw rgba(10,6,2,.5)) drop-shadow(0 0.9cqw 1.3cqw rgba(10,6,2,.45))}
+/* P780: a LIT card (D3X.cardGlow holds an entry for it) drops the dark
+   contact shadows - they painted OVER the halo canvas below, the 'hole
+   in the alpha' Denis photographed. The glow is the card's grounding
+   while it lasts. Same replace-the-filter move as .fcv-drag and
+   .armed; spent stays later in the sheet and still wins. */
+#famRowP .fcv.fcv-lit{filter:brightness(1.05)}
 /* P576: ALL THREE filter declarations move together or none do - a filter
    REPLACES the property, so leaving this one behind would snap a spent card back
    to the old hard offset the moment it greyed out. */
@@ -25481,7 +25487,7 @@ var D3X={
      for their own accents. */
   CARD_GLOW:{col:'#ffd84e', softCol:'#ffae1f', soft:11, rim:2.5, strength:0.91,
     grow:1.0, dyF:0, round:0.075, line:0, floor:0.42,
-    octaves:[{r:3,col:'#fff7dc',passes:2},{r:8,col:'#ffd24a'},{r:20,col:'#ff9e30',deep:true}]},
+    octaves:[{r:3,col:'#fff7dc',passes:2},{r:8,col:'#ffd24a'},{r:24,col:'#ff9e30',deep:true}]},
   GLOW:{soft:11, rim:3, rimPasses:5, softPasses:1, line:3.2, grow:1.004, clear:0.7, strength:0.91,
         /* P731: the SOFT pass can stretch and lean - sx/sy scale the
            silhouette, dy biases it vertically. 1/1/0 = today's look
@@ -25849,6 +25855,19 @@ var D3X={
     this._cardGlows=this._cardGlows||{};
     if(!el||!(k>0))delete this._cardGlows[key];
     else this._cardGlows[key]={el:el,k:k,col:col||null};
+    /* P780: whoever holds a glow entry is LIT - the class swaps the
+       card's dark contact shadows out from over the halo. Reconciled
+       here so every caller and every removal path agrees. */
+    var _lits=[],_self=this;
+    Object.keys(this._cardGlows).forEach(function(kk){
+      var e=_self._cardGlows[kk];
+      if(e.el&&e.el.isConnected)_lits.push(e.el);
+    });
+    (this._litEls||[]).forEach(function(le){
+      if(_lits.indexOf(le)<0){try{le.classList.remove('fcv-lit');}catch(e){}}
+    });
+    _lits.forEach(function(le){try{le.classList.add('fcv-lit');}catch(e){}});
+    this._litEls=_lits;
     this._drawCardGlows();
   },
   _drawCardGlows:function(){
