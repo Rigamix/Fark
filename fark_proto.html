@@ -1284,6 +1284,53 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
    and the hole freezes open with it; none resets the art to the box.
    Precedent: spent cards already sit still this way (P713). */
 #famRowP .fcv.fcv-lit .fcvIn{animation:none}
+/* P789: THE CARD GLOW IS DENIS'S PROTOTYPE (tools/card_glow_test.html),
+   his production CSS verbatim: two solid-colour divs masked by the
+   card art's alpha - all you see is their drop-shadow, a true GPU
+   gaussian hugging the real silhouette. The layer is FLAT and sits
+   under the rows (z41), because a filter inside the 3D-transformed
+   rows is clipped to its own box on WebKit (P727/P746-748). Vars
+   carry his authored defaults; the lab and his test page share them. */
+#cardGlowLayer{position:absolute;inset:0;pointer-events:none;z-index:41;
+  --core:hsl(13 100% 63%);--glow:hsl(36 88% 56%);
+  --core-b:1.83;--glow-b:0.40;--core-sharp:0.67;
+  --halo:5;--bloom:17;--intensity:1;--speed:1.3;--flick:1;--blend:plus-lighter}
+#cardGlowLayer .cgw{position:absolute}
+.cgw .spill{position:absolute;left:50%;top:50%;width:190%;height:165%;
+  translate:-50% -50%;pointer-events:none;
+  background:radial-gradient(closest-side,var(--glow),transparent 70%);
+  opacity:calc(.22*var(--glow-b)*var(--intensity)*var(--state,1));
+  mix-blend-mode:var(--blend);transition:opacity .2s ease}
+.cgw .glow{position:absolute;inset:0;mix-blend-mode:var(--blend);opacity:var(--flick)}
+.cgw .breathe{position:absolute;inset:0;
+  animation:cgBreathe calc(3.7s/max(var(--speed),.0001)) ease-in-out infinite}
+.cgw .halo,.cgw .bloom{position:absolute;inset:0;transition:opacity .2s ease;
+  will-change:opacity,filter}
+/* mask on the CHILD, filter on the PARENT - filters run before masking
+   (Denis's rule 1, his comment verbatim) */
+.cgw .halo>i,.cgw .bloom>i{position:absolute;inset:0;
+  -webkit-mask:var(--card-src) center/contain no-repeat;
+  mask:var(--card-src) center/contain no-repeat}
+.cgw .bloom{opacity:min(1,calc(var(--glow-b)*var(--intensity)*var(--state,1)));
+  filter:drop-shadow(0 0 calc(var(--bloom)*1px) var(--glow))
+         drop-shadow(0 0 calc(var(--bloom)*0.5px) var(--glow))
+         brightness(max(1,calc(var(--glow-b)*var(--intensity)*var(--state,1))));
+  animation:cgSwell calc(5.3s/max(var(--speed),.0001)) ease-in-out infinite}
+.cgw .bloom>i{background:var(--glow)}
+/* sharpness redistributes the same reach: one wide pass = gaussian
+   mush; four tight passes compound into a hard-edged plateau */
+.cgw .halo{z-index:2;opacity:min(1,calc(var(--core-b)*var(--intensity)*var(--state,1)));
+  filter:drop-shadow(0 0 calc(var(--halo)*(1 - 0.75*var(--core-sharp))*1px) var(--core))
+         drop-shadow(0 0 calc(var(--halo)*0.25*var(--core-sharp)*1px) var(--core))
+         drop-shadow(0 0 calc(var(--halo)*0.25*var(--core-sharp)*1px) var(--core))
+         drop-shadow(0 0 calc(var(--halo)*0.25*var(--core-sharp)*1px) var(--core))
+         brightness(max(1,calc(var(--core-b)*var(--intensity)*var(--state,1))))}
+.cgw .halo>i{background:var(--core)}
+@keyframes cgBreathe{0%,100%{opacity:.88}50%{opacity:1}}
+@keyframes cgSwell{
+  0%,100%{opacity:min(1,calc(var(--glow-b)*var(--intensity)*var(--state,1)*.82))}
+  50%{opacity:min(1,calc(var(--glow-b)*var(--intensity)*var(--state,1)*1.25))}}
+body.reduced-motion .cgw .breathe,body.reduced-motion .cgw .bloom{animation:none}
 /* P576: ALL THREE filter declarations move together or none do - a filter
    REPLACES the property, so leaving this one behind would snap a spent card back
    to the old hard offset the moment it greyed out. */
@@ -25503,7 +25550,9 @@ var D3X={
      card borrows the dice's GLOW dials and SEL colours wholesale - one
      look, two subjects. Only the card's own geometry lives here: its
      hull's corner radius and the drag ramp's floor. */
-  CARD_GLOW:{round:0.075, floor:0.42, trim:0.967, lineBlur:2},
+  /* P789: the card glow is CSS (Denis's prototype) - every look dial
+     is a var on #cardGlowLayer. Only the arm ramp's floor stays here. */
+  CARD_GLOW:{floor:0.42},
   GLOW:{soft:11, rim:3, rimPasses:5, softPasses:1, line:3.2, grow:1.004, clear:0.7, strength:0.91,
         /* P731: the SOFT pass can stretch and lean - sx/sy scale the
            silhouette, dy biases it vertically. 1/1/0 = today's look
@@ -25672,27 +25721,7 @@ var D3X={
     /* the mip blur: halve until the step reaches ~r user px, then one
        smooth upscale. The falloff width tracks r, so the lab's soft and
        rim numbers keep their meaning. */
-    var blurOnto=function(dst,r,passes,hqCol){
-      /* P788: opts.hq = a TRUE gaussian via canvas shadowBlur (core
-         canvas2d, every engine - no ctx.filter gate). The pass's shape
-         is drawn fully off-canvas and only its shadow lands, in the
-         pass's colour. For subjects the card's size the mip chain's
-         bilinear facets read as 'incredibly low res' (Denis); the dice
-         pass no hq and keep the mip look their dials were tuned on.
-         Identity transform: the _sos shadow-offset quirk needs none. */
-      if(hqCol&&opts&&opts.hq){
-        dst.save();
-        dst.setTransform(1,0,0,1,0,0);
-        dst.shadowColor=hqCol;
-        /* shadowBlur is sigma-ish: x2 so a dial 'reach' of r reads as
-           ~r user px of visible falloff, matching the mip semantics */
-        dst.shadowBlur=Math.max(1,r*dpr*2);
-        dst.shadowOffsetX=S.width;
-        dst.shadowOffsetY=0;
-        for(var hp=0;hp<(passes||1);hp++)dst.drawImage(S,-S.width,0);
-        dst.restore();
-        return;
-      }
+    var blurOnto=function(dst,r,passes){
       var F=Math.max(2,r*dpr);
       var n=Math.max(1,Math.min(5,Math.round(Math.log(F)/Math.LN2)));
       var cur=S,cw=S.width,ch=S.height;
@@ -25741,19 +25770,14 @@ var D3X={
     /* P777: opts-aware stretch - the dice keep G.sx/G.sy, the cards
        pass 1/1. The borrowed 1.24 was a 15px top/bottom smear on a
        card (dyF, the card's own vertical dial, is authored at 0). */
-    /* P785: sx/sy are caller dials like soft/rim/strength - the lean
-       is proportional to the subject, and 1.24 on a card-tall shape is
-       Denis's 'too tall'. Dice pass nothing and keep G's lean. */
-    var SX=(opts&&opts.sx!==undefined)?opts.sx:G.sx;
-    var SY=(opts&&opts.sy!==undefined)?opts.sy:G.sy;
-    sel.forEach(function(sh){lay(sxc,sh,SOFT,{dy:(DY!==null)?DY:G.dy,sx:SX,sy:SY});});
-    blurOnto(gx,SOFTR,G.softPasses||1,SOFT);
+    sel.forEach(function(sh){lay(sxc,sh,SOFT,{dy:(DY!==null)?DY:G.dy,sx:G.sx,sy:G.sy});});
+    blurOnto(gx,SOFTR,G.softPasses||1);
     /* then the bright rim, stacked - the punch-out below throws away the
        inner half of every blur, so a single pass never reads as strong */
     sxc.setTransform(dpr,0,0,dpr,0,0);
     sxc.clearRect(0,0,sc.width,sc.height);
     sel.forEach(function(sh){lay(sxc,sh,COL,(DY!==null)?{dy:DY}:{});});
-    blurOnto(gx,RIMR,G.rimPasses||1,COL);
+    blurOnto(gx,RIMR,G.rimPasses||1);
     /* cut the subject back out EXACTLY on its painted edge: everything
        left is outside the shape, which is the whole point. clear widens
        the cut a hair past the edge - see the note above GLOW. */
@@ -25785,27 +25809,12 @@ var D3X={
        so the two composite as one glow. Hulls only: a stamp's crisp edge
        is the subject's own art. */
     if(LINE>0){
-      if(opts&&opts.lineBlur){
-        /* P785: the hot core takes a breath of blur (Denis) - the same
-           line, stroked into the scratch and mip-softened instead of
-           drawn crisp. Two passes keep it hot through the blur. */
-        sxc.setTransform(dpr,0,0,dpr,0,0);
-        sxc.globalCompositeOperation='source-over';
-        sxc.clearRect(0,0,sc.width,sc.height);
-        sxc.strokeStyle=COL;sxc.lineWidth=LINE;sxc.lineJoin='round';
-        sel.forEach(function(sh){
-          if(sh&&sh.stamp)return;
-          trace(sxc,sh&&sh.hull||sh,0);sxc.stroke();
-        });
-        blurOnto(gx,opts.lineBlur,2,COL);
-      }else{
       gx.strokeStyle=COL;gx.lineWidth=LINE;gx.lineJoin='round';
       gx.globalAlpha=1;
       sel.forEach(function(sh){
         if(sh&&sh.stamp)return;
         trace(gx,sh&&sh.hull||sh,0);gx.stroke();
       });
-      }
     }
     /* additive, so it reads as light rather than paint */
     x.save();
@@ -25832,23 +25841,19 @@ var D3X={
      under the dice and far under the hand - right for dice, useless
      for a card at z 42. This one sits just under the dragged card
      (9500) and above everything else it must not hide behind. */
-  _glowHiCv:function(){
+  /* P789: the glow layer - Denis's prototype DOM, one wrapper per lit
+     card, positioned where the canvas stamp used to paint. FLAT on
+     purpose: no 3D ancestor, so WebKit cannot clip the drop-shadows
+     (P727/P746-748). Same z as the retired canvas (41, under rows). */
+  _cardGlowLayer:function(){
     var sc=document.getElementById('screen-match');
     if(!sc)return null;
-    var cv=document.getElementById('dgCanvasHi');
-    if(!cv){
-      cv=document.createElement('canvas');cv.id='dgCanvasHi';
-      /* P756: UNDER the card layer (Denis's call, and the better
-         architecture): rows sit at 42 and a dragged card at 9500, so at
-         41 the card body hides the halo's middle by being on top, the
-         badge sits over the glow for free, and no punch-out is needed -
-         which is what removed the visible gap the cut used to make.
-         Appended after the dice canvas, so the same z paints above it. */
-      cv.style.cssText='position:absolute;inset:0;width:100%;height:100%;'
-        +'pointer-events:none;z-index:41';
-      sc.appendChild(cv);
+    var ly=document.getElementById('cardGlowLayer');
+    if(!ly){
+      ly=document.createElement('div');ly.id='cardGlowLayer';
+      sc.appendChild(ly);
     }
-    return cv;
+    return ly;
   },
   /* a card's silhouette as a hull the painter understands: a rounded
      rect, corners sampled so the halo follows the card's shape rather
@@ -25893,61 +25898,99 @@ var D3X={
   },
   _drawCardGlows:function(){
     var sc0=document.getElementById('screen-match');
-    var cv=document.getElementById('dgCanvasHi');
     var live=this._cardGlows&&Object.keys(this._cardGlows).length;
-    if(!sc0||(!live&&!cv))return;
-    cv=this._glowHiCv();if(!cv)return;
-    /* P784: the core canvas is retired - clear a stale one if this
-       session predates the retirement */
-    var _stale=document.getElementById('dgCanvasCore');if(_stale)_stale.remove();
-    var _staleL=document.getElementById('dgCanvasLine');if(_staleL)_staleL.remove();/* P788 */
+    var ly=document.getElementById('cardGlowLayer');
+    if(!sc0||(!live&&!ly))return;
+    /* the canvas generation is retired - clear strays from older DOM */
+    ['dgCanvasHi','dgCanvasCore','dgCanvasLine'].forEach(function(id){
+      var el=document.getElementById(id);if(el)el.remove();});
+    ly=this._cardGlowLayer();if(!ly)return;
     var sc=sc0.getBoundingClientRect();
     if(sc.width<10)return;
-    var dpr=Math.min(devicePixelRatio||1,this.GLOW_DPR_MAX||3);
-    if(cv.width!==Math.round(sc.width*dpr)||cv.height!==Math.round(sc.height*dpr)){
-      cv.width=Math.round(sc.width*dpr);cv.height=Math.round(sc.height*dpr);
-    }
-    var x=cv.getContext('2d');
-    x.setTransform(dpr,0,0,dpr,0,0);
-    x.clearRect(0,0,sc.width,sc.height);
-    if(!live)return;
-    var self=this,CG=this.CARD_GLOW;
+    var self=this,CG=this.CARD_GLOW,seen={};
     Object.keys(this._cardGlows).forEach(function(kk){
       var e=self._cardGlows[kk];
       if(!e.el||!e.el.isConnected){delete self._cardGlows[kk];return;}
       var r=e.el.getBoundingClientRect();
       if(r.width<4)return;
-      /* P784 (Denis: "should be the same effect as on the dice"): the
-         card halo is the DICE's halo - the same painter call with the
-         same GLOW dials and SEL colours, no opts. The only difference
-         is the silhouette: the card's rounded box, built from the
-         UNTRANSFORMED element size (the AABB of a rotated card is
-         inflated) and rotated to match the fan. The stroked line rides
-         the hull exactly as it rides a die's, straddling the card's
-         edge, so the punch's clear-ring can never read as a gap. */
+      seen[kk]=1;
+      var w=ly.querySelector('[data-k="'+kk+'"]');
+      if(!w){
+        w=document.createElement('div');
+        w.className='cgw';w.dataset.k=kk;
+        /* Denis's markup verbatim, minus .face - the REAL card is the
+           face, up in its row */
+        w.innerHTML='<div class="spill"></div>'
+          +'<div class="glow"><div class="breathe">'
+          +'<span class="bloom"><i></i></span>'
+          +'<span class="halo"><i></i></span>'
+          +'</div></div>';
+        ly.appendChild(w);
+      }
+      /* the mask IS the card's own art */
+      var img=e.el.querySelector('.fcvIn img')||e.el.querySelector('img');
+      var src=img?(img.currentSrc||img.src):'';
+      if(w._src!==src){w._src=src;w.style.setProperty('--card-src','url("'+src+'")');}
+      /* geometry: the untransformed box at the element's screen centre,
+         rotated to the fan (an AABB of a rotated card is inflated) */
       var cs2=getComputedStyle(e.el);
       var rot=parseFloat(cs2.rotate);if(isNaN(rot))rot=0;
       var scl=parseFloat(cs2.scale);if(!(scl>0))scl=1;
-      /* P785: trim to the ART's edge - the webp carries a ~1.7%
-         transparent margin per side, and a hull on the element box put
-         the line and the punch outside the visible card, exposing a
-         dark ring of erased halo (Denis: 'is it card thickness?'). */
-      var w=e.el.offsetWidth*scl*self.GLOW.grow*(CG.trim||1),
-          h=e.el.offsetHeight*scl*self.GLOW.grow*(CG.trim||1);
-      var ccx=r.left-sc.left+r.width/2,ccy=r.top-sc.top+r.height/2;
-      var hull=self._rectHull(ccx-w/2,ccy-h/2,w,h,Math.min(w,h)*CG.round);
-      if(rot){
-        var rad=rot*Math.PI/180,cr=Math.cos(rad),sr=Math.sin(rad);
-        hull=hull.map(function(p){var dx=p[0]-ccx,dy=p[1]-ccy;
-          return [ccx+dx*cr-dy*sr,ccy+dx*sr+dy*cr];});
-      }
+      /* computed width, not offsetWidth: the row sizes cards in cqw so
+         the true width is fractional, and offsetWidth's truncation put
+         the mask ~2px inside the art */
+      var cw=(parseFloat(cs2.width)||e.el.offsetWidth)*scl,
+          ch=(parseFloat(cs2.height)||e.el.offsetHeight)*scl;
+      /* the row is a 3D stage (perspective + rotateX), so the PROJECTED
+         card is ~2% bigger than its CSS size. Unrotated: the rect IS
+         the projected box - exact. Fanned cards keep the computed size
+         (their AABB is rotation-inflated); the <=2px keystone error
+         hides under 5-17px of shadow. */
+      if(!rot){cw=r.width;ch=r.height;}
+      w.style.left=(r.left-sc.left+r.width/2-cw/2)+'px';
+      w.style.top=(r.top-sc.top+r.height/2-ch/2)+'px';
+      w.style.width=cw+'px';w.style.height=ch+'px';
+      w.style.rotate=rot?(rot+'deg'):'0deg';
+      /* the arm ramp maps onto his state axis: full arm = 'selected' */
       var _am=CG.floor+(1-CG.floor)*Math.min(1,e.k);
-      /* P788: ONE call, ALL of it under the card (Denis), gaussian-
-         blurred (hq) - the breathed line included. The card's pencil
-         border reads as the object's silhouette against the light. */
-      self._paintHalo(cv,x,sc,dpr,[hull],e.col||self.SEL_COL,e.col||self.SEL_SOFT,
-        _am,undefined,{sx:1,sy:1,lineBlur:CG.lineBlur,hq:true});
+      w.style.setProperty('--state',(1+0.9*_am).toFixed(3));
+      /* an accent (the rival's red telegraph) re-tints the whole thing */
+      if(e.col){w.style.setProperty('--core',e.col);w.style.setProperty('--glow',e.col);}
+      else{w.style.removeProperty('--core');w.style.removeProperty('--glow');}
     });
+    [].forEach.call(ly.querySelectorAll('.cgw'),function(w){
+      if(!seen[w.dataset.k])w.remove();
+    });
+    this._flickSync();
+  },
+  /* Denis's candle flicker: three incommensurate sines, never visibly
+     loops. Runs only while something is lit; one style-var write per
+     frame, no repaints. */
+  _flickSync:function(){
+    var self=this;
+    if(this._flickRAF)return;
+    if(!(this._cardGlows&&Object.keys(this._cardGlows).length))return;
+    var t0=performance.now();
+    var step=function(now){
+      if(!(self._cardGlows&&Object.keys(self._cardGlows).length)){
+        self._flickRAF=null;
+        var ly=document.getElementById('cardGlowLayer');
+        if(ly)ly.style.setProperty('--flick','1');
+        return;
+      }
+      var ly=document.getElementById('cardGlowLayer');
+      if(ly){
+        if(document.body.classList.contains('reduced-motion')){
+          ly.style.setProperty('--flick','1');
+        }else{
+          var t=(now-t0)/1000;
+          var n=Math.sin(t*5.7)*.55+Math.sin(t*11.3+1.7)*.3+Math.sin(t*2.1)*.15;
+          ly.style.setProperty('--flick',(1-.34*.2*(.5+.5*n)).toFixed(4));
+        }
+      }
+      self._flickRAF=requestAnimationFrame(step);
+    };
+    this._flickRAF=requestAnimationFrame(step);
   },
   _drawGlow:function(){
     var cv=document.getElementById('dgCanvas');
