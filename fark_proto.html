@@ -1291,7 +1291,14 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
    under the rows (z41), because a filter inside the 3D-transformed
    rows is clipped to its own box on WebKit (P727/P746-748). Vars
    carry his authored defaults; the lab and his test page share them. */
+/* P791: THE BLEND LIVES ON THE LAYER. z-index makes the layer a
+   stacking context, so a blend INSIDE it can only see the layer's own
+   transparent backdrop - additive onto nothing is plain paint, which
+   was the washed-out core Denis compared against his test page. At
+   layer level the backdrop is the table itself, exactly like his
+   stage. */
 #cardGlowLayer{position:absolute;inset:0;pointer-events:none;z-index:41;
+  mix-blend-mode:var(--blend);
   --core:hsl(13 100% 63%);--glow:hsl(36 88% 56%);
   --core-b:1.83;--glow-b:0.40;--core-sharp:0.67;
   --halo:5;--bloom:17;--intensity:1;--speed:1.3;--flick:1;--blend:plus-lighter}
@@ -1300,8 +1307,8 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
   translate:-50% -50%;pointer-events:none;
   background:radial-gradient(closest-side,var(--glow),transparent 70%);
   opacity:calc(.22*var(--glow-b)*var(--intensity)*var(--state,1));
-  mix-blend-mode:var(--blend);transition:opacity .2s ease}
-.cgw .glow{position:absolute;inset:0;mix-blend-mode:var(--blend);opacity:var(--flick)}
+  transition:opacity .2s ease}
+.cgw .glow{position:absolute;inset:0;opacity:var(--flick)}
 .cgw .breathe{position:absolute;inset:0;
   animation:cgBreathe calc(3.7s/max(var(--speed),.0001)) ease-in-out infinite}
 .cgw .halo,.cgw .bloom{position:absolute;inset:0;transition:opacity .2s ease;
@@ -1311,19 +1318,21 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
 .cgw .halo>i,.cgw .bloom>i{position:absolute;inset:0;
   -webkit-mask:var(--card-src) center/contain no-repeat;
   mask:var(--card-src) center/contain no-repeat}
+/* P792: --cgs = cardWidth/200 - the prototype is authored at a 200px
+   card, so a px there is a proportion, not a length */
 .cgw .bloom{opacity:min(1,calc(var(--glow-b)*var(--intensity)*var(--state,1)));
-  filter:drop-shadow(0 0 calc(var(--bloom)*1px) var(--glow))
-         drop-shadow(0 0 calc(var(--bloom)*0.5px) var(--glow))
+  filter:drop-shadow(0 0 calc(var(--bloom)*var(--cgs,1)*1px) var(--glow))
+         drop-shadow(0 0 calc(var(--bloom)*var(--cgs,1)*0.5px) var(--glow))
          brightness(max(1,calc(var(--glow-b)*var(--intensity)*var(--state,1))));
   animation:cgSwell calc(5.3s/max(var(--speed),.0001)) ease-in-out infinite}
 .cgw .bloom>i{background:var(--glow)}
 /* sharpness redistributes the same reach: one wide pass = gaussian
    mush; four tight passes compound into a hard-edged plateau */
 .cgw .halo{z-index:2;opacity:min(1,calc(var(--core-b)*var(--intensity)*var(--state,1)));
-  filter:drop-shadow(0 0 calc(var(--halo)*(1 - 0.75*var(--core-sharp))*1px) var(--core))
-         drop-shadow(0 0 calc(var(--halo)*0.25*var(--core-sharp)*1px) var(--core))
-         drop-shadow(0 0 calc(var(--halo)*0.25*var(--core-sharp)*1px) var(--core))
-         drop-shadow(0 0 calc(var(--halo)*0.25*var(--core-sharp)*1px) var(--core))
+  filter:drop-shadow(0 0 calc(var(--halo)*(1 - 0.75*var(--core-sharp))*var(--cgs,1)*1px) var(--core))
+         drop-shadow(0 0 calc(var(--halo)*0.25*var(--core-sharp)*var(--cgs,1)*1px) var(--core))
+         drop-shadow(0 0 calc(var(--halo)*0.25*var(--core-sharp)*var(--cgs,1)*1px) var(--core))
+         drop-shadow(0 0 calc(var(--halo)*0.25*var(--core-sharp)*var(--cgs,1)*1px) var(--core))
          brightness(max(1,calc(var(--core-b)*var(--intensity)*var(--state,1))))}
 .cgw .halo>i{background:var(--core)}
 @keyframes cgBreathe{0%,100%{opacity:.88}50%{opacity:1}}
@@ -25936,17 +25945,23 @@ var D3X={
       var cs2=getComputedStyle(e.el);
       var rot=parseFloat(cs2.rotate);if(isNaN(rot))rot=0;
       var scl=parseFloat(cs2.scale);if(!(scl>0))scl=1;
-      /* computed width, not offsetWidth: the row sizes cards in cqw so
-         the true width is fractional, and offsetWidth's truncation put
-         the mask ~2px inside the art */
       var cw=(parseFloat(cs2.width)||e.el.offsetWidth)*scl,
           ch=(parseFloat(cs2.height)||e.el.offsetHeight)*scl;
-      /* the row is a 3D stage (perspective + rotateX), so the PROJECTED
-         card is ~2% bigger than its CSS size. Unrotated: the rect IS
-         the projected box - exact. Fanned cards keep the computed size
-         (their AABB is rotation-inflated); the <=2px keystone error
-         hides under 5-17px of shadow. */
-      if(!rot){cw=r.width;ch=r.height;}
+      /* P792: the rows are a perspective stage - the projected card is
+         a TRAPEZOID, and a rect mask sized to its AABB overhangs the
+         art at the narrow edge, detaching the rim (the grey outline
+         Denis circled). Anchor to the art's true aspect at the MINIMUM
+         projection: 0.99 x projected height x natural ratio sits just
+         inside the card everywhere, the rim's shadows reach out tight
+         against the edge - the reference's own composition. This also
+         removes 'contain' letterboxing (the wrapper IS the art's
+         shape). */
+      if(!rot)ch=r.height;
+      ch*=0.99;
+      var _nat=(img&&img.naturalWidth>0)?(img.naturalWidth/img.naturalHeight):(cw/ch);
+      cw=ch*_nat;
+      /* P792: his dials are proportions of his 200px authoring card */
+      w.style.setProperty('--cgs',(cw/200).toFixed(4));
       w.style.left=(r.left-sc.left+r.width/2-cw/2)+'px';
       w.style.top=(r.top-sc.top+r.height/2-ch/2)+'px';
       w.style.width=cw+'px';w.style.height=ch+'px';
