@@ -25474,8 +25474,11 @@ var D3X={
      and the projected card disagree by a few pixels, and with a tight
      rim that disagreement reads as a gap on one side. The excess hides
      under the card, so there is no cost. */
-  CARD_GLOW:{col:'#ffe6a4', softCol:'#ffa93a', soft:6, rim:2.5, strength:0.91,
-    grow:1.05, dyF:0, round:0.075, line:0, floor:0.42},
+  /* P778: retuned AT DENIS'S REQUEST (2026-08-19) - gold not beige,
+     tail at the dice's reach, core ring thinned so the edge is all
+     falloff. */
+  CARD_GLOW:{col:'#ffd84e', softCol:'#ffae1f', soft:11, rim:2.5, strength:0.91,
+    grow:1.02, dyF:0, round:0.075, line:0, floor:0.42},
   GLOW:{soft:11, rim:3, rimPasses:5, softPasses:1, line:3.2, grow:1.004, clear:0.7, strength:0.91,
         /* P731: the SOFT pass can stretch and lean - sx/sy scale the
            silhouette, dy biases it vertically. 1/1/0 = today's look
@@ -25696,7 +25699,7 @@ var D3X={
     var SX=(opts&&opts.sx!==undefined)?opts.sx:G.sx;
     var SY=(opts&&opts.sy!==undefined)?opts.sy:G.sy;
     sel.forEach(function(sh){lay(sxc,sh,SOFT,{dy:(DY!==null)?DY:G.dy,sx:SX,sy:SY});});
-    blurOnto(gx,SOFTR,G.softPasses||1);
+    blurOnto(gx,SOFTR,(opts&&opts.softPasses)||G.softPasses||1);/* P778b: caller's count */
     /* then the bright rim, stacked - the punch-out below throws away the
        inner half of every blur, so a single pass never reads as strong */
     sxc.setTransform(dpr,0,0,dpr,0,0);
@@ -25790,8 +25793,13 @@ var D3X={
          badge sits over the glow for free, and no punch-out is needed -
          which is what removed the visible gap the cut used to make.
          Appended after the dice canvas, so the same z paints above it. */
+      /* P778: SCREEN-BLENDED - the halo brightens the table under it
+         (grain showing through) instead of painting over it. This is
+         the additive read Denis asked for; the ctx-level 'lighter' in
+         _paintHalo only ever blended the glow with its own cleared
+         canvas. Cards only: the dice canvas is separate and liked. */
       cv.style.cssText='position:absolute;inset:0;width:100%;height:100%;'
-        +'pointer-events:none;z-index:41';
+        +'pointer-events:none;z-index:41;mix-blend-mode:screen';
       sc.appendChild(cv);
     }
     return cv;
@@ -25870,6 +25878,7 @@ var D3X={
       self._paintHalo(cv,x,sc,dpr,[shape],e.col||CG.col,e.col||CG.softCol,
         CG.floor+(1-CG.floor)*Math.min(1,e.k),CG.line,
         {soft:CG.soft,rim:CG.rim,strength:CG.strength,dy:r.height*(CG.dyF||0),
+         softPasses:CG.softPasses||2,/* P778b: presence under the screen blend */
          sx:1,sy:1,/* P777: the card does not lean like a die */
          punchUnder:true,punchScaleMul:1/(CG.grow||1)});/* P777: tail-only, tucked under the card */
     });
