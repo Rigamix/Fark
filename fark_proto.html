@@ -25474,11 +25474,14 @@ var D3X={
      and the projected card disagree by a few pixels, and with a tight
      rim that disagreement reads as a gap on one side. The excess hides
      under the card, so there is no cost. */
-  /* P778: retuned AT DENIS'S REQUEST (2026-08-19) - gold not beige,
-     tail at the dice's reach, core ring thinned so the edge is all
-     falloff. */
+  /* P779 (Denis: "a magical golden glow"): the card halo is summed
+     octaves - hot near-white core, golden body, faint warm spill. grow
+     1.0: nothing solid survives the punch, every visible pixel is
+     blur. col stays as the tint the drag/armed callers fall back to
+     for their own accents. */
   CARD_GLOW:{col:'#ffd84e', softCol:'#ffae1f', soft:11, rim:2.5, strength:0.91,
-    grow:1.02, dyF:0, round:0.075, line:0, floor:0.42},
+    grow:1.0, dyF:0, round:0.075, line:0, floor:0.42,
+    octaves:[{r:3,col:'#fff7dc',passes:2},{r:8,col:'#ffd24a'},{r:20,col:'#ff9e30',deep:true}]},
   GLOW:{soft:11, rim:3, rimPasses:5, softPasses:1, line:3.2, grow:1.004, clear:0.7, strength:0.91,
         /* P731: the SOFT pass can stretch and lean - sx/sy scale the
            silhouette, dy biases it vertically. 1/1/0 = today's look
@@ -25647,9 +25650,11 @@ var D3X={
     /* the mip blur: halve until the step reaches ~r user px, then one
        smooth upscale. The falloff width tracks r, so the lab's soft and
        rim numbers keep their meaning. */
-    var blurOnto=function(dst,r,passes){
+    var blurOnto=function(dst,r,passes,maxN){
       var F=Math.max(2,r*dpr);
-      var n=Math.max(1,Math.min(5,Math.round(Math.log(F)/Math.LN2)));
+      /* P779: the default cap of 5 tops the radius out at 32/dpr user px
+         - ~10.7 on a dpr-3 phone. A wide octave passes 6. */
+      var n=Math.max(1,Math.min(maxN||5,Math.round(Math.log(F)/Math.LN2)));
       var cur=S,cw=S.width,ch=S.height;
       self._mips=self._mips||[];
       for(var mi=0;mi<n;mi++){
@@ -25698,6 +25703,19 @@ var D3X={
        card (dyF, the card's own vertical dial, is authored at 0). */
     var SX=(opts&&opts.sx!==undefined)?opts.sx:G.sx;
     var SY=(opts&&opts.sy!==undefined)?opts.sy:G.sy;
+    if(opts&&opts.octaves){
+      /* P779: ONE CONTINUOUS LIGHT. The same silhouette, blurred at a
+         few radii in a few colours and SUMMED - a smooth curve with no
+         rim band and no boundary between layers (Denis: "I can see the
+         two layers"). Each octave: {r, col, passes, deep}. */
+      opts.octaves.forEach(function(oc){
+        sxc.setTransform(dpr,0,0,dpr,0,0);
+        sxc.globalCompositeOperation='source-over';
+        sxc.clearRect(0,0,sc.width,sc.height);
+        sel.forEach(function(sh){lay(sxc,sh,oc.col,{dy:(DY!==null)?DY:0,sx:SX,sy:SY});});
+        blurOnto(gx,oc.r,oc.passes||1,oc.deep?6:undefined);
+      });
+    }else{
     sel.forEach(function(sh){lay(sxc,sh,SOFT,{dy:(DY!==null)?DY:G.dy,sx:SX,sy:SY});});
     blurOnto(gx,SOFTR,(opts&&opts.softPasses)||G.softPasses||1);/* P778b: caller's count */
     /* then the bright rim, stacked - the punch-out below throws away the
@@ -25706,6 +25724,7 @@ var D3X={
     sxc.clearRect(0,0,sc.width,sc.height);
     sel.forEach(function(sh){lay(sxc,sh,COL,(DY!==null)?{dy:DY}:{});});
     blurOnto(gx,RIMR,G.rimPasses||1);
+    }
     /* cut the subject back out EXACTLY on its painted edge: everything
        left is outside the shape, which is the whole point. clear widens
        the cut a hair past the edge - see the note above GLOW. */
@@ -25875,10 +25894,14 @@ var D3X={
         shape={hull:self._rectHull(r.left-sc.left,r.top-sc.top,r.width,r.height,
           Math.min(r.width,r.height)*CG.round)};
       }
+      /* P779: a caller accent (the rival's red telegraph) re-tints the
+         whole octave stack - same light, their colour. */
+      var _oct=CG.octaves;
+      if(e.col&&_oct)_oct=_oct.map(function(oc){return {r:oc.r,col:e.col,passes:oc.passes,deep:oc.deep};});
       self._paintHalo(cv,x,sc,dpr,[shape],e.col||CG.col,e.col||CG.softCol,
         CG.floor+(1-CG.floor)*Math.min(1,e.k),CG.line,
         {soft:CG.soft,rim:CG.rim,strength:CG.strength,dy:r.height*(CG.dyF||0),
-         softPasses:CG.softPasses||2,/* P778b: presence under the screen blend */
+         octaves:_oct,/* P779: one continuous light */
          sx:1,sy:1,/* P777: the card does not lean like a die */
          punchUnder:true,punchScaleMul:1/(CG.grow||1)});/* P777: tail-only, tucked under the card */
     });
