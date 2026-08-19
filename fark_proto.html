@@ -1277,6 +1277,13 @@ body.gbSetOn .hsIcon{opacity:0;pointer-events:none}
    while it lasts. Same replace-the-filter move as .fcv-drag and
    .armed; spent stays later in the sheet and still wins. */
 #famRowP .fcv.fcv-lit{filter:brightness(1.05)}
+/* P781: and it HOLDS STILL - famBob translates the art inside the box
+   the halo was stamped from, so a bobbing lit card breathes out from
+   under its own light (the hole that moved between Denis's crops).
+   animation:none, NOT paused - paused freezes the bob mid-translate
+   and the hole freezes open with it; none resets the art to the box.
+   Precedent: spent cards already sit still this way (P713). */
+#famRowP .fcv.fcv-lit .fcvIn{animation:none}
 /* P576: ALL THREE filter declarations move together or none do - a filter
    REPLACES the property, so leaving this one behind would snap a spent card back
    to the old hard offset the moment it greyed out. */
@@ -15413,6 +15420,17 @@ function _cardFocusClose(){
   if(_cardFocusEl){try{_cardFocusEl.classList.remove('focus');}catch(e){}}
   _cardFocusEl=null;
   try{var ms=document.getElementById('screen-match');if(ms)ms.classList.remove('tip-open');}catch(e){}
+  _cardGlowRefit();
+}
+/* P781: the focus scale (1.24) lands AFTER a glow was painted, so the
+   halo sat stamped at the old size - the card grew out of its light.
+   One refit, after the .18s scale transition settles. */
+function _cardGlowRefit(){
+  try{
+    if(window.D3X&&D3X._cardGlows&&Object.keys(D3X._cardGlows).length){
+      setTimeout(function(){try{D3X._drawCardGlows();}catch(e){}},230);
+    }
+  }catch(e){}
 }
 /* P681: TAP ANYWHERE ELSE DISMISSES. One document-level listener, installed
    once; taps on a card route through the toggle (switch or close) and taps
@@ -15440,6 +15458,7 @@ function _cardFocusToggle(el,o){
   if(_cardFocusEl===el){_cardFocusClose();return;}
   _cardFocusClose();
   _cardFocusEl=el;el.classList.add('focus');
+  _cardGlowRefit();/* P781: the halo re-fits the grown card */
   var ms=document.getElementById('screen-match')||document.body;
   /* P681: while a tip is open the status strips fade, so it never overlaps
      the score or the 'X IS ROLLING' line */
@@ -25487,7 +25506,7 @@ var D3X={
      for their own accents. */
   CARD_GLOW:{col:'#ffd84e', softCol:'#ffae1f', soft:11, rim:2.5, strength:0.91,
     grow:1.0, dyF:0, round:0.075, line:0, floor:0.42,
-    octaves:[{r:3,col:'#fff7dc',passes:2},{r:8,col:'#ffd24a'},{r:24,col:'#ff9e30',deep:true}]},
+    octaves:[{r:6,col:'#ffe08a',passes:2,core:true},{r:8,col:'#ffd24a'},{r:24,col:'#ff9e30',deep:true}]},
   GLOW:{soft:11, rim:3, rimPasses:5, softPasses:1, line:3.2, grow:1.004, clear:0.7, strength:0.91,
         /* P731: the SOFT pass can stretch and lean - sx/sy scale the
            silhouette, dy biases it vertically. 1/1/0 = today's look
@@ -25806,6 +25825,23 @@ var D3X={
      under the dice and far under the hand - right for dice, useless
      for a card at z 42. This one sits just under the dragged card
      (9500) and above everything else it must not hide behind. */
+  /* P781: the CORE's canvas - same geometry, NO blend mode, appended
+     after the spill canvas so it paints above it. Screen blending
+     vanishes over light backdrops (it can only brighten), so the hot
+     edge lives here where it is visible on parchment and table alike. */
+  _glowCoreCv:function(){
+    var sc=document.getElementById('screen-match');
+    if(!sc)return null;
+    var cv=document.getElementById('dgCanvasCore');
+    if(!cv){
+      this._glowHiCv();/* the spill canvas first, so core lands above it */
+      cv=document.createElement('canvas');cv.id='dgCanvasCore';
+      cv.style.cssText='position:absolute;inset:0;width:100%;height:100%;'
+        +'pointer-events:none;z-index:41';
+      sc.appendChild(cv);
+    }
+    return cv;
+  },
   _glowHiCv:function(){
     var sc=document.getElementById('screen-match');
     if(!sc)return null;
@@ -25876,15 +25912,19 @@ var D3X={
     var live=this._cardGlows&&Object.keys(this._cardGlows).length;
     if(!sc0||(!live&&!cv))return;
     cv=this._glowHiCv();if(!cv)return;
+    var cv2=this._glowCoreCv();
     var sc=sc0.getBoundingClientRect();
     if(sc.width<10)return;
     var dpr=Math.min(devicePixelRatio||1,this.GLOW_DPR_MAX||3);
     if(cv.width!==Math.round(sc.width*dpr)||cv.height!==Math.round(sc.height*dpr)){
       cv.width=Math.round(sc.width*dpr);cv.height=Math.round(sc.height*dpr);
     }
+    if(cv2&&(cv2.width!==cv.width||cv2.height!==cv.height)){cv2.width=cv.width;cv2.height=cv.height;}
     var x=cv.getContext('2d');
     x.setTransform(dpr,0,0,dpr,0,0);
     x.clearRect(0,0,sc.width,sc.height);
+    var x2=cv2?cv2.getContext('2d'):null;
+    if(x2){x2.setTransform(dpr,0,0,dpr,0,0);x2.clearRect(0,0,sc.width,sc.height);}
     if(!live)return;
     var self=this,CG=this.CARD_GLOW;
     Object.keys(this._cardGlows).forEach(function(kk){
@@ -25916,13 +25956,19 @@ var D3X={
       /* P779: a caller accent (the rival's red telegraph) re-tints the
          whole octave stack - same light, their colour. */
       var _oct=CG.octaves;
-      if(e.col&&_oct)_oct=_oct.map(function(oc){return {r:oc.r,col:e.col,passes:oc.passes,deep:oc.deep};});
-      self._paintHalo(cv,x,sc,dpr,[shape],e.col||CG.col,e.col||CG.softCol,
-        CG.floor+(1-CG.floor)*Math.min(1,e.k),CG.line,
-        {soft:CG.soft,rim:CG.rim,strength:CG.strength,dy:r.height*(CG.dyF||0),
-         octaves:_oct,/* P779: one continuous light */
-         sx:1,sy:1,/* P777: the card does not lean like a die */
-         punchUnder:true,punchScaleMul:1/(CG.grow||1)});/* P777: tail-only, tucked under the card */
+      if(e.col&&_oct)_oct=_oct.map(function(oc){return {r:oc.r,col:e.col,passes:oc.passes,deep:oc.deep,core:oc.core};});
+      /* P781: core octaves paint on the NORMAL canvas (visible on any
+         backdrop), the rest on the screened spill canvas. */
+      var _spill=_oct.filter(function(oc){return !oc.core;});
+      var _core=_oct.filter(function(oc){return oc.core;});
+      var _opts=function(list){return {soft:CG.soft,rim:CG.rim,strength:CG.strength,
+        dy:r.height*(CG.dyF||0),octaves:list,sx:1,sy:1,
+        punchUnder:true,punchScaleMul:1/(CG.grow||1)};};
+      var _am=CG.floor+(1-CG.floor)*Math.min(1,e.k);
+      if(_spill.length)self._paintHalo(cv,x,sc,dpr,[shape],e.col||CG.col,e.col||CG.softCol,
+        _am,CG.line,_opts(_spill));
+      if(_core.length&&x2)self._paintHalo(cv2,x2,sc,dpr,[shape],e.col||CG.col,e.col||CG.softCol,
+        _am,CG.line,_opts(_core));
     });
   },
   _drawGlow:function(){
