@@ -5,6 +5,24 @@ Written 2026-07-30 so a fresh session loses nothing. Companion to
 
 ## Open, low-stakes
 
+- **Tamper's texts say "for the night"; the break is match-scoped.** (found
+  2026-08-19, card-text audit) `CFX.tamper` sets `broken` on the `G.oF`
+  instance, which is re-dealt per match. No observable difference today —
+  bosses are the only family-card holders and are faced once a night — but if
+  a second boss match per night ever exists, the wording and the code split.
+
+- **The halo blur's radius is DPR-quantized.** `blurOnto`'s mip count is
+  `round(log2(r*dpr))`, so the effective radius is `2^n/dpr` user px: a lab
+  `soft:6` is ~8px at dpr2 and ~5.3px at dpr3. The dice happen to round UP at
+  dpr3 (softer on phone), cards round DOWN (tighter). P753's "the lab's
+  numbers keep their meaning" contract is only approximately true. Fix if a
+  look ever needs to match exactly across devices: make the last mip step
+  fractional so the final scale is exactly `1/F`.
+
+- **`tar_pit` dead-reader sweep** (noted in code at the NPC_ARMS site): the
+  card is retired off FAM_LIVE; the `G._oTarPit`/`G._famTarPit` consumption
+  blocks have no writer left.
+
 - **`type:'once'` is decorative on 11 of 14 pooled cards.** Only `challenge`
   and `steal_low_bank` gate on `effect.type`; everywhere else the use-count is
   enforced by `eff.uses||1` or a boolean flag, and `type` is never read.
