@@ -117,7 +117,7 @@ sub("""    /* P733: CHAOS IS VARIANCE. The old kick read its direction off the
        doing the same to the old scatter). Self-calibrating: the row
        tells us where its edge is. */
     var edge=this.KICK.edge||2.6;
-    hit.forEach(function(d){var ax=Math.abs(d.phys.x);if(ax+0.9>edge)edge=ax+0.9;});
+    hit.forEach(function(d){var ax=Math.abs(d.phys.x);if(ax+0.45>edge)edge=ax+0.45;});/* P799c: the outermost die was clipping the screen at +0.9 */
     hit.forEach(function(d){
       var dx=d.phys.x-ix,dz=(d.phys.z||0)-iz;
       var L=Math.sqrt(dx*dx+dz*dz)||0.001;
