@@ -24564,12 +24564,15 @@ var D3X={
   scatterRow:function(sel){
     if(!this.ready||this.fail||!this.PHYS||!this.PHYS.on)return 0;
     var self=this,t0=performance.now();
-    /* P733: CHAOS IS VARIANCE. The old kick read its direction off the
-       die's SIGN - left of centre went left, right went right, with a
-       whisker of jitter - so the row PARTED and bunched, which is what
-       Denis saw. Each die now gets its own angle (outward bias, wide
-       spread), its own magnitude, and two of them are picked for a hard
-       hit. Same one impulse, applied unevenly. */
+    /* P799: AN IMPACT, NOT A PARTING. P733 named the disease ('the row
+       PARTED and bunched') and kept its cause - the base angle was still
+       sign(phys.x), and 42 degrees of jitter cannot break a binary
+       (Denis: 'they split into two stacks left and right'). ONE SLAM
+       POINT now, never dead centre and always off the dice line in
+       depth: every die is thrown RADIALLY away from it, so direction is
+       continuous in position and no two-lobe pattern can form; closer
+       dice are hit harder (falloff replaces the old hard-hit lottery);
+       spin scales with the hit; the wave reaches far dice a beat later. */
     var hit=[];
     this.dice.forEach(function(d){
       if(!d.match||!d.phys||d.burst||d.kick)return;
@@ -24577,25 +24580,29 @@ var D3X={
       hit.push(d);
     });
     if(!hit.length)return 0;
-    /* the two unlucky ones */
-    var hard={},picks=Math.min(2,hit.length);
-    while(Object.keys(hard).length<picks)hard[Math.floor(Math.random()*hit.length)]=1;
-    hit.forEach(function(d,i){
-      /* outward from the row's middle, then thrown off by up to 42 degrees */
-      var base=Math.atan2((Math.random()-0.5)*0.6,(d.phys.x>=0?1:-1));
-      var ang=base+(Math.random()-0.5)*1.47;
-      var mag=(hard[i]?1.5+Math.random()*0.6:0.65+Math.random()*0.8)*self.KICK.dist;
-      var vx=Math.cos(ang)*mag,vz=Math.sin(ang)*mag*0.7-0.1*self.KICK.dist;
-      /* P743: THE TABLE HAS EDGES. The kick was unbounded, so a hard hit
-         carried a die off screen. Anything that would end past the edge
-         bounces off it - the sign flips and the overshoot is what is
-         left of the travel, which is what a wall does. */
-      var edge=self.KICK.edge||2.6,endX=d.phys.x+vx;
+    var ix=(Math.random()-0.5)*1.6;
+    var iz=(Math.random()<0.5?-1:1)*(0.35+Math.random()*0.55);
+    this._lastImpact={x:ix,z:iz};/* the probe reads this */
+    /* P799b: the wall sits just past the OUTERMOST die - the fixed 2.6
+       sat INSIDE the row (dice rest out to ~4.8), so the clamp yanked
+       outer dice toward the centre, inverting their kicks (it was
+       doing the same to the old scatter). Self-calibrating: the row
+       tells us where its edge is. */
+    var edge=this.KICK.edge||2.6;
+    hit.forEach(function(d){var ax=Math.abs(d.phys.x);if(ax+0.9>edge)edge=ax+0.9;});
+    hit.forEach(function(d){
+      var dx=d.phys.x-ix,dz=(d.phys.z||0)-iz;
+      var L=Math.sqrt(dx*dx+dz*dz)||0.001;
+      var ang=Math.atan2(dz,dx)+(Math.random()-0.5)*0.55;
+      var mag=self.KICK.dist*(0.55+Math.random()*0.35)*(1.75/(0.6+L));
+      var vx=Math.cos(ang)*mag,vz=Math.sin(ang)*mag*0.8;
+      /* P743: THE TABLE HAS EDGES - bounce off them, never leave */
+      var endX=d.phys.x+vx;
       if(endX>edge)vx=(edge-d.phys.x)-(endX-edge)*0.45;
       else if(endX<-edge)vx=(-edge-d.phys.x)-(endX+edge)*0.45;
       if(Math.abs(vz)>edge*0.5)vz=(vz>0?1:-1)*edge*0.5;
-      d.kick={t0:t0,vx:vx,vz:vz,
-        sp:(Math.random()<0.5?-1:1)*(hard[i]?4+Math.random()*3:1.5+Math.random()*3)};
+      d.kick={t0:t0+L*70,vx:vx,vz:vz,
+        sp:(Math.random()<0.5?-1:1)*(1.5+mag*3.2+Math.random()*1.6)};
     });
     this._shDirty=true;
     return hit.length;
@@ -27806,6 +27813,7 @@ var D3X={
           if(d.kick){
             var _kt2=(performance.now()-d.kick.t0)/D3X.KICK.ms;
             if(_kt2>1)_kt2=1;
+            if(_kt2<0)_kt2=0;/* P799: the wave has not reached this die yet */
             var _ke2=1-Math.pow(1-_kt2,2.4);
             d.obj.position.x+=d.kick.vx*_ke2;
             d.obj.position.z+=d.kick.vz*_ke2;
