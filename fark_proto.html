@@ -25503,7 +25503,7 @@ var D3X={
      card borrows the dice's GLOW dials and SEL colours wholesale - one
      look, two subjects. Only the card's own geometry lives here: its
      hull's corner radius and the drag ramp's floor. */
-  CARD_GLOW:{round:0.075, floor:0.42},
+  CARD_GLOW:{round:0.075, floor:0.42, trim:0.967, lineBlur:2},
   GLOW:{soft:11, rim:3, rimPasses:5, softPasses:1, line:3.2, grow:1.004, clear:0.7, strength:0.91,
         /* P731: the SOFT pass can stretch and lean - sx/sy scale the
            silhouette, dy biases it vertically. 1/1/0 = today's look
@@ -25721,7 +25721,16 @@ var D3X={
     /* P777: opts-aware stretch - the dice keep G.sx/G.sy, the cards
        pass 1/1. The borrowed 1.24 was a 15px top/bottom smear on a
        card (dyF, the card's own vertical dial, is authored at 0). */
-    sel.forEach(function(sh){lay(sxc,sh,SOFT,{dy:(DY!==null)?DY:G.dy,sx:G.sx,sy:G.sy});});
+    /* P785: sx/sy are caller dials like soft/rim/strength - the lean
+       is proportional to the subject, and 1.24 on a card-tall shape is
+       Denis's 'too tall'. Dice pass nothing and keep G's lean. */
+    var SX=(opts&&opts.sx!==undefined)?opts.sx:G.sx;
+    var SY=(opts&&opts.sy!==undefined)?opts.sy:G.sy;
+    /* P786: lineOnly skips the body - the card's line pass paints on
+       its own over-card canvas, where it can light the art's pencil
+       ink. Everything else about the call is unchanged. */
+    if(!(opts&&opts.lineOnly)){
+    sel.forEach(function(sh){lay(sxc,sh,SOFT,{dy:(DY!==null)?DY:G.dy,sx:SX,sy:SY});});
     blurOnto(gx,SOFTR,G.softPasses||1);
     /* then the bright rim, stacked - the punch-out below throws away the
        inner half of every blur, so a single pass never reads as strong */
@@ -25729,6 +25738,7 @@ var D3X={
     sxc.clearRect(0,0,sc.width,sc.height);
     sel.forEach(function(sh){lay(sxc,sh,COL,(DY!==null)?{dy:DY}:{});});
     blurOnto(gx,RIMR,G.rimPasses||1);
+    }
     /* cut the subject back out EXACTLY on its painted edge: everything
        left is outside the shape, which is the whole point. clear widens
        the cut a hair past the edge - see the note above GLOW. */
@@ -25744,7 +25754,7 @@ var D3X={
        subject's true edge, G.clear tucks it a hair further in, and the
        card body covers the join. What survives is the grow ring (the
        crisp rim core) plus the blur tails - the dice's grammar. */
-    if(!(opts&&opts.noPunch)){
+    if(!(opts&&opts.noPunch)&&!(opts&&opts.lineOnly)){
       gx.globalCompositeOperation='destination-out';
       gx.globalAlpha=1;
       sel.forEach(function(sh){
@@ -25760,12 +25770,27 @@ var D3X={
        so the two composite as one glow. Hulls only: a stamp's crisp edge
        is the subject's own art. */
     if(LINE>0){
+      if(opts&&opts.lineBlur){
+        /* P785: the hot core takes a breath of blur (Denis) - the same
+           line, stroked into the scratch and mip-softened instead of
+           drawn crisp. Two passes keep it hot through the blur. */
+        sxc.setTransform(dpr,0,0,dpr,0,0);
+        sxc.globalCompositeOperation='source-over';
+        sxc.clearRect(0,0,sc.width,sc.height);
+        sxc.strokeStyle=COL;sxc.lineWidth=LINE;sxc.lineJoin='round';
+        sel.forEach(function(sh){
+          if(sh&&sh.stamp)return;
+          trace(sxc,sh&&sh.hull||sh,0);sxc.stroke();
+        });
+        blurOnto(gx,opts.lineBlur,2);
+      }else{
       gx.strokeStyle=COL;gx.lineWidth=LINE;gx.lineJoin='round';
       gx.globalAlpha=1;
       sel.forEach(function(sh){
         if(sh&&sh.stamp)return;
         trace(gx,sh&&sh.hull||sh,0);gx.stroke();
       });
+      }
     }
     /* additive, so it reads as light rather than paint */
     x.save();
@@ -25792,6 +25817,23 @@ var D3X={
      under the dice and far under the hand - right for dice, useless
      for a card at z 42. This one sits just under the dragged card
      (9500) and above everything else it must not hide behind. */
+  /* P786: the card line's canvas - ABOVE the card layer (rows 42,
+     dragged card 9500), because the card's edge is opaque pencil ink
+     and light from underneath can never brighten ink. Holds ONLY the
+     blurred line pass. */
+  _glowLineCv:function(){
+    var sc=document.getElementById('screen-match');
+    if(!sc)return null;
+    var cv=document.getElementById('dgCanvasLine');
+    if(!cv){
+      this._glowHiCv();
+      cv=document.createElement('canvas');cv.id='dgCanvasLine';
+      cv.style.cssText='position:absolute;inset:0;width:100%;height:100%;'
+        +'pointer-events:none;z-index:9600';
+      sc.appendChild(cv);
+    }
+    return cv;
+  },
   _glowHiCv:function(){
     var sc=document.getElementById('screen-match');
     if(!sc)return null;
@@ -25860,15 +25902,19 @@ var D3X={
     /* P784: the core canvas is retired - clear a stale one if this
        session predates the retirement */
     var _stale=document.getElementById('dgCanvasCore');if(_stale)_stale.remove();
+    var cvL=this._glowLineCv();
     var sc=sc0.getBoundingClientRect();
     if(sc.width<10)return;
     var dpr=Math.min(devicePixelRatio||1,this.GLOW_DPR_MAX||3);
     if(cv.width!==Math.round(sc.width*dpr)||cv.height!==Math.round(sc.height*dpr)){
       cv.width=Math.round(sc.width*dpr);cv.height=Math.round(sc.height*dpr);
     }
+    if(cvL&&(cvL.width!==cv.width||cvL.height!==cv.height)){cvL.width=cv.width;cvL.height=cv.height;}
     var x=cv.getContext('2d');
     x.setTransform(dpr,0,0,dpr,0,0);
     x.clearRect(0,0,sc.width,sc.height);
+    var xL=cvL?cvL.getContext('2d'):null;
+    if(xL){xL.setTransform(dpr,0,0,dpr,0,0);xL.clearRect(0,0,sc.width,sc.height);}
     if(!live)return;
     var self=this,CG=this.CARD_GLOW;
     Object.keys(this._cardGlows).forEach(function(kk){
@@ -25887,7 +25933,12 @@ var D3X={
       var cs2=getComputedStyle(e.el);
       var rot=parseFloat(cs2.rotate);if(isNaN(rot))rot=0;
       var scl=parseFloat(cs2.scale);if(!(scl>0))scl=1;
-      var w=e.el.offsetWidth*scl*self.GLOW.grow,h=e.el.offsetHeight*scl*self.GLOW.grow;
+      /* P785: trim to the ART's edge - the webp carries a ~1.7%
+         transparent margin per side, and a hull on the element box put
+         the line and the punch outside the visible card, exposing a
+         dark ring of erased halo (Denis: 'is it card thickness?'). */
+      var w=e.el.offsetWidth*scl*self.GLOW.grow*(CG.trim||1),
+          h=e.el.offsetHeight*scl*self.GLOW.grow*(CG.trim||1);
       var ccx=r.left-sc.left+r.width/2,ccy=r.top-sc.top+r.height/2;
       var hull=self._rectHull(ccx-w/2,ccy-h/2,w,h,Math.min(w,h)*CG.round);
       if(rot){
@@ -25895,8 +25946,14 @@ var D3X={
         hull=hull.map(function(p){var dx=p[0]-ccx,dy=p[1]-ccy;
           return [ccx+dx*cr-dy*sr,ccy+dx*sr+dy*cr];});
       }
+      var _am=CG.floor+(1-CG.floor)*Math.min(1,e.k);
+      /* P786: the body glows from UNDER the card (line suppressed)... */
       self._paintHalo(cv,x,sc,dpr,[hull],e.col||self.SEL_COL,e.col||self.SEL_SOFT,
-        CG.floor+(1-CG.floor)*Math.min(1,e.k));
+        _am,0,{sx:1,sy:1});
+      /* ...and the breathed line rides ABOVE it, lighting the art's
+         pencil ink the way a die's ivory edge never needed. */
+      if(xL)self._paintHalo(cvL,xL,sc,dpr,[hull],e.col||self.SEL_COL,e.col||self.SEL_SOFT,
+        _am,undefined,{lineOnly:true,lineBlur:CG.lineBlur});
     });
   },
   _drawGlow:function(){
