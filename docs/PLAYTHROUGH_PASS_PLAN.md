@@ -72,16 +72,18 @@ OPEN.md.
   SKIP pays 75% of the BOSS purse. Ambrose keeps his renown-only final
   screen. Probe: tools/apv_boss_win_draft.js (screenshot verified).
 
-## Step 5 — dice feel
+## Step 5 — dice feel — DONE (P821, 2026-08-20)
 
-- Busted dice must SETTLE ON A FACE - no edge-standing "no gravity"
-  poses. (Suspect: the bust kick rides on a phys pose frozen before
-  the settle finished.)
-- Scatter wider and FASTER; break the lane look at the bust moment if
-  cheap, ignore if risky (Denis's own risk call).
-- Rolled dice minimum spacing (some land nearly touching).
-- RECORDED, not acted (Denis: "don't act on it"): group the dice at
-  the throw's start so they read as coming from a hand or goblet.
+- Busted dice settle FLAT: the kick's yaw was composed in the die's
+  LOCAL frame (only faces 2/5 have their normal on mesh Y), so 1/3/4/6
+  rolled over — measured 8/10 cocked pre-patch, 18/18 flat after
+  (premultiply = world-up yaw). Probe: tools/apv_bust_dice_flat.js.
+- Scatter wider + faster: KICK ms 620→460, dist 0.85→1.15 (P743's 1.5
+  was too strong), stagger 70→55ms/die-width.
+- Spacing: sim collider proxy 1.06→1.22 die-widths (was narrower than
+  the painted die, allowing on-screen overlap; the old 'fights the
+  pen' warning is obsolete — the slot pen is dead code).
+- Hand/goblet gather at throw start: recorded, deliberately not acted.
 
 ## Step 6 — patron leveling (PATRON_LEVELING_BRIEF.md)
 
