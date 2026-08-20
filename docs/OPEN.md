@@ -554,22 +554,39 @@ disk/repo — say the word and I git-rm them.
 
 ---
 
-## 12. THE ENCHANT-PAGE CRASH — cannot reproduce, need one thing from you
+## 12. THE ENCHANT-PAGE CRASH — DIAGNOSED + FIX SHIPPED (P842, 2026-08-20)
 
-Five probes drove the full route (fresh run → shop → ENCHANTS tab → every
-plaque → every die, all 8 enchants, fully-branded rack into a boss match,
-12 tab flips, shop re-entries, quicksilver, the legacy sheet path) on BOTH
-the current build and the pre-session build, headless AND in a real Chrome
-tab, with error listeners armed. **Zero exceptions anywhere.**
+Your "more layers on screen" report cracked it. The five exception-hunting
+probes found nothing because there was nothing to find: **it was never a JS
+error — it's GPU pressure**, and your description named the exact state.
 
-The one input that couldn't be replayed is **your actual save** — a mid-run
-save with fields a fresh run never produces is the remaining suspect.
+**Measured (layer census on the enchant-focus state):** six visible
+1080×1920 art layers + one *ghost* (the faded-out tab character — opacity 0
+but still composited, the transition holds the layer alive) + the live
+full-viewport WebGL dice canvas (it IS running in the shop — 4 rack dice,
+rAF at full rate). On top of that, `st-focus`/`st-epick` applied an
+**animated `blur(5px) brightness(.62) saturate(.9)` filter to every art
+layer separately** — seven+ independent full-screen blur rasters, re-run
+through the .35s transition, plus a second blur on the enchant shelf. At
+phone dpr 3 that's the overload; desktop GPUs shrug it off, which is why I
+couldn't reproduce.
 
-**What I need, either one:**
-- the red error text from the browser console when it crashes (F12 → Console), or
-- your save: F12 → Console → `localStorage.getItem('fark_save')` → copy → paste to me.
+**The fix (P842), look-preserving:**
+- The per-layer filters are gone. Two `backdrop-filter` scrims blur the
+  *composed* region once: scrimA under the goods shelf (die focus — art
+  recedes, shelf sharp, as today), scrimB above it (enchant picker —
+  everything beneath recedes in one pass). Same blur/brightness values.
+- The faded-out tab character now gets `visibility:hidden` after its .34s
+  fade (instant on the way back in) — one character layer composited per
+  tab, not two.
+- One stated look delta: in the enchant picker the art behind the shelf
+  reads ~.42 brightness instead of .62 — slightly darker behind the modal.
 
-With either in hand the stack names the line in minutes.
+Probes green (`tools/apv_shop_scrims.js`): scrims carry the blur, zero
+per-layer filters remain, ghost layer count 0. **The one thing I can't
+verify from here is the kill itself — that needs your phone.** If the
+enchant screen still dies after this build, say so and the next suspect is
+the WebGL canvas running under the shop (it can be paused there).
 
 ## Bank-seam mirror rulings - RULED AND SHIPPED (P774, 2026-08-19)
 1. GAIN_WHEN_AHEAD: bank-inclusive both seats (Denis: evaluated on the
