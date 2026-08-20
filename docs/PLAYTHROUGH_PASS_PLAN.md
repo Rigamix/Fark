@@ -53,11 +53,13 @@ CARD_EFFECT_SPECS_FULL.md. Deliverable: a per-card verdict table;
 fixes for every break. (Denis: "You need to check card actions are
 actually connected to the game.")
 
-## Step 3 — boss dialogue silent (Grog)
+## Step 3 — boss dialogue silent (Grog) — DONE (P818, 2026-08-20)
 
-No dialogue during his match. Reachability first: do DLG triggers fire
-in boss matches at all (OPP_BIG_BANK etc. exist in code); find where
-the boss-match path fails to arm them.
+Root: bosses were bypassed into the emptied OPP_DIALOGUE store and had
+no seat identity. Fixed: bypass deleted, BOSS_TRAIT stamp (launch +
+resume), ledger greetings revived. Probes: tools/apv_boss_dialogue*.js.
+Content gaps (boss :open pools, triggerCard barks, trait remap) in
+OPEN.md.
 
 ## Step 4 — small UI correctness
 

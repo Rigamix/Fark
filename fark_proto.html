@@ -12057,7 +12057,7 @@ function resumeMatch(){
      snapshot's rung IS the deep-cloned patron, art and persona included.
      Boot, Settings, banner and both launch redirects all pass here. */
   try{
-    if(snap.isBoss)_stampSeatIdentity(null,null,null,null);
+    if(snap.isBoss)_stampSeatIdentity(null,null,null,null,snap.rung);/* P818 */
     else _stampSeatIdentity(snap.rung,(snap.seatIdx!=null)?snap.seatIdx:0,!!snap.sealRule,null);
   }catch(e){}
   SFX.nav();
@@ -19200,6 +19200,10 @@ var PT_CHAR_EXT='_opt.webp';
    had been written and unseatable since the lore system went in. */
 var PT_ART_POOL=['Corbin','Dunstan','Eira','Golgoth','Krox','Mudge','Nebb','Nell','Nix','Osgood','Pell','Poll','Rask','Regis','Remny','Rilla','Roan','Sil','Sparr','Squib','Thorne','Tuck','Twill','Vess','Odo','Ollis','Peck','Ferrand','Fenn','Tam'];
 var PT_TRAIT={ones:'steady',hoard:'greedy',aggro:'reckless',triples:'strong',straights:'orderly',combo:'cunning'};
+/* P818: the bosses' lore voice, keyed by rung archetype. Chosen from the
+   rung identities (drunkard/soldier/merchant...), flagged in OPEN.md for
+   remap if Denis reads any of them differently. */
+var BOSS_TRAIT={drunkard:'reckless',peasant:'steady',commoner:'cunning',merchant:'greedy',soldier:'strong',knight:'orderly',noble:'cunning',bishop:'orderly'};
 var PT_TRAITDIR=FK_ART.traits;
 var PT_COLORS=['green','purple','blue','red'];
 /* ══ PATRON LORE ═══════════════════════════════════════════════════════════
@@ -37622,7 +37626,10 @@ const LEDGER_LINES={
        spacing gate with OPP_BUST and OPP_BIG_BANK, which are the payoff
        beats. This is the dial - there is no other. */OPP_HESITATE_PUSH:.3,OPP_HESITATE_BANK:.3},
     init(rungName,rungKey){this.oppKey=rungName.toUpperCase();this.portraitKey=rungKey||rungName.toLowerCase();this.lastTime=0;this.active=false;this.usedLines={};this.cardFiredThisMatch={};if(this.hideTimer)clearTimeout(this.hideTimer);this.hide();},
-    getLine(cat){const data=OPP_DIALOGUE[this.oppKey];if(!data)return null;
+    getLine(cat){const data=OPP_DIALOGUE[this.oppKey]||{};/* P818: the
+      emptied bark store no longer kills the LEDGER_LINES and class-line
+      branches below - `if(!data[cat])return null` already covers every
+      missing category. */
       /* THE REGULARS REMEMBER: when a boss has real shared history with this
          player (S.npcLedger), ~65% of match opens quote the ACTUAL record —
          "{w} to {l}, your favor" — instead of a generic greeting. */
@@ -37748,7 +37755,12 @@ const LEDGER_LINES={
          written only by launchSeat and were never cleared - and the
          _DLG_PERSONAL branch even advanced that absent patron's story arc
          and saved it. Bosses go straight to their own bespoke barks. */
-      if(typeof G!=='undefined'&&G&&G._isBoss)return _orig(cat);
+      /* P818: the P682 boss bypass is DELETED. It routed bosses around
+         this resolver into original getLine, whose first guard nulls on
+         the emptied OPP_DIALOGUE - the comment below already named the
+         hazard ("excluding bosses would leave them mute"). The leak P682
+         fixed is closed at its source: bosses stamp art=null, so the
+         personal branch cannot advance an absent patron's arc. */
       try{
         /* BOSSES GO THROUGH THIS TOO. P392 sent them to their own hand-written
            pools instead, which was correct while those pools existed - they
@@ -43223,9 +43235,14 @@ function closePeek(){
    _lastSeatTrait, the disc reads _lastSeatColor. One stamper, three
    callers (launchSeat, launchBossMatch, resumeMatch) - a resumed match
    used to skip all three writes and dressed a faceless, silent patron. */
-function _stampSeatIdentity(patron,seatIdx,sealed,night){
+function _stampSeatIdentity(patron,seatIdx,sealed,night,bossRung){
   window._lastSeatArt=(patron&&patron._art)||null;
-  window._lastSeatTrait=patron?(((typeof PT_TRAIT!=='undefined'&&PT_TRAIT[patron.persona])||'steady')):null;
+  /* P818: a BOSS stamps its TRAIT (BOSS_TRAIT by rung key) while art and
+     colour stay null - the personal patron arcs stay closed to bosses
+     (the exact leak P682 fixed), but the trait moment pools and the
+     ambient line open up. */
+  window._lastSeatTrait=patron?(((typeof PT_TRAIT!=='undefined'&&PT_TRAIT[patron.persona])||'steady'))
+    :((bossRung&&typeof BOSS_TRAIT!=='undefined'&&BOSS_TRAIT[bossRung.key])||null);
   if(!patron){window._lastSeatColor=null;return;}
   /* the night offset is cosmetic seat-colour bookkeeping; a resume with
      the night gone falls back to the plain index and loses nothing */
@@ -43306,10 +43323,11 @@ function launchBossMatch(){
   _getS();
   if(S&&S.pendingMatch&&!window._fkDiscardOk){resumeMatch();return;}/* P693 */
   /* P682: the stale-seat hygiene half of the same fix (P700 folded it
-     into the one stamper, and the stale COLOUR now clears too) */
-  _stampSeatIdentity(null,null,null,null);
+     into the one stamper, and the stale COLOUR now clears too).
+     P818: the stamp moved below the boss lookup so the trait rides in. */
   var tier=TIERS[S.run.tier]||TIERS[0];
   var boss=tier.boss;
+  _stampSeatIdentity(null,null,null,null,boss);
   var pCards=(S.run.cards||[]).filter(function(c){return !!c;});
   var oCards=generateOppCards(boss,pCards.length);
   SFX.nav();

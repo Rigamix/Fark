@@ -758,3 +758,26 @@ TEXT changes instead. Shipped as P816: the +800 rides G._turnBonusPot
 bank collected 900, bust paid zero and zeroed the pot), and both
 cards' text + FAM_SHORT now say what actually happens. Delete this
 section on read.
+
+## Boss dialogue is BACK (P818, 2026-08-20) — three content gaps remain
+
+Your "no Grog dialogue" note traced to a two-patch contradiction: the
+per-boss bark pools were deliberately deleted (moved to the lore
+resolver), but P682's boss BYPASS still routed bosses around the
+resolver into the emptied store, and bosses had no seat identity.
+P818: bypass deleted, bosses stamp a lore TRAIT (art stays null so the
+patron personal arcs stay closed), and the getLine guard no longer
+kills LEDGER_LINES — driven: Grog greets with his real record ("2
+nights at me table an' we're dead even"), busts get "Ha! Greedy!",
+patron side regression-clean, resume restamps.
+Three things only you can fill:
+1. **BOSS_TRAIT map** — my defaults: grog reckless, mabel steady,
+   finnick cunning, corvus greedy, brutus strong, aldric orderly,
+   whisper cunning, ambrose orderly. Remap any of these with a word.
+2. **First-ever meeting** has no boss MATCH_START line (the ledger
+   greeting needs history; PATRON_LINES has only boss:win/loss pools).
+   A `boss:<key>:open` pool per boss would close it — needs your lines.
+3. **DLG.triggerCard is dead game-wide** (its card-bark pools were
+   deleted with OPP_DIALOGUE; ~24 call sites fire into nothing, patron
+   matches included). Revive wants content or a ruling to delete the
+   call sites.
