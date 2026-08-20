@@ -25,10 +25,23 @@ step-7 presentation pass).
 | fools_gold_f | player | PASS | keep 100 → dead roll → auto-reroll (all 5 reroll draws consumed) → dead again → bank burned exactly 100 (1000→900), charge spent |
 | bloom | player | PASS | jade triple paid 800 (500+300); CONTROL triple without the jade paid exactly 500 (not always-on, not dead) |
 | cultivate | player | PASS | jade triple grew lane 0 by 50 AND the grown die's next triple paid 850 (growth actually pays) |
+| preserve | player | PASS | full round trip: trapped kept 1 (100), trapping turn banked 100, return turn re-paid kept+turnPts, dealt LOADOUT−1 fresh (numDice write-trap: startPTurn 6 → _dropLanes 5), preserved die minted committed on the roll, immediate bank paid 200 (preserved+new). pPts write-trap: exactly two handleBank writes, same G |
+| honeytrap | player | PASS | pair [5,5] kept → armed 5 → next real roll pulled a queued 2 into a 5 (famApplyRollForces), force consumed, charge spent. NOTE: arming while dice are mid-flight is consumed by the settling roll (the roll path ends in _clearRollForces "spent by this roll either way") — the effect fires on the landing roll, not lost, but the timing reads oddly |
+| slow_cook | player | **FIXED (P813)** | measured: 3-roll turn banked 250 not 400 and acc 0 — the player roll seam fired pre-increment with dead field `rolls`; now carries rollNum (rival semantics). Re-measured 400/150, spill turn pays nothing |
+
+## Open question (parked, not verdict-blocking)
+
+Preserve probe flake: 3 of 11 headless runs ended the RETURN turn
+paying zero (two signatures: dead die-tap + intact pPts; banked pPts
+zeroed during the rival turn). Never reproduces under instrumentation
+— numDice trap, exit wraps, and a pPts write-trap all ran green 8/8
+(pPts written exactly twice, both handleBank, same G object). Suspect
+SwiftShader/rAF stalls in headless; if a phone player ever reports a
+vanished bank after a preserve turn, start here.
 
 ## Queue
 
-AMBER (preserve, honeytrap, slow_cook — tar_pit retired) → SILVER
+AMBER done. SILVER
 (steady_hand, retort, reprisal) → OBSIDIAN (powder_keg,
 double_or_nothing, sacrifice, short_fuse) → STARSTONE (encore,
 ill_omen, falling_star) → VAGABOND (pickpocket, tamper, vanguard_f,

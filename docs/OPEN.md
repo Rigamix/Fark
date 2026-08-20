@@ -723,3 +723,14 @@ backlog's 'implemented both seats' is stale - fully undealt AND gone);
 periodic_drain mirrors correctly (per-owner turn counters) - the tool's
 player-side scope just misses its site.
 
+
+## Preserve return-turn flake (card audit, 2026-08-20)
+
+3 of 11 headless probe runs ended the preserve RETURN turn paying zero
+(one run's banked 100 also vanished during the rival turn). Never
+reproduces under instrumentation: numDice trap, turn-exit wraps, and a
+pPts write-trap all ran green 8/8 — pPts written exactly twice, both
+by handleBank, same G object throughout. **My read: headless
+SwiftShader/rAF stall, not a game bug — preserve stays PASS.** Nothing
+to answer unless a phone playtest ever shows a vanished bank after a
+preserve turn; if it does, that's this.
