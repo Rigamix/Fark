@@ -705,14 +705,14 @@ read.
 ## Architecture audit delivered (2026-08-20) — one fold candidate, five rot items
 
 docs/ARCHITECTURE_AUDIT.md is the full table. Headlines needing you:
-1. **The one fold candidate**: the P839 greeting router — bespoke
-   state→pool if/else that three tiny _DLG_COND predicates would
-   express as conditioned rows in one pool. Small, low-risk; say the
-   word and it folds.
-2. **A live display bug found in passing**: the game-over FEATS stat
-   counts only 2 of 25 feats (_famFeats' side-channel grants are the
-   sole writer of the stat the screen reads; all 23 mainline feats
-   show 0 there). Fix is small and self-contained.
+1. FOLDED same night (P841, Denis's word): three _DLG_COND
+   predicates, one pool per boss, the router collapsed to a single
+   _dlgPick call - the P839 probe passed VERBATIM after the fold
+   (behavior-preserving, proven).
+2. FIXED same night (P840, Denis pulled it forward): the two
+   side-channel grants are roster rows, evaluateFeats writes the
+   stat - driven: 3 feats earned, stat 3, renown honest. (Also
+   caught: the _featView whitelist needed the keg flag.)
 3. Eight orphan _feat* flags, a feat-accumulator resume gap, one stale
    comment, one dead In-Arrears refund bypass — enumerated in the
    audit doc, normal fix flow when you want them.

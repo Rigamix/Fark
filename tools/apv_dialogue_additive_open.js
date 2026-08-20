@@ -27,7 +27,7 @@ let disc={};
 for(let i=0;i<40;i++){const r=_dlgPick('reaction:discrepancy',0,S.run._dlgHeard);
   if(r)disc[(r.c||[]).length]=1;}
 /* boss :open - seed a row, launch grog with no ledger */
-PATRON_LINES.push({p:'boss:grog:open',s:0,t:'TEST-OPEN-LINE'});
+PATRON_LINES.push({p:'boss:grog:greet',s:0,c:['boss_unmet'],t:'TEST-OPEN-LINE'});/* P841: one pool, the state is a condition */
 S.npcLedger={};try{save();}catch(e){}
 window._fkDiscardOk=true;
 setTier(0);

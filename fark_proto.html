@@ -11411,7 +11411,7 @@ const FEAT_ART={
 function _featView(G){
   if(!G)return G;
   var v={};
-  ['_isBoss','_famBankCount','_famMinBank','_featBloom','_featBusts',
+  ['_isBoss','_famBankCount','_famKegTriple','_famMinBank','_featBloom','_featBusts',/* P840: keg_triple's flag joins the view whitelist - its check read undefined without it */
    '_featJade','_featMaxBank','_featMaxDeficit','_featMaxRolls','_featOmenTrue',
    '_featShatterBanked','_featStarChain','_featSticky','_featWardSaves',
    '_forKeeps','_handicap','_sleeve','matchDice','rung'].forEach(function(k){
@@ -11433,6 +11433,16 @@ function _featView(G){
   });
 }
 const FEATS=[
+  /* ── P840: the two side-channel grants join the roster (they lived in
+     _famFeats as raw ifs - no per-run dedup, no tab, and their counter
+     was the ONLY thing the game-over FEATS stat read, so 23 mainline
+     feats displayed as zero). Same ids: lifetime records and wall
+     entries stay valid. Roster semantics now apply: per-run re-award,
+     like every other feat. */
+  {id:'own_reckoning',   label:'Own Reckoning',    desc:'Win a match under your own Reckoning sleeve', renown:30,
+    check:function(G){return G._sleeve==='reckoning';}},
+  {id:'keg_triple',      label:'Powder Trail',     desc:'A Powder Keg reroll lands a triple', renown:20,
+    check:function(G){return !!G._famKegTriple;}},
   /* ── JADE ── */
   {id:'green_thumb',     label:'Green Thumb',      desc:'Bank a straight completed by a jade wild', renown:10,
     check:function(G){return !!G._featJade;}},
@@ -11746,7 +11756,13 @@ function evaluateFeats(){
       }
     }catch(e){/* feat check threw — skip silently */}
   });
-  if(earned.length){_checkRenownPerks();save();}
+  if(earned.length){
+    /* P840: the ONE writer of the per-run count the game-over screen
+       reads - _famFeats' side-channel counter made the stat show 2 of
+       25 at best. */
+    try{if(S.run)S.run._featsThisRun=(S.run._featsThisRun||0)+earned.length;}catch(e){}
+    _checkRenownPerks();save();
+  }
   return earned;
 }
 function _getCurrentTier(renown){
@@ -16425,28 +16441,9 @@ function _famReplaceDo(i){
   _gbSheetClose();
   _famDraftDone(o);
 }
-function _famFeats(win){
-  _getS();S.featsDone=S.featsDone||{};
-  function grant(id,msg,amt){
-    if(S.featsDone[id])return;
-    S.featsDone[id]=1;S.renown=(S.renown||0)+amt;
-    /* and how many were earned THIS RUN. S.featsDone is lifetime and lives on S,
-       so the game-over screen was about to tell a player who died on night two
-       that they had earned every feat they had ever earned. */
-    try{if(S.run)S.run._featsThisRun=(S.run._featsThisRun||0)+1;}catch(e){}
-    famLog('FEAT — '+msg);try{save();}catch(e){}
-  }
-  if(!win||!G)return;
-  /* never_small RETIRED HERE: it is TEETOTALLER now, in FEATS, with the
-     brief's 500 and a painting. Keeping both paid renown twice for one act
-     and only one of them could ever be seen. */
-  /* P719: three_lucky retired with the lucky-die take - luckyNames has no
-     writer any more. */
-  if(G._sleeve==='reckoning')grant('own_reckoning','WON UNDER YOUR OWN RECKONING',30);
-  /* ember_night RETIRED HERE: it is THREE TORCHES now, in FEATS, with a
-     painting. Same condition, same act, one grant. */
-  if(G._famKegTriple)grant('keg_triple','POWDER KEG INTO A TRIPLE',20);
-}
+/* P840: _famFeats is DELETED - its two grants are FEATS rows now and
+   evaluateFeats writes the per-run stat. The side-channel was the whole
+   reason the game-over FEATS number ignored the real roster. */
 function famFkTake(i){
   var pool=window._fkPool;if(!pool)return;
   var m=pool[i];if(!m)return;
@@ -19450,6 +19447,13 @@ var _DLG_COND={
   night_gte:function(a){return ((S&&S.run&&S.run.tier)||0)+1>=+a;},
   night_lte:function(a){return ((S&&S.run&&S.run.tier)||0)+1<=+a;},
   boss_beaten:function(a){try{return (S.run.bossesBeaten||[]).indexOf(a)>=0;}catch(e){return false;}},
+  /* P841: the greeting router's states, as conditions. Each reads the
+     CURRENT boss's ledger (rung.key - npcLedger's own key) and is
+     false outside a boss match. boss_wins requires nights>0, so
+     wins:0 (undefeated) can never match a first-ever meeting. */
+  boss_unmet:function(){try{var k=(typeof G!=='undefined'&&G&&G._isBoss&&G.rung)?G.rung.key:null;if(!k)return false;var l=S.npcLedger&&S.npcLedger[k];return !(l&&l.nights>0);}catch(e){return false;}},
+  boss_wins:function(a){try{var k=(typeof G!=='undefined'&&G&&G._isBoss&&G.rung)?G.rung.key:null;if(!k)return false;var l=S.npcLedger&&S.npcLedger[k];return !!(l&&l.nights>0)&&((l.w||0)===+a);}catch(e){return false;}},
+  boss_wins_gte:function(a){try{var k=(typeof G!=='undefined'&&G&&G._isBoss&&G.rung)?G.rung.key:null;if(!k)return false;var l=S.npcLedger&&S.npcLedger[k];return !!(l&&l.nights>0)&&((l.w||0)>=+a);}catch(e){return false;}},
   enchant_owned:function(a){try{
     return (S.run.dieEnch||[]).concat(S.run.dieEnchInv||[])
       .some(function(e){return e&&e.t===a;});}catch(e){return false;}},
@@ -20697,89 +20701,90 @@ var PATRON_LINES=[
   {p:'patron:remny',s:0,g:'b7',add:1,c:['night_gte:7'],t:"People trust my memory now. Still wrong half the time, though."},
   {p:'patron:remny:recog',s:0,t:"Remember you well by now. Or someone just like you."},
   {p:'patron:golgoth:recog',s:0,t:"...Still here."},
-  /* P839: THE BOSS GREETINGS (docs/FARK_BOSS_GREETING_LINES.md,
-     Denis's content) - first meeting plus three history states per
-     boss, drawn by the state router in getLine. */
-  {p:'boss:grog:open',s:0,t:"Haven't seen you at my table before. Sit down, then. Let's see what you've got."},
-  {p:'boss:grog:undefeated',s:0,g:'v0',t:"Back again? Suit yourself. Table's always warm for you."},
-  {p:'boss:grog:undefeated',s:0,g:'v1',t:"Still trying, are you. Respect that, actually."},
-  {p:'boss:grog:undefeated',s:0,g:'v2',t:"Hah. Same face, same table. Sit."},
-  {p:'boss:grog:firstloss',s:0,g:'v0',t:"So. Beat me once. Don't let it go to your head."},
-  {p:'boss:grog:firstloss',s:0,g:'v1',t:"Huh. Wasn't expecting that. Sit, we'll see if it was luck."},
-  {p:'boss:grog:firstloss',s:0,g:'v2',t:"Well, well. Look who's got some nerve now."},
-  {p:'boss:grog:beaten',s:0,g:'v0',t:"You again. Starting to think I'm the easy night."},
-  {p:'boss:grog:beaten',s:0,g:'v1',t:"At this rate you'll own the place. Sit down."},
-  {p:'boss:grog:beaten',s:0,g:'v2',t:"Fine, fine. Let's see if tonight's different."},
-  {p:'boss:mabel:open',s:0,t:"New face. Don't get many of those. Sit, dear — I don't bite, the dice might."},
-  {p:'boss:mabel:undefeated',s:0,g:'v0',t:"Back again, dear? I do worry about you."},
-  {p:'boss:mabel:undefeated',s:0,g:'v1',t:"Oh, you're persistent. Sit, I'll get you something warm."},
-  {p:'boss:mabel:undefeated',s:0,g:'v2',t:"Still coming back for more. Bless you."},
-  {p:'boss:mabel:firstloss',s:0,g:'v0',t:"Well! Look who's feeling proud of themselves. Sit anyway."},
-  {p:'boss:mabel:firstloss',s:0,g:'v1',t:"So you've got some fight in you after all. Good. Sit."},
-  {p:'boss:mabel:firstloss',s:0,g:'v2',t:"My, my. Didn't see that coming from you."},
-  {p:'boss:mabel:beaten',s:0,g:'v0',t:"You again, and still winning. I'm almost proud."},
-  {p:'boss:mabel:beaten',s:0,g:'v1',t:"At this point I ought to start taking you seriously."},
-  {p:'boss:mabel:beaten',s:0,g:'v2',t:"Back to try your luck again? Sit, dear."},
-  {p:'boss:finnick:open',s:0,t:"Don't think we've played. Good. Means you don't know my tricks yet."},
-  {p:'boss:finnick:undefeated',s:0,g:'v0',t:"Back for more? Suit yourself."},
-  {p:'boss:finnick:undefeated',s:0,g:'v1',t:"Same trick, same table. Sit down."},
-  {p:'boss:finnick:undefeated',s:0,g:'v2',t:"Still trying. Respect the persistence, honestly."},
-  {p:'boss:finnick:firstloss',s:0,g:'v0',t:"Huh. Got the better of me once. Don't get used to it."},
-  {p:'boss:finnick:firstloss',s:0,g:'v1',t:"Well, that's new. Sit, let's see if it sticks."},
-  {p:'boss:finnick:firstloss',s:0,g:'v2',t:"So you've got some skill after all. Noted."},
-  {p:'boss:finnick:beaten',s:0,g:'v0',t:"You're becoming a genuine problem for my business. Sit."},
-  {p:'boss:finnick:beaten',s:0,g:'v1',t:"At this rate I'll need a new trick. Or a new table."},
-  {p:'boss:finnick:beaten',s:0,g:'v2',t:"Back again. Guess I'm paying you tonight too."},
-  {p:'boss:corvus:open',s:0,t:"No record of you here. Let's start one, then."},
-  {p:'boss:corvus:undefeated',s:0,g:'v0',t:"Another entry, same column. Sit."},
-  {p:'boss:corvus:undefeated',s:0,g:'v1',t:"The numbers haven't favored you yet. Sit anyway."},
-  {p:'boss:corvus:undefeated',s:0,g:'v2',t:"Predictable. Sit, let's continue the pattern."},
-  {p:'boss:corvus:firstloss',s:0,g:'v0',t:"An anomaly. I'll be recalculating. Sit."},
-  {p:'boss:corvus:firstloss',s:0,g:'v1',t:"Unexpected. Noted. Sit, we'll see if it repeats."},
-  {p:'boss:corvus:firstloss',s:0,g:'v2',t:"My figures needed adjusting after last time. Sit."},
-  {p:'boss:corvus:beaten',s:0,g:'v0',t:"You're becoming difficult to price. Sit anyway."},
-  {p:'boss:corvus:beaten',s:0,g:'v1',t:"I've revised my estimate of you twice now. Sit."},
-  {p:'boss:corvus:beaten',s:0,g:'v2',t:"An anomaly, still. A persistent one. Sit."},
-  {p:'boss:brutus:open',s:0,t:"New recruit. Sit. We'll see what you're made of."},
-  {p:'boss:brutus:undefeated',s:0,g:'v0',t:"Back for more drilling? Good. Sit."},
-  {p:'boss:brutus:undefeated',s:0,g:'v1',t:"Still haven't learned the count. Sit, we'll try again."},
-  {p:'boss:brutus:undefeated',s:0,g:'v2',t:"Soldier, you're persistent. Sit down."},
-  {p:'boss:brutus:firstloss',s:0,g:'v0',t:"Fair fight, soldier. Sit, let's see if it holds."},
-  {p:'boss:brutus:firstloss',s:0,g:'v1',t:"Earned that one. Don't let it go to your head. Sit."},
-  {p:'boss:brutus:firstloss',s:0,g:'v2',t:"Hm. Noted. Sit, soldier."},
-  {p:'boss:brutus:beaten',s:0,g:'v0',t:"You're drilling well. Sit, I'll allow this once more."},
-  {p:'boss:brutus:beaten',s:0,g:'v1',t:"Reassessing your training. Sit down."},
-  {p:'boss:brutus:beaten',s:0,g:'v2',t:"Still winning, are you. Sit. We'll fix that."},
-  {p:'boss:aldric:open',s:0,t:"Thou art unknown to me. Sit, and we shall remedy that."},
-  {p:'boss:aldric:undefeated',s:0,g:'v0',t:"Thou returnest, still unconfessed. Sit."},
-  {p:'boss:aldric:undefeated',s:0,g:'v1',t:"Persistence is its own small virtue. Sit."},
-  {p:'boss:aldric:undefeated',s:0,g:'v2',t:"The same lesson awaits thee. Sit."},
-  {p:'boss:aldric:firstloss',s:0,g:'v0',t:"Well struck. I confess it plainly. Sit."},
-  {p:'boss:aldric:firstloss',s:0,g:'v1',t:"A worthy match, that. Sit, let's see if it repeats."},
-  {p:'boss:aldric:firstloss',s:0,g:'v2',t:"Thy cleverness surprised me. Sit."},
-  {p:'boss:aldric:beaten',s:0,g:'v0',t:"Thy cleverness wants no further quieting from me. Sit."},
-  {p:'boss:aldric:beaten',s:0,g:'v1',t:"I begin to look forward to these. Sit."},
-  {p:'boss:aldric:beaten',s:0,g:'v2',t:"Twice bested. Sit, let's make it thrice."},
-  {p:'boss:whisper:open',s:0,t:"A new face. How rare. Let's see if you're worth remembering."},
-  {p:'boss:whisper:undefeated',s:0,g:'v0',t:"Back again. I do love a repeat performance. Sit."},
-  {p:'boss:whisper:undefeated',s:0,g:'v1',t:"Predictable. Sit, I usually am right."},
-  {p:'boss:whisper:undefeated',s:0,g:'v2',t:"Same result, different night. Sit."},
-  {p:'boss:whisper:firstloss',s:0,g:'v0',t:"Oh. Well played. I'll remember that. Sit."},
-  {p:'boss:whisper:firstloss',s:0,g:'v1',t:"Unexpected. I do enjoy being surprised. Sit."},
-  {p:'boss:whisper:firstloss',s:0,g:'v2',t:"Huh. You've got my attention now. Sit."},
-  {p:'boss:whisper:beaten',s:0,g:'v0',t:"You're becoming genuinely interesting to me. Sit."},
-  {p:'boss:whisper:beaten',s:0,g:'v1',t:"I'm starting to take you seriously. Dangerous, that. Sit."},
-  {p:'boss:whisper:beaten',s:0,g:'v2',t:"Careful. I'm watching you closer now. Sit."},
-  {p:'boss:ambrose:open',s:0,t:"The house doesn't know your name yet. Sit. We'll see if it should."},
-  {p:'boss:ambrose:undefeated',s:0,g:'v0',t:"The house remembers your name. Sit."},
-  {p:'boss:ambrose:undefeated',s:0,g:'v1',t:"Back to be reckoned with again. Sit."},
-  {p:'boss:ambrose:undefeated',s:0,g:'v2',t:"The house has seen your face enough times now. Sit."},
-  {p:'boss:ambrose:firstloss',s:0,g:'v0',t:"A fair reckoning. I'll not pretend otherwise. Sit."},
-  {p:'boss:ambrose:firstloss',s:0,g:'v1',t:"The table turned. Noted. Sit."},
-  {p:'boss:ambrose:firstloss',s:0,g:'v2',t:"Earned, that. Sit, we'll see if it holds."},
-  {p:'boss:ambrose:beaten',s:0,g:'v0',t:"The house is taking notice of you now. Sit."},
-  {p:'boss:ambrose:beaten',s:0,g:'v1',t:"You're no longer a name I'll forget by morning. Sit."},
-  {p:'boss:ambrose:beaten',s:0,g:'v2',t:"Twice bested my table. Sit. Let's make it thrice."},
+  /* P841: THE BOSS GREETINGS (docs/FARK_BOSS_GREETING_LINES.md,
+     Denis's content) - ONE pool per boss, the history state carried
+     as a condition per row (the audit's fold: the router dissolved
+     into the resolver's own vocabulary). */
+  {p:'boss:grog:greet',s:0,c:['boss_unmet'],t:"Haven't seen you at my table before. Sit down, then. Let's see what you've got."},
+  {p:'boss:grog:greet',s:0,g:'v0',c:['boss_wins:0'],t:"Back again? Suit yourself. Table's always warm for you."},
+  {p:'boss:grog:greet',s:0,g:'v1',c:['boss_wins:0'],t:"Still trying, are you. Respect that, actually."},
+  {p:'boss:grog:greet',s:0,g:'v2',c:['boss_wins:0'],t:"Hah. Same face, same table. Sit."},
+  {p:'boss:grog:greet',s:0,g:'v0',c:['boss_wins:1'],t:"So. Beat me once. Don't let it go to your head."},
+  {p:'boss:grog:greet',s:0,g:'v1',c:['boss_wins:1'],t:"Huh. Wasn't expecting that. Sit, we'll see if it was luck."},
+  {p:'boss:grog:greet',s:0,g:'v2',c:['boss_wins:1'],t:"Well, well. Look who's got some nerve now."},
+  {p:'boss:grog:greet',s:0,g:'v0',c:['boss_wins_gte:2'],t:"You again. Starting to think I'm the easy night."},
+  {p:'boss:grog:greet',s:0,g:'v1',c:['boss_wins_gte:2'],t:"At this rate you'll own the place. Sit down."},
+  {p:'boss:grog:greet',s:0,g:'v2',c:['boss_wins_gte:2'],t:"Fine, fine. Let's see if tonight's different."},
+  {p:'boss:mabel:greet',s:0,c:['boss_unmet'],t:"New face. Don't get many of those. Sit, dear — I don't bite, the dice might."},
+  {p:'boss:mabel:greet',s:0,g:'v0',c:['boss_wins:0'],t:"Back again, dear? I do worry about you."},
+  {p:'boss:mabel:greet',s:0,g:'v1',c:['boss_wins:0'],t:"Oh, you're persistent. Sit, I'll get you something warm."},
+  {p:'boss:mabel:greet',s:0,g:'v2',c:['boss_wins:0'],t:"Still coming back for more. Bless you."},
+  {p:'boss:mabel:greet',s:0,g:'v0',c:['boss_wins:1'],t:"Well! Look who's feeling proud of themselves. Sit anyway."},
+  {p:'boss:mabel:greet',s:0,g:'v1',c:['boss_wins:1'],t:"So you've got some fight in you after all. Good. Sit."},
+  {p:'boss:mabel:greet',s:0,g:'v2',c:['boss_wins:1'],t:"My, my. Didn't see that coming from you."},
+  {p:'boss:mabel:greet',s:0,g:'v0',c:['boss_wins_gte:2'],t:"You again, and still winning. I'm almost proud."},
+  {p:'boss:mabel:greet',s:0,g:'v1',c:['boss_wins_gte:2'],t:"At this point I ought to start taking you seriously."},
+  {p:'boss:mabel:greet',s:0,g:'v2',c:['boss_wins_gte:2'],t:"Back to try your luck again? Sit, dear."},
+  {p:'boss:finnick:greet',s:0,c:['boss_unmet'],t:"Don't think we've played. Good. Means you don't know my tricks yet."},
+  {p:'boss:finnick:greet',s:0,g:'v0',c:['boss_wins:0'],t:"Back for more? Suit yourself."},
+  {p:'boss:finnick:greet',s:0,g:'v1',c:['boss_wins:0'],t:"Same trick, same table. Sit down."},
+  {p:'boss:finnick:greet',s:0,g:'v2',c:['boss_wins:0'],t:"Still trying. Respect the persistence, honestly."},
+  {p:'boss:finnick:greet',s:0,g:'v0',c:['boss_wins:1'],t:"Huh. Got the better of me once. Don't get used to it."},
+  {p:'boss:finnick:greet',s:0,g:'v1',c:['boss_wins:1'],t:"Well, that's new. Sit, let's see if it sticks."},
+  {p:'boss:finnick:greet',s:0,g:'v2',c:['boss_wins:1'],t:"So you've got some skill after all. Noted."},
+  {p:'boss:finnick:greet',s:0,g:'v0',c:['boss_wins_gte:2'],t:"You're becoming a genuine problem for my business. Sit."},
+  {p:'boss:finnick:greet',s:0,g:'v1',c:['boss_wins_gte:2'],t:"At this rate I'll need a new trick. Or a new table."},
+  {p:'boss:finnick:greet',s:0,g:'v2',c:['boss_wins_gte:2'],t:"Back again. Guess I'm paying you tonight too."},
+  {p:'boss:corvus:greet',s:0,c:['boss_unmet'],t:"No record of you here. Let's start one, then."},
+  {p:'boss:corvus:greet',s:0,g:'v0',c:['boss_wins:0'],t:"Another entry, same column. Sit."},
+  {p:'boss:corvus:greet',s:0,g:'v1',c:['boss_wins:0'],t:"The numbers haven't favored you yet. Sit anyway."},
+  {p:'boss:corvus:greet',s:0,g:'v2',c:['boss_wins:0'],t:"Predictable. Sit, let's continue the pattern."},
+  {p:'boss:corvus:greet',s:0,g:'v0',c:['boss_wins:1'],t:"An anomaly. I'll be recalculating. Sit."},
+  {p:'boss:corvus:greet',s:0,g:'v1',c:['boss_wins:1'],t:"Unexpected. Noted. Sit, we'll see if it repeats."},
+  {p:'boss:corvus:greet',s:0,g:'v2',c:['boss_wins:1'],t:"My figures needed adjusting after last time. Sit."},
+  {p:'boss:corvus:greet',s:0,g:'v0',c:['boss_wins_gte:2'],t:"You're becoming difficult to price. Sit anyway."},
+  {p:'boss:corvus:greet',s:0,g:'v1',c:['boss_wins_gte:2'],t:"I've revised my estimate of you twice now. Sit."},
+  {p:'boss:corvus:greet',s:0,g:'v2',c:['boss_wins_gte:2'],t:"An anomaly, still. A persistent one. Sit."},
+  {p:'boss:brutus:greet',s:0,c:['boss_unmet'],t:"New recruit. Sit. We'll see what you're made of."},
+  {p:'boss:brutus:greet',s:0,g:'v0',c:['boss_wins:0'],t:"Back for more drilling? Good. Sit."},
+  {p:'boss:brutus:greet',s:0,g:'v1',c:['boss_wins:0'],t:"Still haven't learned the count. Sit, we'll try again."},
+  {p:'boss:brutus:greet',s:0,g:'v2',c:['boss_wins:0'],t:"Soldier, you're persistent. Sit down."},
+  {p:'boss:brutus:greet',s:0,g:'v0',c:['boss_wins:1'],t:"Fair fight, soldier. Sit, let's see if it holds."},
+  {p:'boss:brutus:greet',s:0,g:'v1',c:['boss_wins:1'],t:"Earned that one. Don't let it go to your head. Sit."},
+  {p:'boss:brutus:greet',s:0,g:'v2',c:['boss_wins:1'],t:"Hm. Noted. Sit, soldier."},
+  {p:'boss:brutus:greet',s:0,g:'v0',c:['boss_wins_gte:2'],t:"You're drilling well. Sit, I'll allow this once more."},
+  {p:'boss:brutus:greet',s:0,g:'v1',c:['boss_wins_gte:2'],t:"Reassessing your training. Sit down."},
+  {p:'boss:brutus:greet',s:0,g:'v2',c:['boss_wins_gte:2'],t:"Still winning, are you. Sit. We'll fix that."},
+  {p:'boss:aldric:greet',s:0,c:['boss_unmet'],t:"Thou art unknown to me. Sit, and we shall remedy that."},
+  {p:'boss:aldric:greet',s:0,g:'v0',c:['boss_wins:0'],t:"Thou returnest, still unconfessed. Sit."},
+  {p:'boss:aldric:greet',s:0,g:'v1',c:['boss_wins:0'],t:"Persistence is its own small virtue. Sit."},
+  {p:'boss:aldric:greet',s:0,g:'v2',c:['boss_wins:0'],t:"The same lesson awaits thee. Sit."},
+  {p:'boss:aldric:greet',s:0,g:'v0',c:['boss_wins:1'],t:"Well struck. I confess it plainly. Sit."},
+  {p:'boss:aldric:greet',s:0,g:'v1',c:['boss_wins:1'],t:"A worthy match, that. Sit, let's see if it repeats."},
+  {p:'boss:aldric:greet',s:0,g:'v2',c:['boss_wins:1'],t:"Thy cleverness surprised me. Sit."},
+  {p:'boss:aldric:greet',s:0,g:'v0',c:['boss_wins_gte:2'],t:"Thy cleverness wants no further quieting from me. Sit."},
+  {p:'boss:aldric:greet',s:0,g:'v1',c:['boss_wins_gte:2'],t:"I begin to look forward to these. Sit."},
+  {p:'boss:aldric:greet',s:0,g:'v2',c:['boss_wins_gte:2'],t:"Twice bested. Sit, let's make it thrice."},
+  {p:'boss:whisper:greet',s:0,c:['boss_unmet'],t:"A new face. How rare. Let's see if you're worth remembering."},
+  {p:'boss:whisper:greet',s:0,g:'v0',c:['boss_wins:0'],t:"Back again. I do love a repeat performance. Sit."},
+  {p:'boss:whisper:greet',s:0,g:'v1',c:['boss_wins:0'],t:"Predictable. Sit, I usually am right."},
+  {p:'boss:whisper:greet',s:0,g:'v2',c:['boss_wins:0'],t:"Same result, different night. Sit."},
+  {p:'boss:whisper:greet',s:0,g:'v0',c:['boss_wins:1'],t:"Oh. Well played. I'll remember that. Sit."},
+  {p:'boss:whisper:greet',s:0,g:'v1',c:['boss_wins:1'],t:"Unexpected. I do enjoy being surprised. Sit."},
+  {p:'boss:whisper:greet',s:0,g:'v2',c:['boss_wins:1'],t:"Huh. You've got my attention now. Sit."},
+  {p:'boss:whisper:greet',s:0,g:'v0',c:['boss_wins_gte:2'],t:"You're becoming genuinely interesting to me. Sit."},
+  {p:'boss:whisper:greet',s:0,g:'v1',c:['boss_wins_gte:2'],t:"I'm starting to take you seriously. Dangerous, that. Sit."},
+  {p:'boss:whisper:greet',s:0,g:'v2',c:['boss_wins_gte:2'],t:"Careful. I'm watching you closer now. Sit."},
+  {p:'boss:ambrose:greet',s:0,c:['boss_unmet'],t:"The house doesn't know your name yet. Sit. We'll see if it should."},
+  {p:'boss:ambrose:greet',s:0,g:'v0',c:['boss_wins:0'],t:"The house remembers your name. Sit."},
+  {p:'boss:ambrose:greet',s:0,g:'v1',c:['boss_wins:0'],t:"Back to be reckoned with again. Sit."},
+  {p:'boss:ambrose:greet',s:0,g:'v2',c:['boss_wins:0'],t:"The house has seen your face enough times now. Sit."},
+  {p:'boss:ambrose:greet',s:0,g:'v0',c:['boss_wins:1'],t:"A fair reckoning. I'll not pretend otherwise. Sit."},
+  {p:'boss:ambrose:greet',s:0,g:'v1',c:['boss_wins:1'],t:"The table turned. Noted. Sit."},
+  {p:'boss:ambrose:greet',s:0,g:'v2',c:['boss_wins:1'],t:"Earned, that. Sit, we'll see if it holds."},
+  {p:'boss:ambrose:greet',s:0,g:'v0',c:['boss_wins_gte:2'],t:"The house is taking notice of you now. Sit."},
+  {p:'boss:ambrose:greet',s:0,g:'v1',c:['boss_wins_gte:2'],t:"You're no longer a name I'll forget by morning. Sit."},
+  {p:'boss:ambrose:greet',s:0,g:'v2',c:['boss_wins_gte:2'],t:"Twice bested my table. Sit. Let's make it thrice."},
 ];
 var _ptOpen=false,_ptSeats=[];
 function _ptLayout(n){
@@ -37370,7 +37375,7 @@ var _DRAFT_DELAY={bossWin:500,patronWin:500,loss:900};
     S.run._hotdNext=true;save();
     famLog('HAIR OF THE DOG — YOUR FIRST BANK NEXT MATCH IS DOUBLED');
   }}catch(e){}
-  try{_famFeats(win);}catch(e){}
+  /* P840: _famFeats retired - its feats ride evaluateFeats below */
   G._endRoute={_forKeeps:!!G._forKeeps,win:win,isBoss:isBoss,seatIdx:((typeof LO!=='undefined'&&LO&&LO.seatIdx!=null)?LO.seatIdx:null),isGauntlet:isGauntlet,isHandicap:isHandicap,practice:!!G._practice,pointsEarned:pointsEarned,bossName:G.rung?G.rung.name:'',bossKey:G.rung?G.rung.key:'',_bossLossData:_bossLossData||null};
   /* Settle the outcome into S.run NOW (tier/hearts/points/death), not at the
      CONTINUE tap — closing the app on the end screen must not drop a boss
@@ -38252,23 +38257,16 @@ const LEDGER_LINES={
          wrapper always reaches this original (art is null, P818); for
          patrons the personal layer answers MATCH_START first. */
       if((cat==='MATCH_START'||cat==='REMATCH_START')&&typeof G!=='undefined'&&G&&G._isBoss){
-        /* P839: the STATE ROUTER (Denis's greeting set). No history ->
-           :open. With history - once the 65% ledger record-greeting
-           above has passed - the relationship picks the pool: the boss
-           undefeated (:undefeated), the first sit-down since the
-           player's first win (:firstloss), beaten more than once
-           (:beaten). w counts PLAYER wins, the ledger's own convention. */
+        /* P841 (the audit's fold, Denis's ruling): the history states
+           are CONDITIONS on rows in one pool, not a router. The
+           boss_unmet / boss_wins:N / boss_wins_gte:2 predicates are
+           mutually exclusive, so plain condition filtering does all
+           the selection - a fifth state someday is a predicate + rows,
+           not another branch. The 65% ledger record-greeting upstream
+           layers over this exactly as before. */
         try{
           if(typeof _dlgPick==='function'){
-            var _lg0=(typeof S!=='undefined')&&S&&S.npcLedger&&S.npcLedger[this.portraitKey];
-            var _bk0='boss:'+String(this.oppKey||'').toLowerCase();
-            var _bPool;
-            if(!(_lg0&&_lg0.nights>0))_bPool=_bk0+':open';
-            else{
-              var _bw=_lg0.w||0;
-              _bPool=_bk0+(_bw===0?':undefeated':(_bw===1?':firstloss':':beaten'));
-            }
-            var _bo=_dlgPick(_bPool,0,null);
+            var _bo=_dlgPick('boss:'+String(this.oppKey||'').toLowerCase()+':greet',0,null);
             if(_bo)return _bo.t;
           }
         }catch(e){}
