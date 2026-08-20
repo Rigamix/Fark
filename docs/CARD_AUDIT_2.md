@@ -38,6 +38,10 @@ step-7 presentation pass).
 | encore | player | PASS | kept 200 survived the encore, the four free dice rerolled from the stub, bank 800 exact; encore into a dead spread busts through its resolve window; both charges spent |
 | ill_omen | player | PASS | landed: +800/−800 exact (handler witness, rival pts 0); missed: rival +400 with their bank riding on top; declaration consumed both ways |
 | falling_star | player | PASS | tier-3 1000 bank → extra full turn with ZERO rival rolls (_oRollNum unchanged); flag consumed; control 100 bank → rival plays. NOTE: phase string briefly reads 'opp' during the skip — display-only |
+| pickpocket | player | PASS | bank 100 lifted exactly 100 from the rival (tier-1 P): +200/−100; control with empty rival purse paid plain, no lift |
+| tamper | player→rival | **FIXED (P815)** | broke the HIGHEST-tier rival card, lower card untouched, t3 stole 300, charge spent — but the broken retort's bust payment still took 700: famFire had no broken filter (every NPC lever does). Bus guard added; re-driven: 0 lost |
+| vanguard_f | player | PASS | scorer FIRST in the row banked 300 (t1 +200); same scorer second in the row banked plain 100 |
+| for_keeps | run | PASS | seat chip → G._forKeeps; WIN: picker offered the rival's non-lucky dice, famFkTake seated the prize + seat offer shown; LOSS: their pick took the seeded amber (route._fkLost='amber'), bone backfilled to six |
 
 ## Open question (parked, not verdict-blocking)
 
@@ -51,8 +55,7 @@ vanished bank after a preserve turn, start here.
 
 ## Queue
 
-AMBER, SILVER, OBSIDIAN, STARSTONE done. VAGABOND (pickpocket, tamper, vanguard_f,
-for_keeps) → TAVERN (the_tab, hair_of_the_dog, marked_table,
+AMBER, SILVER, OBSIDIAN, STARSTONE, VAGABOND done. TAVERN (the_tab, hair_of_the_dog, marked_table,
 high_table). Rival routes ride the parity-era probes
 (tools/_probe_actor_pipe.js and the P765 sweeps) — rerun, not retired.
 
