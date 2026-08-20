@@ -42,6 +42,10 @@ step-7 presentation pass).
 | tamper | player→rival | **FIXED (P815)** | broke the HIGHEST-tier rival card, lower card untouched, t3 stole 300, charge spent — but the broken retort's bust payment still took 700: famFire had no broken filter (every NPC lever does). Bus guard added; re-driven: 0 lost |
 | vanguard_f | player | PASS | scorer FIRST in the row banked 300 (t1 +200); same scorer second in the row banked plain 100 |
 | for_keeps | run | PASS | seat chip → G._forKeeps; WIN: picker offered the rival's non-lucky dice, famFkTake seated the prize + seat offer shown; LOSS: their pick took the seeded amber (route._fkLost='amber'), bone backfilled to six |
+| the_tab | run | PASS | room chip reachable when owned; take → +250g / owe 400; pay refused while short; pay clears at 500g; broke night-settle rubs a circle instead |
+| hair_of_the_dog | run | PASS | arms on a REAL loss (36765); bust before any bank → _hotdToll rubs a circle + clears; first bank after a loss paid 200 for 100; next bank plain |
+| marked_table (Cursed Table) | run | PASS | sealed-seat loss with the card rubbed TWO circles (5→3); rival win + isHandicap routing confirmed via the end route |
+| high_table | run | PASS | owned → seat target +500 (2800→3300) and G._highTable armed; win pot half-again on the seat baseline (handicap-aware: 70 sealed / 40 plain, both = floor(base×1.5)+buy-in) |
 
 ## Open question (parked, not verdict-blocking)
 
@@ -55,8 +59,9 @@ vanished bank after a preserve turn, start here.
 
 ## Queue
 
-AMBER, SILVER, OBSIDIAN, STARSTONE, VAGABOND done. TAVERN (the_tab, hair_of_the_dog, marked_table,
-high_table). Rival routes ride the parity-era probes
+AMBER, SILVER, OBSIDIAN, STARSTONE, VAGABOND, TAVERN done. ENCHANTS
+(tithe, ward, snare, break, trade, snuff, quicksilver — fog done) →
+rival-route regressions. Rival routes ride the parity-era probes
 (tools/_probe_actor_pipe.js and the P765 sweeps) — rerun, not retired.
 
 ## Notes for the presentation pass (step 7)
