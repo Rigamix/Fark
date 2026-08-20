@@ -85,16 +85,13 @@ OPEN.md.
   pen' warning is obsolete — the slot pen is dead code).
 - Hand/goblet gather at throw start: recorded, deliberately not acted.
 
-## Step 6 — patron leveling (PATRON_LEVELING_BRIEF.md)
+## Step 6 — patron leveling — CORE SHIPPED (P822), rulings in OPEN.md
 
-The spec exists in the master doc; verify before building:
-does loadout generation read the trait->family bias at all; does card
-count key off the actual night; do the three six-way taxonomies'
-literal keys line up (strong-vs-bullish class of bug). Then: cards 0-1
-early -> 3 late with the player's tier night-locks, die family bias by
-persona. Growth dialogue mechanism (band-4/band-7 pools + the rare
-recognition beat) after the mechanics; the LINES exist in
-PATRON_GROWTH_LINES.md.
+Recon: the brief's card ramp was already implemented and night-keyed;
+the die-family bias was dead (P822 wires it: bias lists + tier pools,
+probe-verified leans, nights 1-2 mundane). Parked for Denis: rival
+obsidian shatter, tier-III lock semantics, persona↔name binding, the
+band-lines resolver exclusivity — all in OPEN.md.
 
 ## Step 7 — presentation pass
 

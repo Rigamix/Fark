@@ -809,3 +809,31 @@ of the boss purse). Two choices you may want different:
    when the end screen builds) — a boss draft is one night "ahead" of
    a patron draft the same evening. Deliberate reading: the reward is
    for the night you just entered.
+
+## Patron leveling (P822 shipped; four rulings left) — 2026-08-20
+
+Recon verified your brief's three check-items: the card ramp already
+keys off the real night (your preferred reading, no build needed); the
+die-family bias was genuinely dead (two contradictory tables and no
+family material in any patron pool); named patrons have NO stable
+persona. P822 ships the die bias: aggro→obsidian, ones→silver,
+combo→vagabond/starstone head their bias lists and the tier pools
+admit family materials from night 4 (the tier-2 one-up splash gives
+night 3 its occasional curveball — measured 5%). Driven: nights 1-2
+mundane 0/80, aggro 93% obsidian vs 24% baseline, family dice deal and
+roll on a real rival seat.
+Needs your ruling:
+1. **Rival obsidian never shatters** (the 6% check lives in the player
+   roll path only). A rival stat-stick, or wire their shatter too?
+2. **Tier locks**: patrons roll raw tier-III from night 6 (20%); the
+   player's III is upgrade-only. Same-locks per the master brief, or
+   keep the patron shortcut?
+3. **Persona↔name binding**: 'Krox' can be STEADY tonight, RECKLESS
+   next night — mechanical identity isn't tied to the name. The
+   growth-dialogue pieces (band lines, recognition beat) need a stable
+   binding. Build a name→persona registry?
+4. **Band lines resolver gotcha**: the 'most conditions wins' rule
+   makes a night_gte:4 line EXCLUSIVE — from night 4 the patron would
+   ONLY say band lines, never the baseline pool (your brief wants
+   additive). Needs a resolver tweak or mirrored night_lte baselines
+   before PATRON_GROWTH_LINES.md gets wired.
