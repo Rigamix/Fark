@@ -93,7 +93,7 @@ probe-verified leans, nights 1-2 mundane). Parked for Denis: rival
 obsidian shatter, tier-III lock semantics, persona↔name binding, the
 band-lines resolver exclusivity — all in OPEN.md.
 
-## Step 7 — presentation — TOP OF THE LIST SHIPPED (P823-P824); ranked backlog in OPEN.md
+## Step 7 — presentation — ALL SHIPPED (P823-P830, 2026-08-20); details in OPEN.md
 
 - Enchant descriptions pass (Fog first).
 - Fog's lingering table visual until it fires.

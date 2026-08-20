@@ -15182,7 +15182,8 @@ function famRenderRow(){
        gate is open; ill_omen while the declaration is out (the rival's
        declaration already marks THEIR card - this closes the asymmetry). */
     var _live=(inst.id==='reprisal'&&G&&((G.oPts||0)-(G.pPts||0))>=1000)
-      ||(inst.id==='ill_omen'&&G&&!!G._famIllOmen);
+      ||(inst.id==='ill_omen'&&G&&!!G._famIllOmen)
+      ||(inst.id==='sleight'&&G&&!!G._famSleight);/* P830: the rival's armed sleight already shows - the player's now does too */
     var cls=(spent?' spent':'')+((inst.state.armed||_live)?' armed':'');
     hp+=famCardArt(inst.id,inst.tier,{cls:cls.trim(),onclick:'famCardTap('+i+')',
       uses:(d.kind==='active'&&inst.charges>0)?inst.charges:undefined});/* P727 */
@@ -31974,8 +31975,15 @@ function _afterRollImpl(){
   if(G&&G._oSleight&&G.phase!=='opp'&&(G.turnRollCount||0)===0){
     G._oSleight=false;
     var _slFree=G.pool.filter(function(d){return !d.committed&&!d._frozen;});
-    _slFree.forEach(function(d){d.val=_rollD(d);try{reDrawDieFace(d);}catch(e){}});
+    /* P830: the re-tumble already happens (adopted dice re-throw through
+       reDrawDieFace) - it now wears the reroll glow and the roll sound
+       so it reads as THEIR act, not a glitch. */
+    _slFree.forEach(function(d){d.val=_rollD(d);
+      if(d.el){d.el.classList.add('card-reroll');
+        setTimeout(function(){if(d.el)d.el.classList.remove('card-reroll');},700);}
+      try{reDrawDieFace(d);}catch(e){}});
     famLog('SLEIGHT — YOUR ROLL COMES BACK DIFFERENT');
+    try{SFX.roll&&SFX.roll();}catch(e){}
   }
   if(typeof famApplyRollForces==='function'&&G&&G.phase!=='opp')famApplyRollForces();
   /* P813: THIS roll's ordinal - the rival seam's semantics (it fires
@@ -35142,9 +35150,8 @@ function runOppTurn(){
        comes back different, the mirror of _afterRollImpl's rival side. */
     if(G._famSleight&&oppRollNum===1){
       G._famSleight=false;
-      G.oppDice.filter(function(d){return !d.kept;})
-        .forEach(function(d){d.val=rollFace(d.mat);try{reDrawDieFace(d);}catch(e){}});
-      setStatusMsg('SLEIGHT — THEIR ROLL COMES BACK DIFFERENT','gold');
+      G._famSleightGo=true;/* P830: consumed at the SETTLE - the original
+        roll must be seen to land before the hand switches it */
     }
     /* P766 (Q2): STARGAZER LANDS - the peeked roll IS the roll, spent
        whether or not it fit (the player's famApplyRollForces contract). */
@@ -35199,6 +35206,21 @@ function runOppTurn(){
        length that the physics tape routinely outlived, so the rival selected
        and scored over dice that were still tumbling. See _afterOppSettle. */
     _afterOppSettle(()=>{
+      /* P830: SLEIGHT'S BEAT. The roll landed and sat for the settle
+         beat; now the hand switches it - values rewritten SYNCHRONOUSLY
+         (everything below this line reads the final faces) while the
+         re-tumble plays on the physics tape: reDrawDieFace on an adopted
+         die is a real re-throw (the Gambler's Eye idiom). */
+      if(G._famSleightGo){
+        G._famSleightGo=false;
+        G.oppDice.filter(function(d){return !d.kept;})
+          .forEach(function(d){d.val=rollFace(d.mat);
+            if(d.el){d.el.classList.add('card-reroll');
+              setTimeout(function(){if(d.el)d.el.classList.remove('card-reroll');},700);}
+            try{reDrawDieFace(d);}catch(e){}});
+        setStatusMsg('SLEIGHT — THEIR ROLL COMES BACK DIFFERENT','gold');
+        try{SFX.roll&&SFX.roll();}catch(e){}
+      }
       G.oppDice.forEach(d=>{if(d.el){
         settleDie(d.el);
         if(G._lanternActive)d.el.classList.add('die-blind');
@@ -38454,8 +38476,14 @@ function refundActiveCardUse(cardId){
 /* Helper: redraw die face dots from d.val */
 function reDrawDieFace(d){
   if(!d.el)return;
+  /* P830: the true value is stamped FIRST, unconditionally. A rewrite in
+     the pre-adoption window (rival deal loop: sleight, their peek, their
+     honeytrap, NPC hot streak) used to fall into the dots branch, write
+     nothing, and the mesh was born 40ms later from mkDie's STALE stamp -
+     the face shown was not the value scored. _tradePaint's comment has
+     always documented the window. */
+  d.el._trueVal=d.val;
   if(d.el._d3){
-    d.el._trueVal=d.val;
     d.el.classList.toggle('die-wild',(/^jade\d?$/.test(d.mat||'')&&d.val===6));
     D3.roll(d.el._d3,d.val,{dur:420,homeX:0,homeY:0});
     return;

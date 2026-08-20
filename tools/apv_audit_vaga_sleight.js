@@ -41,7 +41,10 @@ window.rollFace=function(m){
 };
 tap(document.getElementById('btnBank'));
 if(!await until(()=>(G.oppDice||[]).length>=6,20000))return {err:'no opp deal',draws:draws.length};
-await sleep(700);/* the sleight reroll happens synchronously at deal; settle */
+/* P830: the reroll fires at the SETTLE beat, not at the deal - hold the
+   stub until the glow (the beat's own signal) or all 12 draws land */
+await until(()=>draws.length>=12||(G.oppDice||[]).some(d=>d.el&&d.el.classList.contains('card-reroll')),20000);
+await sleep(400);
 window.rollFace=realF;
 const vals=(G.oppDice||[]).slice(0,6).map(d=>({lane:d.lane,val:d.val}));
 const finalVals=vals.map(v=>v.val);

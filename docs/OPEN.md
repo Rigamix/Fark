@@ -838,35 +838,29 @@ Needs your ruling:
    additive). Needs a resolver tweak or mirrored night_lte baselines
    before PATRON_GROWTH_LINES.md gets wired.
 
-## The presentation backlog (step-7 census, ranked) — 2026-08-20
+## The presentation backlog — ALL SHIPPED (P823-P830, 2026-08-20)
 
-A six-agent census mapped all 24 spec'd cards + 8 enchants against
-their spec'd visuals, with exact seams. SHIPPED tonight: fog's dim +
-cloud (P823), the enchant desc pass (P823), short_fuse's tray smolder
-(P824), powder_keg's per-die detonation (P824). Already present and
-used as templates: sacrifice, preserve, pickpocket, tamper, trade,
-break-enchant, quicksilver, tithe.
+Denis ruled: do all of it now. Done, each item probe-driven:
+P825 reprisal/ill_omen/sleight live-states on the cards + slow_cook
+simmer and for_keeps stakes chips; P826 fool's-gold burn beat, retort
+hits both ways, the DoN flip beat, falling_star's starburst; P827
+stargazer GHOST DICE over each free die, honeytrap honey marks + the
+die-anchored pull, vanguard's primer revived (it tested the retired
+card list) + end-spot hints; P828 encore rerolls starstone-BLUE (the
+keg contrast) + cultivate growth floats off the die; P829 transmute's
+in-world face picker (window.prompt retired); P830 sleight's
+land-pause-reroll beat both directions.
 
-REMAINING, in census impact order (seams in tools/… the recon output):
-1. **sleight's land-pause-reroll beat** — both directions fire
-   instantly (rival: inside the deal loop pre-settle ~34874; player:
-   top of _afterRollImpl ~31717). CAUTION, why this needs its own
-   session: for 3D dice the FACE is mesh orientation — a delayed
-   visual flip needs the mesh re-landed (the _setF path), not just
-   reDrawDieFace, and the data-vs-face lie window needs a tap gate.
-2. fools_gold's double-fail bank burn is one log line — the game's
-   harshest punishment, invisible.
-3. stargazer ghost dice (the peek is a famLog text list; the
-   lane-keyed promises are exactly what a per-lane ghost overlay
-   needs).
-4. honeytrap pair marker + a visible pull beat.
-5. vanguard_f pre-roll spot glow — a primer EXISTS at ~30677 but
-   tests the dead legacy card list (effectiveCards() returns []);
-   one-line revive + a lane glow.
-6. reprisal live-state on the card (glow while trailing ≥1000).
-7. for_keeps / slow_cook standing chips in the aux row.
-8. ill_omen player-side declared marker (the rival side already has
-   one — asymmetric).
-9. double_or_nothing flip beat; retort steal-motes; falling_star
-   streak; encore blue-vs-gold tint; cultivate stack marker;
-   transmute's window.prompt picker (placeholder UI).
+P830 also fixed a real family bug the beat work uncovered: every
+rival DEAL-LOOP value rewrite (sleight, their stargazer, their
+honeytrap, NPC hot streak) ran in mkDie's 40ms pre-adoption window —
+the mesh was born from the stale stamp, so THE FACE SHOWN WAS NOT THE
+VALUE SCORED on the 3D path. reDrawDieFace now stamps the true value
+first, unconditionally; driven: six rival dice sampled live, every
+mesh stamp equals its scored value.
+
+One deliberate order change to know about: a rival's scripted roll
+(their peek/honeytrap) now lands at the deal and the player's sleight
+rerolls it away at the settle — the forced reroll beats their script,
+which is what a forced reroll means. Say the word if you want the old
+precedence back.
