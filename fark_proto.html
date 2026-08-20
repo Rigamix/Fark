@@ -31352,6 +31352,7 @@ function startPTurn(){
         triggerCard(cid,npc.name+': SWAPPED '+pOld.toUpperCase()+' ↔ '+oOld.toUpperCase(),false);
         setStatusMsg(G.rung.name+' SWAPPED YOUR '+pOld.toUpperCase()+'!','red');
         spawnPop('🔄 SWAPPED');
+        try{famFire('cardHit',{actor:'p',src:'swap_die'});}catch(e){}/* P836 */
         
       }else if(eff.mode==='downgrade_best'){
         /* Downgrade the TOP TWO premium dice to bone (was just one). The
@@ -31375,6 +31376,7 @@ function startPTurn(){
           triggerCard(cid,npc.name+': '+_dgLabel+' → BONE',false);
           setStatusMsg(G.rung.name+' DOWNGRADED '+_dgLabel+'!','red');
           spawnPop('📦 ×'+_dgnDowngraded.length+' DOWNGRADED');
+          try{famFire('cardHit',{actor:'p',src:'swap_die'});}catch(e){}/* P836 */
           
         }
       }
@@ -31413,6 +31415,7 @@ function startPTurn(){
         triggerCard(cid,npc.name+': TOOK YOUR '+stolen.toUpperCase()+'!',false);
         setStatusMsg(G.rung.name+' SEIZED YOUR '+stolen.toUpperCase()+'!','red');
         spawnPop('👑 SEIZED');
+        try{famFire('cardHit',{actor:'p',src:'steal_die'});}catch(e){}/* P836 */
         
       }else if(eff.mode==='take_and_use'){
         /* Remove from player, add to NPC */
@@ -31619,6 +31622,7 @@ function handleRoll(){
       if(Math.random()<_rfrChance&&G.numDice>5){
         if(!_consumeWard((_rfrCard?_rfrCard.name:'POCKET SAND'))){
           G.numDice=Math.min(G.numDice,5);
+          try{famFire('cardHit',{actor:'p',src:'reduce_first_roll'});}catch(e){}/* P836 */
           triggerCard(_rfrId,(_rfrCard?_rfrCard.name:'').toUpperCase()+' — 5 DICE!',false);
         }
       }
@@ -32416,6 +32420,7 @@ function _afterRollImpl(){
         G.npcCardState.usedOnce[cid]=(G.npcCardState.usedOnce[cid]||0)+1;
         var _sbN=eff.swapN||1;
         var _sbTo=eff.swapTo||3;
+        try{famFire('cardHit',{actor:'p',src:'swap_best_to_3'});}catch(e){}/* P836 */
         /* Sort highest-value first so we hit the best dice. */
         var _sbSorted=scoring.slice().sort(function(a,b){return(b.val===1?100:50)-(a.val===1?100:50);});
         var _sbVictims=_sbSorted.slice(0,_sbN);
@@ -33413,6 +33418,7 @@ function doBust(){
       if(!G.npcCardState.usedOnce)G.npcCardState.usedOnce={};
       G.npcCardState.usedOnce['iron_gate_npc']=(G.npcCardState.usedOnce['iron_gate_npc']||0)+1;
       G.oPts+=_igLost;updHUD();
+      try{famFire('cardHit',{actor:'p',src:'steal_on_bust'});}catch(e){}/* P836 */
       triggerCard('iron_gate_npc','IRON GATE +'+_igLost,false);
       setStatusMsg('IRON GATE — '+(G.rung?G.rung.name:'RIVAL')+' SEIZED '+_igLost+'!','red');
       
@@ -33439,6 +33445,7 @@ function doBust(){
   if(G.npcCardState.challengeActive){
     G.npcCardState.challengeActive=false;
     G.pPts=Math.max(0,G.pPts-G.npcCardState.challengePenalty);
+    try{famFire('cardHit',{actor:'p',src:'challenge'});}catch(e){}/* P836 */
   }
   /* NPC card bust effects — apply score changes now, queue trigger animations */
   G.npcCardState.playerBustCount++;
@@ -33454,6 +33461,7 @@ function doBust(){
     if(eff.type==='on_player_bust'&&eff.mechanic==='punish_busts'&&G.npcCardState.playerBustCount>=BUST_FX.punish_busts.threshold(eff)&&(G.npcCardState.usedOnce[cid]||0)<_useCap(cid)){
       G.npcCardState.usedOnce[cid]=(G.npcCardState.usedOnce[cid]||0)+1;
       G.pPts=Math.max(0,G.pPts-BUST_FX.punish_busts.penalty(eff));
+      try{famFire('cardHit',{actor:'p',src:'punish_busts'});}catch(e){}/* P836 */
       _pendingBustTriggers.push({cid:cid,msg:npc.name+' −'+BUST_FX.punish_busts.penalty(eff)+'!'});
     }
   });
@@ -33695,12 +33703,14 @@ function _oppFxPlayer(pts){
         /* Percentage steal from opp's bank */
         if(eff.type==='on_player_bank'&&eff.mechanic==='steal_pct'&&pts>0){
           var steal=BANK_TAKE.steal_pct(pts,eff);pts-=steal;G.pPts+=steal;
+          try{famFire('cardHit',{actor:'o',src:'steal_pct'});}catch(e){}/* P836 */
           triggerCard(cid,npc.name+' +'+steal,true);
         }
         /* Steal opp's low bank entirely (the_lords_seal) */
         if(eff.type==='once'&&eff.mechanic==='steal_low_bank'&&(G.npcCardState.playerOnce[cid]||0)<_useCap(cid)&&pts>0&&pts<eff.threshold){
           G.npcCardState.playerOnce[cid]=(G.npcCardState.playerOnce[cid]||0)+1;
           G.pPts+=pts;pts=0;
+          try{famFire('cardHit',{actor:'o',src:'steal_low_bank'});}catch(e){}/* P836 */
           triggerCard(cid,npc.name+' STOLE!',true);spawnPop('STOLEN!');
         }
                 /* Challenge opp: if their bank is below threshold, they lose penalty (steady_hands / the_verdict_npc) */
@@ -33722,6 +33732,7 @@ function _oppFxPlayer(pts){
             var _chFromBank=Math.min(pts,penalty);
             pts=Math.max(0,pts-_chFromBank);
             G.oPts=Math.max(0,G.oPts-(penalty-_chFromBank));
+            try{famFire('cardHit',{actor:'o',src:'challenge'});}catch(e){}/* P836 */
             triggerCard(cid,npc.name+' −'+penalty,true);
             setStatusMsg(npc.name+' — '+G.rung.name+' LOST '+penalty+'!','gold');
           }else{triggerCard(cid,npc.name+' MET',true);}
@@ -33734,6 +33745,7 @@ function _oppFxPlayer(pts){
         if(eff.type==='on_player_bank'&&eff.mechanic==='halve_first_bank'&&!G.npcCardState.oppFirstBankDone&&pts>0){
           G.npcCardState.playerOnce[cid]=(G.npcCardState.playerOnce[cid]||0)+1;
           var half=pts-BANK_FX.halve_first_bank(pts,eff);pts-=half;
+          try{famFire('cardHit',{actor:'o',src:'halve_first_bank'});}catch(e){}/* P836 */
           triggerCard(cid,npc.name+' −'+half,true);
         }
       });
@@ -34208,6 +34220,7 @@ function handleBank(){
       var steal=BANK_TAKE.steal_pct(total,eff);total-=steal;G.oPts+=steal;
       bonusMsg+=' -'+steal+' '+npc.name;
       triggerCard(cid,npc.name+' −'+steal,false);
+      try{famFire('cardHit',{actor:'p',src:'steal_pct'});}catch(e){}/* P836 */
       
     }
     /* Halve first bank (fine_print) */
@@ -34215,6 +34228,7 @@ function handleBank(){
       var half=total-BANK_FX.halve_first_bank(total,eff);total-=half;
       bonusMsg+=' -'+half+' '+npc.name;
       triggerCard(cid,npc.name+' −'+half+'!',false);
+      try{famFire('cardHit',{actor:'p',src:'halve_first_bank'});}catch(e){}/* P836 */
       
     }
     /* Halve next big bank (corvus_writ): once per match, fires on the
@@ -34228,11 +34242,13 @@ function handleBank(){
       var _cwHalf=Math.floor(total/2);total-=_cwHalf;
       bonusMsg+=' -'+_cwHalf+' '+npc.name;
       triggerCard(cid,npc.name+' −'+_cwHalf+'!',false);
+      try{famFire('cardHit',{actor:'p',src:'halve_big_bank'});}catch(e){}/* P836 */
       
     }
     /* Steal low bank (the_lords_seal) */
     if(eff.type==='once'&&eff.mechanic==='steal_low_bank'&&(G.npcCardState.usedOnce[cid]||0)<_useCap(cid)&&total<eff.threshold){
       G.npcCardState.usedOnce[cid]=(G.npcCardState.usedOnce[cid]||0)+1;G.oPts+=total;
+      try{famFire('cardHit',{actor:'p',src:'steal_low_bank'});}catch(e){}/* P836 */
       bonusMsg+=' STOLEN! '+npc.name;setStatusMsg(npc.name+' — '+G.rung.name+' STOLE '+total+'!','red');
       triggerCard(cid,npc.name+' STOLE '+total+'!',false);
       spawnPop('STOLEN!');
@@ -34256,6 +34272,7 @@ function handleBank(){
         var _chFromBankP=Math.min(total,_chPenP);
         total-=_chFromBankP;
         G.pPts=Math.max(0,(G.pPts||0)-(_chPenP-_chFromBankP));
+        try{famFire('cardHit',{actor:'p',src:'challenge'});}catch(e){}/* P836 */
         bonusMsg+=' -'+_chPenP+' '+npc.name;
         setStatusMsg(npc.name+' — LOST '+_chPenP+'!','red');
       }else{bonusMsg+=' CHALLENGE MET!';}
@@ -34270,6 +34287,7 @@ function handleBank(){
     var npc=getNpcCard(cid);if(!npc)return;
     if(npc.effect.mechanic==='periodic_drain'&&G.npcCardState.playerTurnCount>0&&G.npcCardState.playerTurnCount%npc.effect.interval===0){
       G.pPts=SCORE_DRAIN.periodic_drain(G.pPts,npc.effect);
+      try{famFire('cardHit',{actor:'p',src:'periodic_drain'});}catch(e){}/* P836 */
       bonusMsg+=' -'+npc.effect.amount+' '+npc.name;
       triggerCard(cid,npc.name+' −'+npc.effect.amount,false);
       
@@ -34316,7 +34334,7 @@ function handleBank(){
      this to make the effect bidirectional. */
   if(G.oCards.includes('cowards_bell')){
     var _cbCut=Math.ceil(total*0.10);
-    if(_cbCut>0){total-=_cbCut;bonusMsg+=' -'+_cbCut+" COWARD'S BELL";triggerCard('cowards_bell','-'+_cbCut,false);}
+    if(_cbCut>0){total-=_cbCut;bonusMsg+=' -'+_cbCut+" COWARD'S BELL";triggerCard('cowards_bell','-'+_cbCut,false);try{famFire('cardHit',{actor:'p',src:'cowards_bell'});}catch(e){}/* P836 */}
   }
   /* THE UNDERDOG (tin): catch-up bonus when behind by 1000+. Encourages
      not surrendering when the opponent pulls ahead. */
@@ -36442,6 +36460,7 @@ function _npcEndOfTurnActives(){
       var pOld=G.matchDice[pBestIdx],oOld=G.matchOppDice[oWorstIdx];
       G.matchDice[pBestIdx]=oOld;G.matchOppDice[oWorstIdx]=pOld;
       _dieLeftSeat(pBestIdx);/* P564 */
+      try{famFire('cardHit',{actor:'p',src:'sleight_of_hand'});}catch(e){}/* P836 */
       triggerCard('sleight_of_hand',G.rung.name+' SLEIGHT',false);
       setStatusMsg(G.rung.name+' STOLE YOUR '+pOld.toUpperCase()+' FOR '+oOld.toUpperCase(),'red');
       return;

@@ -666,3 +666,15 @@ stays as shipped — "if Sleight fires, the original roll is gone, full
 stop, not gone except for whatever the rival had scripted on top of
 it." The old precedence would have weakened the card exactly when
 aimed at a rival about to do something clever.
+
+## Found while completing cardHit (P836): the skim can VOID a bank on a threshold seat
+
+Driven live: on Grog's boss table (LAST CALL, nothing under 800), the
+rival's the_skim cut a 1,000 bank to 700 — and the house then refused
+the whole bank. The take happens before the threshold check, so a
+percentage-steal card can push an otherwise-legal bank under the
+floor and cost the player EVERYTHING (the rival still keeps its cut).
+Rule-stack reading: arguably correct (the house judges what reaches
+the till), arguably brutal. Flagging it because a player will
+eventually hit it and call it a bug; your call whether the threshold
+should judge the PRE-take amount.
