@@ -2239,6 +2239,14 @@ body.dlg-speaking #screen-match #tellBadge{opacity:0;pointer-events:none}
   rgba(192,50,22,.42) 0%, rgba(120,24,10,.68) 100%);/* P801: eased back per Denis */
   transition:opacity .16s ease-out}
 #matchBustRed.on{opacity:1}
+/* P824: SHORT FUSE - the tray smolders while lit (the card's own text
+   mandates the warning state). Same band as the bust flinch, which
+   proved this layer paints under the dice and over the table. */
+#fuseSmolder{position:absolute;inset:0;z-index:0;pointer-events:none;opacity:0;transition:opacity .8s ease;
+  background:radial-gradient(ellipse 75% 45% at 50% 58%,rgba(214,92,34,.22),rgba(150,50,18,.11) 55%,transparent 75%);
+  mix-blend-mode:screen}
+#fuseSmolder.on{opacity:1;animation:fuseSmolderPulse 1.6s ease-in-out infinite}
+@keyframes fuseSmolderPulse{0%,100%{filter:brightness(.85)}50%{filter:brightness(1.3)}}
 #matchLookVig{position:absolute;inset:0;z-index:0;pointer-events:none;
   mix-blend-mode:multiply;
   background:radial-gradient(ellipse at 50% 46%, rgba(16,10,4,0) 48%, rgba(16,10,4,.61) 100%)}
@@ -10375,6 +10383,7 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
 <div id="matchProps"></div>
 <div id="matchLookVig"></div><!-- P732: the approved look's vignette - art band, under everything interactive -->
 <div id="matchBustRed"></div><!-- P733: the bust flinch, same band -->
+<div id="fuseSmolder"></div><!-- P824: short_fuse's lit-tray warning, same band -->
 <div id="matchPause" onclick="SFX.nav();showQuitConfirm()"><img src="Art/Assets/Match/optimized/pause_new_opt.webp" alt="pause"></div>
 <div id="matchVignette"></div>
 <!-- SVG filter -->
@@ -17140,9 +17149,13 @@ CFX.short_fuse={
     var rc=(ev.owner==='p')?(G.turnRollCount||0):(G._oRollNum||0);
     if(rc<3)return;
     ev.mul(2);ev.me.state.lit=true;
-    if(ev.owner==='p')_famPop('x2 SHORT FUSE');
+    if(ev.owner==='p'){_famPop('x2 SHORT FUSE');
+      try{document.getElementById('fuseSmolder').classList.add('on');}catch(e){}/* P824 */}
     else setStatusMsg('THEIR FUSE BURNS — x2','red');},
-  turnStart:function(ev){if(ev.mine)ev.me.state.lit=false;},
+  turnStart:function(ev){if(ev.mine){ev.me.state.lit=false;
+    if(ev.owner==='p')try{document.getElementById('fuseSmolder').classList.remove('on');}catch(e){}}},
+  bank:function(ev){if(ev.mine&&ev.owner==='p'){
+    try{document.getElementById('fuseSmolder').classList.remove('on');}catch(e){}}},
   /* the three jade/positional adders that used to sit in famCommitBonus.
      Each keeps its own gate verbatim - they are NOT one condition. */
   bust:function(ev){if(!ev.mine||!ev.me.state.lit)return;
@@ -17151,7 +17164,8 @@ CFX.short_fuse={
       if(ev.owner==='p'){G.pPts=Math.max(0,G.pPts-burn);famLog('THE FIRE SPREADS — '+burn+' BURNS OFF YOUR BANK');}
       else{G.oPts=Math.max(0,G.oPts-burn);setStatusMsg('THE FIRE SPREADS — '+burn+' BURNS OFF THEIR BANK','gold');}
       try{updHUD();}catch(e){}}
-    ev.me.state.lit=false;}
+    ev.me.state.lit=false;
+    if(ev.owner==='p')try{document.getElementById('fuseSmolder').classList.remove('on');}catch(e){}}
 };
 /* forces applied to a fresh roll (stargazer peek, honeytrap pull) */
 /* P556 (D7): THE ROLL-FORCES BUFFER IS SPENT, WHETHER OR NOT IT LANDED.
@@ -17316,6 +17330,10 @@ CFX.powder_keg={
     G.pool.forEach(function(d){
       d.committed=false;d._frozen=false;d.sel=false;
       d.val=_rollD(d);
+      /* P824: the spec's one demand - every die VISIBLY detonates, the
+         signal that kept dice are back in play. Same shards sacrifice's
+         shatter proved visible over the 3D dice. */
+      if(d.el)try{spawnShards(d.el,'#7a2f1a');}catch(e){}
       if(d.el){d.el.classList.remove('committed','selected','die-frozen');try{reDrawDieFace(d);}catch(e){}}
     });
     /* P518: a MAX, not an assignment. This was G.numDice=G.pool.length, and

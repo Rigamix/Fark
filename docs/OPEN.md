@@ -837,3 +837,36 @@ Needs your ruling:
    ONLY say band lines, never the baseline pool (your brief wants
    additive). Needs a resolver tweak or mirrored night_lte baselines
    before PATRON_GROWTH_LINES.md gets wired.
+
+## The presentation backlog (step-7 census, ranked) — 2026-08-20
+
+A six-agent census mapped all 24 spec'd cards + 8 enchants against
+their spec'd visuals, with exact seams. SHIPPED tonight: fog's dim +
+cloud (P823), the enchant desc pass (P823), short_fuse's tray smolder
+(P824), powder_keg's per-die detonation (P824). Already present and
+used as templates: sacrifice, preserve, pickpocket, tamper, trade,
+break-enchant, quicksilver, tithe.
+
+REMAINING, in census impact order (seams in tools/… the recon output):
+1. **sleight's land-pause-reroll beat** — both directions fire
+   instantly (rival: inside the deal loop pre-settle ~34874; player:
+   top of _afterRollImpl ~31717). CAUTION, why this needs its own
+   session: for 3D dice the FACE is mesh orientation — a delayed
+   visual flip needs the mesh re-landed (the _setF path), not just
+   reDrawDieFace, and the data-vs-face lie window needs a tap gate.
+2. fools_gold's double-fail bank burn is one log line — the game's
+   harshest punishment, invisible.
+3. stargazer ghost dice (the peek is a famLog text list; the
+   lane-keyed promises are exactly what a per-lane ghost overlay
+   needs).
+4. honeytrap pair marker + a visible pull beat.
+5. vanguard_f pre-roll spot glow — a primer EXISTS at ~30677 but
+   tests the dead legacy card list (effectiveCards() returns []);
+   one-line revive + a lane glow.
+6. reprisal live-state on the card (glow while trailing ≥1000).
+7. for_keeps / slow_cook standing chips in the aux row.
+8. ill_omen player-side declared marker (the rival side already has
+   one — asymmetric).
+9. double_or_nothing flip beat; retort steal-motes; falling_star
+   streak; encore blue-vs-gold tint; cultivate stack marker;
+   transmute's window.prompt picker (placeholder UI).
