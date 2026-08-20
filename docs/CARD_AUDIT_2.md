@@ -31,6 +31,10 @@ step-7 presentation pass).
 | steady_hand | player | PASS | arm→tap rerolled the 6 into the queued 5, charge billed AT THE TAP (arm is free), bank 150; leg B rerolled the only scorer into a dead table and the P535 re-derive BUSTED the turn paying nothing |
 | retort | both | **FIXED (P814)** | bust half paid 400 on the nose both owners (boss bust cost the player exactly 400, once — no double-pay); the "hit by an opponent card" half was FULLY DEAD (driven hex hit paid 0, no seam existed). P814 wires famFire('cardHit') at the taking sites; hex hit now pays 400 (witnessed 900→500). Taxonomy note in OPEN.md |
 | reprisal | player | PASS | trailing by 2000, a 100 bank stole exactly 25 (tier-1 quarter): pPts +125 / oPts −25; control with empty rival purse paid plain 100, rival untouched |
+| powder_keg | player | PASS | committed 200 then detonated: kept emptied, all six rerolled from the stub, fresh triple banked EXACTLY 500 (no double-count); keg into a dead table busts (P535 re-derive); both charges spent |
+| double_or_nothing | player | PASS | forced flips: lost nets +50 (half of a 100 bank), won nets +200; arm consumed. Spec-letter note: arms BEFORE the bank, spec describes a post-bank window (same information, see OPEN.md) |
+| sacrifice | player | PASS | +800 landed the instant the die shattered, matchDice 6→5, next deal five, bank still clean, charge spent. DIVERGENCE: pays G.pPts (bust-proof); spec says current TURN total (at risk) — question in OPEN.md |
+| short_fuse | player | PASS | keeps on rolls 1-2 plain, roll-3 keep doubled AND the bank-committed roll-4 keep doubled (bank total 400 exactly); lit bust burned exactly the lost turn (300) off the banked points |
 
 ## Open question (parked, not verdict-blocking)
 
@@ -44,9 +48,7 @@ vanished bank after a preserve turn, start here.
 
 ## Queue
 
-AMBER, SILVER done. OBSIDIAN
-(powder_keg,
-double_or_nothing, sacrifice, short_fuse) → STARSTONE (encore,
+AMBER, SILVER, OBSIDIAN done. STARSTONE (encore,
 ill_omen, falling_star) → VAGABOND (pickpocket, tamper, vanguard_f,
 for_keeps) → TAVERN (the_tab, hair_of_the_dog, marked_table,
 high_table). Rival routes ride the parity-era probes
