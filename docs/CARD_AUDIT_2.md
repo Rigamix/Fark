@@ -35,10 +35,13 @@ step-7 presentation pass).
 | double_or_nothing | player | PASS | forced flips: lost nets +50 (half of a 100 bank), won nets +200; arm consumed. Spec-letter note: arms BEFORE the bank, spec describes a post-bank window (same information, see OPEN.md) |
 | sacrifice | player | PASS | +800 landed the instant the die shattered, matchDice 6→5, next deal five, bank still clean, charge spent. DIVERGENCE: pays G.pPts (bust-proof); spec says current TURN total (at risk) — question in OPEN.md |
 | short_fuse | player | PASS | keeps on rolls 1-2 plain, roll-3 keep doubled AND the bank-committed roll-4 keep doubled (bank total 400 exactly); lit bust burned exactly the lost turn (300) off the banked points |
+| encore | player | PASS | kept 200 survived the encore, the four free dice rerolled from the stub, bank 800 exact; encore into a dead spread busts through its resolve window; both charges spent |
+| ill_omen | player | PASS | landed: +800/−800 exact (handler witness, rival pts 0); missed: rival +400 with their bank riding on top; declaration consumed both ways |
+| falling_star | player | PASS | tier-3 1000 bank → extra full turn with ZERO rival rolls (_oRollNum unchanged); flag consumed; control 100 bank → rival plays. NOTE: phase string briefly reads 'opp' during the skip — display-only |
 
 ## Open question (parked, not verdict-blocking)
 
-Preserve probe flake: 3 of 11 headless runs ended the RETURN turn
+Flake ledger: an ill_omen witness run once measured +400/−800 (irreproducible; the pPts write-trap run showed one write, +800 exact). Preserve: 3 of 11 headless runs ended the RETURN turn
 paying zero (two signatures: dead die-tap + intact pPts; banked pPts
 zeroed during the rival turn). Never reproduces under instrumentation
 — numDice trap, exit wraps, and a pPts write-trap all ran green 8/8
@@ -48,8 +51,7 @@ vanished bank after a preserve turn, start here.
 
 ## Queue
 
-AMBER, SILVER, OBSIDIAN done. STARSTONE (encore,
-ill_omen, falling_star) → VAGABOND (pickpocket, tamper, vanguard_f,
+AMBER, SILVER, OBSIDIAN, STARSTONE done. VAGABOND (pickpocket, tamper, vanguard_f,
 for_keeps) → TAVERN (the_tab, hair_of_the_dog, marked_table,
 high_table). Rival routes ride the parity-era probes
 (tools/_probe_actor_pipe.js and the P765 sweeps) — rerun, not retired.
