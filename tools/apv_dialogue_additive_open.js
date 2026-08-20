@@ -46,7 +46,7 @@ return {n2,n5,n8,discCondCounts:Object.keys(disc),
     night5B4Joins:n5.indexOf('b4')>=0&&n5.indexOf('b0')>=0&&n5.indexOf('b7')<0,
     night8B7Joins:n8.indexOf('b7')>=0&&n8.indexOf('b4')>=0&&n8.indexOf('b0')>=0,
     discrepancyStillOverrides:Object.keys(disc).join(',')==='2',
-    bossOpenAnswersNoHistory:openNoHist==='TEST-OPEN-LINE',
+    bossOpenAnswersNoHistory:/TEST-OPEN-LINE|Haven't seen you at my table/.test(openNoHist||''),/* P839: Denis's real :open line shares the pool with the seeded row */
     historySuppressesOpen:openWithHist!=='TEST-OPEN-LINE'},
   verdict:n2.length===3&&n5.indexOf('b4')>=0&&n5.indexOf('b7')<0&&n8.indexOf('b7')>=0
-    &&Object.keys(disc).join(',')==='2'&&openNoHist==='TEST-OPEN-LINE'&&openWithHist!=='TEST-OPEN-LINE'};
+    &&Object.keys(disc).join(',')==='2'&&/TEST-OPEN-LINE|Haven't seen you at my table/.test(openNoHist||'')&&openWithHist!=='TEST-OPEN-LINE'};
