@@ -29367,19 +29367,42 @@ function _projectedBank(){
       if(typeof _ruleActive==='function'&&_ruleActive('reckoning','p')
          &&G._tellState&&G._tellState.lastNpcBank>0&&t<G._tellState.lastNpcBank)return 0;
     }
+    /* P819: LAST CALL refuses sub-threshold banks outright (handleBank
+       zeroes them) - projecting them as bankable was the button lying
+       on the exact seat Denis reported. Same rule source, same gate
+       (_ruleActive, NOT G._tell - sleeves and seals count). */
+    if(typeof _ruleActive==='function'&&_ruleActive('last_call','p')&&t>0){
+      var _lcR=(typeof _tellById==='function')?_tellById('last_call'):null;
+      if(t<((_lcR&&_lcR.minBank)||800))return 0;
+    }
+    /* P819: the two DETERMINISTIC post-refusal bonuses the win check
+       counts - slow_cook's simmer pot (famFire bankBonus adds state.acc
+       flat) and the first-bank hangover double. Escrowed banks skip the
+       bonus branch in handleBank, so they skip it here too. Flip- and
+       rival-dependent rewrites stay unprojected (OPEN.md). */
+    if(t>0&&!G._tabArmedVsPlayer){
+      (G.pF||[]).forEach(function(c){
+        if(c&&c.id==='slow_cook'&&c.state&&c.state.acc>0&&!c.broken)t+=c.state.acc;});
+      if((G._famBankCount||0)===0&&typeof S!=='undefined'&&S&&S.run&&S.run._hotdNext)t*=2;
+    }
   }catch(e){}
   return t;
 }
-function setBtns(r,b){
-  var rollBtn=document.getElementById('btnRoll');
-  var bankBtn=document.getElementById('btnBank');
-  var wasDisabled=bankBtn.classList.contains('disabled');
-  /* flow spec 5: when the bank would cross the target, BANK takes the
-     primary weight and says so — the win tap must be unmissable. */
+/* P819: THE LABEL IS ITS OWN FUNCTION, fed by the button's live class
+   rather than a caller argument, so every site that already calls
+   updHUD heals the label for free (Loan and tier-3 tamper moved pPts
+   with no label refresh - the structural hole behind 'inconsistently
+   becomes BANK TO WIN'). setBtns calls it AFTER the class toggles and
+   the drill lock; updHUD calls it after every mutation. */
+function _refreshBankLabel(){
+  var bankBtn=document.getElementById('btnBank');if(!bankBtn)return;
+  var b=!bankBtn.classList.contains('disabled');
   try{
     var _verb=document.getElementById('bankVerb'),_cap=document.getElementById('bankCap');
     var _bpts=_projectedBank();
-    var _wins=!!(G&&b&&_bpts>0&&(G.pPts+_bpts)>=G.target);
+    /* P819: an escrowed bank (rival's tab) is held a turn and cannot win
+       NOW - the caption may promise the amount, the win state may not. */
+    var _wins=!!(G&&b&&_bpts>0&&(G.pPts+_bpts)>=G.target&&!G._tabArmedVsPlayer);
     if(G&&G._bankedToWin)_wins=true;/* P728: latched at the winning press */
     /* Nothing to bank and only branded faces picked: the one thing this
        button does is fire them, so it says so. Guarded on _bpts, because
@@ -29399,6 +29422,11 @@ function setBtns(r,b){
     /* no running total on the winning press - the button says what it does */
     if(_cap)_cap.textContent=(b&&_bpts>0&&!_wins)?('+'+_bpts.toLocaleString()):'';
   }catch(e){}
+}
+function setBtns(r,b){
+  var rollBtn=document.getElementById('btnRoll');
+  var bankBtn=document.getElementById('btnBank');
+  var wasDisabled=bankBtn.classList.contains('disabled');
   if(r)rollBtn.classList.remove('disabled');else rollBtn.classList.add('disabled');
   if(b){
     bankBtn.classList.remove('disabled');
@@ -29411,6 +29439,7 @@ function setBtns(r,b){
      valid selection (refreshSelUI → setBtns(true,...)) would re-enable a
      roll button that Drill Order should keep locked. */
   _updateDrillLock();
+  _refreshBankLabel();/* P819: after the classes and the lock, so it reads truth */
 }
 /* DRILL ORDER, asked once. Three sites wanted to know about the roll cap and
    asked three different questions: handleRoll checked the RULE (_ruleActive, so
@@ -29559,6 +29588,7 @@ function _turnLabel(word,num){
 }
 function updHUD(){
   if(!G)return;
+  try{_refreshBankLabel();}catch(e){}/* P819: every mutation site heals the label */
   /* THE GLINT: re-evaluate card ready-states on every HUD refresh (fires on
      every meaningful state change — selection, phase, commit, bank). */
   if(typeof _updateCardGlints==='function')try{_updateCardGlints();}catch(e){}
@@ -34118,7 +34148,14 @@ function handleBank(){
   if((G.turnRollCount||0)>(G._featMaxRolls||0))G._featMaxRolls=G.turnRollCount||0;
   updHUD();refreshKeptTray();_turnTableClear();setBtns(false,false);
   try{_renderSelTags([],0,true);}catch(e){}
-  if(G.pPts>=G.target){setTimeout(()=>endMatch(true),700);return;}
+  if(G.pPts>=G.target){
+    /* P719/P728 (P819 restore): the WINNING press must hold BANK TO WIN
+       through the 700ms to endMatch. The old latch lived in handleYield -
+       unreachable, because this return skips yielding and the setBtns
+       above already stripped the class it tested. Latch on the fact, then
+       re-run the label so the class comes back. */
+    G._bankedToWin=true;try{_refreshBankLabel();}catch(e){}
+    setTimeout(()=>endMatch(true),700);return;}
   if(G.oPts>=G.target){setTimeout(()=>endMatch(false),700);return;}
   showYieldButton();
 }
@@ -34137,10 +34174,9 @@ function showYieldButton(){
 }
 function handleYield(){
   SFX.nav();
-  /* P728: the bank-to-win scale must not snap back on the press - latch
-     it for the rest of this match (the flag dies with G). */
-  try{var _bw=document.getElementById('btnBank');
-    if(G&&_bw&&_bw.classList.contains('bank-to-win'))G._bankedToWin=true;}catch(e){}
+  /* P728's latch moved to handleBank's win check (P819) - reading the
+     class here was dead: the tail setBtns stripped it first, and a
+     winning bank never yields at all. */
   if(window.DLG&&G._lastBankForDlg){
     if(G._lastBankForDlg>=800)DLG.trigger('BIG_BANK');
     else if(G._lastBankForDlg<=200)DLG.trigger('EARLY_BANK');

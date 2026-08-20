@@ -781,3 +781,19 @@ Three things only you can fill:
    deleted with OPP_DIALOGUE; ~24 call sites fire into nothing, patron
    matches included). Revive wants content or a ruling to delete the
    call sites.
+
+## BANK TO WIN, stage 1 shipped (P819) — the full oracle is a choice
+
+Fixed and probe-driven: the winning press no longer snaps back (P728
+latch restored at the win check), a sealed LAST CALL seat no longer
+captions a bank it will refuse, tab-escrowed banks can't claim TO WIN,
+slow_cook's pot and the hangover double are projected, and the label
+self-heals from updHUD (Loan / tier-3 tamper used to leave it stale).
+STILL UNPROJECTED (label under-promises): the ~30-card bank-bonus
+stack (×2 cards, underdog, weight...), short_fuse's commit-time double
+in the selection preview, and rival deductions (cowards_bell, halve /
+steal-low). Closing those needs handleBank's total pipeline extracted
+into one dry-runnable oracle — a real refactor of the game's most
+central function. **My read: stage 1 covers what you reported; do the
+oracle as its own careful session if you want the caption exact to
+the point.** Say the word and I'll plan it.
