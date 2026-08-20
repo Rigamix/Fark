@@ -13475,8 +13475,8 @@ function _maybeFireCutpurse(){
 
 /* Generate a faceless patron for a given tier */
 var LUCKY_NAMES=['Old Bess','Matilda','The Splinter','Knuckle','Widow\'s Tooth','Pip','The Vicar','Bad Penny','Grandfather','The Last Word'];
-function generatePatron(tierIndex){
-  var _gp=_generatePatronInner(tierIndex);
+function generatePatron(tierIndex,forcePersona){
+  var _gp=_generatePatronInner(tierIndex,forcePersona);
   _gp.lucky={name:LUCKY_NAMES[Math.floor(Math.random()*LUCKY_NAMES.length)]};
   var night=tierIndex+1;
   _gp.title=_titleFor(night);
@@ -13493,7 +13493,10 @@ function generatePatron(tierIndex){
     var pick=pool.splice(Math.floor(Math.random()*pool.length),1)[0];
     var t=1;
     if(night>=3&&Math.random()<0.30)t=2;
-    if(night>=6&&Math.random()<0.20)t=3;
+    /* P837 (Denis, ruling 2): NO raw tier-III for patrons - the player's
+       III is upgrade-only, and parity means matching rules, not an NPC
+       shortcut. The night>=6 20% roll is deleted. Bosses keep their own
+       schedule (a different table by design). */
     fc.push({id:pick.id,tier:t});
   }
   _gp.fcards=fc;
@@ -13513,7 +13516,7 @@ function generatePatron(tierIndex){
   }
   return _gp;
 }
-function _generatePatronInner(tierIndex){
+function _generatePatronInner(tierIndex,forcePersona){
   var t=TIERS[tierIndex];if(!t)t=TIERS[0];
   var ps=t.patronStats;
   /* Target is now FIXED at the midpoint of the tier's range so the same patron
@@ -13525,9 +13528,10 @@ function _generatePatronInner(tierIndex){
   /* ── PERSONA: assign a strategy so the loadout is coherent. Low tiers
      (T0-T1) keep it simple (ones/hoard/aggro); from T2 up, full spread.
      Read by the loadout biasing below + the Phase-3 turn AI. ── */
-  var _personaKey=(tierIndex<=1)
+  var _personaKey=(forcePersona&&PERSONAS[forcePersona])?forcePersona
+    :((tierIndex<=1)
     ? ['ones','hoard','aggro'][Math.floor(Math.random()*3)]
-    : _PERSONA_KEYS[Math.floor(Math.random()*_PERSONA_KEYS.length)];
+    : _PERSONA_KEYS[Math.floor(Math.random()*_PERSONA_KEYS.length)]);/* P837: the registry wins */
   var _persona=PERSONAS[_personaKey]||PERSONAS.ones;
   /* Dice: bias toward the persona's preferred materials when the tier
      pool actually offers them (60% pull from the bias subset). */
@@ -20758,6 +20762,10 @@ function _ptRoom(host,tier,bossReady){
       var pool=free.length?free:PT_ART_POOL;
       p2._art=pool[Math.floor(Math.random()*pool.length)];
       used[p2._art]=1;dirty=true;
+      /* P837: the legacy fallback records first-seen personas into the
+         same registry the roster build consults. */
+      try{S.run._artPersona=S.run._artPersona||{};
+        if(!S.run._artPersona[p2._art])S.run._artPersona[p2._art]=p2.persona;}catch(e){}
     });
     if(dirty)try{save();}catch(e){}
   })();
@@ -23482,6 +23490,41 @@ function _iconRescuesRow(){
    plan's own sentence groups Trade with these three; measured, G._tradeSwaps is
    an ARRAY of swap records unwound newest-first, with no live, no turn and no
    window, and it snapshots across a save. It has an undo, not an expiry. */
+/* P837: THE RIVAL-SIDE REMOVAL PATH - the mirror of _removeDieAt's
+   lane repairs, built for the first permanent rival-die removal (the
+   obsidian shatter). matchOppDice shrinks (the deal reads its length,
+   so the next turn deals one fewer by itself); every stored rival-lane
+   index above L shifts down; a marker sitting ON L dies with the die;
+   the trade ledger's oLane is repaired (NEVER lane - that indexes the
+   player's board, the exact error P531 caught); and the change is
+   re-snapshotted with alsoOpp so a reload cannot resurrect the die. */
+function _oRemoveOppDieAt(L){
+  if(!G||!G.matchOppDice||typeof L!=='number'||L<0||L>=G.matchOppDice.length)return null;
+  if(G.matchOppDice.length<=1)return null;/* the one-die floor, both sides */
+  var gone=G.matchOppDice.splice(L,1)[0];
+  ['_snuff','_fog','_snare'].forEach(function(k){
+    var m=G[k];if(!m||typeof m.lane!=='number')return;
+    if(m.lane===L)m.live=false;
+    else if(m.lane>L)m.lane--;
+  });
+  (G._tradeSwaps||[]).forEach(function(t){
+    if(!t||typeof t.oLane!=='number')return;
+    if(t.oLane===L)t.oLane=-1;
+    else if(t.oLane>L)t.oLane--;
+  });
+  (G._oppHeld||[]).forEach(function(d){
+    if(typeof d.lane==='number'&&d.lane>L)d.lane--;
+  });
+  if(typeof G._oSnuffLane==='number'){
+    if(G._oSnuffLane===L)G._oSnuffLane=-1;
+    else if(G._oSnuffLane>L)G._oSnuffLane--;
+  }
+  (G.oppDice||[]).forEach(function(d){
+    if(typeof d.lane==='number'&&d.lane>L)d.lane--;
+  });
+  try{_snapDiceOnly(true);}catch(e){}
+  return gone;
+}
 function _lmArm(key,lane,turns,extra){
   if(!G)return;
   var m={lane:lane,live:true,turn:(G.oppTurnCount||0)+1,turns:turns||1};
@@ -35353,6 +35396,37 @@ function runOppTurn(){
       /* P769: twinning_charm and aldrics_vow arm through NPC_ARMS'
          roll moment - same conditions, same spends, one walker. */
       _npcRunArms('roll',{oppBank:oppBank});
+      /* P837 (Denis, ruling 1): RIVAL OBSIDIAN SHATTERS TOO - the
+         material cannot mean something different per side. Same
+         denominator as the player's sweep (each free obsidian, each
+         roll, its own chance via _dieEffect - hushable the same way),
+         same payout shape (straight to the score, bust-proof), die gone
+         for the match through the one removal path. Runs BEFORE the
+         reckoning builds its view, so a shattered die never scores. */
+      try{
+        for(var _obI=G.oppDice.length-1;_obI>=0;_obI--){
+          var _obD=G.oppDice[_obI];
+          if(_obD.kept)continue;
+          var _obFx=(typeof _dieEffect==='function')?_dieEffect(_obD):null;
+          if(!_obFx||_obFx.mechanic!=='shatter_bonus')continue;
+          if(Math.random()>=(_obFx.chance||0.06))continue;
+          var _obAmt=_obFx.amount||1000;
+          var _obL=(typeof _obD.lane==='number')?_obD.lane:-1;
+          if(_oRemoveOppDieAt(_obL)===null)continue;/* the floor said no */
+          G.oPts+=_obAmt;
+          G.oppDice.splice(_obI,1);
+          if(_obD.el){
+            try{if(window.D3X&&D3X.shatter)D3X.shatter(_obD.el);}catch(e){}
+            try{spawnObsidianBurst(_obD.el);}catch(e){}
+            try{_obD.el.classList.add('die-shatter');}catch(e){}
+            (function(_e){setTimeout(function(){try{_e.remove();}catch(e2){}},420);})(_obD.el);
+          }
+          try{SFX.coinExplode&&SFX.coinExplode();}catch(e){}
+          triggerCard('obsidian',(G.rung&&G.rung.name||'RIVAL')+' SHATTERED +'+_obAmt,false);
+          setStatusMsg((G.rung&&G.rung.name||'RIVAL')+' — OBSIDIAN SHATTERS +'+_obAmt,'red');
+          try{updHUD();}catch(e){}
+        }
+      }catch(e){}
       const _oFree=G.oppDice.filter(d=>!d.kept);
       const fV=_oFree.map(d=>d.val);
       const fMats=_oFree.map(d=>d.mat);
@@ -38187,6 +38261,28 @@ const LEDGER_LINES={
         var m=(typeof _DLG_MOMENT!=='undefined')&&_DLG_MOMENT[cat];
         if(m){var line=_dlgEvent(m);if(line)return line;}
         else if(typeof _DLG_PERSONAL!=='undefined'&&_DLG_PERSONAL[cat]){
+          /* P837 (Denis's brief, piece 2): THE RECOGNITION BEAT - the
+             first meeting since this patron's band changed, once, ahead
+             of the ordinary open. Bands: nights 1-3 / 4-6 / 7+. State
+             per art name on S.run, the same identity register the
+             dialogue stages use. A first-ever meeting records the band
+             silently; only a CHANGE speaks. */
+          try{
+            var _ra=window._lastSeatArt;
+            if(_ra&&(cat==='MATCH_START'||cat==='REMATCH_START')){
+              _getS();S.run._artBand=S.run._artBand||{};
+              var _rk=String(_ra).toLowerCase();
+              var _nightNow=((S.run.tier||0)+1);
+              var _nowB=(_nightNow>=7)?2:((_nightNow>=4)?1:0);
+              var _prevB=S.run._artBand[_rk];
+              if(_prevB===undefined){S.run._artBand[_rk]=_nowB;try{save();}catch(e){}}
+              else if(_nowB>_prevB){
+                S.run._artBand[_rk]=_nowB;try{save();}catch(e){}
+                var _rr=_dlgPick('patron:'+_rk+':recog',0,null);
+                if(_rr)return _rr.t;
+              }
+            }
+          }catch(e){}
           var pl=_dlgSay(window._lastSeatArt);if(pl)return pl;
         }
         else if(typeof _DLG_AMBIENT!=='undefined'&&_DLG_AMBIENT[cat]
@@ -43431,7 +43527,22 @@ function _ensureNight(){
     return;
   }
   var n=_nightSeats(),roster=[];
-  for(var i=0;i<n;i++)roster.push(generatePatron(S.run.tier));
+  /* P837 (Denis, ruling 3): THE NAME IS THE CHARACTER. The art name is
+     chosen BEFORE generation and its persona rides S.run._artPersona,
+     so the same name is mechanically the same patron every night - the
+     approved growth dialogue has a stable identity under it. */
+  S.run._artPersona=S.run._artPersona||{};
+  var _apUsed={};
+  for(var i=0;i<n;i++){
+    var _apFree=PT_ART_POOL.filter(function(a){return !_apUsed[a];});
+    var _apPool=_apFree.length?_apFree:PT_ART_POOL;
+    var _apName=_apPool[Math.floor(Math.random()*_apPool.length)];
+    _apUsed[_apName]=1;
+    var _apP=generatePatron(S.run.tier,S.run._artPersona[_apName]||null);
+    _apP._art=_apName;
+    S.run._artPersona[_apName]=_apP.persona;
+    roster.push(_apP);
+  }
   S.run.night={tier:S.run.tier,roster:roster,
     seatsPlayed:roster.map(function(){return false;}),
     results:roster.map(function(){return null;}),
