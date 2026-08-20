@@ -22,8 +22,11 @@ tools/ladder_real.js drives full real matches on both seats (tap-driven,
 the harness's own carl/rita policies over F.legalKeeps, modal night
 loadouts, bare gear — stated convention). Calibrated: ~75-130s per real
 match; Brutus crushed carl 9900-5750 and 13200-4950 in the calibration
-pair, consistent with the model-understates-the-rival finding. Priority
-cells (nights 6, 7, 8, 3 × carl, n=20) are running; remaining cells:
+pair, consistent with the model-understates-the-rival finding. The priority
+sweep was STOPPED on Denis's word mid-first-cell (2026-08-20 ~19:10)
+— no cell completed, so NO numbers are recorded yet; the table is
+still unmeasured. Pick up by running cells (nights 6,7,8,3 first,
+then the rest × carl,rita):
   node tools/shoot.js --url <dev>/fark_proto.html#lad=<tier>,<carl|rita>,<n> --eval-file tools/ladder_real.js
 
 §2–§4 still need you or a playtest.
