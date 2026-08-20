@@ -686,14 +686,15 @@ stop, not gone except for whatever the rival had scripted on top of
 it." The old precedence would have weakened the card exactly when
 aimed at a rival about to do something clever.
 
-## Found while completing cardHit (P836): the skim can VOID a bank on a threshold seat
+## Skim-vs-LAST-CALL — RULED AND SHIPPED (P839, 2026-08-20)
 
-Driven live: on Grog's boss table (LAST CALL, nothing under 800), the
-rival's the_skim cut a 1,000 bank to 700 — and the house then refused
-the whole bank. The take happens before the threshold check, so a
-percentage-steal card can push an otherwise-legal bank under the
-floor and cost the player EVERYTHING (the rival still keeps its cut).
-Rule-stack reading: arguably correct (the house judges what reaches
-the till), arguably brutal. Flagging it because a player will
-eventually hit it and call it a bug; your call whether the threshold
-should judge the PRE-take amount.
+Denis ruled: the threshold judges the PRE-take amount — "a bank that
+cleared the floor on its own terms shouldn't retroactively fail
+because of a tax applied after the fact. The skim still gets its cut
+regardless." Shipped and driven: the exact construction that voided
+(1,000 skimmed to 700 on Grog's table) now pays 700 with the skim
+keeping its 300; a genuine sub-floor bank still voids. His eighty
+boss greeting lines are wired the same commit (state router: open /
+undefeated / firstloss / beaten by the ledger's own w-count) — all
+four states answered with his lines under a driven probe. Delete on
+read.
