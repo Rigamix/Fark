@@ -1,5 +1,23 @@
 # Next session - start here
 
+## Where things stand (2026-08-20 latest+1: Denis's ruling batch EXECUTED)
+
+Denis ruled on everything open; all of it shipped as P832-P838 (see
+OPEN.md's header for the item list — every one probe-driven, deployed).
+Highlights: the additive dialogue resolver + growth lines + recognition
+beat are LIVE (krox spoke his recognition line once, then a band-4 line
+from the additive pool — driven); the rival's obsidian shatters through
+_oRemoveOppDieAt (the first permanent rival-die removal — lane repairs +
+alsoOpp snapshot); the cardHit rule covers all 20 taker docks; 155
+legacy files purged (masters kept). The LADDER REBUILD instrument is
+tools/ladder_real.js (real engine both seats; ~75-130s/match); priority
+cells were measuring in background at session close — check
+scratchpad ladder_results.txt or rerun per OPEN.md §1. The bank oracle
+is PLANNED (docs/BANK_ORACLE_PLAN.md), gated on its own session.
+Open asks on Denis only: eight boss :open greeting lines; §2-§4;
+the skim-vs-LAST-CALL rule interaction note.
+
+
 ## Where things stand (2026-08-20 latest: the presentation backlog is DONE)
 
 Denis ruled "do all of it now" - the entire step-7 backlog shipped as

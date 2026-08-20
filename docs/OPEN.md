@@ -3,11 +3,30 @@
 The only file you need to read. Everything has my recommendation, so **"yours"
 is a valid answer.** Answered items are deleted, not marked — this stays short.
 
-**§1's ladder rebuild is commissioned** (Denis's 2026-08-20 ruling batch —
-re-measure against the real rival first). §2–§4 need you or a playtest.
-The rest of that batch (drag, labels, relics, seven dice, triggerCard,
-cardHit, the four leveling items) is being built; sections return here
-only if something needs a fresh ruling.
+**The 2026-08-20 ruling batch is EXECUTED** (P832-P838): Corvus orderly,
+boss :open pool wired (your eight greeting lines are the one open ask),
+DLG.triggerCard deleted, the additive resolver + all 22 patrons' growth
+lines live, Seven Dice redesigned (free one-die reroll), relics are
+trophies, committed dice sit out the vagabond drag (+ one real drag
+canceller), the cardHit rule is complete (20 new dock fires, both
+directions), all four leveling rulings (rival obsidian shatters through
+a new rival-side removal path, no raw patron tier-III, the name IS the
+character via S.run._artPersona, the recognition beat), and 155
+unreferenced legacy files are out of the repo (psd masters and your
+live-edited files kept). §8's Last Orders layout was VERIFIED already
+in its ruled shape — your P804-P808 mockup round had resolved it;
+nothing changed. Every item probe-driven; probes in tools/apv_*.js.
+
+**§1's ladder rebuild: the instrument is BUILT and measuring.**
+tools/ladder_real.js drives full real matches on both seats (tap-driven,
+the harness's own carl/rita policies over F.legalKeeps, modal night
+loadouts, bare gear — stated convention). Calibrated: ~75-130s per real
+match; Brutus crushed carl 9900-5750 and 13200-4950 in the calibration
+pair, consistent with the model-understates-the-rival finding. Priority
+cells (nights 6, 7, 8, 3 × carl, n=20) are running; remaining cells:
+  node tools/shoot.js --url <dev>/fark_proto.html#lad=<tier>,<carl|rita>,<n> --eval-file tools/ladder_real.js
+
+§2–§4 still need you or a playtest.
 
 Rebuilt 2026-08-06 — it had reached 960 lines with four `CLOSED` sections still
 in it, which defeated the point of the file. Deleted items live in git history.
