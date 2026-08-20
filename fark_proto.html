@@ -4184,6 +4184,17 @@ html.fk3d #screen-match .die-wrap:has(.die.d3on.selected)::after{
   0%,100%{box-shadow:0 0 14px 4px rgba(255,180,40,.7),0 0 6px rgba(255,220,80,.4)}
   50%{box-shadow:0 0 20px 6px rgba(255,180,40,.9),0 0 10px rgba(255,220,80,.6)}
 }
+/* P828: encore's shimmer is STARSTONE BLUE - the spec's contrast with
+   powder keg's explosion. The modifier swaps the animation, not just
+   the static shadow: keyframe box-shadows beat any static override. */
+.die.card-reroll.crr-blue{
+  box-shadow:0 0 14px 4px rgba(143,168,255,.7),0 0 6px rgba(190,205,255,.4)!important;
+  animation:dRoll .4s linear infinite,cardRerollPulseBlue .6s ease-in-out infinite!important;
+}
+@keyframes cardRerollPulseBlue{
+  0%,100%{box-shadow:0 0 14px 4px rgba(143,168,255,.7),0 0 6px rgba(190,205,255,.4)}
+  50%{box-shadow:0 0 20px 6px rgba(143,168,255,.9),0 0 10px rgba(190,205,255,.6)}
+}
 .die.card-reroll-settle{
   animation:cardRerollSettle .4s ease-out forwards!important;
 }
@@ -4414,6 +4425,21 @@ body.crit-dilate{animation:critDilate .55s ease-out both}
 .fog-float{position:fixed;transform:translate(-50%,-55%);font-size:30px;color:#cdd5dc;
   text-shadow:0 2px 6px #000c,0 0 14px #a8b0b880;pointer-events:none;z-index:60;
   animation:fogFloatDrift 2.4s ease-in-out infinite}
+/* P827: die-anchored floats - stargazer's ghost faces, honeytrap's
+   honey marks, vanguard's end-spot hints. Same body-level fixed
+   pattern; left/top are the anchor center. */
+.peek-float{position:fixed;transform:translate(-50%,-130%);pointer-events:none;z-index:60;
+  font-family:monospace;font-weight:bold;font-size:17px;color:#8fa8ff;
+  background:#101426cc;border:1px solid #8fa8ff88;border-radius:4px;padding:1px 6px;
+  text-shadow:0 0 8px #8fa8ff;animation:peekFloatBreathe 1.6s ease-in-out infinite}
+@keyframes peekFloatBreathe{0%,100%{opacity:.8;transform:translate(-50%,-130%)}
+  50%{opacity:1;transform:translate(-50%,-145%)}}
+.honey-float{position:fixed;transform:translate(-50%,-140%);pointer-events:none;z-index:60;
+  font-size:16px;text-shadow:0 1px 4px #000c,0 0 10px #e8b04090;
+  animation:peekFloatBreathe 1.8s ease-in-out infinite}
+.vang-float{position:fixed;transform:translate(-50%,-135%);pointer-events:none;z-index:60;
+  font-size:13px;color:#ffd870;font-family:monospace;letter-spacing:1px;
+  text-shadow:0 1px 3px #000c,0 0 8px #ffd87080;opacity:.95}
 @keyframes fogFloatDrift{0%,100%{transform:translate(-58%,-55%);opacity:.92}
   50%{transform:translate(-42%,-58%);opacity:1}}
 /* — Grog's Flask: warm amber — */
@@ -14802,6 +14828,7 @@ CFX.slow_cook={
   roll:function(ev){if(!ev.mine)return;
     var rc=(ev.rollNum!=null)?ev.rollNum:(G.turnRollCount||0);
     if(rc>=3){ev.me.state.acc=(ev.me.state.acc||0)+ev.P;
+      try{famRenderRow();}catch(e){}/* P825: the simmer chip tracks live */
       if(ev.owner==='p')_famPop('+'+ev.P+' SLOW COOK');}},
   bankBonus:function(ev){if(!ev.mine)return;
     var a=ev.me.state.acc||0;
@@ -14975,8 +15002,12 @@ CFX.fair_trade={
    retort belongs to the seat that was hit. Retort's own payment fires
    no seam, so retort-vs-retort cannot chain. */
 function _retortPay(ev){
-  if(ev.owner==='p'){G.oPts=Math.max(0,G.oPts-ev.P);famLog('RETORT — THEY LOSE '+ev.P);}
-  else{G.pPts=Math.max(0,G.pPts-ev.P);setStatusMsg('THEIR RETORT — YOU LOSE '+ev.P,'red');}
+  /* P826: retort must never read as silent (spec) - the losing side's
+     surface takes the hit both ways. */
+  if(ev.owner==='p'){G.oPts=Math.max(0,G.oPts-ev.P);famLog('RETORT — THEY LOSE '+ev.P);
+    cardFx('hit',{row:'oppDice'},{color:'#c4404f'});}
+  else{G.pPts=Math.max(0,G.pPts-ev.P);setStatusMsg('THEIR RETORT — YOU LOSE '+ev.P,'red');
+    cardFx('hit',{row:'score'},{color:'#c4404f'});}
   try{updHUD();}catch(e){}
 }
 CFX.retort={
@@ -15022,7 +15053,8 @@ CFX.falling_star={
     if(ev.owner==='p'){
       if(!G._fExtraTurn){G._fExtraTurn=true;
         G._featStarChain=(G._featStarChain||0)+1;/* WISH GRANTED */
-        famLog('FALLING STAR — ANOTHER TURN COMES');}
+        famLog('FALLING STAR — ANOTHER TURN COMES');
+        cardFx('gain',{myCard:'falling_star'});/* P826: the wish is granted ON the card */}
     }else{
       if(!G._oExtraTurn){G._oExtraTurn=true;
         setStatusMsg('FALLING STAR — THEY WILL GO AGAIN','red');}
@@ -15055,8 +15087,9 @@ CFX.encore={
     if(!free.length)return false;
     free.forEach(function(d){
       d.val=_rollD(d);d.sel=false;
-      if(d.el){d.el.classList.remove('selected');d.el.classList.add('card-reroll');reDrawDieFace(d);
-        setTimeout(function(){d.el.classList.remove('card-reroll');},400);}
+      if(d.el){d.el.classList.remove('selected');d.el.classList.add('card-reroll','crr-blue');reDrawDieFace(d);
+        try{_fxSpray(d.el,'#8fa8ff',8,{speed:65,g:-20,size:5,spread:2.0});}catch(e){}/* P828: starstone motes */
+        setTimeout(function(){d.el.classList.remove('card-reroll','crr-blue');},400);}
     });
     try{SFX.roll();}catch(e){}
     G.turnRollCount++;
@@ -15093,12 +15126,19 @@ CFX.double_or_nothing={
     ev.me.state.armed=false;
     var _meP=(ev.owner==='p');
     var winFlip=Math.random()<0.5;
+    /* P826: the flip gets a BEAT - the card churns as the coin goes up,
+       then swells or takes the hit with the outcome. cardFx is rAF-
+       deferred and descriptor-addressed, so it survives the row rebuild
+       famUse triggers. */
+    if(_meP)cardFx('churn',{myCard:'double_or_nothing'});
     if(winFlip){
-      if(_meP){G.pPts+=ev.amt;famLog('THE FLIP LANDS — BANK DOUBLED (+'+ev.amt+')');_famPop('x2 BANK');}
+      if(_meP){G.pPts+=ev.amt;famLog('THE FLIP LANDS — BANK DOUBLED (+'+ev.amt+')');_famPop('x2 BANK');
+        setTimeout(function(){cardFx('gain',{myCard:'double_or_nothing'});},260);}
       else{G.oPts+=ev.amt;setStatusMsg('THEY FLIP — DOUBLE ('+(ev.amt*2)+')','red');}
     }else{
       var lose=Math.round(ev.amt*ev.P);
-      if(_meP){G.pPts=Math.max(0,G.pPts-lose);famLog('THE FLIP FAILS — '+lose+' GONE');_famPop('-'+lose);}
+      if(_meP){G.pPts=Math.max(0,G.pPts-lose);famLog('THE FLIP FAILS — '+lose+' GONE');_famPop('-'+lose);
+        setTimeout(function(){cardFx('hit',{myCard:'double_or_nothing'});},260);}
       else{G.oPts=Math.max(0,G.oPts-lose);setStatusMsg('THEY FLIP AND LOSE — '+lose+' GONE','gold');}
     }
     try{updHUD();}catch(e){}}
@@ -15137,7 +15177,13 @@ function famRenderRow(){
        Waters hushes a die's FAMILY, never a card. G._fSealIdx was never
        assigned by anything, so this only ever compared against undefined. */
     var spent=d.kind==='active'&&inst.charges<=0;
-    var cls=(spent?' spent':'')+(inst.state.armed?' armed':'');
+    /* P825: PASSIVE LIVE-STATES read as armed - the same lift+warmth the
+       arm state already wears on this row. reprisal while the trailing
+       gate is open; ill_omen while the declaration is out (the rival's
+       declaration already marks THEIR card - this closes the asymmetry). */
+    var _live=(inst.id==='reprisal'&&G&&((G.oPts||0)-(G.pPts||0))>=1000)
+      ||(inst.id==='ill_omen'&&G&&!!G._famIllOmen);
+    var cls=(spent?' spent':'')+((inst.state.armed||_live)?' armed':'');
     hp+=famCardArt(inst.id,inst.tier,{cls:cls.trim(),onclick:'famCardTap('+i+')',
       uses:(d.kind==='active'&&inst.charges>0)?inst.charges:undefined});/* P727 */
   });
@@ -15221,6 +15267,16 @@ function famRenderRow(){
       +'style="cursor:pointer;padding:2px 7px;background:#122;color:#6bc;border:1px dashed #365">SLEEVED: '
       +(_st?_st.name:G._sleeve)+_slVal+' (both) ⓘ</div>';
   }
+  /* P825: STANDING CHIPS - stakes riding right now that the card art
+     cannot say. Same wholesale-rebuild idiom as the quicksilver chip. */
+  try{
+    (G&&G.pF||[]).forEach(function(inst){
+      if(inst.id==='slow_cook'&&inst.state&&inst.state.acc>0)
+        ha+='<div style="padding:2px 7px;background:#181008;color:#e8a23c;border:1px dashed #a66">SLOW COOK — +'+inst.state.acc+' SIMMERING</div>';
+    });
+    if(G&&G._forKeeps)
+      ha+='<div style="padding:2px 7px;background:#141014;color:#c8a45c;border:1px dashed #875">FOR KEEPS — A DIE RIDES ON THIS MATCH</div>';
+  }catch(e){}
   hostA.innerHTML=ha;
 }
 /* P657: DRAG A FAMILY CARD UP TO PLAY IT. The same gesture P612 built for the
@@ -17188,6 +17244,11 @@ CFX.short_fuse={
 function _clearRollForces(){
   if(!G)return;
   G._famPeekVals=null;G._famHoneyVal=null;
+  G._transArmed=false;/* P829: a roll voids a stranded transmute arm */
+  /* P827: the ghost faces and honey marks live exactly as long as the
+     forces they mark - one lifecycle point, no second exit. */
+  try{(window._pkGhosts||[]).forEach(function(g){if(g.parentNode)g.remove();});window._pkGhosts=[];}catch(e){}
+  try{(window._htMarks||[]).forEach(function(g){if(g.parentNode)g.remove();});window._htMarks=[];}catch(e){}
 }
 function famApplyRollForces(){
   if(!G)return;
@@ -17217,9 +17278,33 @@ function famApplyRollForces(){
      rather than incidental - apv_roll_forces_scope measures the order. */
   if(G._famHoneyVal&&free.length){
     var d0=free[0];d0.val=G._famHoneyVal;try{reDrawDieFace(d0);}catch(e){}
-    _famPop('HONEYTRAP → '+G._famHoneyVal);
+    /* P827: the pull lands ON the pulled die - spawnPop has always taken
+       an anchor (P-note at its head); _famPop just never passed one. */
+    try{spawnPop('HONEYTRAP \u2192 '+G._famHoneyVal,d0.el);}catch(e){_famPop('HONEYTRAP \u2192 '+G._famHoneyVal);}
+    try{_fxSpray(d0.el,'#e8b040',12,{speed:70,g:60,size:6,spread:2.2});}catch(e){}
   }
   _clearRollForces();/* P556 - spent by this roll either way */
+  /* P827: VANGUARD AIMS - as the roll settles, the paying end spots wear
+     a brief gold hint so the player knows where the card pays. Self-
+     expiring; per-roll, from the one per-roll visual moment this
+     function already owns. */
+  try{
+    var _vfh=(typeof famInst==='function')?famInst('vanguard_f'):null;
+    if(_vfh&&G.pool&&G.pool.length){
+      var _vt2=_vfh.tier||1;
+      var _spots=[G.pool[0]];
+      if(_vt2>=2&&G.pool.length>1)_spots.push(G.pool[G.pool.length-1]);
+      _spots.forEach(function(sd){
+        if(!sd||!sd.el)return;
+        var r=sd.el.getBoundingClientRect();if(!(r.width>0))return;
+        var g=document.createElement('div');
+        g.className='vang-float';g.textContent='\u25C6 PAYS';
+        g.style.left=(r.left+r.width/2)+'px';g.style.top=(r.top+r.height/2)+'px';
+        document.body.appendChild(g);
+        setTimeout(function(){if(g.parentNode)g.remove();},2600);
+      });
+    }
+  }catch(e){}
 }
 /* fool's gold: auto-fires on a dead roll, one reroll; double-fail burns */
 /* THE BODY OF CFX.fools_gold_f.deadRoll, kept as a named function.
@@ -17254,7 +17339,12 @@ CFX.fools_gold_f={
     if(famFoolsGold(ev.free))ev.claim();},
   bust:function(ev){if(!_fxMine(ev)||!ev.me.state.burn)return;
     var burn=ev.lost||0;
-    if(burn>0){G.pPts=Math.max(0,G.pPts-burn);famLog("FOOL'S GOLD BURNS "+burn+' MORE FROM YOUR BANK');try{updHUD();}catch(e){}}
+    if(burn>0){G.pPts=Math.max(0,G.pPts-burn);famLog("FOOL'S GOLD BURNS "+burn+' MORE FROM YOUR BANK');
+      /* P826: the harshest punishment in the game was one log line -
+         the score takes a visible hit and the number leaves loudly. */
+      cardFx('hit',{row:'score'},{color:'#e8c874'});
+      _famPop('-'+burn+" FOOL'S GOLD");
+      try{updHUD();}catch(e){}}
     ev.me.state.burn=false;}
 };
 /* P764: SYMMETRIC - the seam already derives the payload per seat;
@@ -17286,6 +17376,12 @@ CFX.cultivate={
       if(typeof L!=='number'||!(L>=0))return;/* NaN fails >=0, unlike <0 */
       grown+=(_arr[L]||0);
       _arr[L]=(_arr[L]||0)+50;
+      /* P828: the stack is visible ON the die - its accumulated growth
+         floats off the jade that carries it, with the family's green. */
+      if(ev.owner==='p'&&d.el){
+        try{spawnPop('\u25B4 '+_arr[L],d.el);}catch(e){}
+        try{_fxSpray(d.el,'#46c46e',8,{speed:60,g:-30,size:5,spread:1.4});}catch(e){}
+      }
     });
     if(ev.owner==='p'){
       if(grown>0){ev.add(grown);_famPop('+'+grown+' CULTIVATE');}
@@ -17309,19 +17405,47 @@ CFX.vanguard_f={
 };
 CFX.transmute={
   canUse:function(){return G&&G.phase==='choosing';},
+  /* P829: the prompt() picker was placeholder UI. Steady_hand's shape:
+     use() paints the targets and returns FALSE (the charge stays), the
+     die tap opens the face picker, the PICK bills. An arm the player
+     walks away from costs nothing; a roll voids it (_clearRollForces). */
   use:function(inst){
-    var free=G.pool.filter(function(d){return !d.committed;});
+    var free=G.pool.filter(function(d){return !d.committed&&!d._frozen;});
     if(!free.length)return false;
-    var pick=parseInt(prompt('Which die? 1..'+free.length+' (left to right, uncommitted)'),10);
-    if(!(pick>=1&&pick<=free.length))return false;
-    var face=parseInt(prompt('New face? 1-6'),10);
-    if(!(face>=1&&face<=6))return false;
-    var d=free[pick-1];d.val=face;try{reDrawDieFace(d);}catch(e){}
-    famLog('TRANSMUTED TO '+face);
-    try{refreshSelUI();}catch(e){}
-    return true;
+    G._transArmed=true;
+    try{setStatusMsg('TRANSMUTE — TAP THE DIE TO CHANGE','gold');}catch(e){}
+    free.forEach(function(d){
+      if(!d.el)return;
+      d.el.classList.add('break-target');
+      d.el.onclick=function(){
+        if(!G._transArmed)return;
+        G._transArmed=false;
+        free.forEach(function(q){if(q.el){q.el.classList.remove('break-target');q.el.onclick=function(){toggleDie(q);};}});
+        if(inst.charges<=0)return;
+        window._transDie=d;window._transInst=inst;
+        var _bt='';
+        for(var f=1;f<=6;f++)_bt+='<div class="gbx-btn primary" style="height:44px;font-size:19px" data-f="'+f+'" onclick="_gbModalClose();_transPick(this.dataset.f)">'+f+'</div>';
+        _gbModalOpen('<b>Transmute to?</b>'
+          +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">'+_bt+'</div>'
+          +'<div class="gbx-btn" style="height:40px" onclick="_gbModalClose()">leave it</div>');
+      };
+    });
+    return false;
   }
 };
+function _transPick(f){
+  var d=window._transDie,inst=window._transInst;
+  window._transDie=null;window._transInst=null;
+  f=parseInt(f,10);
+  if(!d||!inst||!(f>=1&&f<=6)||inst.charges<=0)return;
+  inst.charges--;
+  d.val=f;d.sel=false;
+  if(d.el)d.el.classList.remove('selected');
+  try{reDrawDieFace(d);}catch(e){}
+  try{_fxSpray(d.el,'#46c46e',12,{speed:70,g:-10,size:6,spread:2.0});}catch(e){}
+  famLog('TRANSMUTED TO '+f);
+  try{refreshSelUI();}catch(e){}try{famRenderRow();}catch(e){}
+}
 CFX.powder_keg={
   canUse:function(){return G&&G.phase==='choosing';},
   use:function(inst){
@@ -17500,6 +17624,22 @@ CFX.stargazer={
        goes unused. */
     G._famPeekVals=free.map(function(d){return {lane:d.lane,val:_rollD(d)};});
     famLog('STARGAZER — NEXT ROLL: '+G._famPeekVals.map(function(p){return p.val;}).join(' · '));/* P708: only Ill Omen says OMEN */
+    /* P827: GHOST DICE - each free die shows its promised face, floating
+       in starstone blue over the die itself (the fog-float pattern; chip
+       overlays are invisible under the canvas). Cleared with the promise
+       in _clearRollForces. */
+    try{
+      (window._pkGhosts||[]).forEach(function(g){if(g.parentNode)g.remove();});
+      window._pkGhosts=[];
+      free.forEach(function(d,i){
+        if(!d.el)return;
+        var r=d.el.getBoundingClientRect();if(!(r.width>0))return;
+        var g=document.createElement('div');
+        g.className='peek-float';g.textContent=String(G._famPeekVals[i].val);
+        g.style.left=(r.left+r.width/2)+'px';g.style.top=(r.top+r.height/2)+'px';
+        document.body.appendChild(g);window._pkGhosts.push(g);
+      });
+    }catch(e){}
     return true;
   }
 };
@@ -17649,6 +17789,21 @@ CFX.honeytrap={
     }else{
       G._famHoneyVal=pairVal;
       famLog('HONEYTRAP SET — THE NEXT ROLL PULLS A '+pairVal);
+      /* P827: the pair wears the honey - marks float over the dice that
+         made it (selected or kept chips both stay in G.pool). Cleared
+         with the force in _clearRollForces. */
+      try{
+        (window._htMarks||[]).forEach(function(g){if(g.parentNode)g.remove();});
+        window._htMarks=[];
+        (G.pool||[]).forEach(function(d){
+          if(d.val!==pairVal||!(d.sel||d.committed)||!d.el)return;
+          var r=d.el.getBoundingClientRect();if(!(r.width>0))return;
+          var g=document.createElement('div');
+          g.className='honey-float';g.textContent='\uD83C\uDF6F';
+          g.style.left=(r.left+r.width/2)+'px';g.style.top=(r.top+r.height/2)+'px';
+          document.body.appendChild(g);window._htMarks.push(g);
+        });
+      }catch(e){}
     }
     return true;
   }
@@ -30769,13 +30924,17 @@ function toggleDie(d){
        chime on top of the regular feedback. Makes Vanguard / Anchor /
        Flanks feel as satisfying to set up as their payoff at commit. */
     try{
-      var _pcCards=effectiveCards()||[];
+      /* P827: the legacy list (vanguard/anchor/flanks via effectiveCards)
+         is retired and effectiveCards() returns [] - this primer could
+         never fire for the live card. vanguard_f's tier shapes: I pays
+         the first spot, II either end, III both ends. */
+      var _vf=(typeof famInst==='function')?famInst('vanguard_f'):null;
       var _pFirst=G.pool[0],_pLast=G.pool[G.pool.length-1];
       var _pcFire=false;
-      if(_pcCards.indexOf('vanguard')>=0&&d===_pFirst&&(d.val===1||d.val===5))_pcFire=true;
-      else if(_pcCards.indexOf('anchor')>=0&&d===_pLast&&d.val===6)_pcFire=true;
-      else if(_pcCards.indexOf('flanks')>=0&&_pFirst!==_pLast){
-        if((d===_pFirst&&_pLast&&_pLast.sel)||(d===_pLast&&_pFirst&&_pFirst.sel))_pcFire=true;
+      if(_vf){
+        var _vt=_vf.tier||1;
+        if(d===_pFirst)_pcFire=true;
+        else if(_vt>=2&&d===_pLast)_pcFire=true;
       }
       if(_pcFire){
         d.el.classList.remove('die-pos-pulse');void d.el.offsetWidth;
@@ -34411,6 +34570,12 @@ function endPTurn(){
   if(G._fExtraTurn&&G.pPts<G.target&&G.oPts<G.target){
     G._fExtraTurn=false;
     setStatusMsg('FALLING STAR — YOU GO AGAIN','gold');
+    /* P826: the ruled 'loud, unmissable' beat - a starburst over the
+       table alongside the turn flash (the FX canvas sits above all). */
+    try{var _fsAnchor=document.getElementById('hud')||document.body;
+      _fxSpray(_fsAnchor,'#ffd870',30,{speed:230,g:70,size:9,spread:Math.PI*2});
+      _fxSpray(_fsAnchor,'#fff2c0',14,{speed:120,g:40,size:6,spread:Math.PI*2});}catch(e){}
+    _famPop('\u2605 FALLING STAR');
     flashYourTurn();setTimeout(()=>{setTurnMode(false);startPTurn();},900);
     return;
   }
