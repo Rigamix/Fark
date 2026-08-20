@@ -13695,7 +13695,7 @@ function generateDiceLoadout(tierIndex){
   {id:'brutus_grit',name:"BRUTUS'S GRIT",icon:'⛓️',rarity:'gold',npc:'brutus',eff:'1ST BUST UNDER 500: SAVED. BANKS 500+ +15%',desc:"Once per match, if you bust below 500 turn points, your dice refresh instead. Banks of 500+ also gain +15%.",rewardQuote:'"Stand longer than they expect, and they\'ll never expect again."',arch:'brinksman'},
   {id:'whispers_veil',name:"WHISPER'S VEIL",icon:'🕯️',rarity:'gold',npc:'whisper',eff:'EVERY OTHER OPP TURN: 5 DICE',desc:"On every other opponent turn (their 1st, 3rd, 5th…) they roll only 5 dice instead of 6. A persistent diminishment.",rewardQuote:'"Six was always too generous, dear."',arch:'saboteur'},
   /* Phase 6b — fun active cards */
-  {id:'seven_dice',name:'SEVEN DICE',icon:'🎲',rarity:'gold',type:'active',maxUses:1,timing:'idle',eff:'NEXT ROLL: 7 DICE INSTEAD OF 6',desc:"Activate before your next roll: throw 7 dice instead of 6. Keep up to 6 scoring dice as normal.",arch:'sharp'},
+  {id:'seven_dice',name:'SEVEN DICE',icon:'🎲',rarity:'gold',type:'active',maxUses:1,timing:'idle',eff:'REROLL ONE DIE, FREE',desc:"Activate during your turn: tap one die and it rerolls, free. You keep the new face, better or worse.",arch:'sharp'},/* P834: redesigned per Denis - the 7th-lane promise was a silent no-op since the seat clamps */
   {id:'loan',name:'THE LOAN',icon:'💰',rarity:'gold',type:'active',maxUses:1,timing:'idle',eff:'+1500 NOW; −200/TURN FOR 5 TURNS',desc:"Take a loan: gain 1500 points immediately. The innkeeper docks 200 from your total at the start of each of your next 5 turns.",arch:'hoarder'},
   /* ── DICE PROTECTION / SWAP ── */
   /* iron_grip removed — pure counter card, no one drafts it. */
@@ -16513,7 +16513,16 @@ function _gbSpoilsConfirm(kind){
 function famSpoilsPick(kind){
   var sp=window._spoils;if(!sp)return;
   _getS();var msg='';
-  if(kind==='relic'&&sp.relic){S.run.diceInv=S.run.diceInv||[];S.run.diceInv.push(sp.relic);msg='THE RELIC IS YOURS: '+getDie(sp.relic).name;}
+  if(kind==='relic'&&sp.relic){
+    /* P834 (Denis, ruling b): relics are TROPHIES, not dice - they rank
+       0 against real dice, so seating one was strictly worse than any
+       die the player owns; the value is the shelf story. Same shelf the
+       Ambrose night-8 win already uses (the RUN WON screen renders 🏆
+       per entry). */
+    S.trophies=S.trophies||[];
+    if(S.trophies.indexOf(sp.relic)<0)S.trophies.push(sp.relic);
+    msg='THE TROPHY GOES ON YOUR SHELF: '+getDie(sp.relic).name;
+  }
   else if(kind==='tell'&&sp.tell){S.run.tells=S.run.tells||[];if(S.run.tells.indexOf(sp.tell)<0)S.run.tells.push(sp.tell);msg='HIS RULE GOES TO YOUR SHELF: '+sp.tellName;}
   else{S.run.gold=(S.run.gold||0)+sp.purse;msg='THE PURSE: +'+sp.purse+'g';}
   window._spoils=null;save();
@@ -31581,12 +31590,9 @@ function handleRoll(){
     _updateDrillLock();
     return;
   }
-  /* Seven Dice (active): bump dice count by 1 for this roll only */
-  if(G._sevenDiceArmed){
-    G._sevenDiceArmed=false;
-    G.numDice=Math.min(G.numDice+1,7);
-    triggerCard('seven_dice','SEVEN DICE!',true);
-  }
+  /* P834: the Seven Dice +1-die arm is retired with the redesign - it
+     was a silent no-op anyway (the P529 seat clamp below never dealt
+     the 7th die; P523's comment names the card). */
   /* NPC reduce_first_roll cards (Pocket Sand 70%, Mabel's Pinch 50%, etc) — first
      roll of each turn uses 5 dice. Chance pulled from each card's effect.chance.
      Keen Eyes was the old counter; WARDED replaces it as a general shield. */
@@ -37140,7 +37146,7 @@ var _DRAFT_DELAY={bossWin:500,patronWin:500,loss:900};
     var rd=_spRelic?getDie(_spRelic):null;
     sh+='<div onclick="_gbSpoilsConfirm(\'relic\')" style="cursor:pointer;aspect-ratio:2/3;display:flex;flex-direction:column;background:#191919;border:2px solid #dc5;padding:7px">'
       +'<div style="font-size:11px;font-weight:bold;color:#eee">'+(rd?rd.name:'RELIC')+'</div>'
-      +'<div style="font-size:10px;color:#dc5;margin:2px 0">HIS DIE</div>'
+      +'<div style="font-size:10px;color:#dc5;margin:2px 0">HIS DIE — A TROPHY FOR THE SHELF</div>'
       +'<div style="flex:1;font-size:10px;color:#bbb;line-height:1.45;margin-top:4px">'+(rd?rd.desc:'')+'</div></div>';
     sh+='<div onclick="_gbSpoilsConfirm(\'tell\')" style="cursor:pointer;aspect-ratio:2/3;display:flex;flex-direction:column;background:#191919;border:2px solid #6bc;padding:7px">'
       +'<div style="font-size:11px;font-weight:bold;color:#eee">'+(_spTell?_spTell.name:'TELL')+'</div>'
@@ -39132,11 +39138,31 @@ function activateAllIn(){
   setStatusMsg('ALL IN — NEXT BANK DOUBLED (OR -500)','gold');
 }
 
-/* Seven Dice: arm a flag — next roll uses +1 die */
+/* P834: Seven Dice redesigned (Denis) - a free one-die reroll,
+   steady_hand's tap shape with the P535 re-derive. The +1-die arm was
+   a silent no-op since the seat clamps. */
 function activateSevenDice(){
-  G._sevenDiceArmed=true;
-  setStatusMsg('SEVEN DICE — NEXT ROLL HAS 7','gold');
+  var free=(G&&G.pool||[]).filter(function(d){return !d.committed&&!d._frozen;});
+  if(!free.length){setStatusMsg('SEVEN DICE — NOTHING TO REROLL','red');return;}
+  setStatusMsg('SEVEN DICE — TAP THE DIE TO REROLL','gold');
   triggerCard('seven_dice','ARMED',true);
+  free.forEach(function(d){
+    if(!d.el)return;
+    d.el.classList.add('break-target');
+    d.el.onclick=function(){
+      free.forEach(function(q){if(q.el){q.el.classList.remove('break-target');q.el.onclick=function(){toggleDie(q);};}});
+      d.val=_rollD(d);d.sel=false;
+      if(d.el){d.el.classList.remove('selected');d.el.classList.add('card-reroll');
+        setTimeout(function(){if(d.el)d.el.classList.remove('card-reroll');},700);}
+      try{reDrawDieFace(d);}catch(e){}
+      famLog('SEVEN DICE — '+d.val);
+      /* the table as it is NOW can be a bust (steady_hand's P535 lesson) */
+      var _sf=(G.pool||[]).filter(function(x){return !x.committed&&!x._shattered;});
+      var fv=_sf.map(function(x){return x.val;}),fm=_sf.map(function(x){return x.mat;});
+      if(!anyScoring(fv,effectiveCards(),fm,_sf)){if(!_tryBustSave(_sf))_delayedDoBust(_sf);return;}
+      try{refreshSelUI();}catch(e){}
+    };
+  });
 }
 
 /* Loan: take the money now, pay it off in installments */
@@ -39279,12 +39305,9 @@ var NPC_ARMS=[
     G.oPts+=1500;G._oLoanRemaining=5;updHUD();
     triggerCard('loan','+1500 LOAN',false);
     setStatusMsg(G.rung.name+': LOAN +1500 (−200/TURN)','red');}},
-  {id:'seven_dice',moment:'turnStart',try:function(ctx){
-    if(G.npcCardState.oppTurnCount!==0)return;
-    npcUseActive('seven_dice');
-    ctx.left=7;
-    triggerCard('seven_dice','7 DICE!',false);
-    setStatusMsg(G.rung.name+': SEVEN DICE — 7 DICE!','red');}},
+  /* P834: the NPC seven_dice arm is deleted with the redesign - no
+     rung pools the card, and ctx.left=7 was clamped to the six seats
+     by the P521 join regardless. */
   {id:'all_in',moment:'turnStart',try:function(ctx){
     if(!(G.oPts*2>=G.target&&G.oPts<G.target&&G.npcCardState.oppTurnCount>=2))return;
     npcUseActive('all_in');
