@@ -13470,7 +13470,7 @@ function _maybeFireCutpurse(){
   /* Patron dialogue first-fire */
   /* DLG hook: reuse the pocket_sand (=PICKPOCKET card) dialog lines since
      the tell and the card share theme/name now. */
-  if(window.DLG)setTimeout(function(){DLG.triggerCard('pocket_sand',false);},400);
+  
 }
 
 /* Generate a faceless patron for a given tier */
@@ -19480,10 +19480,21 @@ function _dlgPick(pool,stage,skip){
     return _dlgCondOk(r);
   });
   if(!live.length)return null;
-  var spec=Math.max.apply(null,live.map(function(r){return (r.c||[]).length;}));
-  live=live.filter(function(r){return (r.c||[]).length===spec;});
-  var flo=Math.max.apply(null,live.map(function(r){return r.s||0;}));
-  live=live.filter(function(r){return (r.s||0)===flo;});
+  /* P833: ADDITIVE ROWS (add:1) join the pool whenever their conditions
+     pass, WITHOUT entering the specificity contest - the band-growth
+     lines are additive by the brief's explicit word ("the baseline
+     stays the baseline"). The most-conditions rule below keeps its
+     meaning for everything untagged - the Discrepancy thread's
+     deliberate story-ending override depends on it. */
+  var _addR=live.filter(function(r){return r.add;});
+  live=live.filter(function(r){return !r.add;});
+  if(live.length){
+    var spec=Math.max.apply(null,live.map(function(r){return (r.c||[]).length;}));
+    live=live.filter(function(r){return (r.c||[]).length===spec;});
+    var flo=Math.max.apply(null,live.map(function(r){return r.s||0;}));
+    live=live.filter(function(r){return (r.s||0)===flo;});
+  }
+  live=live.concat(_addR);
   /* P621: DROP THE GROUP THAT SPOKE LAST, but never empty the pool. The
      random pick among ties is still the rule the original comment defends;
      this only stops two lines that mean the same thing landing back to back,
@@ -20598,8 +20609,81 @@ var PATRON_LINES=[
   {p:'reaction:discrepancy',s:0,c:['heard:discrepancy_intro','night_gte:4'],g:'discrepancy-resolution',t:"Turned out to be an honest error. Corbin fixed it himself, mortified the whole time."},
   {p:'reaction:discrepancy',s:0,c:['heard:discrepancy_intro','night_gte:4'],g:'discrepancy-resolution',t:"Never did find out what really happened with Corvus's books. Some things stay buried."},
   {p:'reaction:discrepancy',s:0,c:['heard:discrepancy_intro','night_gte:4'],g:'discrepancy-resolution',t:"Corbin's back to his usual precise self. Whatever happened, it's handled."},
-  {p:'reaction:discrepancy',s:0,c:['heard:discrepancy_intro','night_gte:4'],g:'discrepancy-resolution',t:"Heard Corvus quietly wrote it off. Strange, for him. Makes you wonder."}
+  {p:'reaction:discrepancy',s:0,c:['heard:discrepancy_intro','night_gte:4'],g:'discrepancy-resolution',t:"Heard Corvus quietly wrote it off. Strange, for him. Makes you wonder."},
 
+  /* P833: THE GROWTH LINES (docs/PATRON_GROWTH_LINES.md, Denis's own
+     content pass). band-4/band-7 rows are add:1 - additive with the
+     baseline pool from their night on, never replacing it. The :recog
+     pools hold the rare "first meeting since the band changed" beat,
+     drawn once the persona registry lands (P838). Golgoth: recognition
+     only, his silence is the design. */
+  {p:'patron:krox',s:0,g:'b4',add:1,c:['night_gte:4'],t:"Selling to the guard-house now. Didn't expect that."},
+  {p:'patron:krox',s:0,g:'b7',add:1,c:['night_gte:7'],t:"Apprentice asked to learn from me last week. Told him no."},
+  {p:'patron:krox:recog',s:0,t:"You've been around a while now. Suppose I have too."},
+  {p:'patron:eira',s:0,g:'b4',add:1,c:['night_gte:4'],t:"Busier than ever. Half the town's writing someone this month."},
+  {p:'patron:eira',s:0,g:'b7',add:1,c:['night_gte:7'],t:"Started keeping a second book. The one nobody reads."},
+  {p:'patron:eira:recog',s:0,t:"Known you a good while now. Still charging you the same rate, though."},
+  {p:'patron:nebb',s:0,g:'b4',add:1,c:['night_gte:4'],t:"Started three new jobs this week. Finished one."},
+  {p:'patron:nebb',s:0,g:'b7',add:1,c:['night_gte:7'],t:"Slowed down a little. Don't tell Eira."},
+  {p:'patron:nebb:recog',s:0,t:"We've crossed paths a lot lately. Good, that. Keeps me moving."},
+  {p:'patron:regis',s:0,g:'b4',add:1,c:['night_gte:4'],t:"They've started listening to me more. About time."},
+  {p:'patron:regis',s:0,g:'b7',add:1,c:['night_gte:7'],t:"Someone called me 'the master of ceremonies' unironically last week. Best day of my life."},
+  {p:'patron:regis:recog',s:0,t:"You've become a regular fixture here. I approve."},
+  {p:'patron:corbin',s:0,g:'b4',add:1,c:['night_gte:4'],t:"Corvus trusts me with the big ledgers now."},
+  {p:'patron:corbin',s:0,g:'b7',add:1,c:['night_gte:7'],t:"Handling half his correspondence myself these days."},
+  {p:'patron:corbin:recog',s:0,t:"Seen you enough times now to know your patterns. Useful, that."},
+  {p:'patron:sparr',s:0,g:'b4',add:1,c:['night_gte:4'],t:"Running further routes now. Corvus trusts me with the long ones."},
+  {p:'patron:sparr',s:0,g:'b7',add:1,c:['night_gte:7'],t:"Know every shortcut in this town now. Every one."},
+  {p:'patron:sparr:recog',s:0,t:"You're becoming a regular stop on my route, you know."},
+  {p:'patron:pell',s:0,g:'b4',add:1,c:['night_gte:4'],t:"Selling to the guard now too. Word gets around."},
+  {p:'patron:pell',s:0,g:'b7',add:1,c:['night_gte:7'],t:"Taken on an apprentice. He's better than I was at his age."},
+  {p:'patron:pell:recog',s:0,t:"Seen you around enough now to know your draw. Good one, too."},
+  {p:'patron:osgood',s:0,g:'b4',add:1,c:['night_gte:4'],t:"Telling fewer war stories these days. Running out, probably."},
+  {p:'patron:osgood',s:0,g:'b7',add:1,c:['night_gte:7'],t:"Rilla's taken over most of the stall work now. Good. Gives my knees a rest."},
+  {p:'patron:osgood:recog',s:0,t:"Seen a lot of faces come and go. Yours keeps coming back, though."},
+  {p:'patron:rilla',s:0,g:'b4',add:1,c:['night_gte:4'],t:"Stall's doing better. Taking on more of it myself now."},
+  {p:'patron:rilla',s:0,g:'b7',add:1,c:['night_gte:7'],t:"Uncle's finally letting me run things my way."},
+  {p:'patron:rilla:recog',s:0,t:"We've gotten to know each other, haven't we."},
+  {p:'patron:dunstan',s:0,g:'b4',add:1,c:['night_gte:4'],t:"Taking bigger commissions now. Brutus himself ordered a piece."},
+  {p:'patron:dunstan',s:0,g:'b7',add:1,c:['night_gte:7'],t:"Son's old enough for the hammer now. Started him this week."},
+  {p:'patron:dunstan:recog',s:0,t:"Seen you enough times to trust your handshake now."},
+  {p:'patron:rask',s:0,g:'b4',add:1,c:['night_gte:4'],t:"Bigger jobs coming my way lately."},
+  {p:'patron:rask',s:0,g:'b7',add:1,c:['night_gte:7'],t:"People ask for me by name now. Used to just be 'the big one.'"},
+  {p:'patron:rask:recog',s:0,t:"You're a familiar face now. Good thing, in my line of work."},
+  {p:'patron:sil',s:0,g:'b4',add:1,c:['night_gte:4'],t:"Busier than usual. Town's gotten clumsier, apparently."},
+  {p:'patron:sil',s:0,g:'b7',add:1,c:['night_gte:7'],t:"Training someone now. She's sharper than I was."},
+  {p:'patron:sil:recog',s:0,t:"Seen enough of you now to know you heal fast. Good sign."},
+  {p:'patron:thorne',s:0,g:'b4',add:1,c:['night_gte:4'],t:"Tracking further out these days. Town's pushing the woods back."},
+  {p:'patron:thorne',s:0,g:'b7',add:1,c:['night_gte:7'],t:"Taken on a dog. Wasn't planning to. Happened anyway."},
+  {p:'patron:thorne:recog',s:0,t:"You're one of the few faces I actually remember now."},
+  {p:'patron:vess',s:0,g:'b4',add:1,c:['night_gte:4'],t:"Expanding the stall. Coin's been good."},
+  {p:'patron:vess',s:0,g:'b7',add:1,c:['night_gte:7'],t:"Daughter's running half the business now. Better at it than me, honestly."},
+  {p:'patron:vess:recog',s:0,t:"You've become a regular customer. I notice these things."},
+  {p:'patron:nell',s:0,g:'b4',add:1,c:['night_gte:4'],t:"Squib's getting harder to read. Almost proud."},
+  {p:'patron:nell',s:0,g:'b7',add:1,c:['night_gte:7'],t:"Teaching him properly now. Against my better judgment."},
+  {p:'patron:nell:recog',s:0,t:"Played you enough times now to know your tells. Mostly."},
+  {p:'patron:squib',s:0,g:'b4',add:1,c:['night_gte:4'],t:"Winning more often now. Nell's noticed."},
+  {p:'patron:squib',s:0,g:'b7',add:1,c:['night_gte:7'],t:"Nell actually asked my opinion on a hand last week."},
+  {p:'patron:squib:recog',s:0,t:"You've watched me grow into this. Feels good, that."},
+  {p:'patron:tuck',s:0,g:'b4',add:1,c:['night_gte:4'],t:"Bread's selling further than ever. Even Tam's customers come by now."},
+  {p:'patron:tuck',s:0,g:'b7',add:1,c:['night_gte:7'],t:"Teaching the recipe to my daughter. She's better at the kneading than me."},
+  {p:'patron:tuck:recog',s:0,t:"Fed you enough times now to know what you like."},
+  {p:'patron:mudge',s:0,g:'b4',add:1,c:['night_gte:4'],t:"More crossings these days. Town's growing."},
+  {p:'patron:mudge',s:0,g:'b7',add:1,c:['night_gte:7'],t:"Boat's got a second oar now. Hired help, finally."},
+  {p:'patron:mudge:recog',s:0,t:"Carried you across enough times now to call you a regular."},
+  {p:'patron:nix',s:0,g:'b4',add:1,c:['night_gte:4'],t:"Blamed for fewer bad hands lately. Progress, maybe."},
+  {p:'patron:nix',s:0,g:'b7',add:1,c:['night_gte:7'],t:"Someone called me lucky last week. First time ever."},
+  {p:'patron:nix:recog',s:0,t:"You've stuck around despite my reputation. That says something."},
+  {p:'patron:poll',s:0,g:'b4',add:1,c:['night_gte:4'],t:"Getting the details wrong less often. Or so I'm told."},
+  {p:'patron:poll',s:0,g:'b7',add:1,c:['night_gte:7'],t:"Told a story straight last week. Felt strange."},
+  {p:'patron:poll:recog',s:0,t:"Remember you from before. Probably correctly, this time."},
+  {p:'patron:roan',s:0,g:'b4',add:1,c:['night_gte:4'],t:"More errands than ever. Town keeps growing."},
+  {p:'patron:roan',s:0,g:'b7',add:1,c:['night_gte:7'],t:"Innkeep trusts me with the big deliveries now."},
+  {p:'patron:roan:recog',s:0,t:"Run into you enough times now to call it a pattern."},
+  {p:'patron:remny',s:0,g:'b4',add:1,c:['night_gte:4'],t:"Remember more faces these days. Or I think I do."},
+  {p:'patron:remny',s:0,g:'b7',add:1,c:['night_gte:7'],t:"People trust my memory now. Still wrong half the time, though."},
+  {p:'patron:remny:recog',s:0,t:"Remember you well by now. Or someone just like you."},
+  {p:'patron:golgoth:recog',s:0,t:"...Still here."},
 ];
 var _ptOpen=false,_ptSeats=[];
 function _ptLayout(n){
@@ -31259,7 +31343,7 @@ function startPTurn(){
         triggerCard(cid,npc.name+': SWAPPED '+pOld.toUpperCase()+' ↔ '+oOld.toUpperCase(),false);
         setStatusMsg(G.rung.name+' SWAPPED YOUR '+pOld.toUpperCase()+'!','red');
         spawnPop('🔄 SWAPPED');
-        setTimeout(function(){if(window.DLG)DLG.triggerCard(cid,false);},600);
+        
       }else if(eff.mode==='downgrade_best'){
         /* Downgrade the TOP TWO premium dice to bone (was just one). The
            single-die downgrade felt soft compared to Finnick's swap which
@@ -31282,7 +31366,7 @@ function startPTurn(){
           triggerCard(cid,npc.name+': '+_dgLabel+' → BONE',false);
           setStatusMsg(G.rung.name+' DOWNGRADED '+_dgLabel+'!','red');
           spawnPop('📦 ×'+_dgnDowngraded.length+' DOWNGRADED');
-          setTimeout(function(){if(window.DLG)DLG.triggerCard(cid,false);},600);
+          
         }
       }
     }
@@ -31320,7 +31404,7 @@ function startPTurn(){
         triggerCard(cid,npc.name+': TOOK YOUR '+stolen.toUpperCase()+'!',false);
         setStatusMsg(G.rung.name+' SEIZED YOUR '+stolen.toUpperCase()+'!','red');
         spawnPop('👑 SEIZED');
-        setTimeout(function(){if(window.DLG)DLG.triggerCard(cid,false);},600);
+        
       }else if(eff.mode==='take_and_use'){
         /* Remove from player, add to NPC */
         /* P530: THE ONE EXIT PATH, as Sacrifice took in P519. This was a
@@ -31372,7 +31456,7 @@ function startPTurn(){
         setStatusMsg(G.rung.name+' CONFISCATED YOUR '+stolen.toUpperCase()+'!','red');
         spawnPop('✝️ CONFISCATED');
         try{famFire('cardHit',{actor:'p',src:'confiscate'});}catch(e){}/* P814 */
-        setTimeout(function(){if(window.DLG)DLG.triggerCard(cid,false);},600);
+        
       }
     }
   });
@@ -32206,7 +32290,7 @@ function _afterRollImpl(){
       _hsV5.val=5;reDrawDieFace(_hsV5);
       if(_hsV5.el){_hsV5.el.classList.add('eff-glow-red');spawnPixelSparks(_hsV5.el,4);setTimeout(function(){if(_hsV5.el)_hsV5.el.classList.remove('eff-glow-red');},700);}
     }
-    triggerCard('hot_streak','HOT STREAK!',true);if(window.DLG)setTimeout(function(){DLG.triggerCard('hot_streak',true);},800);
+    triggerCard('hot_streak','HOT STREAK!',true);
   }
   /* Chain Lightning: track consecutive scoring rolls. Surface the running
      bank-bonus mid-turn so the player sees the chain build instead of
@@ -32300,7 +32384,7 @@ function _afterRollImpl(){
        the third field the brand died here, and the kept group is what
        preserve, _keptScorers and every icon check downstream read. */
     G.kept.push({vals:[freeV[0]],mat:d.mat,pts:600,dice:[{val:freeV[0],mat:d.mat,ench:d.ench||null}]});G.turnPts=G.kept.reduce((a,k)=>a+k.pts,0)+(G._turnBonusPot||0);refreshKeptTray();updHUD();
-    triggerCard('last_stand','LAST STAND! 600',true);if(window.DLG)setTimeout(function(){DLG.triggerCard('last_stand',true);},800);setBtns(false,true);return;
+    triggerCard('last_stand','LAST STAND! 600',true);setBtns(false,true);return;
   }
   /* ── Boss edicts removed — patron "edict" system simplified away.
      NPC card effects below handle all opponent-side disruption now. ── */
@@ -32347,7 +32431,7 @@ function _afterRollImpl(){
         setStatusMsg(npc.name+(_sbN>1?' — '+_sbN+' DICE → '+_sbTo+'!':' — DIE → '+_sbTo+'!'),'red');
         try{SFX.err&&SFX.err();}catch(e){}
         try{Haptic.bust&&Haptic.bust();}catch(e){}
-        (function(_cid){setTimeout(function(){if(window.DLG)DLG.triggerCard(_cid,false);},650);})(cid);
+        
       }
     }
     /* crown_authority / blessed_dice / corvus_writ: reroll ALL kept dice (once) */
@@ -32409,7 +32493,7 @@ function _afterRollImpl(){
           setTimeout(function(){_da&&_da.classList.remove('bust-shake');},460);}
       }catch(e){}
       setTimeout(function(){refreshKeptTray();updHUD();},260);
-      (function(_cid){setTimeout(function(){if(window.DLG)DLG.triggerCard(_cid,false);},700);})(cid);
+      
     }
   });
   /* Re-check scoring after NPC roll effects */
@@ -33325,7 +33409,7 @@ function doBust(){
       G.oPts+=_igLost;updHUD();
       triggerCard('iron_gate_npc','IRON GATE +'+_igLost,false);
       setStatusMsg('IRON GATE — '+(G.rung?G.rung.name:'RIVAL')+' SEIZED '+_igLost+'!','red');
-      try{if(window.DLG)setTimeout(function(){DLG.triggerCard('iron_gate_npc',false);},700);}catch(e){}
+      
     }
   }
   /* Synergy: Last Resort — on bust, keep 25% of accumulated turn pts */
@@ -33430,11 +33514,9 @@ function doBust(){
     /* Fire NPC card animations AFTER bust overlay appears */
     _pendingBustTriggers.forEach(function(p){triggerCard(p.cid,p.msg,false);});
     if(_pendingBustTriggers.length)updHUD();
-    /* Patron dialogue for the most impactful bust-triggered card (just one to avoid stacking) */
-    if(_pendingBustTriggers.length&&window.DLG){
-      var _firstBT=_pendingBustTriggers[0];
-      setTimeout(function(){DLG.triggerCard(_firstBT.cid,false);},900);
-    }
+    /* P833: the DLG.triggerCard bust bark went with the feature - its
+       pools were deleted with OPP_DIALOGUE and Denis ruled the call
+       sites out rather than revived (trait reactions cover the beat). */
     /* Extended to 1100ms so the bustPop keyframe (1s) gets to complete its
        full scale+fade arc instead of being cut off mid-animation. */
     setTimeout(()=>document.getElementById('bust-ov').classList.remove('flash'),1100);
@@ -33566,7 +33648,7 @@ function _oppFxOwnA(pts){
         var npc=getNpcCard(cid);if(!npc)return;var eff=npc.effect;
         /* old_partners_badge: +100 flat per bank */
         if(eff.type==='on_opp_bank'&&eff.mechanic==='flat_bonus'){pts=BANK_FX.flat_bonus(pts,eff);triggerCard(cid,npc.name+' +'+eff.amount,false);
-          (function(_cid){setTimeout(function(){if(window.DLG)DLG.triggerCard(_cid,false);},_oppDelay(700));})(cid);}
+          }
         /* measure_twice: double first bank (was tripled — too strong).
            Show the actual delta in the trigger label so the doubling reads
            clearly. Player feedback B6: "Measure Twice didn't double bank
@@ -33579,7 +33661,7 @@ function _oppFxOwnA(pts){
           pts=BANK_FX.double_first_bank(pts,eff);
           triggerCard(cid,'×2 → +'+_mtBonus,false);
           spawnPop('×2! +'+_mtBonus.toLocaleString());
-          (function(_cid){setTimeout(function(){if(window.DLG)DLG.triggerCard(_cid,false);},_oppDelay(700));})(cid);
+          
         }
       });
   return pts;
@@ -33592,7 +33674,7 @@ function _oppFxOwnB(pts){
   G.oCards.forEach(function(cid){
         var npc=getNpcCard(cid);if(!npc)return;
         if(npc.effect.mechanic==='gain_when_ahead'&&(G.oPts+pts)>G.pPts){pts=BANK_FX.gain_when_ahead(pts,npc.effect);triggerCard(cid,npc.name+' +'+npc.effect.amount,false);
-          (function(_cid){setTimeout(function(){if(window.DLG)DLG.triggerCard(_cid,false);},_oppDelay(700));})(cid);}
+          }
       });
   return pts;
 }
@@ -34075,14 +34157,14 @@ function handleBank(){
   /* Hot Streak: track safe turns and prime next roll */
   if(G.pCards.includes('hot_streak')&&G.safeTurnStreak>=2){G._hotStreakReady=true;}
   /* High Roller: bank 800+ → +200 */
-  if(G.pCards.includes('high_roller')&&total>=600){total+=400;bonusMsg+=' +400 HIGH ROLLER';triggerCard('high_roller','+400',true);if(window.DLG)setTimeout(function(){DLG.triggerCard('high_roller',true);},800);}
+  if(G.pCards.includes('high_roller')&&total>=600){total+=400;bonusMsg+=' +400 HIGH ROLLER';triggerCard('high_roller','+400',true);}
   /* Blood Tithe: -50 per turn cost */
-  if(G.pCards.includes('blood_tithe')){var _btCost=50;if(G.pCards.includes('the_alchemist')&&G._alchemistActive)_btCost*=2;total-=_btCost;bonusMsg+=' -'+_btCost+' TITHE';triggerCard('blood_tithe','-'+_btCost,true);if(window.DLG)setTimeout(function(){DLG.triggerCard('blood_tithe',true);},800);}
+  if(G.pCards.includes('blood_tithe')){var _btCost=50;if(G.pCards.includes('the_alchemist')&&G._alchemistActive)_btCost*=2;total-=_btCost;bonusMsg+=' -'+_btCost+' TITHE';triggerCard('blood_tithe','-'+_btCost,true);}
   /* Twin Flames: 2 different triples in this turn → +500 */
   if(G.pCards.includes('twin_flames')){
     var _tfTriples={};
     G.kept.forEach(function(k){if(k.vals.length>=3){var _fc={};k.vals.forEach(function(v){_fc[v]=(_fc[v]||0)+1;});for(var _fk in _fc){if(_fc[_fk]>=3)_tfTriples[_fk]=true;}}});
-    if(Object.keys(_tfTriples).length>=2){total+=750;bonusMsg+=' +750 TWIN FLAMES';triggerCard('twin_flames','+750',true);if(window.DLG)setTimeout(function(){DLG.triggerCard('twin_flames',true);},800);}
+    if(Object.keys(_tfTriples).length>=2){total+=750;bonusMsg+=' +750 TWIN FLAMES';triggerCard('twin_flames','+750',true);}
   }
   /* The Alchemist: 3+ tin cards → double tin effect bonuses (applied inline above) */
   /* The Fence: opponent-disruption 25% stronger (applied in runOppTurn/finOpp) */
@@ -34120,14 +34202,14 @@ function handleBank(){
       var steal=BANK_TAKE.steal_pct(total,eff);total-=steal;G.oPts+=steal;
       bonusMsg+=' -'+steal+' '+npc.name;
       triggerCard(cid,npc.name+' −'+steal,false);
-      (function(_cid){setTimeout(function(){if(window.DLG)DLG.triggerCard(_cid,false);},800);})(cid);
+      
     }
     /* Halve first bank (fine_print) */
     if(eff.type==='on_player_bank'&&eff.mechanic==='halve_first_bank'&&!G.npcCardState.firstBankDone){
       var half=total-BANK_FX.halve_first_bank(total,eff);total-=half;
       bonusMsg+=' -'+half+' '+npc.name;
       triggerCard(cid,npc.name+' −'+half+'!',false);
-      (function(_cid){setTimeout(function(){if(window.DLG)DLG.triggerCard(_cid,false);},800);})(cid);
+      
     }
     /* Halve next big bank (corvus_writ): once per match, fires on the
        first player bank ≥ threshold (500). The old reroll_all_kept
@@ -34140,7 +34222,7 @@ function handleBank(){
       var _cwHalf=Math.floor(total/2);total-=_cwHalf;
       bonusMsg+=' -'+_cwHalf+' '+npc.name;
       triggerCard(cid,npc.name+' −'+_cwHalf+'!',false);
-      (function(_cid){setTimeout(function(){if(window.DLG)DLG.triggerCard(_cid,false);},800);})(cid);
+      
     }
     /* Steal low bank (the_lords_seal) */
     if(eff.type==='once'&&eff.mechanic==='steal_low_bank'&&(G.npcCardState.usedOnce[cid]||0)<_useCap(cid)&&total<eff.threshold){
@@ -34148,7 +34230,7 @@ function handleBank(){
       bonusMsg+=' STOLEN! '+npc.name;setStatusMsg(npc.name+' — '+G.rung.name+' STOLE '+total+'!','red');
       triggerCard(cid,npc.name+' STOLE '+total+'!',false);
       spawnPop('STOLEN!');
-      (function(_cid){setTimeout(function(){if(window.DLG)DLG.triggerCard(_cid,false);},800);})(cid);
+      
       _turnScoreClear();G.numDice=6;updHUD();refreshKeptTray();_turnTableClear();setBtns(false,false);try{_renderSelTags([],0,true);}catch(e){}
       _bankAborted=true;
       if(G.oPts>=G.target){setTimeout(function(){endMatch(false)},700);return;}
@@ -34184,7 +34266,7 @@ function handleBank(){
       G.pPts=SCORE_DRAIN.periodic_drain(G.pPts,npc.effect);
       bonusMsg+=' -'+npc.effect.amount+' '+npc.name;
       triggerCard(cid,npc.name+' −'+npc.effect.amount,false);
-      setTimeout(function(){if(window.DLG)DLG.triggerCard(cid,false);},600);
+      
     }
   });
 
@@ -35465,7 +35547,7 @@ function runOppTurn(){
         if(_bsOut&&_bsOut.kind==='survive'){
           setStatusMsg(G.rung.name+' SURVIVES BUST!','red');
           if(_bsOut.cid){var _bsCid=_bsOut.cid;triggerCard(_bsCid,getNpcCard(_bsCid).name+'!',false);
-            setTimeout(function(){if(window.DLG)DLG.triggerCard(_bsCid,false);},_oppDelay(700));}
+            }
           setTimeout(function(){_oResumeAfterBustSave();/* P524 */},_oppDelay(900));return;
         }
         if(_bsOut&&_bsOut.kind==='bank'){
@@ -37969,6 +38051,23 @@ const LEDGER_LINES={
           }
         }catch(e){}
       }
+      /* P833: FIRST-EVER MEETING (Denis). The ledger greeting needs
+         history; with none, a boss draws its own :open pool
+         (boss:<name>:open - _bossKey's key family, the lowercased rung
+         name). Rows are Denis's to write; an empty pool falls through
+         silently. Covers MATCH_START and the rematch redirect alike.
+         Boss-reachable and patron-inert by construction: for bosses the
+         wrapper always reaches this original (art is null, P818); for
+         patrons the personal layer answers MATCH_START first. */
+      if((cat==='MATCH_START'||cat==='REMATCH_START')&&typeof G!=='undefined'&&G&&G._isBoss){
+        try{
+          var _lg0=(typeof S!=='undefined')&&S&&S.npcLedger&&S.npcLedger[this.portraitKey];
+          if(!(_lg0&&_lg0.nights>0)&&typeof _dlgPick==='function'){
+            var _bo=_dlgPick('boss:'+String(this.oppKey||'').toLowerCase()+':open',0,null);
+            if(_bo)return _bo.t;
+          }
+        }catch(e){}
+      }
       /* PATRON class flavour: on a match open, ~60% chance to use a
          persona-specific intro (from PATRON_CLASS_LINES) instead of the
          generic patron pool, so the patron's 'class' comes through. */
@@ -38001,37 +38100,10 @@ const LEDGER_LINES={
       var _priority=(cat==='MATCH_START'||cat==='REMATCH_START'||cat==='PLAYER_SIX_KIND'||cat==='OPP_WINS');
       if(!_priority&&now<this.busyUntil+this.gap)return;
       const line=this.getLine(cat);if(!line)return;this.show(line);this.lastTime=now;},
-    /* triggerCard: patron reacts to a specific card firing.
-       isPlayerCard=false → NPC card the patron just used (pool: OPP_DIALOGUE[oppKey].CARDS[cardId])
-       isPlayerCard=true  → player card the patron is reacting to (pool: PLAYER_CARDS[cardId])
-       First fire of a given card per match is guaranteed (bypasses cooldown)
-       so the player always learns the card's flavor. One line per card per match max. */
-    triggerCard(cardId,isPlayerCard){if(!this.oppKey||!cardId)return;
-      const data=OPP_DIALOGUE[this.oppKey];if(!data)return;
-      const bucketKey=isPlayerCard?'PLAYER_CARDS':'CARDS';
-      const bucket=data[bucketKey];
-      const firedKey=bucketKey+':'+cardId;
-      /* One line per card per match */
-      if(this.cardFiredThisMatch[firedKey])return;
-      /* Look up lines — fall back to generic category if no card-specific set */
-      let lines=(bucket&&bucket[cardId])?bucket[cardId]:null;
-      let usedKey=firedKey;
-      if(!lines||!lines.length){
-        /* Fallback: use existing generic category to avoid silent miss */
-        const fallbackCat=isPlayerCard?'CARD_EFFECT':'BOSS_ATTACK';
-        if(!data[fallbackCat])return;
-        lines=data[fallbackCat];usedKey='FALLBACK:'+fallbackCat;
-      }
-      /* Pick an unused line from the per-card pool */
-      if(!this.usedLines[usedKey])this.usedLines[usedKey]=[];
-      let avail=lines.filter((_,i)=>!this.usedLines[usedKey].includes(i));
-      if(!avail.length){this.usedLines[usedKey]=[];avail=lines;}
-      const line=avail[Math.floor(Math.random()*avail.length)];
-      this.usedLines[usedKey].push(lines.indexOf(line));
-      /* Mark fired so we don't repeat this match */
-      this.cardFiredThisMatch[firedKey]=true;
-      /* First-fire bypasses cooldown to guarantee the teach-moment */
-      this.show(line);this.lastTime=Date.now();},
+    /* P833: DLG.triggerCard is DELETED (Denis's ruling) - its card-bark
+       pools were removed with OPP_DIALOGUE and the ~24 call sites fired
+       into nothing; trait reactions + hesitation cover event reactions.
+       The GLOBAL triggerCard() banner is a different function, alive. */
     show(text){
       const box=document.getElementById('dlgBox'),textEl=document.getElementById('dlgText'),img=document.getElementById('dlgImg');
       if(!box||!textEl)return;
@@ -38564,7 +38636,7 @@ function activateCard(cardId){
   /* Trigger patron reaction. Card-specific lines (when authored) override the
      generic CARD_EFFECT fallback. First-fire-per-match guarantee inside DLG.triggerCard
      means the player always learns the card name + patron's voice on first use. */
-  setTimeout(function(){if(window.DLG)DLG.triggerCard(cardId,true);},800);
+  
 }
 
 /* Grog's Flask: reroll up to 2 non-scoring free dice */
