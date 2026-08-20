@@ -4401,6 +4401,13 @@ body.crit-dilate{animation:critDilate .55s ease-out both}
 .mcard-active[data-cid="old_bones"]{--card-accent:rgba(168,152,130,.8);--card-dither:rgba(168,152,130,.08)}
 /* — Gambler's Eye: mystic teal — */
 .mcard-active[data-cid="gamblers_eye"]{--card-accent:rgba(80,200,180,.8);--card-dither:rgba(80,200,180,.09)}
+/* P823: the fog cloud - floats in the top layer over the blinded die
+   (chip-level overlays are invisible under the 3D canvas). */
+.fog-float{position:fixed;transform:translate(-50%,-55%);font-size:30px;color:#cdd5dc;
+  text-shadow:0 2px 6px #000c,0 0 14px #a8b0b880;pointer-events:none;z-index:60;
+  animation:fogFloatDrift 2.4s ease-in-out infinite}
+@keyframes fogFloatDrift{0%,100%{transform:translate(-58%,-55%);opacity:.92}
+  50%{transform:translate(-42%,-58%);opacity:1}}
 /* — Grog's Flask: warm amber — */
 .mcard-active[data-cid="grogs_flask"]{--card-accent:rgba(200,150,60,.8);--card-dither:rgba(200,150,60,.08)}
 /* — Mabel's Stitch: rose — */
@@ -17987,6 +17994,7 @@ var FKFX={
     'ench:tithe':{f:'COIN',c:'#d8b054',p:1}, 'ench:ward':{f:'SET',c:'#9ab0d0',p:1},
     'ench:snare':{f:'SET',c:'#c05a3a',p:1}, 'ench:trade':{f:'TRANSFORM',c:'#46c46e',p:1},
     'ench:snuff':{f:'BREAK',c:'#4a4060',p:1}, 'ench:quicksilver':{f:'TRANSFORM',c:'#dfe8f2',p:1},
+    'ench:break':{f:'BREAK',c:'#c66058',p:2}, 'ench:fog':{f:'SET',c:'#a8b0b8',p:1},/* P823: the census's only two unlisted enchants */
     'mat:amber':{f:'PAY',c:'#ffd870',p:1}, 'mat:jade':{f:'TRANSFORM',c:'#70d898',p:1},
     'mat:jade2':{f:'TRANSFORM',c:'#70d898',p:2}, 'mat:jade3':{f:'TRANSFORM',c:'#70d898',p:3},
     'mat:brass':{f:'COIN',c:'#e8b860',p:1}, 'mat:silver':{f:'FATE',c:'#e0e8f0',p:1},
@@ -22683,7 +22691,7 @@ var ENCH_ICONS={
      because a second warded die is a second CHANCE TO ARM and the save-cap
      alone does not restrict that. */
   ward:{name:'Ward',price:350,glyph:'\u25B2',ink:'#9ab0d0',
-    desc:'Brand a shield on one face. Keep it: it banks nothing and arms this turn — a bust halves your bank instead of taking it all.',
+    desc:'Brand a shield on one face. Keep it: it banks nothing and arms this turn — bust, and HALF the turn is saved to your bank instead of losing it all.',
     doubles:true,
     fire:function(c){
       /* WARD'S LIFETIME (Phase 3), and it is NOT a lane marker - it is armed on
@@ -22728,7 +22736,7 @@ var ENCH_ICONS={
      97.7% within six turns - not a bet at all. The short window is what
      makes it a wager. */
   snare:{name:'Snare',price:400,glyph:'\u2442',ink:'#a888c0',
-    desc:'Brand a snare on one face. Keep it: it banks nothing and sets a trap in this lane for the rival\u2019s next turn.',
+    desc:'Brand a snare on one face. Keep it: it banks nothing and traps this lane — next turn, the rival\u2019s die in this seat scores HALF, once.',
     doubles:true,
     fire:function(c){
       /* stamped with the opponent turn it is FOR. "Until it fires" tested at
@@ -22753,7 +22761,7 @@ var ENCH_ICONS={
      property name, and matching the art filename beats inventing an
      abbreviation nothing else uses. */
   'break':{name:'Break',price:300,glyph:'\u2620',ink:'#c66058',
-    desc:'Brand a skull on one face. Keep it: it banks nothing and breaks another of your dice for good — and whatever that die was dies loudly.',
+    desc:'Brand a skull on one face. Keep it: it banks nothing and breaks another of your dice for the rest of the match — and whatever that die was dies loudly.',
     /* only ARMS here. Targeting cannot start inside the commit: the caller
        carries on and re-throws the row, wiping the tap handlers in the same
        call that set them. handleRoll/handleBank pick this up once the commit
@@ -22860,7 +22868,7 @@ var ENCH_ICONS={
      than assuming threat-assessment it does not have. (Whisper, an earlier
      concept, was cut for needing an opponent smart enough to be fooled.) */
   fog:{name:'Fog',price:250,glyph:'\u2601',ink:'#a8b0b8',
-    desc:'Brand a cloud on one face. Keep it: it banks nothing and hides this seat from the rival\u2019s reckoning next turn.',
+    desc:'Brand a cloud on one face. Keep it: it banks nothing and blinds the rival to this seat next turn — the fogged die goes dark on their table and they play around it.',
     doubles:true,
     fire:function(c){
       /* KINDRED (#32): two opponent turns, same reading as Snuff */
@@ -26583,6 +26591,7 @@ var D3X={
     _k=_k<0?0:(_k>1?1:_k);
     _k=_k*_k*(3-2*_k);/* smoothstep: no visible start, no visible stop */
     var _kk=(Math.round(_k*_R.steps)/_R.steps)*this.SIDEDIM_MAX;
+    if(d._fogDim)_kk=Math.max(_kk,1.15);/* P823: a fogged die sits past full shadow (_dimMap supports k>1 - the bust-wipe path) */
     d.obj.traverse(function(o){
       if(!o.isMesh||!o.material||o.userData.outline)return;
       var m=o.material;
@@ -27887,6 +27896,7 @@ var D3X={
             if(_kL<0)_kL=0;if(_kL>1)_kL=1;
             _kL=_kL*_kL*(3-2*_kL);
             var _kkL=(Math.round(_kL*D3X.SIDEDIM_RAMP.steps)/D3X.SIDEDIM_RAMP.steps)*D3X.SIDEDIM_MAX;
+            if(d._fogDim)_kkL=Math.max(_kkL,1.15);/* P823 */
             d.obj.traverse(function(o){
               if(!o.isMesh||!o.material||o.userData.outline)return;
               var m=o.material;
@@ -35042,6 +35052,29 @@ function runOppTurn(){
         if(_fi>=0&&_fogV.length>1){
           _fogV.splice(_fi,1);_fogM.splice(_fi,1);if(_fogE)_fogE.splice(_fi,1);_fogCut=_fi;/* P762 */
           try{famLog('FOG — THEY MISREAD A SEAT');}catch(e){}
+          /* P823: THE FOG SHOWS. Chip overlays are invisible under the 3D
+             canvas (screenshot-proven), so the blinded die goes DARK
+             through the dim system and a cloud drifts over its seat in
+             the top layer. The dim lingers until their row rebuilds. */
+          try{
+            var _fgChip=_oFree[_fi]&&_oFree[_fi].el;
+            if(_fgChip&&window.D3X&&D3X.dice){
+              var _fgD=null;
+              for(var _fk=0;_fk<D3X.dice.length;_fk++)if(D3X.dice[_fk].chip===_fgChip){_fgD=D3X.dice[_fk];break;}
+              if(_fgD){_fgD._fogDim=true;try{D3X._settleDim(_fgD);}catch(e2){}}
+            }
+            if(_fgChip){
+              var _fgR=_fgChip.getBoundingClientRect();
+              if(_fgR.width>0){
+                var _fgTag=document.createElement('div');
+                _fgTag.className='fog-float';_fgTag.textContent='\u2601';
+                _fgTag.style.left=(_fgR.left+_fgR.width/2)+'px';
+                _fgTag.style.top=(_fgR.top+_fgR.height/2)+'px';
+                document.body.appendChild(_fgTag);
+                setTimeout(function(){if(_fgTag.parentNode)_fgTag.remove();},3200);
+              }
+            }
+          }catch(e){}
         }
         /* KINDRED holds it for a second opponent turn (#32) */
         _lmSpend('_fog');
