@@ -39476,11 +39476,7 @@ function activateBlessedDicePlayer(){
 function activateCoinFlip(){
   /* Cancel any in-flight Vagabond drag — otherwise selDice can be stale because the
      dragging die is in pc-drag-origin state and not officially "selected". */
-  if(typeof _vgDragState!=='undefined'&&_vgDragState){
-    if(_vgDragState.clone&&_vgDragState.clone.parentNode)_vgDragState.clone.parentNode.removeChild(_vgDragState.clone);
-    if(_vgDragState.srcEl)_vgDragState.srcEl.classList.remove('vg-drag-origin');
-    _vgDragState=null;
-  }
+  try{_vgDragCancel();}catch(e){}/* P835b: the one canceller (the old inline copy used a dead state shape) */
   var selDice=G.pool.filter(function(d){return d.sel&&!d.committed;});
   if(!selDice.length){setStatusMsg('TAP A DIE FIRST, THEN TAP COIN FLIP','red');refundActiveCardUse('coin_flip');return;}
   var d=selDice[0];
@@ -39496,11 +39492,7 @@ function activateCoinFlip(){
 /* THE NUDGE — bumps a selected die up by 1 (6 wraps to 1). Two charges
    per match. Mirrors the COIN FLIP / DOUBLE DOWN DIE pattern. */
 function activateTheNudge(){
-  if(typeof _vgDragState!=='undefined'&&_vgDragState){
-    if(_vgDragState.clone&&_vgDragState.clone.parentNode)_vgDragState.clone.parentNode.removeChild(_vgDragState.clone);
-    if(_vgDragState.srcEl)_vgDragState.srcEl.classList.remove('vg-drag-origin');
-    _vgDragState=null;
-  }
+  try{_vgDragCancel();}catch(e){}/* P835b: the one canceller (the old inline copy used a dead state shape) */
   var selDice=G.pool.filter(function(d){return d.sel&&!d.committed;});
   if(!selDice.length){setStatusMsg('TAP A DIE FIRST, THEN TAP THE NUDGE','red');refundActiveCardUse('the_nudge');return;}
   var d=selDice[0];
@@ -39519,11 +39511,7 @@ function activateTheNudge(){
    AND G.matchDice[matchSlot] so the change survives in-turn rerolls,
    hot-dice fresh rolls, and subsequent turns this match. */
 function activateAlchemistsChisel(){
-  if(typeof _vgDragState!=='undefined'&&_vgDragState){
-    if(_vgDragState.clone&&_vgDragState.clone.parentNode)_vgDragState.clone.parentNode.removeChild(_vgDragState.clone);
-    if(_vgDragState.srcEl)_vgDragState.srcEl.classList.remove('vg-drag-origin');
-    _vgDragState=null;
-  }
+  try{_vgDragCancel();}catch(e){}/* P835b: the one canceller (the old inline copy used a dead state shape) */
   var selDice=G.pool.filter(function(d){return d.sel&&!d.committed;});
   if(selDice.length!==2){
     setStatusMsg('SELECT EXACTLY 2 OF YOUR DICE','red');
@@ -44587,6 +44575,21 @@ var _vgDragState=null;
 function _vgRowInfo(){
   if(!window.D3X||!D3X.dice)return null;
   var mine=D3X.dice.filter(function(d){return d.match&&d.phys&&d.chip&&d.chip.isConnected;});
+  /* P835 (Denis, §6): COMMITTED DICE ARE NOT REORDERABLE. They held a
+     place in the census, so a drag lerped them aside and the commit
+     permuted their seats - moving Finnick's Palm adjacency mid-turn and
+     letting a scored die park at an end to aim vanguard_f. They now sit
+     out like the destroyed-dice holes: seat, pool position and home all
+     stay. State-true read via the pool entry, not a class. */
+  try{
+    if(typeof G!=='undefined'&&G&&G.pool){
+      mine=mine.filter(function(d){
+        var pd=null;
+        for(var i=0;i<G.pool.length;i++)if(G.pool[i].el===d.chip){pd=G.pool[i];break;}
+        return !(pd&&(pd.committed||pd._frozen));
+      });
+    }
+  }catch(e){}
   if(mine.length<2)return null;
   var key=D3X._rowKey(mine[0]);
   mine=mine.filter(function(d){return D3X._rowKey(d)===key;});
@@ -44671,6 +44674,23 @@ function _startVagabondDrag(die){
   document.addEventListener('touchend',onEnd,{passive:true,once:true});
   document.addEventListener('touchcancel',onEnd,{passive:true,once:true});
 }
+/* P835b: THE ONE CANCELLER. Three activation paths carried identical
+   copies nulling the state through clone/srcEl - fields this drag
+   system never had - so a cancel left the carried die lifted, the
+   neighbour lerp running and the listeners leaked. */
+function _vgDragCancel(){
+  var _st=(typeof _vgDragState!=='undefined')?_vgDragState:null;
+  if(!_st)return;
+  _vgDragState=null;
+  try{
+    if(_st.raf)cancelAnimationFrame(_st.raf);
+    if(_st.onMove){document.removeEventListener('pointermove',_st.onMove,{passive:false});
+      document.removeEventListener('touchmove',_st.onMove,{passive:false});}
+    if(_st.die)_st.die.classList.remove('vg-drag-origin');
+    if(_st.me&&_st.y0!==undefined)_st.me.phys.y=_st.y0;
+    if(_st.order&&_st.homes)_st.order.forEach(function(d,i){d.phys.x=_st.homes[i];});
+  }catch(e){}
+}
 function _commitVagabondDrag(){
   var st=_vgDragState;if(!st)return;
   _vgDragState=null;
@@ -44693,8 +44713,16 @@ function _commitVagabondDrag(){
         for(var i=0;i<G.pool.length;i++)if(G.pool[i].el===d.chip)return G.pool[i];
         return null;
       }).filter(Boolean);
-      if(poolSeq.length===G.pool.length){
-        G.pool=poolSeq;
+      /* P835: the census excludes committed dice, so poolSeq covers the
+         FREE entries only - the old whole-pool guard would always fail.
+         The free entries re-fill the free positions in their new order;
+         committed entries keep their indices (their seats never enter
+         _slots below, so their lane/mat/ench are untouched - the same
+         leave-the-hole shape the seat loop already uses). */
+      var _freeCount=G.pool.filter(function(p){return !(p.committed||p._frozen);}).length;
+      if(poolSeq.length===_freeCount&&poolSeq.length===seq.length){
+        var _pk=0;
+        G.pool=G.pool.map(function(p){return (p.committed||p._frozen)?p:poolSeq[_pk++];});
         /* P520: AND NOW THE REORDER IS REAL. Reordering G.pool and the DOM
            moved where the die is DRAWN. It left d.lane, G.matchDice and
            G._enchArr behind in the old seat, so the die walked away from its
@@ -44754,9 +44782,12 @@ function _commitVagabondDrag(){
        orphaned them from their wrap and hid them behind
        .die-wrap:not(:has(.die)){display:none} */
     var row=document.getElementById('playerDiceRow');
-    if(row){
-      seq.forEach(function(d){
-        var w=d.chip.closest?d.chip.closest('.die-wrap'):null;
+    if(row&&typeof G!=='undefined'&&G&&G.pool){
+      /* P835: re-append in the NEW POOL order - committed wraps included,
+         in place. Appending only the free wraps shoved them all behind
+         the committed ones and broke DOM-order == pool-order. */
+      G.pool.forEach(function(p){
+        var w=(p.el&&p.el.closest)?p.el.closest('.die-wrap'):null;
         if(w&&w.parentNode===row)row.appendChild(w);
       });
     }
