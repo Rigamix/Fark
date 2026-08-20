@@ -17131,9 +17131,24 @@ function _clearRollForces(){
 function famApplyRollForces(){
   if(!G)return;
   var free=G.pool.filter(function(d){return !d.committed&&!d._frozen;});
-  if(G._famPeekVals&&G._famPeekVals.length===free.length){
-    free.forEach(function(d,i){d.val=G._famPeekVals[i];try{reDrawDieFace(d);}catch(e){}});
-    famLog('THE STARS HOLD');/* P708 */
+  if(G._famPeekVals&&G._famPeekVals.length){
+    /* P811: lane-keyed consume - every rolling die takes its promised
+       face. Legacy index-array saves (bare numbers) keep the old
+       exact-count contract so an old mid-match resume cannot misapply
+       promises to the wrong dice. */
+    if(typeof G._famPeekVals[0]==='number'){
+      if(G._famPeekVals.length===free.length){
+        free.forEach(function(d,i){d.val=G._famPeekVals[i];try{reDrawDieFace(d);}catch(e){}});
+        famLog('THE STARS HOLD');/* P708 */
+      }
+    }else{
+      var _pk={};G._famPeekVals.forEach(function(p){if(p&&p.lane!==undefined)_pk[p.lane]=p.val;});
+      var _pkHit=0;
+      free.forEach(function(d){
+        if(_pk[d.lane]!==undefined){d.val=_pk[d.lane];_pkHit++;try{reDrawDieFace(d);}catch(e){}}
+      });
+      if(_pkHit)famLog('THE STARS HOLD');/* P708 */
+    }
   }
   /* honeytrap runs SECOND and overwrites lane 0 even when the peek just set
      it. Left that way on purpose: its promise is the stronger of the two
@@ -17403,8 +17418,16 @@ CFX.stargazer={
     }
     var free=G.pool.filter(function(d){return !d.committed&&!d._frozen;});
     if(!free.length)return false;
-    G._famPeekVals=free.map(function(d){return _rollD(d);});
-    famLog('STARGAZER — NEXT ROLL: '+G._famPeekVals.join(' · '));/* P708: only Ill Omen says OMEN */
+    /* P811: the promise is PER DIE (lane-keyed), not an index array.
+       The old array only applied when the next roll's free count
+       matched exactly - and rolling requires keeping a scorer first,
+       so it almost never did: the peek was silently discarded and the
+       'prediction' was a fresh random roll (Denis caught it live).
+       Same contract as the rival's per-seat peek: whichever of these
+       dice roll next take their promised face; a kept die's promise
+       goes unused. */
+    G._famPeekVals=free.map(function(d){return {lane:d.lane,val:_rollD(d)};});
+    famLog('STARGAZER — NEXT ROLL: '+G._famPeekVals.map(function(p){return p.val;}).join(' · '));/* P708: only Ill Omen says OMEN */
     return true;
   }
 };
