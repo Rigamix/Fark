@@ -46,6 +46,13 @@ step-7 presentation pass).
 | hair_of_the_dog | run | PASS | arms on a REAL loss (36765); bust before any bank → _hotdToll rubs a circle + clears; first bank after a loss paid 200 for 100; next bank plain |
 | marked_table (Cursed Table) | run | PASS | sealed-seat loss with the card rubbed TWO circles (5→3); rival win + isHandicap routing confirmed via the end route |
 | high_table | run | PASS | owned → seat target +500 (2800→3300) and G._highTable armed; win pot half-again on the seat baseline (handicap-aware: 70 sealed / 40 plain, both = floor(base×1.5)+buy-in) |
+| tithe (enchant) | player | PASS | branded 1 kept with a 5, banked: icon banked NOTHING (+50 not 150) and paid +15g |
+| ward (enchant) | player | PASS | armed on the real keep; the bust paid HALF the turn (25 of 50) instead of taking it all |
+| snare (enchant) | player→rival | PASS | keep armed lane 0 for their NEXT turn; when their lane-0 die scores, the halving branch runs and the mark retires (witnessed); scoreless lane expires it instead; deal normal after |
+| snuff (enchant) | player→rival | PASS | their next deal was FIVE dice with lane 0 empty; six again the turn after |
+| trade (enchant) | player | PASS | swap landed both match arrays (took their LUCKY die), ledgered in _tradeSwaps, die repainted to the borrowed material, brand left with the die |
+| break (enchant) | player | PASS | icon keep → targeting offered post-bank → tapped die gone for good (matchDice 6→5, next deal five) |
+| quicksilver (enchant) | player | PASS | chip rerolled the quicksilver die to the queued face; second tap same turn refused |
 
 ## Open question (parked, not verdict-blocking)
 
@@ -59,9 +66,7 @@ vanished bank after a preserve turn, start here.
 
 ## Queue
 
-AMBER, SILVER, OBSIDIAN, STARSTONE, VAGABOND, TAVERN done. ENCHANTS
-(tithe, ward, snare, break, trade, snuff, quicksilver — fog done) →
-rival-route regressions. Rival routes ride the parity-era probes
+All six families + tavern + all eight enchants done. Rival routes ride the parity-era probes
 (tools/_probe_actor_pipe.js and the P765 sweeps) — rerun, not retired.
 
 ## Notes for the presentation pass (step 7)
