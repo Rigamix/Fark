@@ -1,6 +1,20 @@
 # Next session - start here
 
-## Where things stand (2026-08-20 late, after plan Steps 3-7)
+## Where things stand (2026-08-20 latest: the presentation backlog is DONE)
+
+Denis ruled "do all of it now" - the entire step-7 backlog shipped as
+P825-P830 (live-states + chips, bank beats, ghost dice + honey marks +
+vanguard primer, encore blue + cultivate growth, transmute's in-world
+picker, sleight's land-pause-reroll both directions). P830 also fixed
+the pre-adoption stale-face family bug: every rival deal-loop rewrite
+was born on the mesh from mkDie's stale stamp - face shown != value
+scored. All probe-driven (tools/apv_pres_*.js, apv_sleight_beat.js);
+final regression sweep green (slowcook/honeytrap/stargazer/preserve/
+fog/actor-pipe/foolsgold/bloom-cult/transmute). One deliberate order
+change flagged in OPEN.md: sleight's settle-reroll now beats the
+rival's scripted roll-forces.
+
+## The state before that (2026-08-20 late, after plan Steps 3-7)
 
 The whole playthrough plan is worked through (docs/PLAYTHROUGH_PASS_PLAN.md):
 - P816 sacrifice pays the TURN pot (Denis's ruling; bust burns it - driven)
