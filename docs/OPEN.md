@@ -3,9 +3,11 @@
 The only file you need to read. Everything has my recommendation, so **"yours"
 is a valid answer.** Answered items are deleted, not marked — this stays short.
 
-**§1 is now blocked and needs you.** The ladder table it rests on was measured
-with the real player engine on one side and a *harness model* on the other —
-see §1a. §2–§4 need you or a playtest; §5 is a small cleanup question.
+**§1's ladder rebuild is commissioned** (Denis's 2026-08-20 ruling batch —
+re-measure against the real rival first). §2–§4 need you or a playtest.
+The rest of that batch (drag, labels, relics, seven dice, triggerCard,
+cardHit, the four leveling items) is being built; sections return here
+only if something needs a fresh ruling.
 
 Rebuilt 2026-08-06 — it had reached 960 lines with four `CLOSED` sections still
 in it, which defeated the point of the file. Deleted items live in git history.
@@ -123,7 +125,7 @@ Caveat kept honest: 4 of 49 turns did not complete within the probe's window
 and were dropped rather than counted as busts. If long turns are the ones that
 stall, the true figure is **above** 1041, not below.
 
-**My rec: rebuild the ladder table against the real rival before touching §1.**
+**RULED (Denis): rebuild the ladder against the real rival before touching anything else — commissioned, in flight.**
 That is now a measurement with a working instrument rather than an open
 question, so it is hours, not half a day.
 
@@ -221,12 +223,6 @@ two of the three worst-off nights.
 **The same false claim was in the source** (a P509 comment reading "those bosses
 can draw a card only the player can activate"); corrected in place by P557. This
 doc inherited it. Nothing to action here now — the item is simply withdrawn.
-
-### 1b. `challenge` is broken on the PLAYER side too
-
-Law 6 has no stated exception here — a bug, to be closed on correctness grounds.
-But it is also a difficulty change, and the ladder is already too hard
-everywhere, so it lands **in this batch, measured with the rest**.
 
 ### 1c. `blessed_dice` / `crown_authority` say "reroll", the code wipes
 
@@ -456,80 +452,6 @@ but only HIGH ROLLER has fired through a live match.
 
 ---
 
-## 5. Tags describing a mechanic that does not exist
-
-`blessed_dice` and `crown_authority` are tagged `npcOnly:true` with
-`owner:'ambrose'` / `owner:'whisper'`, but **nothing ever makes a boss fire
-them** — they exist only as player activations. Either the tags are wrong, or a
-boss firing path was intended and never built.
-
-**Not to be resolved by building the path** — that would be a further difficulty
-increase on the two worst-off nights. My rec: treat the tags as the bug, drop
-them, keep the cards as player spoils. Cheap either way, but it should be a
-decision rather than a silent edit.
-
----
-
-## 6. Vagabond's drag — does a die keep its lane, or does the seat?
-
-**A one-line ruling, and four cards are waiting on it.** Dragging a die to
-reorder your row moves the die's *look* but not its *lane*, so lane stops
-meaning "the seat you can see". Driven: vagabond dragged seat 2 → seat 6, and
-**Trade took the rival's silver — the die facing lane 1 — while the player was
-looking at a starstone** in the seat it now sits in. Snuff and Fog read the same
-way, and all four cards say *"in the same seat"* in their own text.
-
-Two coherent answers:
-
-- **(a) the seat wins.** The drag permutes material, brand and lane together, so
-  seat == lane always and every card takes the die the player is pointing at.
-- **(b) the lane wins.** Lanes are an invisible identity, and those four cards
-  stop presenting as seat-facing — their text has to change.
-
-**My rec: (a).** It matches what you already ruled for §9 — per-die facts travel
-*with the die* — and it is the only one where the card's existing text stays
-true. (b) means rewriting four cards to describe an identity the player cannot
-see.
-
-Separate and confirmed, same drag: it reorders **committed** dice too, which
-moves Finnick's Palm adjacency mid-turn. That one is a bug on either ruling.
-
----
-
-## 8. Last Orders: the labels are boxed in by the art. Above, or below?
-
-You said the icons and text sit too high in the panel. **The sign itself is
-fixed** (P573 hangs it as low as the painted ceiling allows — the ropes and beam
-are part of the panel image, so the whole thing moves together and its dark top
-has to stay on the background's dark ceiling; 8.7% is where a seam opens).
-
-**Inside the panel I've run out of room, and it's the art, not the CSS.** The
-moon and mug are *painted into* `LastOrders_panel.png` at 56.7%–72% of its
-height. The hearts and the night number are already centred on them (measured:
-hearts 57.6%–70.6%, number 63.9%, painted icons ~64.3%). There is no slack —
-lowering them would pull them off the row they belong to.
-
-That leaves the labels, and one real choice:
-
-- **(a) Keep them above the icons**, as you asked. They fit in an 18-unit strip
-  of clear parchment, which caps them at **11.5px**. That is a ceiling from the
-  artwork, not a tuning choice.
-- **(b) Move them into the writing band below the icons** — 5× taller, ruled
-  lines already painted there. Labels roughly **double** the size, and it fills
-  the empty lower two-thirds you're seeing. But it isn't "above".
-- **(c) Repaint the panel** with more clearance above the icons, and keep (a).
-
-**My rec: (b)**, on the grounds that the writing band is clearly what the art was
-drawn to hold and it solves the empty-space problem in the same move. But you
-asked for "above", so I'm not reversing that on my own.
-
-**Also worth confirming:** the lower two-thirds is empty now because the night
-number and NEW ROSTER moved up out of it. That matches your mockup — but it is a
-change to what used to live there, so say if it was an accepted trade rather than
-a side effect.
-
----
-
 ## Not blocking, for your awareness
 
 - **Pages deploy is healthy.** The GitHub outage recorded here is over; six
@@ -575,43 +497,6 @@ are three tunable blocks in one function.
 
 ---
 
-## 11. FIRST STRIKE — it is a sealed-seat rule, and most players can never trigger it
-
-You asked: *"Is First Strike still an handicap match? Or a card now? What is it?
-I went into a handicap match that said First Strike, with a super abstract
-description, and in game nothing happened."*
-
-**What it is.** A sealed-seat **tell** — one of the nine in `_SEAL_POOL`, Corvus's
-own. Not a card, and not a legacy handicap (those were deleted; the sealed seat
-replaced them). It took the `first_strike` id from the retired In Arrears rule,
-which is why the id turns up in gold-drain code that has nothing to do with it.
-
-**Why nothing happened, and it is not a bug.** The reveal fires from exactly one
-place: `_firstStrike(side)`, called by the *fire* handler of four enchant brands —
-**Snare, Trade, Snuff and Fog**. If you are not carrying one of those and do not
-cast it that match, the rule has no trigger at all. They cost 250–350g, so on an
-early night the seal is guaranteed to do nothing. When it does fire it opens both
-six-seat dice layouts side by side for the rest of the match.
-
-**And the description says none of that.** It reads *"Reach across the table and I
-read both sides of the book."* — flavour with no mechanical statement, which is
-the "super abstract" you hit.
-
-**Three ways out, and this one is yours:**
-
-- **(a) Say what it does.** Rewrite the desc to name the trigger — *"Cast a brand
-  at their row and both hands open."* Cheapest, keeps the design, and the rule
-  stops looking broken. **My rec.**
-- **(b) Widen the trigger** so it fires on something every player has — first
-  bank, first hot dice, first card. Makes it always land, but it stops being
-  Corvus's counting-house identity and becomes a generic reveal.
-- **(c) Take it out of `_SEAL_POOL`** and keep it for Corvus's own boss match,
-  where the player is likelier to be geared for it.
-
-I have not touched it — (b) and (c) are design changes and (a) is your words.
-
----
-
 ## 10. THE ≤700 KEPT-TRAY OVERLAP — pre-existing, out of your band
 
 On viewports 700px tall and under, the kept-dice tray overlaps the card-drop
@@ -622,19 +507,6 @@ already only 50px at that size — so it trades one tight number for another.
 *My recommendation: leave it until someone reports it on a real short phone.*
 
 ---
-
-## 13. RELIC SPOILS — the last thing still feeding the dead reserve
-
-Fair Trade is retired and For Keeps seats its prize directly (P718, your
-ruling a). One inflow still lands in the invisible reserve: taking a
-BOSS RELIC as spoils. Nothing can ever surface it now.
-
-- **(a) Same treatment as For Keeps** — the relic asks which seat it takes,
-  immediately, on the win screen. One reuse of the P718 picker.
-- **(b) Relics are trophies, not dice** — they go to `S.trophies` (the
-  run-won screen already shows those) and stop pretending to be playable.
-  **My rec** — relics rank 0 as dice, so seating one is strictly worse
-  than any real die; their value is the shelf story.
 
 ## 15. THE LEGACY-ART PURGE (P714) — three surfaces now wait on new art
 
@@ -677,36 +549,6 @@ save with fields a fresh run never produces is the remaining suspect.
 
 With either in hand the stack names the line in minutes.
 
-## NPC AI rework (see docs/NPC_AI_BRIEF.md) - 2026-08-18
-- The brief proposes personas become WEIGHTS on one EV core (slack capped
-  ~10-15%), replacing the pure style rules. aggro keeps its identity
-  (minimal keeps, more rerolls) but only among sanity-checked options.
-  OK to proceed on phase 1 (guardrails + delete the release block +
-  bank-implies-max-keep)?
-- Phase 3 migrates NPC legacy actives (second_wind, double_down, bust
-  saves...) onto the family-card CFX rails one at a time. That will
-  touch boss fights - want it gated behind a specific night for testing?
-
-## The five parity rulings (asked in chat 2026-08-18)
-1. SLEIGHT: (a) build the player half too (un-retire), (b) retire both
-   ways, or (c) rival-only but through the one pipe?
-2. STARGAZER: replace the rival's bespoke bust-dodge with the faithful
-   card - they PEEK their next roll and the AI banks if it sees a bust?
-3. ILL OMEN mirrored: they declare; you bust next turn -> you pay the
-   tier reward; you score -> you gain the consolation. Confirm?
-4. FALLING STAR for the rival = extra-turn support in their turn
-   machine (they can double-turn like you). Build it?
-5. Rival-only roster (second_wind, double_down, bust saves): should the
-   player ever be able to draft/win these? If yes they need two-seat
-   effects from the start.
-
-## SEVEN DICE is a dormant no-op (found by P769's probe, 2026-08-19)
-The card sets left=7 but P521's seat-join caps every deal at the 6 free
-seats - it has dealt 6 dice since the seat model landed, silently. The
-refactor preserved the behaviour (a refactor is not the place to invent
-a 7th seat). Ruling wanted: give the table a 7th lane for this card, or
-retire/redesign it (e.g. '+1 die' becomes 'reroll one die free')?
-
 ## Bank-seam mirror rulings - RULED AND SHIPPED (P774, 2026-08-19)
 1. GAIN_WHEN_AHEAD: bank-inclusive both seats (Denis: evaluated on the
    result of the banking action). Player test now (pPts+total)>oPts.
@@ -743,21 +585,9 @@ trigger"; a driven hex hit paid 0). P814 adds famFire('cardHit',
 pickpocket/reprisal/ill_omen-landing (both owners). **My rule: an
 opponent card that takes dice or points is a hit; pure buffs to their
 own side are not, and retort's own payment never fires the seam (no
-retort-vs-retort chains).** Two things you may want to rule
-differently: (1) NPC quirk cards beyond hex/confiscate (bumps,
-pinches, etc.) don't fire it yet — census them if you want retort to
-answer everything; (2) Ward's spec names the same event, so the seam
-is ready for it if Ward ever comes back.
-
-## Sacrifice / Double or Nothing — RULED AND SHIPPED (P816, 2026-08-20)
-
-Denis ruled: sacrifice moves to the TURN total ("there should be real
-risk in taking it"); double_or_nothing keeps its pre-bank arm and the
-TEXT changes instead. Shipped as P816: the +800 rides G._turnBonusPot
-(banks with the turn, burns on a bust - probe-verified both ways:
-bank collected 900, bust paid zero and zeroed the pot), and both
-cards' text + FAM_SHORT now say what actually happens. Delete this
-section on read.
+retort-vs-retort chains).** RULED (Denis): extend to every NPC quirk card that takes dice or
+points — the rule should be complete, not answer for two cards and
+stay silent on the rest. Census + build in flight.
 
 ## Boss dialogue is BACK (P818, 2026-08-20) — three content gaps remain
 
@@ -770,17 +600,10 @@ patron personal arcs stay closed), and the getLine guard no longer
 kills LEDGER_LINES — driven: Grog greets with his real record ("2
 nights at me table an' we're dead even"), busts get "Ha! Greedy!",
 patron side regression-clean, resume restamps.
-Three things only you can fill:
-1. **BOSS_TRAIT map** — my defaults: grog reckless, mabel steady,
-   finnick cunning, corvus greedy, brutus strong, aldric orderly,
-   whisper cunning, ambrose orderly. Remap any of these with a word.
-2. **First-ever meeting** has no boss MATCH_START line (the ledger
-   greeting needs history; PATRON_LINES has only boss:win/loss pools).
-   A `boss:<key>:open` pool per boss would close it — needs your lines.
-3. **DLG.triggerCard is dead game-wide** (its card-bark pools were
-   deleted with OPP_DIALOGUE; ~24 call sites fire into nothing, patron
-   matches included). Revive wants content or a ruling to delete the
-   call sites.
+RULED (Denis): Corvus is ORDERLY, not greedy (shipped, P832); the
+`boss:<key>:open` pool mechanism gets built now and **Denis writes the
+eight greeting lines as a follow-up** — that's the one open item here;
+DLG.triggerCard's call sites get DELETED, not revived (being built).
 
 ## BANK TO WIN, stage 1 shipped (P819) — the full oracle is a choice
 
@@ -794,21 +617,9 @@ stack (×2 cards, underdog, weight...), short_fuse's commit-time double
 in the selection preview, and rival deductions (cowards_bell, halve /
 steal-low). Closing those needs handleBank's total pipeline extracted
 into one dry-runnable oracle — a real refactor of the game's most
-central function. **My read: stage 1 covers what you reported; do the
-oracle as its own careful session if you want the caption exact to
-the point.** Say the word and I'll plan it.
-
-## Boss-win draft (P820) — two small design notes
-
-Shipped per your note: the family draft now follows the spoils pick on
-the boss win screen (same offer, same skip/claim flow; SKIP pays 75%
-of the boss purse). Two choices you may want different:
-1. **Ambrose (night 8)** keeps his renown-card final screen, no draft
-   — felt right for the last night. Say so if he should draft too.
-2. The draft rolls at the NEW night's odds (tier has already advanced
-   when the end screen builds) — a boss draft is one night "ahead" of
-   a patron draft the same evening. Deliberate reading: the reward is
-   for the night you just entered.
+central function. RULED (Denis): plan it as its own session, not urgent — the failure
+direction is safe (under-promises, never over). The plan lives in
+docs/BANK_ORACLE_PLAN.md once written.
 
 ## Patron leveling (P822 shipped; four rulings left) — 2026-08-20
 
@@ -822,23 +633,14 @@ admit family materials from night 4 (the tier-2 one-up splash gives
 night 3 its occasional curveball — measured 5%). Driven: nights 1-2
 mundane 0/80, aggro 93% obsidian vs 24% baseline, family dice deal and
 roll on a real rival seat.
-Needs your ruling:
-1. **Rival obsidian never shatters** (the 6% check lives in the player
-   roll path only). A rival stat-stick, or wire their shatter too?
-2. **Tier locks**: patrons roll raw tier-III from night 6 (20%); the
-   player's III is upgrade-only. Same-locks per the master brief, or
-   keep the patron shortcut?
-3. **Persona↔name binding**: 'Krox' can be STEADY tonight, RECKLESS
-   next night — mechanical identity isn't tied to the name. The
-   growth-dialogue pieces (band lines, recognition beat) need a stable
-   binding. Build a name→persona registry?
-4. **Band lines resolver gotcha**: the 'most conditions wins' rule
-   makes a night_gte:4 line EXCLUSIVE — from night 4 the patron would
-   ONLY say band lines, never the baseline pool (your brief wants
-   additive). Needs a resolver tweak or mirrored night_lte baselines
-   before PATRON_GROWTH_LINES.md gets wired.
+ALL FOUR RULED (Denis), being built: (1) wire the rival's obsidian
+shatter — the material can't mean different things per side; (2) same
+tier locks as the player, no raw tier-III for patrons; (3) build the
+persona↔name registry — the approved growth dialogue needs a stable
+character under it; (4) make the resolver genuinely additive for band
+lines, per the brief's explicit intent.
 
-## The presentation backlog — ALL SHIPPED (P823-P830, 2026-08-20)
+ — ALL SHIPPED (P823-P830, 2026-08-20)
 
 Denis ruled: do all of it now. Done, each item probe-driven:
 P825 reprisal/ill_omen/sleight live-states on the cards + slow_cook
