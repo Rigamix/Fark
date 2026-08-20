@@ -36,7 +36,15 @@ CARD_EFFECT_SPECS_FULL.md (exact card texts = audit ground truth).
   (execution witness), then step 7 gives it the lingering table visual
   Denis asked for + a clearer description.
 
-## Step 2 — functional audit of ALL cards (the actions, not the text)
+## Step 2 — functional audit of ALL cards (the actions, not the text) — DONE 2026-08-20
+
+Complete: all six families + tavern + all eight enchants, verdicts in
+docs/CARD_AUDIT_2.md. Broken and fixed: stargazer (P811), double
+stakes panel (P812), slow_cook roll ordinal (P813), retort's dead
+second trigger (P814, new cardHit seam), tamper vs the bus (P815,
+broken cards now silent). Two spec divergences parked in OPEN.md
+(sacrifice pays the bank not the turn; double_or_nothing arms
+pre-bank). Rival-route regression sweeps rerun clean.
 
 P776 audited words; this audits WIRES. A harness drives every family
 card's player route AND rival route through the real seams and asserts

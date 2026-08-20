@@ -64,9 +64,24 @@ zeroed during the rival turn). Never reproduces under instrumentation
 SwiftShader/rAF stalls in headless; if a phone player ever reports a
 vanished bank after a preserve turn, start here.
 
+## Rival-route regressions (rerun on the P811–P815 build)
+
+- _probe_actor_pipe: all seven verdicts green (slow_cook both actors,
+  pickpocket both, double-or-nothing flip, preserve capture+return on
+  the rival side).
+- famsweep ft_ench / keg_numdice / preserve_lane / sac_loan /
+  sac_snapshot / stargazer: every defect flag false.
+- famsweep_steady_stale (SUITE: exclude) reads red, but a fresh driven
+  construction of its exact arrangement — arm steady, sacrifice removes
+  a scorer mid-window, reroll the last scorer dead — shows the arm
+  surviving, the reroll landing, and _delayedDoBust firing on the LIVE
+  table. The sweep's own mechanics are stale (pre-P519 line refs), not
+  the game.
+
 ## Queue
 
-All six families + tavern + all eight enchants done. Rival routes ride the parity-era probes
+All six families + tavern + all eight enchants done; rival-route
+regressions rerun clean. THE ACTIONS AUDIT IS COMPLETE. Rival routes ride the parity-era probes
 (tools/_probe_actor_pipe.js and the P765 sweeps) — rerun, not retired.
 
 ## Notes for the presentation pass (step 7)
