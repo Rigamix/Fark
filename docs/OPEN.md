@@ -797,3 +797,15 @@ into one dry-runnable oracle — a real refactor of the game's most
 central function. **My read: stage 1 covers what you reported; do the
 oracle as its own careful session if you want the caption exact to
 the point.** Say the word and I'll plan it.
+
+## Boss-win draft (P820) — two small design notes
+
+Shipped per your note: the family draft now follows the spoils pick on
+the boss win screen (same offer, same skip/claim flow; SKIP pays 75%
+of the boss purse). Two choices you may want different:
+1. **Ambrose (night 8)** keeps his renown-card final screen, no draft
+   — felt right for the last night. Say so if he should draft too.
+2. The draft rolls at the NEW night's odds (tier has already advanced
+   when the end screen builds) — a boss draft is one night "ahead" of
+   a patron draft the same evening. Deliberate reading: the reward is
+   for the night you just entered.

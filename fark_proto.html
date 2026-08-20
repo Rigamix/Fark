@@ -16440,8 +16440,26 @@ function famSpoilsPick(kind){
   else{S.run.gold=(S.run.gold||0)+sp.purse;msg='THE PURSE: +'+sp.purse+'g';}
   window._spoils=null;save();
   var rc=document.querySelector('#end-ov .res-card');
-  if(rc)rc.innerHTML='<div style="font-family:monospace;color:#dc5;padding:30px 10px;text-align:center">'+msg+'</div>';
-  _famEndReady();
+  /* P820: THE DRAFT FOLLOWS THE SPOILS (Denis: "the boss win screen must
+     show the card draft like a regular win"). Same offer, same P644 skip
+     hoist, same funnel - every draft outcome ends in _famEndReady, which
+     re-shows #end-btns. The spoils message rides as a header line. */
+  try{
+    _famOffer=famOffer(false);
+    var _dg=_famDeclineGold();
+    if(rc){rc.innerHTML='<div style="font-family:monospace;color:#dc5;padding:6px 10px 2px;text-align:center;font-size:12px;letter-spacing:1px">'+msg+'</div>'
+      +famOfferHtml(_famOffer,'famDraftPick',_dg);rc.classList.add('show');}
+    var _ovSk=document.getElementById('end-ov');
+    _ovSk.querySelectorAll(':scope>.fo-skip').forEach(function(e){e.remove();});
+    var _sk=rc&&rc.querySelector('.fo-skip');
+    if(_sk&&_ovSk)_ovSk.appendChild(_sk);
+    try{_foInstallDrag();}catch(e){}
+    try{_foFocusPrep();}catch(e){}
+    var _eb=document.getElementById('end-btns');if(_eb)_eb.style.display='none';
+  }catch(e){
+    if(rc)rc.innerHTML='<div style="font-family:monospace;color:#dc5;padding:30px 10px;text-align:center">'+msg+'</div>';
+    _famEndReady();
+  }
 }
 /* What declining a card is worth. Tied to the purse the player just won
    rather than to the tier alone, so it stays a real choice against the card
@@ -36465,7 +36483,9 @@ function endMatch(win){
        the refund block above runs unconditionally so we mirror it here. */
     if(_arrearsRefund>0)_bossGold+=_arrearsRefund;
     if(_bossGold){
-      _getS();S.run.gold=(S.run.gold||0)+_bossGold;save();
+      _getS();S.run.gold=(S.run.gold||0)+_bossGold;
+      S.run._lastWinGold=_bossGold;/* P820: SKIP on the boss draft pays 75% of THIS purse, not the previous patron's */
+      save();
     }
     setTimeout(function(){
       if(resGoldWrap){resGoldWrap.style.display='flex';resGoldWrap.classList.add('fade-in');}

@@ -61,10 +61,16 @@ resume), ledger greetings revived. Probes: tools/apv_boss_dialogue*.js.
 Content gaps (boss :open pools, triggerCard barks, trait remap) in
 OPEN.md.
 
-## Step 4 — small UI correctness
+## Step 4 — small UI correctness — DONE (P819+P820, 2026-08-20)
 
-- BANK button does not consistently become "BANK TO WIN".
-- The boss win screen must show the card draft like a regular win.
+- BANK TO WIN: winning-press latch restored, sealed LAST CALL and tab
+  escrow modeled, slow_cook/hangover projected, label self-heals from
+  updHUD. Probes: tools/apv_bank_label_*.js. The full dry-run bank
+  oracle (card ×2 stack, short_fuse preview, rival deductions) is an
+  OPEN.md question.
+- Boss win draft: chains after the spoils pick, same offer/funnel,
+  SKIP pays 75% of the BOSS purse. Ambrose keeps his renown-only final
+  screen. Probe: tools/apv_boss_win_draft.js (screenshot verified).
 
 ## Step 5 — dice feel
 
