@@ -859,8 +859,8 @@ VALUE SCORED on the 3D path. reDrawDieFace now stamps the true value
 first, unconditionally; driven: six rival dice sampled live, every
 mesh stamp equals its scored value.
 
-One deliberate order change to know about: a rival's scripted roll
-(their peek/honeytrap) now lands at the deal and the player's sleight
-rerolls it away at the settle — the forced reroll beats their script,
-which is what a forced reroll means. Say the word if you want the old
-precedence back.
+RULED (Denis, same night): the sleight-beats-their-script precedence
+stays as shipped — "if Sleight fires, the original roll is gone, full
+stop, not gone except for whatever the rival had scripted on top of
+it." The old precedence would have weakened the card exactly when
+aimed at a rival about to do something clever.
