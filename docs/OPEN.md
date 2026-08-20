@@ -749,15 +749,12 @@ pinches, etc.) don't fire it yet — census them if you want retort to
 answer everything; (2) Ward's spec names the same event, so the seam
 is ready for it if Ward ever comes back.
 
-## Sacrifice pays the BANK, the spec says the TURN (audit, 2026-08-20)
+## Sacrifice / Double or Nothing — RULED AND SHIPPED (P816, 2026-08-20)
 
-Measured: sacrifice's +800 lands in G.pPts (bust-proof) the moment the
-die shatters. Your spec sheet says "+800 adds immediately to the
-current TURN total" - at-risk points, which also fits obsidian's
-theme. Both are defensible; the difference is real (bank = the 800 can
-never be lost; turn = a bust burns it). **My recommendation: move it
-to the turn total per your spec** - one-line change, say the word.
-Same family, smaller cousin: double_or_nothing arms BEFORE the bank
-(spec describes a post-bank window). Functionally the same decision -
-you see the table before banking - so I'd leave that one and just make
-the card text say "arm before you bank".
+Denis ruled: sacrifice moves to the TURN total ("there should be real
+risk in taking it"); double_or_nothing keeps its pre-bank arm and the
+TEXT changes instead. Shipped as P816: the +800 rides G._turnBonusPot
+(banks with the turn, burns on a bust - probe-verified both ways:
+bank collected 900, bust paid zero and zeroed the pot), and both
+cards' text + FAM_SHORT now say what actually happens. Delete this
+section on read.
