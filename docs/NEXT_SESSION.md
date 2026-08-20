@@ -1,6 +1,31 @@
 # Next session - start here
 
-## Where things stand (2026-08-20, after the FULL card-actions audit)
+## Where things stand (2026-08-20 late, after plan Steps 3-7)
+
+The whole playthrough plan is worked through (docs/PLAYTHROUGH_PASS_PLAN.md):
+- P816 sacrifice pays the TURN pot (Denis's ruling; bust burns it - driven)
+- P818 BOSSES SPEAK: P682's bypass deleted, BOSS_TRAIT stamped
+  (launch+resume), ledger record-greetings revived. Grog busts get
+  "Ha! Greedy!"; patron side regression-clean.
+- P819 BANK TO WIN honesty: winning-press latch restored, sealed LAST
+  CALL + tab escrow modeled, slow_cook/hangover projected, label
+  self-heals from updHUD. Full dry-run bank oracle = OPEN.md question.
+- P820 boss wins draft after the spoils (screenshot-verified).
+- P821 busted dice settle FLAT (kick yaw was in the die's local frame;
+  18/18 flat after vs 8/10 cocked before), scatter wider+faster,
+  collider 1.06->1.22.
+- P822 patron die-family bias live (aggro->obsidian 93%, ones->silver
+  93%, family dice in tier pools from night 4).
+- P823 enchant desc pass + fog's lingering look (dim + cloud - chip
+  overlays are INVISIBLE under the 3D canvas, screenshot-proven; the
+  look rides the dim system + a top-layer float).
+- P824 short_fuse tray smolder + powder_keg detonation.
+Everything probe-driven (tools/apv_*.js) and deployed to Pages.
+NEXT: OPEN.md carries every open ruling (cardHit taxonomy, bank
+oracle, patron leveling gaps 1-4, boss dialogue content, presentation
+backlog ranked with sleight's 3D-face caveat).
+
+## The state before that (2026-08-20, after the FULL card-actions audit)
 
 Denis's playthrough plan is docs/PLAYTHROUGH_PASS_PLAN.md. Steps 1-2
 are DONE: the four accusations driven and settled, then every family
