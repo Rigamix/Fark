@@ -35,6 +35,15 @@ particular reason").
 
 ## Rot found in passing (bugs/debt, not folds — normal fix flow)
 
+> **Status 2026-08-20: all five items fixed.** Item 1 shipped as P840
+> (same night, Denis pulled it forward). Items 2-5 shipped as P843
+> after a full adversarial census: item 2's count corrected to SEVEN
+> deletions (_featHotDiceCount is read by the committed sim
+> instruments — kept); item 3's blast radius corrected to 12 carried
+> fields (not 4); item 5 gained a fourth dead leg the audit missed
+> (the inert arrearsVal HUD writer). Probes: apv_feats_resume,
+> apv_feats_stat. The line numbers below are pre-P843.
+
 1. **The game-over FEATS stat counts 2 of 25 feats.** `_famFeats()`
    grants `own_reckoning` and `keg_triple` through raw ifs outside the
    FEATS roster (16428) and is the SOLE writer of

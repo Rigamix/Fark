@@ -5462,11 +5462,6 @@ body:has(#mLoadout-ov.show) #dbgButtons{display:flex !important}
 .res-gold-text.pop{animation:goldTextPop .3s cubic-bezier(.2,1.8,.4,1) forwards}
 @keyframes goldTextPop{0%{transform:scale(1)}50%{transform:scale(1.25)}100%{transform:scale(1)}}
 .res-gold-text.fade-out{opacity:0;transform:scale(.85);transition:opacity .3s,transform .3s}
-/* Corvus In-Arrears refund suffix appended to .res-gold-text on victory. */
-@keyframes fadeInRefund{
-  0%  {opacity:0;transform:translateY(4px)}
-  100%{opacity:1;transform:translateY(0)}
-}
 .rgt-gold{color:var(--gold);font-size:clamp(18px,5vw,28px)}
 .rgt-loss{color:#e05040;font-size:clamp(18px,5vw,28px)}
 .rgt-bonus{font-size:clamp(11px,3vw,15px);letter-spacing:1.5px;opacity:.8}
@@ -11325,7 +11320,6 @@ function dbgWin(){
     G.pPts=Math.max(G.pPts,(G.target||G.rung.target||1500)+100);
     G.oPts=Math.max(0,G.pPts-1100);/* loose win margin so Crushing Win may fire */
     /* Reasonable feat-tracking defaults so SOME feats can fire */
-    if(typeof G._featBanks==='undefined')G._featBanks=2;
     if(typeof G._featBusts==='undefined')G._featBusts=0;
     if(typeof G._featMaxBank==='undefined')G._featMaxBank=1200;
   }else{
@@ -11336,8 +11330,7 @@ function dbgWin(){
       matchDice:['bone','bone','bone','bone','bone','bone'],
       matchOppDice:['bone','bone','bone','bone','bone','bone'],
       target:1500,turnNum:3,
-      _featBanks:2,_featBusts:0,_featMaxBank:1200,
-      _featActivesUsed:false,_featFullStraight:false,_featHotDiceCount:0,
+      _featBusts:0,_featMaxBank:1200,_featHotDiceCount:0,
       _isBoss:false,_isGauntlet:false,
     };
   }
@@ -12118,6 +12111,31 @@ famState:{
      not merely reset a tally, it rewrites the smallest bank of the match. */
   famBankCount:(G._famBankCount===undefined)?null:G._famBankCount,
   famMinBank:(G._famMinBank===undefined)?null:G._famMinBank
+},
+/* P843: the feat accumulators. Every live threshold check reads one of
+   these, and NONE was carried - a mid-match reload zeroed progress
+   toward Slow Boiled, Full Bloom, Twice Saved, High Roller, Green
+   Thumb, Sticky Fingers, Powder Monkey, Wish Granted, Omens True and
+   The Long Road, and let No Claim forget pre-save busts (the one flip
+   in the player's favour). _forKeeps was the worst case: the family
+   card's spent charge WAS carried in famState.pF while the flag it
+   bought was not. Raw values with a null absent-marker (same
+   presence-not-truthiness care as famState above); restored by one
+   keyed loop at the famState restore site, so a field added here
+   restores itself. */
+featState:{
+  _featMaxRolls:(G._featMaxRolls===undefined)?null:G._featMaxRolls,
+  _featBloom:(G._featBloom===undefined)?null:G._featBloom,
+  _featWardSaves:(G._featWardSaves===undefined)?null:G._featWardSaves,
+  _featMaxBank:(G._featMaxBank===undefined)?null:G._featMaxBank,
+  _featJade:(G._featJade===undefined)?null:G._featJade,
+  _featSticky:(G._featSticky===undefined)?null:G._featSticky,
+  _featBusts:(G._featBusts===undefined)?null:G._featBusts,
+  _featShatterBanked:(G._featShatterBanked===undefined)?null:G._featShatterBanked,
+  _featStarChain:(G._featStarChain===undefined)?null:G._featStarChain,
+  _featOmenTrue:(G._featOmenTrue===undefined)?null:G._featOmenTrue,
+  _featMaxDeficit:(G._featMaxDeficit===undefined)?null:G._featMaxDeficit,
+  _forKeeps:(G._forKeeps===undefined)?null:G._forKeeps
 }
   };
   save();
@@ -13172,13 +13190,7 @@ function _tellById(id){
    that dead rule back on. It is a blunt instrument: it cannot tell a retired
    id from a LIVE rule wearing the same id, so anything listed here switches
    its replacement off through a sleeve and a sealed seat too. Only list an id
-   whose replacement does not exist yet.
-   last_call is exactly that trap, still armed and NOT fixed here: Grog's
-   badge carries ZERO HOUR under this id now, _iconFire reads G._tell.id for
-   it directly rather than _ruleActive, and 'last_call' is in _SEAL_POOL - so
-   a sealed seat can roll a rule this very table calls retired. Reported to
-   whoever owns Zero Hour; the fix is the same shape as the two removals
-   below. */
+   whose replacement does not exist yet. */
 /* first_strike left when First Strike replaced In Arrears (the gold drain is
    switched off at its only site). still_waters and kindred leave now: the
    old card-sealing and die-cursing they were guarding is DELETED below, so
@@ -13216,7 +13228,6 @@ function _applySleeve(){
     var t=_tellById(G._sleeve);
     if(t){G._tell=t;G._tellState={};
       if(t.id==='steeped')G._tellState.bonus=0;
-      if(t.id==='first_strike')G._tellState.totalRollCost=0;
       if(t.id==='reckoning')G._tellState.lastNpcBank=0;
     }
   }
@@ -13232,7 +13243,6 @@ function _applySeal(){
   if(!G._tell){
     var t=_tellById(G._sealRule);
     if(t){G._tell=t;
-      if(t.id==='first_strike')G._tellState.totalRollCost=0;
     }
   }
   /* THE CURSE, not SEALED SEAT - the word is retired for this meaning. Not
@@ -13252,7 +13262,7 @@ function _applyTell(){
     case 'zero_hour':/* fires off the icon path, no per-match state */ break;
     case 'steeped': G._tellState.bonus=0; break;
     case 'pickpocket':/* per-roll RNG, no persistent state */ break;
-    case 'first_strike': G._tellState.totalRollCost=0; break;
+    case 'first_strike':/* pure information, no state (P843) */ break;
     case 'drill_order':/* uses turnRollCount + maxRolls */ break;
     /* Still Waters and Kindred are both stateless reads - of the die, and of
        the loadout - so there is nothing to set up. The sealedCard and
@@ -13373,15 +13383,6 @@ function _updateTellHUD(){
   if(t.id==='reckoning'){
     var r=document.getElementById('reckoningVal');
     if(r){var f=(G._tellState&&G._tellState.lastNpcBank)||0;r.textContent='≥'+f;}
-  }
-  if(t.id==='first_strike'){
-    var ar=document.getElementById('arrearsVal');
-    if(ar){
-      var _arCost=(G._tellState&&G._tellState.totalRollCost)||0;
-      ar.textContent='−'+_arCost+'g';
-      /* Pop animation each time it ticks */
-      ar.classList.remove('tb-pop');void ar.offsetWidth;ar.classList.add('tb-pop');
-    }
   }
 }
 /* Triggered when a Tell cancels a bank (Last Call below threshold,
@@ -22509,8 +22510,6 @@ function scoreRoll(vals,cards,locked,context,dieMats,dieEnchs){
     context.crowsLuckFiredThisRoll=true;
   }
   if(n>=6&&hasSet([1,2,3,4,5,6])){
-    /* Feat tracking — full straight rolled (regardless of who's scoring) */
-    if(typeof G!=='undefined'&&G&&cards===G.pCards)G._featFullStraight=true;
     if(_crowsCanFire){_consumeCrows();pts+=SCORING_BASE.straight5high;markSet([2,3,4,5,6]);}
     else{
       var _straightBase=SCORING_BASE.straight6;
@@ -22560,7 +22559,6 @@ function scoreRoll(vals,cards,locked,context,dieMats,dieEnchs){
          consumed. Full House stays correct — it needs a LEFTOVER pair, but
          used.fill(true) leaves none, so cnt() finds nothing and it won't fire. */
       _tripFaces.forEach(function(_tf){_triplesFired.push(_tf);});
-      if(typeof G!=='undefined'&&G&&cards===G.pCards)G._featTwoTriplets=true;
     }
     /* Three Pairs: exactly three distinct faces each a clean pair. A quad
        counts as 0 pairs here (it's handled by the triples/quad path), so
@@ -29450,8 +29448,7 @@ function newG(rung,pCards,oCards,pStake,oStake){
     _echoArmed:false,_echoReady:false,_frozenDie:null,_lanternActive:false,_thickSkinUsed:false,_alchemistActive:false,_fenceActive:false,
     _brewerBoosts:null,_deadManBoosts:null,
     /* Feat tracking — counters reset per match, evaluated at endMatch(win) */
-    _featBanks:0,_featBusts:0,_featMaxBank:0,_featActivesUsed:false,_featFullStraight:false,_featHotDiceCount:0,
-    _featTemptingFate:false,_featWinBankRolls:0,_turnTriple1Scored:false,_rolledAfterTriple1:false,
+    _featBusts:0,_featMaxBank:0,_featHotDiceCount:0,
     pF:_famInit(),oF:_famInitOpp(rung),/* P1/P5 family cards */
     activeCardState:{usedCards:{},stitchActive:false,vowActive:false,hexActive:false,secondWindActive:false,allInActive:false,pyreBonus:0},
     crowsLuckCtx:{crowsLuck:oCards.includes('crows_luck'),crowsLuckRemaining:oCards.includes('crows_luck')?2:0,crowsLuckFiredThisRoll:false},
@@ -30067,9 +30064,6 @@ function updHUD(){
   _tweenScore(pEl,G.pPts);
   _tweenScore(oEl,G.oPts);
   tpEl.textContent=G.turnPts>0?'+'+G.turnPts.toLocaleString():'';
-  /* Comeback feat tracking — flag the moment opponent is up by 50% target.
-     If the player still wins after that, the Comeback feat awards renown. */
-  if(G.target&&(G.oPts-G.pPts)>=G.target*0.5)G._featTrailedDeep=true;
   /* THE LONG ROAD wants an absolute gap, not a fraction of target: the
      brief says 2,000 behind and a tier-7 target would make 50% mean 8,500. */
   var _dfc=(G.oPts||0)-(G.pPts||0);
@@ -31286,9 +31280,6 @@ function startPTurn(){
   /* Triple Hunter: one fire per turn — reset its flag so the next turn
      can earn the +500 bonus on its first triple. */
   G._tripleHunterFiredThisTurn=false;
-  /* Tempting Fate feat: per-turn flags reset each turn (the achievement
-     flag G._featTemptingFate persists for the match once earned). */
-  G._turnTriple1Scored=false;G._rolledAfterTriple1=false;
   /* Turn-boundary sweep: clear any leftover card-trigger labels so a
      label from last turn (e.g. a slow per-turn fade) can't linger into
      the new turn. The per-label 3s timeout still runs as backup. */
@@ -31673,9 +31664,6 @@ function handleRoll(){
   /* P734: a preserved die parked in amber comes home once THIS throw
      settles - scheduled here so the wait is on the dice, not a timer */
   try{if(window._fkAmberChip)_amberReturnWhenSettled();}catch(e){}
-  /* Tempting Fate feat: the player is choosing to roll AGAIN after
-     committing a triple of 1s this turn — the gamble the feat rewards. */
-  if(G._turnTriple1Scored)G._rolledAfterTriple1=true;
   /* Dismiss any board-covering overlays before rolling, so the new dice
      are visible immediately. Otherwise on a non-scoring first roll, the
      dice render hidden behind an overlay, bust fires, dice cleared —
@@ -32255,25 +32243,9 @@ function _afterRollImpl(){
       _updateTellHUD();
       try{SFX.coins&&SFX.coins();}catch(e){}
     }
-    /* In Arrears (Corvus): −Xg per roll, gold can go negative.
-       Also ticks the inline HUD value next to the Tell title. */
-    /* First Strike is pure information - no gold drain. NOTE: In Arrears was
-       the only economy tell in the roster, so no badge taxes gold any more. */
-    if(false&&S&&S.run){
-      if(!G._tellState)G._tellState={totalRollCost:0};
-      var _iaCost=G._tell.perRoll||15;
-      S.run.gold=(S.run.gold||0)-_iaCost;
-      G._tellState.totalRollCost=(G._tellState.totalRollCost||0)+_iaCost;
-      var _gel=document.getElementById('goldAmt');
-      if(_gel){_gel.textContent=S.run.gold;_gel.classList.toggle('gold-debt',S.run.gold<0);
-        _gel.classList.remove('gold-tick-down');void _gel.offsetWidth;_gel.classList.add('gold-tick-down');}
-      _updateTellHUD();
-      /* save() persists S to localStorage. Was `saveState()` which doesn't
-         exist — threw a ReferenceError that crashed afterRoll mid-flight,
-         leaving phase stuck on "rolling" with no way for the player to
-         act. Reproduces on Corvus matches (his Tell is first_strike). */
-      try{save();}catch(e){}
-    }
+    /* First Strike is pure information - no gold drain. The In Arrears
+       per-roll economy that lived here is deleted (P843) - it was dead
+       behind if(false); the revive shape is in git history at P843. */
     /* Drill Order: update HUD counter */
     /* the RULE, not the tell: a sleeved Drill Order never refreshed, so its
      count sat wherever the turn started. Each surface ignores the call when it
@@ -33753,8 +33725,6 @@ function _applyCommitBonuses(selDice,pts,cards){
       spawnPop('+500 HUNTER');
     }
   }
-  /* Tempting Fate feat: triple of 1s committed this turn */
-  var _tfOnes=0;selDice.forEach(function(d){if(d.val===1)_tfOnes++;});if(_tfOnes>=3)G._turnTriple1Scored=true;
   if(G._vowDoubleActive){pts*=2;G._vowDoubleActive=false;spawnPop('VOW x2');}
   /* The Echo: previous roll scored → this selection gets +35% */
   if(G._echoReady&&G.pCards.includes('the_echo')){var _echoB=Math.floor(pts*0.35);if(_echoB>0){pts+=_echoB;spawnPop('+'+_echoB+' ECHO');triggerCard('the_echo','ECHO +'+_echoB,true);}G._echoReady=false;}
@@ -34631,20 +34601,12 @@ function handleBank(){
      player-side increment in finOpp at line ~13141. */
   if(G.oCards.includes('the_grudge')){G._oGrudgeStack=Math.min((G._oGrudgeStack||0)+150,750);}
   /* Feat tracking */
-  G._featBanks=(G._featBanks||0)+1;
   if(total>(G._featMaxBank||0))G._featMaxBank=total;
-  /* Brinksman feat: remember how many rolls this banked turn took. The
-     winning bank is the last one before endMatch, so this holds the
-     winning turn's roll count at match end. */
-  G._featWinBankRolls=G.turnRollCount||0;
-  /* Tempting Fate feat: banked a turn in which the player committed a
-     triple of 1s AND chose to roll again afterward. */
-  if(G._rolledAfterTriple1)G._featTemptingFate=true;
   /* THE BANK IS WHERE A TURN'S CLAIMS SETTLE. Green Thumb and Powder
      Monkey are both stated as "bank a ...", so their pending flags are
      promoted here and dropped in doBust - a turn that busts proves
      neither. Slow Boiled wants the LONGEST turn, which is why it is a max
-     and not the winning turn's count (that is _featWinBankRolls). */
+     and not just the winning turn's count. */
   if(G._featJadePend)G._featJade=true;
   if(G._featShatterPend)G._featShatterBanked=true;
   G._featJadePend=false;G._featShatterPend=false;
@@ -36897,15 +36859,6 @@ function endMatch(win){
         /* Pop bounce on land */
         resGoldText.classList.remove('pop');void resGoldText.offsetWidth;
         resGoldText.classList.add('pop');
-        /* B3: if part of the gold was a Corvus refund, append a small
-           "REFUNDED!" suffix so the player feels the recovery. */
-        if(_arrearsRefund>0){
-          var _suf=document.createElement('span');
-          _suf.className='res-gold-refund';
-          _suf.textContent=' ('+_arrearsRefund+'g recovered)';
-          _suf.style.cssText='display:block;font-size:11px;color:#a0e0ff;letter-spacing:1px;margin-top:2px;opacity:0;animation:fadeInRefund .5s ease .2s forwards;text-shadow:0 0 8px rgba(140,200,255,.55)';
-          resGoldText.appendChild(_suf);
-        }
       }
     }
     requestAnimationFrame(step);
@@ -37003,21 +36956,6 @@ function endMatch(win){
     _patronGold+=((typeof LO!=='undefined'&&LO&&LO.buyIn)?LO.buyIn:0);
     _getS();S.run.gold=(S.run.gold||0)+_patronGold;save();
   }
-  /* B3: Corvus In-Arrears refund — beating Corvus refunds every gold piece
-     he drained from you across the match. Computed here, applied once
-     either in the patron-gold path (folded into _patronGold above) or the
-     boss-gold path below. Player feedback: "Maybe you win Corvus lost
-     gold through the match when you beat him, makes it sweeter". */
-  var _arrearsRefund=0;
-  if(win&&G&&G._tell&&G._tell.id==='first_strike'&&G._tellState&&G._tellState.totalRollCost>0){
-    _arrearsRefund=G._tellState.totalRollCost;
-    if(!isBoss){
-      /* Fold into the patron-gold count-up so it reads as a single reward */
-      _patronGold+=_arrearsRefund;
-      _getS();S.run.gold=(S.run.gold||0)+_arrearsRefund;save();
-    }
-    /* Boss path adds it inside the boss-gold block below to avoid double-count. */
-  }
   if(win&&!isBoss){
     /* Patron win: coins spin in golden with stagger, gold number
        counts up below the coins (synchronized start). */
@@ -37038,10 +36976,6 @@ function endMatch(win){
   }else if(win&&isBoss){
     /* Boss win: award gold and show +Xg animation */
     var _bossGold=(G.rung&&G.rung.gold)||0;
-    /* Fold any first_strike refund into the boss payout too, in case a future
-       boss form ever uses Corvus's tell. Today only patron Corvus does, but
-       the refund block above runs unconditionally so we mirror it here. */
-    if(_arrearsRefund>0)_bossGold+=_arrearsRefund;
     if(_bossGold){
       _getS();S.run.gold=(S.run.gold||0)+_bossGold;
       S.run._lastWinGold=_bossGold;/* P820: SKIP on the boss draft pays 75% of THIS purse, not the previous patron's */
@@ -38768,8 +38702,7 @@ function _refreshCardUsesDisplay(cardId){
 /* Refund a card use — call from inside an active-card handler when the
    card couldn't actually do anything (no valid dice, etc.). Reverses
    markActiveCardUsed so the player isn't penalized for hitting a card
-   in a state where it has no effect. (Doesn't touch the Pure Bones feat
-   flag — borderline cases stay strict.) */
+   in a state where it has no effect. */
 function refundActiveCardUse(cardId){
   if(!G||!G.activeCardState||!G.activeCardState.usedCards)return;
   G.activeCardState.usedCards[cardId]=(G.activeCardState.usedCards[cardId]||0)+1;
@@ -38820,8 +38753,6 @@ function reDrawDieFace(d){
 function activateCard(cardId){
   if(!canActivateCard(cardId))return;
   markActiveCardUsed(cardId);
-  /* Feat tracking: any active-card use disqualifies "Pure Bones" */
-  if(G)G._featActivesUsed=true;
   /* Haptic: any active-card activation gets a solid bump so the player
      feels the effect landing (rerolls, freezes, transforms, etc.). */
   _haptic(18);
@@ -40290,6 +40221,14 @@ if(_rdFam){
   if(_rdFam.famBankCount!==undefined&&_rdFam.famBankCount!==null)G._famBankCount=_rdFam.famBankCount;
   if(_rdFam.famMinBank!==undefined&&_rdFam.famMinBank!==null)G._famMinBank=_rdFam.famMinBank;
 }
+/* P843: the feat accumulators come home. Same care as the famState
+   block above - assign on PRESENCE, not truthiness: these are numbers
+   legitimately 0 and booleans legitimately false. Null marks a field
+   absent at save time (or a pre-P843 snapshot) and is skipped, keeping
+   the fresh-match zero. */
+var _rdFt=params._resumeData.featState;
+if(_rdFt)for(var _ftK in _rdFt)
+  if(_rdFt[_ftK]!==null&&_rdFt[_ftK]!==undefined)G[_ftK]=_rdFt[_ftK];
 var _rdTs=params._resumeData._tradeSwaps;
     G._tradeSwaps=(Array.isArray(_rdTs)&&_rdTs.length)
       /* P532: oLane and seatGone were added by P527 and this hand-written

@@ -36,6 +36,25 @@ in it, which defeated the point of the file. Deleted items live in git history.
 
 ---
 
+## Corvus In-Arrears: want the economy back? (P843, 2026-08-20)
+
+The feats-rot pass deleted the dead In-Arrears code — ALL of it was
+unreachable (the per-roll gold drain sat behind `if(false)`, the HUD
+badge element was never created, and the win refund was gated on a
+counter nothing incremented). First Strike stays pure information, as
+its tell text says today.
+
+But the refund carried your player feedback in its comment: *"Maybe you
+win Corvus lost gold through the match when you beat him, makes it
+sweeter."* That feature only means something if the drain comes back.
+**Question: should Corvus drain gold per roll again (with the
+beat-him-get-it-back refund), or does First Strike stay
+information-only?** If revive: the exact deleted code is in git history
+at P843 (drain in _afterRollImpl, totalRollCost counter, refund at
+settle, HUD badge) — it's a rebuild from record, not from scratch.
+
+---
+
 ## 1. THE RETUNE BATCH — ruled, ready to build, must land together
 
 Three changes that all move difficulty. Ruled that they ship as **one measured
@@ -730,8 +749,19 @@ docs/ARCHITECTURE_AUDIT.md is the full table. Headlines needing you:
    side-channel grants are roster rows, evaluateFeats writes the
    stat - driven: 3 feats earned, stat 3, renown honest. (Also
    caught: the _featView whitelist needed the keg flag.)
-3. Eight orphan _feat* flags, a feat-accumulator resume gap, one stale
-   comment, one dead In-Arrears refund bypass — enumerated in the
-   audit doc, normal fix flow when you want them.
+3. FIXED (P843, 2026-08-20): seven orphan flags deleted (each
+   adversarially verified through every access pattern before
+   deletion; _featHotDiceCount KEPT — the committed sim instruments
+   read it, so it was never an orphan); the resume gap closed — the
+   snapshot now carries a featState block (12 live fields, not the
+   audit's 4 — including _forKeeps, whose family-card charge was
+   carried while the flag it bought was not) restored by one
+   presence-guarded loop; the stale _RETIRED_RULES paragraph deleted;
+   the dead In-Arrears economy removed in ALL legs (the census found a
+   fourth leg the audit missed — an inert HUD writer whose element no
+   markup creates). Probes: apv_feats_resume (12/12 fields across the
+   localStorage boundary, pre-P843 snapshots resume clean, restored
+   progress awards feats on a driven win), apv_feats_stat re-run
+   verbatim green, first_strike tell route clean.
 Everything else: seven systems confirmed genuinely separate with
 stated reasons, three confirmed already-data — no forced merges.
