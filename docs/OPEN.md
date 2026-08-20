@@ -734,3 +734,17 @@ by handleBank, same G object throughout. **My read: headless
 SwiftShader/rAF stall, not a game bug — preserve stays PASS.** Nothing
 to answer unless a phone playtest ever shows a vanished bank after a
 preserve turn; if it does, that's this.
+
+## The cardHit taxonomy (P814, retort's second trigger — 2026-08-20)
+
+Retort's hit-half was fully dead (spec says "fully automatic on either
+trigger"; a driven hex hit paid 0). P814 adds famFire('cardHit',
+{actor:<victim>}) at the TAKING sites: NPC hex, NPC confiscation,
+pickpocket/reprisal/ill_omen-landing (both owners). **My rule: an
+opponent card that takes dice or points is a hit; pure buffs to their
+own side are not, and retort's own payment never fires the seam (no
+retort-vs-retort chains).** Two things you may want to rule
+differently: (1) NPC quirk cards beyond hex/confiscate (bumps,
+pinches, etc.) don't fire it yet — census them if you want retort to
+answer everything; (2) Ward's spec names the same event, so the seam
+is ready for it if Ward ever comes back.

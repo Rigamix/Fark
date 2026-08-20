@@ -28,6 +28,9 @@ step-7 presentation pass).
 | preserve | player | PASS | full round trip: trapped kept 1 (100), trapping turn banked 100, return turn re-paid kept+turnPts, dealt LOADOUT−1 fresh (numDice write-trap: startPTurn 6 → _dropLanes 5), preserved die minted committed on the roll, immediate bank paid 200 (preserved+new). pPts write-trap: exactly two handleBank writes, same G |
 | honeytrap | player | PASS | pair [5,5] kept → armed 5 → next real roll pulled a queued 2 into a 5 (famApplyRollForces), force consumed, charge spent. NOTE: arming while dice are mid-flight is consumed by the settling roll (the roll path ends in _clearRollForces "spent by this roll either way") — the effect fires on the landing roll, not lost, but the timing reads oddly |
 | slow_cook | player | **FIXED (P813)** | measured: 3-roll turn banked 250 not 400 and acc 0 — the player roll seam fired pre-increment with dead field `rolls`; now carries rollNum (rival semantics). Re-measured 400/150, spill turn pays nothing |
+| steady_hand | player | PASS | arm→tap rerolled the 6 into the queued 5, charge billed AT THE TAP (arm is free), bank 150; leg B rerolled the only scorer into a dead table and the P535 re-derive BUSTED the turn paying nothing |
+| retort | both | **FIXED (P814)** | bust half paid 400 on the nose both owners (boss bust cost the player exactly 400, once — no double-pay); the "hit by an opponent card" half was FULLY DEAD (driven hex hit paid 0, no seam existed). P814 wires famFire('cardHit') at the taking sites; hex hit now pays 400 (witnessed 900→500). Taxonomy note in OPEN.md |
+| reprisal | player | PASS | trailing by 2000, a 100 bank stole exactly 25 (tier-1 quarter): pPts +125 / oPts −25; control with empty rival purse paid plain 100, rival untouched |
 
 ## Open question (parked, not verdict-blocking)
 
@@ -41,8 +44,8 @@ vanished bank after a preserve turn, start here.
 
 ## Queue
 
-AMBER done. SILVER
-(steady_hand, retort, reprisal) → OBSIDIAN (powder_keg,
+AMBER, SILVER done. OBSIDIAN
+(powder_keg,
 double_or_nothing, sacrifice, short_fuse) → STARSTONE (encore,
 ill_omen, falling_star) → VAGABOND (pickpocket, tamper, vanguard_f,
 for_keeps) → TAVERN (the_tab, hair_of_the_dog, marked_table,

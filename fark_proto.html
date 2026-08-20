@@ -14943,11 +14943,19 @@ CFX.fair_trade={
   }
 };
 /* P765: SYMMETRIC - the owner's bust makes the OTHER side pay. */
+/* P814: the card's SECOND trigger. Text and spec promise "bust OR hit
+   by an opponent card"; only bust paid (driven: a hex hit paid 0 with
+   retort held). One payer, two seams. cardHit's actor is the VICTIM -
+   retort belongs to the seat that was hit. Retort's own payment fires
+   no seam, so retort-vs-retort cannot chain. */
+function _retortPay(ev){
+  if(ev.owner==='p'){G.oPts=Math.max(0,G.oPts-ev.P);famLog('RETORT — THEY LOSE '+ev.P);}
+  else{G.pPts=Math.max(0,G.pPts-ev.P);setStatusMsg('THEIR RETORT — YOU LOSE '+ev.P,'red');}
+  try{updHUD();}catch(e){}
+}
 CFX.retort={
-  bust:function(ev){if(!ev.mine)return;
-    if(ev.owner==='p'){G.oPts=Math.max(0,G.oPts-ev.P);famLog('RETORT — THEY LOSE '+ev.P);}
-    else{G.pPts=Math.max(0,G.pPts-ev.P);setStatusMsg('THEIR RETORT — YOU LOSE '+ev.P,'red');}
-    try{updHUD();}catch(e){}}
+  bust:function(ev){if(!ev.mine)return;_retortPay(ev);},
+  cardHit:function(ev){if(!ev.mine)return;_retortPay(ev);}
 };
 /* P765: SYMMETRIC - the owner banks while trailing, the leader bleeds. */
 CFX.reprisal={
@@ -14959,8 +14967,10 @@ CFX.reprisal={
     if(!trailing)return;
     var steal=Math.min(Math.round(ev.amt*ev.P),_meP?G.oPts:G.pPts);
     if(steal>0){
-      if(_meP){G.oPts-=steal;G.pPts+=steal;famLog('REPRISAL TAKES '+steal+' FROM THEM');}
-      else{G.pPts-=steal;G.oPts+=steal;setStatusMsg('THEIR REPRISAL — '+steal+' TAKEN FROM YOU','red');}
+      if(_meP){G.oPts-=steal;G.pPts+=steal;famLog('REPRISAL TAKES '+steal+' FROM THEM');
+        try{famFire('cardHit',{actor:'o',src:'reprisal'});}catch(e){}/* P814 */}
+      else{G.pPts-=steal;G.oPts+=steal;setStatusMsg('THEIR REPRISAL — '+steal+' TAKEN FROM YOU','red');
+        try{famFire('cardHit',{actor:'p',src:'reprisal'});}catch(e){}/* P814 */}
       try{updHUD();}catch(e){}}}
 };
 /* P762: SYMMETRIC - whoever banks, their fingers find the OTHER purse.
@@ -14971,9 +14981,11 @@ CFX.pickpocket={
     var lift=Math.min(ev.P,_meP?G.oPts:G.pPts);
     if(lift>0){
       if(_meP){G.oPts-=lift;G.pPts+=lift;famLog('PICKPOCKET LIFTS '+lift);
-        cardFx('steal',{row:'oppDice'},{to:{row:'score'}});}
+        cardFx('steal',{row:'oppDice'},{to:{row:'score'}});
+        try{famFire('cardHit',{actor:'o',src:'pickpocket'});}catch(e){}/* P814 */}
       else{G.pPts-=lift;G.oPts+=lift;
-        setStatusMsg('THEIR FINGERS — '+lift+' LIFTED FROM YOU','red');}
+        setStatusMsg('THEIR FINGERS — '+lift+' LIFTED FROM YOU','red');
+        try{famFire('cardHit',{actor:'p',src:'pickpocket'});}catch(e){}/* P814 */}
       try{updHUD();}catch(e){}}}
 };
 /* P766 (Q4): SYMMETRIC - a big enough bank buys another turn, either
@@ -17599,9 +17611,11 @@ CFX.ill_omen={
       if(_meP){G.oPts-=take;G.pPts+=_ioP[0];
         G._featOmenTrue=true;/* OMENS TRUE */
         famLog('THE OMEN LANDS — YOU TAKE '+_ioP[0]);
-        cardFx('steal',{row:'oppDice'},{to:{row:'score'}});}
+        cardFx('steal',{row:'oppDice'},{to:{row:'score'}});
+        try{famFire('cardHit',{actor:'o',src:'ill_omen'});}catch(e){}/* P814 */}
       else{G.pPts-=take;G.oPts+=_ioP[0];
-        famLog('THEIR OMEN LANDS — THEY TAKE '+_ioP[0]);}
+        famLog('THEIR OMEN LANDS — THEY TAKE '+_ioP[0]);
+        try{famFire('cardHit',{actor:'p',src:'ill_omen'});}catch(e){}/* P814 */}
     }else{
       if(_meP){G.oPts+=_ioP[1];famLog('THE OMEN MISSES — THEY GAIN '+_ioP[1]);
         cardFx('hit',{row:'score'});}
@@ -30797,7 +30811,7 @@ function startPTurn(){
     updHUD();
   }
   /* NPC-armed Whisper's Hex: reduce player's dice count this turn */
-  if(G._npcHexArmed){G._npcHexArmed=false;G.numDice=Math.max(3,G.numDice-1);triggerCard('whispers_hex',G.rung.name+" HEX — YOU HAVE "+G.numDice+" DICE",false);}
+  if(G._npcHexArmed){G._npcHexArmed=false;G.numDice=Math.max(3,G.numDice-1);triggerCard('whispers_hex',G.rung.name+" HEX — YOU HAVE "+G.numDice+" DICE",false);try{famFire('cardHit',{actor:'p',src:'whispers_hex'});}catch(e){}}
   /* Sudden Death: update display round at start of player turn (after NPC finishes) */
   if(G._handicap==='sudden_death')G._sdDisplayRound=G.turnNum;
   G._echoArmed=false;G._echoReady=false;
@@ -31079,6 +31093,7 @@ function startPTurn(){
         triggerCard(cid,npc.name+': TOOK YOUR '+stolen.toUpperCase()+' AND USES IT!',false);
         setStatusMsg(G.rung.name+' CONFISCATED YOUR '+stolen.toUpperCase()+'!','red');
         spawnPop('✝️ CONFISCATED');
+        try{famFire('cardHit',{actor:'p',src:'confiscate'});}catch(e){}/* P814 */
         setTimeout(function(){if(window.DLG)DLG.triggerCard(cid,false);},600);
       }
     }
