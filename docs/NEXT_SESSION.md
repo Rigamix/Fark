@@ -1,6 +1,28 @@
 # Next session - start here
 
-## Where things stand (2026-08-19, after the save/desc/glow fixes)
+## Where things stand (2026-08-20, after the FULL card-actions audit)
+
+Denis's playthrough plan is docs/PLAYTHROUGH_PASS_PLAN.md. Steps 1-2
+are DONE: the four accusations driven and settled, then every family
+card, tavern card and enchant audited by adversarial probe
+(docs/CARD_AUDIT_2.md is the verdict table; tools/apv_audit_*.js
+rerun against any build). Five real breaks found and FIXED + deployed:
+- P811 stargazer (peek discarded on every real path -> lane-keyed)
+- P812 double stakes room panel (economy was honest, display lied)
+- P813 slow_cook (player roll seam fired a dead field -> accrual a
+  roll late; seam now carries rollNum like the rival's)
+- P814 retort's second trigger ("hit by an opponent card") was fully
+  dead -> new famFire('cardHit') seam at the taking sites
+- P815 tamper was cosmetic against passives -> the famFire bus now
+  skips broken cards
+Parked in docs/OPEN.md for Denis: sacrifice pays the BANK (spec says
+turn total), double_or_nothing arms pre-bank (spec says post-bank
+window), the cardHit taxonomy, and the preserve headless flake.
+NEXT: plan Steps 3-7 (boss dialogue, BANK-TO-WIN + boss-win draft,
+dice feel, patron leveling per docs/PATRON_LEVELING_BRIEF.md,
+presentation pass incl. enchant descriptions + fog/sleight visuals).
+
+## The state before that (2026-08-19, after the save/desc/glow fixes)
 
 Read docs/NPC_AI_BRIEF.md sections 6-9 for the NPC arc. Short version:
 - Decisions: EV floor + bank plan (P760). Pipe: famUse(i,actor), seven
