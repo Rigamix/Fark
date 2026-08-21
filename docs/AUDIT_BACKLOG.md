@@ -72,12 +72,10 @@ live doc tracked it. Sources named so the full context is one hop away.
 - **The §1c wipe finding is re-armed** (see OPEN.md §1c): the
   player-side crown_authority/blessed_dice consume site un-keeps and
   zeroes without rerolling — build the real reroll or retire the arms.
-- **The post-roll TELL block wants extraction** (P847): Gambler's Eye's
-  reroll now fires `famFire('roll')` but the tell hooks below it in
-  `_afterRollImpl` (Steeped's per-roll bonus, Loaded Die, Gambler's
-  Thumb, Hot Streak) still run only on the main path — a GE reroll is
-  invisible to them. Copying the block into the GE branch would be the
-  two-copies bug; extract it into one function with two callers.
+- ~~The post-roll TELL block wants extraction~~ **CLOSED by P848**: the
+  GE branch now falls through to the main roll path — the tells,
+  deadRoll, `_afterRowSettle` and every future seam are inherited, not
+  grafted. The main path IS the extraction; there is no second caller.
 
 **Instrument/code hygiene:**
 - **`_oppHas(mech)` helper never shipped** — the 6 inline

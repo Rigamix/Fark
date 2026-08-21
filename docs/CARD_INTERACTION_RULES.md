@@ -208,10 +208,17 @@ sweeping.
 Structural (not driven, stated as such — P847 added the two
 player-side pool rewrites Denis flagged as safe-but-unstated):
 - **`famFoolsGold`** rewrites every free die with direct `.val=` — safe
-  by ORDER: it fires on the dead-roll seam, after `famApplyRollForces`
-  consumed the promise and `_clearRollForces`/`_steadyDisarm` ran on
-  the roll path. Both branches (rescue and burn) sit behind that clear;
-  the success branch's own `_steadyDisarm` is belt-and-braces.
+  by an INVARIANT, not by one call site (Denis's correction to this
+  entry's first version, which credited `handleRoll`'s disarm and
+  cited the wrong line): **every path into a dead table has already
+  disarmed and voided** — the main roll path via
+  `famApplyRollForces`/`_clearRollForces`/`_steadyDisarm`, and every
+  card path (powder keg, encore, steady's tap, seven dice's tap,
+  quicksilver, gamblers_eye) via `famTableChanged` before its own bust
+  check. Both fool's gold branches (rescue and burn) sit behind that
+  invariant; the success branch's own `_steadyDisarm` is
+  belt-and-braces. Whoever writes the next dead-roll consumer inherits
+  the invariant, not a dependency on `handleRoll` running first.
 - **The jade Break row** ("EVERYTHING ROLLS AGAIN") is direct-write ON
   PURPOSE and must NOT convert to `_setDieVal`: `_breakDie`'s tail
   resumes the interrupted roll ~320ms later, and a pending promise
@@ -226,15 +233,21 @@ player-side pool rewrites Denis flagged as safe-but-unstated):
   and lane-stamps, not by a driven drag (headless drag gestures are
   not in the harness).
 
-Gambler's Eye's full story (P846+P847, driven both halves): its ENTRY
-deselects the pool and rebinds onclicks → `famTableChanged()` after
-the refund guard (arms disarm at activation, not at the roll — driven:
-steady flag+rings die at entry); its REROLL goes through `_setDieVal`
-(the promise void) and fires `famFire('roll')` with the main path's
-payload (slow_cook counts it — driven: one event, right rollNum). The
-post-roll TELL hooks still run only on the main path — that block
-wants one extraction with two callers, not a copy; AUDIT_BACKLOG
-carries it.
+Gambler's Eye's full story (P846→P848, driven at every step): its
+ENTRY deselects the pool and rebinds onclicks → `famTableChanged()`
+after the refund guard (arms disarm at activation — driven: steady
+flag+rings die at entry). Its REROLL **is the main roll path** (P848):
+the branch validates the split, freezes the holds, arms
+`G._geExclude` (lane → old face, the "reroll must visibly differ"
+rule as a flag on the roll, one exit in `_clearRollForces`), and falls
+through — the deal rolls exactly the free unfrozen dice, so
+`famFire('roll')`, the **deadRoll seam** (fool's gold rescues a GE
+bust now — driven: charge spent, turn alive; before P848 the player
+busted holding the charge), the tell hooks, `famApplyRollForces`,
+`_afterRowSettle` and the real physics all come with it, now and for
+whatever seam is added next. The branch had been a second roll
+implementation needing seams grafted one at a time — the two-copies
+bug in slow motion, ended by deleting the copy.
 
 ## Known remaining gaps (recorded, not fixed)
 

@@ -126,20 +126,22 @@ if(await freshTurn([1,1,5,2,3,4])&&await armStar()){
   await sleep(400);
   record('card:seven_dice_tap',pre,true,{gate7,rings7,armSurvivedDispatch:rings7>0,obtain:'live'});}
 
-/* gamblers_eye - LIVE, the P846 headline: whole-pool reroll off the
-   roll path, through its REAL flow (activate -> select holds -> ROLL) */
+/* gamblers_eye - LIVE. P848: the roll falls through to the MAIN path,
+   so the void moment is the ENTRY (P847's guard) - pre is captured
+   before activateCard. The reroll itself is a real roll now (seams,
+   physics, deadRoll all inherited - apv_ge_edges drives those). */
 if(await freshTurn([1,1,5,2,3,4])&&await armStar()){
   G.activeCardState=G.activeCardState||{usedCards:{}};
   G.activeCardState.usedCards['gamblers_eye']=1;G.oCards=[];
   const gateGE=canActivateCard('gamblers_eye');
+  const pre=ftcN;
   activateCard('gamblers_eye');await sleep(300);
   const inMode=G.phase==='gamblers_eye';
-  /* hold the two 1s, reroll the rest */
+  /* hold the two 1s, reroll the rest through the real roll */
   const ones=(G.pool||[]).filter(d=>!d.committed&&d.val===1).slice(0,2);
   ones.forEach(d=>tap(d.el));await sleep(300);
-  const pre=ftcN;
   tap(document.getElementById('btnRoll'));
-  await until(()=>G.phase==='choosing',10000);await sleep(700);
+  await until(()=>G.phase==='choosing',15000);await sleep(700);
   record('card:gamblers_eye',pre,true,{gateGE,inMode,
     frozenHolds:(G.pool||[]).filter(d=>d._frozen).length,obtain:'live'});}
 

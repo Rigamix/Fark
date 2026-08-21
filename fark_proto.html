@@ -17277,6 +17277,7 @@ CFX.short_fuse={
 function _clearRollForces(){
   if(!G)return;
   G._famPeekVals=null;G._famHoneyVal=null;
+  G._geExclude=null;/* P848: the GE visibly-differs flag is roll-scoped */
   try{_transDisarm();}catch(e){}/* P829/P844: a stranded transmute arm is
      voided WITH its rings and hijacked taps - the rings used to be
      cleaned only by steady_hand's sweep on the roll path (safety by
@@ -31779,31 +31780,23 @@ function handleRoll(){
        were pure loss. A frozen die survives the reroll, stays selectable,
        counts in bust checks, and scores with new matches. */
     geSelected.forEach(function(d){d._frozen=true;d.sel=false;if(d.el){d.el.classList.remove('selected');d.el.classList.add('die-frozen');if(d.el._d3)D3.draw(d.el._d3);}});
-    /* Reroll non-held free dice */
-    var toReroll=geFree.filter(function(d){return !d._frozen;});
-    G.numDice=toReroll.length;
-    toReroll.forEach(function(d){
-      _setDieVal(d,rollFaceExclude(d.mat,d.val,d));d.sel=false;
-      if(d.el){d.el.classList.add('card-reroll');
-        setTimeout(function(){d.el.classList.remove('card-reroll');d.el.classList.add('card-reroll-settle');settleDie(d.el);
-          setTimeout(function(){d.el.classList.remove('card-reroll-settle');},400);},400);}
-    });
-    /* P847: this IS a roll - the player tapped ROLL - and it never
-       reached the seam every roll-counting system reads (slow_cook's
-       P813 accrual missed every GE reroll). Same payload shape as the
-       main path at _afterRollImpl. The post-roll TELL hooks are still
-       main-path-only: that block wants ONE extraction with two
-       callers, not a copy here - AUDIT_BACKLOG carries it. */
-    try{famFire('roll',{actor:'p',rollNum:(G.turnRollCount||0)+1});}catch(e){}
-    SFX.roll();G.turnRollCount++;
-    setTimeout(function(){
-      var free2=G.pool.filter(function(d){return !d.committed;});var fv=free2.map(function(d){return d.val;});var fm=free2.map(function(d){return d.mat;});var cards=effectiveCards();
-      if(!anyScoring(fv,cards,fm,free2)&&!_anchorRescues(cards)){if(_tryBustSave(free2))return;_delayedDoBust(free2);return;}
-      _steadyDisarm();/* these dice are new - the arm was about the old ones */
-      free2.forEach(function(d){d.el.onclick=function(){toggleDie(d);};});
-      G.phase='choosing';refreshSelUI();
-    },600);
-    return;
+    /* P848: NO SECOND ROLL IMPLEMENTATION. This branch used to reroll
+       inline and return - a parallel roll path that had already needed
+       _setDieVal (P846) and famFire('roll') (P847) grafted on, and
+       still skipped deadRoll (fool's gold never fired on a GE bust -
+       the player busted holding a live rescue charge), the post-roll
+       tell hooks, and _afterRowSettle (its bust resolved on a 600ms
+       timer under ~2000ms physics). The main path below rolls exactly
+       the free, unfrozen dice - which after the freeze above is
+       precisely this card's reroll set - so every seam comes for free,
+       now and for whatever seam is added next. The one real
+       difference, "the reroll must visibly differ", is a flag on the
+       roll: the deal's value writer consults G._geExclude (lane -> old
+       face) and rolls through rollFaceExclude for those lanes. It is a
+       per-roll buffer; its one exit is _clearRollForces. */
+    G._geExclude={};
+    geFree.forEach(function(d){if(!d._frozen)G._geExclude[d.lane]=d.val;});
+    /* falls through to the main roll path - no return */
   }
   if(G.phase!=='idle'&&G.phase!=='choosing')return;
   /* ── TELL: Drill Order (Brutus) — roll cap per turn ──
@@ -32133,7 +32126,11 @@ G.numDice=Math.min((G.matchDice?G.matchDice.length:6),(G.numDice||(G.matchDice?G
        It stays a normal selectable pool die — afterRoll reattaches its
        click handler like any other. */
     if(d._frozen){d.sel=false;if(d.el){d.el.classList.remove('sel');}return;}
-    const val=useSpur?rollFaceSpur(d.mat):_rollD(d);d.val=val;d.sel=false;
+    /* P848: a Gambler's Eye reroll must visibly differ from the face it
+       replaces - the flag on the roll, not a second roll path. */
+    const val=useSpur?rollFaceSpur(d.mat)
+      :((G._geExclude&&G._geExclude[d.lane]!==undefined)?rollFaceExclude(d.mat,G._geExclude[d.lane],d):_rollD(d));
+    d.val=val;d.sel=false;
     d.el.classList.remove('sel');d.el.style.transition='none';d.el.style.transform='';d.el.style.animation='';d.el.offsetHeight;
     d.el.classList.add('rolling');d.el.onclick=null;d.el.style.cursor='';
     // Wait until 90° into first spin (0.4s period × 0.25 = 100ms) then crossfade dots.

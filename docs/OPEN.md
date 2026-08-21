@@ -70,6 +70,29 @@ EFFECTS audited to the fam-card standard; rollFace (NPC + hot-dice
 path) has the same die-less Still Waters question as rollFaceExclude
 did — measured next pass.
 
+**P848 (your P847 verification — the structural answer taken):**
+Gambler's Eye is no longer a second roll implementation. The branch
+validates the split, freezes the holds, arms the visibly-differs flag
+(`G._geExclude`, consumed by the deal's value writer, one exit in
+`_clearRollForces`) and FALLS THROUGH to the main roll path — which
+rolls exactly the free unfrozen dice, so every seam comes for free.
+Driven (apv_ge_edges, 6/6): entry disarm preserved; the roll seam
+fires once through the main path with the right rollNum; both holds
+survive; all rerolled lanes visibly differ; and the headline — **a GE
+reroll into a dead table fires deadRoll and fool's gold rescues**
+(charge spent, turn alive; before this the player busted holding the
+charge). The bust also resolves at the real settle now, not a 600ms
+timer under 2s physics. Deleted with the copy: the inline reroll loop,
+the duplicate bust check, onclick restore, turnRollCount++, and both
+seams P846/P847 had grafted on. The tell-extraction backlog item
+closed as moot. The full 25-leg sweep re-ran green after the rewrite.
+One accepted edge, stated in the patch header: a Drill Order cap can
+refuse the fall-through roll AFTER the freeze — the player keeps their
+holds and banks, which is what the cap means. Also corrected on your
+note: fool's gold's structural entry now states the real invariant
+("every path into a dead table has already disarmed") instead of
+crediting one handleRoll call site with the wrong line number.
+
 **P847 (your P846 verification, all four items):** Gambler's Eye's
 ENTRY now disarms (famTableChanged after the refund guard — driven:
 steady's flag+rings die at activation, where they used to sit painted
