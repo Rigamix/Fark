@@ -1,5 +1,17 @@
 # Card audit 2 — the ACTIONS audit (2026-08-19)
 
+> **SCOPE CORRECTION (P846, 2026-08-21):** "check ALL cards" was
+> executed for the FAMILY cards, tavern cards and enchants — this doc's
+> tables. The **legacy player-active layer** (the CARDS-table actives:
+> gamblers_eye, the_pyre, mabels_stitch, loan, all_in, corvus_ledger,
+> aldrics_vow, whispers_hex, and the nine dice-mutating actives) was
+> silently out of scope because OPEN.md §1c wrongly recorded the whole
+> layer as unreachable — it has been LIVE since P615. Those ~18
+> obtainable actives now have card-INTERACTION coverage (the P846
+> sweep drives their R1 void contract) but their EFFECTS have never
+> been audited to this doc's adversarial standard. That audit is
+> queued in AUDIT_BACKLOG.md.
+
 Denis: "You need to check card actions are actually connected to the
 game. Check all cards. Again." P776 audited the words; this audits the
 wires. Standard: every verdict comes from an adversarial probe — a

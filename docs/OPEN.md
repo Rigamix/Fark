@@ -38,6 +38,38 @@ in it, which defeated the point of the file. Deleted items live in git history.
 
 ---
 
+## Card interactions round 3: the roster deletes itself (P846, 2026-08-21)
+
+Your second review held on every count. Shipped:
+- **`_setDieVal(d,v)`** — write + redraw + R1 void at the MUTATION,
+  routed through every player-side out-of-roll face write (17 sites).
+  The dispatch id roster is DELETED: it enrolled six retired ids,
+  missed the live Gambler's Eye, couldn't cover an enchant, and voided
+  on refunded no-ops. Enrollment is by construction now; the new-card
+  checklist item is "you already did".
+- **Gambler's Eye enrolled** (live, obtainable, the worst hole: a
+  whole-pool reroll off the roll path — driven through its real flow:
+  activate → hold two dice → ROLL; promise+ghosts void, holds freeze).
+- **famQuicksilver enrolled** (the enchant no card list could cover).
+- **Still Waters fixed at rollFaceExclude**: it now carries the die
+  object to `_rollTable`, so `_famHushed` sees it — both live call
+  sites (Gambler's Eye, Grog's Flask) were bypassing the badge.
+- **The over-void is gone**: a refunded no-op (flask with nothing to
+  reroll) writes nothing, voids nothing — asserted as a PASS condition
+  now, not accepted as a cost.
+- **The sweep verdict is the claim**: 25 legs, zero tolerance, both
+  sides asserted per leg (mutated ⇒ voided; refunded ⇒ promise
+  intact), obtainability labeled per id (19 live / 6 retired). 25/25.
+- **§1c above is rewritten** — the stale unreachable-layer claim (dead
+  since P615, ~230 patches) is retracted, the source comment it had
+  colonized is re-driven, and the original wipe finding is back as a
+  live ruling ask.
+Still open from your review, queued in AUDIT_BACKLOG: the ~18 live
+draftable actives have void-coverage now but have never had their
+EFFECTS audited to the fam-card standard; rollFace (NPC + hot-dice
+path) has the same die-less Still Waters question as rollFaceExclude
+did — measured next pass.
+
 ## Card interactions REVISED on your review (P845/P845b, 2026-08-21)
 
 All four objections held, and one found a shipped bug:
@@ -320,30 +352,29 @@ doc inherited it. Nothing to action here now — the item is simply withdrawn.
 
 ### 1c. `blessed_dice` / `crown_authority` say "reroll", the code wipes
 
-#### RETRACTED — do not build this. The code is unreachable.
+#### THE RETRACTION IS ITSELF RETRACTED (P846, on your review) — the layer is LIVE
 
-Verified end to end: `initMatchScreen` declares `const pCards=[];` at **31786**
-with the comment *"P1 cutover: old cards retired"*, discarding `params.pCards`.
-That empty array is the only thing that populates `G.activeCardState.usedCards`
-(**31859**). `activateCard` (**30842**) has exactly one caller and opens with a
-`canActivateCard` gate requiring `usedCards[cardId] > 0`. `effectiveCards()`
-(**24283**) returns `[]` outright.
+The paragraph that stood here said the whole legacy player-active layer
+was unreachable because `initMatchScreen` declared `const pCards=[]`.
+That was true when written and has been FALSE since **P615**, whose own
+comment says "THE PLAYER'S HAND, AT LAST… the hand died on this one
+line" — the line now reads `const pCards=(params.pCards||[]).filter(Boolean)`
+and both launchers feed it from `S.run.cards`. The stale claim stood for
+~230 patches, got copied into a source comment that was justifying a live
+design decision (the sacrifice `_frozen` exclusion — re-driven in P846,
+same verdict, honest reason), and steered P844's enrollment design. You
+caught it.
 
-So **`activateBlessedDicePlayer` and `activateCrownAuthorityPlayer` can never
-fire.** Building "a real reroll" here would have been building a feature into
-dead code.
-
-The same chain kills the whole legacy player-active layer: Seven Dice,
-Gambler's Eye, Vanishing Act, Double Down, Alchemist's Chisel, player-side
-Blessed Confiscation and Royal Seizure, Sticky Fingers, Mabel's Stitch and
-Second Wind are all unreachable. What is live is the **family engine** (CFX /
-`G.pF`), **NPC cards**, and **patron tells** — Pickpocket is a tell, not a card,
-which is why it fires.
-
-**This also corrects §5's reasoning.** I called these two "player weapons" and
-ruled on that basis. They are not weapons for anyone — dead on both sides.
-Dropping the tags was still right (measured inert), but the justification was
-wrong.
+**So the ORIGINAL §1c finding is back on the table.** The player-side
+`crown_authority` / `blessed_dice` arms are in the live dispatch, and
+their consume site (the rival-turn block at ~35924) is the WIPER: it
+un-keeps the rival's kept dice and zeroes their total while announcing
+"KEPT DICE REROLLED!" — **without rerolling a single value**. If a
+player can hold either card (they're npc-rarity; the player-side
+activators exist on purpose, so the game intends it), that's a lying
+announce on a live weapon. **Rule: build the real reroll, or retire the
+two player-side arms.** Recommendation: build the reroll — it's the
+card text, and the NPC-side implementation already shows the shape.
 
 
 The block un-keeps the rival's dice, sets `total=0`, and announces *"KEPT DICE

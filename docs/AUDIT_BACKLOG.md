@@ -53,6 +53,26 @@ live doc tracked it. Sources named so the full context is one hop away.
   pricing, Renown perks, dead boss-tell UI, Bookends feat) is owed and
   not done.
 
+**Added 2026-08-21 by P846 (Denis's second interaction review):**
+- **The legacy player-active layer's EFFECTS audit** — ~18 live,
+  obtainable CARDS-table actives (gamblers_eye, the_pyre,
+  mabels_stitch, loan, all_in, corvus_ledger, aldrics_vow,
+  whispers_hex, grogs_flask, finnicks_palm, vanishing_act, frozen_die,
+  double_down, coin_flip, the_nudge, alchemists_chisel,
+  twinning_charm, seven_dice) have never been probe-driven to
+  CARD_AUDIT_2's adversarial standard. They were silently out of every
+  audit's scope because OPEN.md §1c wrongly called the layer
+  unreachable for ~230 patches (dead since P615). Interaction/void
+  coverage exists (the P846 sweep); effects coverage does not.
+- **rollFace is die-less** — the NPC's only roller and the player's
+  hot-dice path call `_rollTable(mat)` with no die object, so Still
+  Waters cannot hush those rolls (the same shape P846 fixed in
+  `rollFaceExclude`). Whether the badge SHOULD reach those paths is a
+  design question; measure, then ask.
+- **The §1c wipe finding is re-armed** (see OPEN.md §1c): the
+  player-side crown_authority/blessed_dice consume site un-keeps and
+  zeroes without rerolling — build the real reroll or retire the arms.
+
 **Instrument/code hygiene:**
 - **`_oppHas(mech)` helper never shipped** — the 6 inline
   `G.oCards.some(...mechanic===...)` query sites remain

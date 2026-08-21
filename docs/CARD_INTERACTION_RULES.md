@@ -104,38 +104,49 @@ seven_dice return without billing; the tap pays). Corollary: the arm
 must be voidable for free at any moment — which is why R1 can disarm
 it.
 
-## Enrollment map — verified ids, all DRIVEN
+## Enrollment — BY CONSTRUCTION (P846: the id roster deleted itself)
 
-Fam layer (handlers named, ids are the CFX keys):
+**`_setDieVal(d,v)`** — write + redraw + R1 void, at the mutation — is
+the one way to rewrite a die's face outside the roll path. Every
+player-side out-of-roll face write routes through it (17 sites: the
+fam handlers, the CARDS handlers, Gambler's Eye's reroll branch, and
+`famQuicksilver` — an ENCHANT, which no card list could ever have
+covered). A card that writes through it is enrolled by construction; a
+refund path that writes nothing voids nothing.
 
-| Mutation moment | Site | Driven |
-|---|---|---|
-| A die leaves the table (sacrifice, break, seizures, obsidian shatter) | `_removeDieAt` tail | ✔ sacrifice through its card + `_removeDieAt` directly |
-| Steady Hand's reroll | its die-tap handler | ✔ |
-| Transmute's face write | `_transPick` | ✔ |
-| Seven Dice's reroll (P845b: an ARM — enrolls at the TAP, not dispatch) | its die-tap handler | ✔ |
-| Powder Keg (whole table re-rolls) | `CFX.powder_keg.use` | ✔ |
-| Encore (free dice re-roll) | `CFX.encore.use` | ✔ |
+The P844/P845 dispatch-time id roster this replaces was the defect,
+found by Denis's review: it enrolled six retired ids, missed the one
+live card with the worst failure mode (Gambler's Eye — a whole-pool
+reroll off the roll path, so a promise survived a reroll of every die
+it covered), and voided on refunded no-ops (a flask with nothing to
+reroll ate the player's promise).
 
-CARDS layer — **15 ids**, one hook after `activateCard`'s dispatch
-switch. Every id verified three ways: present in the dispatch switch,
-its handler classified as dice-mutating by reading the body (writes
-`d.val`, splices the pool, or freezes), and **individually driven
-through `activateCard` with the gate satisfied** (probe
-`apv_card_interactions_sweep.js`):
+Four mutations don't write a face; each keeps ONE explicit
+`famTableChanged()` at its site:
 
-`grogs_flask, finnicks_palm, brutus_fist, ambrose_grace,
-vanishing_act, old_bones, frozen_die, double_down, wild_die,
-coin_flip, the_nudge, alchemists_chisel, alchemist_touch,
-twinning_charm, double_down_die`
+| Non-val mutation | Site |
+|---|---|
+| A die leaves the table permanently | `_removeDieAt` tail (sacrifice, break, seizures, shatter) |
+| Vanishing Act's turn-scoped splice | its handler (bypasses `_removeDieAt` by design — the die returns) |
+| Frozen Die's freeze | its handler |
+| Double Down's whole-table teardown | its handler |
+| Alchemist's Chisel's mat swap ({mat,ench} is the die's identity) | its handler |
 
-(`seven_dice` was on this list in P844 and is NOT now: driving it
-through its real gate showed it arms at dispatch and mutates at its
-tap — the dispatch hook was stripping its freshly painted rings while
-the hijack lived, an invisible arm. It moved to the ARM kind with
-tap-time enrollment. The same driving found the P834 redesign
-unreachable: its gate was `timing:'idle'` and the pool is always empty
-at idle — fixed to `'choosing'`, P845.)
+Stated exception: **Finnick's Palm** keeps its own write/redraw
+choreography (the hardened 840ms reveal) with the void placed beside
+its `target.val=` write.
+
+Arms enroll at their TAP, where the mutation is: Steady Hand,
+Transmute (`_transPick`), Seven Dice (P845b; the same driving found
+the P834 redesign unreachable — `timing:'idle'` gates a card whose
+pool is always empty at idle; fixed to `'choosing'`, P845).
+
+**Still Waters rider (P846):** `rollFaceExclude` now carries the die
+object to `_rollTable`, so `_famHushed` can see it — without it the
+badge was bypassed at exactly its two live call sites (Gambler's Eye,
+Grog's Flask). `rollFace` (the NPC + hot-dice roller) still rolls
+die-less; measuring whether the badge should reach those paths is
+queued in AUDIT_BACKLOG.
 
 ### Id collisions (the sticky_fingers lesson, checked per id)
 
@@ -157,10 +168,10 @@ route-through-existing rule):
    its own `_*Disarm` enrolled at the same moments). Lane record →
    maintenance in `_removeDieAt` AND the vagabond reorder. Flag →
    nothing.
-2. Does it mutate free dice — and WHEN? At play → join the
-   `activateCard` id list or call `famTableChanged()` in its handler.
-   At a later tap (two-stage) → enroll at the tap, NOT the dispatch
-   (the seven_dice lesson).
+2. Does it rewrite a die's face? → **write through `_setDieVal` — you
+   already enrolled.** Direct `.val=` on a pool die outside the roll
+   path is the bug. A non-val mutation (splice, freeze, un-commit, mat
+   swap) → one `famTableChanged()` at the mutation site.
 3. Does it defer work? → re-derive the table inside the callback
    (P535) and guard G identity (`_ddG`).
 4. Does it float a visual over a die? → lane-stamp it
@@ -170,16 +181,28 @@ route-through-existing rule):
 
 ## Coverage — what was actually driven vs. what is structural
 
-Driven, one leg per mutator, in `apv_card_interactions_sweep.js`
-(each leg: fresh match → real roll → stargazer promise armed → the
-mutator fired through its REAL path → asserted: the hook call counted,
-ghosts 0, promise null): **22/22 legs green** — the 6 fam-layer
-moments and all 15 CARDS-layer ids plus seven_dice's tap. Cards whose
-handlers refund for want of a target still fire the hook (it sits
-after the dispatch); that over-void on a refunded activation is known
-and accepted. Also driven, in `apv_card_interactions.js`: the original
-break pair, base stargazer un-regressed (promise lands on the right
-lanes), honeytrap surviving a flag-only card, a stranded transmute arm
+Driven in `apv_card_interactions_sweep.js`, **25/25 legs, zero
+tolerance** — the verdict asserts BOTH sides of the contract on every
+leg (a mutated leg: hook fired AND ghosts 0 AND promise null; a
+refunded leg: hook silent AND promise INTACT — the over-void is a
+tested failure, not an accepted cost). Each CARDS id carries its
+obtainability class so retired content can't pad the headline:
+
+- **19 live legs**: the 6 fam moments, quicksilver (the enchant),
+  seven_dice's tap, **gamblers_eye through its real flow** (activate →
+  hold two dice → ROLL; the P846 headline hole), the flask REFUND leg
+  (promise survives a no-op), and the 9 live/obtainable CARDS ids
+  (grogs_flask, finnicks_palm, vanishing_act, frozen_die, double_down,
+  coin_flip, the_nudge, alchemists_chisel, twinning_charm).
+- **6 retired legs**, labeled: old_bones (dep, but NOT stripped from
+  old saves — save-reachable), and brutus_fist / ambrose_grace /
+  wild_die / alchemist_touch / double_down_die (dep + `_removedCards`
+  — driven anyway: old content in an old save must still void
+  honestly).
+
+Also driven, in `apv_card_interactions.js`: the original break pair,
+base stargazer un-regressed (promise lands on the right lanes),
+honeytrap surviving a flag-only card, a stranded transmute arm
 sweeping.
 
 Structural (not driven, stated as such):

@@ -14929,11 +14929,9 @@ CFX.steady_hand={
         /* .selected is what the glow is DRAWN from, so clearing d.sel alone left
            the die wearing a gold ring while the model and the preview had it
            unselected - the table claiming a die scores when it does not. */
-        d.val=_rollD(d);d.sel=false;
+        _setDieVal(d,_rollD(d));d.sel=false;
         if(d.el)d.el.classList.remove('selected');
-        try{reDrawDieFace(d);}catch(e){}
         try{famLog('STEADY HAND — '+d.val);}catch(e){}
-        try{famTableChanged();}catch(e){}/* P844: the reroll changed the table a promise was read from */
         /* P535: RE-DERIVE. `free` was captured when the CARD WAS USED and this
            runs when the player taps a die - an unbounded gap, not a timer, and
            use() changes no phase so removers stay legal throughout. A
@@ -15127,15 +15125,15 @@ CFX.encore={
     var free=G.pool.filter(function(d){return !d.committed&&!d._frozen;});
     if(!free.length)return false;
     free.forEach(function(d){
-      d.val=_rollD(d);d.sel=false;
-      if(d.el){d.el.classList.remove('selected');d.el.classList.add('card-reroll','crr-blue');reDrawDieFace(d);
+      _setDieVal(d,_rollD(d));d.sel=false;
+      if(d.el){d.el.classList.remove('selected');d.el.classList.add('card-reroll','crr-blue');
         try{_fxSpray(d.el,'#8fa8ff',8,{speed:65,g:-20,size:5,spread:2.0});}catch(e){}/* P828: starstone motes */
         setTimeout(function(){d.el.classList.remove('card-reroll','crr-blue');},400);}
     });
     try{SFX.roll();}catch(e){}
     G.turnRollCount++;
     famLog('ENCORE — ROLL IT AGAIN');
-    famTableChanged();/* P844: these dice are new - every arm and promise was about the old ones */
+    /* each _setDieVal above fired the R1 void; nothing left to disarm here */
     /* held across the resolve window, and cleared on every way out of it */
     G._encorePending=true;
     G.phase='rolling';
@@ -17330,6 +17328,21 @@ function _famRefloatGhosts(){
     });
   }catch(e){}
 }
+/* P846: THE ONE WAY TO REWRITE A DIE'S FACE OUTSIDE A ROLL - write,
+   redraw, R1 void, at the MUTATION. Replaces the dispatch id roster,
+   which was the defect: it enrolled six retired ids, missed the live
+   Gambler's Eye (the worst failure mode - a whole-pool reroll off the
+   roll path), could never cover an enchant (quicksilver), and voided
+   on refunded no-op activations. A card that writes through this is
+   enrolled by construction. The roll path does NOT use this - the
+   deal and famApplyRollForces own their own redraw, and their void is
+   _clearRollForces at the roll tail. */
+function _setDieVal(d,v){
+  if(!d)return;
+  d.val=v;
+  try{reDrawDieFace(d);}catch(e){}
+  try{famTableChanged();}catch(e){}
+}
 function famApplyRollForces(){
   if(!G)return;
   var free=G.pool.filter(function(d){return !d.committed&&!d._frozen;});
@@ -17527,12 +17540,10 @@ function _transPick(f){
   f=parseInt(f,10);
   if(!d||!inst||!(f>=1&&f<=6)||inst.charges<=0)return;
   inst.charges--;
-  d.val=f;d.sel=false;
+  _setDieVal(d,f);d.sel=false;
   if(d.el)d.el.classList.remove('selected');
-  try{reDrawDieFace(d);}catch(e){}
   try{_fxSpray(d.el,'#46c46e',12,{speed:70,g:-10,size:6,spread:2.0});}catch(e){}
   famLog('TRANSMUTED TO '+f);
-  try{famTableChanged();}catch(e){}/* P844 */
   try{refreshSelUI();}catch(e){}try{famRenderRow();}catch(e){}
 }
 CFX.powder_keg={
@@ -17542,12 +17553,12 @@ CFX.powder_keg={
     G.kept=[];
     G.pool.forEach(function(d){
       d.committed=false;d._frozen=false;d.sel=false;
-      d.val=_rollD(d);
+      _setDieVal(d,_rollD(d));
       /* P824: the spec's one demand - every die VISIBLY detonates, the
          signal that kept dice are back in play. Same shards sacrifice's
          shatter proved visible over the 3D dice. */
       if(d.el)try{spawnShards(d.el,'#7a2f1a');}catch(e){}
-      if(d.el){d.el.classList.remove('committed','selected','die-frozen');try{reDrawDieFace(d);}catch(e){}}
+      if(d.el){d.el.classList.remove('committed','selected','die-frozen');}
     });
     /* P518: a MAX, not an assignment. This was G.numDice=G.pool.length, and
        numDice is the LANE COUNT for the turn while pool is what is physically
@@ -17562,7 +17573,7 @@ CFX.powder_keg={
     G.turnRollCount++;
     try{SFX.roll();}catch(e){}
     famLog('POWDER KEG — THE WHOLE TABLE BLOWS');
-    famTableChanged();/* P844: these dice are new - every arm and promise was about the old ones */
+    /* each _setDieVal above fired the R1 void */
     var free=G.pool.slice();
     setTimeout(function(){
       /* P535: RE-DERIVE INSIDE THE TIMEOUT. `free` was G.pool.slice() taken
@@ -17599,11 +17610,14 @@ CFX.sacrifice={
        filter is curated - the loan lane and the one-die floor are both carved
        out on purpose - so _frozen was never considered rather than allowed, and
        the census at _fxMine lists every other card excluding it.
-       NO LIVE EFFECT TODAY, measured rather than assumed: _frozen's only two
-       writers are Gambler's Eye and activateFrozenDie, both in the legacy
-       player-active layer, and a driven check found canActivateCard refusing
-       every id in that layer with effectiveCards() and pCards empty. Landmine
-       removal - the frozen mechanic is a feature someone will revive.
+       P846: THE JUSTIFICATION ABOVE THIS LINE AGED OUT AND IS REWRITTEN -
+       the P568-era note here said _frozen had no live writer because the
+       player-active layer was dead (pCards empty). P615 revived the hand;
+       Gambler's Eye and Frozen Die are both live and obtainable, so this
+       exclusion is now LOAD-BEARING PROTECTION, not landmine removal: a
+       frozen die is one the player deliberately HELD, and sacrifice's
+       untargeted free[last] pick must never eat it. Decision re-driven on
+       the live build, same verdict, stronger reason.
        TRANSMUTE IS NOT THE SAME CASE and is deliberately left alone: its `use`
        runs free[pick-1], so the player chooses, and transmuting your own held
        die is a decision rather than a theft. */
@@ -24653,7 +24667,7 @@ function famQuicksilver(){
   var d=(G.pool||[]).filter(function(x){return x.ench&&x.ench.t==='quicksilver'&&!x.committed&&!x._frozen;})[0];
   if(!d)return;
   G._qsTurn=G.turnNum;
-  d.val=_rollD(d);d.sel=false;try{reDrawDieFace(d);}catch(e){}
+  _setDieVal(d,_rollD(d));d.sel=false;/* P846: the R1 gap no card list could cover */
   /* P684: the free reroll was invisible - the face just changed */
   try{if(d.el&&typeof _fxSpray==='function')_fxSpray(d.el,'#eef4fb',10,{speed:75,g:50,size:6,spread:2.6});}catch(eQ){}
   famLog('QUICKSILVER — IT ROLLS ALONE, FREE');
@@ -24669,10 +24683,14 @@ function rollFace(mat){
   const faces=_rollTable(mat);
   return faces[Math.floor(Math.random()*faces.length)];
 }
-function rollFaceExclude(mat,exclude){
+function rollFaceExclude(mat,exclude,d){
   /* Reroll that's guaranteed to differ from `exclude` — used by active cards
-     (Grog's Flask, Gambler's Eye) so a reroll always looks like a reroll. */
-  const faces=_rollTable(mat).filter(f=>f!==exclude);
+     (Grog's Flask, Gambler's Eye) so a reroll always looks like a reroll.
+     P846: takes the DIE, not just its material - _rollTable hands it to
+     _famHushed, so without it Still Waters was bypassed on exactly these
+     two live rerolls (the same die-shaped-object rule _enchFaces
+     documents). Callers without a die keep the old (hush-blind) table. */
+  const faces=_rollTable(mat,d).filter(f=>f!==exclude);
   if(!faces.length)return rollFace(mat);/* fallback if die has only one face */
   return faces[Math.floor(Math.random()*faces.length)];
 }
@@ -31765,8 +31783,8 @@ function handleRoll(){
     var toReroll=geFree.filter(function(d){return !d._frozen;});
     G.numDice=toReroll.length;
     toReroll.forEach(function(d){
-      d.val=rollFaceExclude(d.mat,d.val);d.sel=false;
-      if(d.el){d.el.classList.add('card-reroll');reDrawDieFace(d);
+      _setDieVal(d,rollFaceExclude(d.mat,d.val,d));d.sel=false;
+      if(d.el){d.el.classList.add('card-reroll');
         setTimeout(function(){d.el.classList.remove('card-reroll');d.el.classList.add('card-reroll-settle');settleDie(d.el);
           setTimeout(function(){d.el.classList.remove('card-reroll-settle');},400);},400);}
     });
@@ -38873,18 +38891,13 @@ function activateCard(cardId){
     case 'twinning_charm': activateTwinningCharm(); break;
     case 'double_down_die': activateDoubleDownDie(); break;
   }
-  /* P844/P845b: the dice-mutating actives void pending promises/arms
-     - one site, one classified list (each handler verified to write
-     d.val, splice the pool, or freeze - and DRIVEN individually, the
-     sweep probe). Flag-only and points-only actives stay off it: a
-     promise survives a wager. seven_dice is NOT here: it ARMS at
-     dispatch and mutates at its die tap, which enrolls there instead
-     (the steady_hand/transmute shape). A NEW active that touches dice
-     joins this list - docs/CARD_INTERACTION_RULES.md. */
-  if(['grogs_flask','finnicks_palm','brutus_fist','ambrose_grace','vanishing_act',
-      'old_bones','frozen_die','double_down','wild_die','coin_flip',
-      'the_nudge','alchemists_chisel','alchemist_touch','twinning_charm',
-      'double_down_die'].indexOf(cardId)>=0){try{famTableChanged();}catch(e){}}
+  /* P846: the P844 id-roster hook that lived here DELETED ITSELF - it
+     enrolled six retired ids, missed the live gamblers_eye, and voided
+     on refunded no-ops. Enrollment now happens AT the mutation:
+     _setDieVal for face writes, one explicit famTableChanged at the
+     four non-val mutations (vanishing's splice, frozen_die's freeze,
+     double_down's teardown, chisel's mat swap), palm's beside its
+     choreographed write. docs/CARD_INTERACTION_RULES.md. */
   /* Trigger patron reaction. Card-specific lines (when authored) override the
      generic CARD_EFFECT fallback. First-fire-per-match guarantee inside DLG.triggerCard
      means the player always learns the card name + patron's voice on first use. */
@@ -38902,8 +38915,8 @@ function activateGrogsFlask(){
   const toReroll=nonScoring.slice(0,2);
   if(!toReroll.length){setStatusMsg("NO NON-SCORING DICE TO REROLL",'red');refundActiveCardUse('grogs_flask');return;}
   toReroll.forEach(d=>{
-    d.val=rollFaceExclude(d.mat,d.val);
-    if(d.el){d.el.classList.add('card-reroll');reDrawDieFace(d);
+    _setDieVal(d,rollFaceExclude(d.mat,d.val,d));
+    if(d.el){d.el.classList.add('card-reroll');
       setTimeout(()=>{d.el.classList.remove('card-reroll');d.el.classList.add('card-reroll-settle');settleDie(d.el);
         setTimeout(()=>{d.el.classList.remove('card-reroll-settle');},400);},400);}
   });
@@ -38972,6 +38985,8 @@ function activateFinnicksPalm(){
      can't fire during the 840 ms animation either. */
   G._palmAnimating=true;
   target.val=newVal;
+  try{famTableChanged();}catch(e){}/* P846: void at the write; palm keeps its
+     hardened 840ms write/redraw choreography - the stated exception */
   var el=target.el;
   /* Phase 1: spin + gold pulse (400 ms). Strip every competing transient
      class first and cancel any in-flight Web Animations on the die so
@@ -39054,6 +39069,7 @@ function activateVanishingAct(){
   }
   G.pool=G.pool.filter(function(x){return x!==d;});
   _dropLanes(1);/* P516 */
+  try{famTableChanged();}catch(e){}/* P846: a die left the table (turn-scoped splice, not _removeDieAt) */
   _haptic(20);
   try{if(SFX.posCard)SFX.posCard();else SFX.commit();}catch(e){}
   setStatusMsg('VANISHED A '+d.val+' — ONE FEWER DIE THIS TURN','gold');
@@ -39066,8 +39082,8 @@ function activateBrutusFist(){
   const nonOne=free.filter(d=>d.val!==1);
   if(!nonOne.length){refundActiveCardUse('brutus_fist');return;}
   const target=nonOne[Math.floor(Math.random()*nonOne.length)];
-  target.val=1;
-  if(target.el){target.el.classList.add('card-reroll');reDrawDieFace(target);
+  _setDieVal(target,1);
+  if(target.el){target.el.classList.add('card-reroll');
     setTimeout(()=>{target.el.classList.remove('card-reroll');target.el.classList.add('card-reroll-settle');settleDie(target.el);
       setTimeout(()=>{target.el.classList.remove('card-reroll-settle');},400);},400);}
   SFX.commit();setTimeout(()=>{refreshSelUI();},500);
@@ -39092,8 +39108,8 @@ function activateAmbroseGrace(){
   if(!nonScoring.length){refundActiveCardUse('ambrose_grace');return;}
   const toConvert=nonScoring.slice(0,2);/* cap at 2 dice */
   toConvert.forEach(d=>{
-    d.val=5;
-    if(d.el){d.el.classList.add('rolling');reDrawDieFace(d);
+    _setDieVal(d,5);
+    if(d.el){d.el.classList.add('rolling');
       setTimeout(()=>{d.el.classList.remove('rolling');settleDie(d.el);},300);}
   });
   SFX.commit();refreshSelUI();
@@ -39162,7 +39178,7 @@ function activateOldBones(){
   const free=G.pool.filter(d=>!d.committed&&!d.sel);
   const nonScoring=free.filter(d=>d.val!==1&&d.val!==5);
   if(!nonScoring.length){setStatusMsg('NO BLANK DICE','red');refundActiveCardUse('old_bones');return;}
-  nonScoring.forEach(function(d){d.val=1;reDrawDieFace(d);});
+  nonScoring.forEach(function(d){_setDieVal(d,1);});
   triggerCard('old_bones','ALL BLANKS → 1s!',true);
   setStatusMsg(nonScoring.length+' DICE → 1s!','gold');
   /* Re-enable selection on new 1s */
@@ -39189,6 +39205,7 @@ function activateFrozenDie(){
     return;}
   var d=selDice[0];
   d._frozen=true;
+  try{famTableChanged();}catch(e){}/* P846: freezing removes a die from the free pool a promise was read from */
   /* Held, NOT committed: deselect immediately. handleRoll auto-commits the
      current selection before rerolling, so a still-selected frozen die would
      be committed out of the free pool — then the rest reroll and can bust,
@@ -39266,6 +39283,7 @@ function activateDoubleDown(){
       if(d.el){d.el.classList.remove('committed','selected','scatter','die-frozen');d.el.onclick=null;d.el.remove();}
     });
     G.pool=[];
+    try{famTableChanged();}catch(e){}/* P846: the whole table tore down */
     /* handleRoll creates (numDice − pool.length) new dice → a full fresh hand. */
     G.numDice=_fullHand;
     refreshKeptTray();updHUD();
@@ -39300,7 +39318,7 @@ function activateWildDie(){
       var btn=document.createElement('button');btn.className='wdp-btn';btn.textContent=face;
       btn.onclick=function(){
         var victim=nonScoring[Math.floor(Math.random()*nonScoring.length)];
-        victim.val=face;reDrawDieFace(victim);
+        _setDieVal(victim,face);
         victim.el.classList.add('eff-glow-green');setTimeout(function(){victim.el.classList.remove('eff-glow-green');},800);
         picker.remove();
         setStatusMsg('WILD DIE → '+face+'!','gold');
@@ -39401,12 +39419,10 @@ function activateSevenDice(){
       if(!G._sevenArmed)return;
       G._sevenArmed=false;
       free.forEach(function(q){if(q.el){q.el.classList.remove('break-target');q.el.onclick=function(){toggleDie(q);};}});
-      d.val=_rollD(d);d.sel=false;
+      _setDieVal(d,_rollD(d));d.sel=false;
       if(d.el){d.el.classList.remove('selected');d.el.classList.add('card-reroll');
         setTimeout(function(){if(d.el)d.el.classList.remove('card-reroll');},700);}
-      try{reDrawDieFace(d);}catch(e){}
       famLog('SEVEN DICE — '+d.val);
-      try{famTableChanged();}catch(e){}/* P845b: the reroll is the mutation moment */
       /* the table as it is NOW can be a bust (steady_hand's P535 lesson) */
       var _sf=(G.pool||[]).filter(function(x){return !x.committed&&!x._shattered;});
       var fv=_sf.map(function(x){return x.val;}),fm=_sf.map(function(x){return x.mat;});
@@ -39732,8 +39748,7 @@ function activateCoinFlip(){
   if(!selDice.length){setStatusMsg('TAP A DIE FIRST, THEN TAP COIN FLIP','red');refundActiveCardUse('coin_flip');return;}
   var d=selDice[0];
   var oppositeFace={1:6,2:5,3:4,4:3,5:2,6:1}[d.val]||d.val;
-  d.val=oppositeFace;
-  reDrawDieFace(d);
+  _setDieVal(d,oppositeFace);
   if(d.el){d.el.classList.add('eff-glow-gold');spawnPixelSparks(d.el,5);setTimeout(function(){if(d.el)d.el.classList.remove('eff-glow-gold');},700);}
   triggerCard('coin_flip','FLIPPED → '+oppositeFace,true);
   setStatusMsg('COIN FLIP — DIE NOW '+oppositeFace,'gold');
@@ -39748,8 +39763,7 @@ function activateTheNudge(){
   if(!selDice.length){setStatusMsg('TAP A DIE FIRST, THEN TAP THE NUDGE','red');refundActiveCardUse('the_nudge');return;}
   var d=selDice[0];
   var newVal=d.val>=6?1:d.val+1;
-  d.val=newVal;
-  reDrawDieFace(d);
+  _setDieVal(d,newVal);
   if(d.el){d.el.classList.add('eff-glow-gold');spawnPixelSparks(d.el,5);setTimeout(function(){if(d.el)d.el.classList.remove('eff-glow-gold');},700);}
   triggerCard('the_nudge','NUDGED → '+newVal,true);
   setStatusMsg('THE NUDGE — DIE NOW '+newVal,'gold');
@@ -39782,6 +39796,7 @@ function activateAlchemistsChisel(){
   /* Apply the swap: in-pool mat + matchDice slot so future rolls inherit. */
   leftDie.mat=newMat;
   if(G.matchDice&&G.matchDice[leftPoolIdx]!==undefined)G.matchDice[leftPoolIdx]=newMat;
+  try{famTableChanged();}catch(e){}/* P846: {mat,ench} is the die's identity - a promise pre-rolled from the OLD table */
   /* Visual update — swap the dtype-* class + redraw face dots. */
   if(leftDie.el){
     leftDie.el.classList.remove('dtype-'+oldMat);
@@ -39808,8 +39823,7 @@ function activateAlchemistTouch(){
   if(!selDice.length){setStatusMsg('SELECT A NON-SCORING DIE FIRST','red');refundActiveCardUse('alchemist_touch');return;}
   var d=selDice[0];
   if(d.val===1||d.val===5){setStatusMsg('ALREADY SCORING — PICK A 2/3/4/6','red');refundActiveCardUse('alchemist_touch');return;}
-  d.val=5;
-  reDrawDieFace(d);
+  _setDieVal(d,5);
   if(d.el){d.el.classList.add('eff-glow-green');spawnPixelSparks(d.el,6);setTimeout(function(){if(d.el)d.el.classList.remove('eff-glow-green');},700);}
   triggerCard('alchemist_touch',"ALCHEMIST'S TOUCH → 5",true);
   setStatusMsg("ALCHEMIST'S TOUCH — DIE NOW 5",'gold');
@@ -39831,8 +39845,7 @@ function activateTwinningCharm(){
     if(!candidates.length){setStatusMsg('NO DICE TO MIRROR','red');refundActiveCardUse('twinning_charm');return;}
   }
   var target=candidates[Math.floor(Math.random()*candidates.length)];
-  target.val=src.val;
-  reDrawDieFace(target);
+  _setDieVal(target,src.val);
   if(target.el){target.el.classList.add('eff-glow-blue');spawnPixelSparks(target.el,6);setTimeout(function(){if(target.el)target.el.classList.remove('eff-glow-blue');},700);}
   if(src.el){spawnPixelSparks(src.el,3);}
   triggerCard('twinning_charm','TWINNING → '+src.val,true);
@@ -39847,8 +39860,7 @@ function activateDoubleDownDie(){
   var d=selDice[0];
   if(d.val<2||d.val>4){setStatusMsg('PICK A 2, 3, OR 4','red');refundActiveCardUse('double_down_die');return;}
   var newVal=Math.min(6,d.val*2);
-  d.val=newVal;
-  reDrawDieFace(d);
+  _setDieVal(d,newVal);
   if(d.el){d.el.classList.add('eff-glow-gold');spawnPixelSparks(d.el,8);setTimeout(function(){if(d.el)d.el.classList.remove('eff-glow-gold');},900);}
   triggerCard('double_down_die','DOUBLED → '+newVal,true);
   setStatusMsg('DOUBLE DOWN — DIE NOW '+newVal,'gold');
