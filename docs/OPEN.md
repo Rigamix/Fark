@@ -36,6 +36,31 @@ in it, which defeated the point of the file. Deleted items live in git history.
 
 ---
 
+## Card interactions: the rules are written + the Stargazer break fixed (P844, 2026-08-21)
+
+Your report reproduced exactly: stargazer → sacrifice left all six
+ghost numbers floating over five dice, and the next roll landed the
+promised faces lane-shifted onto the WRONG dice. Fixed and generalized:
+**docs/CARD_INTERACTION_RULES.md** is the written contract — a promise
+or arm is about the table as it stood; any dice-mutating effect voids
+it (values + visuals through the one exit, with a "THE STARS BLUR" log
+so the player knows); flag-only cards touch nothing; a drag reorder
+moves the floats instead of voiding. Enforced by `famTableChanged()`
+at every mutation moment (fam handlers + `_removeDieAt` + one
+classified hook for the 16 dice-mutating actives). Five adjacent holes
+from the same census fixed in the pass: transmute's stranded rings +
+leaked die ref, steady_hand's missing bank-flow disarm, encore's
+unguarded deferred callback, preserve's `_pvDie` lane maintenance.
+Probe `apv_card_interactions.js`: 4 legs green (break fixed, base
+stargazer unregressed, honeytrap survives a wager, arm sweeps).
+
+**One default you may want to overrule:** a removal/reroll VOIDS a
+promise (charge stays spent). The alternative — the promise follows
+the surviving dice — is richer but was the measured wrong-dice bug;
+say the word if any specific card should follow instead of void.
+
+---
+
 ## Corvus In-Arrears: want the economy back? (P843, 2026-08-20)
 
 The feats-rot pass deleted the dead In-Arrears code — ALL of it was

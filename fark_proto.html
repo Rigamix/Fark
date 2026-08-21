@@ -14931,6 +14931,7 @@ CFX.steady_hand={
         if(d.el)d.el.classList.remove('selected');
         try{reDrawDieFace(d);}catch(e){}
         try{famLog('STEADY HAND — '+d.val);}catch(e){}
+        try{famTableChanged();}catch(e){}/* P844: the reroll changed the table a promise was read from */
         /* P535: RE-DERIVE. `free` was captured when the CARD WAS USED and this
            runs when the player taps a die - an unbounded gap, not a timer, and
            use() changes no phase so removers stay legal throughout. A
@@ -15132,11 +15133,14 @@ CFX.encore={
     try{SFX.roll();}catch(e){}
     G.turnRollCount++;
     famLog('ENCORE — ROLL IT AGAIN');
-    _steadyDisarm();/* these dice are new - the arm was about the old ones */
+    famTableChanged();/* P844: these dice are new - every arm and promise was about the old ones */
     /* held across the resolve window, and cleared on every way out of it */
     G._encorePending=true;
     G.phase='rolling';
+    var _eg=G;/* P844: the _ddG pattern - a match torn down inside the
+       window must not let this run against the next match's G */
     setTimeout(function(){
+      if(G!==_eg)return;
       G._encorePending=false;
       var fv=free.map(function(d){return d.val;}),fm=free.map(function(d){return d.mat;});
       var cards=effectiveCards();
@@ -17273,11 +17277,56 @@ CFX.short_fuse={
 function _clearRollForces(){
   if(!G)return;
   G._famPeekVals=null;G._famHoneyVal=null;
-  G._transArmed=false;/* P829: a roll voids a stranded transmute arm */
+  try{_transDisarm();}catch(e){}/* P829/P844: a stranded transmute arm is
+     voided WITH its rings and hijacked taps - the rings used to be
+     cleaned only by steady_hand's sweep on the roll path (safety by
+     coincidence) */
   /* P827: the ghost faces and honey marks live exactly as long as the
      forces they mark - one lifecycle point, no second exit. */
   try{(window._pkGhosts||[]).forEach(function(g){if(g.parentNode)g.remove();});window._pkGhosts=[];}catch(e){}
   try{(window._htMarks||[]).forEach(function(g){if(g.parentNode)g.remove();});window._htMarks=[];}catch(e){}
+}
+/* P844: transmute's disarm owns flag AND visuals together - the
+   _steadyDisarm model. Guarded so the every-roll clear path does not
+   re-bind onclicks the roll flow owns. */
+function _transDisarm(){
+  if(!G||!G._transArmed)return;
+  G._transArmed=false;
+  try{(G.pool||[]).forEach(function(d){
+    if(d.el&&!d.committed){d.el.classList.remove('break-target');d.el.onclick=function(){toggleDie(d);};}
+  });}catch(e){}
+}
+/* P844: THE TABLE CHANGED UNDER A PROMISE. A peek, a pull, or an arm
+   is a claim about the table AS IT STOOD when the card was played -
+   any effect that mutates the free pool outside the roll path voids
+   it, values and visuals together, through the one existing exit.
+   Measured before this: stargazer -> sacrifice left the ghosts up and
+   landed the promised faces lane-shifted onto the WRONG dice.
+   docs/CARD_INTERACTION_RULES.md is the written rule; every new
+   mutating card enrolls here (the _steadyDisarm precedent). */
+function famTableChanged(){
+  if(!G)return;
+  var _hadPromise=!!(G._famPeekVals||G._famHoneyVal);
+  try{_steadyDisarm();}catch(e){}
+  if(_hadPromise||((window._pkGhosts||[]).length)||((window._htMarks||[]).length)||G._transArmed){
+    _clearRollForces();
+    if(_hadPromise)try{famLog('THE STARS BLUR — THE TABLE CHANGED');}catch(e){}
+  }
+}
+/* P844: a vagabond reorder is COSMETIC - same dice, same values, new
+   seats. It must not void a promise; the floats just follow their
+   dice. Ghosts and marks are lane-stamped at mint for exactly this. */
+function _famRefloatGhosts(){
+  try{
+    var byLane={};(G&&G.pool||[]).forEach(function(d){if(d.el&&!d.committed)byLane[d.lane]=d;});
+    [].concat(window._pkGhosts||[],window._htMarks||[]).forEach(function(g){
+      if(!g.isConnected)return;
+      var d=byLane[+g.dataset.lane];
+      if(!d){if(g.parentNode)g.remove();return;}
+      var r=d.el.getBoundingClientRect();if(!(r.width>0))return;
+      g.style.left=(r.left+r.width/2)+'px';g.style.top=(r.top+r.height/2)+'px';
+    });
+  }catch(e){}
 }
 function famApplyRollForces(){
   if(!G)return;
@@ -17464,7 +17513,7 @@ CFX.transmute={
         for(var f=1;f<=6;f++)_bt+='<div class="gbx-btn primary" style="height:44px;font-size:19px" data-f="'+f+'" onclick="_gbModalClose();_transPick(this.dataset.f)">'+f+'</div>';
         _gbModalOpen('<b>Transmute to?</b>'
           +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">'+_bt+'</div>'
-          +'<div class="gbx-btn" style="height:40px" onclick="_gbModalClose()">leave it</div>');
+          +'<div class="gbx-btn" style="height:40px" onclick="_gbModalClose();_transPick(0)">leave it</div>');/* P844: _transPick(0) nulls the stashed refs, fails validation, bills nothing */
       };
     });
     return false;
@@ -17481,6 +17530,7 @@ function _transPick(f){
   try{reDrawDieFace(d);}catch(e){}
   try{_fxSpray(d.el,'#46c46e',12,{speed:70,g:-10,size:6,spread:2.0});}catch(e){}
   famLog('TRANSMUTED TO '+f);
+  try{famTableChanged();}catch(e){}/* P844 */
   try{refreshSelUI();}catch(e){}try{famRenderRow();}catch(e){}
 }
 CFX.powder_keg={
@@ -17510,7 +17560,7 @@ CFX.powder_keg={
     G.turnRollCount++;
     try{SFX.roll();}catch(e){}
     famLog('POWDER KEG — THE WHOLE TABLE BLOWS');
-    _steadyDisarm();/* these dice are new - the arm was about the old ones */
+    famTableChanged();/* P844: these dice are new - every arm and promise was about the old ones */
     var free=G.pool.slice();
     setTimeout(function(){
       /* P535: RE-DERIVE INSIDE THE TIMEOUT. `free` was G.pool.slice() taken
@@ -17673,6 +17723,7 @@ CFX.stargazer={
         var r=d.el.getBoundingClientRect();if(!(r.width>0))return;
         var g=document.createElement('div');
         g.className='peek-float';g.textContent=String(G._famPeekVals[i].val);
+        g.dataset.lane=String(G._famPeekVals[i].lane);/* P844: refloat key */
         g.style.left=(r.left+r.width/2)+'px';g.style.top=(r.top+r.height/2)+'px';
         document.body.appendChild(g);window._pkGhosts.push(g);
       });
@@ -17837,6 +17888,7 @@ CFX.honeytrap={
           var r=d.el.getBoundingClientRect();if(!(r.width>0))return;
           var g=document.createElement('div');
           g.className='honey-float';g.textContent='\uD83C\uDF6F';
+          g.dataset.lane=String(d.lane);/* P844: refloat key */
           g.style.left=(r.left+r.width/2)+'px';g.style.top=(r.top+r.height/2)+'px';
           document.body.appendChild(g);window._htMarks.push(g);
         });
@@ -24223,7 +24275,19 @@ function _removeDieAt(lane,opts){
       if(G._pvLane===lane)G._pvLane=null;
       else if(G._pvLane>lane)G._pvLane--;
     }
+    /* P844: _pvDie is a lane record in the same sense - the third door
+       to right-numbers-empty-board (a removal in the restore-to-first-
+       deal window aimed it at a moved seat and the deal's occupancy
+       guard silently never placed it). */
+    var _pvd=G._pvDie;
+    if(_pvd&&typeof _pvd.lane==='number'){
+      if(_pvd.lane===lane)G._pvDie=null;
+      else if(_pvd.lane>lane)_pvd.lane--;
+    }
   }catch(e){}
+  /* P844: a die leaving the table is a table change - promises void
+     rather than land lane-shifted on the wrong dice (measured). */
+  try{famTableChanged();}catch(e){}
   /* P527: AND THE TRADE LEDGER'S SEATS, which are seats in the same sense and
      were the only lane record here NOT being maintained. _tradeRestore had to
      guess its index back afterwards by counting materials - a reconstruction of
@@ -34771,6 +34835,7 @@ function endPTurn(){
      gate or one new caller puts a peek armed in your turn onto the rival's
      roll. Cleared here so the invariant holds at every instant. */
   _clearRollForces();
+  try{_steadyDisarm();}catch(e){}/* P844: the one arm with no exit on this path */
   /* P766 (Q3): the bespoke omen consumer is DELETED - CFX.ill_omen's
      one hook pays for both owners off the rivalTurn seam fired just
      above, and keeping this copy would have paid the boss twice. */
@@ -38806,6 +38871,15 @@ function activateCard(cardId){
     case 'twinning_charm': activateTwinningCharm(); break;
     case 'double_down_die': activateDoubleDownDie(); break;
   }
+  /* P844: the dice-mutating actives void pending promises/arms - one
+     site, one classified list (each handler verified to write d.val,
+     splice the pool, or freeze). Flag-only and points-only actives
+     stay off it: a promise survives a wager. A NEW active that touches
+     dice joins this list - docs/CARD_INTERACTION_RULES.md. */
+  if(['grogs_flask','finnicks_palm','brutus_fist','ambrose_grace','vanishing_act',
+      'old_bones','frozen_die','double_down','wild_die','seven_dice','coin_flip',
+      'the_nudge','alchemists_chisel','alchemist_touch','twinning_charm',
+      'double_down_die'].indexOf(cardId)>=0){try{famTableChanged();}catch(e){}}
   /* Trigger patron reaction. Card-specific lines (when authored) override the
      generic CARD_EFFECT fallback. First-fire-per-match guarantee inside DLG.triggerCard
      means the player always learns the card name + patron's voice on first use. */
@@ -45007,6 +45081,10 @@ function _commitVagabondDrag(){
      a quit after a drag lost the whole rearrangement and both lane carries
      with it. It never touches the rival's board, so no alsoOpp. */
   try{_snapDiceOnly();}catch(e){}
+  /* P844: the floats follow their dice to the new seats - once now,
+     once after the glide settles. */
+  try{_famRefloatGhosts();}catch(e){}
+  setTimeout(function(){try{_famRefloatGhosts();}catch(e){}},350);
   try{_haptic(20);}catch(e){}
   try{SFX.commit&&SFX.commit();}catch(e){}
   setStatusMsg('REARRANGED','active');
