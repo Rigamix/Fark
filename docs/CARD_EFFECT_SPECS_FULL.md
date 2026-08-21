@@ -186,6 +186,11 @@ of just gaining. 25% of each bank is stolen from them."*
 ### Double or Nothing (active)
 *"After banking, flip for it: double the bank or lose half."*
 
+> **RULED (P816, 2026-08-20): the PRE-bank arm is the design.** The
+> card is armed before the bank and resolves against it; the in-game
+> text now reads "Arm it, then bank." Item 1 below is the superseded
+> original spec, kept for the record.
+
 1. Only available in the window immediately after a bank — not
    mid-roll.
 2. A clear flip or gamble animation (a coin or die flip fits the name)
@@ -205,6 +210,9 @@ now."*
    state.
 3. +800 adds immediately to the current turn total, with a clear
    causal link on screen between the shatter and the point gain.
+   *(RULED P816: no instant pay — the value rides `_turnBonusPot`,
+   collected at the bank, burned entirely on a bust. The causal-link
+   visual requirement stands.)*
 
 ### Short Fuse (passive)
 *"From your third roll each turn, everything scores double. But bust

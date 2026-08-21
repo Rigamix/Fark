@@ -19,7 +19,7 @@ not merged — each fold is its own design/risk decision.
 | Dialogue/traits (`_dlgPick`, `_DLG_COND`, trait pools) | one resolver, one condition vocabulary, pools as rows | **SEPARATE, confirmed — and it is the fold TARGET for others.** The `add:1` additive class (P833) is a resolver feature, not a new system. |
 | cardHit taxonomy (P814/P836) | "an opponent card that takes dice or points is a hit" | **NOT a system — data on famFire.** One seam name on the existing bus; 28 fire-sites are single lines at docks; the consumer is an ordinary CFX handler. |
 | Patron leveling bias (`_TRAIT_FAM`, `dieBias`, `S.run._artPersona`) | trait→family lean; the name-is-the-character registry | **NOT a system — lookup tables + a registry consumed by the existing generator.** The brief's own suspicion confirmed. |
-| History-state greeting router (P839) | ledger state → which boss greeting pool | **CANDIDATE — the brief's suspicion is right.** The state→pool if/else in getLine is bespoke selection logic; three tiny `_DLG_COND` predicates (`boss_met`, `boss_wins:N`, `boss_wins_gte:N`) would express all four states as conditioned rows in ONE pool — the states are mutually exclusive, so no reliance on the specificity contest. Fold into: `_DLG_COND` + row data. Small, low-risk; awaiting the ruling. |
+| History-state greeting router (P839) | ledger state → which boss greeting pool | **CANDIDATE — the brief's suspicion is right.** The state→pool if/else in getLine is bespoke selection logic; three tiny `_DLG_COND` predicates (`boss_met`, `boss_wins:N`, `boss_wins_gte:N`) would express all four states as conditioned rows in ONE pool — the states are mutually exclusive, so no reliance on the specificity contest. Fold into: `_DLG_COND` + row data. **FOLDED same night as P841 on Denis's ruling — behavior-preserving, the P839 probe passed verbatim.** |
 | Band lines + recognition beat (P833/P837) | growth dialogue by night band; first-meeting-since-band-change | **Band lines: already pure data** (`add:1` rows + `night_gte` conditions). **Recognition: separate-confirmed, minimal** — the band-state WRITE (compare-and-update on `S.run._artBand`) is genuinely new state logic (~12 lines); its line draw is already `_dlgPick`. Nothing worth folding. |
 | Badges / tells / seals | the nine sealed-seat rules, eight boss tells, the badge | **ONE mechanism, three vocabularies — already consolidated.** `_tellById` one store, `_ruleActive` the one gate (verified: every effect read routes through it; the only effectful bypass is dead code), one badge renderer with per-rule CSS rows. The sealed seat and the sleeve are delivery routes, not systems. The six TRAIT seals are a word-collision: pure presentation + dialogue pool keys, no rule contact. |
 | Feats | 23-row data table, one resolver, no-write proxy view | **SEPARATE, confirmed — it already has the shape this audit wants.** `evaluateFeats()` is the one resolver; `_featView`'s write-throwing proxy ("feats observe, they don't grant power") is an invariant no other system carries; award-every-passing-row semantics are incompatible with dialogue's pick-one contest. The ~14 inline `_feat*` accumulators are irreducible instrumentation, not duplicated resolution. |
@@ -27,11 +27,12 @@ not merged — each fold is its own design/risk decision.
 
 **Count verdict:** of the eleven audited, seven are confirmed
 genuinely separate with stated reasons, three are already data on
-existing mechanisms (cardHit, leveling bias, relics), and exactly ONE
-is a fold candidate (the P839 greeting router — built fresh the same
-night the additive-resolver work proved the fold target could carry
-it; the honest answer to "why not route through `_DLG_COND`" is "no
-particular reason").
+existing mechanisms (cardHit, leveling bias, relics), and the ONE fold
+candidate — the P839 greeting router, built fresh the same night the
+additive-resolver work proved the fold target could carry it; the
+honest answer to "why not route through `_DLG_COND`" was "no
+particular reason" — **was folded as P841 on Denis's ruling. Eleven
+audited, zero pending folds.**
 
 ## Rot found in passing (bugs/debt, not folds — normal fix flow)
 

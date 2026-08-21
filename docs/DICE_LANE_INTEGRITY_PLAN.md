@@ -1,5 +1,15 @@
 # Dice, lane, and card positional integrity — full brief
 
+> **STATUS 2026-08-21:** two sections aged since Aug 13. The
+> "rival-side rework — scoped, not started" shipped: `_oRemoveOppDieAt`
+> (P837) is the rival's canonical removal path with full lane repairs.
+> The standing cross-reference sweep is partly superseded by
+> `famTableChanged()` (P844) sitting at every player-side mutation
+> moment — see docs/CARD_INTERACTION_RULES.md. STILL LIVE INSIDE THIS
+> DOC and nowhere else: the nine nominations that never received a
+> verdict (~line 3200) and the two NOT-DRIVEN queues — do not archive
+> this file without extracting them.
+
 Supersedes the original plan below. That plan's hypothesis was tested and
 refuted early — lane position already uses a stable per-die id, not array
 index, so no architectural rework was needed. What follows is everything
@@ -4392,7 +4402,7 @@ happening more than once.
 
 ### D25 — the player's Blessed Confiscation still pushes a seventh seat
 
-Found by Denis reviewing `docs/CARD_ART_NEEDED.md`, chasing a stale card
+Found by Denis reviewing `docs/archive/CARD_ART_NEEDED.md`, chasing a stale card
 description; the description was stale *because of* a fix whose twin was never
 made.
 

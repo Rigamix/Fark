@@ -4,7 +4,7 @@ The only file you need to read. Everything has my recommendation, so **"yours"
 is a valid answer.** Answered items are deleted, not marked — this stays short.
 
 **The 2026-08-20 ruling batch is EXECUTED** (P832-P838): Corvus orderly,
-boss :open pool wired (your eight greeting lines are the one open ask),
+boss :open pool wired (your 80 greeting lines shipped in P839),
 DLG.triggerCard deleted, the additive resolver + all 22 patrons' growth
 lines live, Seven Dice redesigned (free one-die reroll), relics are
 trophies, committed dice sit out the vagabond drag (+ one real drag
@@ -22,11 +22,13 @@ tools/ladder_real.js drives full real matches on both seats (tap-driven,
 the harness's own carl/rita policies over F.legalKeeps, modal night
 loadouts, bare gear — stated convention). Calibrated: ~75-130s per real
 match; Brutus crushed carl 9900-5750 and 13200-4950 in the calibration
-pair, consistent with the model-understates-the-rival finding. The priority
-sweep was STOPPED on Denis's word mid-first-cell (2026-08-20 ~19:10)
-— no cell completed, so NO numbers are recorded yet; the table is
-still unmeasured. Pick up by running cells (nights 6,7,8,3 first,
-then the rest × carl,rita):
+pair, consistent with the model-understates-the-rival finding.
+**FOUR REAL CELLS MEASURED (2026-08-21, stopped again on your word):
+ALDRIC carl 0/18 · ALDRIC rita 0/16 · WHISPER carl 0/20 · WHISPER rita
+0/20 — 0 wins in 74 real matches.** The sim's 9-12% for those nights was
+OPTIMISTIC; the real rival is stronger still. AMBROSE and FINNICK cells
+not reached. Resume (tier is 0-INDEXED: night = tier+1, so nights
+6,7,8,3 = tiers 5,6,7,2):
   node tools/shoot.js --url <dev>/fark_proto.html#lad=<tier>,<carl|rita>,<n> --eval-file tools/ladder_real.js
 
 §2–§4 still need you or a playtest.
@@ -360,7 +362,7 @@ directions, and only the dead one wipes:
 | **29875** | **player-armed → rival.** `G._playerRerollKeptArmed`, set by `activateCrownAuthorityPlayer` / `activateBlessedDicePlayer` | **STILL WIPES.** `d.kept=false; total=0;` then announces the reroll. No roller, no `val=`. **Unreachable** — it comes through `activateCard`, and the legacy player-active layer is dead (driven tonight: `canActivateCard` refuses every id, `pCards` and `effectiveCards()` both empty). |
 
 **So the paragraph above is true only of the dead half.** The boss firing it at
-you — the direction `docs/CARD_ART_NEEDED.md` describes, and the only one a
+you — the direction `docs/archive/CARD_ART_NEEDED.md` describes, and the only one a
 player meets — genuinely rerolls and rescores.
 
 **What this means for the art list:** nothing needs a caveat. Its wording for
@@ -399,7 +401,7 @@ card read as current and the others as foreign. It is a live art gap, not a
 data regression.
 
 **RULED: no card gets a CSS style, every card gets art.** The list is
-**`docs/CARD_ART_NEEDED.md` — 41 cards**, and the loader is built, so a PNG
+**`docs/archive/CARD_ART_NEEDED.md` — 41 cards**, and the loader is built, so a PNG
 dropped into `assets/cards/` renders on its own with no code change per card.
 
 - **41 rival/boss cards** — every `NPC_CARDS` id reachable through a rung's

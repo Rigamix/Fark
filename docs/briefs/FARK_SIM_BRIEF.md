@@ -1,5 +1,16 @@
 # FARK — SIM BRIEF FOR CODE
 
+> **STATUS 2026-08-21:** the receipts below are outdated — Break's
+> restore, the Ward cap and live Preserve all shipped since. The
+> harness lineage moved twice: `tools/sim_harness.js` (FSIM) replaced
+> agents.js, and `tools/ladder_real.js` replaced the sim for DIFFICULTY
+> after OPEN.md §1 measured the sim's rival as unfaithful (understates
+> by 23-51%). The acceptance targets here are under revision by the
+> ladder rebuild. The four-lens program (FUN/POWER/ELEGANCE/Scavenger)
+> was deferred and never run end-to-end — that ask now lives in
+> AUDIT_BACKLOG.md's RE-HOMED section. The brief's METHOD remains the
+> reference; its numbers do not.
+
 Why this is yours to run, not mine: everything shipped since the enchant/
 badge rework (Silver's new identity, all eight enchants, four rescoped
 badges, Break's timing mechanic) has never been through run-level

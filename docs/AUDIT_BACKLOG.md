@@ -3,6 +3,104 @@
 Written 2026-07-30 so a fresh session loses nothing. Companion to
 `archive/AUDIT_FINDINGS_RAW.md` (all 72 soak findings verbatim, with repro lines).
 
+## RE-HOMED 2026-08-21 (docs cleanup — these lived only in now-archived working papers)
+
+Every item below was quoted out of a doc moving to `archive/` because no
+live doc tracked it. Sources named so the full context is one hop away.
+
+**Player-facing / highest first:**
+- **THE SETTLE DRAG IS STILL OPEN.** Denis reported it twice: dice hang,
+  then slide slowly into place "as if against an invisible wall". Measured
+  (archive/NOTES_2026-08-15.md): tapes run 1.2–1.9s with 183–650ms of
+  crawl. P736 tried two fixes — BOTH FAILED — and was reverted whole. No
+  fix shipped since; this is the oldest open player-reported feel bug.
+- **~46 KB heap retained per match, never released** (archive/BREAK_ROWS_2026-08-03.md,
+  diagnosed: cumulative per page load, not DOM, not batch size). Caps every
+  long study and is a slow leak on a phone session. Worth finding.
+- **shoot.js has no watchdog** — a vanished browser blocks a run forever
+  (one 178-minute hang measured, archive/FINDINGS.md); each hang leaks a
+  profile. Same family as the 270GB/orphan-browser incidents.
+
+**Design calls (Denis, when wanted):**
+- **Seven fam actives are never played BY bosses**: `_npcArmActives` was
+  never taught when a boss should choose transmute / powder_keg /
+  sacrifice / steady_hand / fair_trade / tamper / fool's gold — "a
+  genuinely larger job nobody has scoped" (archive/P5_NPC_CARDS.md).
+- **Opponent-enchant sourcing** (archive/OPP_ENCHANTS_SIZE.md): if rival
+  enchants ever exist, where from — patron generation, boss relic dice, or
+  only via For Keeps/Trade? Dormant until wanted; the engine currently has
+  none by ruling.
+- **Seven patrons have no growth/recognition lines by deliberate
+  exclusion** (Twill, Fenn, Ferrand, Odo, Ollis, Tam, Peck — not enough
+  lore grounding to write without inventing; archive/PATRON_GROWTH_LINES.md).
+  Your lines whenever you want them to grow too.
+- **Patron leveling "up to 3 late" cap**: shipped as a flat cap for every
+  persona; the brief flagged "confirm rather than assume" and it was never
+  explicitly confirmed (archive/PATRON_LEVELING_BRIEF.md).
+- **CARD_VFX A3b environment darkening** (room dims 1.0→0.82 as
+  pPts→target, stepped per bank): never built, never ruled
+  (archive/CARD_VFX.md).
+- **Hand/goblet gather at throw start**: recorded, deliberately not acted
+  (archive/PLAYTHROUGH_PASS_PLAN.md step 5).
+- **The enchant-badge rework's §5 open items** (briefs/FARK_ENCHANT_BADGE_REWORK.md
+  — the brief is live, its open list just had no pointer here): enchant
+  gold prices are placeholders needing a pricing pass; Snuff/Fog power
+  vs an ADAPTING rival unmeasured; relic-vs-badge architecture open;
+  First Strike's reduced form never explicitly signed off (OPEN.md's P843
+  entry covers only the economy half).
+- **FARK_MASTER_BRIEF's own stale-content pass** (flagged in its header):
+  the line-by-line mark-or-strike sweep (old enchant menu, old Silver
+  pricing, Renown perks, dead boss-tell UI, Bookends feat) is owed and
+  not done.
+
+**Instrument/code hygiene:**
+- **`_oppHas(mech)` helper never shipped** — the 6 inline
+  `G.oCards.some(...mechanic===...)` query sites remain
+  (archive/MECHANIC_TABLE_SCOPE.md).
+- **jade3 reachability never verified** — it is in no tier's diceWeights;
+  whether any upgrade path reaches it was flagged and never answered
+  (archive/EFFECT_INVENTORY.md).
+- **famsweep_steady_stale probe is known-broken** (pre-P519 line refs,
+  excluded from the suite) — fix or retire (archive/CARD_AUDIT_2.md...
+  which stays live; the probe note had no other home).
+- **ill_omen flake signature**: one witness run measured +400/−800
+  (irreproducible; write-trap showed one +800 write). Recorded beside the
+  preserve flake as the second member of the headless-flake ledger.
+- **Sim-spread comparability trap**: a 4-agent and an 8-agent spread are
+  not comparable numbers; changing agent count breaks comparability with
+  every prior run (archive/SPREAD_AUDIT.md).
+- **The sim brief's four-lens program** (FUN spread / POWER delta /
+  ELEGANCE checks / Scavenger sweep) was deferred pending resolutions
+  that later landed, and never run end-to-end (briefs/FARK_SIM_BRIEF.md).
+- **Art filename nits** (archive/ART_TODO.md): two masters are camelCase
+  (`card_face_steadyHand.png`, `card_face_FairTrade.png`) where the set is
+  snake_case; `fools_gold_f`/`vanguard_f` map to un-suffixed filenames and
+  `anchor_f`/`bookends_f` are `_FAM_ALIAS` aliases — any script deriving
+  ids from filenames needs these four exceptions.
+- **The P505 CSS-palette stopgap's deletion is armed**: OPEN.md §1d said
+  it "retires itself once the card-art list is filled" — the list is now
+  filled (archive/CARD_ART_NEEDED.md); the deletion itself has not been
+  done.
+- **Old audit-resolution residuals** (archive/AUDIT_RESOLUTIONS.md):
+  whispers_fang's post-fix "worth it?" sim check never ran by name; the
+  SFX.shield→ward.fire re-home has no landing record (Ward may still arm
+  silently); the Still Waters pre-wide-build sim pass is subsumed by the
+  ladder-rebuild-first ruling but never explicitly closed.
+
+## STATUS CORRECTIONS (2026-08-21) — entries below that are now wrong
+
+- `block_low_bank` "implemented on both seats": now has ZERO
+  implementation sites (OPEN.md P774 entry — fully undealt AND gone).
+- "Area A is in (P383). The other six are not": B–G all shipped (P397–P400).
+- "Still to build: Brutus relic Ward / Fair Trade tiers / Still Waters /
+  1-or-5 restriction": all done or mooted (P383, P718 retired Fair Trade).
+- The two "in flight" workflow-journal sections reference dead session
+  journals; their subjects were superseded (Steady Hand P535, Preserve
+  P744 + the P844 lane-record taxonomy).
+- "PRESERVE built, NOT APPLIED": superseded — preserve is live as a real
+  pool die (P744); docs/CARD_INTERACTION_RULES.md files it as a lane
+  record.
+
 ## Open, low-stakes
 
 - **Tamper's texts say "for the night"; the break is match-scoped.** (found
@@ -30,7 +128,7 @@ Written 2026-07-30 so a fresh session loses nothing. Companion to
   `type:'twice'` **and** `uses:2`, so rebalancing it via the obvious field would
   silently do nothing. Either enforce `type` or drop it from the mechanics that
   ignore it. Same latent-drift class as the `||500` defaults. See
-  `docs/CARD_AUDIT.md`.
+  `docs/archive/CARD_AUDIT.md`.
 
 - **`block_low_bank` is implemented on both seats and no card declares it.**
   The mechanic has branches in `handleBank` and `finOpp` — tabulated during the
