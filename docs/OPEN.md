@@ -36,6 +36,32 @@ in it, which defeated the point of the file. Deleted items live in git history.
 
 ---
 
+## Card interactions REVISED on your review (P845/P845b, 2026-08-21)
+
+All four objections held, and one found a shipped bug:
+1. **The 16-name list**: every id now verified three ways (in the
+   dispatch switch, handler body read, individually DRIVEN — 22/22
+   sweep legs green in apv_card_interactions_sweep.js) and the
+   collision table is in the doc: old_bones/the_nudge + 6 others also
+   live in NPC_RESCUES (rival seat, no cross-wire), finnicks_palm is a
+   THREE-way collision (card + rescue + relic die), seven_dice is one
+   id — the CARDS row IS the P834 redesign in place.
+2. **Driving seven_dice found it UNREACHABLE in real play**: the P834
+   redesign shipped behind timing:'idle' where the pool is always
+   empty (measured) — the P834 probe drove the handler directly and
+   never ran the gate. Fixed to 'choosing' (P845). Driving it further
+   showed it's an ARM (mutates at its die tap), so it left the
+   dispatch list and enrolls at the tap with its own flag (P845b) —
+   the dispatch hook had been stripping its rings while the hijack
+   lived.
+3. **Preserve reclassified**: the taxonomy is now FOUR kinds — promise
+   (void), arm (disarm), LANE RECORD (maintain — preserve's honest
+   home), flag (nothing). Faces void, seats follow.
+4. **Palm's two stories cross-referenced**: it has BOTH its 840ms lock
+   and the R1 hook, in sequence, and the doc says how they compose.
+The doc's coverage section now states exactly what was driven (22
+legs) vs. what is structural (NPC-side ordering, the drag refloat).
+
 ## Card interactions: the rules are written + the Stargazer break fixed (P844, 2026-08-21)
 
 Your report reproduced exactly: stargazer → sacrifice left all six

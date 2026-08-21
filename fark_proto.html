@@ -13733,7 +13733,7 @@ function generateDiceLoadout(tierIndex){
   {id:'brutus_grit',name:"BRUTUS'S GRIT",icon:'⛓️',rarity:'gold',npc:'brutus',eff:'1ST BUST UNDER 500: SAVED. BANKS 500+ +15%',desc:"Once per match, if you bust below 500 turn points, your dice refresh instead. Banks of 500+ also gain +15%.",rewardQuote:'"Stand longer than they expect, and they\'ll never expect again."',arch:'brinksman'},
   {id:'whispers_veil',name:"WHISPER'S VEIL",icon:'🕯️',rarity:'gold',npc:'whisper',eff:'EVERY OTHER OPP TURN: 5 DICE',desc:"On every other opponent turn (their 1st, 3rd, 5th…) they roll only 5 dice instead of 6. A persistent diminishment.",rewardQuote:'"Six was always too generous, dear."',arch:'saboteur'},
   /* Phase 6b — fun active cards */
-  {id:'seven_dice',name:'SEVEN DICE',icon:'🎲',rarity:'gold',type:'active',maxUses:1,timing:'idle',eff:'REROLL ONE DIE, FREE',desc:"Activate during your turn: tap one die and it rerolls, free. You keep the new face, better or worse.",arch:'sharp'},/* P834: redesigned per Denis - the 7th-lane promise was a silent no-op since the seat clamps */
+  {id:'seven_dice',name:'SEVEN DICE',icon:'🎲',rarity:'gold',type:'active',maxUses:1,timing:'choosing',/* P845: was 'idle', where the pool is always empty - unreachable */eff:'REROLL ONE DIE, FREE',desc:"Activate during your turn: tap one die and it rerolls, free. You keep the new face, better or worse.",arch:'sharp'},/* P834: redesigned per Denis - the 7th-lane promise was a silent no-op since the seat clamps */
   {id:'loan',name:'THE LOAN',icon:'💰',rarity:'gold',type:'active',maxUses:1,timing:'idle',eff:'+1500 NOW; −200/TURN FOR 5 TURNS',desc:"Take a loan: gain 1500 points immediately. The innkeeper docks 200 from your total at the start of each of your next 5 turns.",arch:'hoarder'},
   /* ── DICE PROTECTION / SWAP ── */
   /* iron_grip removed — pure counter card, no one drafts it. */
@@ -14894,6 +14894,8 @@ function _steadyDisarm(){
   try{
     if(typeof G==='undefined'||!G)return;
     G._steadyArmed=false;
+    G._sevenArmed=false;/* P845b: same arm class, same exits - the flag
+       makes any stale hijacked onclick a no-op */
     document.querySelectorAll('#playerDiceRow .die.break-target')
       .forEach(function(el){el.classList.remove('break-target');});
   }catch(e){}
@@ -38871,13 +38873,16 @@ function activateCard(cardId){
     case 'twinning_charm': activateTwinningCharm(); break;
     case 'double_down_die': activateDoubleDownDie(); break;
   }
-  /* P844: the dice-mutating actives void pending promises/arms - one
-     site, one classified list (each handler verified to write d.val,
-     splice the pool, or freeze). Flag-only and points-only actives
-     stay off it: a promise survives a wager. A NEW active that touches
-     dice joins this list - docs/CARD_INTERACTION_RULES.md. */
+  /* P844/P845b: the dice-mutating actives void pending promises/arms
+     - one site, one classified list (each handler verified to write
+     d.val, splice the pool, or freeze - and DRIVEN individually, the
+     sweep probe). Flag-only and points-only actives stay off it: a
+     promise survives a wager. seven_dice is NOT here: it ARMS at
+     dispatch and mutates at its die tap, which enrolls there instead
+     (the steady_hand/transmute shape). A NEW active that touches dice
+     joins this list - docs/CARD_INTERACTION_RULES.md. */
   if(['grogs_flask','finnicks_palm','brutus_fist','ambrose_grace','vanishing_act',
-      'old_bones','frozen_die','double_down','wild_die','seven_dice','coin_flip',
+      'old_bones','frozen_die','double_down','wild_die','coin_flip',
       'the_nudge','alchemists_chisel','alchemist_touch','twinning_charm',
       'double_down_die'].indexOf(cardId)>=0){try{famTableChanged();}catch(e){}}
   /* Trigger patron reaction. Card-specific lines (when authored) override the
@@ -39387,16 +39392,21 @@ function activateSevenDice(){
   if(!free.length){setStatusMsg('SEVEN DICE — NOTHING TO REROLL','red');return;}
   setStatusMsg('SEVEN DICE — TAP THE DIE TO REROLL','gold');
   triggerCard('seven_dice','ARMED',true);
+  G._sevenArmed=true;/* P845b: the arm-flag - a table change disarms via
+     _steadyDisarm's sweep, and a stale hijacked onclick dies on it */
   free.forEach(function(d){
     if(!d.el)return;
     d.el.classList.add('break-target');
     d.el.onclick=function(){
+      if(!G._sevenArmed)return;
+      G._sevenArmed=false;
       free.forEach(function(q){if(q.el){q.el.classList.remove('break-target');q.el.onclick=function(){toggleDie(q);};}});
       d.val=_rollD(d);d.sel=false;
       if(d.el){d.el.classList.remove('selected');d.el.classList.add('card-reroll');
         setTimeout(function(){if(d.el)d.el.classList.remove('card-reroll');},700);}
       try{reDrawDieFace(d);}catch(e){}
       famLog('SEVEN DICE — '+d.val);
+      try{famTableChanged();}catch(e){}/* P845b: the reroll is the mutation moment */
       /* the table as it is NOW can be a bust (steady_hand's P535 lesson) */
       var _sf=(G.pool||[]).filter(function(x){return !x.committed&&!x._shattered;});
       var fv=_sf.map(function(x){return x.val;}),fm=_sf.map(function(x){return x.mat;});
