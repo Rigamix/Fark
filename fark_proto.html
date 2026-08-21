@@ -31788,6 +31788,13 @@ function handleRoll(){
         setTimeout(function(){d.el.classList.remove('card-reroll');d.el.classList.add('card-reroll-settle');settleDie(d.el);
           setTimeout(function(){d.el.classList.remove('card-reroll-settle');},400);},400);}
     });
+    /* P847: this IS a roll - the player tapped ROLL - and it never
+       reached the seam every roll-counting system reads (slow_cook's
+       P813 accrual missed every GE reroll). Same payload shape as the
+       main path at _afterRollImpl. The post-roll TELL hooks are still
+       main-path-only: that block wants ONE extraction with two
+       callers, not a copy here - AUDIT_BACKLOG carries it. */
+    try{famFire('roll',{actor:'p',rollNum:(G.turnRollCount||0)+1});}catch(e){}
     SFX.roll();G.turnRollCount++;
     setTimeout(function(){
       var free2=G.pool.filter(function(d){return !d.committed;});var fv=free2.map(function(d){return d.val;});var fm=free2.map(function(d){return d.mat;});var cards=effectiveCards();
@@ -39140,6 +39147,12 @@ function activateGamblersEye(){
        didn't, destroying the one-use gold card with zero effect. */
     refundActiveCardUse('gamblers_eye');
     return;}
+  /* P847: the mode's entry deselects the pool and rebinds every free
+     die's onclick - the R1 mutation class. Without this, an armed
+     Steady Hand sat flag-true with rings painted and taps toggling
+     selection for the whole GE window. After the refund guard on
+     purpose: a no-op voids nothing. */
+  try{famTableChanged();}catch(e){}
   /* Deselect all current selections */
   G.pool.forEach(d=>{d.sel=false;if(d.el){d.el.classList.remove('selected');if(d.el._d3)D3.draw(d.el._d3);}});
   _clearDieEffects();

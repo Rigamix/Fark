@@ -205,7 +205,19 @@ base stargazer un-regressed (promise lands on the right lanes),
 honeytrap surviving a flag-only card, a stranded transmute arm
 sweeping.
 
-Structural (not driven, stated as such):
+Structural (not driven, stated as such — P847 added the two
+player-side pool rewrites Denis flagged as safe-but-unstated):
+- **`famFoolsGold`** rewrites every free die with direct `.val=` — safe
+  by ORDER: it fires on the dead-roll seam, after `famApplyRollForces`
+  consumed the promise and `_clearRollForces`/`_steadyDisarm` ran on
+  the roll path. Both branches (rescue and burn) sit behind that clear;
+  the success branch's own `_steadyDisarm` is belt-and-braces.
+- **The jade Break row** ("EVERYTHING ROLLS AGAIN") is direct-write ON
+  PURPOSE and must NOT convert to `_setDieVal`: `_breakDie`'s tail
+  resumes the interrupted roll ~320ms later, and a pending promise
+  legitimately lands on THAT roll — converting the scatter would void
+  the promise the resumed roll is about to consume. The scatter is
+  cosmetic pre-roll noise (measured in the row's own comment).
 - The NPC-side tables (NPC_RESCUES, NPC actives) are argued safe by
   ordering (promises die at endPTurn before the rival acts), not
   driven. The rival's OWN peek (`G._oPeekVals`) is index-keyed and
@@ -213,6 +225,16 @@ Structural (not driven, stated as such):
 - `_famRefloatGhosts` after a drag reorder is verified by code reading
   and lane-stamps, not by a driven drag (headless drag gestures are
   not in the harness).
+
+Gambler's Eye's full story (P846+P847, driven both halves): its ENTRY
+deselects the pool and rebinds onclicks → `famTableChanged()` after
+the refund guard (arms disarm at activation, not at the roll — driven:
+steady flag+rings die at entry); its REROLL goes through `_setDieVal`
+(the promise void) and fires `famFire('roll')` with the main path's
+payload (slow_cook counts it — driven: one event, right rollNum). The
+post-roll TELL hooks still run only on the main path — that block
+wants one extraction with two callers, not a copy; AUDIT_BACKLOG
+carries it.
 
 ## Known remaining gaps (recorded, not fixed)
 

@@ -70,6 +70,18 @@ EFFECTS audited to the fam-card standard; rollFace (NPC + hot-dice
 path) has the same die-less Still Waters question as rollFaceExclude
 did — measured next pass.
 
+**P847 (your P846 verification, all four items):** Gambler's Eye's
+ENTRY now disarms (famTableChanged after the refund guard — driven:
+steady's flag+rings die at activation, where they used to sit painted
+and inert for the whole GE window) and its reroll fires the roll seam
+with the main path's payload (driven: one event, rollNum right —
+slow_cook counts GE rerolls now). The post-roll TELL hooks are NOT
+copied into the branch — that block wants one extraction with two
+callers; backlogged. famFoolsGold and the jade Break row are documented
+as structural in the rules doc: fool's gold is order-safe on both
+branches, and jade must STAY direct-write — converting it would void
+the promise the resumed roll is about to legitimately consume.
+
 ## Card interactions REVISED on your review (P845/P845b, 2026-08-21)
 
 All four objections held, and one found a shipped bug:
