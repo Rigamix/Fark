@@ -68,15 +68,48 @@ say bosses at nights 6-7 win ~100% (0 wins in 74). Patrons at nights
 bosses** — which is exactly the shape a player would describe as "the
 patrons don't do anything and then the boss is a wall."
 
-**The ask (yours):** do patrons get a card layer designed for them?
-Options, cheapest first: (a) let patrons draw from the CURRENT tavern
-pool with a tier-scaled count — one line, but it's the balance call
-P507 declined to make blind; (b) give them MORE family cards / earlier
-tier-II instead — reuses the engine they already ride, no new content;
-(c) design a small patron-specific card set. My recommendation: **(b)
-now** (it's tuning inside a shipped system and the ladder rebuild can
-measure it), with (a) or (c) as the real answer once the retune batch
-lands. Nothing shipped — this is a design ruling, not a bug.
+**RULED AND SHIPPED (P851/P851b):** "patrons should get cards earlier…
+if I have 3 cards or so they should have similar (and the ability to
+play them)."
+
+Measured first, both halves. **You hold THREE family cards flat from
+night 2 to night 8** — `S.run.fcards` is hard-capped at 3 with no
+growth curve anywhere; only card TIER rises. Patrons held 0.5 at
+nights 1-2 (half of them NONE), 1.3 at nights 3-5, 2.5 at 6-8. And
+**25-31% of every card they were dealt was unplayable by them** at
+every night: `famUse` gates the rival on `NPC_FAM_READY`, which holds
+7 of the 17 actives — the other ten are player-only UI (steady_hand,
+transmute wait for a TAP), player-pool rewriters that would detonate
+YOUR dice run for the rival (powder_keg, sacrifice), passive-shaped
+(fools_gold_f has no `use()` at all), or run-scope economy cards.
+
+Shipped: the hand now mirrors yours — **night 1 → 1, night 2 → 2,
+nights 3+ → 3** — and the draw only offers what a patron can actually
+use (any passive, or an active in the ready registry). Tavern cards
+left the pool entirely (run-scope, inert in a hand — the grudge pool
+already excluded them, the main pool didn't). Persona is a bias now
+rather than a ceiling: amber/silver/obsidian carry only 2-3 usable
+cards, so a 3-card hand used to silently under-deal. And the night<5
+"one active" telegraph rule now SWAPS the surplus active for a passive
+instead of deleting it — it was quietly costing a card.
+**Measured after: 1 / 2 / 3 cards per night, 0% empty hands, 0 dead
+cards at every night.** Driven (apv_patron_plays): a real night-6
+patron fires double_or_nothing and sleight in a real rival turn,
+charge 1→0 both times.
+
+**Deliberately NOT done:** the ten dead actives were not force-added to
+`NPC_FAM_READY`. That registry is load-bearing, not merely unfinished —
+`CFX.tamper` run for the rival would break the rival's OWN cards and
+pay YOU 300 (its target list is hard-coded to `G.oF`). Teaching the
+other ten an actor branch is the scoped job in AUDIT_BACKLOG; this
+patch stops dealing cards that job hasn't reached yet. ~44% of a
+patron's cards are now playable actives, so ~4 in 5 hands hold
+something they can fire.
+
+**Still yours:** whether the night<5 one-active telegraph cap should
+lift now that hands are full (it holds nights 3-4 to ~1 active + 2
+passives), and whether patron DICE should follow the same parity logic
+(family dice still start at night 4 per P822).
 
 ---
 

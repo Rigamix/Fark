@@ -13518,13 +13518,41 @@ function generatePatron(tierIndex,forcePersona){
   /* family cards: 0-1 early, up to 3 late; tier locks follow the player's */
   var fams=_TRAIT_FAM[_gp.persona]||['silver'];
   if(night>=3&&Math.random()<0.15){ /* off-diagonal curveball */
-    var all=Object.keys(FAMILIES);fams=[all[Math.floor(Math.random()*all.length)]];
+    /* P851: never onto TAVERN - those are run-scope cards, inert in a
+       hand. The grudge pool below already excluded them; this one did
+       not, so ~2% of night-3+ patrons were handed a dead loadout. */
+    var all=Object.keys(FAMILIES).filter(function(f){return f!=='tavern';});
+    fams=[all[Math.floor(Math.random()*all.length)]];
   }
-  var count=night<=2?(Math.random()<0.5?0:1):(night<=5?(Math.random()<0.4?2:1):(Math.random()<0.5?3:2));
-  var pool=FAM_CARDS.filter(function(d){return _famDraftable(d)&&fams.indexOf(d.fam)>=0;});/* P588 */
+  /* P851: THE PATRON'S HAND MIRRORS THE PLAYER'S. Measured: the player
+     holds THREE family cards flat from night 2 (S.run.fcards, hard cap
+     3, no growth curve - only tier rises), while patrons held 0.5 at
+     nights 1-2 (half of them none at all), 1.3 at nights 3-5 and 2.5
+     at nights 6-8. Denis: "if I have 3 cards or so they should have
+     similar". Night 1 stays light because the player's own night 1
+     runs 0 -> 2. */
+  var count=night<=1?1:(night<=2?2:3);
+  /* P851: A CARD A PATRON CANNOT PLAY IS NOT A CARD. famUse gates
+     actor 'o' on NPC_FAM_READY (7 of 17 actives); the other ten are
+     player-only UI, player-pool rewriters, passive-shaped, or
+     run-scope - measured at 25-31% of every hand dealt, at every
+     night. Passives are fine for either seat: they ride famFire
+     seams rather than famUse. */
+  var _npcUsable=function(d){
+    if(!d||d.fam==='tavern')return false;
+    if(d.kind!=='active')return true;
+    return !!(typeof NPC_FAM_READY!=='undefined'&&NPC_FAM_READY[d.id]);
+  };
+  var pool=FAM_CARDS.filter(function(d){return _famDraftable(d)&&_npcUsable(d)&&fams.indexOf(d.fam)>=0;});/* P588 */
+  /* P851: PERSONA IS A BIAS, NOT A CEILING. amber/silver/obsidian carry
+     only 2-3 usable cards each and this loop is pool-bounded, so a
+     three-card hand used to silently under-deal. The persona's own
+     families are drawn first; the rest of the usable set backs it. */
+  var _wide=FAM_CARDS.filter(function(d){return _famDraftable(d)&&_npcUsable(d)&&fams.indexOf(d.fam)<0;});
   var fc=[];
-  for(var ci=0;ci<count&&pool.length;ci++){
-    var pick=pool.splice(Math.floor(Math.random()*pool.length),1)[0];
+  for(var ci=0;ci<count&&(pool.length||_wide.length);ci++){
+    var _src=pool.length?pool:_wide;
+    var pick=_src.splice(Math.floor(Math.random()*_src.length),1)[0];
     var t=1;
     if(night>=3&&Math.random()<0.30)t=2;
     /* P837 (Denis, ruling 2): NO raw tier-III for patrons - the player's
@@ -13538,15 +13566,32 @@ function generatePatron(tierIndex,forcePersona){
     _gp._grudgeNight=night;
     _gp.grudge=true;_gp.agg=Math.min(0.95,(_gp.agg||0.5)+0.12);
     if(fc.length<3&&Math.random()<0.5){/* +1 aggression tier: an extra card */
-      var gPool=FAM_CARDS.filter(function(d){return _famDraftable(d)&&d.fam!=='tavern';});/* P588 */
+      var gPool=FAM_CARDS.filter(function(d){return _famDraftable(d)&&_npcUsable(d);});/* P588; P851: same usability rule as the main draw */
       var gp2=gPool[Math.floor(Math.random()*gPool.length)];
       fc.push({id:gp2.id,tier:1});
     }
   }
   if(night<5){/* telegraph rule sibling: at most ONE active before night 5 */
-    var _na=0;
+    /* P851b: SWAP, DON'T DROP. This used to filter the excess actives
+       out, which quietly cost the patron a card whenever it drew two -
+       measured at 1.9-2.6 cards on nights 2-4 against a target of 3.
+       The rule means "not two actives at once", not "a smaller hand",
+       so a surplus active is replaced by a passive from the same
+       usable pool and only an empty pool shrinks the hand. */
+    var _na=0,_swap=[];
     _gp.fcards=fc.filter(function(c){var cd=famDef(c.id);
-      if(cd&&cd.kind==='active'){_na++;return _na<=1;}return true;});
+      if(cd&&cd.kind==='active'){_na++;if(_na>1){_swap.push(c);return false;}}
+      return true;});
+    if(_swap.length){
+      var _held={};_gp.fcards.forEach(function(c){_held[c.id]=1;});
+      var _pass=FAM_CARDS.filter(function(d){
+        return _famDraftable(d)&&_npcUsable(d)&&d.kind!=='active'&&!_held[d.id];});
+      _swap.forEach(function(c){
+        if(!_pass.length)return;
+        var p=_pass.splice(Math.floor(Math.random()*_pass.length),1)[0];
+        _gp.fcards.push({id:p.id,tier:c.tier});
+      });
+    }
   }
   return _gp;
 }
