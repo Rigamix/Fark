@@ -93,6 +93,13 @@ note: fool's gold's structural entry now states the real invariant
 ("every path into a dead table has already disarmed") instead of
 crediting one handleRoll call site with the wrong line number.
 
+**P849 (your P848 notes, both taken):** the Spur-wins-the-ternary
+priority is now stated at the site ("do not fix this by reordering"),
+and `_geExclude` joined `famTableChanged`'s gate with a comment telling
+the next buffer's author to join it too — the one-exit invariant holds
+by construction now, not by the current call graph. apv_ge_edges 6/6
+after the gate change.
+
 **P847 (your P846 verification, all four items):** Gambler's Eye's
 ENTRY now disarms (famTableChanged after the refund guard — driven:
 steady's flag+rings die at activation, where they used to sit painted
