@@ -38,6 +38,48 @@ in it, which defeated the point of the file. Deleted items live in git history.
 
 ---
 
+## PATRONS ARE THIN BY RULING, AND IT'S YOUR OWN (measured 2026-08-21)
+
+You asked: "patrons still don't have cards or decent dice even at
+Finnick's level?" Measured, 12 generated patrons per tier plus a live
+night-3 table:
+
+**Cards.** Patrons get FAMILY cards only — night 3 averages **1.2**
+(mostly tier I, 30% roll tier II), rising to ~2.4 by night 6. They get
+**ZERO tavern cards, at every tier** — `pCardCount=0`, and that is
+**P507, your own ruling**: the old code built patron hands out of the
+retired 133-card legacy roster (17 distinct dead ids measured in real
+matches), and the fix switched the layer off rather than repoint it,
+because "a fresh patron card layer is unscoped design work." The
+comment even predicted this conversation: *"NOTE: this makes nights 3-8
+easier — a correctness fix, not a balance call."* So the thinness is
+real, deliberate, and was always meant to come back as designed work.
+
+**Dice.** Night 3 (tier 2) draws from bone/iron/lead + one lucky die —
+measured across 12 patrons: lead 23, iron 19, bone 17, lucky 10, amber
+3 (the 35% next-tier splash). **Family dice only enter at night 4**
+(P822). So at Finnick's night a patron holds five plain dice, one
+lucky, and about one tier-I family card — against a player with three
+card slots, drafted cards and enchants.
+
+**This is the other half of the ladder finding.** The measured cells
+say bosses at nights 6-7 win ~100% (0 wins in 74). Patrons at nights
+1-5 are the opposite. **The curve is bimodal: trivial seats, impossible
+bosses** — which is exactly the shape a player would describe as "the
+patrons don't do anything and then the boss is a wall."
+
+**The ask (yours):** do patrons get a card layer designed for them?
+Options, cheapest first: (a) let patrons draw from the CURRENT tavern
+pool with a tier-scaled count — one line, but it's the balance call
+P507 declined to make blind; (b) give them MORE family cards / earlier
+tier-II instead — reuses the engine they already ride, no new content;
+(c) design a small patron-specific card set. My recommendation: **(b)
+now** (it's tuning inside a shipped system and the ladder rebuild can
+measure it), with (a) or (c) as the real answer once the retune batch
+lands. Nothing shipped — this is a design ruling, not a bug.
+
+---
+
 ## Card interactions round 3: the roster deletes itself (P846, 2026-08-21)
 
 Your second review held on every count. Shipped:
