@@ -13459,10 +13459,12 @@ function _maybeFireCutpurse(){
      G._tell too, so even past the gate a sleeved pickpocket would have rolled
      against whatever other rule occupied that slot. Same shape D22 documents on
      the player's side of Drill Order, so this is the file's existing pattern.
-     They agree today (the RUNGS record carries chance:.15 against a 0.15
-     fallback) - which is precisely D22's point: retune the record and the two
-     paths diverge in silence. P854 retuned it (.30 -> .15 on Denis's note)
-     and moved BOTH, because this comment said what would happen otherwise. */
+     THREE sites read this rule, not two: the RUNGS record (chance:.15),
+     this fallback, and the rival turn's own roll. P854 retuned the first
+     two and MISSED THE THIRD, which is exactly the silent divergence this
+     comment warns about - the badge ran 15% against the player and 30%
+     for them until P855. The third site now reads the record instead of
+     carrying a literal, so the number lives in one place. */
   var _ppDef=(G._tell&&G._tell.id===_ppId)?G._tell:(_tellById(_ppId)||{});
   if(Math.random()>(_ppDef.chance||0.15))return;
   /* WARDED shield: fizzle the palm before any animation. */
@@ -14667,17 +14669,24 @@ var FAM_CARDS=[
   text:['Shatter one of your own dice, gone for the match, for +800 on this turn. Bank it or lose it.',
         'Shatter one of your own dice, gone for the match, for +1200 on this turn. Bank it or lose it.',
         'Shatter one of your own dice, gone for the match, for +2000 on this turn. Bank it or lose it.']},
- /* P854: tiers II and III were EMPTY STRINGS - an upgraded Short Fuse
-    showed a blank card (Denis: "Short Fuse doesn't have a description").
-    They read the same because the CARD behaves the same: CFX.short_fuse
-    reads no tier at all - rc<3 gate, flat ev.mul(2), full-loss burn -
-    so it is the one family card an upgrade does not change. Whether
-    II/III should scale is a design question in OPEN.md; the text is not
-    the place to promise something the code does not do. */
- {id:'short_fuse',fam:'obsidian',kind:'passive',name:'Short Fuse',
+ /* P855 (Denis's ruling): SHORT FUSE SCALES - gate first, then
+    multiplier, and the burn stays ABSOLUTE at every tier because that is
+    the card's price. Kept here so it is not re-litigated: the card has
+    three dials and Obsidian already spends the other two - sacrifice
+    scales the upside (p:[800,1200,2000]), double_or_nothing the downside
+    (half/third/quarter). Softening the burn would be a third copy of
+    that pattern AND would make an Obsidian card safer as it levels,
+    which fights the family. The gate is where the decision lives ("do I
+    push to a third roll?"), so moving it changes the shape of a turn
+    rather than paying a bigger number - but it cannot carry all three
+    tiers, because lighting from roll 1 means always-lit and deletes the
+    decision. So III takes the multiplier.
+      p:  the multiplier      (sacrifice's p: convention)
+      lit: the roll it lights from */
+ {id:'short_fuse',fam:'obsidian',kind:'passive',name:'Short Fuse',p:[2,2,3],lit:[3,2,2],
   text:['From your third roll each turn, everything scores double. But bust after that and the fire spreads to your banked points.',
-        'From your third roll each turn, everything scores double. But bust after that and the fire spreads to your banked points.',
-        'From your third roll each turn, everything scores double. But bust after that and the fire spreads to your banked points.']},
+        'From your SECOND roll each turn, everything scores double. But bust after that and the fire spreads to your banked points.',
+        'From your SECOND roll each turn, everything scores TRIPLE. But bust after that and the fire spreads to your banked points.']},
  /* STARSTONE */
  {id:'encore',fam:'starstone',kind:'active',name:'Encore',charges:[1,2,3],
   text:['Do not like a roll? Roll it again. Once per match.',
@@ -17311,11 +17320,19 @@ CFX.short_fuse={
   /* THE ONLY MULTIPLIER IN THE GAME so far, and the reason ev.mul exists. */
   commit:function(ev){if(!ev.mine)return;
     var rc=(ev.owner==='p')?(G.turnRollCount||0):(G._oRollNum||0);
-    if(rc<3)return;
-    ev.mul(2);ev.me.state.lit=true;
-    if(ev.owner==='p'){_famPop('x2 SHORT FUSE');
+    /* P855: TIER-SHAPED, from the card's own data. ev.me is the ACTING
+       seat's instance, so the tier read is owner-correct the same way
+       the roll count above is (P765) - a boss's upgraded fuse lights on
+       its own schedule, not the player's. Same accessor the bookends
+       commit handler uses. */
+    var _sfD=famDef('short_fuse')||{},_sfT=ev.me.tier||1;
+    var _sfLit=(_sfD.lit&&_sfD.lit[_sfT-1])||3;
+    var _sfMul=(_sfD.p&&_sfD.p[_sfT-1])||2;
+    if(rc<_sfLit)return;
+    ev.mul(_sfMul);ev.me.state.lit=true;
+    if(ev.owner==='p'){_famPop('x'+_sfMul+' SHORT FUSE');
       try{document.getElementById('fuseSmolder').classList.add('on');}catch(e){}/* P824 */}
-    else setStatusMsg('THEIR FUSE BURNS — x2','red');},
+    else setStatusMsg('THEIR FUSE BURNS — x'+_sfMul,'red');},
   turnStart:function(ev){if(ev.mine){ev.me.state.lit=false;
     if(ev.owner==='p')try{document.getElementById('fuseSmolder').classList.remove('on');}catch(e){}}},
   bank:function(ev){if(ev.mine&&ev.owner==='p'){
@@ -17421,6 +17438,18 @@ function _setDieVal(d,v){
   d.val=v;
   try{reDrawDieFace(d);}catch(e){}
   try{famTableChanged();}catch(e){}
+}
+/* P855: ONE PLACE TO EMPTY THE TURN POT. _turnBonusPot had NINE clear
+   sites; P854's _sacPot tally shadowed it and reached only two of them,
+   so a sacrifice from an earlier turn survived a bust-save and later
+   REFUSED A WON MATCH. Adding a sixth clear would have been the same
+   bet that caused it - this is the _removeDieAt move instead: every
+   site calls this, and the next tally that rides the pot is added here
+   once rather than at nine call sites minus the ones someone misses. */
+function _clearTurnPot(){
+  if(typeof G==='undefined'||!G)return;
+  G._turnBonusPot=0;
+  G._sacPot=0;/* P854: sacrifice's slice, which cannot win a match */
 }
 function famApplyRollForces(){
   if(!G)return;
@@ -31475,7 +31504,7 @@ function startPTurn(){
      (matches card description "your next turn starts with +300 turn points
      already on the table"). Tracked in G._turnBonusPot so it survives
      commit overwrites of G.turnPts and gets folded into the bank total. */
-  G._turnBonusPot=0;
+  _clearTurnPot();/* P855 */
   if(G._stakesRisingNext&&G.pCards.includes('stakes_rising')){
     G._stakesRisingNext=false;
     G._turnBonusPot=300;
@@ -32659,7 +32688,7 @@ function _afterRollImpl(){
       if(typeof _updatePlayerCardVisuals==='function')_updatePlayerCardVisuals();
     }else{
       const lost=G.kept.reduce((a,k)=>a+k.pts,0)+(G._turnBonusPot||0);
-      G.turnPts=0;G.kept=[];G._turnBonusPot=0;refreshKeptTray();updHUD();
+      G.turnPts=0;G.kept=[];_clearTurnPot();/* P855 */refreshKeptTray();updHUD();
       setStatusMsg('VOW FAILED — LOST '+lost+' TURN PTS','red');triggerCard('aldrics_vow','VOW FAILED',true);
     }
   }
@@ -33498,7 +33527,7 @@ function doBust(){
        G.pPts and one of them reads G.kept, so this is the only point in the
        branch where either can be paid honestly. */
     _bustTolls();
-    _turnScoreClear();G._turnBonusPot=0;G._sacPot=0;/* P854 */
+    _turnScoreClear();_clearTurnPot();/* P855 */
     try{updHUD();refreshKeptTray();}catch(e){}
     G.safeTurnStreak=0;
     /* it is still a bust: the chain breaks and the feat counter ticks, which
@@ -33584,7 +33613,8 @@ function doBust(){
     /* Save half of all turn pts (kept dice + stakes-rising bonus). */
     var _tsTurnPts=G.kept.reduce((a,k)=>a+k.pts,0)+(G._turnBonusPot||0);
     var _tsSaved=Math.floor(_tsTurnPts/2);
-    G._turnBonusPot=0;
+    _clearTurnPot();/* P855: the sacrifice slice dies with the pot - a
+       bust-save banks half the turn and used to leave the tally full */
     /* Apply bust class to all visible dice in the row */
     (function(){var _r=document.getElementById('playerDiceRow');if(_r)Array.prototype.forEach.call(_r.querySelectorAll('.die'),function(el){el.style.opacity='';el.style.filter='';el.classList.add('bust');if(el._d3)D3.draw(el._d3);});})();
     G.safeTurnStreak=0;_turnScoreClear();updHUD();refreshKeptTray();setBtns(false,false);
@@ -33631,7 +33661,7 @@ function doBust(){
     G.npcCardState.playerOnce[_lsCid]=(G.npcCardState.playerOnce[_lsCid]||0)+1;
     var _lsTurnPts=G.kept.reduce((a,k)=>a+k.pts,0)+(G._turnBonusPot||0);
     var _lsSaved=Math.floor(_lsTurnPts/2);
-    G._turnBonusPot=0;
+    _clearTurnPot();/* P855 */
     (function(){var _r=document.getElementById('playerDiceRow');if(_r)Array.prototype.forEach.call(_r.querySelectorAll('.die'),function(el){el.style.opacity='';el.style.filter='';el.classList.add('bust');if(el._d3)D3.draw(el._d3);});})();
     G.safeTurnStreak=0;_turnScoreClear();updHUD();refreshKeptTray();setBtns(false,false);
     var _lsBov=document.getElementById('bust-ov');
@@ -33673,7 +33703,7 @@ function doBust(){
     G.activeCardState.stitchActive=false;clearCardLabel('mabels_stitch');
     try{_bustShieldFX('#ffd98a');}catch(e){}/* P716 */
     const saved=G.kept.reduce((a,k)=>a+k.pts,0)+(G._turnBonusPot||0);
-    G._turnBonusPot=0;
+    _clearTurnPot();/* P855 */
     /* Apply bust to all visible dice in the row */
     (function(){var _r=document.getElementById('playerDiceRow');if(_r)Array.prototype.forEach.call(_r.querySelectorAll('.die'),function(el){el.style.opacity='';el.style.filter='';el.classList.add('bust');if(el._d3)D3.draw(el._d3);});})();
     /* Bank the accumulated pts safely into G.pPts so they aren't at risk
@@ -33793,7 +33823,7 @@ function doBust(){
   }
   G.safeTurnStreak=0;_turnScoreClear();
   /* Stakes Rising bonus is also lost on bust (it was "on the table" turn pts) */
-  G._turnBonusPot=0;G._sacPot=0;/* P854: the tally dies with the pot */
+  _clearTurnPot();/* P855 */
   /* TELL: Steeped — bust loses accumulated bonus, refresh HUD immediately */
   if(_ruleActive('steeped','p')&&G._tellState){G._tellState.bonus=0;_updateTellHUD();}
   /* ── Handicap: Rising Stakes — reset streak on bust ── */
@@ -34263,7 +34293,8 @@ function handleBank(){
       bonusMsg+=' +'+G._turnBonusPot+' STAKES';
       triggerCard('stakes_rising','+'+G._turnBonusPot,true);
     }
-    G._turnBonusPot=0;
+    G._turnBonusPot=0;/* P855: the SAC slice is cleared by the win check
+       just below, which needs to read it first - see _sacHeld */
   }
   const totalCommitted=G.kept.reduce((a,k)=>a+k.vals.length,0);
   if(G.pCards.includes('half_measure')&&totalCommitted===3){total+=400;bonusMsg+=' +400 HALF MEASURE';triggerCard('half_measure','+400',true);}
@@ -34815,10 +34846,10 @@ function handleBank(){
   if(_sacHeld>0&&G.pPts>=G.target&&(G.pPts-_sacHeld)<G.target){
     try{famLog('THE SHATTERED DIE WILL NOT WIN IT — BANKED, BUT NOT THE BLOW');}catch(e){}
     try{setStatusMsg('SACRIFICE CANNOT WIN THE MATCH','red');}catch(e){}
-    G._sacPot=0;
+    _clearTurnPot();/* P855 */
     showYieldButton();return;
   }
-  G._sacPot=0;
+  _clearTurnPot();/* P855 */
   if(G.pPts>=G.target){
     /* P719/P728 (P819 restore): the WINNING press must hold BANK TO WIN
        through the 700ms to endMatch. The old latch lived in handleYield -
@@ -35517,7 +35548,10 @@ function runOppTurn(){
     /* THE OPPONENT'S roll SEAM, after the counter advances, same reason. */
     try{famFire('roll',{actor:'o',rollNum:oppRollNum});}catch(e){}/* P762 */
     /* (In Arrears' pot retired with the rule) */
-    if(_ruleActive('pickpocket','o')&&Math.random()<0.3&&left>1){left--;setStatusMsg('A DIE PALMED FROM THEIR HAND','gold');}
+    /* P855: READS THE RECORD, CARRIES NO LITERAL. This site kept its own
+       0.3 through P854's retune, so the badge went asymmetric - 15%
+       palming from the player, 30% palming for them. One number now. */
+    if(_ruleActive('pickpocket','o')&&Math.random()<((_tellById('pickpocket')||{}).chance||0.15)&&left>1){left--;setStatusMsg('A DIE PALMED FROM THEIR HAND','gold');}
     const leakyActive=G.pCards.includes('leaky_cup')&&G.oppTurnCount%4===0&&G.oppTurnCount>0;
     /* Player-side reduce_first_roll cards (Pocket Sand 70%, Mabel's Pinch 50%):
        opp's first roll uses 5 dice with the same chance the NPC version would use. */
