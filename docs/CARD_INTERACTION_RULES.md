@@ -181,6 +181,16 @@ route-through-existing rule):
 
 ## Coverage — what was actually driven vs. what is structural
 
+> **REACHABILITY CORRECTION (2026-08-21, driven):** the "live vs
+> retired" labels below split the CARDS-table ids by draft-pool
+> membership — but that pool feeds a draft screen that never opens.
+> **The whole CARDS-table layer is unreachable** (OPEN.md §1c,
+> `apv_cards_layer_reach`), so every CARDS-layer leg tests correct code
+> on a card no player can hold. The legs that cover LIVE mechanisms are
+> the six fam-layer moments and `quicksilver`. The rules R1-R6 and
+> `_setDieVal` are unaffected — they are enforced on the family engine,
+> which is the live card system.
+
 Driven in `apv_card_interactions_sweep.js`, **25/25 legs, zero
 tolerance** — the verdict asserts BOTH sides of the contract on every
 leg (a mutated leg: hook fired AND ghosts 0 AND promise null; a

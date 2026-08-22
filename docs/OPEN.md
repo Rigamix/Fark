@@ -115,6 +115,18 @@ passives), and whether patron DICE should follow the same parity logic
 
 ## Card interactions round 3: the roster deletes itself (P846, 2026-08-21)
 
+> **SCOPE CORRECTION (2026-08-21, driven):** the CARDS-table layer is
+> UNREACHABLE (see §1c) — `S.run.cards` is never filled by any live
+> path. So "Gambler's Eye is live and obtainable" below is WRONG, and
+> the sweep's "19 live / 6 retired" labels are wrong: the obtainability
+> check I added asked `_buildDraftPool`, which feeds a draft screen
+> that never opens. What remains TRUE and live: `_setDieVal` itself,
+> and its enrollment of the FAM layer (steady_hand, transmute,
+> powder_keg, encore, sacrifice via `_removeDieAt`) plus
+> `famQuicksilver` — an enchant, genuinely reachable. The Gambler's Eye
+> work (P846-P849) is correct code on a card no player can currently
+> hold; it costs nothing to keep and is ready if the layer is revived.
+
 Your second review held on every count. Shipped:
 - **`_setDieVal(d,v)`** — write + redraw + R1 void at the MUTATION,
   routed through every player-side out-of-roll face write (17 sites).
@@ -469,6 +481,41 @@ doc inherited it. Nothing to action here now — the item is simply withdrawn.
 
 ### 1c. `blessed_dice` / `crown_authority` say "reroll", the code wipes
 
+#### CORRECTION (2026-08-21, driven): §1c's CONCLUSION WAS RIGHT. My P846 retraction was wrong.
+
+**Do not build the reroll.** The layer is unreachable — I retracted a
+stale REASON and replaced it with an unverified opposite conclusion,
+then shipped four patches on top of it.
+
+What is actually true: P615 did revive the *plumbing*
+(`const pCards=(params.pCards||[]).filter(Boolean)`, both launchers
+feeding from `S.run.cards`) — that part of my P846 note stands. But
+**nothing ever fills `S.run.cards`.** All six writers are behind doors
+that never open:
+
+| writer | blocked by |
+|---|---|
+| `_draftSelectCard` / `_draftReplaceSlot` (42437/42454) | `showScreen('draft')` — never called |
+| `_rewardSelectCard` (42578) | `showScreen('bossreward')` — never called |
+| `_draftPlaceCard` / `_draftUndoActivePick` (40806/40840) | `#endDraftSlots` — read 9×, created 0× |
+| `_showLegendDraft` (42694) | `S.renownPerks.legend` — `_getS` wipes the map (11143), nothing sets it |
+
+The only `showScreen` names the file ever passes are `menu`,
+`gauntlet`, `match`, `shop`, `gameover`. **Driven** (`apv_cards_layer_reach`):
+a real patron win and a real boss win both leave
+`S.run.cards=[null,null,null,null]`; `bossreward` and `draft` never
+open. Boss rewards pay through the FAMILY layer (`famSpoilsPick`).
+
+So `crown_authority` / `blessed_dice` cannot reach your hand, the wipe
+is not a live lie, and building the real reroll would be building into
+dead code — exactly what the original §1c warned. **The honest state:
+the whole CARDS-table active layer is unreachable, and the question for
+you is whether to REVIVE it (wire a draft/reward screen) or DELETE it
+(~40 handlers + the reward/draft screens). Recommendation: decide
+before anyone spends on it again — I already did, twice.**
+
+<details><summary>The wrong P846 text, kept for the record</summary>
+
 #### THE RETRACTION IS ITSELF RETRACTED (P846, on your review) — the layer is LIVE
 
 The paragraph that stood here said the whole legacy player-active layer
@@ -525,6 +572,8 @@ which arm it against the *rival*. So it is a **player weapon**, the wipe is
 *stronger* than an honest reroll, and fixing it makes the game slightly
 **harder** — which is exactly why it must be batched rather than shipped as
 relief.
+
+</details>
 
 ---
 

@@ -53,17 +53,22 @@ live doc tracked it. Sources named so the full context is one hop away.
   pricing, Renown perks, dead boss-tell UI, Bookends feat) is owed and
   not done.
 
-**Added 2026-08-21 by P846 (Denis's second interaction review):**
-- **The legacy player-active layer's EFFECTS audit** — ~18 live,
-  obtainable CARDS-table actives (gamblers_eye, the_pyre,
-  mabels_stitch, loan, all_in, corvus_ledger, aldrics_vow,
-  whispers_hex, grogs_flask, finnicks_palm, vanishing_act, frozen_die,
-  double_down, coin_flip, the_nudge, alchemists_chisel,
-  twinning_charm, seven_dice) have never been probe-driven to
-  CARD_AUDIT_2's adversarial standard. They were silently out of every
-  audit's scope because OPEN.md §1c wrongly called the layer
-  unreachable for ~230 patches (dead since P615). Interaction/void
-  coverage exists (the P846 sweep); effects coverage does not.
+**Added 2026-08-21 by P846, CORRECTED same day (driven):**
+- ~~The legacy player-active layer's EFFECTS audit~~ **WITHDRAWN — the
+  layer is UNREACHABLE, so there is nothing to audit; it needs a
+  RULING instead.** `S.run.cards` is never filled: `showScreen('draft')`
+  and `showScreen('bossreward')` are never called, `#endDraftSlots` is
+  read 9× and created 0×, and `S.renownPerks.legend` is wiped by
+  `_getS` with no setter. Driven (`apv_cards_layer_reach`): a real
+  patron win and a real boss win both leave `S.run.cards` empty; the
+  only screens the game ever opens are menu/gauntlet/match/shop/gameover.
+  **THE RULING FOR DENIS: revive the layer (wire a draft or reward
+  screen to it) or delete it (~40 `activate*` handlers, the draft and
+  boss-reward screens, `initDraftScreen`/`initBossRewardScreen`).**
+  This has now been mis-scoped twice — the original §1c gave the right
+  answer for a reason that later went stale, and P846 corrected the
+  reason while flipping the answer the wrong way. Nobody should touch
+  these handlers again until it is ruled.
 - **rollFace is die-less** — the NPC's only roller and the player's
   hot-dice path call `_rollTable(mat)` with no die object, so Still
   Waters cannot hush those rolls (the same shape P846 fixed in

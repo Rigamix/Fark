@@ -1,6 +1,15 @@
 # Card audit 2 — the ACTIONS audit (2026-08-19)
 
-> **SCOPE CORRECTION (P846, 2026-08-21):** "check ALL cards" was
+> **CORRECTION TO THE CORRECTION (2026-08-21, driven):** the scope note
+> below is itself wrong. The CARDS-table active layer is NOT live — it
+> is unreachable (`S.run.cards` is never filled; every writer sits
+> behind a screen that never opens — see OPEN.md §1c, probe
+> `apv_cards_layer_reach`). So those ~18 actives do NOT need an effects
+> audit: they need a RULING on revive-or-delete. This doc's original
+> scope (family cards, tavern cards, enchants — the live engine) was
+> correct all along.
+>
+> **SUPERSEDED SCOPE NOTE (P846, 2026-08-21):** "check ALL cards" was
 > executed for the FAMILY cards, tavern cards and enchants — this doc's
 > tables. The **legacy player-active layer** (the CARDS-table actives:
 > gamblers_eye, the_pyre, mabels_stitch, loan, all_in, corvus_ledger,
