@@ -86,6 +86,15 @@ for(let r=0;r<40;r++){
 const mn=a=>a.reduce((x,y)=>x+y,0)/a.length;
 const liveMean=+mn(liveRatios).toFixed(2),partedMean=+mn(partedRatios).toFixed(2);
 const liveMax=Math.max(...liveRatios),partedMax=Math.max(...partedRatios);
+/* THE PRIMARY SIGNAL IS SPREAD, NOT MEAN. A fixed rule produces
+   CONSISTENT geometry (every bust parts the same way); a roaming impact
+   produces VARIED geometry. That contrast is a property of the
+   mechanism, so it survives retuning - whereas the mean gap ratio moves
+   with KICK.dist and edge, so a mean threshold is a magic number that
+   whoever retunes those has to recalibrate or watch go red for the wrong
+   reason. Measured at n=40: parted range ~0.27, live range ~1.31. */
+const rng=a=>+(Math.max(...a)-Math.min(...a)).toFixed(2);
+const liveSpread=rng(liveRatios),partedSpread=rng(partedRatios);
 
 const ok=runs.filter(r=>r.leftFrac!==undefined);
 const ixs=ok.map(r=>r.ix);
@@ -94,7 +103,8 @@ const zf=ok.map(r=>r.zPosFrac);
 const mean=a=>a.reduce((x,y)=>x+y,0)/a.length;
 const sd=a=>{const m=mean(a);return Math.sqrt(mean(a.map(v=>(v-m)*(v-m))));};
 return {samples:ok.length,
-  parting:{liveMean,liveMax,partedMean,partedMax,
+  parting:{liveMean,liveMax,partedMean,partedMax,liveSpread,partedSpread,
+    spreadRatio:+(liveSpread/(partedSpread||0.01)).toFixed(2),n:liveRatios.length,
     liveRatios:liveRatios.slice(0,8),partedRatios:partedRatios.slice(0,8)},
   impactX:{min:Math.min(...ixs),max:Math.max(...ixs),sd:+sd(ixs).toFixed(2)},
   leftFrac:{min:Math.min(...lf),max:Math.max(...lf),sd:+sd(lf).toFixed(3),mean:+mean(lf).toFixed(2)},
@@ -105,6 +115,12 @@ return {samples:ok.length,
     depthNotOneCoinFlip:sd(zf)>0.05||(Math.max(...zf)<1&&Math.min(...zf)>0),
     /* the symptom leg: the live build must sit clearly below what the
        pre-P858 parameters score through the same maths */
-    noPartingInFinalPositions:liveMean<partedMean*0.85},
+    /* PRIMARY: geometry varies bust to bust instead of repeating. Tuning
+       -independent. */
+    partingGeometryVaries:liveSpread>partedSpread*2,
+    /* SECONDARY, and valid ONLY on the mean of the full n=40 sample: the
+       distributions overlap (healthy busts land above the parted mean),
+       so this can never be asserted per-bust without flaking. */
+    noPartingInFinalPositions_meanOfN:liveMean<partedMean*0.85},
   verdict:Math.max(...ixs)>2.0&&Math.min(...ixs)<-2.0&&sd(lf)>0.12
-    &&liveMean<partedMean*0.85};
+    &&liveSpread>partedSpread*2&&liveMean<partedMean*0.85};
