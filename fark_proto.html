@@ -13521,7 +13521,9 @@ function _maybeFireCutpurse(){
       /* Offer the bust saves (Martyr/Iron Stomach/Grit) here too — every
          bust path must, or a save-holder loses the turn to a palm-induced
          bust with the save never offered. */
-      if(fv.length===0||!_tryBustSave(fv))setTimeout(function(){_delayedDoBust(fv);},200);
+      /* P858: ONE BEAT, not a 200ms lead-in plus the full 600 - the
+         same double-beat P857 removed from the deadRoll route. */
+      if(fv.length===0||!_tryBustSave(fv))_delayedDoBust(fv,400);
     }
   },650);
   setStatusMsg('PICKPOCKET — DIE PALMED!','red');
@@ -25331,18 +25333,40 @@ var D3X={
       hit.push(d);
     });
     if(!hit.length)return 0;
-    var ix=(Math.random()-0.5)*1.6;
+    /* P858: THE EDGE IS MEASURED FIRST, because the impact point needs
+       it. Same self-calibration P799b introduced for the wall - the row
+       tells us where it ends - just hoisted above the draw so one
+       measurement serves both. */
+    var edge=this.KICK.edge||2.6;
+    hit.forEach(function(d){var ax=Math.abs(d.phys.x);if(ax+0.45>edge)edge=ax+0.45;});/* P799c: the outermost die was clipping the screen at +0.9 */
+    /* P858: THE IMPACT LANDS ANYWHERE ALONG THE ROW. It used to be
+       (Math.random()-0.5)*1.6 - within +-0.8 of centre against a row
+       running out to ~+-4.8, i.e. the middle ~17%, so every bust was a
+       centre blast by construction and the two centre dice always took
+       the hardest hit (Denis: "sometimes the bust scatter still happens
+       from the center" - it was always). P799's radial model is KEPT
+       deliberately: it is the fix for P733's two-stack parting, and
+       per-die random directions would bring that back. Widening the
+       point moves the blast without touching what makes it read as one
+       impact. */
+    var ix=(Math.random()*2-1)*edge*0.85;
     var iz=(Math.random()<0.5?-1:1)*(0.35+Math.random()*0.55);
     this._lastImpact={x:ix,z:iz};/* the probe reads this */
     /* P799b: the wall sits just past the OUTERMOST die - the fixed 2.6
        sat INSIDE the row (dice rest out to ~4.8), so the clamp yanked
        outer dice toward the centre, inverting their kicks (it was
        doing the same to the old scatter). Self-calibrating: the row
-       tells us where its edge is. */
-    var edge=this.KICK.edge||2.6;
-    hit.forEach(function(d){var ax=Math.abs(d.phys.x);if(ax+0.45>edge)edge=ax+0.45;});/* P799c: the outermost die was clipping the screen at +0.9 */
+       tells us where its edge is. (P858: measured above, where the
+       impact point needs it too.) */
     hit.forEach(function(d){
-      var dx=d.phys.x-ix,dz=(d.phys.z||0)-iz;
+      /* P858: DEPTH IS PER DIE. The solver pins every settled die to the
+         row's mean z, so (d.phys.z - iz) was the SAME constant for all
+         six - one coin flip decided "above or below" for the whole row
+         and atan2 collapsed to ~0 or ~pi, giving a flat horizontal fan.
+         A per-die offset around the shared point restores real 2D
+         spread, so the radial field has something to vary over. */
+      var _pz=(d.phys.z||0)+(Math.random()-0.5)*0.9;
+      var dx=d.phys.x-ix,dz=_pz-iz;
       var L=Math.sqrt(dx*dx+dz*dz)||0.001;
       var ang=Math.atan2(dz,dx)+(Math.random()-0.5)*0.55;
       var mag=self.KICK.dist*(0.55+Math.random()*0.35)*(1.75/(0.6+L));
@@ -32913,7 +32937,10 @@ function _afterRollImpl(){
   var freeVN=free.map(function(d){return d.val;});
   var freeMatsN=free.map(function(d){return d.mat;});
   var cardsN=effectiveCards();
-  if(!anyScoring(freeVN,cardsN,freeMatsN,free)&&!_anchorRescues(cardsN)){if(_tryBustSave(free))return;setTimeout(function(){_delayedDoBust(free);},150);return;}
+  /* P858: one beat here too - was a 150ms lead-in stacked on the full
+     600. The recheck runs after the NPC card effects, so the dice have
+     already settled; 450 is the verdict pause, not a pause plus a pause. */
+  if(!anyScoring(freeVN,cardsN,freeMatsN,free)&&!_anchorRescues(cardsN)){if(_tryBustSave(free))return;_delayedDoBust(free,450);return;}
 
   /* Reckless die tracking (Brass): busts cost extra from banked total */
   /* (penalty applied in doBust, no forced bust here) */
