@@ -53,6 +53,30 @@ live doc tracked it. Sources named so the full context is one hop away.
   pricing, Renown perks, dead boss-tell UI, Bookends feat) is owed and
   not done.
 
+**DENIS'S FEEL NOTES (2026-08-21) — in flight, measured not guessed:**
+1. **Bust animation + red light fire ~0.5s too late.** Timing bug, not
+   a look bug. Measure the gap between the bust decision and the
+   visual, then close it.
+2. **Bust scatter sometimes pushes from CENTRE.** Each die should be
+   pushed from a random axis (above/below/side). If the centre case is
+   random, add a rule that excludes it rather than reducing its odds.
+3. **Dice physics go sticky/clunky after a few rolls or games.**
+   Degradation over a session — the most serious of the six because it
+   affects every match. Candidate link: the ~46KB/match heap retention
+   already in this list.
+4. **Steady Hand outlines every die — "not needed".** Note the tension
+   with item 6 (which assumes outlines still appear somewhere): the
+   ask is probably fewer/one, not zero. CONFIRM WITH DENIS before
+   deleting the affordance — a tap-target with no marking is how the
+   arm becomes invisible.
+5. **Grog's Bump lands DURING the roll; should land after the settle.**
+   Same class as the P827/dice-throw-has-no-rise family: an effect
+   keyed to the wrong moment in the throw.
+6. **Outlines must match the SETTLED DIE'S SHAPE**, not a straight
+   square. Applies to steady-hand/transmute rings and any other card
+   outline. The 3D dice land rotated, so a square ring reads as
+   misaligned.
+
 **Added 2026-08-21 by P846, CORRECTED same day (driven):**
 - ~~The legacy player-active layer's EFFECTS audit~~ **WITHDRAWN — the
   layer is UNREACHABLE, so there is nothing to audit; it needs a

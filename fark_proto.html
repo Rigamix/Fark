@@ -3937,7 +3937,13 @@ html.fk3d #screen-match .die-wrap:has(.die.d3on.selected)::after{
   50%    {opacity:.85;transform:translate(-50%,-50%) scale(1.06)}
 }
 /* a die about to be broken, or picked for a reroll */
-.die.break-target{outline:2px solid #c66058;outline-offset:2px;cursor:pointer}
+/* P856: NO OUTLINE HERE. A CSS outline is an axis-aligned box around the
+   border box, so on a die that settles rotated it can only ever be a
+   square around a tilted thing. The mark is painted from the die's real
+   hull by D3X's halo painter (see .cardmark) - this class now carries
+   only the pointer affordance. */
+.die.break-target{cursor:pointer}
+.die.cardmark{cursor:pointer}
 /* the scored dice, in their own line below the throwing row. The height is
    RESERVED, not grown into: letting it size to its contents made the whole
    throwing row hop upward the moment the first die was kept. */
@@ -14980,8 +14986,8 @@ function _steadyDisarm(){
     G._steadyArmed=false;
     G._sevenArmed=false;/* P845b: same arm class, same exits - the flag
        makes any stale hijacked onclick a no-op */
-    document.querySelectorAll('#playerDiceRow .die.break-target')
-      .forEach(function(el){el.classList.remove('break-target');});
+    document.querySelectorAll('#playerDiceRow .die.break-target,#playerDiceRow .die.cardmark')
+      .forEach(function(el){el.classList.remove('break-target','cardmark');});/* P856 */
   }catch(e){}
 }
 CFX.steady_hand={
@@ -14999,9 +15005,12 @@ CFX.steady_hand={
     if(!free.length)return false;
     G._steadyArmed=true;
     try{setStatusMsg('STEADY HAND — TAP THE DIE TO REROLL','gold');}catch(e){}
+    /* P856 (Denis): the ARM marks nothing - the status line above says
+       TAP THE DIE TO REROLL, and marking every candidate was noise. The
+       die actually PICKED gets the card's own mark, below. */
     free.forEach(function(d){
       if(!d.el)return;
-      d.el.classList.add('break-target');
+      d.el.classList.add('break-target');/* affordance only - no outline */
       d.el.onclick=function(){
         if(!G._steadyArmed)return;
         G._steadyArmed=false;
@@ -15015,6 +15024,11 @@ CFX.steady_hand={
            unselected - the table claiming a die scores when it does not. */
         _setDieVal(d,_rollD(d));d.sel=false;
         if(d.el)d.el.classList.remove('selected');
+        /* P856b: AFTER the reroll, not before - _setDieVal fires
+           famTableChanged, whose _steadyDisarm strips this very class.
+           Marking first drew the ring and erased it in the same tick. */
+        try{if(d.el){d.el.classList.add('cardmark');
+          setTimeout(function(){if(d.el)d.el.classList.remove('cardmark');},900);}}catch(e){}
         try{famLog('STEADY HAND — '+d.val);}catch(e){}
         /* P535: RE-DERIVE. `free` was captured when the CARD WAS USED and this
            runs when the player taps a die - an unbounded gap, not a timer, and
@@ -17386,7 +17400,7 @@ function _transDisarm(){
   if(!G||!G._transArmed)return;
   G._transArmed=false;
   try{(G.pool||[]).forEach(function(d){
-    if(d.el&&!d.committed){d.el.classList.remove('break-target');d.el.onclick=function(){toggleDie(d);};}
+    if(d.el&&!d.committed){d.el.classList.remove('break-target','cardmark');d.el.onclick=function(){toggleDie(d);};}/* P856 */
   });}catch(e){}
 }
 /* P844: THE TABLE CHANGED UNDER A PROMISE. A peek, a pull, or an arm
@@ -17625,10 +17639,12 @@ CFX.transmute={
     try{setStatusMsg('TRANSMUTE — TAP THE DIE TO CHANGE','gold');}catch(e){}
     free.forEach(function(d){
       if(!d.el)return;
-      d.el.classList.add('break-target');
+      d.el.classList.add('break-target');/* P856: affordance only */
       d.el.onclick=function(){
         if(!G._transArmed)return;
         G._transArmed=false;
+        try{d.el.classList.add('cardmark');
+          setTimeout(function(){if(d.el)d.el.classList.remove('cardmark');},900);}catch(e){}
         free.forEach(function(q){if(q.el){q.el.classList.remove('break-target');q.el.onclick=function(){toggleDie(q);};}});
         if(inst.charges<=0)return;
         window._transDie=d;window._transInst=inst;
@@ -24151,7 +24167,13 @@ function _breakBegin(src){
   try{setStatusMsg('BREAK — TAP A DIE TO DESTROY IT','red');}catch(e){}
   live.forEach(function(d){
     if(!d.el)return;
+    /* P856: BREAK KEEPS ITS CANDIDATE MARKING and is the deliberate
+       exception to Denis's note 4 - it marks a SUBSET (`live`) for a
+       DESTRUCTIVE pick, so which dice are eligible is information the
+       player needs. It moves to .cardmark so the mark is the die's real
+       silhouette rather than a square. */
     d.el.classList.add('break-target');
+    d.el.classList.add('cardmark');
     d.el.onclick=function(){_breakDie(d);};
   });
   return true;
@@ -24471,7 +24493,7 @@ function _removeDieAt(lane,opts){
 function _breakClear(){
   if(!G||!G.pool)return;
   G._breakArmed=false;
-  G.pool.forEach(function(q){if(q.el)q.el.classList.remove('break-target');});
+  G.pool.forEach(function(q){if(q.el)q.el.classList.remove('break-target','cardmark');});/* P856 */
 }
 function _breakDie(d){
   if(!G._breakArmed)return;
@@ -26806,14 +26828,29 @@ var D3X={
     x.setTransform(dpr,0,0,dpr,0,0);
     x.clearRect(0,0,sc.width,sc.height);
     var self=this,G=this.GLOW;
-    var sel=[],oppSel=false;
+    var sel=[],oppSel=false,marks=[];
     this.dice.forEach(function(d){
       if(!d.match||!d.obj.visible)return;
+      /* P856: a CARD MARK is the same shape problem the keep-glow already
+         solved. It used to be `outline:2px solid` on the flat chip, which
+         is an axis-aligned box by spec, so it could never follow a die
+         that landed rotated (Denis: "outlines... match the shape of the
+         settled die and not a straight square"). Built from the same
+         _hullOf projection as the selection halo. */
+      if(d.chip.classList.contains('cardmark')){
+        var mh=self._hullOf(d,sc,G.grow);
+        if(mh)marks.push(mh);
+      }
       if(!d.chip.classList.contains('selected'))return;
       if(d.chip.classList.contains('oppkeep'))oppSel=true;
       var hull=self._hullOf(d,sc,G.grow);
       if(hull)sel.push(hull);
     });
+    if(marks.length){
+      /* the card ink the square outline used, now on the real silhouette */
+      var MK=(window.CARD_MARK_INK||'#c66058');
+      this._paintHalo(cv,x,sc,dpr,marks,MK,MK,1);
+    }
     if(!sel.length)return;
     /* gold is the PLAYER's colour. A rival keep glows in their patron accent
        instead, which is the same --patCol the portrait disc and the DOM
@@ -32212,7 +32249,7 @@ G.numDice=Math.min((G.matchDice?G.matchDice.length:6),(G.numDice||(G.matchDice?G
      Shared with every other site that rebinds the free dice - see
      _steadyDisarm, which exists because this was the only one that knew. */
   _steadyDisarm();
-  row.querySelectorAll('.die').forEach(el=>{if(el.classList.contains('die-frozen'))return;el.getAnimations().forEach(a=>a.cancel());el.style.transform='';el.style.opacity='';el.style.animation='';el.classList.remove('scatter','bust','break-target');});
+  row.querySelectorAll('.die').forEach(el=>{if(el.classList.contains('die-frozen'))return;el.getAnimations().forEach(a=>a.cancel());el.style.transform='';el.style.opacity='';el.style.animation='';el.classList.remove('scatter','bust','break-target','cardmark');});/* P856 */
   /* the scored dice leave the throwing row before anything is thrown into
      it - see _dropKeptToTray */
   _dropKeptToTray();
@@ -39584,7 +39621,7 @@ function activateSevenDice(){
      _steadyDisarm's sweep, and a stale hijacked onclick dies on it */
   free.forEach(function(d){
     if(!d.el)return;
-    d.el.classList.add('break-target');
+    d.el.classList.add('break-target');/* P856: affordance only */
     d.el.onclick=function(){
       if(!G._sevenArmed)return;
       G._sevenArmed=false;
@@ -39592,6 +39629,11 @@ function activateSevenDice(){
       _setDieVal(d,_rollD(d));d.sel=false;
       if(d.el){d.el.classList.remove('selected');d.el.classList.add('card-reroll');
         setTimeout(function(){if(d.el)d.el.classList.remove('card-reroll');},700);}
+      /* P856b: AFTER the reroll, not before - _setDieVal fires
+         famTableChanged, whose _steadyDisarm strips this very class.
+         Marking first drew the ring and erased it in the same tick. */
+      try{if(d.el){d.el.classList.add('cardmark');
+        setTimeout(function(){if(d.el)d.el.classList.remove('cardmark');},900);}}catch(e){}
       famLog('SEVEN DICE — '+d.val);
       /* the table as it is NOW can be a bust (steady_hand's P535 lesson) */
       var _sf=(G.pool||[]).filter(function(x){return !x.committed&&!x._shattered;});
