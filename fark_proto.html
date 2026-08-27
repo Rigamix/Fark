@@ -27076,7 +27076,15 @@ var D3X={
   _dimMap:function(tex,v,k){
     if(!tex||!tex.image||!v||!k)return null;
     if(!tex.userData)tex.userData={};
-    var dm=tex.userData.dimMaps||(tex.userData.dimMaps={});
+    var dm=tex.userData.dimMaps;
+    if(!dm){
+      dm=tex.userData.dimMaps={};
+      /* P859: REGISTER THE OWNER so the cache can be handed back. Nothing
+         in this file disposed a texture before - all three .dispose()
+         calls are material disposals, and this cache lives on userData
+         where a material disposal cannot reach it. */
+      (this._dimOwners||(this._dimOwners=[])).push(tex);
+    }
     var _mkk=this.SIDEDIM_MASK||{};
     var kq=Math.round(k*1000)/1000,key=v+'|'+kq+'|'+(_mkk.axis||'')+(_mkk.amt||0);
     if(dm[key])return dm[key];
@@ -27261,6 +27269,30 @@ var D3X={
      authored-bright maps that no code re-dimmed until the next painted
      frame, one full bright flash on every dimmed die (Denis's
      'appears then off then back on'). */
+  /* P859: HAND THE DIM TEXTURES BACK. Each is a 384x256 CanvasTexture
+     (393,216 bytes, ~524KB with mips) and a match builds ~42-60 of them
+     per liveMap - bounded, because both callers quantise k to
+     SIDEDIM_RAMP.steps before the key is built, but never freed. Every
+     distinct {mat,ench} pair has its own liveMap and its own cache, so
+     the retained set multiplied per loadout and survived every match for
+     the page's whole life. That is Denis's "sticky after a few games".
+     The liveMap atlases themselves are module-level and shared by every
+     die of that material - they are deliberately NOT touched here; only
+     the derived dim textures are released. */
+  _purgeDimMaps:function(){
+    var freed=0,owners=this._dimOwners||[];
+    for(var i=0;i<owners.length;i++){
+      var tex=owners[i];
+      if(!tex||!tex.userData||!tex.userData.dimMaps)continue;
+      var dm=tex.userData.dimMaps;
+      for(var k in dm){
+        try{if(dm[k]&&dm[k].dispose){dm[k].dispose();freed++;}}catch(e){}
+      }
+      tex.userData.dimMaps=null;
+    }
+    this._dimOwners=[];
+    return freed;
+  },
   _settleDim:function(d){
     if(!d||!d.obj||!d.phys||!d.phys.v)return;
     var self=this,_R=this.SIDEDIM_RAMP;
@@ -28295,6 +28327,12 @@ var D3X={
     /* materials are made per die; geometry is shared with the proto and
        must NOT be disposed */
     if(d.obj)d.obj.traverse(function(o){
+      /* P859: point the material back at its shared atlas before the
+         material goes - otherwise a dropped mesh is left referencing a
+         dim texture that _purgeDimMaps is about to dispose. */
+      if(o.isMesh&&o.material&&o.material.userData&&o.material.userData.liveMap){
+        try{o.material.map=o.material.userData.liveMap;}catch(e){}
+      }
       if(o.isMesh&&o.material&&o.material.dispose)o.material.dispose();
     });
     d.roll=null;d.phys=null;
@@ -28311,6 +28349,10 @@ var D3X={
     var self=this;
     this.dice.forEach(function(d){self._drop(d);});
     this.dice=[];
+    /* P859: the dim textures belong to the dice that just stopped
+       existing - free them here, at the layer's own teardown, rather
+       than letting a match's ~22-31MB ride to the end of the session. */
+    try{this._purgeDimMaps();}catch(e){}
     document.documentElement.classList.remove('fk3d');
   },
   /* P553: THE CHIP ANIMATION PASS - the only motion a non-match die has.
