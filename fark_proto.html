@@ -12862,7 +12862,7 @@ const RUNGS=[
     boss:null,bossDesc:null,
     agg:.80,cardRarity:'gold',wager:true,wagerCount:2,wagerMode:'best',minBank:700,diceStop:1,chaotic:false,adaptive:true,
     dice:['amber','jade','jade','jade','starstone','flint'],
-    cardPool:['the_verdict_npc','point_of_order','fathers_die','the_oath_npc','family_crest'],cardCount:4,
+    cardPool:['the_verdict_npc','point_of_order','fathers_die','the_oath_npc','family_crest'],cardCount:3,/* P868 */
     /* ALDRIC — STILL WATERS (was Confession, never validated). An enchanted
        die loses its FAMILY trait for the match; its enchant still fires.
        Sim, Obsidian only: strips ~644 points, ~14.5% of that build's match
@@ -12879,7 +12879,14 @@ const RUNGS=[
     boss:null,bossDesc:null,
     agg:.84,cardRarity:'gold',wager:true,wagerCount:2,wagerMode:'best',minBank:800,diceStop:1,chaotic:false,adaptive:true,
     dice:['amber','jade','jade','jade2','starstone','flint'],
-    cardPool:['the_royal_purse','crown_authority','the_quiet_decree','sundays_rest','old_roads','royal_seizure'],cardCount:4,
+    /* P869: SLOT 0 IS THE SIGNATURE and named bosses always draw it. It held
+       the_royal_purse - a flat start bonus worth about 31% of his target
+       before the first roll, on a night the real-match ladder has never won.
+       The purse stays in the pool and stays drawable; it stops being certain.
+       royal_seizure takes the player's best die once and is bounded, which is
+       both weaker and the right shape - a noble seizing property, touching
+       the loadout rather than the scoreboard. */
+    cardPool:['royal_seizure','crown_authority','the_quiet_decree','sundays_rest','old_roads','the_royal_purse'],cardCount:3,
     /* WHISPER — KINDRED (was Counterfeit, never validated). RESCOPED to the
        player alone: the engine has no opponent-side enchants, so the original
        "either side" wording could never be true on their half of the table.
@@ -12897,7 +12904,13 @@ const RUNGS=[
     boss:null,bossDesc:null,
     agg:.88,cardRarity:'gold',wager:true,wagerCount:3,wagerMode:'all',minBank:900,diceStop:1,chaotic:false,adaptive:true,
     dice:['amber','amber','jade','jade','jade2','starstone'],
-    cardPool:['communion_wine','blessed_dice','the_sermon','judgment_npc','never_saw_a_robe','blessed_confiscation'],cardCount:5,
+    /* P869: same trade on night 8, where it is starker. communion_wine is a
+       flat start bonus worth about 36% of a 12,500 target, guaranteed, every
+       time - and the ladder is 0/20 here. It stays in the pool, drawable, no
+       longer certain. blessed_confiscation takes the player's best die AND
+       plays it against them: bounded, once, and it interacts in both
+       directions, which a flat number never can. */
+    cardPool:['blessed_confiscation','blessed_dice','the_sermon','judgment_npc','never_saw_a_robe','communion_wine'],cardCount:3,
     tell:{id:'reckoning',name:'THE RECKONING',desc:"“Match my last bank, or you score nothing.”",icon:'⚖️'}},
 ];
 
@@ -40739,6 +40752,9 @@ function hideGoldFloat(){
 
 
 /* ═══════ OPPONENT CARD GENERATION ═══════ */
+/* P868 (brief 11.1): no NPC brings more than three cards, ever. Denis: "right
+   now bosses can have more than 3 cards which I think is weird". */
+var NPC_CARD_CAP=3;
 function generateOppCards(rung,playerCardCount){
   /* P473 - THE STUB IS LIFTED. This returned [] unconditionally since the P1
      cutover, so G.oCards was ALWAYS empty and every patron card was dealt to
@@ -40753,9 +40769,27 @@ function generateOppCards(rung,playerCardCount){
   if(S&&S.npcWonCards&&rung.key&&S.npcWonCards[rung.key]){
     S.npcWonCards[rung.key].forEach(function(cid){if(!pool.includes(cid))pool.push(cid);});
   }
-  var n=rung.cardCount||1;
-  /* Boss matches: match player card count so it feels fair */
-  if(playerCardCount!==undefined)n=Math.max(n,playerCardCount);
+  /* P868: THE CEILING, and it lives HERE rather than in eight rows that all
+     have to agree - which is how it broke the first time. Each row's
+     cardCount is that boss's LEVEL; this is the maximum none of them can
+     exceed, so a future row asking for five is capped rather than obeyed. Grog stays
+     at 2 by his own row: the cap is a maximum, not a level, and night 1
+     should be light. */
+  var n=Math.min(rung.cardCount||1,NPC_CARD_CAP);
+  /* P868: THE MATCH-THE-PLAYER LIFT IS DELETED. It took the larger of the
+     row's count and the player's hand size, and the player holds up to four -
+     boss slot plus three regulars - so
+     every boss could already draw four whatever their row said. Editing the
+     rows alone would have changed nothing whenever the player carried a full
+     hand, and the symptom would have looked like the fix failing.
+     Deleted rather than clamped: against a ceiling of three, a clamped lift
+     could only ever raise a boss toward a ceiling it already sits at. It
+     would buy nothing, and its old comment - "so it feels fair" - would no
+     longer be true of it.
+     playerCardCount stays in the signature because two live call sites pass
+     it and removing it is pure churn. IT IS DELIBERATELY IGNORED. If a future
+     change wants the rival's hand to track the player's, that is a design
+     decision and it belongs above this cap, not inside it. */
   /* Signature guarantee: a defined boss (rung.key set, has a fixed
      cardPool) ALWAYS brings cardPool[0] — its signature card. Otherwise
      a 5-card pool drawing 3 left the signature out ~40% of the time
