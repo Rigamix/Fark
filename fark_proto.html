@@ -16672,25 +16672,38 @@ function _fkSeatSkip(){
 }
 function _gbSpoilsConfirm(kind){
   var sp=window._spoils;if(!sp)return;
-  var what=kind==='relic'?('his die — '+(sp.relic?getDie(sp.relic).name:''))
+  var what=kind==='card'?('his card — '+(sp.cardName||''))
     :kind==='tell'?('his rule — '+(sp.tellName||''))
     :('his purse — '+sp.purse+'g');
-  _gbModalOpen('<b>Take '+what+'?</b><div class="gbx-label">it is final — the other two go back behind the bar</div>'
+  /* P864: the boss slot equips immediately on win (see _rewardSelectCard), so
+     taking a second boss card REPLACES the first. "It is final" was already
+     true of the choice; this says what the choice costs. */
+  var _held='';
+  try{
+    if(kind==='card'&&S&&S.run&&S.run.cards&&S.run.cards[0]&&S.run.cards[0]!==sp.card){
+      var _hc=getCard(S.run.cards[0]);
+      if(_hc)_held='<div class="gbx-label">it takes the boss slot — '+_hc.name+' goes back behind the bar</div>';
+    }
+  }catch(e){}
+  _gbModalOpen('<b>Take '+what+'?</b><div class="gbx-label">it is final — the other two go back behind the bar</div>'+_held
     +'<div class="gbx-btn primary" style="height:48px" data-kind="'+kind+'" onclick="_gbModalClose();famSpoilsPick(this.dataset.kind)">TAKE</div>'
     +'<div class="gbx-btn" style="height:48px" onclick="_gbModalClose()">look again</div>');
 }
 function famSpoilsPick(kind){
   var sp=window._spoils;if(!sp)return;
   _getS();var msg='';
-  if(kind==='relic'&&sp.relic){
-    /* P834 (Denis, ruling b): relics are TROPHIES, not dice - they rank
-       0 against real dice, so seating one was strictly worse than any
-       die the player owns; the value is the shelf story. Same shelf the
-       Ambrose night-8 win already uses (the RUN WON screen renders 🏆
-       per entry). */
-    S.trophies=S.trophies||[];
-    if(S.trophies.indexOf(sp.relic)<0)S.trophies.push(sp.relic);
-    msg='THE TROPHY GOES ON YOUR SHELF: '+getDie(sp.relic).name;
+  if(kind==='card'&&sp.card){
+    /* P864: the boss slot, idx 0, which _rewardSelectCard already describes as
+       "always available - signatures equip immediately on win". No usedCards
+       seeding here: a match seeds every held active from its ROW at start
+       (usedCards[cid]=cd.maxUses||1), so a card granted between matches picks
+       up its charges on the next one for free.
+       The relic no longer arrives here - it is granted automatically at the
+       win, so the shelf keeps filling without the die having to beat two
+       mechanical rewards to get there (P834's ruling, followed through). */
+    S.run.cards=S.run.cards||[null,null,null,null];
+    S.run.cards[0]=sp.card;
+    msg='HIS CARD IS YOURS: '+(sp.cardName||sp.card);
   }
   else if(kind==='tell'&&sp.tell){S.run.tells=S.run.tells||[];if(S.run.tells.indexOf(sp.tell)<0)S.run.tells.push(sp.tell);msg='HIS RULE GOES TO YOUR SHELF: '+sp.tellName;}
   else{S.run.gold=(S.run.gold||0)+sp.purse;msg='THE PURSE: +'+sp.purse+'g';}
@@ -37878,6 +37891,18 @@ var _DRAFT_DELAY={bossWin:500,patronWin:500,loss:900};
   }
 
   /* Night 8 (Ambrose): renown payout, his die is a trophy — no spoils */
+  /* P864: THIS BRANCH HAS NEVER FIRED AND IS LEFT THAT WAY DELIBERATELY.
+     Ambrose's rung key is 'bishop' (RUNGS[7]; the file's own idiom for him is
+     key==='bishop', see the FEATS check), so `key==='ambrose'` never matches
+     and he falls through to the ordinary boss-spoils branch below - where
+     _bossKey resolves him BY NAME and his tiles render correctly. That is why
+     the brief's eighth card is winnable at all.
+     Two things follow, and neither is fixed here. The +150 renown and the
+     trophy push below have never paid, so that is a reward the game does not
+     have. And correcting the key would DELETE Ambrose's spoils screen, which
+     section 2 needs, so this is a design ruling and not a typo fix. The
+     trophy half is already honoured: P864 grants every boss's die at the win,
+     ambrose_weight included. Denis's call on the renown. */
   if(win&&isBoss&&G.rung&&G.rung.key==='ambrose'){
     _getS();
     if(!S.run._n8Paid){
@@ -37902,20 +37927,46 @@ var _DRAFT_DELAY={bossWin:500,patronWin:500,loss:900};
       brutus:'brutus_shield',aldric:'aldrics_square',whisper:'whispers_fang',ambrose:'ambrose_weight'}[_spKey];
     var _spTell=G.rung&&G.rung.tell;
     var _spPurse=500+((S.run.tier||0))*60;
-    window._spoils={relic:_spRelic,tell:_spTell?_spTell.id:null,purse:_spPurse,tellName:_spTell?_spTell.name:'',tellDesc:_spTell?_spTell.desc:''};
+    /* P864: HIS CARD. Found by the npc: tag rather than by a second boss->card
+       map - section 2 put exactly one type:'active' row on each boss, so the
+       tag IS the map and a hand-written table beside it could only ever drift
+       from it. */
+    var _spCardObj=null;
+    try{_spCardObj=CARDS.filter(function(c){return c.type==='active'&&c.npc===_spKey;})[0]||null;}catch(e){}
+    /* P864: THE TROPHY IS GRANTED, NOT OFFERED. P834 made relics trophies -
+       rank 0 against real dice, never seated - so the die was a keepsake
+       competing with two mechanical rewards and losing every time (Denis: "no
+       one will pick a relic as a reward if it's just visual"). Dropping the
+       tile on its own would have left S.trophies with NO live writer at all,
+       because this pick was its only one; the other push is in the night-8
+       branch above, which has never fired. A shelf that cannot gain an entry
+       is not a kept shelf, so winning the boss now puts his die on it. */
+    try{
+      if(_spRelic){S.trophies=S.trophies||[];
+        if(S.trophies.indexOf(_spRelic)<0){S.trophies.push(_spRelic);save();}}
+    }catch(e){}
+    window._spoils={relic:_spRelic,tell:_spTell?_spTell.id:null,purse:_spPurse,
+      tellName:_spTell?_spTell.name:'',tellDesc:_spTell?_spTell.desc:'',
+      card:_spCardObj?_spCardObj.id:null,cardName:_spCardObj?_spCardObj.name:'',
+      cardEff:_spCardObj?_spCardObj.eff:'',cardDesc:_spCardObj?_spCardObj.desc:'',
+      cardIcon:_spCardObj?_spCardObj.icon:''};
     var sh='<div style="font-family:monospace;color:#eee;text-align:left;padding:10px 6px">'
       +'<div style="font-size:12px;letter-spacing:2px;color:#dc5;margin-bottom:10px">SPOILS — TAKE ONE, IT IS FINAL</div>'
-      +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">';
-    var rd=_spRelic?getDie(_spRelic):null;
-    sh+='<div onclick="_gbSpoilsConfirm(\'relic\')" style="cursor:pointer;aspect-ratio:2/3;display:flex;flex-direction:column;background:#191919;border:2px solid #dc5;padding:7px">'
-      +'<div style="font-size:11px;font-weight:bold;color:#eee">'+(rd?rd.name:'RELIC')+'</div>'
-      +'<div style="font-size:10px;color:#dc5;margin:2px 0">HIS DIE — A TROPHY FOR THE SHELF</div>'
-      +'<div style="flex:1;font-size:10px;color:#bbb;line-height:1.45;margin-top:4px">'+(rd?rd.desc:'')+'</div></div>';
-    sh+='<div onclick="_gbSpoilsConfirm(\'tell\')" style="cursor:pointer;aspect-ratio:2/3;display:flex;flex-direction:column;background:#191919;border:2px solid #6bc;padding:7px">'
+      +'<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px">';
+    /* P864: HIS CARD takes the relic's tile. Same inline styling and the same
+       1fr 1fr 1fr grid as its neighbours, so this is the existing layout with
+       a different first tile - not a new layout. The eff line sits where the
+       relic's one-liner sat and the long text below it, so the three tiles
+       still read as one row of the same shape. */
+    sh+='<div onclick="_gbSpoilsConfirm(\'card\')" style="cursor:pointer;min-height:186px;overflow:hidden;display:flex;flex-direction:column;background:#191919;border:2px solid #dc5;padding:5px">'
+      +'<div style="font-size:11px;font-weight:bold;color:#eee">'+(_spCardObj?(_spCardObj.icon+' '+_spCardObj.name):'HIS CARD')+'</div>'
+      +'<div style="font-size:10px;color:#dc5;margin:2px 0">'+(_spCardObj?_spCardObj.eff:'HIS CARD')+'</div>'
+      +'<div style="flex:1;font-size:10px;color:#bbb;line-height:1.45;margin-top:4px">'+(_spCardObj?_spCardObj.desc:'')+'</div></div>';
+    sh+='<div onclick="_gbSpoilsConfirm(\'tell\')" style="cursor:pointer;min-height:186px;overflow:hidden;display:flex;flex-direction:column;background:#191919;border:2px solid #6bc;padding:5px">'
       +'<div style="font-size:11px;font-weight:bold;color:#eee">'+(_spTell?_spTell.name:'TELL')+'</div>'
       +'<div style="font-size:10px;color:#6bc;margin:2px 0">HIS RULE — TO THE SHELF</div>'
       +'<div style="flex:1;font-size:10px;color:#bbb;line-height:1.45;margin-top:4px">'+(_spTell?_spTell.desc:'')+'</div></div>';
-    sh+='<div onclick="_gbSpoilsConfirm(\'purse\')" style="cursor:pointer;aspect-ratio:2/3;display:flex;flex-direction:column;background:#191919;border:2px solid #8e8;padding:7px">'
+    sh+='<div onclick="_gbSpoilsConfirm(\'purse\')" style="cursor:pointer;min-height:186px;overflow:hidden;display:flex;flex-direction:column;background:#191919;border:2px solid #8e8;padding:5px">'
       +'<div style="font-size:11px;font-weight:bold;color:#eee">HIS PURSE</div>'
       +'<div style="font-size:10px;color:#8e8;margin:2px 0">'+_spPurse+'g</div>'
       +'<div style="flex:1;font-size:10px;color:#bbb;line-height:1.45;margin-top:4px">Coin in hand. No questions.</div></div>';
