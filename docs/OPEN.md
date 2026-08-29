@@ -3,6 +3,80 @@
 The only file you need to read. Everything has my recommendation, so **"yours"
 is a valid answer.** Answered items are deleted, not marked — this stays short.
 
+---
+
+## BOSS REWARD BRIEF — BUILT (P860-P866). Six things need you.
+
+All five sections shipped in §8's order and every §9 check is driven. What
+follows is only what I could not decide.
+
+**1. Night 8 pays no renown, and has never paid any.** The Ambrose branch
+gates on `G.rung.key==='ambrose'`; his rung key is `'bishop'` (the file's own
+idiom for him elsewhere). So the branch has never fired — he falls through to
+the ordinary spoils screen, where `_bossKey` resolves him by NAME and his
+tiles render correctly. That is *why* your eighth card is winnable at all. But
+the `+150 renown` and the trophy push in that branch are a reward the game
+does not have. **Correcting the key would delete Ambrose's spoils screen**,
+which §2 needs, so this is a ruling, not a typo fix. My recommendation: pay
+the renown alongside the spoils and delete the dead branch. Marked dead in
+place until you say.
+
+**2. Actives are now boss-only — confirm that is what you meant.** §2's
+"delete the other twenty" removes all 13 non-boss active cards, so after this
+the ONLY way to hold an active is to beat a boss and take his card. The draft
+pool loses 13 entries and does not starve (tin 25→25, silver 40→33, gold
+33→26). It follows from the brief and reads well to me — one active, earned,
+in a dedicated slot — but it is a big change to how a run feels and I would
+rather you said it out loud.
+
+**3. §6's census was wrong in both directions; the assertion is narrower than
+the brief asked.** Driven at runtime against the real arrays: **6 collisions,
+not 23**, and one at depth three, not three. Five of your 23 were test
+fixtures (`{id:'steady_hand',tier:1}` at 22510 and 45590) counted as table
+rows. Ten more you missed are *foreign keys doing their job* — an NPC_RESCUES
+row is named for the card whose effect it runs, and `_RELIC_FAM` is keyed by
+DICE_TYPES id on purpose. An assertion over "any id in two arrays" would have
+shouted ~20 times per boot on correct code. It checks definition tables only,
+and reports unresolvable REFERENCES as a second, separate failure. §2 retired
+two of the six; four remain, all harmless: `the_collector`, `high_roller`,
+`second_wind` (CARDS vs FEATS) and `pickpocket` (the Vagabond family card vs
+Finnick's badge). Rename any of them, or leave them grandfathered?
+
+**4. Four dead blocks left in the bust and bank paths.** Deleting the twenty
+handlers stranded `stitchActive`, `vowActive`, `ledgerActive` and
+`allInActive` — their only writers were those handlers, so four blocks now
+test a flag nothing can set. Removing them is surgery in the two riskiest
+paths in the file for zero behaviour change, so I marked them in place instead
+and stopped. Want them out in a patch of their own?
+
+**5. §5 Pass B and Pass C not done, deliberately.** Pass A shipped (12
+player-facing strings). Pass B renames the persisted `S.run.tells` /
+`S.run.sleeve`, which needs a migration and buys nothing a player can see —
+your own brief says only do it "if the rename actually buys something". Pass C
+you already called "probably never". Say if you want either.
+
+**6. §10's two recorded items, answered.**
+- **Steeped has three disagreeing numbers for one value**: 100 in the record,
+  `G._tell.perRoll||50` in the player fallback, and a hardcoded 100 on the
+  rival side. It is parked so this is dormant, but it is one retune away from
+  paying three different amounts.
+- **Relics post-P834**: inert *by starvation*, not by deletion. `_RELIC_FAM`
+  has one live reader (`_matFam`) and the `effect:{}` readers are all live
+  code — nothing hands them a relic material any more. One route survives: a
+  PRE-P834 save with a relic still in `S.run.diceInv`, which `famDiceSwapIn`
+  will seat and no migration strips. Three of the effect blocks are dead even
+  if seated (`palm_adjacent`, `fang`, `weight_bank` are implemented by
+  hardcoded material checks, not by the block).
+
+**Also found, not acted on:** `getDie()` never returns null — it falls back to
+`DICE_TYPES[0]`, so a card id fed to the die namespace silently yields the
+*wrong die* rather than an error. That is the mechanism behind the
+`corvus_ledger` / `corvus_ledger_d` bug the file already documents. And the
+tell badge sits at opacity 0 for the whole of the FIRST boss match after a
+cold boot — drill_order too, so it is not new — which needs a real-play check
+before it is called a player-facing bug.
+
+
 **The 2026-08-20 ruling batch is EXECUTED** (P832-P838): Corvus orderly,
 boss :open pool wired (your 80 greeting lines shipped in P839),
 DLG.triggerCard deleted, the additive resolver + all 22 patrons' growth
