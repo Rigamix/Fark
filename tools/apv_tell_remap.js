@@ -20,11 +20,15 @@ RUNGS.forEach(r => { if (r.tell) out.rungs[r.name] = { id: r.tell.id, name: r.te
 const grog  = RUNGS.find(r => r.key === 'drunkard');
 const mabel = RUNGS.find(r => r.key === 'peasant');
 out.grogTell  = grog  && grog.tell  ? { id: grog.tell.id,  name: grog.tell.name,  minBank: grog.tell.minBank } : null;
-out.mabelTell = mabel && mabel.tell ? { id: mabel.tell.id, name: mabel.tell.name } : null;
+/* carries minRolls the way grogTell carries minBank: the rule's PARAMETER is
+   the half that can silently go missing, and a projection that drops it makes
+   a verdict about it unfalsifiable rather than true. */
+out.mabelTell = mabel && mabel.tell ? { id: mabel.tell.id, name: mabel.tell.name, minRolls: mabel.tell.minRolls } : null;
 
 /* ── a parked rule still has to be findable, or the seal pool gets null ── */
 const parked = _tellById('steeped');
 out.parkedSteeped = parked ? { id: parked.id, name: parked.name, perRoll: parked.perRoll } : null;
+out.parkedZeroHour = (typeof PARKED_TELLS!=='undefined') ? PARKED_TELLS.zero_hour : null;
 out.steepedOnNoBadge = !RUNGS.some(r => r.tell && r.tell.id === 'steeped');
 
 /* every id the seal pool can roll must resolve — a pool entry that returns
@@ -50,7 +54,7 @@ function doors(id){
    rule resolving through one door and not another, so every rule the game has
    is walked rather than a chosen five. */
 out.doors = {};
-['last_call', 'zero_hour', 'pickpocket', 'first_strike', 'drill_order',
+['last_call', 'zero_hour', 'mending', 'pickpocket', 'first_strike', 'drill_order',
  'still_waters', 'kindred', 'reckoning', 'steeped'].forEach(id => {
   out.doors[id] = doors(id);
 });
@@ -74,8 +78,17 @@ if (realG) G = realG; else try { G = null; }catch(e){}
 out.verdict = {
   grogIsLastCall:     !!(out.grogTell && out.grogTell.id === 'last_call'
                          && out.grogTell.name === 'LAST CALL' && out.grogTell.minBank === 800),
-  mabelIsZeroHour:    !!(out.mabelTell && out.mabelTell.id === 'zero_hour'
-                         && out.mabelTell.name === 'ZERO HOUR'),
+  /* P861: Mabel carries THE MENDING now. This verdict used to assert Zero
+     Hour and would have sat permanently false after the swap - a red light
+     nobody can act on is one people learn to scroll past, so it is re-pointed
+     at the new truth rather than left to rot. Zero Hour is asserted PARKED
+     just below, which is the half that could actually break: it stays in
+     _SEAL_POOL, so a cursed seat can still draw it, and _tellById has to keep
+     answering for it from PARKED_TELLS now that no rung carries the record. */
+  mabelIsTheMending:  !!(out.mabelTell && out.mabelTell.id === 'mending'
+                         && out.mabelTell.name === 'THE MENDING'
+                         && out.mabelTell.minRolls === 2),
+  zeroHourParkedNotLost: !!(out.parkedZeroHour && out.parkedZeroHour.id === 'zero_hour'),
   steepedParkedNotLost: !!out.parkedSteeped && out.steepedOnNoBadge,
   everySealRuleResolves: out.sealPoolUnresolvable.length === 0,
   /* the headline: every rule reachable through all three doors */

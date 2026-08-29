@@ -10027,6 +10027,14 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
 .tell-badge.tell-still_waters .tb-name{color:#d0d0d8;text-shadow:0 0 8px rgba(200,200,210,.45)}
 .tell-badge.tell-kindred{color:#c8c8b8}
 .tell-badge.tell-kindred .tb-name{color:#dcdccc;text-shadow:0 0 8px rgba(220,220,200,.45)}
+/* P861: Mabel's linen-blue, off BOSS_ACCENT.mabel - every other live rule
+   carries its own tint and a badge with none reads as unfinished. */
+.tell-badge.tell-mending{color:#a8c0e0}
+.tell-badge.tell-mending .tb-name{color:#c0d4f0;text-shadow:0 0 8px rgba(150,185,240,.45)}
+/* the bank held shut by a rule, not merely unavailable - the ordinary disabled
+   state is a grey nothing, and the player needs to see WHICH kind of no this
+   is. Same linen as the badge, so the two read as one rule. */
+#btnBank.mend-held{border-color:rgba(168,192,224,.55)!important;box-shadow:0 0 10px rgba(150,185,240,.25) inset}
 .tell-badge.tell-reckoning{color:#e0a848}
 .tell-badge.tell-reckoning .tb-name{color:#f0c060;text-shadow:0 0 10px rgba(220,150,40,.55)}
 
@@ -12761,19 +12769,27 @@ const RUNGS=[
     agg:.58,cardRarity:'tin',wager:true,wagerCount:1,wagerMode:'best',minBank:200,diceStop:2,chaotic:false,adaptive:false,
     dice:['bone','bone','iron','iron','amber','amber'],
     cardPool:['the_last_stitch_npc','measure_twice','worn_thimble','the_nightshift','mabels_pinch'],cardCount:3,
-    /* MABEL — ZERO HOUR, moved off Grog. Chosen by NAME, not by slot:
-       Aldric already carries an enchant-suppression rule (Still Waters) and
-       Brutus already carries a turn-length constraint (Drill Order), so
-       either would have doubled a theme that boss already owns. Steeped is
-       pure passive accumulation with no overlap with enchant tempo.
-       THE VOICE MOVES WITH THE RULE. Grog's line was a bar-closing line and
-       read wrong in Mabel's mouth; hers is stitchwork, which is also what
-       her cards are made of. The mechanic is untouched. */
-    /* "enchanted", never "marked". A mark on a die IS an enchant now, and the
-       terminology probe asserts no tell says otherwise — it caught this line
-       within a minute of it being written. The word was inherited from Grog's
-       original Zero Hour text, which had been corrected for the same reason. */
-    tell:{id:'zero_hour',name:'ZERO HOUR',desc:"“Take an enchanted face at my table, dear, and I cut the thread.”",icon:'✂️'}},
+    /* MABEL — THE MENDING. Zero Hour is parked, not deleted, and the reason
+       is night 2: it punishes ENCHANTED faces, enchants cost 150-400g at the
+       innkeep, and at night 2 a player holds starting gold plus one win. Her
+       badge could fire against nothing at all, for the whole match, purely by
+       the player not having shopped yet. That is the one thing a badge may
+       not be.
+       STEEPED WAS THE OBVIOUS SWAP AND IS WRONG for a different reason: it
+       works from a bare loadout, but every one of its sites is player-side
+       and it PAYS +100 per extra roll, so worn it is free points. It would be
+       the only badge that is not a constraint - Last Call floors your banks,
+       Drill Order caps your rolls, Pickpocket takes a die, First Strike
+       charges gold, Reckoning makes you match a total, Still Waters silences
+       your dice, Kindred amplifies theirs. A bonus in both directions is a
+       lure, not a badge. Both rules are parked; neither is deleted.
+       THE MENDING IS A CONSTRAINT AND A WEAPON, which is the test the other
+       eight pass: against you it removes the safe one-roll bank and makes you
+       throw again, which is exactly the pressure night 2 should teach; worn,
+       it forces the rival to over-roll into busts.
+       THE VOICE IS STILL HERS. She is the mender and the rule is "finish the
+       work" - the same stitchwork her cards are made of. */
+    tell:{id:'mending',name:'THE MENDING',desc:"“Nothing leaves my table half-done, dear. Roll twice before you bank.”",icon:'🪢',minRolls:2}},
   {id:2,name:'FINNICK',key:'commoner',icon:'🎭',tier:'known',target:7200,gold:250,buyIn:35,
     boss:null,bossDesc:null,
     agg:.62,cardRarity:'tin',wager:true,wagerCount:1,wagerMode:'best',minBank:250,diceStop:2,chaotic:false,adaptive:true,
@@ -13178,7 +13194,12 @@ function _initHandicapHUD(){
    ADDED, NOT SWAPPED: steeped's place here is deliberate, see above.
    AND IT IS A BALANCE CHANGE, said out loud - _rollSealTell picks uniformly, so
    every other rule moves from 1/8 to 1/9 on a cursed seat. */
-var _SEAL_POOL=['last_call','zero_hour','steeped','pickpocket','first_strike','drill_order','kindred','reckoning','still_waters'];
+/* P861: mending JOINS, and this is a balance change said out loud the way
+   P568 said its own - _rollSealTell picks uniformly, so every other rule moves
+   from 1/9 to 1/10 on a cursed seat. zero_hour KEEPS its place: it is parked
+   off Mabel's rung, not retired, and PARKED_TELLS above is what keeps
+   _tellById able to answer for it here. */
+var _SEAL_POOL=['last_call','zero_hour','mending','steeped','pickpocket','first_strike','drill_order','kindred','reckoning','still_waters'];
 function _rollSealTell(){return _SEAL_POOL[Math.floor(Math.random()*_SEAL_POOL.length)];}
 /* PARKED RULES — real, working table rules that no boss currently wears.
    Steeped is the first: Zero Hour took Mabel's badge, and every other
@@ -13191,7 +13212,16 @@ function _rollSealTell(){return _SEAL_POOL[Math.floor(Math.random()*_SEAL_POOL.l
    got null. Cursed seats already draw from the full rule pool, so Steeped
    keeps exactly the role it always had, minus one name attached to it.
    If a future reshuffle needs an eighth rule, it is sitting here intact. */
-var PARKED_TELLS={steeped:{id:'steeped',name:'STEEPED',desc:"“Each extra roll, I'll add 100 to your bank — bust and it all spills.”",icon:'🍵',perRoll:100}};
+var PARKED_TELLS={steeped:{id:'steeped',name:'STEEPED',desc:"“Each extra roll, I'll add 100 to your bank — bust and it all spills.”",icon:'🍵',perRoll:100},
+  /* P861: ZERO HOUR PARKS HERE THE MOMENT IT LEAVES MABEL'S RUNG, and this
+     is not tidiness - it is the whole reason this table exists. zero_hour
+     STAYS in _SEAL_POOL below, so a cursed seat can still draw it; _tellById
+     scans RUNGS first and would have returned null for every one of those
+     seats the instant no rung carried the record. tools/apv_tell_remap.js
+     asserts precisely this (`sealPoolUnresolvable`), so the two edits are one
+     edit. Ready if the game ever wants an anti-enchant boss late, when a
+     player actually owns enchants for it to bite. */
+  zero_hour:{id:'zero_hour',name:'ZERO HOUR',desc:"“Take an enchanted face at my table, dear, and I cut the thread.”",icon:'✂️'}};
 function _tellById(id){
   for(var i=0;i<RUNGS.length;i++)if(RUNGS[i].tell&&RUNGS[i].tell.id===id)return RUNGS[i].tell;
   return PARKED_TELLS[id]||null;
@@ -13279,6 +13309,7 @@ function _applyTell(){
     case 'pickpocket':/* per-roll RNG, no persistent state */ break;
     case 'first_strike': G._tellState.totalRollCost=0; break;/* P853 */
     case 'drill_order':/* uses turnRollCount + maxRolls */ break;
+    case 'mending':/* P861: reads turnRollCount against the record's minRolls, no state */ break;
     /* Still Waters and Kindred are both stateless reads - of the die, and of
        the loadout - so there is nothing to set up. The sealedCard and
        cursedDice fields these two seeded belonged to Confession and
@@ -13347,8 +13378,12 @@ function _initTellHUD(){
      separate row below the desc, which overlapped the player score row).
      Player feedback: "Put the 1/3 number next to DRILL ORDER". */
   var _drillInlineVal=(t.id==='drill_order')?' <span class="tb-val tb-val-inline" id="drillVal">0/'+_drillMax()+'</span>':'';/* P567 */
+  /* P861: the same inline counter Drill Order carries, for the same reason -
+     the rule is a number the player has to be able to see coming. Drill Order
+     counts UP to a ceiling; this counts up to a floor. */
+  var _mendInlineVal=(t.id==='mending')?' <span class="tb-val tb-val-inline" id="mendVal">0/'+_mendMin()+'</span>':'';
   badge.innerHTML='<span class="tb-icon">'+t.icon+'</span>'+
-    '<span class="tb-name">'+_tellNameHtml+_stedInlineVal+_arInlineVal+_drillInlineVal+'</span>'+
+    '<span class="tb-name">'+_tellNameHtml+_stedInlineVal+_arInlineVal+_drillInlineVal+_mendInlineVal+'</span>'+
     '<span class="tb-desc">'+t.desc+'</span>';
   /* _isBoss, not isBoss - nothing has ever assigned the latter, so the red
      boss seal this class carries (see #tellBadge.bossbind) never appeared. */
@@ -13405,6 +13440,14 @@ function _updateTellHUD(){
     if(d){var _dm=_drillMax(),rc=Math.min(G.turnRollCount||0,_dm);d.textContent=rc+'/'+_dm;
       d.classList.toggle('tb-warn',rc>=_dm-1);
       d.classList.toggle('tb-danger',rc>=_dm);}
+  }
+  if(t.id==='mending'){
+    var _mv=document.getElementById('mendVal');
+    if(_mv){var _mn=_mendMin(),_mc=Math.min(G.turnRollCount||0,_mn);
+      _mv.textContent=_mc+'/'+_mn;
+      /* clears the moment the floor is met - the badge stops warning about a
+         rule that is no longer holding anything shut */
+      _mv.classList.toggle('tb-warn',_mc<_mn);}
   }
   if(t.id==='reckoning'){
     var r=document.getElementById('reckoningVal');
@@ -30311,6 +30354,18 @@ function setBtns(r,b){
       setTimeout(function(){bankBtn.style.animation='';},300);
     }
   }else{bankBtn.classList.add('disabled');}
+  /* P861: THE MENDING holds the bank shut while the turn is one roll old.
+     Recorded here rather than derived again elsewhere - `r` IS the answer to
+     "is a roll on offer", and the escape hatch depends on it: if no roll is
+     available the rule stands down rather than hanging the turn with two dead
+     buttons. Runs after the enable above so it wins, exactly as the Drill
+     Order lock below re-asserts itself over a fresh setBtns(true,...). */
+  G._canRollNow=!!r;
+  try{
+    var _mg=_mendGate();
+    bankBtn.classList.toggle('mend-held',!!_mg.blocked);
+    if(_mg.blocked)bankBtn.classList.add('disabled');
+  }catch(e){}
   /* Re-assert the Drill Order lock after every setBtns call — otherwise a
      valid selection (refreshSelUI → setBtns(true,...)) would re-enable a
      roll button that Drill Order should keep locked. */
@@ -30345,6 +30400,30 @@ function _drillMax(){
   var d=(typeof G!=='undefined'&&G&&G._tell&&G._tell.id==='drill_order')
         ?G._tell:(_tellById('drill_order')||{});
   return d.maxRolls||3;
+}
+/* P861: THE FLOOR COMES FROM THE RECORD, never a literal - the same shape
+   _drillMax landed on, and for the same reason: retune the record and the
+   player, the rival and the badge would otherwise enforce three different
+   numbers. Reads whichever slot holds the rule, because a SLEEVED or SEALED
+   Mending has no G._tell to read - that direct-read mistake is what left Zero
+   Hour dead outside Grog's badge. */
+function _mendMin(){
+  var m=(typeof G!=='undefined'&&G&&G._tell&&G._tell.id==='mending')
+        ?G._tell:(_tellById('mending')||{});
+  return m.minRolls||2;
+}
+/* Is the player's bank held shut this instant? `short` is the rule; whether it
+   may be ENFORCED is a separate question, because a rule that demanded a roll
+   the table cannot supply would kill both buttons and hang the turn. setBtns
+   already computes whether a roll is on offer - that is its `r` - so it records
+   it there and this reads it. One writer, one reader; the alternative was a
+   second copy of refreshSelUI's rollability expression, free to drift. */
+function _mendGate(){
+  var off={active:false,need:0,count:0,short:false,blocked:false};
+  if(!G||typeof _ruleActive!=='function'||!_ruleActive('mending','p'))return off;
+  var need=_mendMin(),count=G.turnRollCount||0,short=count<need;
+  return {active:true,need:need,count:count,short:short,
+          blocked:short&&(G._canRollNow!==false)};
 }
 function _drillCap(){
   var off={active:false,cap:0,count:0,capped:false,free:false,blocked:false};
@@ -31702,7 +31781,16 @@ function startPTurn(){
     /* the RULE, not the tell: a sleeved Drill Order never refreshed, so its
      count sat wherever the turn started. Each surface ignores the call when it
      is not the one showing the rule. */
-  if(_ruleActive('drill_order','p')){try{_updateTellHUD();}catch(e){}try{famRenderRow();}catch(e){}}
+  /* P861c: THE HUD REFRESH IS UNGATED. _updateTellHUD early-returns without
+     a tell and every branch inside it is id-guarded - the comment right above
+     says exactly that - so this wrapper never protected the call. It decided
+     which rules were ALLOWED a live counter, and the answer was "drill_order
+     and nothing added later". The Mending's badge read 0/2 for a whole match
+     on a rule that was otherwise working on both seats.
+     famRenderRow keeps its gate: different surface, heavier, and not
+     self-guarding - nothing here measured it safe to run every roll. */
+  try{_updateTellHUD();}catch(e){}
+  if(_ruleActive('drill_order','p')){try{famRenderRow();}catch(e){}}
     /* Reckoning: refresh floor display */
     if(G._tell.id==='reckoning'){_updateTellHUD();}
     /* Confession's card-seal and Counterfeit's cursed dice are GONE, not
@@ -32683,7 +32771,16 @@ function _afterRollImpl(){
     /* the RULE, not the tell: a sleeved Drill Order never refreshed, so its
      count sat wherever the turn started. Each surface ignores the call when it
      is not the one showing the rule. */
-  if(_ruleActive('drill_order','p')){try{_updateTellHUD();}catch(e){}try{famRenderRow();}catch(e){}}
+  /* P861c: THE HUD REFRESH IS UNGATED. _updateTellHUD early-returns without
+     a tell and every branch inside it is id-guarded - the comment right above
+     says exactly that - so this wrapper never protected the call. It decided
+     which rules were ALLOWED a live counter, and the answer was "drill_order
+     and nothing added later". The Mending's badge read 0/2 for a whole match
+     on a rule that was otherwise working on both seats.
+     famRenderRow keeps its gate: different surface, heavier, and not
+     self-guarding - nothing here measured it safe to run every roll. */
+  try{_updateTellHUD();}catch(e){}
+  if(_ruleActive('drill_order','p')){try{famRenderRow();}catch(e){}}
     /* Cutpurse: maybe palm a die after the roll settles */
     if(_ruleActive('pickpocket','p')){setTimeout(_maybeFireCutpurse,650);}
   }
@@ -35004,6 +35101,18 @@ function handleBank(){
        direct-read mistake that left Zero Hour dead outside Grog's badge.
        total>0 guards it: a scoreless turn is a bust, not a refusal, and
        handleBank already returns before here on total<=0. */
+    /* P861: THE MENDING refuses the bank outright rather than voiding it -
+       Last Call below zeroes a bank that broke its floor, but this rule is
+       "not yet", so the turn continues untouched and the player rolls again.
+       The button is already dead by here (setBtns); this is the backstop for
+       any path that reaches handleBank without going through it. */
+    var _mgB=(typeof _mendGate==='function')?_mendGate():{blocked:false};
+    if(_mgB.blocked){
+      setStatusMsg('THE MENDING — ROLL AGAIN BEFORE YOU BANK ('+_mgB.count+'/'+_mgB.need+')','red');
+      try{_flashTellRule();}catch(e){}
+      try{Haptic.bust&&Haptic.bust();}catch(e){}
+      return;
+    }
     var _lcRule=_tellById('last_call');
     var _lcT=(_lcRule&&_lcRule.minBank)||800;
     if(_ruleActive('last_call','p')&&_preTakeTotal>0&&_preTakeTotal<_lcT){
@@ -35351,6 +35460,16 @@ function endPTurn(){
 
 /* ═══════ OPPONENT AI ═══════ */
 function oppShouldBank(rung,oppBank,diceLeft,oppTotal,playerTotal,target){
+  /* P861: THE MENDING, worn by the player, binds the rival - and it sits ABOVE
+     the winning-total line on purpose. The player's gate is absolute: it holds
+     even on a total that would win. If this sat below, the two seats would be
+     playing different rules and the badge would be worth less worn than met,
+     which is the Steeped defect the brief names.
+     diceLeft>0 is the same escape hatch the player side has: a rule may not
+     demand a roll the table cannot supply. G._oRollNum is written in
+     runOppTurn before this is consulted. */
+  if(typeof _ruleActive==='function'&&_ruleActive('mending','o')&&
+     diceLeft>0&&((typeof G!=='undefined'&&G&&G._oRollNum)||0)<_mendMin())return false;
   if((oppTotal+oppBank)>=target)return true;
   /* Zero Hour has no bank-threshold behaviour - it ends turns instead. */
   if(typeof _ruleActive==='function'&&_ruleActive('reckoning','o')&&typeof G!=='undefined'&&G&&(G._lastBankAmount||0)>0&&oppBank<G._lastBankAmount&&diceLeft>=2)return false;
