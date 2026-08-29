@@ -37910,41 +37910,49 @@ var _DRAFT_DELAY={bossWin:500,patronWin:500,loss:900};
     if(endBtns)endBtns.style.display='none';
   }
 
-  /* Night 8 (Ambrose): renown payout, his die is a trophy — no spoils */
-  /* P864: THIS BRANCH HAS NEVER FIRED AND IS LEFT THAT WAY DELIBERATELY.
-     Ambrose's rung key is 'bishop' (RUNGS[7]; the file's own idiom for him is
-     key==='bishop', see the FEATS check), so `key==='ambrose'` never matches
-     and he falls through to the ordinary boss-spoils branch below - where
-     _bossKey resolves him BY NAME and his tiles render correctly. That is why
-     the brief's eighth card is winnable at all.
-     Two things follow, and neither is fixed here. The +150 renown and the
-     trophy push below have never paid, so that is a reward the game does not
-     have. And correcting the key would DELETE Ambrose's spoils screen, which
-     section 2 needs, so this is a design ruling and not a typo fix. The
-     trophy half is already honoured: P864 grants every boss's die at the win,
-     ambrose_weight included. Denis's call on the renown. */
-  if(win&&isBoss&&G.rung&&G.rung.key==='ambrose'){
+  /* ═══ P867: THE BOSS-WIN PAYOUT, LIFTED OUT OF THE CHAIN ═══
+     What stood here compared G.rung.key against his NAME, and it has never
+     fired once: Ambrose's rung key is 'bishop'. Nothing in this file
+     assigns key:'ambrose' to anything, so that comparison was dead by
+     construction and his +150 renown is a reward the game does not have.
+     AND THE SAME BUG IS FIXED AND DOCUMENTED TWELVE LINES BELOW, in the branch
+     that follows: "the boss's NAME, not rung.key - see _bossKey. This read
+     rung.key and always missed." Someone hit this defect, understood it, wrote
+     down what it was, fixed their own instance and did not look up. That is
+     what _bossKey is FOR - it resolves the boss by name, because rung.key is
+     drunkard/peasant/.../bishop and never a boss's name.
+     THE FIX IS NOT TO CORRECT THE KEY IN PLACE. Doing that would make the
+     branch fire and delete Ambrose's spoils screen, which is where his Pyre is
+     won. The payout and the screen were fused into one if/else and they are
+     two different things, so the payout lifts OUT, above the chain, keyed with
+     _bossKey - and Ambrose now falls through to the ordinary spoils branch
+     with his three tiles like every other boss. His line survives as a header
+     above them (see _n8Hdr) rather than as a replacement for them.
+     ONE WRITER FOR THE SHELF. P864 granted the trophy inside the spoils branch
+     for every boss; Denis asked for Ambrose's trophy to lift with his renown.
+     Doing both would leave two writers for one shelf - which is the shape that
+     produced this bug. So the whole grant moved up here instead, and
+     _spKey/_spRelic are computed ONCE, in this block, for everything below. */
+  var _spKey=_bossKey(G&&G.rung);
+  var _spRelic={grog:'grogs_tooth',mabel:'mabels_thimble',finnick:'finnicks_palm',corvus:'corvus_ledger_d',
+    brutus:'brutus_shield',aldric:'aldrics_square',whisper:'whispers_fang',ambrose:'ambrose_weight'}[_spKey];
+  if(win&&isBoss){
     _getS();
-    if(!S.run._n8Paid){
-      S.run._n8Paid=true;
-      S.renown=(S.renown||0)+150;
-      S.trophies=S.trophies||[];if(S.trophies.indexOf('ambrose_weight')<0)S.trophies.push('ambrose_weight');
-      save();
+    var _paid=false;
+    /* his die goes on the shelf for beating him - P834 made relics trophies,
+       so a trophy should not have to beat a reward to be yours */
+    try{
+      if(_spRelic){S.trophies=S.trophies||[];
+        if(S.trophies.indexOf(_spRelic)<0){S.trophies.push(_spRelic);_paid=true;}}
+    }catch(e){}
+    /* night 8's renown. _n8Paid is run-scoped, so no existing save carries it
+       and every run in flight pays the first time it beats him. */
+    if(_spKey==='ambrose'&&S.run&&!S.run._n8Paid){
+      S.run._n8Paid=true;S.renown=(S.renown||0)+150;_paid=true;
     }
-    if(resCard){resCard.innerHTML='<div style="font-family:monospace;color:#dc5;padding:24px 10px;text-align:center;line-height:2">'
-      +'THE HOUSE REMEMBERS YOUR NAME<br>'
-      +'<span style="color:#999;font-size:11px">+150 renown · his weight sits on your shelf</span></div>';
-      resCard.classList.add('show');}
-    if(endBtns)endBtns.style.display='';_endScreenPhase='ready';
+    if(_paid){try{save();}catch(e){}}
   }
-  else if(win&&isBoss){
-    /* the boss's NAME, not rung.key - see _bossKey. This read rung.key and
-       always missed, so "HIS DIE" was an empty card that paid gold instead. */
-    var _spKey=_bossKey(G&&G.rung);
-    /* keyed by boss name - see _bossKey; this read rung.key and always missed,
-       so "HIS DIE" was an empty card that silently paid gold instead */
-    var _spRelic={grog:'grogs_tooth',mabel:'mabels_thimble',finnick:'finnicks_palm',corvus:'corvus_ledger_d',
-      brutus:'brutus_shield',aldric:'aldrics_square',whisper:'whispers_fang',ambrose:'ambrose_weight'}[_spKey];
+  if(win&&isBoss){
     var _spTell=G.rung&&G.rung.tell;
     var _spPurse=500+((S.run.tier||0))*60;
     /* P864: HIS CARD. Found by the npc: tag rather than by a second boss->card
@@ -37953,24 +37961,22 @@ var _DRAFT_DELAY={bossWin:500,patronWin:500,loss:900};
        from it. */
     var _spCardObj=null;
     try{_spCardObj=CARDS.filter(function(c){return c.type==='active'&&c.npc===_spKey;})[0]||null;}catch(e){}
-    /* P864: THE TROPHY IS GRANTED, NOT OFFERED. P834 made relics trophies -
-       rank 0 against real dice, never seated - so the die was a keepsake
-       competing with two mechanical rewards and losing every time (Denis: "no
-       one will pick a relic as a reward if it's just visual"). Dropping the
-       tile on its own would have left S.trophies with NO live writer at all,
-       because this pick was its only one; the other push is in the night-8
-       branch above, which has never fired. A shelf that cannot gain an entry
-       is not a kept shelf, so winning the boss now puts his die on it. */
-    try{
-      if(_spRelic){S.trophies=S.trophies||[];
-        if(S.trophies.indexOf(_spRelic)<0){S.trophies.push(_spRelic);save();}}
-    }catch(e){}
+    /* P867: the trophy grant MOVED UP into the lifted payout block, so the
+       shelf has one writer covering all eight bosses instead of two. */
     window._spoils={relic:_spRelic,tell:_spTell?_spTell.id:null,purse:_spPurse,
       tellName:_spTell?_spTell.name:'',tellDesc:_spTell?_spTell.desc:'',
       card:_spCardObj?_spCardObj.id:null,cardName:_spCardObj?_spCardObj.name:'',
       cardEff:_spCardObj?_spCardObj.eff:'',cardDesc:_spCardObj?_spCardObj.desc:'',
       cardIcon:_spCardObj?_spCardObj.icon:''};
+    /* P867: night 8 keeps its line, ABOVE the tiles rather than instead of
+       them. It used to be the entire screen, which is what made the renown and
+       the spoils mutually exclusive. */
+    var _n8Hdr=(_spKey==='ambrose')
+      ?'<div style="color:#dc5;text-align:center;line-height:1.8;margin-bottom:10px">THE HOUSE REMEMBERS YOUR NAME<br>'
+       +'<span style="color:#999;font-size:11px">+150 renown · his weight sits on your shelf</span></div>'
+      :'';
     var sh='<div style="font-family:monospace;color:#eee;text-align:left;padding:10px 6px">'
+      +_n8Hdr
       +'<div style="font-size:12px;letter-spacing:2px;color:#dc5;margin-bottom:10px">SPOILS — TAKE ONE, IT IS FINAL</div>'
       +'<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px">';
     /* P864: HIS CARD takes the relic's tile. Same inline styling and the same

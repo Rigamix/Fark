@@ -7,27 +7,30 @@ is a valid answer.** Answered items are deleted, not marked — this stays short
 
 ## BOSS REWARD BRIEF — BUILT (P860-P866). Six things need you.
 
-All five sections shipped in §8's order and every §9 check is driven. What
-follows is only what I could not decide.
+All five sections shipped in §8's order and every §9 check is driven. Items 1
+and 2 below are now CLOSED — kept visible so the corrections are on the record
+rather than silently deleted. The rest is what I could not decide.
 
-**1. Night 8 pays no renown, and has never paid any.** The Ambrose branch
-gates on `G.rung.key==='ambrose'`; his rung key is `'bishop'` (the file's own
-idiom for him elsewhere). So the branch has never fired — he falls through to
-the ordinary spoils screen, where `_bossKey` resolves him by NAME and his
-tiles render correctly. That is *why* your eighth card is winnable at all. But
-the `+150 renown` and the trophy push in that branch are a reward the game
-does not have. **Correcting the key would delete Ambrose's spoils screen**,
-which §2 needs, so this is a ruling, not a typo fix. My recommendation: pay
-the renown alongside the spoils and delete the dead branch. Marked dead in
-place until you say.
+**1. Night 8 renown — FIXED (P867), no longer a question.** Lifted the
+payout out of the if/else chain into an unconditional block above it, keyed
+with `_bossKey`; deleted the split so Ambrose falls through to the ordinary
+spoils branch with his three tiles; his line is now a header above them.
+The trophy grant moved up with it, so the shelf has ONE writer covering all
+eight bosses rather than two. Driven: first win pays (delta 255 — the +150
+plus other renown a boss win already pays), the latch holds it to once per
+run, a cleared latch pays exactly 150, Brutus pays none but still takes his
+trophy, and Ambrose keeps three unclipped tiles.
 
-**2. Actives are now boss-only — confirm that is what you meant.** §2's
-"delete the other twenty" removes all 13 non-boss active cards, so after this
-the ONLY way to hold an active is to beat a boss and take his card. The draft
-pool loses 13 entries and does not starve (tin 25→25, silver 40→33, gold
-33→26). It follows from the brief and reads well to me — one active, earned,
-in a dedicated slot — but it is a big change to how a run feels and I would
-rather you said it out loud.
+**2. ~~Actives are now boss-only~~ — MY QUESTION WAS WRONG, withdrawn.**
+Denis: *"Patrons should have regular family cards, some passive, some
+active. And I can win active cards from the start like I currently do?
+Only limitation is boss cards, limited to boss encounters."* That is
+already what the brief does, and I conflated two tables. §2 deletes
+CARDS-table actives, which the player has never been able to hold; the
+cards a player drafts are FAM_CARDS. `famOffer` filters on `_famDraftable`
+and tier only — no `kind` test. Driven to be sure: **647 of 1200 night-1
+offers are active family cards (53.9%, against a 58.6% share of the table),
+15 distinct ones**. Nothing to change; the patron draft was never narrowed.
 
 **3. §6's census was wrong in both directions; the assertion is narrower than
 the brief asked.** Driven at runtime against the real arrays: **6 collisions,
@@ -67,6 +70,21 @@ you already called "probably never". Say if you want either.
   will seat and no migration strips. Three of the effect blocks are dead even
   if seated (`palm_adjacent`, `fang`, `weight_bank` are implemented by
   hardcoded material checks, not by the block).
+
+**§11 (NPC LOADOUTS) IS NEW SINCE I STARTED AND IS NOT BUILT.** The copy of
+the brief I worked from ended at §10; the re-attached copy carries a §11 — the
+three-card cap, the WHISPER/AMBROSE pool reorder, and `syn:` weighted draws.
+I have not touched any of it. Two things worth saying now:
+
+- **Its guard is already satisfied.** §11.2 says do not let §2's sweep delete
+  `royal_seizure` and `blessed_confiscation`. Checked: both NPC_CARDS rows are
+  intact and so are both player-side activators with their switch cases. §2
+  never touched NPC_CARDS — only the CARDS table.
+- **§11.2 says it belongs in the §1a measured batch** with the target
+  reductions, the card cap and Short Fuse's scaling. §11.1 and §11.3 do not
+  say that. Tell me whether to build §11 now or hold all of it for that batch —
+  it is a difficulty lever either way, and the ladder cells it would move are
+  the same ones the other levers move.
 
 **Also found, not acted on:** `getDie()` never returns null — it falls back to
 `DICE_TYPES[0]`, so a card id fed to the die namespace silently yields the
