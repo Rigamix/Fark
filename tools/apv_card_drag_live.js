@@ -39,7 +39,13 @@ if (typeof launchSeat !== 'function') return { skip: 'launchSeat unreachable' };
 /* equip a card the way the draft does, then take a seat */
 S.run.cards = [null, null, null, null];
 S.run.fcards = S.run.fcards || [];
-S.run.cards[1] = 'the_tab';
+/* P862: RE-POINTED. This probe's subject used to be a non-boss active in a
+   REGULAR slot, and section 2 deleted every one of those - so the equip
+   silently produced an empty hand and this instrument, one of only two
+   covering the whole player-active layer, went VACUOUS rather than red.
+   The subject is now the_pyre (Ambrose's Pyre) in the BOSS slot, because
+   slot 0 is the only place an active can live now. */
+S.run.cards[0] = 'the_pyre';
 try { G = null; } catch (e) {}
 launchSeat(0);
 if (!await until(() => typeof G !== 'undefined' && G && G.pCards !== undefined, 14000))

@@ -1,3 +1,22 @@
+/* SUPERSEDED IN PART BY tools/apv_frozen_vs_sacrifice.js - READ THIS FIRST.
+ *
+ * This probe's headline verdict is `wholeLegacyActiveLayerIsDead`, and that
+ * WAS true when it was written and is NOT true now. The boss-reward brief's
+ * section 2 re-pointed the eight boss cards onto the surviving CARDS actives,
+ * so frozen_die IS Brutus's Grip: won from his spoils, equipped in the boss
+ * slot, and able to freeze a die for the first time.
+ *
+ * The verdict still returns true here only because this probe drives an EMPTY
+ * loadout, where nothing is activatable by definition. Scoped that narrowly it
+ * is still a true statement; read as a headline it is reassurance about a world
+ * that has moved, which is the more expensive kind of stale.
+ *
+ * The live question - can Sacrifice destroy a die the player has frozen - is
+ * re-asked against the mechanism in apv_frozen_vs_sacrifice.js, with Brutus's
+ * Grip actually equipped. Answer: no. CFX.sacrifice._targets() carries
+ * `!d._frozen`, so the D18 defect was fixed after this probe was written, and
+ * that exclusion is what is load-bearing now that the layer is reachable.
+ */
 /* D18 - "Transmute and Sacrifice both admit `_frozen` dice; every other card
  * excludes them", and Sacrifice has no targeting, so a held die can be
  * destroyed without being chosen.

@@ -42,7 +42,13 @@ const EQUIP = /(?:\?|&)equip=1/.test(location.search);
 const out = { arm: EQUIP ? 'equipped' : 'control' };
 window.__icd = 0;
 S.run.cards = [null, null, null, null];
-if (EQUIP) S.run.cards[1] = 'the_tab';
+/* P862: RE-POINTED. This probe's subject used to be a non-boss active in a
+   REGULAR slot, and section 2 deleted every one of those - so the equip
+   silently produced an empty hand and this instrument, one of only two
+   covering the whole player-active layer, went VACUOUS rather than red.
+   The subject is now the_pyre (Ambrose's Pyre) in the BOSS slot, because
+   slot 0 is the only place an active can live now. */
+if (EQUIP) S.run.cards[0] = 'the_pyre';
 out.equippedAtStart = (S.run.cards || []).filter(Boolean).slice();
 /* THE LATCH: _getS used to run the legacy cutover on EVERY call and blank this */
 for (let i = 0; i < 5; i++) { try { _getS(); } catch (e) {} }
@@ -56,6 +62,6 @@ out.gPCards = (typeof G !== 'undefined' && G && G.pCards) ? G.pCards.slice() : n
 out.rowCards = [...document.querySelectorAll('#playerCards .mcard')].map(e => e.dataset.cid);
 out.icd = window.__icd;
 out.usesSeeded = (typeof G !== 'undefined' && G && G.activeCardState && G.activeCardState.usedCards)
-  ? (G.activeCardState.usedCards['the_tab'] === undefined ? null : G.activeCardState.usedCards['the_tab']) : null;
-out.gate = (typeof _cardHasUse === 'function') ? _cardHasUse('the_tab') : null;
+  ? (G.activeCardState.usedCards['the_pyre'] === undefined ? null : G.activeCardState.usedCards['the_pyre']) : null;
+out.gate = (typeof _cardHasUse === 'function') ? _cardHasUse('the_pyre') : null;
 return out;
