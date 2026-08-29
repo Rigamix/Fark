@@ -47,8 +47,18 @@ return {
 
   liveCollisions: present.sort(),
   liveCollisionCount: present.length,
+  /* THE INVARIANT, not the number. This asserted present.length===6 and would
+     have gone red the moment section 2 deleted the_tab's and finnicks_palm's
+     CARDS rows - a true change reported as a failure, which is how a check
+     gets ignored. What actually matters is that every collision the game HAS
+     is one the grandfather list licenses, and that the list licenses nothing
+     that no longer collides. That holds at 6, at 4, and at 0. */
+  everyLiveCollisionIsGrandfathered:
+    present.map(x=>x.split(' :: ')[0]).every(id=>Object.prototype.hasOwnProperty.call(_ID_GRANDFATHER,id)),
+  noStaleGrandfathers: clean.stale.length===0,
 
   VERDICT: (anyEmpty.length===0 && clean.collisions.length===0 && clean.dangling.length===0
             && injected.collisions.length===2 && grandfathered.collisions.length===0
-            && present.length===6) ? 'PASS' : 'FAIL',
+            && present.map(x=>x.split(' :: ')[0]).every(id=>Object.prototype.hasOwnProperty.call(_ID_GRANDFATHER,id))
+            && clean.stale.length===0) ? 'PASS' : 'FAIL',
 };

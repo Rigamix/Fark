@@ -11213,7 +11213,26 @@ function _getS(){
     if(S.run.diceStock&&typeof S.run.diceStock.starstone==='number'&&S.run.diceStock.starstone<3){
       S.run.diceStock.starstone=3;
     }
-    if(Array.isArray(S.run.cards))S.run.cards=S.run.cards.map(function(cid){return cid&&_removedCards.indexOf(cid)===-1?cid:null;});
+    /* P863: ASK THE CATALOG, do not maintain a list of what left it. The
+       comment above already promises this behaviour - "drop any equipped cards
+       that no longer exist in the catalog (e.g. removed in an update)" - and
+       the list had drifted from it: it named 4 of the 20 cards section 2
+       deleted, so a run holding any of the other 16 kept a phantom id that
+       buildCBar still COUNTS when it lays out the fan (a 3-card spread drawing
+       2 cards, with a gap where the phantom would be) and that _pcSlotHtml
+       paints as a filled, draggable, nameless slot, because .empty is gated on
+       !cid rather than on whether the id resolves.
+       try/catch, NOT typeof: CARDS is a const, and `typeof` on a const inside
+       its temporal dead zone THROWS rather than returning 'undefined', so a
+       typeof guard would be the very bug it was added to prevent. If the
+       tables are not up yet the id is KEPT - losing a real card to a load-order
+       accident is far worse than carrying a phantom for one boot. */
+    var _cardGone=function(cid){
+      if(!cid)return true;
+      if(_removedCards.indexOf(cid)>=0)return true;
+      try{return !(CARDS_MAP[cid]||NPC_CARDS_MAP[cid]);}catch(e){return false;}
+    };
+    if(Array.isArray(S.run.cards))S.run.cards=S.run.cards.map(function(cid){return _cardGone(cid)?null:cid;});
     /* Ensure cards array is exactly the current 4-slot length. (Save format
        was rev'd to 4 slots — boss in [0], regulars in [1..3]. No migration:
        fresh start was the design call.) */
@@ -11242,7 +11261,10 @@ function _getS(){
     if(!Array.isArray(S.run.pouch))S.run.pouch=[null,null,null];
     while(S.run.pouch.length<3)S.run.pouch.push(null);
     /* Drop any pouch cards that were in the removed-cards list */
-    S.run.pouch=S.run.pouch.map(function(cid){return cid&&_removedCards.indexOf(cid)===-1?cid:null;});
+    /* P863: the pouch gets the same resolution test as the deck. It had NO
+       removal migration beyond this list, and a phantom here is draggable into
+       a deck slot - so a dead id could be shuffled around a run forever. */
+    S.run.pouch=S.run.pouch.map(function(cid){return _cardGone(cid)?null:cid;});
     /* P4 migration: the 160-renown perk changed from a 4th-slot unlock to
        +1 night seat. Anyone who had it keeps a granted extraSeat; slot 3 now
        rides the 60-renown perk, and slot 2 is base — nobody can LOSE a slot. */
@@ -13817,7 +13839,6 @@ function generateDiceLoadout(tierIndex){
   {id:'blood_debt',name:'BLOOD DEBT',icon:'🩸',rarity:'gold',eff:'-100 START; +400 PER OPP BUST',desc:'You start -100 points. Each time the opponent busts, you gain 400 points.',arch:'hoarder',dep:true},
   {id:'leaky_cup',name:'LEAKY CUP',icon:'🥛',rarity:'gold',eff:"RIVAL 5 DICE EVERY 4TH TURN",desc:"Every fourth turn the opponent takes, they start with only 5 dice on their first roll.",arch:'saboteur'},
   {id:'crows_luck',name:"CROW'S LUCK",icon:'🐦',rarity:'gold',eff:'DOWNGRADE RIVAL STRAIGHTS (2x)',desc:"Twice per match, downgrades any straight the opponent rolls by one tier: Full (1500) → High (750), High (750) → Low (500), Low (500) → nothing.",arch:'saboteur'},
-  {id:'the_tab',name:'THE TAB',icon:'🍺',rarity:'silver',type:'active',maxUses:1,timing:'idle|choosing|yielding',eff:"HOLD RIVAL'S NEXT BANK 1 TURN",desc:"Put your rival on the tab. Their next bank is held in escrow — those points (and any win they'd trigger) don't count until the start of their following turn, buying you a turn to answer.",arch:'saboteur'},
   {id:'taxing_breath',name:'TAXING BREATH',icon:'💨',rarity:'gold',eff:'STEAL 400 ON RIVAL BANK',desc:'Each time the opponent banks any points, steal 400 of those points for yourself.',arch:'saboteur'},
   {id:'thieves_luck',name:"THIEF'S LUCK",icon:'🎭',rarity:'gold',eff:'STEAL RIVAL BANK <200',desc:"When the opponent banks less than 200 points in a turn, those points transfer to you instead.",arch:'saboteur',dep:true},
   {id:'plague_wind',name:'PLAGUE WIND',icon:'🌬️',rarity:'gold',eff:'RIVAL PLAYS SAFER',desc:"Reduces the opponent's tendency to keep re-rolling aggressively — they play safer.",arch:'saboteur',dep:true},
@@ -13829,15 +13850,8 @@ function generateDiceLoadout(tierIndex){
   {id:'serpents_whisper',name:"SERPENT'S WHISPER",icon:'🐍',rarity:'silver',eff:"RIVAL MIN BANK +300",desc:"Raises the opponent's minimum banking threshold by 300 — they must keep rolling until they hit it or bust.",arch:'saboteur',dep:true},
   /* cowards_bell removed — effect was confusing, didn't impact play. */
   /* ── ACTIVE CARDS (shop + NPC rewards, drag-to-activate) ── */
-  {id:'gamblers_eye',name:"GAMBLER'S EYE",icon:'👁️‍🗨️',rarity:'gold',type:'active',maxUses:1,timing:'choosing',eff:'KEEP ANY DICE, REROLL REST',desc:'Choose any dice to keep — scoring or not — then reroll everything else.',arch:'sharp'},
+  {id:'gamblers_eye',name:"FINNICK'S EYE",icon:'👁️‍🗨️',npc:'finnick',rarity:'gold',type:'active',maxUses:1,timing:'choosing',eff:'KEEP ANY DICE, REROLL REST',desc:'Choose any dice to keep — scoring or not — then reroll everything else.',rewardQuote:'"Not bad, mate! Keep this, yeah?"',arch:'sharp'},
   {id:'grogs_flask',name:"GROG'S FLASK",icon:'🍺',rarity:'gold',type:'active',npc:'grog',maxUses:1,timing:'choosing',eff:'REROLL 2 NON-SCORING DICE',desc:'During dice selection, pick up to two dice that aren\'t scoring and reroll them.',rewardQuote:'"Here… take thish. Won it fair an\' shquare."',arch:'sharp'},
-  {id:'mabels_stitch',name:"MABEL'S STITCH",icon:'🧵',rarity:'gold',type:'active',npc:'mabel',maxUses:1,timing:'idle|choosing|yielding',eff:'BUST → BANK PTS + FREE REROLL',desc:'Activate before rolling: if you bust this turn, bank your accumulated points safely AND get a fresh 6-die reroll to keep going.',rewardQuote:'"Take this. May it mend thy fortune."',arch:'brinksman'},
-  {id:'finnicks_palm',name:"FINNICK'S PALM",icon:'🤏',rarity:'gold',type:'active',npc:'finnick',maxUses:1,timing:'choosing',eff:'PALM 1 UNSELECTED DIE → 1 OR 5',desc:'Flips one of your unselected non-scoring dice to a 1 or 5. Selected dice stay safe.',rewardQuote:'"Not bad, mate! Keep this, yeah?"',arch:'sharp'},
-  {id:'corvus_ledger',name:"CORVUS'S LEDGER",icon:'📒',rarity:'gold',type:'active',npc:'corvus',maxUses:1,timing:'idle|choosing|yielding',eff:'NEXT BANK x2',desc:'Activate at any point during your turn — your next bank is doubled.',rewardQuote:'"Take the ledger. Consider it… a dividend."',arch:'hoarder'},
-  {id:'brutus_fist',name:"BRUTUS'S FIST",icon:'👊',rarity:'gold',type:'active',npc:'brutus',maxUses:1,timing:'choosing',eff:'FORCE 1 DIE → 1',desc:'During dice selection, force one non-scoring die to show a 1 (worth 100 pts).',rewardQuote:'"Iron in thy bones. Take this, soldier."',arch:'sharp',dep:true},
-  {id:'aldrics_vow',name:"ALDRIC'S VOW",icon:'⚔️',rarity:'gold',type:'active',npc:'aldric',maxUses:1,timing:'idle',eff:'DOUBLE OR NOTHING',desc:'Your next roll: score 300+ and it doubles; score less and you lose your accumulated turn points.',rewardQuote:'"Thou hast proven worthy. Bear this vow."',arch:'brinksman'},
-  {id:'whispers_hex',name:"WHISPER'S HEX",icon:'🔮',rarity:'gold',type:'active',npc:'whisper',maxUses:1,timing:'yielding',eff:'OPP −1 DIE NEXT TURN',desc:'Activate while yielding your turn — the opponent starts their next turn with only five dice.',rewardQuote:'"This hex is yours. Use it wisely."',arch:'saboteur'},
-  {id:'ambrose_grace',name:"AMBROSE'S GRACE",icon:'✝️',rarity:'gold',type:'active',npc:'ambrose',maxUses:1,timing:'choosing',eff:'2 BLANKS → 5s',desc:'During dice selection, convert up to 2 non-scoring dice into 5s (50 pts each).',rewardQuote:'"The heavens smiled upon thee. Accept this grace."',arch:'sharp',dep:true},
   /* ── Boss SIGNATURE passives (Phase 5) — alternative to one-use actives ── */
   {id:'mabels_ward',name:"MABEL'S WARD",icon:'🪡',rarity:'gold',npc:'mabel',eff:'EVERY BANK +200; 3RD BANK +600',desc:"Every bank gains +200. Your 3rd, 6th, 9th bank gains +600 instead.",rewardQuote:'"This thread holds firm. Take it, dear."',arch:'safeBanker'},
   {id:'corvus_book',name:"CORVUS'S BOOK",icon:'📖',rarity:'gold',npc:'corvus',eff:'EACH BANK +75 INTEREST (PERMANENT)',desc:"Each bank adds +75 to a running interest line that applies to every future bank this match. Banks of 1000+ add +150 instead.",rewardQuote:'"Compounding. The lender\'s purest art."',arch:'hoarder'},
@@ -13852,11 +13866,10 @@ function generateDiceLoadout(tierIndex){
   {id:'brutus_grit',name:"BRUTUS'S GRIT",icon:'⛓️',rarity:'gold',npc:'brutus',eff:'1ST BUST UNDER 500: SAVED. BANKS 500+ +15%',desc:"Once per match, if you bust below 500 turn points, your dice refresh instead. Banks of 500+ also gain +15%.",rewardQuote:'"Stand longer than they expect, and they\'ll never expect again."',arch:'brinksman'},
   {id:'whispers_veil',name:"WHISPER'S VEIL",icon:'🕯️',rarity:'gold',npc:'whisper',eff:'EVERY OTHER OPP TURN: 5 DICE',desc:"On every other opponent turn (their 1st, 3rd, 5th…) they roll only 5 dice instead of 6. A persistent diminishment.",rewardQuote:'"Six was always too generous, dear."',arch:'saboteur'},
   /* Phase 6b — fun active cards */
-  {id:'seven_dice',name:'SEVEN DICE',icon:'🎲',rarity:'gold',type:'active',maxUses:1,timing:'choosing',/* P845: was 'idle', where the pool is always empty - unreachable */eff:'REROLL ONE DIE, FREE',desc:"Activate during your turn: tap one die and it rerolls, free. You keep the new face, better or worse.",arch:'sharp'},/* P834: redesigned per Denis - the 7th-lane promise was a silent no-op since the seat clamps */
-  {id:'loan',name:'THE LOAN',icon:'💰',rarity:'gold',type:'active',maxUses:1,timing:'idle',eff:'+1500 NOW; −200/TURN FOR 5 TURNS',desc:"Take a loan: gain 1500 points immediately. The innkeeper docks 200 from your total at the start of each of your next 5 turns.",arch:'hoarder'},
+/* P834: redesigned per Denis - the 7th-lane promise was a silent no-op since the seat clamps */
+  {id:'loan',name:"CORVUS'S NOTE",icon:'📒',npc:'corvus',rarity:'gold',type:'active',maxUses:1,timing:'idle',eff:'+1500 NOW; −200/TURN FOR 5 TURNS',desc:"Take a loan: gain 1500 points immediately. The innkeeper docks 200 from your total at the start of each of your next 5 turns.",rewardQuote:'"Take the note. Consider it… a dividend."',arch:'hoarder'},
   /* ── DICE PROTECTION / SWAP ── */
   /* iron_grip removed — pure counter card, no one drafts it. */
-  {id:'sleight_of_hand',name:'SLEIGHT OF HAND',icon:'🃏',rarity:'gold',type:'active',maxUses:1,timing:'idle',eff:'SWAP ONE DIE WITH OPP',desc:'Before rolling, swap one of your dice with one of the opponent\'s — you choose which dice to exchange.',arch:'sharp',dep:true},
   /* ── NEW CARDS — Synergy Enablers ── */
   /* Archetype enablers (Phase 4 — reward committing to one archetype) */
   {id:'tab_at_bar',name:'TAB AT THE BAR',icon:'📋',rarity:'silver',eff:'+150/BANK PER SAFE-BANKER CARD',desc:'For each Safe-Banker card you have equipped (this one included), every bank gains +150.',arch:'safeBanker',dep:true},
@@ -13887,11 +13900,9 @@ function generateDiceLoadout(tierIndex){
   {id:'twin_dice',name:'TWIN DICE',icon:'🎯',rarity:'silver',eff:'PAIR OF 1s = 500',desc:'A pair of 1s scores 500 points instead of the usual 200.',arch:'collector'},
   {id:'sawdust',name:'SAWDUST IN THE CUP',icon:'🪵',rarity:'silver',eff:'OPP 1ST ROLL: 2 DICE NO 1/5',desc:"On the opponent's first roll each turn, 2 dice can't land on 1 or 5.",arch:'saboteur'},
   {id:'short_pour',name:'SHORT POUR',icon:'🍺',rarity:'silver',eff:'OPP BANKS -20%',desc:"Opponent's banks are worth 20% less.",arch:'saboteur'},
-  {id:'vanishing_act',name:'VANISHING ACT',icon:'🎩',rarity:'silver',type:'active',maxUses:1,timing:'choosing',eff:'VANISH A DIE FOR THE TURN',desc:'Select a die, then activate — it vanishes for the rest of this turn (you play one fewer die, easier to clear for Hot Dice). Returns next turn.',arch:'sharp'},
   {id:'the_collector',name:'THE COLLECTOR',icon:'🏆',rarity:'gold',eff:'+400 FOR 3+ SCORE TYPES/TURN',desc:'If you score 3 or more unique types (single 1, single 5, triple, straight) in a turn, gain +400 when you bank.',arch:'collector'},
   {id:'tavern_cheer',name:'TAVERN CHEER',icon:'🍻',rarity:'gold',eff:'FULL STRAIGHT +750 BONUS',desc:'Rolling a full straight (1-2-3-4-5-6) scores an extra +750 bonus.',arch:'collector'},
   {id:'closing_bell',name:'CLOSING BELL',icon:'🔔',rarity:'gold',eff:'WINNING BANK +50%',desc:'If your bank would win the match, it gains +50% bonus.',arch:'hoarder'},
-  {id:'old_bones',name:'OLD BONES',icon:'💀',rarity:'gold',type:'active',maxUses:1,timing:'choosing',eff:'ALL BLANKS → 1s',desc:'Once per match: all non-scoring dice become 1s. Use during dice selection.',arch:'sharp',dep:true},
   /* ── BATCH 2 — Remaining Cards ── */
   /* Tin */
   {id:'the_jinx',name:'THE JINX',icon:'🧿',rarity:'tin',eff:'OPP 5 DICE EVERY 2ND TURN',desc:'Every other opponent turn, they start with only five dice instead of six.',arch:'saboteur',dep:true},
@@ -13899,17 +13910,12 @@ function generateDiceLoadout(tierIndex){
   {id:'blood_tithe',name:'BLOOD TITHE',icon:'🩸',rarity:'tin',eff:'-50/TURN, 1s = 150',desc:'Each turn costs 50 pts from your total, but single 1s score 150 instead of 100.',arch:'brinksman'},
   /* Silver */
   {id:'the_echo',name:'THE ECHO',icon:'🔊',rarity:'silver',eff:'SCORE → NEXT ROLL +35%',desc:'After a scoring roll, your next roll in the same turn gets a +35% score bonus.',arch:'sharp'},
-  {id:'frozen_die',name:'FROZEN DIE',icon:'🧊',rarity:'silver',type:'active',maxUses:2,timing:'choosing',eff:'HOLD A DIE THROUGH REROLLS',desc:"Freeze one selected die — it keeps its face through your rerolls this turn (won't reroll) while you chase a match for it. Still scorable: re-select it and bank when ready. Spend both uses to hold a pair.",arch:'sharp'},
-  {id:'double_down',name:'DOUBLE DOWN',icon:'✌️',rarity:'silver',type:'active',maxUses:1,timing:'choosing',eff:'2× TURN PTS, THEN REROLL ALL',desc:'Doubles the points you\'ve scored THIS turn, then frees all your kept dice for a fresh roll. Keep going from there — but a bust now loses the doubled total.',arch:'brinksman'},
+  {id:'frozen_die',name:"BRUTUS'S GRIP",icon:'👊',npc:'brutus',rarity:'silver',type:'active',maxUses:2,timing:'choosing',eff:'HOLD A DIE THROUGH REROLLS',desc:"Freeze one selected die — it keeps its face through your rerolls this turn (won't reroll) while you chase a match for it. Still scorable: re-select it and bank when ready. Spend both uses to hold a pair.",rewardQuote:'"Iron in thy bones. Take this, soldier."',arch:'sharp'},
+  {id:'double_down',name:"WHISPER'S WAGER",icon:'🔮',npc:'whisper',rarity:'silver',type:'active',maxUses:1,timing:'choosing',eff:'2× TURN PTS, THEN REROLL ALL',desc:'Doubles the points you\'ve scored THIS turn, then frees all your kept dice for a fresh roll. Keep going from there — but a bust now loses the doubled total.',rewardQuote:'"The wager is yours, dear. Spend it well."',arch:'brinksman'},
   /* ── Tactile active cards (select a die, then activate) ── */
   /* COIN FLIP — restored from retired. Started at silver/2-use, briefly
      tin/1-use, now silver/1-use: the flip mechanic is strong enough that
      tin felt undertuned but two charges felt obnoxious. */
-  {id:'coin_flip',name:'COIN FLIP',icon:'🪙',rarity:'silver',type:'active',maxUses:1,timing:'choosing',eff:'FLIP SELECTED DIE',desc:'Select a die, then activate — it flips to the opposite face (1↔6, 2↔5, 3↔4).',arch:'sharp'},
-  {id:'the_nudge',name:'THE NUDGE',icon:'👆',rarity:'silver',type:'active',maxUses:2,timing:'choosing',eff:'BUMP A DIE +1 (6→1)',desc:'Select a die, then activate — its face bumps up by 1 (6 wraps back to 1).',arch:'sharp'},
-  {id:'alchemist_touch',name:"ALCHEMIST'S TOUCH",icon:'🧪',rarity:'silver',type:'active',maxUses:1,timing:'choosing',eff:'SELECTED DIE → 5',desc:'Select a non-scoring die (2/3/4/6), then activate — it becomes a 5 (50 pts).',arch:'sharp',dep:true},
-  {id:'twinning_charm',name:'TWINNING CHARM',icon:'🧬',rarity:'silver',type:'active',maxUses:1,timing:'choosing',eff:'MIRROR SELECTED VALUE',desc:'Select a die, then activate — a random other unkept die changes to the same value.',arch:'sharp'},
-  {id:'double_down_die',name:'DOUBLE DOWN DIE',icon:'⚗️',rarity:'gold',type:'active',maxUses:1,timing:'choosing',eff:'SELECTED 2/3/4 → DOUBLED',desc:'Select a die showing 2, 3, or 4, then activate — its value doubles (capped at 6).',arch:'sharp',dep:true},
   /* ── New scoring-pattern cards — unlock new combos ── */
   {id:'sevens_gift',name:"SEVEN'S GIFT",icon:'🎲',rarity:'tin',eff:'ANY PAIR SUMMING TO 7: +200',desc:'Pairs of dice that sum to 7 (1+6, 2+5, 3+4) score +200 per pair. Dice are consumed by the pair.',arch:'collector'},
   {id:'twin_fury',name:'TWIN FURY',icon:'👯',rarity:'silver',eff:'TWO PAIRS IN ONE ROLL: +600',desc:'If your roll contains two separate pairs (any values), score +600 bonus. The four dice are consumed.',arch:'collector'},
@@ -13952,7 +13958,7 @@ function generateDiceLoadout(tierIndex){
   {id:'the_troupe',name:'THE TROUPE',icon:'🎭',rarity:'tin',eff:'COMMIT 4+ DIFFERENT VALUES: +150',desc:'Commit four or more dice showing different values in one selection: gain +150. Rewards the spread that builds toward straights.',arch:'collector'},
   /* ── Die-material mutating cards (E4) — let players reshape their
      loadout mid-run / mid-match. ── */
-  {id:'alchemists_chisel',name:"ALCHEMIST'S CHISEL",icon:'⚒️',rarity:'gold',type:'active',maxUses:1,timing:'choosing',eff:'LEFT DIE TAKES RIGHT DIE\'S MATERIAL',desc:'Select exactly two of your dice, then activate — the one further LEFT in the row adopts the RIGHT one\'s material for the rest of this match. Once per run.',arch:'sharp'},
+  {id:'alchemists_chisel',name:"ALDRIC'S WHETSTONE",icon:'⚒️',npc:'aldric',rarity:'gold',type:'active',maxUses:1,timing:'choosing',eff:'LEFT DIE TAKES RIGHT DIE\'S MATERIAL',desc:'Select exactly two of your dice, then activate — the one further LEFT in the row adopts the RIGHT one\'s material for the rest of this match. Once per run.',rewardQuote:'"Thou hast proven worthy. Take the stone that made my edge."',arch:'sharp'},
   {id:'forge_night',name:'FORGE NIGHT',icon:'🔥',rarity:'silver',eff:'WIN: 1 BONE → RANDOM TIER-1 DIE',desc:'After every match you win, one random Bone die in your loadout upgrades to a random tier-1 material (Iron, Flint, Lead, or Amber). Permanent for the run.',arch:'utility'},
   /* ── Die-building Vanguard family (E1) — silver/gold cards that REWARD
      investing in upgraded dice. Each scales with the player's loadout
@@ -14002,13 +14008,10 @@ function generateDiceLoadout(tierIndex){
      ANY disruption gets fizzled. */
   {id:'warded',name:'WARDED',icon:'🛡️',rarity:'gold',eff:'FIZZLES NEXT OPP DISRUPTION',desc:'The first time the opponent tries to palm, swap, seize, or downgrade one of your dice this match, the effect fizzles harmlessly. One charge per match.',arch:'utility'},
   /* Gold */
-  {id:'broken_lantern',name:'BROKEN LANTERN',icon:'🏮',rarity:'gold',type:'active',maxUses:1,timing:'yielding',eff:'OPP PLAYS BLIND 1 TURN',desc:'Opponent\'s next turn: their dice faces are hidden until committed.',arch:'saboteur',dep:true},
-  {id:'wild_die',name:'THE WILD DIE',icon:'🃏',rarity:'gold',type:'active',maxUses:1,timing:'choosing',eff:'PICK ANY DIE FACE',desc:'Choose any face value (1-6) for one non-scoring die.',arch:'sharp',dep:true},
-  {id:'second_wind',name:'SECOND WIND',icon:'💨',rarity:'gold',type:'active',maxUses:1,timing:'idle|choosing|yielding',eff:'BUST → 3-DICE RESCUE ROLL',desc:'Activate before you bust. If you bust this turn, you immediately roll 3 rescue dice once — whatever they score is banked automatically, then your turn ends.',arch:'brinksman'},
+  {id:'second_wind',name:"MABEL'S STITCH",icon:'🧵',npc:'mabel',rarity:'gold',type:'active',maxUses:1,timing:'idle|choosing|yielding',eff:'BUST → 3-DICE RESCUE ROLL',desc:'Activate before you bust. If you bust this turn, you immediately roll 3 rescue dice once — whatever they score is banked automatically, then your turn ends.',rewardQuote:'"Take this. May it mend thy fortune."',arch:'brinksman'},
   {id:'the_brewer',name:'THE BREWER',icon:'🍺',rarity:'gold',eff:'ACTIVE CARDS +1 USE',desc:'All your active cards get one extra use this match.',arch:'hoarder'},
   {id:'dead_mans_hand',name:"DEAD MAN'S HAND",icon:'🃏',rarity:'gold',eff:'ONCE-PER-MATCH → TWICE',desc:'Your once-per-match card effects can trigger twice instead of once.',arch:'hoarder'},
-  {id:'the_pyre',name:'THE PYRE',icon:'🔥',rarity:'gold',type:'active',maxUses:1,timing:'choosing',eff:'BURN CARD → +500 BANK',desc:'Permanently disable one of your equipped cards this match to add +500 to your current bank.',arch:'brinksman'},
-  {id:'all_in',name:'ALL IN',icon:'💎',rarity:'gold',type:'active',maxUses:1,timing:'idle',eff:'2× BANK OR −500',desc:'Double your next bank — but if it doesn\'t win the match, lose 500 points.',arch:'brinksman'},
+  {id:'the_pyre',name:"AMBROSE'S PYRE",icon:'🔥',npc:'ambrose',rarity:'gold',type:'active',maxUses:1,timing:'choosing',eff:'BURN CARD → +500 BANK',desc:'Permanently disable one of your equipped cards this match to add +500 to your current bank.',rewardQuote:'"The heavens smiled upon thee. Accept this fire."',arch:'brinksman'},
 ];
 /* ── Card Synergy Sets ── */
 const CARD_BG={
@@ -23531,8 +23534,11 @@ var _ID_GRANDFATHER={
      tools/_census_ids2.js walks the real arrays. Anything not on this list is
      a NEW collision and fails. Two of these retire in the section-2 card pass;
      when they do, the check says so rather than leaving the list to rot. */
-  the_tab:'CARDS active + the Amber family card. The CARDS row goes in section 2.',
-  finnicks_palm:'CARDS active + his relic DIE. Two spoils tiles, one name, one icon - the brief section 6 case. The CARDS row goes in section 2.',
+  /* P863: the_tab and finnicks_palm stood here until P862 deleted their CARDS
+     rows, which is precisely what P860's entries said would happen. Removed
+     rather than left to rot - a grandfather entry for a collision that no
+     longer exists is a licence nobody is using, and the check reports stale
+     entries as a console note so this one announced itself. */
   the_collector:'CARDS + FEATS.',
   high_roller:'CARDS + FEATS.',
   second_wind:'CARDS + FEATS.',
@@ -39268,7 +39274,9 @@ function canActivateCard(cardId){
    A card pulses ONLY when its timing window is open AND it would actually do
    something right now. Replaces the old always-on sheen in-match, so total
    motion goes DOWN and a glowing card means "this is usable, here, now". */
-var _GLINT_NEEDS_SELECTION=['frozen_die','coin_flip','the_nudge','twinning_charm','double_down_die','alchemist_touch','wild_die'];
+/* P863: six of these seven cards are gone. frozen_die is Brutus's Grip now
+   and is the only survivor that needs a selection before it can fire. */
+var _GLINT_NEEDS_SELECTION=['frozen_die'];
 function _glintReady(cid){
   if(!G)return false;
   /* Selection-gated tools: matte until a die is actually selected. */
@@ -39373,7 +39381,11 @@ function activateCard(cardId){
   _haptic(18);
   const cd=CARDS.find(c=>c.id===cardId)||NPC_CARDS_MAP[cardId];
   /* Lingering effects get persistent labels */
-  const lingers=['mabels_stitch','aldrics_vow','whispers_hex','corvus_ledger','second_wind','all_in','broken_lantern'];
+  /* P863: the ids, not the display names. second_wind IS Mabel's Stitch now
+     and the_pyre is Ambrose's Pyre - both arm something that resolves later in
+     the turn, which is what earns a persistent label. The five deleted ids
+     that used to sit here are gone with their rows. */
+  const lingers=['second_wind','loan','the_pyre'];
   /* Full-word, title-cased label for activation */
   const _abbr={'PTS':'Points','OPP':'Opponent','DMG':'Damage','AMT':'Amount','LVL':'Level'};
   const effText=cd?cd.eff.split(' ').map(w=>{
@@ -39384,25 +39396,11 @@ function activateCard(cardId){
   triggerCard(cardId,effText,true,lingers.includes(cardId));
   switch(cardId){
     case 'grogs_flask': activateGrogsFlask(); break;
-    case 'mabels_stitch': activateMabelsStitch(); break;
-    case 'finnicks_palm': activateFinnicksPalm(); break;
-    case 'corvus_ledger': activateCorvusLedger(); break;
-    case 'brutus_fist': activateBrutusFist(); break;
-    case 'aldrics_vow': activateAldricsVow(); break;
-    case 'whispers_hex': activateWhispersHex(); break;
-    case 'ambrose_grace': activateAmbroseGrace(); break;
-    case 'sleight_of_hand': activateSleightOfHand(); break;
     case 'gamblers_eye': activateGamblersEye(); break;
-    case 'old_bones': activateOldBones(); break;
     case 'frozen_die': activateFrozenDie(); break;
-    case 'the_tab': activateTheTab(); break;
     case 'double_down': activateDoubleDown(); break;
-    case 'broken_lantern': activateBrokenLantern(); break;
-    case 'wild_die': activateWildDie(); break;
     case 'second_wind': activateSecondWind(); break;
     case 'the_pyre': activateThePyre(); break;
-    case 'all_in': activateAllIn(); break;
-    case 'seven_dice': activateSevenDice(); break;
     case 'loan': activateLoan(); break;
     case 'sticky_fingers_die': activateStickyFingersPlayer(); break;
     case 'collateral_die': activateCollateralPlayer(); break;
@@ -39413,13 +39411,7 @@ function activateCard(cardId){
     case 'corvus_writ': activateCorvusWritPlayer(); break;
     case 'crown_authority': activateCrownAuthorityPlayer(); break;
     case 'blessed_dice': activateBlessedDicePlayer(); break;
-    case 'coin_flip': activateCoinFlip(); break;
-    case 'the_nudge': activateTheNudge(); break;
     case 'alchemists_chisel': activateAlchemistsChisel(); break;
-    case 'vanishing_act': activateVanishingAct(); break;
-    case 'alchemist_touch': activateAlchemistTouch(); break;
-    case 'twinning_charm': activateTwinningCharm(); break;
-    case 'double_down_die': activateDoubleDownDie(); break;
   }
   /* P846: the P844 id-roster hook that lived here DELETED ITSELF - it
      enrolled six retired ids, missed the live gamblers_eye, and voided
@@ -40000,114 +39992,12 @@ function _npcRescueSet(d,v){
   try{if(d.el)spawnPixelSparks(d.el,3);}catch(e){}
 }
 var NPC_RESCUES=[
-  {id:'old_bones',fix:function(bl){
-    bl.forEach(function(d){_npcRescueSet(d,1);});
-    return 'OLD BONES — BLANKS → 1s';}},
-  {id:'ambrose_grace',fix:function(bl){
-    bl.slice(0,2).forEach(function(d){_npcRescueSet(d,5);});
-    return 'AMBROSE GRACE — BLANKS → 5s';}},
-  {id:'wild_die',fix:function(bl){
-    _npcRescueSet(bl[0],1);return 'WILD DIE → 1';}},
-  {id:'brutus_fist',fix:function(bl){
-    _npcRescueSet(bl[0],1);return "BRUTUS'S FIST → 1";}},
-  {id:'finnicks_palm',fix:function(bl){
-    _npcRescueSet(bl[0],Math.random()<0.5?1:5);return "FINNICK'S PALM → 1/5";}},
-  {id:'grogs_flask',need:function(bl){return bl.length>=2;},fix:function(bl){
+{id:'grogs_flask',need:function(bl){return bl.length>=2;},fix:function(bl){
     bl.slice(0,2).forEach(function(d){_npcRescueSet(d,rollFaceExclude(d.mat,d.val));});
     return "GROG'S FLASK — REROLLED";}},
-  {id:'coin_flip',fix:function(bl){
-    /* 6→1 (+100) first, then 2→5 (+50); anything else is a wasted charge */
-    var M={1:6,2:5,3:4,4:3,5:2,6:1},p=null;
-    bl.some(function(d){if(d.val===6){p=d;return true;}return false;});
-    if(!p)bl.some(function(d){if(d.val===2){p=d;return true;}return false;});
-    if(!p)return null;
-    _npcRescueSet(p,M[p.val]);return 'COIN FLIP → '+p.val;}},
-  {id:'the_nudge',fix:function(bl){
-    /* +1 with 6→1 wrap: a 6 (+100) first, then a 4 (+50) */
-    var p=null;
-    bl.some(function(d){if(d.val===6){p=d;return true;}return false;});
-    if(!p)bl.some(function(d){if(d.val===4){p=d;return true;}return false;});
-    if(!p)return null;
-    _npcRescueSet(p,p.val>=6?1:p.val+1);return 'THE NUDGE → '+p.val;}}
 ];
-/* P768: THE BUST-SAVE TABLE (legacy cluster 1b). Each entry answers
-   'can you soften this bust?' with {kind:'survive'} (the turn continues
-   via _oResumeAfterBustSave), {kind:'bank',pts,label,cid} (the turn
-   ends, pts banked through the finOpp timer), or null (pass). ctx
-   carries oppBank in and OUT - bust_survive halves what survives.
-   Entry 1 is the survive/immune walker EXACTLY as the old loop was:
-   both mechanics in one pass over G.oCards, so a boss holding both
-   resolves by card order. bust_immune spends no use (a turn window,
-   not a charge). */
-var NPC_BUST_SAVES=[
-  {name:'surviveOrImmune',try:function(ctx){
-    var hit=null;
-    (G.oCards||[]).some(function(cid){
-      var npc=getNpcCard(cid);if(!npc||!npc.effect)return false;
-      var eff=npc.effect;
-      if(eff.mechanic==='bust_immune_turns'&&G.npcCardState.oppTurnCount<=(eff.turns||2)){
-        hit={cid:cid};return true;
-      }
-      if(eff.mechanic==='bust_survive'&&(G.npcCardState.usedOnce[cid]||0)<_useCap(cid)&&Math.random()<eff.chance){
-        G.npcCardState.usedOnce[cid]=(G.npcCardState.usedOnce[cid]||0)+1;
-        /* survival costs half the turn's points - see the card text */
-        ctx.oppBank=Math.floor(ctx.oppBank/2);
-        hit={cid:cid};return true;
-      }
-      return false;
-    });
-    return hit?{kind:'survive',cid:hit.cid}:null;
-  }},
-  {name:'bankHalf',try:function(ctx){
-    var out=null;
-    (G.oCards||[]).some(function(cid){
-      var npc=getNpcCard(cid);if(!npc)return false;
-      if(npc.effect.mechanic==='bust_bank_half'&&(G.npcCardState.usedOnce[cid]||0)<_useCap(cid)&&ctx.oppBank>0){
-        G.npcCardState.usedOnce[cid]=(G.npcCardState.usedOnce[cid]||0)+1;
-        var half=Math.floor(ctx.oppBank/2);
-        out={kind:'bank',pts:half,cid:cid,
-          msg:npc.name+'! '+G.rung.name+' SAVES '+half};
-        return true;
-      }
-      return false;
-    });
-    return out;
-  }},
-  {name:'stitch',try:function(ctx){
-    if(!G.oCards.includes('mabels_stitch'))return null;
-    if((G.npcCardState.usedOnce['mabels_stitch']||0)>=_useCap('mabels_stitch'))return null;
-    if(ctx.oppBank<=0)return null;
-    G.npcCardState.usedOnce['mabels_stitch']=(G.npcCardState.usedOnce['mabels_stitch']||0)+1;
-    return {kind:'bank',pts:ctx.oppBank,cid:'mabels_stitch',
-      msg:"MABEL'S STITCH — "+G.rung.name+' SAVES '+ctx.oppBank,
-      label:'STITCH +'+ctx.oppBank};
-  }},
-  {name:'secondWind',try:function(ctx){
-    if(!npcHasActive('second_wind'))return null;
-    npcUseActive('second_wind');
-    var vals=[],mats=[];
-    for(var i=0;i<3;i++){var m=(G.matchOppDice&&G.matchOppDice[i])||'bone';mats.push(m);vals.push(rollFace(m));}
-    var r=_scoreRollBest(vals,G.oCards,0,{crowsLuck:false,crowsLuckRemaining:0},mats);
-    return {kind:'bank',pts:(r&&r.total)||0,cid:'second_wind',
-      msg:G.rung.name+' — SECOND WIND! ROLLING 3 DICE',
-      label:G.rung.name+' SECOND WIND!'};
-  }}
-];
-/* P769: THE ARM TABLE (legacy cluster 2). Each entry answers 'is now
-   my moment?' and arms itself - spend inside, like the bust-save
-   table's entries. moment 'turnStart' runs once at the head of the
-   rival's turn; 'roll' runs in step() after the deal. ctx carries
-   `left` (seven_dice widens the hand through it) and, for roll
-   entries, oppBank (aldrics_vow's odds test). */
 var NPC_ARMS=[
-  {id:'the_tab',moment:'turnStart',try:function(ctx){
-    if(G._tabArmedVsPlayer||(G._tabHeldPlayer>0)||!G.target)return;
-    if(!(G.pPts>=G.target*0.8&&G.pPts>G.oPts))return;
-    npcUseActive('the_tab');
-    G._tabArmedVsPlayer=true;
-    triggerCard('the_tab','RIVAL PUTS YOU ON THE TAB',false);
-    setStatusMsg((G.rung?G.rung.name:'RIVAL')+": YOU'RE ON THE TAB — NEXT BANK HELD",'red');}},
-  {id:'loan',moment:'turnStart',try:function(ctx){
+{id:'loan',moment:'turnStart',try:function(ctx){
     if(G.npcCardState.oppTurnCount!==0)return;
     npcUseActive('loan');
     G.oPts+=1500;G._oLoanRemaining=5;updHUD();
@@ -40116,36 +40006,6 @@ var NPC_ARMS=[
   /* P834: the NPC seven_dice arm is deleted with the redesign - no
      rung pools the card, and ctx.left=7 was clamped to the six seats
      by the P521 join regardless. */
-  {id:'all_in',moment:'turnStart',try:function(ctx){
-    if(!(G.oPts*2>=G.target&&G.oPts<G.target&&G.npcCardState.oppTurnCount>=2))return;
-    npcUseActive('all_in');
-    G._oAllInArmed=true;
-    triggerCard('all_in','ALL IN ARMED',false);
-    setStatusMsg(G.rung.name+': ALL IN — NEXT BANK 2× (OR −500)','red');}},
-  {id:'corvus_ledger',moment:'bank',try:function(ctx){
-    if(!(ctx.pts>=400))return;
-    npcUseActive('corvus_ledger');
-    var _b=Math.floor(ctx.pts*0.75);ctx.pts+=_b;
-    triggerCard('corvus_ledger','+'+_b+' LEDGER',false);
-    setStatusMsg(G.rung.name+": CORVUS'S LEDGER +"+_b,'red');}},
-  {id:'twinning_charm',moment:'roll',try:function(ctx){
-    var _f=G.oppDice.filter(function(d){return !d.kept;});
-    var _src=_f.filter(function(d){return d.val===1;})[0]||_f.filter(function(d){return d.val===5;})[0];
-    var _tgt=_f.filter(function(d){return d.val!==1&&d.val!==5;})[0];
-    if(!_src||!_tgt)return;
-    npcUseActive('twinning_charm');
-    _tgt.val=_src.val;reDrawDieFace(_tgt);
-    if(_tgt.el){_tgt.el.classList.add('eff-glow-blue');spawnPixelSparks(_tgt.el,6);
-      setTimeout(function(){if(_tgt.el)_tgt.el.classList.remove('eff-glow-blue');},_oppDelay(700));}
-    triggerCard('twinning_charm','TWINNING → '+_src.val,false);}},
-  {id:'aldrics_vow',moment:'roll',try:function(ctx){
-    if(G._oVowArmed)return;
-    var _fc=G.oppDice.filter(function(d){return !d.kept;}).length;
-    if(!(_fc>=4&&ctx.oppBank>=200&&ctx.oppBank<=500))return;
-    npcUseActive('aldrics_vow');
-    G._oVowArmed=true;
-    triggerCard('aldrics_vow','VOW ARMED',false);
-    setStatusMsg(G.rung.name+': VOW — 300+ DOUBLES, ELSE LOSE PTS','red');}}
 ];
 function _npcRunArms(moment,ctx){
   for(var _ai=0;_ai<NPC_ARMS.length;_ai++){
