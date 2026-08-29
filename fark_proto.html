@@ -31843,6 +31843,17 @@ function startPTurn(){
   if(G._handicap==='sudden_death')G._sdDisplayRound=G.turnNum;
   G._echoArmed=false;G._echoReady=false;
   var _ecRst=document.querySelector('.mcard[data-cid="the_echo"]');if(_ecRst)_ecRst.classList.remove('echo-armed');
+  /* P865: stitchActive, vowActive, ledgerActive and allInActive ARE NOW
+     DEAD - their only writers were the four handlers deleted with the cards
+     they belonged to, so every block that tests them is unreachable. They are
+     reset here, and the resets are kept, precisely so this line keeps naming
+     them: a flag that is initialised and cleared but never set is the cheapest
+     possible marker for the branches downstream that can no longer be taken
+     (the Stitch bust-save, the Vow roll check, the Ledger and All In bank
+     blocks). Removing those four blocks is surgery in the bust and bank paths
+     for no behaviour change, so it is written up rather than done here.
+     secondWindActive and pyreBonus are LIVE: second_wind is Mabel's Stitch and
+     the_pyre is Ambrose's Pyre. */
   if(G.activeCardState){G.activeCardState.stitchActive=false;G.activeCardState.vowActive=false;G._vowDoubleActive=false;G.activeCardState.ledgerActive=false;G.activeCardState.secondWindActive=false;G.activeCardState.allInActive=false;G.activeCardState.pyreBonus=0;clearCardLabel('mabels_stitch');clearCardLabel('aldrics_vow');clearCardLabel('corvus_ledger');clearCardLabel('second_wind');clearCardLabel('all_in');}
   /* Frozen Die is now a within-turn hold — nothing to restore across the
      turn boundary; the held die was just a normal pool die that skipped
@@ -39502,10 +39513,6 @@ function activateGrogsFlask(){
 }
 
 /* Mabel's Stitch: flag — if bust, bank turn pts instead */
-function activateMabelsStitch(){
-  G.activeCardState.stitchActive=true;
-  setStatusMsg("STITCH ACTIVE — BUST PROTECTION",'gold');
-}
 
 /* Finnick's Palm: swap one non-scoring die → 1 or 5 (random).
    Hardened version. The previous implementation bugged out because:
@@ -39523,186 +39530,23 @@ function activateMabelsStitch(){
      5. The "exclude selected dice" filter silently refunded if the
         player happened to have a non-scoring die selected.
      6. No status message / spawnPop — the swap was silent. */
-function activateFinnicksPalm(){
-  /* Candidate dice MUST be: not committed, not currently selected by the
-     player, AND not already a 1/5. Player feedback: "it flips a scoring/
-     selected die rather than a non one. It doesn't understand a potential
-     straight (shorter ones made possible by other cards)."
-     Respecting the player's selection state is the cleanest fix — if the
-     player picked a die, it's intentionally part of a setup (straight,
-     False Triple pair, position-card trigger, etc.) and shouldn't be
-     touched by an automatic helper. */
-  var pool=G.pool.filter(function(d){return !d.committed;});
-  var eligible=pool.filter(function(d){return !d.sel&&d.val!==1&&d.val!==5;});
-  if(!eligible.length){
-    /* Distinguish the two reasons so the player understands the refund:
-       all unselected dice are scoring vs. the only non-scoring dice are
-       already selected. */
-    var allUnselectedScoring=pool.filter(function(d){return !d.sel;}).every(function(d){return d.val===1||d.val===5;});
-    setStatusMsg(allUnselectedScoring?'NO NON-SCORING DIE TO PALM':'UNSELECT A DIE TO PALM IT','red');
-    refundActiveCardUse('finnicks_palm');
-    return;
-  }
-  var target=eligible[Math.floor(Math.random()*eligible.length)];
-  /* Smart pick: 1 is worth 100 AND can build to triple-1 (1000). 5 only
-     wins when there are already two 5s AND fewer than two 1s — then
-     completing triple-5 (500) beats a lone +100. Count from the WHOLE
-     free pool (selected dice included) so already-selected 1s/5s count
-     toward triple-completion logic. */
-  var existing1s=pool.filter(function(d){return d.val===1;}).length;
-  var existing5s=pool.filter(function(d){return d.val===5;}).length;
-  var newVal=(existing5s===2&&existing1s<2)?5:1;
-  /* Lock the tray — same flag the Pickpocket TELL uses; they never
-     run concurrently (TELL fires post-roll, this active is choosing-
-     phase only). canActivateCard also reads this flag, so other actives
-     can't fire during the 840 ms animation either. */
-  G._palmAnimating=true;
-  target.val=newVal;
-  try{famTableChanged();}catch(e){}/* P846: void at the write; palm keeps its
-     hardened 840ms write/redraw choreography - the stated exception */
-  var el=target.el;
-  /* Phase 1: spin + gold pulse (400 ms). Strip every competing transient
-     class first and cancel any in-flight Web Animations on the die so
-     card-reroll wins cleanly. */
-  if(el){
-    try{el.getAnimations().forEach(function(a){try{a.cancel();}catch(e){}});}catch(e){}
-    el.classList.remove('die-tap-pop','die-sel-pop','die-pos-pulse','eff-glow-gold','eff-glow-blue','eff-glow-red','rolling');
-    el.style.animation='';el.style.transform='';el.style.opacity='';el.style.transition='';el.style.boxShadow='';
-    void el.offsetWidth;/* force reflow so the next animation actually starts */
-    el.classList.add('card-reroll');
-    try{reDrawDieFace(target);}catch(e){}
-  }
-  /* Phase 2: settle glow (420 ms). Bail gracefully if the die was
-     destroyed in the meantime. NOT calling settleDie here — that was the
-     original bug; settleDie cancels animations and would kill the settle
-     class we just added. The die isn't rolling anyway, so settleDie's
-     job (clearing rolling state) is unnecessary.
-     Both setTimeout cleanup paths use try/finally so that ANY thrown
-     exception still releases G._palmAnimating — otherwise a single edge
-     case would soft-lock the player out of rolling, banking, and every
-     active card for the rest of the match. */
-  setTimeout(function(){
-    try{
-      var stillAlive=G&&G.pool&&G.pool.indexOf(target)>=0&&el&&el.isConnected;
-      if(stillAlive){
-        el.classList.remove('card-reroll');
-        void el.offsetWidth;
-        el.classList.add('card-reroll-settle');
-        setTimeout(function(){
-          try{
-            if(el&&el.isConnected)el.classList.remove('card-reroll-settle');
-          }finally{
-            if(G)G._palmAnimating=false;
-            try{refreshSelUI();}catch(e){}
-          }
-        },420);
-      }else{
-        /* Die was removed mid-animation (hot-dice clear, bust scatter,
-           Pickpocket palm, match exit). Strip leftover classes from the
-           orphan element (if any) and clear the lock. */
-        if(el){el.classList.remove('card-reroll','card-reroll-settle');}
-        if(G)G._palmAnimating=false;
-        try{refreshSelUI();}catch(e){}
-      }
-    }catch(e){
-      /* Unconditional release on any unexpected throw — prevents soft-
-         lock. Better to leave a stray class on a die than to brick the
-         player's whole turn. */
-      if(G)G._palmAnimating=false;
-    }
-  },420);
-  /* Audible / visual confirmation distinct from a generic die-tap. */
-  try{if(SFX.posCard)SFX.posCard();else SFX.commit();}catch(e){}
-  if(el){try{spawnPop('✋ '+newVal,el);}catch(e){}}
-  setStatusMsg("FINNICK'S PALM — DIE NOW "+newVal,'gold');
-}
 
 /* Corvus's Ledger: next bank +50% (lingering flag) */
-function activateCorvusLedger(){
-  G.activeCardState.ledgerActive=true;
-  setStatusMsg("LEDGER ACTIVE — NEXT BANK x2",'gold');
-}
 
 /* Vanishing Act: remove one selected die for the rest of THIS turn. Uses
    the robust within-turn pattern (no cross-turn carry) — the die is
    pulled from the pool and numDice drops by 1; both reset cleanly at the
    next startPTurn, so it "returns next turn" automatically. */
-function activateVanishingAct(){
-  var selDice=G.pool.filter(function(d){return d.sel&&!d.committed;});
-  if(!selDice.length){
-    setStatusMsg('SELECT A DIE TO VANISH FIRST','red');
-    refundActiveCardUse('vanishing_act');return;
-  }
-  var d=selDice[0];
-  if(d.el){
-    var _ve=d.el;
-    try{spawnPixelSparks(_ve,8);}catch(e){}
-    _ve.classList.add('die-shatter');/* reuse the crumble-away animation */
-    setTimeout(function(){if(_ve&&_ve.parentNode)_ve.remove();},360);
-  }
-  G.pool=G.pool.filter(function(x){return x!==d;});
-  _dropLanes(1);/* P516 */
-  try{famTableChanged();}catch(e){}/* P846: a die left the table (turn-scoped splice, not _removeDieAt) */
-  _haptic(20);
-  try{if(SFX.posCard)SFX.posCard();else SFX.commit();}catch(e){}
-  setStatusMsg('VANISHED A '+d.val+' — ONE FEWER DIE THIS TURN','gold');
-  refreshSelUI();
-}
 
 /* Brutus's Fist: force one non-1 die → 1 */
-function activateBrutusFist(){
-  const free=G.pool.filter(d=>!d.committed&&!d.sel);
-  const nonOne=free.filter(d=>d.val!==1);
-  if(!nonOne.length){refundActiveCardUse('brutus_fist');return;}
-  const target=nonOne[Math.floor(Math.random()*nonOne.length)];
-  _setDieVal(target,1);
-  if(target.el){target.el.classList.add('card-reroll');
-    setTimeout(()=>{target.el.classList.remove('card-reroll');target.el.classList.add('card-reroll-settle');settleDie(target.el);
-      setTimeout(()=>{target.el.classList.remove('card-reroll-settle');},400);},400);}
-  SFX.commit();setTimeout(()=>{refreshSelUI();},500);
-}
 
 /* Aldric's Vow: next roll → double if 300+, else lose turn pts */
-function activateAldricsVow(){
-  G.activeCardState.vowActive=true;
-  setStatusMsg("VOW ACTIVE — 300+ = DOUBLE, ELSE LOSE PTS",'gold');
-}
 
 /* Whisper's Hex: opponent loses 1 die next turn */
-function activateWhispersHex(){
-  G.activeCardState.hexActive=true;
-  setStatusMsg("HEX CAST — OPP −1 DIE NEXT TURN",'gold');
-}
 
 /* Ambrose's Grace: all non-scoring free dice → 5 */
-function activateAmbroseGrace(){
-  const free=G.pool.filter(d=>!d.committed&&!d.sel);
-  const nonScoring=free.filter(d=>d.val!==1&&d.val!==5);
-  if(!nonScoring.length){refundActiveCardUse('ambrose_grace');return;}
-  const toConvert=nonScoring.slice(0,2);/* cap at 2 dice */
-  toConvert.forEach(d=>{
-    _setDieVal(d,5);
-    if(d.el){d.el.classList.add('rolling');
-      setTimeout(()=>{d.el.classList.remove('rolling');settleDie(d.el);},300);}
-  });
-  SFX.commit();refreshSelUI();
-}
 
 /* Sleight of Hand: swap your worst die for opponent's best */
-function activateSleightOfHand(){
-  if(!G||!G.matchDice||!G.matchOppDice)return;
-  /* dieRank defined globally */
-  /* Find player's worst die */
-  var pWorstIdx=0;G.matchDice.forEach(function(d,i){if(dieRank(d)<dieRank(G.matchDice[pWorstIdx]))pWorstIdx=i;});
-  /* Find NPC's best die */
-  var oBestIdx=0;G.matchOppDice.forEach(function(d,i){if(dieRank(d)>dieRank(G.matchOppDice[oBestIdx]))oBestIdx=i;});
-  var pOld=G.matchDice[pWorstIdx],oOld=G.matchOppDice[oBestIdx];
-  G.matchDice[pWorstIdx]=oOld;G.matchOppDice[oBestIdx]=pOld;
-  _dieLeftSeat(pWorstIdx);/* P564 */
-  setStatusMsg('SLEIGHT OF HAND: '+pOld.toUpperCase()+' ↔ '+oOld.toUpperCase()+'!','gold');
-  spawnPop('🃏 SWAPPED');
-  SFX.commit();
-}
 
 /* Gambler's Eye: select ANY dice to keep, reroll the rest */
 function activateGamblersEye(){
@@ -39753,17 +39597,6 @@ function activateGamblersEye(){
 }
 
 /* Old Bones: convert all non-scoring dice to 1s */
-function activateOldBones(){
-  const free=G.pool.filter(d=>!d.committed&&!d.sel);
-  const nonScoring=free.filter(d=>d.val!==1&&d.val!==5);
-  if(!nonScoring.length){setStatusMsg('NO BLANK DICE','red');refundActiveCardUse('old_bones');return;}
-  nonScoring.forEach(function(d){_setDieVal(d,1);});
-  triggerCard('old_bones','ALL BLANKS → 1s!',true);
-  setStatusMsg(nonScoring.length+' DICE → 1s!','gold');
-  /* Re-enable selection on new 1s */
-  free.forEach(d=>{d.el.onclick=()=>toggleDie(d);});
-  updHUD();
-}
 
 /* Frozen Die (REWORKED — within-turn HOLD): mark the selected die so it
    keeps its current face through your rerolls THIS turn. It stays a
@@ -39808,10 +39641,6 @@ function activateFrozenDie(){
    when the rival next banks (finOpp), those points are held instead of
    credited, then released at the rival's following turn start (runOppTurn).
    This defers any winning bank by a turn. */
-function activateTheTab(){
-  G._tabArmedVsOpp=true;
-  setStatusMsg("RIVAL ON THE TAB — THEIR NEXT BANK IS HELD A TURN",'gold');
-}
 
 /* Double Down: double turn pts, release all kept, must roll 6 */
 function activateDoubleDown(){
@@ -39878,38 +39707,8 @@ function activateDoubleDown(){
 }
 
 /* Broken Lantern: opponent plays blind next turn */
-function activateBrokenLantern(){
-  G._lanternActive=true;
-  setStatusMsg('LANTERN BROKEN — OPPONENT PLAYS BLIND','gold');
-}
 
 /* Wild Die: pick any face value for one non-scoring die */
-function activateWildDie(){
-  const free=G.pool.filter(d=>!d.committed&&!d.sel);
-  const nonScoring=free.filter(d=>d.val!==1&&d.val!==5);
-  if(!nonScoring.length){setStatusMsg('NO NON-SCORING DICE','red');refundActiveCardUse('wild_die');return;}
-  /* Show face picker UI */
-  var picker=document.createElement('div');picker.className='wild-die-picker';
-  picker.innerHTML='<h3>Choose Die Face</h3><div class="wdp-row"></div>';
-  var row=picker.querySelector('.wdp-row');
-  for(var f=1;f<=6;f++){
-    (function(face){
-      var btn=document.createElement('button');btn.className='wdp-btn';btn.textContent=face;
-      btn.onclick=function(){
-        var victim=nonScoring[Math.floor(Math.random()*nonScoring.length)];
-        _setDieVal(victim,face);
-        victim.el.classList.add('eff-glow-green');setTimeout(function(){victim.el.classList.remove('eff-glow-green');},800);
-        picker.remove();
-        setStatusMsg('WILD DIE → '+face+'!','gold');
-        /* Re-enable selection */
-        free.forEach(function(d){d.el.onclick=function(){toggleDie(d);};});
-        refreshSelUI();
-      };
-      row.appendChild(btn);
-    })(f);
-  }
-  document.body.appendChild(picker);
-}
 
 /* Second Wind: flag — if bust, get 3-dice rescue turn */
 function activateSecondWind(){
@@ -39975,46 +39774,10 @@ function activateThePyre(){
 }
 
 /* All In: double next bank, -500 if doesn't win */
-function activateAllIn(){
-  if(!G.activeCardState)return;
-  G.activeCardState.allInActive=true;
-  setStatusMsg('ALL IN — NEXT BANK DOUBLED (OR -500)','gold');
-}
 
 /* P834: Seven Dice redesigned (Denis) - a free one-die reroll,
    steady_hand's tap shape with the P535 re-derive. The +1-die arm was
    a silent no-op since the seat clamps. */
-function activateSevenDice(){
-  var free=(G&&G.pool||[]).filter(function(d){return !d.committed&&!d._frozen;});
-  if(!free.length){setStatusMsg('SEVEN DICE — NOTHING TO REROLL','red');return;}
-  setStatusMsg('SEVEN DICE — TAP THE DIE TO REROLL','gold');
-  triggerCard('seven_dice','ARMED',true);
-  G._sevenArmed=true;/* P845b: the arm-flag - a table change disarms via
-     _steadyDisarm's sweep, and a stale hijacked onclick dies on it */
-  free.forEach(function(d){
-    if(!d.el)return;
-    d.el.classList.add('break-target');/* P856: affordance only */
-    d.el.onclick=function(){
-      if(!G._sevenArmed)return;
-      G._sevenArmed=false;
-      free.forEach(function(q){if(q.el){q.el.classList.remove('break-target');q.el.onclick=function(){toggleDie(q);};}});
-      _setDieVal(d,_rollD(d));d.sel=false;
-      if(d.el){d.el.classList.remove('selected');d.el.classList.add('card-reroll');
-        setTimeout(function(){if(d.el)d.el.classList.remove('card-reroll');},700);}
-      /* P856b: AFTER the reroll, not before - _setDieVal fires
-         famTableChanged, whose _steadyDisarm strips this very class.
-         Marking first drew the ring and erased it in the same tick. */
-      try{if(d.el){d.el.classList.add('cardmark');
-        setTimeout(function(){if(d.el)d.el.classList.remove('cardmark');},900);}}catch(e){}
-      famLog('SEVEN DICE — '+d.val);
-      /* the table as it is NOW can be a bust (steady_hand's P535 lesson) */
-      var _sf=(G.pool||[]).filter(function(x){return !x.committed&&!x._shattered;});
-      var fv=_sf.map(function(x){return x.val;}),fm=_sf.map(function(x){return x.mat;});
-      if(!anyScoring(fv,effectiveCards(),fm,_sf)){if(!_tryBustSave(_sf))_delayedDoBust(_sf);return;}
-      try{refreshSelUI();}catch(e){}
-    };
-  });
-}
 
 /* Loan: take the money now, pay it off in installments */
 function activateLoan(){
@@ -40192,35 +39955,9 @@ function activateBlessedDicePlayer(){
 /* ═══════ NEW TACTILE ACTIVE CARDS (Apr 2026 batch) ═══════ */
 
 /* Coin Flip: selected die flips to its opposite face (1↔6, 2↔5, 3↔4). */
-function activateCoinFlip(){
-  /* Cancel any in-flight Vagabond drag — otherwise selDice can be stale because the
-     dragging die is in pc-drag-origin state and not officially "selected". */
-  try{_vgDragCancel();}catch(e){}/* P835b: the one canceller (the old inline copy used a dead state shape) */
-  var selDice=G.pool.filter(function(d){return d.sel&&!d.committed;});
-  if(!selDice.length){setStatusMsg('TAP A DIE FIRST, THEN TAP COIN FLIP','red');refundActiveCardUse('coin_flip');return;}
-  var d=selDice[0];
-  var oppositeFace={1:6,2:5,3:4,4:3,5:2,6:1}[d.val]||d.val;
-  _setDieVal(d,oppositeFace);
-  if(d.el){d.el.classList.add('eff-glow-gold');spawnPixelSparks(d.el,5);setTimeout(function(){if(d.el)d.el.classList.remove('eff-glow-gold');},700);}
-  triggerCard('coin_flip','FLIPPED → '+oppositeFace,true);
-  setStatusMsg('COIN FLIP — DIE NOW '+oppositeFace,'gold');
-  refreshSelUI();
-}
 
 /* THE NUDGE — bumps a selected die up by 1 (6 wraps to 1). Two charges
    per match. Mirrors the COIN FLIP / DOUBLE DOWN DIE pattern. */
-function activateTheNudge(){
-  try{_vgDragCancel();}catch(e){}/* P835b: the one canceller (the old inline copy used a dead state shape) */
-  var selDice=G.pool.filter(function(d){return d.sel&&!d.committed;});
-  if(!selDice.length){setStatusMsg('TAP A DIE FIRST, THEN TAP THE NUDGE','red');refundActiveCardUse('the_nudge');return;}
-  var d=selDice[0];
-  var newVal=d.val>=6?1:d.val+1;
-  _setDieVal(d,newVal);
-  if(d.el){d.el.classList.add('eff-glow-gold');spawnPixelSparks(d.el,5);setTimeout(function(){if(d.el)d.el.classList.remove('eff-glow-gold');},700);}
-  triggerCard('the_nudge','NUDGED → '+newVal,true);
-  setStatusMsg('THE NUDGE — DIE NOW '+newVal,'gold');
-  refreshSelUI();
-}
 
 /* Alchemist's Chisel: left selected die adopts right selected die's
    material for the rest of the match. Once per RUN — gated by
@@ -40270,54 +40007,10 @@ function activateAlchemistsChisel(){
 }
 
 /* Alchemist's Touch: selected non-scoring die becomes a 5. */
-function activateAlchemistTouch(){
-  var selDice=G.pool.filter(function(d){return d.sel&&!d.committed;});
-  if(!selDice.length){setStatusMsg('SELECT A NON-SCORING DIE FIRST','red');refundActiveCardUse('alchemist_touch');return;}
-  var d=selDice[0];
-  if(d.val===1||d.val===5){setStatusMsg('ALREADY SCORING — PICK A 2/3/4/6','red');refundActiveCardUse('alchemist_touch');return;}
-  _setDieVal(d,5);
-  if(d.el){d.el.classList.add('eff-glow-green');spawnPixelSparks(d.el,6);setTimeout(function(){if(d.el)d.el.classList.remove('eff-glow-green');},700);}
-  triggerCard('alchemist_touch',"ALCHEMIST'S TOUCH → 5",true);
-  setStatusMsg("ALCHEMIST'S TOUCH — DIE NOW 5",'gold');
-  refreshSelUI();
-}
 
 /* Twinning Charm: a random other unkept die mirrors the selected die's value. */
-function activateTwinningCharm(){
-  var selDice=G.pool.filter(function(d){return d.sel&&!d.committed;});
-  if(!selDice.length){setStatusMsg('SELECT A DIE FIRST','red');refundActiveCardUse('twinning_charm');return;}
-  var src=selDice[0];
-  /* Eligible targets: any other free die (not committed, not the source itself,
-     and ideally not already the same value — otherwise no visible effect). */
-  var candidates=G.pool.filter(function(d){return !d.committed&&d!==src&&d.val!==src.val;});
-  if(!candidates.length){
-    /* If all other dice are already the same value, still allow it but fall
-       back to any non-source die so the use isn't wasted on a full-match roll. */
-    candidates=G.pool.filter(function(d){return !d.committed&&d!==src;});
-    if(!candidates.length){setStatusMsg('NO DICE TO MIRROR','red');refundActiveCardUse('twinning_charm');return;}
-  }
-  var target=candidates[Math.floor(Math.random()*candidates.length)];
-  _setDieVal(target,src.val);
-  if(target.el){target.el.classList.add('eff-glow-blue');spawnPixelSparks(target.el,6);setTimeout(function(){if(target.el)target.el.classList.remove('eff-glow-blue');},700);}
-  if(src.el){spawnPixelSparks(src.el,3);}
-  triggerCard('twinning_charm','TWINNING → '+src.val,true);
-  setStatusMsg('TWINNING CHARM — MIRRORED '+src.val,'gold');
-  refreshSelUI();
-}
 
 /* Double Down Die: selected 2/3/4 doubles (cap 6). */
-function activateDoubleDownDie(){
-  var selDice=G.pool.filter(function(d){return d.sel&&!d.committed;});
-  if(!selDice.length){setStatusMsg('SELECT A 2, 3, OR 4','red');refundActiveCardUse('double_down_die');return;}
-  var d=selDice[0];
-  if(d.val<2||d.val>4){setStatusMsg('PICK A 2, 3, OR 4','red');refundActiveCardUse('double_down_die');return;}
-  var newVal=Math.min(6,d.val*2);
-  _setDieVal(d,newVal);
-  if(d.el){d.el.classList.add('eff-glow-gold');spawnPixelSparks(d.el,8);setTimeout(function(){if(d.el)d.el.classList.remove('eff-glow-gold');},900);}
-  triggerCard('double_down_die','DOUBLED → '+newVal,true);
-  setStatusMsg('DOUBLE DOWN — DIE NOW '+newVal,'gold');
-  refreshSelUI();
-}
 
 /* ═══════ DICE ZOOM SYSTEM ═══════ */
 const PIP_LAYOUTS={1:[0,0,0,0,1,0,0,0,0],2:[0,0,1,0,0,0,1,0,0],3:[0,0,1,0,1,0,1,0,0],4:[1,0,1,0,0,0,1,0,1],5:[1,0,1,0,1,0,1,0,1],6:[1,0,1,1,0,1,1,0,1]};

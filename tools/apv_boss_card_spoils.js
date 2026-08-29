@@ -28,6 +28,24 @@ const BOSSES=[[0,'grog'],[1,'mabel'],[2,'finnick'],[3,'corvus'],
 const rows={};
 try{CARDS.filter(c=>c.type==='active'&&c.npc).forEach(c=>{rows[c.npc]=c;});}catch(e){}
 
+/* WARM-UP - a hedge against an INTERMITTENT cold-boot delay, and the first
+   description of it here was wrong, so here is what was actually measured.
+   One run had Grog (first in the loop) fail `reachedSpoils` while the other
+   seven passed, which looked like "whichever boss goes first fails" - the same
+   shape as the tell badge sitting at opacity 0 for match one only. That was
+   written up as proven and it is not: a control with the warm-up REMOVED and
+   the order rotated to Mabel-first/Grog-last passed all eight, Grog included.
+   So it is jitter in how quickly the first match after a cold boot reaches the
+   spoils DOM, not a property of the first slot. The warm-up stays because it
+   costs one match and removes a flake; it is not load-bearing, and a run
+   without it is not thereby invalid. */
+try{
+  S.run.tier=0;try{delete S.pendingMatch;}catch(e){}
+  launchBossMatch();
+  await until(()=>typeof G!=='undefined'&&G&&G.phase==='idle',15000);
+  await sleep(2500);
+}catch(e){}
+
 const out={expected:{},got:[],notes:[]};
 BOSSES.forEach(([t,k])=>{out.expected[k]=rows[k]?rows[k].id:null;});
 
