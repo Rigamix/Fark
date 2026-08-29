@@ -71,20 +71,31 @@ you already called "probably never". Say if you want either.
   if seated (`palm_adjacent`, `fang`, `weight_bank` are implemented by
   hardcoded material checks, not by the block).
 
-**§11 (NPC LOADOUTS) IS NEW SINCE I STARTED AND IS NOT BUILT.** The copy of
-the brief I worked from ended at §10; the re-attached copy carries a §11 — the
-three-card cap, the WHISPER/AMBROSE pool reorder, and `syn:` weighted draws.
-I have not touched any of it. Two things worth saying now:
+**§11 IS BUILT (P868-P870), SPLIT ACROSS TWO MEASURED RUNS.** All three parts
+are difficulty levers, and they do not point the same way — §11.1 and §11.2
+make nights 6-8 easier, §11.3 makes every NPC harder, patrons included. Run
+them together and the two directions net out to noise.
 
-- **Its guard is already satisfied.** §11.2 says do not let §2's sweep delete
-  `royal_seizure` and `blessed_confiscation`. Checked: both NPC_CARDS rows are
-  intact and so are both player-side activators with their switch cases. §2
-  never touched NPC_CARDS — only the CARDS table.
-- **§11.2 says it belongs in the §1a measured batch** with the target
-  reductions, the card cap and Short Fuse's scaling. §11.1 and §11.3 do not
-  say that. Tell me whether to build §11 now or hold all of it for that batch —
-  it is a difficulty lever either way, and the ladder cells it would move are
-  the same ones the other levers move.
+- **Run one — the corrections, LIVE.** §11.1's cap and §11.2's reorder. Both
+  are fixes to things plainly wrong rather than tuning. The cap is now
+  structural (`NPC_CARD_CAP` in the function, not eight rows that have to
+  agree) and the match-the-player lift is deleted; driven at player hand
+  sizes 0-4 for all eight bosses plus a patron, worst hand seen is 3 where it
+  used to become 4. **This branch is what to freeze and run the ladder
+  against.**
+- **Run two — the synergy, SHIPPED DARK.** `NPC_SYN_WEIGHTING` is `false`.
+  Flip that one boolean and re-run the ladder; the delta is attributable
+  entirely to §11.3. Proven dark, not assumed: the flag-off distribution was
+  diffed against a build from the previous commit at 6000 draws per boss and
+  the worst per-card delta is 0.0070 — sampling noise. The old shuffle is
+  preserved as the same lines, not an equivalent rewrite.
+
+  Fourteen starter tags are in, all on non-signature cards (a guaranteed card
+  cannot be up-weighted). With the flag on, tagged cards draw ~0.21 against
+  untagged ~0.08, every pool member is still drawn across 4000 draws per boss
+  — a zero would mean the weighting had become a filter — and a genuinely
+  untagged pool draws identically on and off. Tag more pools whenever; it
+  degrades to today's behaviour with none.
 
 **Also found, not acted on:** `getDie()` never returns null — it falls back to
 `DICE_TYPES[0]`, so a card id fed to the die namespace silently yields the
