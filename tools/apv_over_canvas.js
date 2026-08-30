@@ -68,7 +68,13 @@ out.shadowCanvas = {
 FXH.clearMarks();
 die.chip.classList.remove('selected', 'cardmark');
 die.chip.classList.add('probe-state');
-D3X.STATE_FORMS.push({cls: 'probe-state', ink: '#33cc66', form: 'rim'});
+/* P889: a roster ROW, not the old {cls,form} registry entry. layer:'over'
+   puts it on stCanvas and through:true is what lets it survive a roll -
+   which is the guard this probe exists to test. */
+const savedRoster = D3X.MARKS.slice();
+D3X.MARKS.push({id: 'probe', layer: 'over', through: true, style: 'rim',
+                ink: '#33cc66',
+                on: d => d.chip.classList.contains('probe-state')});
 
 D3X._drawStates(); D3X._drawGlow();
 out.settledNothingSelected = {
@@ -109,10 +115,11 @@ out.framePasses = {before: p0, after: D3X._statePasses || 0,
 
 /* ══ F. UNREGISTERING CLEARS IT ══════════════════════════════════════ */
 await FXH.settled(45000);
-D3X.STATE_FORMS.length = 0;
+D3X.MARKS.length = 0;
 D3X._drawStates();
 out.afterUnregister = FXH.ink('stCanvas');
 out.shadowStillInked = FXH.ink('dsCanvas');
+D3X.MARKS.push.apply(D3X.MARKS, savedRoster);/* put the real rows back */
 if (restore) restore();
 
 out.VERDICT = {

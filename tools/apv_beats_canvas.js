@@ -24,7 +24,7 @@ if (!die) return Object.assign(out, {err: 'no settled die'});
 
 /* states empty on purpose: everything below must hold on beats alone, which
    is the early-return P880 shipped and P883 had to widen. */
-D3X.STATE_FORMS.length = 0;
+D3X.MARKS.length = 0;
 D3X.FX_MARKS.length = 0;
 const draw = () => { try { D3X._drawStates(); return null; } catch (e) { return e.message; } };
 const kidsOf = el => el.children.length;

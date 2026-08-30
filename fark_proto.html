@@ -27415,11 +27415,129 @@ var D3X={
     }
     return cv;
   },
-  /* Registered state forms. Empty here on purpose - the forms are step 7 and
-     the ports come with their own patch. An entry is
-     {cls:'die-frozen', ink:'#9ab0d0', form:'rim'}; `ink` is the state's
-     EXISTING colour from ENCH_ICONS or FKFX.meta, never a new one. */
-  STATE_FORMS:[],
+  /* P889: THE MARK ROSTER. One row per thing a die can wear. `layer` picks
+     the surface - under the dice on dgCanvas, where the tuned dials are, or
+     over them on stCanvas. `through` says whether the mark survives a roll: a
+     selection does not, a state does. `style` is one of the four forms.
+     `ink` is a dial name on D3X, a global name, or a literal - never a new
+     colour, per the brief's rule that a state wears its enchant's own.
+     `on(d)` decides which dice wear it, so the wake test below cannot go
+     stale when a row is added.
+     ORDER IS PAINT ORDER: cardmark before selection, so a selection
+     composites on top of it, which is what _drawGlow did explicitly.
+     `inkWhen` is a SET-level override, not a per-die one - if any selected
+     die is a rival keep, the whole selection turns red, colour and softness
+     together, and flattening that to a per-die ink would change how a mixed
+     selection looks. */
+  MARKS:[
+    {id:'card',layer:'under',through:false,style:'rim',
+     ink:'CARD_MARK_INK',fallback:'#c66058',
+     on:function(d){return d.chip.classList.contains('cardmark');}},
+    {id:'sel',layer:'under',through:false,style:'rim',
+     ink:'SEL_COL',soft:'SEL_SOFT',
+     on:function(d){return d.chip.classList.contains('selected');},
+     inkWhen:[{ink:'OPP_INK',fallback:'#d94c3d',both:true,
+       test:function(ds){
+         for(var i=0;i<ds.length;i++)
+           if(ds[i].chip.classList.contains('oppkeep'))return true;
+         return false;
+       }}]},
+  ],
+  /* CRUST is the keep glow's painter with a tight profile: a hard edge and
+     almost no falloff, so it reads as a treatment ON the edges with the face
+     still legible, rather than as light thrown off them. */
+  CRUST:{soft:3,rim:1.6,strength:0.95,line:2.6},
+  VEIL:{alpha:0.42},
+  DIM:{alpha:0.46,ink:'#12141a'},
+  /* a dial name on D3X, a global name, or a literal */
+  _markInk:function(name,fallback){
+    if(!name)return fallback||'#ffffff';
+    if(name.charAt(0)==='#')return name;
+    if(this[name]!==undefined&&this[name]!==null)return this[name];
+    if(window[name]!==undefined&&window[name]!==null)return window[name];
+    return fallback||'#ffffff';
+  },
+  /* which dice wear this row, right now */
+  _markDice:function(row){
+    var out=[];
+    for(var i=0;i<this.dice.length;i++){
+      var d=this.dice[i];
+      if(!d.match||!d.obj||!d.obj.visible||!d.chip)continue;
+      try{if(row.on(d))out.push(d);}catch(e){}
+    }
+    return out;
+  },
+  /* THE WAKE TEST. Any row on this layer that is allowed to paint right now
+     and has at least one die - so adding a row cannot leave it stale, and a
+     roll with nothing through:true live still puts the whole pass to sleep. */
+  _marksLive:function(layer,rolling){
+    var M=this.MARKS||[];
+    for(var r=0;r<M.length;r++){
+      var row=M[r];
+      if(row.layer!==layer)continue;
+      if(rolling&&!row.through)continue;
+      if(this._markDice(row).length)return true;
+    }
+    return false;
+  },
+  /* THE FOUR FORMS. RIM is the keep glow untouched. CRUST is the same painter
+     with the tight profile above. VEIL and DIM are fills, and belong over the
+     dice because they change what you see OF the face.
+     DIM IS HONEST ABOUT ITS LIMIT: desaturating a die that lives on ANOTHER
+     canvas is not something a 2D context can do - it would need a CSS blend
+     mode on the whole element, which would catch every other thing painted
+     there. So this darkens and adds no colour. True desaturation already has
+     a home in _settleDim / _dimMap, which dim the die's own material maps,
+     and that is the right route if step 8 wants it. */
+  _paintForm:function(style,cv,x,sc,dpr,hulls,col,soft){
+    if(style==='crust'){
+      var C=this.CRUST;
+      this._paintHalo(cv,x,sc,dpr,hulls,col,soft,1,C.line,C);
+      return;
+    }
+    if(style==='veil'||style==='dim'){
+      var A=(style==='dim')?this.DIM:this.VEIL;
+      var self=this;
+      x.save();
+      x.globalAlpha=A.alpha;
+      x.fillStyle=(style==='dim')?this._markInk(A.ink,'#12141a'):col;
+      hulls.forEach(function(h){self._traceHull(x,h);x.fill();});
+      x.restore();
+      return;
+    }
+    this._paintHalo(cv,x,sc,dpr,hulls,col,soft,1);
+  },
+  /* paint every row on one layer, in roster order. ONE _paintHalo per ROW,
+     not per die: a row's hulls are collected and painted together, so the
+     cost is bounded by the roster rather than by the board. */
+  _drawMarks:function(layer,cv,x,sc,dpr,rolling){
+    var self=this,G=this.GLOW,M=this.MARKS||[],n=0;
+    for(var r=0;r<M.length;r++){
+      var row=M[r];
+      if(row.layer!==layer)continue;
+      if(rolling&&!row.through)continue;
+      var ds=this._markDice(row);
+      if(!ds.length)continue;
+      var col=this._markInk(row.ink,row.fallback);
+      var soft=row.soft?this._markInk(row.soft,row.fallback):col;
+      var over=row.inkWhen||[];
+      for(var o=0;o<over.length;o++){
+        var hit=false;
+        try{hit=!!over[o].test(ds);}catch(e){}
+        if(hit){col=this._markInk(over[o].ink,over[o].fallback);
+                if(over[o].both)soft=col;}
+      }
+      var hulls=[];
+      for(var i=0;i<ds.length;i++){
+        var h=self._hullOf(ds[i],sc,G.grow);
+        if(h)hulls.push(h);
+      }
+      if(!hulls.length)continue;
+      this._paintForm(row.style,cv,x,sc,dpr,hulls,col,soft);
+      n++;
+    }
+    return n;
+  },
   /* P883: TRANSIENT BEATS on the same surface. A state is a class that is
      either there or not; a beat has a clock. Both are painted by the pass
      because the pass clears the canvas every frame, so a one-shot paint from
@@ -27464,15 +27582,9 @@ var D3X={
     var beats=this.FX_MARKS=(this.FX_MARKS||[]).filter(function(mk){
       return mk.d&&mk.d.obj&&mk.d.obj.visible&&(_now-mk.t0)<mk.ms;
     });
-    var forms=this.STATE_FORMS||[],want=[];
-    for(i=0;i<this.dice.length;i++){
-      d=this.dice[i];
-      if(!d.match||!d.obj.visible||!d.chip)continue;
-      for(var f=0;f<forms.length;f++){
-        if(d.chip.classList.contains(forms[f].cls))want.push({d:d,form:forms[f]});
-      }
-    }
-    if(!want.length&&!beats.length){
+    var rolling=this._rolling();
+    var live=this._marksLive('over',rolling);
+    if(!live&&!beats.length){
       if(cv&&this._stateInk){
         var c0=cv.getContext('2d');
         c0.setTransform(1,0,0,1,0,0);c0.clearRect(0,0,cv.width,cv.height);
@@ -27485,8 +27597,8 @@ var D3X={
     if(!scEl)return;
     var sc=scEl.getBoundingClientRect();
     if(sc.width<10)return;
-    /* same raster argument as the glow (P739): these are thin crisp rims, so
-       they are painted at the display's resolution, not capped at 2x. */
+    /* same raster argument as the glow (P739): these are thin crisp shapes,
+       so they are painted at the display's resolution, not capped at 2x. */
     var dpr=Math.min(devicePixelRatio||1,this.GLOW_DPR_MAX||3);
     if(cv.width!==Math.round(sc.width*dpr)||cv.height!==Math.round(sc.height*dpr)){
       cv.width=Math.round(sc.width*dpr);cv.height=Math.round(sc.height*dpr);
@@ -27495,20 +27607,8 @@ var D3X={
     x.setTransform(dpr,0,0,dpr,0,0);
     x.clearRect(0,0,sc.width,sc.height);
     this._stateInk=true;
-    var self=this,G=this.GLOW,byInk={};
-    want.forEach(function(w){
-      var h=self._hullOf(w.d,sc,G.grow);
-      if(!h)return;
-      var k=(w.form.form||'rim')+'|'+w.form.ink;
-      (byInk[k]=byInk[k]||[]).push(h);
-    });
-    /* RIM is the only form built here; VEIL, CRUST and DIM arrive with the
-       ports at step 7. It delegates to _paintHalo so a state that is supposed
-       to look like the keep glow cannot drift away from it. */
-    for(var k in byInk){
-      var ink=k.split('|')[1];
-      this._paintHalo(cv,x,sc,dpr,byInk[k],ink,ink,1);
-    }
+    var G=this.GLOW;
+    this._drawMarks('over',cv,x,sc,dpr,rolling);
     /* P883: beats last, so a transient reads ON TOP of the state it belongs
        to rather than under it. */
     for(i=0;i<beats.length;i++){
@@ -27668,6 +27768,18 @@ var D3X={
         ctx.fill();
       }
     };
+    /* P889b: THE FIRST CALL AFTER THESE SCRATCHES ARE CREATED OR RESIZED IS
+       NOT QUITE THE SAME AS THE REST. Measured: it differs from every later
+       paint by a constant 216 bytes, max 1 per channel on ~160 pixels of an
+       860x1800 surface, and paints two through twelve are identical to the
+       byte. Almost certainly the freshly created mip canvases below (430x900
+       down to 54x113) backing differently from resized-and-cleared ones.
+       Not worth fixing at 1/255 on 0.04% of pixels - recorded because the
+       probes now warm the painter and discard that result, so the instrument
+       that found it can no longer see it. It also stops being cosmetic for a
+       form that paints ONCE and briefly: a 250ms one-shot spends a real share
+       of its life in this call, where a selection glow living for seconds
+       spends none. */
     var S=this._haloS||(this._haloS=document.createElement('canvas'));
     if(S.width!==cv.width||S.height!==cv.height){S.width=cv.width;S.height=cv.height;}
     var sxc=S.getContext('2d');
@@ -27957,46 +28069,21 @@ var D3X={
     };
     this._flickRAF=requestAnimationFrame(step);
   },
+  /* P889: THIS IS THE UNDER-LAYER PASS NOW, and it is table-driven. It used
+     to carry two hardcoded branches and two hand-maintained conditions: a
+     wake test naming both classes, and a global _rolling() skip. Both are
+     gone into the roster. Behaviour during a roll is unchanged because both
+     live rows are through:false, so nothing paints and the pass still sleeps.
+     The probe re-proves the output byte-identical to the explicit calls. */
   _drawGlow:function(){
     var cv=document.getElementById('dgCanvas');
-    /* clear-and-leave: no selection, mid-roll, or no dice at all */
     /* not _matchOn: that is turned off whenever ANY sized .d3chip exists
        anywhere in the document, which is a statement about the shop and the
        loadout, not about whether there are match dice to draw around. */
     var anyMatch=false;
     for(var mi=0;mi<this.dice.length;mi++)if(this.dice[mi].match){anyMatch=true;break;}
-    var skip=!anyMatch||this._rolling();
-    if(!skip){
-      skip=true;
-      for(var i=0;i<this.dice.length;i++){
-        var q=this.dice[i];
-        /* P876: A CARD MARK WAKES THIS TOO. The guard tested `selected` alone,
-           and Steady Hand's pick CLEARS selected before it adds the mark - so
-           unless some other die happened to be selected, P856's mark was a
-           class on an element and nothing else. P856 moved the mark onto a
-           painter that refuses to run in the state P856's own call site
-           creates.
-           P879: THE COST ARGUMENT IS PER-FRAME, NOT PER-DURATION. This comment
-           used to call the mark transient and cite its own timeout, and that
-           is only true of Steady Hand's pick. _breakBegin adds `cardmark` to every
-           candidate with NO timer, so a Break prompt paints for as long as the
-           player deliberates.
-           P887: AND THE BOUND IS NOT BORROWED, because the note it was taken
-           from does not cover this. That note reads "this canvas is only
-           painted WHILE DICE ARE SELECTED, and it is one thin shape on an
-           otherwise empty surface" - and the selection condition is exactly
-           what P876 widened and what the state layer discards. So, on its own
-           terms: the cost is one thin hull per marked die per frame on a
-           surface that is otherwise empty, and the pass sleeps entirely when
-           no die carries a registered class. That is per-frame and independent
-           of how long a mark lives, which is what the state layer needs, and
-           it is UNMEASURED - a frame-time comparison against an empty registry
-           is the thing that would settle it. */
-        if(!q.match||!q.obj.visible)continue;
-        if(q.chip.classList.contains('selected')||q.chip.classList.contains('cardmark')){skip=false;break;}
-      }
-    }
-    if(skip){
+    var rolling=this._rolling();
+    if(!anyMatch||!this._marksLive('under',rolling)){
       if(cv&&this._glowInk){
         var c0=cv.getContext('2d');
         c0.setTransform(1,0,0,1,0,0);c0.clearRect(0,0,cv.width,cv.height);
@@ -28016,8 +28103,8 @@ var D3X={
        enlarged and blurred. That is Denis's 'much softer and wider on my
        phone', and no dial could have fixed it because the numbers were
        never what differed - the raster was. The cost is bounded: this
-       canvas is only painted while dice are selected, and it is one thin
-       shape on an otherwise empty surface. */
+       canvas is painted only while a row on this layer has a die, and it is
+       a few thin shapes on an otherwise empty surface. */
     var dpr=Math.min(devicePixelRatio||1,this.GLOW_DPR_MAX||3);
     if(cv.width!==Math.round(sc.width*dpr)||cv.height!==Math.round(sc.height*dpr)){
       cv.width=Math.round(sc.width*dpr);cv.height=Math.round(sc.height*dpr);
@@ -28025,41 +28112,7 @@ var D3X={
     var x=cv.getContext('2d');
     x.setTransform(dpr,0,0,dpr,0,0);
     x.clearRect(0,0,sc.width,sc.height);
-    var self=this,G=this.GLOW;
-    var sel=[],oppSel=false,marks=[];
-    this.dice.forEach(function(d){
-      if(!d.match||!d.obj.visible)return;
-      /* P856: a CARD MARK is the same shape problem the keep-glow already
-         solved. It used to be `outline:2px solid` on the flat chip, which
-         is an axis-aligned box by spec, so it could never follow a die
-         that landed rotated (Denis: "outlines... match the shape of the
-         settled die and not a straight square"). Built from the same
-         _hullOf projection as the selection halo. */
-      if(d.chip.classList.contains('cardmark')){
-        var mh=self._hullOf(d,sc,G.grow);
-        if(mh)marks.push(mh);
-      }
-      if(!d.chip.classList.contains('selected'))return;
-      if(d.chip.classList.contains('oppkeep'))oppSel=true;
-      var hull=self._hullOf(d,sc,G.grow);
-      if(hull)sel.push(hull);
-    });
-    if(marks.length){
-      /* the card ink the square outline used, now on the real silhouette */
-      var MK=(window.CARD_MARK_INK||'#c66058');
-      this._paintHalo(cv,x,sc,dpr,marks,MK,MK,1);
-    }
-    if(!sel.length)return;
-    /* gold is the PLAYER's colour. A rival keep glows in their patron accent
-       instead, which is the same --patCol the portrait disc and the DOM
-       fallback rim already use - so the three readings of a rival agree. */
-    var SOFT=self.SEL_SOFT,COL=self.SEL_COL;
-    /* one red for the rival, every seat - see OPP_INK. This used to read
-       --patCol, so their keep glowed a different colour at every table and
-       no colour at all against a boss. */
-    if(oppSel)COL=SOFT=(window.OPP_INK||'#d94c3d');
-    /* P748: the painter is shared with the cards now - see _paintHalo */
-    this._paintHalo(cv,x,sc,dpr,sel,COL,SOFT,1);
+    this._drawMarks('under',cv,x,sc,dpr,rolling);
   },
   /* ONE GROUP PER ROW. This used to be a single shared group whose position
      and scale were written per die inside the frame loop, so with two rows

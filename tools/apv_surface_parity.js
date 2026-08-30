@@ -169,7 +169,16 @@ out.afterCleanup = {dg: FXH.ink('dgCanvas'), st: FXH.ink('stCanvas')};
 
 /* selected and cardmark were never moved - assert that too, since the whole
    point of this control is that nothing tuned had to be disturbed */
-out.stateFormsStillEmpty = (D3X.STATE_FORMS || []).length === 0;
+/* P889: this used to assert the state registry was EMPTY, which the roster
+   made meaningless - the roster is where selected and cardmark now live. The
+   intent was always "nothing tuned was moved to the other surface", so that
+   is what it says: both live rows still paint UNDER the dice. */
+const rows = D3X.MARKS || [];
+out.roster = {
+  n: rows.length,
+  under: rows.filter(r => r.layer === 'under').map(r => r.id),
+  over:  rows.filter(r => r.layer === 'over').map(r => r.id),
+};
 
 out.VERDICT = {
   bothCanvasesExist:     !!dg && !!st,
@@ -187,7 +196,9 @@ out.VERDICT = {
                                 out.differentHullControl.bytes > 1000,
   /* nothing tuned was moved, and nothing of the shadow survives */
   shadowRemoved: out.afterCleanup.dg.px === 0 && out.afterCleanup.st.px === 0,
-  nothingWasPorted: out.stateFormsStillEmpty === true,
+  selectionAndCardmarkStillPaintUnder:
+    out.roster.under.indexOf('sel') >= 0 && out.roster.under.indexOf('card') >= 0,
+  nothingWasMovedOver: out.roster.over.length === 0,
 };
 out.PASS = Object.keys(out.VERDICT).every(k => out.VERDICT[k] === true);
 return out;
