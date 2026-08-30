@@ -21383,15 +21383,41 @@ function _ptOpenPanel(st){
   var port=document.getElementById('ptPort');
   port.style.background=_pc;
   port.innerHTML=(st.art?'<img class="pwho" src="'+PT_CHAR+st.art+PT_CHAR_EXT+'" onerror="this.remove()" alt="">':'');
-  /* panel-only family name: the given name alone leaves the parchment
-     empty. Deterministic per patron (hash of the given name). */
-  var _FAMN=['Thistledown','Bramblewick','Copperpot','Underbough','Fernwhistle','Mosscreek',
-    'Tallowmere','Hedgeburrow','Cinderfell','Oakhollow','Puddifoot','Greenmantle',
-    'Ashgrove','Silverbrook','Nettlebank','Longbarrow','Foxglove','Willowmarsh',
-    'Duskwater','Honeyfield','Stoutbarrel','Quickstitch','Emberlane','Marrowgate'];
+  /* panel-only family name: the given name alone leaves the parchment empty.
+     P872 (Denis: "loooong last names built upon the same kinda vibe... make it
+     varied and more memorable, hinting at their playstyle/personalities"):
+     THE SURNAME NOW SAYS HOW THEY PLAY. What stood here was twenty-four
+     nature-plus-landscape compounds, all the same length, all the same
+     construction, and true of nobody in particular. The
+     panel already knows the persona, so the name can carry the one thing a
+     player opens this panel to learn.
+     Shapes are mixed on purpose, because "all the same vibe" was half the
+     complaint: Magpie and Sleight and Slowhand are short, Threadneedle and
+     Pennyweight are long, and none of them is noun-plus-scenery. */
+  var _FAMN_BY_TRAIT={
+    /* STEADY - banks small and often, never pushes */
+    ones:['Slowhand','Tallyman','Pennyweight','Twicecount','Coldfoot'],
+    /* GREEDY - sits on the pile and will not spend it */
+    hoard:['Tightfist','Magpie','Deeppurse','Sockful','Neverlends'],
+    /* RECKLESS - rolls into anything */
+    aggro:['Neverblink','Breakneck','Hotblood','Onemore','Firebrand'],
+    /* BULLISH - hunts three-of-a-kind */
+    triples:['Threefold','Bullneck','Ironjaw','Thricelucky','Trebles'],
+    /* ORDERLY - builds runs, keeps it tidy */
+    straights:['Inarow','Straightlace','Dominoes','Ladderman','Onetosix'],
+    /* CUNNING - plays the angles. Foxglove is the one survivor of the old
+       twenty-four, and it lands here: a poison that looks like a flower. */
+    combo:['Sleight','Sidewinder','Threadneedle','Foxglove','Everyangle']
+  };
   var _fh=0,_gn=String(st.name||'');
   for(var _fi=0;_fi<_gn.length;_fi++)_fh=(_fh*31+_gn.charCodeAt(_fi))>>>0;
-  var _sn=_FAMN[_fh%_FAMN.length];
+  /* the SAME hash as before, over a smaller per-persona pool - so a patron's
+     full name stays as stable as it has always been (P837's identity ruling),
+     it just means something now. Falls back to the steady set if a persona
+     ever arrives that this table does not know, so an unknown key costs a
+     flavour mismatch rather than an undefined surname. */
+  var _fpool=(st.pat&&_FAMN_BY_TRAIT[st.pat.persona])||_FAMN_BY_TRAIT.ones;
+  var _sn=_fpool[_fh%_fpool.length];
   var _fullNm=_gn+' '+_sn;
   var _nfs=_fullNm.length>16?3.8:(_fullNm.length>12?4.5:5.6);
   document.getElementById('ptvName').innerHTML=
