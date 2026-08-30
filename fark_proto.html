@@ -27227,6 +27227,98 @@ var D3X={
     }
     return cv;
   },
+  /* P880: THE OVER-CANVAS. dgCanvas is z-index 3, UNDER the dice at 41, which
+     is right for a glow bleeding out from behind a die and wrong for a state
+     that has to sit ON it. 42 is above the dice canvas at 41 and below the
+     player's card row, which the base rule also puts at 42 but the match
+     screen lifts to 45 - so on this screen, and only on this screen, 42 is
+     free. */
+  _stateCv:function(){
+    var sc=document.getElementById('screen-match');
+    if(!sc)return null;
+    /* P880b: THIS WAS #dsCanvas AND THAT ID WAS ALREADY THE SHADOW CANVAS
+       (10434, inside #matchShadows, multiply-blended, drawn by
+       _drawDiceShadows). getElementById-then-create does not fail on a
+       collision, it ADOPTS - so this handed back the shadow canvas and the
+       pass below resized it, cleared it every frame and painted rims into a
+       multiply layer, putting the shadows under the dice out. Nothing caught
+       it: the parse gate, the declaration diff and every pixel assertion in
+       the probe passed at full strength, because a pixel count cannot say
+       WHICH surface it counted. Reading parentElement is what caught it, and
+       that is a verdict in the probe now. */
+    var cv=document.getElementById('stCanvas');
+    if(!cv){
+      cv=document.createElement('canvas');cv.id='stCanvas';
+      cv.style.cssText='position:absolute;inset:0;width:100%;height:100%;'
+        +'pointer-events:none;z-index:42';
+      sc.appendChild(cv);
+    }
+    return cv;
+  },
+  /* Registered state forms. Empty here on purpose - the forms are step 7 and
+     the ports come with their own patch. An entry is
+     {cls:'die-frozen', ink:'#9ab0d0', form:'rim'}; `ink` is the state's
+     EXISTING colour from ENCH_ICONS or FKFX.meta, never a new one. */
+  STATE_FORMS:[],
+  /* THE STATE PASS. Deliberately not _drawGlow: it must not inherit either of
+     that painter's guards. _drawGlow skips whenever no die is being kept or
+     card-marked (a state belongs to a die nobody is touching) and whenever
+     _rolling() is true (a state has to survive the roll - that is what makes
+     it a state). What stays is one test keyed on the REGISTRY: if no die
+     carries a registered class there is nothing to draw, which is the only
+     thing that may put this pass to sleep.
+     THE PASS OWNS THE SURFACE. It clears its canvas every frame, so anything
+     painting here from outside is erased on the next one - register a form,
+     do not paint behind it. */
+  _drawStates:function(){
+    this._statePasses=(this._statePasses||0)+1;
+    var cv=document.getElementById('stCanvas'),i,d;
+    var forms=this.STATE_FORMS||[],want=[];
+    for(i=0;i<this.dice.length;i++){
+      d=this.dice[i];
+      if(!d.match||!d.obj.visible||!d.chip)continue;
+      for(var f=0;f<forms.length;f++){
+        if(d.chip.classList.contains(forms[f].cls))want.push({d:d,form:forms[f]});
+      }
+    }
+    if(!want.length){
+      if(cv&&this._stateInk){
+        var c0=cv.getContext('2d');
+        c0.setTransform(1,0,0,1,0,0);c0.clearRect(0,0,cv.width,cv.height);
+        this._stateInk=false;
+      }
+      return;
+    }
+    cv=this._stateCv();if(!cv)return;
+    var scEl=document.getElementById('screen-match');
+    if(!scEl)return;
+    var sc=scEl.getBoundingClientRect();
+    if(sc.width<10)return;
+    /* same raster argument as the glow (P739): these are thin crisp rims, so
+       they are painted at the display's resolution, not capped at 2x. */
+    var dpr=Math.min(devicePixelRatio||1,this.GLOW_DPR_MAX||3);
+    if(cv.width!==Math.round(sc.width*dpr)||cv.height!==Math.round(sc.height*dpr)){
+      cv.width=Math.round(sc.width*dpr);cv.height=Math.round(sc.height*dpr);
+    }
+    var x=cv.getContext('2d');
+    x.setTransform(dpr,0,0,dpr,0,0);
+    x.clearRect(0,0,sc.width,sc.height);
+    this._stateInk=true;
+    var self=this,G=this.GLOW,byInk={};
+    want.forEach(function(w){
+      var h=self._hullOf(w.d,sc,G.grow);
+      if(!h)return;
+      var k=(w.form.form||'rim')+'|'+w.form.ink;
+      (byInk[k]=byInk[k]||[]).push(h);
+    });
+    /* RIM is the only form built here; VEIL, CRUST and DIM arrive with the
+       ports at step 7. It delegates to _paintHalo so a state that is supposed
+       to look like the keep glow cannot drift away from it. */
+    for(var k in byInk){
+      var ink=k.split('|')[1];
+      this._paintHalo(cv,x,sc,dpr,byInk[k],ink,ink,1);
+    }
+  },
   /* the die's 8 corners projected to screen space, gift-wrapped */
   _hullOf:function(d,sc,grow){
     var mr=this.mount&&this.mount.getBoundingClientRect();
@@ -29057,6 +29149,10 @@ var D3X={
       if(!window._candleOn)try{_candleLoop();}catch(e){}
     }
     try{this._drawGlow();}catch(e){}
+    /* P880: the state pass runs after the glow and never instead of it - they
+       own different surfaces (3 under the dice, 42 over them) and neither
+       clears the other's. */
+    try{this._drawStates();}catch(e){}
   },
   /* rebuild the die list from the .d3chip placeholders inside the mount */
   sync:function(root){
