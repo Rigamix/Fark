@@ -124,6 +124,55 @@ Still true from the same pass: `nv:1` on Golgoth's rows has no reader
 goes, deliberately — win/loss fire once per match, so a per-match de-dup
 could not do anything there.
 
+**THE FX WORK — VERIFIED BEFORE BUILDING, AND SIX CLAIMS DID NOT HOLD.**
+Nothing built yet. I checked both docs against the live file first, because
+the design doc opens by correcting the audit and that is a warning about the
+class of error. Six findings change the build order:
+
+1. **The “missing layer” premise is refuted.** A per-die layer above the
+   dice already ships — `.fog-float`/`.peek-float`/`.honey-float`/`.vang-float`
+   at z-60, with `_famRefloatGhosts` re-anchoring them per die. And
+   `D3X._slaveHost` already translates each die's chip under the drawn 3D die
+   **every frame**. So a chip-anchored overlay tracks the settled die for
+   free, and the audit's “a DOM chip is not where the die is” is no longer
+   true. Route through these rather than adding a sixth layer.
+2. **Only ONE of FKFX's primitives reaches a settled die**, not three.
+   `_spray` works. `_glow` is completely dead (drop-shadow on an element with
+   zero opaque pixels). And `_motion dx/dy` — which the design doc lists as
+   working — animates `translate`, *the exact property `_slaveHost` writes
+   inline every frame*. A comment at that site documents fixing this very
+   bug; FKFX reintroduces it. STRIKE's shake moves the invisible hit box and
+   the die zero pixels.
+3. **Eight classes paint in 3D, not thirteen.** L2811 kills box-shadow/border;
+   **L2812 kills every pseudo-element**. So the ❤ glyph, the `?`, dampened,
+   combo-glow and die-kindred are already suppressed. The census is right
+   about the mistake and roughly 40% over on the count.
+4. **Two brands per die is a turn DEADLOCK, not a cosmetic issue.**
+   `brand-spent`/`_spentLook` are per-die: a die that cast its 1-brand still
+   has a live 5-brand, so `anyScoring` calls the roll non-bust while the die
+   is dimmed and untappable. Not a bust, no legal move. Also the cap is
+   enforced in **four** places, not one, and `_iconFaceRoll` *cannot* avoid a
+   taken face — it has no die index at all, so “two lines” is an argument
+   threaded through two callers.
+5. **The flat 2D path is dead in the page.** `D3_MATCH` is read in four places
+   and assigned in none. Deleting the CSS geometry costs players nothing — but
+   three probes set it on a `#flat` hash and would need cutting in the same
+   patch.
+6. **Two lane-mark bugs the docs missed:** fog and snuff both call `_lmSpend`
+   outside the branch that did anything, so a window turn is burned on a
+   no-op. And Break was explicitly fixed for this exact overwrite shape
+   (P526, “PUSH, not assign”) — the three lane markers were left with the
+   un-fixed version.
+
+**HARNESS CONSTRAINT, and it decides how any of this gets verified.** The
+headless probe runs the 3D layer at **~1 fps**: `D3X._rolling()` takes ~19s
+to clear against ~700ms real, and `_drawGlow` skips the entire pass while it
+is true, so the glow canvas is never even created inside a normal probe
+window. Part Six's tests — centroid across a re-throw, per-frame gap
+assertions, idle-motion pixel diffs, 400ms budgets — are all frame-timed and
+cannot run as written. They need to become state-polled with forced draws.
+Worth knowing before building the thing they are meant to check.
+
 **Also found, not acted on:** `getDie()` never returns null — it falls back to
 `DICE_TYPES[0]`, so a card id fed to the die namespace silently yields the
 *wrong die* rather than an error. That is the mechanism behind the
