@@ -24612,6 +24612,18 @@ function _lmSpend(key){
   if(m.turns>0)m.turn=(G.oppTurnCount||0)+1;
   else m.live=false;
 }
+/* P876: THE NO-OP PATH. A third verb, and it is not a convenience - it is the
+   only correct answer when the window came due and the mark could not act.
+   _lmSpend would take a turn the mark never used; doing nothing at all is
+   WORSE, because _lmDue tests `m.turn===G.oppTurnCount` and a mark whose turn
+   points at the turn that just passed is live for ever and due never. So the
+   window is re-armed for the next opponent turn with its count untouched:
+   nothing was spent because nothing happened. That is the brief's rule - the
+   window ends when it has affected the opponent - stated as code. */
+function _lmDefer(key){
+  var m=G&&G[key];if(!m||!m.live)return;
+  m.turn=(G.oppTurnCount||0)+1;
+}
 function _firstStrike(side){
   /* _ruleActive, not G._tell.id - the id also arrives by sleeve and by sealed
      seat, and reading the tell directly made the badge silently do nothing in
@@ -27578,7 +27590,14 @@ var D3X={
       skip=true;
       for(var i=0;i<this.dice.length;i++){
         var q=this.dice[i];
-        if(q.match&&q.obj.visible&&q.chip.classList.contains('selected')){skip=false;break;}
+        /* P876: A CARD MARK WAKES THIS TOO. The guard tested `selected` alone,
+           and Steady Hand's pick CLEARS selected before it adds the mark - so
+           unless some other die happened to be selected, P856's mark was a
+           class on an element and nothing else for its whole 900ms. P856 moved
+           the mark onto a painter that refuses to run in the state P856's own
+           call site creates. */
+        if(!q.match||!q.obj.visible)continue;
+        if(q.chip.classList.contains('selected')||q.chip.classList.contains('cardmark')){skip=false;break;}
       }
     }
     if(skip){
@@ -36440,13 +36459,21 @@ function runOppTurn(){
   var _snuffLane=-1;
   if(_lmDue('_snuff')){
     _snuffLane=G._snuff.lane;
-    /* KINDRED holds it for a second turn: spend one, and re-arm for the next
-       opponent turn rather than clearing */
-    _lmSpend('_snuff');
     if(_snuffLane>=0&&left>1){
       left--;/* the seat itself is dropped where rungDice is built, below */
       try{setStatusMsg('THEIR '+(_snuffLane+1)+(_snuffLane===0?'ST':(_snuffLane===1?'ND':(_snuffLane===2?'RD':'TH')))+' DIE IS SNUFFED','gold');}catch(e){}
       try{famLog('SNUFF — THEY PLAY ONE SHORT');}catch(e){}
+      /* P876: KINDRED holds it for a second turn - spend one, re-arm for the
+         next. This used to run ABOVE the guard, so a snuff that could not fire
+         because they were down to one die spent a turn of its window anyway. */
+      _lmSpend('_snuff');
+    }else{
+      /* nothing was taken from them, so nothing is spent. NOTE: this follows
+         the ANNOUNCE gate. The seat is actually removed much later under a
+         DIFFERENT condition (_rungMats.length>1), so the two disagree about
+         whether a snuff happened - recorded as its own defect rather than
+         changed here, because reconciling them moves behaviour. */
+      _lmDefer('_snuff');
     }
   }
   clearRow('oppDiceRow');G.oppDice=[];
@@ -36790,9 +36817,18 @@ function runOppTurn(){
               }
             }
           }catch(e){}
+          /* P876: THE SPEND MOVED IN HERE, beside the work, which is where
+             Snare's retire already sits and where its comment says it belongs.
+             KINDRED holds it for a second opponent turn (#32) - and a Kindred
+             fog is exactly the case this was costing: two turns bought, one
+             thrown away on a turn where nothing was misread. */
+          _lmSpend('_fog');
+        }else{
+          /* due, but there was no seat to take - the lane is not among their
+             free dice, or they are down to their last one. Nothing happened to
+             them, so the window is not spent; it re-arms for the next turn. */
+          _lmDefer('_fog');
         }
-        /* KINDRED holds it for a second opponent turn (#32) */
-        _lmSpend('_fog');
       }
       crowsCtx.crowsLuckFiredThisRoll=false;
       var{total,used,context:newCtx}=_scoreRollBest(_fogV,G.oCards,oppBank,crowsCtx,_fogM,_fogE);/* P762 */crowsCtx=newCtx||crowsCtx;
