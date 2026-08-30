@@ -5,6 +5,47 @@ is a valid answer.** Answered items are deleted, not marked — this stays short
 
 ---
 
+## `window.G` IS UNDEFINED — THREE LIVE SITES STILL READ IT
+
+`G` is declared `let G=null,LO=null;` (30882). A `let` at top level makes a
+global BINDING, never a property of `window`, so **`window.G` is undefined for
+the life of the page** and any guard beginning `window.G&&` is dead.
+
+The file already knows: 31018 carries the note verbatim, earned when the same
+mistake silently no-opped a whole migration. I walked into it anyway building
+moment 2 — the beat was unreachable until P884c — which is how I found the rest.
+
+**Three more sites read it, and all three are yours, because each is a
+behaviour change rather than a typo.** I have not touched them.
+
+**1. `12561` — a pressure ratio that is permanently 1.**
+`if(window.G&&G.target&&G.pPts){var p=G.pPts/G.target; r=p>=0.95?1.5:...}`
+The guard never passes, so `r` never leaves 1 and the 1.15 / 1.3 / 1.5 steps
+have never fired. Whatever this scales has never scaled near target.
+*Recommendation: fix, but look at what `r` feeds first — fixing it makes
+something stronger in the last stretch of a night, and that is a difficulty
+change you should see coming rather than discover.*
+
+**2. `46902` — a function that has never run.**
+`if(!(window.G&&G._oppTurnActive))return;` always returns early.
+*Recommendation: read what follows the guard before fixing it. An
+always-returning guard can be load-bearing by accident, and turning on a path
+that has never executed in play is not a one-line change.*
+
+**3. `46654` / `46877` — a sim isolation that does not isolate.**
+`var _savedG=window.G; window.G=null;` around the sim, restored after, with the
+stated intent that `oppShouldBank` be neutral during it. It writes a window
+property nothing reads, so the live `G` is visible to the sim throughout.
+*Recommendation: fix. The intent is written down, the sim is meant to be
+isolated, and this is the one of the three where the current behaviour is
+clearly not what anybody chose.*
+
+**The general form, if you want one guard rather than three fixes:** anything
+matching `window.G&&` in this file is dead by construction. That is a
+grep-able invariant and it could be a line in the parse gate.
+
+---
+
 ## BOSS REWARD BRIEF — BUILT (P860-P866). Six things need you.
 
 All five sections shipped in §8's order and every §9 check is driven. Items 1

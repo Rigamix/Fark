@@ -18564,6 +18564,24 @@ var FKFX={
     }catch(e){return null;}
   },
   /* the one entry point */
+  /* P884: MOMENT 2 - a branded face has landed. A METHOD, not a tenth family:
+     the nine instruments are a count this file's comments cite, and this is a
+     beat composed from the primitives rather than another authored instrument.
+     Both visual halves reach a settled match die only because P881 and P883
+     routed them by owner - _glow becomes a mark on the over-canvas and
+     _motion's `sc` becomes a nudge on the mesh - so this is the first thing
+     built on that work. Quiet on purpose: moment 3 is the payoff, and this one
+     only has to say "there it is". */
+  landed:function(el,ink){
+    if(!this.on||!el)return false;
+    var c=ink||'#d8b054';
+    try{
+      this.snd('shimmer',1,1.35);
+      this._glow(el,c,5,220);
+      this._motion(el,[{o:0,sc:1},{o:.5,sc:1.06},{o:1,sc:1,t:200}]);
+    }catch(e){return false;}
+    return true;
+  },
   play:function(id,el){
     if(!this.on||!id)return false;
     var m=this.resolve(id);
@@ -28745,6 +28763,39 @@ var D3X={
     return xs.length?xs[0]:0;
   },
   /* where a physics die sits/points right now, in table-local space */
+  /* P884 / P884b: MOMENT 2 - a branded face has landed.
+     ONE FUNCTION, TWO CALLERS. A die settles either in _physPose's `done`
+     branch or in the WATCHDOG, which retires a tape that has plainly finished
+     for a die _physPose never ran on - and _physPose only runs for a die the
+     frame decided to DRAW. The watchdog already carries the note for exactly
+     this hazard ("two exits, one payload - the rule"), earned when a
+     watchdog-settled die silently never dimmed. P884 hooked one exit anyway,
+     and headless - where ~1fps makes the watchdog the COMMON exit - measured
+     zero beats on a hand that had a live icon in it.
+     It is hooked at the DIE's own settle rather than the tape's end because
+     the tape ends on the last die, and six jolts fired together are one noise.
+     G.pool is the player's hand, so rival dice are out by construction rather
+     than by a test; and _dieIsIcon has excluded a refused brand since P878, so
+     a brand whose lane is taken lands silently instead of promising a payoff
+     the rules have already declined. */
+  _landed:function(d){
+    if(!d||!d.match||!d.chip)return false;
+    if(!window.FKFX||typeof _dieIsIcon!=='function')return false;
+    try{
+      /* P884c: NOT window.G. G is a `let` (30882), so it is a global binding
+         and not a property of window - `window.G` is undefined for the life of
+         the page, and the guard that used it short-circuited every time,
+         handed back an empty array and made this whole beat unreachable. The
+         same note is already at 31018, where the same mistake silently
+         no-opped a whole migration. FKFX and ENCH_ICONS are `var`, so those
+         window reads are sound. */
+      var p=(typeof G!=='undefined'&&G&&G.pool)||[],g=null;
+      for(var i=0;i<p.length;i++){if(p[i].el===d.chip){g=p[i];break;}}
+      if(!g||!_dieIsIcon(g))return false;
+      var k=(window.ENCH_ICONS&&g.ench&&ENCH_ICONS[g.ench.t])||null;
+      return FKFX.landed(d.chip,k&&k.ink);
+    }catch(e){return false;}
+  },
   _physPose:function(d){
     var R=d.roll;if(!R)return null;
     var last=R.sol.frames.length-1;
@@ -28783,6 +28834,7 @@ var D3X={
           ?d.roll.t0+((d.roll._setF!==undefined?d.roll._setF:d.roll.sol.frames.length))*(this.PHYS.dt*1000)
           :performance.now()};d.roll=null;/* P702/P703/P725 */
       if(!this._rolling())this._shDirty=true;/* they have landed: draw them */
+      this._landed(d);/* P884b: one of TWO settle exits - see _landed */
     }
     return {x:f.x,y:f.y,z:f.z,q:q,done:done};
   },
@@ -29261,6 +29313,8 @@ var D3X={
         v:(R&&R.val)||null,
         t:(R&&R.sol&&R.sol.frames)?R.t0+((R._setF!==undefined?R._setF:R.sol.frames.length))*(D3X.PHYS.dt*1000):performance.now()};/* P725 */
       d.roll=null;
+      D3X._landed(d);/* P884b: the OTHER settle exit - the rule above applies
+                        to the beat exactly as it applies to the payload */
     });
     /* SYNC BEFORE STARTING A DEFERRED THROW. This was the other way round,
        so a throw waiting on its dice was retried against the list as it was
