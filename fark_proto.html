@@ -18417,14 +18417,43 @@ var FKFX={
       setTimeout(function(){b.remove();},(ms||600)+220);
     }catch(e){}
   },
-  /* motion: standalone props, so the row's own transforms survive */
+  /* motion: standalone props, so the row's own transforms survive.
+     P881: WHO OWNS THE ELEMENT DECIDES WHAT MAY BE ANIMATED. On a settled
+     match die the chip is under #d3xCanvas and shows nothing, so the DOM
+     animation below is invisible - while `translate` is the property
+     _slaveHost writes inline every frame (and a running animation outranks
+     inline style, which is the whole reason it picked translate), and
+     `opacity` is read by D3X at 29629 as "hide this die". Invisible, and two
+     ways harmful. So a D3X-owned die takes the mesh instead: dx/dy become a
+     damped shake and `sc` becomes the squash SET has always described and
+     never shown. `rt` is dropped on purpose - D3X owns the quaternion and a
+     settled die's rotation IS the face it is showing, so spinning it would
+     change the number. */
   _motion:function(el,keys){
-    if(!el||!el.animate||!keys||!keys.length)return;
+    if(!el||!keys||!keys.length)return;
     try{
+      var d=(window.D3X&&D3X.dice&&D3X._byChip)?D3X._byChip(el):null;
+      if(d&&d.phys&&d.obj&&d.obj.visible){
+        var mx=0,ms=0,i,k;
+        for(i=0;i<keys.length;i++){
+          k=keys[i];
+          if(k.dx&&Math.abs(k.dx)>Math.abs(mx))mx=k.dx;
+          if(k.dy&&Math.abs(k.dy)>Math.abs(mx))mx=k.dy;
+          if(k.sc!==undefined&&Math.abs(k.sc-1)>Math.abs(ms))ms=k.sc-1;
+        }
+        if(mx||ms)D3X.nudge(d,mx,ms);
+        return;
+      }
+      if(!el.animate)return;
       el.animate(keys.map(function(k){
+        /* P881: the clamp is for a chip _byChip missed. D3X hides a die whose
+           computed opacity is <= .02, so an instrument that fades through
+           zero would delete it. No instrument authors `op` today; this keeps
+           it that way by construction rather than by nobody having tried. */
+        var op=k.op===undefined?1:Math.max(k.op,0.05);
         return {offset:k.o,translate:(k.dx||0)+'px '+(k.dy||0)+'px',
           scale:String(k.sc===undefined?1:k.sc),rotate:(k.rt||0)+'deg',
-          opacity:k.op===undefined?1:k.op,easing:k.e||'ease-out'};
+          opacity:op,easing:k.e||'ease-out'};
       }),{duration:keys[keys.length-1].t||500});
     }catch(e){}
   },
@@ -26316,6 +26345,29 @@ var D3X={
        compose instead of fighting. */
     d.chip.style.translate=d.tx.toFixed(1)+'px '+d.ty.toFixed(1)+'px';
   },
+  /* P881: which die is this chip? FKFX is handed a DOM element and has to
+     know whether D3X owns it, because what is safe to animate depends
+     entirely on that. Linear over at most a couple of dozen dice, and only
+     on an effect, never per frame. */
+  _byChip:function(el){
+    if(!el)return null;
+    for(var i=0;i<this.dice.length;i++)if(this.dice[i].chip===el)return this.dice[i];
+    return null;
+  },
+  /* P881: NUDGE - kick's sibling. kick (29594) is a one-way displacement with
+     a spin; nudge is a damped oscillation with none, because a settled die's
+     rotation is the number it is showing. Amplitude arrives in px, from an
+     instrument that was written against a DOM chip, and is stored in
+     DIE-WIDTHS so the same instrument reads the same at any table size.
+     Applied from inside the settled branch, on top of whatever kick did. */
+  NUDGE:{ms:260,osc:6},
+  nudge:function(d,dxMax,scMax){
+    if(!d)return;
+    d.nudge={t0:performance.now(),
+             amp:(dxMax||0)/((d.w0||60)),
+             sc:(scMax===undefined?0:scMax)};
+    this._shDirty=true;
+  },
   /* one-line health check for a browser that is showing the wrong dice */
   diag:function(){
     var sk=this._sk,out={ready:this.ready,failed:!!this.fail,onScreen:this.dice.length,
@@ -29606,6 +29658,22 @@ var D3X={
                scoring face stays up'; now the math agrees. */
             d.obj.quaternion.premultiply(_kq2);
             if(_kt2<1)D3X._shDirty=true;
+          }
+          /* P881: the nudge rides on top of the kick, same as the kick rides
+             on the frozen pose. Damped sine so it returns to exactly where it
+             started - an effect must not leave a settled die displaced, since
+             the position is what the hit box and the shadow are read from. */
+          if(d.nudge){
+            var _nt=(performance.now()-d.nudge.t0)/(D3X.NUDGE.ms||260);
+            if(_nt>=1){d.nudge=null;D3X._shDirty=true;}
+            else{
+              var _nd=1-_nt;
+              if(d.nudge.amp)d.obj.position.x+=d.nudge.amp*_nd*
+                Math.sin(_nt*Math.PI*(D3X.NUDGE.osc||6));
+              if(d.nudge.sc)d.obj.scale.setScalar(1+d.nudge.sc*_nd*
+                Math.sin(_nt*Math.PI));
+              D3X._shDirty=true;
+            }
           }
           /* P702: scoring face bright, sides in shadow - derived from
              map identity every frame, so a reskin/rebrand self-heals on
