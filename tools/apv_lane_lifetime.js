@@ -82,11 +82,14 @@ out.dueAgainNextTurn = _lmDue('_fog');
 _lmSpend('_fog');
 out.secondSpendRetires = (G._fog.live === false);
 
-/* ── retire is not spend: it kills a marker with turns left ── */
-G.oppTurnCount = N; _lmArm('_snare', 1, 2);
-_lmRetire('_snare');
-G.oppTurnCount = N + 1;
-out.retireBeatsTurnsLeft = (G._snare.live === false) && !_lmDue('_snare');
+/* ── P879: THIS TEST'S SUBJECT WAS DELETED ──
+   It asserted that retiring kills a marker with turns left, which was the
+   whole point of having a second verb. Under the attempts ruling nothing may
+   do that - a mark with attempts left keeps them - so the behaviour is gone
+   along with the verb, and what stands in its place is the assertion above:
+   one spend on a two-attempt mark leaves it live and due again. All that is
+   worth checking here is that the verb really is unreachable. */
+out.retireVerbDeleted = (typeof _lmRetire === 'undefined');
 
 /* ── extra fields survive arming (snare's x2) ── */
 _lmArm('_snare', 1, 1, { x2: true });
@@ -108,7 +111,7 @@ return {
     twoTurnRearmed:        out.twoTurnRearmed === true,
     dueAgainNextTurn:      out.dueAgainNextTurn === true,
     secondSpendRetires:    out.secondSpendRetires === true,
-    retireBeatsTurnsLeft:  out.retireBeatsTurnsLeft === true,
+    retireVerbDeleted:     out.retireVerbDeleted === true,
     extraKept:             out.extraKept === true
   }
 };

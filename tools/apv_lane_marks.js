@@ -28,6 +28,7 @@ out.after2={live:G._probe.live,turns:G._probe.turns};
 G.oppTurnCount=0;_lmArm('_probe',2,1,null);G.oppTurnCount=1;_lmSpend('_probe');
 out.singleAttempt={live:G._probe.live};
 out.deferIsGone=(typeof _lmDefer==='undefined');
+out.retireIsGone=(typeof _lmRetire==='undefined');
 if(realG)G=realG;
 
 /* ══ 2. THE CARD MARK PAINTS WITH NOTHING SELECTED ═══════════════════ */
@@ -40,10 +41,12 @@ const die=r.free[0];
 
 /* A. exactly what Steady Hand leaves behind: marked, nothing selected */
 out.markAlone=FXH.paintWith(()=>{FXH.clearMarks();die.el.classList.add('cardmark');});
+out.markInk=FXH.hue('dgCanvas');
 /* B. control - the canvas must EXIST and be empty, not merely absent */
 out.nothingAtAll=FXH.paintWith(()=>{FXH.clearMarks();});
 /* C. control - a selection alone still paints, so the guard change kept it */
 out.selectionAlone=FXH.paintWith(()=>{FXH.clearMarks();die.el.classList.add('selected');die.sel=true;});
+out.selInk=FXH.hue('dgCanvas');
 
 out.VERDICT={
   firstAttemptSpends:      out.after1.turns===1&&out.after1.live===true,
@@ -51,10 +54,19 @@ out.VERDICT={
   secondAttemptRetires:    out.after2.live===false,
   singleAttemptDiesAtOnce: out.singleAttempt.live===false,
   deferVerbDeleted:        out.deferIsGone===true,
+  retireVerbDeleted:       out.retireIsGone===true,
   probeReachedTheDice:     r.ok===true,
   markPaintsWithNothingSelected: out.markAlone.px>0,
   cleanCanvasExistsAndIsEmpty:   out.nothingAtAll.exists===true&&out.nothingAtAll.px===0,
   selectionStillPaints:          out.selectionAlone.px>0,
+  /* the two states share a silhouette, so equal alpha is CORRECT here - it is
+     the colour that has to differ, and alpha alone cannot say so. */
+  markAndSelectionAreDifferentInk: out.markInk.hex!==out.selInk.hex,
+  /* !goldish is the load-bearing half: gold is reddish by the loose test
+     (255,170,51 clears r>g+24, r>b+24), so `reddish` alone would score a
+     mark painted in the selection's colour as a pass. */
+  markWearsTheCardRed:             out.markInk.reddish===true&&out.markInk.goldish===false&&out.markInk.share>0.2,
+  selectionWearsGold:              out.selInk.goldish===true&&out.selInk.share>0.2,
 };
 out.PASS=Object.keys(out.VERDICT).every(k=>out.VERDICT[k]===true);
 return out;

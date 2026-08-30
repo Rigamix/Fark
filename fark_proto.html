@@ -14897,9 +14897,15 @@ function famFire(hook,ev){
   ev.mul=function(n){ev._mul*=n;};
   /* CLAIM IS A DECISION, NOT A QUANTITY. deadRoll has two outcomes - the turn
      continues or it ends - and encoding that as a number would mean choosing a
-     sentinel that every future claiming card has to know. Same argument as
-     Snare's _lmRetire being separate from _lmSpend: a distinct outcome earns a
-     distinct verb rather than an overloaded one. */
+     sentinel that every future claiming card has to know. A distinct outcome
+     earns a distinct verb rather than an overloaded one.
+     P879: the illustration used to be Snare's _lmRetire against _lmSpend. That
+     pair is gone - the ruling collapsed the two outcomes it named into one act
+     on the marker - so the example now points at the pair that survives:
+     _lmArm and _lmSpend are placing a mark and charging it, which really are
+     two things. The argument for `claim` is unaffected; only the example
+     needed replacing, and an example that no longer exists is worse than
+     none. */
   ev._claimed=false;ev.claim=function(){ev._claimed=true;};
   ['p','o'].forEach(function(owner){
     var list=owner==='p'?(G.pF||[]):(G.oF||[]);
@@ -24595,12 +24601,13 @@ function _iconRescuesRow(){
    placement always arms for +1, measured, not assumed - and different on the
    paths where the count and the mark disagree, which is what a window is for.
 
-   RETIREMENT IS NOT SHARED, deliberately. Snare is ONE turn and is consumed on
-   the bite: it clears inside the branch where it actually halved something, and
-   its one-turn window is enforced by the gate rather than by clearing. Fog and
-   Snuff run for `turns` turns and re-arm. Giving Snare a shared _lmSpend would
-   hand it a second turn - the exact wager its own comment says it must not
-   have ("until it fires tested at 97.7% inside six turns, which is not a bet").
+   P879: RETIREMENT IS SHARED NOW, and the paragraph that stood here was
+   FALSE by the end. It said "giving Snare a shared _lmSpend would hand it a
+   second turn - the exact wager its own comment says it must not have". It
+   would not: _lmSpend decrements before it tests, and Snare arms with turns:1,
+   so 1-1=0 and the mark dies on the spot. The fear was real while `turns` was
+   read as a window the mark lurks in; under the ruling it counts ATTEMPTS, and
+   one attempt spent is one mark gone. All three now spend once per due turn.
 
    TRADE IS NOT ONE OF THESE and must not be migrated onto it. The effect-system
    plan's own sentence groups Trade with these three; measured, G._tradeSwaps is
@@ -24652,15 +24659,12 @@ function _lmDue(key){
   var m=G&&G[key];
   return !!(m&&m.live&&m.turn===G.oppTurnCount);
 }
-/* CONSUMED - for an effect whose HIT uses the whole window at once, whatever
-   its count said. Distinct from _lmSpend, which charges one attempt.
-   P878: THIS COMMENT USED TO PRESENT SNARE AS THE CONSIDERED PATTERN - "it
-   retires inside the branch where it actually halved something" - and that
-   reading is what sent P876 to make fog and snuff match it. Snare was not the
-   template; it was the one missing its miss case. A due mark ALWAYS costs an
-   attempt. Snare calls this on both paths because it arms with a single
-   attempt, so consuming the window and spending its last attempt coincide. */
-function _lmRetire(key){var m=G&&G[key];if(m)m.live=false;}
+/* P879: _lmRetire is DELETED, as _lmDefer was. It expressed "this hit used the
+   whole window whatever the count said", and under the attempts ruling no hit
+   does: fog and snuff bought two FIRINGS with Kindred, so a hit must not
+   consume the rest, and snare's window is one attempt, so spending it and
+   consuming it are the same act. Three verbs became two - arm, due, spend -
+   and the machinery is done. */
 /* Spend one turn of the window: re-arm for the next opponent turn, or retire.
    Snare does not call this - see the note above. */
 function _lmSpend(key){
@@ -27644,9 +27648,18 @@ var D3X={
         /* P876: A CARD MARK WAKES THIS TOO. The guard tested `selected` alone,
            and Steady Hand's pick CLEARS selected before it adds the mark - so
            unless some other die happened to be selected, P856's mark was a
-           class on an element and nothing else for its whole 900ms. P856 moved
-           the mark onto a painter that refuses to run in the state P856's own
-           call site creates. */
+           class on an element and nothing else. P856 moved the mark onto a
+           painter that refuses to run in the state P856's own call site
+           creates.
+           P879: THE COST ARGUMENT IS PER-FRAME, NOT PER-DURATION. This comment
+           used to call the mark transient and cite its own timeout, and that
+           is only true of Steady Hand's pick. _breakBegin adds `cardmark` to every
+           candidate with NO timer, so a Break prompt paints for as long as the
+           player deliberates. What actually bounds the cost is the same thing
+           the note below says about the selection glow: one thin hull on an
+           otherwise empty surface, which holds however long the mark lives.
+           The state layer is built on this next, and states are long-lived by
+           definition - so it must not inherit an argument about transience. */
         if(!q.match||!q.obj.visible)continue;
         if(q.chip.classList.contains('selected')||q.chip.classList.contains('cardmark')){skip=false;break;}
       }
@@ -36917,20 +36930,17 @@ function runOppTurn(){
         if(total>0&&_snIdx>=0&&used&&used[_snIdx]){
           var _snX2=!!G._snare.x2;
           total=Math.floor(total/(_snX2?4:2));/* Kindred halves it twice */
-          _lmRetire('_snare');
           try{famLog('THE SNARE BITES — '+(_snX2?'HALVED TWICE':'HALVED'));}catch(e){}
           try{setStatusMsg('YOUR SNARE CATCHES THEM — '+(_snX2?'A QUARTER':'HALF'),'gold');}catch(e){}
-        }else{
-          /* P878: THE MISS, which the comment above this block has promised
-             since it was written - "the mark then clears whether it fired or
-             not" - and which the code never did. Retiring only on the hit left
-             a missed snare live:true with `turn` pointing at the turn that had
-             just passed, and _lmDue tests turn===oppTurnCount: live for ever,
-             due never. Snare arms with turns:1 and its Kindred halves twice on
-             one shot rather than buying a second attempt, so retiring and
-             spending the last attempt are the same act here. */
-          _lmRetire('_snare');
         }
+        /* P879: ONE SPEND, HIT OR MISS - the same line fog and snuff carry,
+           so all three lane marks finally do the same thing. The block above
+           used to retire on the hit and (P878) retire again on the miss, which
+           is two ways of writing one act. A due mark costs an attempt: snare
+           arms with turns:1, so spending it is what clears it, and the comment
+           this block has always carried - "the mark then clears whether it
+           fired or not" - is now what the code does. */
+        _lmSpend('_snare');
       }
       /* Snake Oil: zero out this roll's score */
       if(G._snakeOilActive){G._snakeOilActive=false;total=0;setStatusMsg('SNAKE OIL — SCORE ZEROED!','gold');}

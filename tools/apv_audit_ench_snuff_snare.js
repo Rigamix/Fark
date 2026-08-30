@@ -2,7 +2,12 @@
  * Snuff: keep the branded 1 (with a 5) and BANK -> the rival's next
  * deal is FIVE dice with lane 0 empty; the turn after, six again.
  * Snare: re-brand, keep, bank -> the mark arms for their next turn
- * and the halving branch RUNS (witnessed via _lmRetire('_snare')). */
+ * and the halving branch RUNS (witnessed via the log line the hit writes).
+ * P879: this used to watch _lmRetire('_snare'), and a straight swap to
+ * _lmSpend would have quietly broken it - the spend is UNCONDITIONAL inside
+ * the due block now, so it fires on a miss too and the witness could not
+ * fail. The halving is the thing under test, so watch what only the halving
+ * does. */
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const until=async(fn,ms)=>{const t0=Date.now();while(Date.now()-t0<ms){try{if(fn())return true;}catch(e){}await sleep(120);}return false;};
 const tap=el=>{if(!el)return false;const r=el.getBoundingClientRect();
@@ -41,11 +46,23 @@ await sleep(2000);
 const snuffDeal=dealSizes[0]||null;
 dealSizes.length=0;/* fresh window for the snare leg */
 /* SNARE turn: witness the halving branch */
-const RET=[];const _oret=window._lmRetire;
-window._lmRetire=function(k){RET.push({k:k,t:performance.now()|0});return _oret.apply(this,arguments);};
+/* TWO WITNESSES, because one cannot tell a miss from a no-show. The probe
+   stubs their roll so lane 0 holds a 5, but it cannot make their AI KEEP it,
+   and the halving is conditional on the keep - measured across five runs this
+   leg fires sometimes and not others, on this build and on the one before it.
+   So: the SPEND says the due block was reached and the mark was evaluated;
+   the LOG says it actually halved. Absent both, the mark was never due, and
+   that is the only outcome that is a bug. */
+const RET=[];const BITE=[];
+const _olog=window.famLog;
+window.famLog=function(m){try{if(/SNARE BITES/.test(String(m)))BITE.push({t:performance.now()|0});}catch(e){}
+  return _olog?_olog.apply(this,arguments):undefined;};
+const _osp=window._lmSpend;
+window._lmSpend=function(k){if(k==='_snare')RET.push({k:k,t:performance.now()|0});
+  return _osp?_osp.apply(this,arguments):undefined;};
 G._enchArr=[{t:'snare',face:1},null,null,null,null,null];
 /* their deal is stubbed so lane 0 holds a 5 they WILL keep - the
-   halving+retire branch is conditional on that lane scoring */
+   halving is conditional on that lane scoring (the SPEND is not, P879) */
 const realRF=window.rollFace;
 let RQ=[5,1,2,2,3,3];
 window.rollFace=m=>RQ.length?RQ.shift():realRF(m);
@@ -64,12 +81,15 @@ if(!await until(()=>G.phase==='idle'&&(G.turnNum||0)>=3,90000)){clearInterval(de
 await sleep(2000);
 clearInterval(dealWatch);
 const nextDeal=dealSizes[0]||null;
-const snareRetired=RET.some(r=>r.k==='_snare');
-return {snuffDeal,nextDealAfterSnare:nextDeal,snareArmedAt,snareState,RET,
+const snareEvaluated=RET.some(r=>r.k==='_snare');/* the due block ran */
+const snareBit=BITE.length>0;/* it actually halved */
+return {snuffDeal,nextDealAfterSnare:nextDeal,snareArmedAt,snareState,RET,BITE,
+  snareOutcome:(!snareEvaluated?'NEVER DUE - the bug':snareBit?'HIT':'MISS - they declined lane 0'),
   verdicts:{
     snuffedLane0Gone:!!(snuffDeal&&snuffDeal.n===5&&snuffDeal.lanes.indexOf(0)<0),
     snareArmedByKeep:snareArmedAt,
     snareLane0:!!(snareState&&snareState.lane===0),
-    snareBranchRan:snareRetired,
+    snareBecameDue:snareEvaluated,/* the assertion that can fail */
+    snareHalvedWhenTheyKept:(!snareEvaluated||!snareBit)?'n/a - no keep on lane 0':true,
     dealBackToSixAfterSnare:!!(nextDeal&&nextDeal.n===6)},
-  verdict:!!(snuffDeal&&snuffDeal.n===5&&snuffDeal.lanes.indexOf(0)<0)&&snareArmedAt&&!!(snareState&&snareState.lane===0)&&snareRetired};
+  verdict:!!(snuffDeal&&snuffDeal.n===5&&snuffDeal.lanes.indexOf(0)<0)&&snareArmedAt&&!!(snareState&&snareState.lane===0)&&snareEvaluated};

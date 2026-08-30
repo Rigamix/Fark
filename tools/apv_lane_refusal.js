@@ -34,8 +34,10 @@ out.afterFogOnLane2={
   breakSameLane:_iconRefused(die('break',2,1)),
 };
 
-/* once the mark has affected the opponent, the spot frees up */
-_lmRetire('_fog');
+/* once the mark has affected the opponent, the spot frees up. P879: that is
+   _lmSpend now - the fog above is armed with a single attempt, so spending it
+   is what ends it, and _lmRetire no longer exists. */
+_lmSpend('_fog');
 out.afterRetire={snuffSameLane:_iconRefused(die('snuff',2,5))};
 
 /* THE SPLIT: a refused brand must leave `icons` and join `rest`, so it scores */

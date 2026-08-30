@@ -132,11 +132,43 @@ window.FXH = (function(){
     return Object.assign(ink('dgCanvas'), t ? {drawThrew:t} : {});
   }
 
+  /* THE INK, not just the coverage. ink() counts alpha, and two states that
+     share a silhouette come out byte-identical under it - the card mark and
+     the keep glow paint the SAME _hullOf projection and differ only in
+     colour. So an alpha probe scores "the mark painted" identically whether
+     it painted the mark's red or the selection's gold, and the regression it
+     cannot see (a state wearing another state's colour) is exactly the one
+     the state layer is about to make possible four more ways.
+     Returns the dominant opaque-ish colour, quantised, plus how dominant it
+     is - a probe that gets a 3% plurality has not measured a colour. */
+  function hue(id, minA){
+    const cv = document.getElementById(id || 'dgCanvas');
+    if (!cv) return {exists:false, why:'no canvas'};
+    if (!cv.width) return {exists:true, why:'zero-width canvas'};
+    const d = cv.getContext('2d').getImageData(0,0,cv.width,cv.height).data;
+    const A = minA == null ? 40 : minA, bin = {};
+    let n = 0;
+    for (let i = 0; i < d.length; i += 4){
+      if (d[i+3] < A) continue;
+      n++;
+      const k = (d[i]>>4<<8) | (d[i+1]>>4<<4) | (d[i+2]>>4);
+      bin[k] = (bin[k]||0) + 1;
+    }
+    if (!n) return {exists:true, lit:0, why:'nothing above alpha floor'};
+    let best = -1, bk = 0;
+    for (const k in bin) if (bin[k] > best){ best = bin[k]; bk = +k; }
+    const r = (bk>>8&15)*17, g = (bk>>4&15)*17, b = (bk&15)*17;
+    const hex = '#' + [r,g,b].map(v => v.toString(16).padStart(2,'0')).join('');
+    return {exists:true, lit:n, hex, rgb:[r,g,b], share:+(best/n).toFixed(3),
+            reddish: r > g + 24 && r > b + 24,
+            goldish: r > b + 40 && g > b + 40 && Math.abs(r-g) < 90};
+  }
+
   const clearMarks = () => ((G && G.pool) || []).forEach(d => {
     if (d.el) d.el.classList.remove('selected','cardmark');
     d.sel = false;
   });
 
   return {sleep, until, tap, settled, match, loadDice, rollAndSettle,
-          draw, ink, paintWith, clearMarks};
+          draw, ink, hue, paintWith, clearMarks};
 })();
