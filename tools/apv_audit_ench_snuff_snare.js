@@ -82,6 +82,10 @@ await sleep(2000);
 clearInterval(dealWatch);
 const nextDeal=dealSizes[0]||null;
 const snareEvaluated=RET.some(r=>r.k==='_snare');/* the due block ran */
+/* P887: some() cannot see a DOUBLE spend, and at Kindred's turns:2 on fog or
+   snuff a second spend in one due turn would silently eat both attempts. So
+   count, do not test existence. */
+const spendCounts={};RET.forEach(function(r){spendCounts[r.k]=(spendCounts[r.k]||0)+1;});
 const snareBit=BITE.length>0;/* it actually halved */
 return {snuffDeal,nextDealAfterSnare:nextDeal,snareArmedAt,snareState,RET,BITE,
   snareOutcome:(!snareEvaluated?'NEVER DUE - the bug':snareBit?'HIT':'MISS - they declined lane 0'),
@@ -90,6 +94,7 @@ return {snuffDeal,nextDealAfterSnare:nextDeal,snareArmedAt,snareState,RET,BITE,
     snareArmedByKeep:snareArmedAt,
     snareLane0:!!(snareState&&snareState.lane===0),
     snareBecameDue:snareEvaluated,/* the assertion that can fail */
+    noKeySpentTwiceInOneDueTurn:Object.keys(spendCounts).every(function(k){return spendCounts[k]<=1;}),
     snareHalvedWhenTheyKept:(!snareEvaluated||!snareBit)?'n/a - no keep on lane 0':true,
     dealBackToSixAfterSnare:!!(nextDeal&&nextDeal.n===6)},
   verdict:!!(snuffDeal&&snuffDeal.n===5&&snuffDeal.lanes.indexOf(0)<0)&&snareArmedAt&&!!(snareState&&snareState.lane===0)&&snareEvaluated};

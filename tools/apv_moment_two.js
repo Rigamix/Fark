@@ -37,7 +37,22 @@ FKFX.landed = function (el, ink) {
   return realLanded.apply(this, arguments);
 };
 
+/* P887: DRIVE THE FRAMES. _physPose only runs for a die the frame decided to
+   DRAW, and headless renders at ~1fps, so every previous run of this probe
+   settled through the WATCHDOG - the exit players do not take. Spinning
+   D3X.frame() while the tape plays makes _physPose the exit, which is the only
+   way to exercise it here at all. */
+D3X._landedVia.physPose = 0; D3X._landedVia.watchdog = 0;
+const beatTimes = [];
+const realLandedT = FKFX.landed;
+FKFX.landed = function () { beatTimes.push(performance.now()); return realLandedT.apply(this, arguments); };
+const spin = setInterval(() => { try { D3X.frame(); } catch (e) {} }, 8);
 const r = await FXH.rollAndSettle({vals: [1, 5, 1, 5, 1, 5]});
+clearInterval(spin);
+FKFX.landed = realLandedT;
+out.exits = Object.assign({}, D3X._landedVia);
+out.beatSpacing = beatTimes.length > 1
+  ? beatTimes.slice(1).map((t, i) => +(t - beatTimes[i]).toFixed(1)) : [];
 out.gotToTheDice = {ok: r.ok, why: r.why, freeDice: r.freeDice};
 FKFX.landed = realLanded;
 if (!r.ok) return Object.assign(out, {err: 'never got to the dice: ' + r.why});
@@ -88,6 +103,10 @@ out.VERDICT = {
   everyBeatWoreItsBrandInk: out.beats.n > 0 && out.inkMatches === true,
   /* the refusal case specifically - it is the one a naive hook gets wrong */
   refusalWasInPlay:        out.predicate.refusedPresent === true,
+  /* P887: which exit fired. Before the counters nothing could tell, and the
+     exit players actually take had never been exercised by any probe. */
+  aBeatCameThroughAnExit: (out.exits.physPose + out.exits.watchdog) > 0,
+  thePhysPoseExitCanFire: out.exits.physPose > 0,
   noBeatForARefusedBrand:  out.beats.n > 0 &&
                            !pool.some(d => d.ench && _iconRefused(d) &&
                                            beatSet.indexOf(d.el) >= 0),

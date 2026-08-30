@@ -18418,7 +18418,14 @@ var FKFX={
     }catch(e){}
   },
   _beam:function(el,col,ms){
-    /* P883: z-index 4, under the dice canvas at 41 - same story as _flash. */
+    /* P883: z-index 4, under the dice canvas at 41 - same story as _flash.
+       P887: AND NOTHING ON A DIE REACHES IT TODAY. Resolved at runtime, the
+       only play() site passing a die element is the enchant keep, and no
+       enchant id resolves to PAY, FATE or ARM - the three families that call
+       this. On a die _flash arrives via BREAK, _glow only through moment 2,
+       and _beam through nothing at all. The painter is correct and worth
+       having ready; it is simply not exercised, and P883's commit overstated
+       the reach by saying otherwise. */
     var _d=(window.D3X&&D3X.dice&&D3X._byChip)?D3X._byChip(el):null;
     if(_d&&_d.phys&&_d.obj&&_d.obj.visible){D3X._fxMark(_d,'beam',col,ms||600);return;}
     if(!el)return;
@@ -18440,8 +18447,8 @@ var FKFX={
      animation below is invisible - while `translate` is the property
      _slaveHost writes inline every frame (and a running animation outranks
      inline style, which is the whole reason it picked translate), and
-     `opacity` is read by D3X at 29629 as "hide this die". Invisible, and two
-     ways harmful. So a D3X-owned die takes the mesh instead: dx/dy become a
+     `opacity` is read by D3X's frame pass as a visibility signal - a chip
+     computed at or under .02 hides its die. Invisible, and two ways harmful. So a D3X-owned die takes the mesh instead: dx/dy become a
      damped shake, `sc` becomes the squash SET has always described and never
      shown, and `rt` becomes a twist.
      P882: rt was dropped here on a wrong reason - that spinning a settled die
@@ -24731,8 +24738,13 @@ function _lmDue(key){
    consume the rest, and snare's window is one attempt, so spending it and
    consuming it are the same act. Three verbs became two - arm, due, spend -
    and the machinery is done. */
-/* Spend one turn of the window: re-arm for the next opponent turn, or retire.
-   Snare does not call this - see the note above. */
+/* Spend one ATTEMPT: re-arm for the next opponent turn, or retire.
+   P887: this used to name Snare as the one mark that never reached this
+   function, and Snare has reached it since P879 - which claimed to have
+   updated all three comments arguing for the old split and missed the one
+   sitting on the function itself. By its
+   own standard that is the worst of the four: a reader checking what _lmSpend
+   is for looks here first. All three marks spend once per due turn now. */
 function _lmSpend(key){
   var m=G&&G[key];if(!m)return;
   m.turns=(m.turns||1)-1;
@@ -26391,7 +26403,8 @@ var D3X={
     for(var i=0;i<this.dice.length;i++)if(this.dice[i].chip===el)return this.dice[i];
     return null;
   },
-  /* P881: NUDGE - kick's sibling. kick (29594) is a one-way displacement with
+  /* P881: NUDGE - kick's sibling. kick, in the same settled branch, is a
+     one-way displacement with
      a spin; nudge is a damped oscillation with none, because a settled die's
      rotation is the number it is showing. Amplitude arrives in px, from an
      instrument that was written against a DOM chip, and is stored in
@@ -27967,11 +27980,18 @@ var D3X={
            used to call the mark transient and cite its own timeout, and that
            is only true of Steady Hand's pick. _breakBegin adds `cardmark` to every
            candidate with NO timer, so a Break prompt paints for as long as the
-           player deliberates. What actually bounds the cost is the same thing
-           the note below says about the selection glow: one thin hull on an
-           otherwise empty surface, which holds however long the mark lives.
-           The state layer is built on this next, and states are long-lived by
-           definition - so it must not inherit an argument about transience. */
+           player deliberates.
+           P887: AND THE BOUND IS NOT BORROWED, because the note it was taken
+           from does not cover this. That note reads "this canvas is only
+           painted WHILE DICE ARE SELECTED, and it is one thin shape on an
+           otherwise empty surface" - and the selection condition is exactly
+           what P876 widened and what the state layer discards. So, on its own
+           terms: the cost is one thin hull per marked die per frame on a
+           surface that is otherwise empty, and the pass sleeps entirely when
+           no die carries a registered class. That is per-frame and independent
+           of how long a mark lives, which is what the state layer needs, and
+           it is UNMEASURED - a frame-time comparison against an empty registry
+           is the thing that would settle it. */
         if(!q.match||!q.obj.visible)continue;
         if(q.chip.classList.contains('selected')||q.chip.classList.contains('cardmark')){skip=false;break;}
       }
@@ -28831,20 +28851,31 @@ var D3X={
      zero beats on a hand that had a live icon in it.
      It is hooked at the DIE's own settle rather than the tape's end because
      the tape ends on the last die, and six jolts fired together are one noise.
+     P887: THAT IS TRUE OF _physPose AND NOT OF THE WATCHDOG. _physPose runs
+     per drawn die per frame, so each die's beat lands on its own frame and the
+     stagger is free. The watchdog retires every overdue die in ONE pass, so
+     beats batch there - measured, three inside 1ms. That is the right trade,
+     because the watchdog only ever catches dice the frame never drew, but the
+     sentence above was claiming a property this code has on one path of two.
+     _landedVia counts the exits: before it, nothing could tell which had
+     fired, and the _physPose exit - the one players take - had never once been
+     exercised by a probe.
      G.pool is the player's hand, so rival dice are out by construction rather
      than by a test; and _dieIsIcon has excluded a refused brand since P878, so
      a brand whose lane is taken lands silently instead of promising a payoff
      the rules have already declined. */
-  _landed:function(d){
+  _landedVia:{physPose:0,watchdog:0},
+  _landed:function(d,via){
+    if(via&&this._landedVia[via]!==undefined)this._landedVia[via]++;
     if(!d||!d.match||!d.chip)return false;
     if(!window.FKFX||typeof _dieIsIcon!=='function')return false;
     try{
-      /* P884c: NOT window.G. G is a `let` (30882), so it is a global binding
+      /* P884c: NOT window.G. G is a `let`, so it is a global binding
          and not a property of window - `window.G` is undefined for the life of
          the page, and the guard that used it short-circuited every time,
          handed back an empty array and made this whole beat unreachable. The
-         same note is already at 31018, where the same mistake silently
-         no-opped a whole migration. FKFX and ENCH_ICONS are `var`, so those
+         same note is already on _dropKeptToTray_OLD's guard, where the same
+         mistake silently no-opped a whole migration. FKFX and ENCH_ICONS are `var`, so those
          window reads are sound. */
       var p=(typeof G!=='undefined'&&G&&G.pool)||[],g=null;
       for(var i=0;i<p.length;i++){if(p[i].el===d.chip){g=p[i];break;}}
@@ -28891,7 +28922,7 @@ var D3X={
           ?d.roll.t0+((d.roll._setF!==undefined?d.roll._setF:d.roll.sol.frames.length))*(this.PHYS.dt*1000)
           :performance.now()};d.roll=null;/* P702/P703/P725 */
       if(!this._rolling())this._shDirty=true;/* they have landed: draw them */
-      this._landed(d);/* P884b: one of TWO settle exits - see _landed */
+      this._landed(d,'physPose');/* P884b: one of TWO settle exits - see _landed */
     }
     return {x:f.x,y:f.y,z:f.z,q:q,done:done};
   },
@@ -29370,8 +29401,9 @@ var D3X={
         v:(R&&R.val)||null,
         t:(R&&R.sol&&R.sol.frames)?R.t0+((R._setF!==undefined?R._setF:R.sol.frames.length))*(D3X.PHYS.dt*1000):performance.now()};/* P725 */
       d.roll=null;
-      D3X._landed(d);/* P884b: the OTHER settle exit - the rule above applies
-                        to the beat exactly as it applies to the payload */
+      D3X._landed(d,'watchdog');/* P884b: the OTHER settle exit - the rule
+                        above applies to the beat exactly as it applies to the
+                        payload. P887: and this one batches - see _landed */
     });
     /* SYNC BEFORE STARTING A DEFERRED THROW. This was the other way round,
        so a throw waiting on its dice was retried against the list as it was
