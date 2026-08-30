@@ -1,0 +1,142 @@
+/* THE FX HARNESS — state-polled, forced-draw, one copy.
+ *
+ * WHY THIS EXISTS. The headless probe renders the 3D layer at about ONE FRAME
+ * PER SECOND. Measured: D3X._rolling() takes ~19s to clear against ~700ms in a
+ * real browser, and _drawGlow refuses to run the whole pass while it is true -
+ * so the glow canvas is not even CREATED inside a normal probe window. Every
+ * wall-clock wait in an FX probe is therefore a coin flip, and a probe that
+ * loses the flip reports a clean zero for a reason that has nothing to do with
+ * the code under test. That has already happened three times.
+ *
+ * THE RULE THIS ENCODES: poll the STATE, never the clock; then force the draw.
+ * Nothing is stubbed - the real painter runs on the real dice. Only the wait
+ * is made honest.
+ *
+ * THE SECOND RULE, and it is the one that makes the first worth having: every
+ * helper reports whether it ACTUALLY GOT THERE. A probe cannot pass because a
+ * canvas was missing, because a roll never landed, or because a pixel counter
+ * looked at nothing. `exists` is separate from `px` for exactly that reason -
+ * testing px===0 alone is a control that cannot fail.
+ *
+ * USAGE, from any probe (the server serves the repo root):
+ *     eval(await (await fetch('/tools/_fxh.js')).text());
+ *     const r = await FXH.rollAndSettle();
+ *     if(!r.ok) return {err:'never got to the dice', r};
+ *     FXH.draw();
+ *     const a = FXH.ink('dgCanvas');
+ */
+window.FXH = (function(){
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  /* poll a predicate. Returns how long it took, or null - a caller that wants
+     to know "did this happen" must be able to tell it from "I gave up". */
+  async function until(fn, ms){
+    const t0 = Date.now();
+    while (Date.now() - t0 < ms){
+      try { if (fn()) return Date.now() - t0; } catch(e){}
+      await sleep(120);
+    }
+    return null;
+  }
+
+  const tap = el => {
+    if (!el) return false;
+    const r = el.getBoundingClientRect();
+    const o = {bubbles:true, cancelable:true, clientX:r.left+r.width/2, clientY:r.top+r.height/2};
+    el.dispatchEvent(new PointerEvent('pointerdown', o));
+    el.dispatchEvent(new PointerEvent('pointerup', o));
+    el.dispatchEvent(new MouseEvent('click', o));
+    return true;
+  };
+
+  /* THE PHYSICS TAPE, not a timer. D3X._rolling() is true while any die still
+     has a tape to play, and the tape advances per FRAME - so at 1fps this is
+     the only honest way to know the dice have stopped. */
+  const settled = (ms) => until(() => typeof D3X !== 'undefined' && D3X.dice
+    && D3X.dice.some(d => d.match) && !D3X._rolling(), ms || 45000);
+
+  /* start a match and stop when the player can actually act */
+  async function match(tier, ms){
+    if (typeof launchBossMatch !== 'function') return {ok:false, why:'no boot'};
+    _getS(); window._fkDiscardOk = true;
+    S.run.tier = tier == null ? 1 : tier; S.run.gold = 500;
+    try { delete S.pendingMatch; } catch(e){}
+    try { showScreen('gauntlet'); } catch(e){}
+    launchBossMatch();
+    const t = await until(() => typeof G !== 'undefined' && G && G.phase === 'idle', ms || 25000);
+    if (t == null) return {ok:false, why:'match never became idle'};
+    await sleep(1200);
+    return {ok:true, tookMs:t};
+  }
+
+  /* force every face to score, so a probe about MARKS is never derailed by a
+     bust it did not ask for */
+  function loadDice(vals){
+    const Q = (vals && vals.slice()) || (function(){const a=[];for(let i=0;i<24;i++)a.push(i%2?5:1);return a;})();
+    const real = window._enchRollM;
+    window._enchRollM = (m,e) => Q.length ? Q.shift() : real(m,e);
+    return () => { window._enchRollM = real; };
+  }
+
+  /* roll, wait for the player's turn to come back, THEN wait for the tape.
+     Both are reported: a probe that only checks the second can pass while the
+     roll never happened. */
+  async function rollAndSettle(opt){
+    opt = opt || {};
+    const restore = opt.noLoad ? null : loadDice(opt.vals);
+    const btn = document.getElementById('btnRoll');
+    if (!btn) return {ok:false, why:'no roll button'};
+    tap(btn);
+    const chose = await until(() => G && G.phase === 'choosing', opt.chooseMs || 40000);
+    const drained = await settled(opt.settleMs);
+    const free = ((G && G.pool) || []).filter(d => !d.committed);
+    if (restore) restore();
+    return {
+      ok: chose != null && drained != null && free.length > 0,
+      reachedChoosing: chose != null, tapeDrained: drained != null,
+      freeDice: free.length, free: free,
+      why: chose == null ? 'never reached choosing'
+         : drained == null ? 'tape never drained'
+         : free.length === 0 ? 'no free dice' : null,
+    };
+  }
+
+  /* THE FORCED DRAW. _drawGlow is only called from D3X's frame pass, which at
+     1fps may not run inside any reasonable window. Calling it directly runs
+     the real painter on the real dice - it is the wait that is skipped, not
+     the work. */
+  function draw(){
+    let threw = null;
+    try { D3X._drawGlow(); } catch(e){ threw = e.message; }
+    return threw;
+  }
+
+  /* alpha-coverage of a canvas. `exists` is deliberately separate from `px`:
+     a missing canvas and an empty one are different findings, and conflating
+     them turns "the canvas is clean" into an assertion that cannot fail. */
+  function ink(id){
+    const cv = document.getElementById(id || 'dgCanvas');
+    if (!cv) return {exists:false, px:0, why:'no canvas'};
+    if (!cv.width) return {exists:true, px:0, why:'zero-width canvas'};
+    const d = cv.getContext('2d').getImageData(0,0,cv.width,cv.height).data;
+    let n = 0;
+    for (let i = 3; i < d.length; i += 4) if (d[i] > 8) n++;
+    return {exists:true, px:n, w:cv.width, h:cv.height};
+  }
+
+  /* paint one configuration and read it back, in one call, so a probe cannot
+     accidentally read a canvas from before its own change */
+  function paintWith(fn){
+    try { fn(); } catch(e){ return {threw:e.message}; }
+    const t = draw();
+    return Object.assign(ink('dgCanvas'), t ? {drawThrew:t} : {});
+  }
+
+  const clearMarks = () => ((G && G.pool) || []).forEach(d => {
+    if (d.el) d.el.classList.remove('selected','cardmark');
+    d.sel = false;
+  });
+
+  return {sleep, until, tap, settled, match, loadDice, rollAndSettle,
+          draw, ink, paintWith, clearMarks};
+})();

@@ -61,8 +61,25 @@ try{_iconFire(okDie,'p');}catch(e){}
 if(realFire)ENCH_ICONS.snuff.fire=realFire;
 out.handler={firesForAllowedOnly:fired===1};
 
+/* P878 (brief 3.6): THE RULE IS IN THE CANONICAL PREDICATE NOW, so every one
+   of _dieIsIcon's twelve readers gets it. The named divergence: _markLoneCast
+   built its list from _dieIsIcon and would mark a refused brand "will cast" on
+   a die that then scored 100 - a visual promising an effect that cannot
+   happen. Asserted directly on the predicate rather than on the marker, since
+   the marker is what reads it. */
+/* FRESH DICE. The first version reused okDie/noDie - but the probe has by
+   then called _iconFire on them, which pushes their brand into G._castEnch
+   and makes _brandSpent true, so `allowedIsBoth` was false for a completely
+   correct reason. The assertion was measuring after a change it had caused. */
+const pFree=die('snuff',4,5), pTaken=die('snuff',2,5);
+out.predicate={
+  refusedIsLiveButNotAnIcon: _iconLive(pTaken)===true&&_dieIsIcon(pTaken)===false,
+  allowedIsBoth:             _iconLive(pFree)===true&&_dieIsIcon(pFree)===true,
+};
 if(realG)G=realG;
 out.VERDICT={
+  refusalLivesInTheCanonicalPredicate: out.predicate.refusedIsLiveButNotAnIcon===true
+                                       &&out.predicate.allowedIsBoth===true,
   nothingRefusedOnACleanTable: !out.cleanTable.fog&&!out.cleanTable.snuff&&!out.cleanTable.tithe,
   occupyingRefusedOnATakenSpot: out.afterFogOnLane2.snuffSameLane===true&&out.afterFogOnLane2.snareSameLane===true,
   occupyingAllowedElsewhere:    out.afterFogOnLane2.snuffOtherLane===false,
