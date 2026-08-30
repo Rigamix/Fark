@@ -18386,12 +18386,21 @@ var FKFX={
   /* the visual primitives, all pre-existing */
   _spray:function(el,col,n2,o){try{_fxSpray(el,col,n2,o);}catch(e){}},
   _glow:function(el,col,size,ms){
+    /* P883: a drop-shadow on an element with no opaque pixels casts nothing,
+       and a match die's chip has none - the die is drawn on the canvas above
+       it. Owned dice take the over-canvas, where the shape is real. */
+    var _d=(window.D3X&&D3X.dice&&D3X._byChip)?D3X._byChip(el):null;
+    if(_d&&_d.phys&&_d.obj&&_d.obj.visible){D3X._fxMark(_d,'glow',col,ms||500);return;}
     if(!el||!el.animate)return;
     try{el.animate([{filter:'drop-shadow(0 0 0 transparent)'},
       {filter:'drop-shadow(0 0 '+(size*2)+'px '+col+') brightness(1.16)'},
       {filter:'drop-shadow(0 0 2px transparent)'}],{duration:ms||500,easing:'ease-out'});}catch(e){}
   },
   _flash:function(el){
+    /* P883: this appends a white div at z-index 8, and on the match screen the
+       dice canvas is 41. Owned dice get the hull filled on the over-canvas. */
+    var _d=(window.D3X&&D3X.dice&&D3X._byChip)?D3X._byChip(el):null;
+    if(_d&&_d.phys&&_d.obj&&_d.obj.visible){D3X._fxMark(_d,'flash','#ffffff',150);return;}
     if(!el)return;
     try{
       var f=document.createElement('div');
@@ -18404,6 +18413,9 @@ var FKFX={
     }catch(e){}
   },
   _beam:function(el,col,ms){
+    /* P883: z-index 4, under the dice canvas at 41 - same story as _flash. */
+    var _d=(window.D3X&&D3X.dice&&D3X._byChip)?D3X._byChip(el):null;
+    if(_d&&_d.phys&&_d.obj&&_d.obj.visible){D3X._fxMark(_d,'beam',col,ms||600);return;}
     if(!el)return;
     try{
       var b=document.createElement('div');
@@ -27320,6 +27332,31 @@ var D3X={
      {cls:'die-frozen', ink:'#9ab0d0', form:'rim'}; `ink` is the state's
      EXISTING colour from ENCH_ICONS or FKFX.meta, never a new one. */
   STATE_FORMS:[],
+  /* P883: TRANSIENT BEATS on the same surface. A state is a class that is
+     either there or not; a beat has a clock. Both are painted by the pass
+     because the pass clears the canvas every frame, so a one-shot paint from
+     outside would live exactly one frame. An entry is
+     {d, kind:'glow'|'flash'|'beam', ink, t0, ms}. */
+  FX_MARKS:[],
+  _fxMark:function(d,kind,ink,ms){
+    if(!d||!d.obj)return false;
+    (this.FX_MARKS||(this.FX_MARKS=[])).push(
+      {d:d,kind:kind,ink:ink||'#ffffff',t0:performance.now(),ms:ms||500});
+    return true;
+  },
+  /* the hull as a path. A small sibling of the tracer inside _paintHalo, not
+     a refactor of it: that one also does shrink, lean, stretch and the stamp
+     branch for the card halo, and taking it apart to share this much would
+     put the selection glow at risk for nothing. */
+  _traceHull:function(ctx,hull){
+    if(!hull||!hull.length)return;
+    ctx.beginPath();
+    for(var i=0;i<hull.length;i++){
+      if(i)ctx.lineTo(hull[i][0],hull[i][1]);
+      else ctx.moveTo(hull[i][0],hull[i][1]);
+    }
+    ctx.closePath();
+  },
   /* THE STATE PASS. Deliberately not _drawGlow: it must not inherit either of
      that painter's guards. _drawGlow skips whenever no die is being kept or
      card-marked (a state belongs to a die nobody is touching) and whenever
@@ -27333,6 +27370,12 @@ var D3X={
   _drawStates:function(){
     this._statePasses=(this._statePasses||0)+1;
     var cv=document.getElementById('stCanvas'),i,d;
+    /* P883: expire first, and drop any beat whose die has gone - a mark that
+       outlived its die would paint over an empty seat. */
+    var _now=performance.now();
+    var beats=this.FX_MARKS=(this.FX_MARKS||[]).filter(function(mk){
+      return mk.d&&mk.d.obj&&mk.d.obj.visible&&(_now-mk.t0)<mk.ms;
+    });
     var forms=this.STATE_FORMS||[],want=[];
     for(i=0;i<this.dice.length;i++){
       d=this.dice[i];
@@ -27341,7 +27384,7 @@ var D3X={
         if(d.chip.classList.contains(forms[f].cls))want.push({d:d,form:forms[f]});
       }
     }
-    if(!want.length){
+    if(!want.length&&!beats.length){
       if(cv&&this._stateInk){
         var c0=cv.getContext('2d');
         c0.setTransform(1,0,0,1,0,0);c0.clearRect(0,0,cv.width,cv.height);
@@ -27377,6 +27420,48 @@ var D3X={
     for(var k in byInk){
       var ink=k.split('|')[1];
       this._paintHalo(cv,x,sc,dpr,byInk[k],ink,ink,1);
+    }
+    /* P883: beats last, so a transient reads ON TOP of the state it belongs
+       to rather than under it. */
+    for(i=0;i<beats.length;i++){
+      var mk=beats[i],hb=this._hullOf(mk.d,sc,G.grow);
+      if(!hb)continue;
+      var tt=(_now-mk.t0)/mk.ms;
+      if(tt<0)tt=0;if(tt>1)tt=1;
+      if(mk.kind==='glow'){
+        /* the keep glow's own painter, alpha on a sine: it swells and leaves */
+        this._paintHalo(cv,x,sc,dpr,[hb],mk.ink,mk.ink,Math.sin(tt*Math.PI));
+      }else if(mk.kind==='flash'){
+        x.save();
+        x.globalAlpha=Math.max(0,1-tt)*0.8;
+        x.fillStyle=mk.ink;
+        this._traceHull(x,hb);
+        x.fill();
+        x.restore();
+      }else if(mk.kind==='beam'){
+        /* a column out of the die's own box, in the proportions the DOM
+           version used, so it reads as the effect it has always been */
+        var bx0=1e9,bx1=-1e9,by0=1e9,by1=-1e9;
+        for(var bi=0;bi<hb.length;bi++){
+          if(hb[bi][0]<bx0)bx0=hb[bi][0];
+          if(hb[bi][0]>bx1)bx1=hb[bi][0];
+          if(hb[bi][1]<by0)by0=hb[bi][1];
+          if(hb[bi][1]>by1)by1=hb[bi][1];
+        }
+        var bw=bx1-bx0,bh=by1-by0;
+        var cx2=bx0+bw*0.22,cw=bw*0.56;
+        var top=by0+bh*0.48-bh*2,bot=by0+bh*0.48;
+        var gr=x.createLinearGradient(0,bot,0,top);
+        gr.addColorStop(0,mk.ink);
+        gr.addColorStop(1,'rgba(0,0,0,0)');
+        x.save();
+        /* screen, like the DOM gradient's blend - a beam adds light */
+        x.globalCompositeOperation='lighter';
+        x.globalAlpha=Math.sin(tt*Math.PI)*0.55;
+        x.fillStyle=gr;
+        x.fillRect(cx2,top,cw,bot-top);
+        x.restore();
+      }
     }
   },
   /* the die's 8 corners projected to screen space, gift-wrapped */
