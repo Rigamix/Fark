@@ -81,6 +81,31 @@ await sleep(1400);
 out.firedDuringOppTurn=asked.filter(a=>a.cat==='PLAYER_IDLE').length;
 G.phase='idle';
 
+/* ── leg 5b: the clock must SURVIVE the roll animation ────────────────
+   `rolling` sits between pressing ROLL and the dice landing, and the clock is
+   re-armed by that very press - so it can expire mid-animation. The first
+   version returned without re-arming, silently spending the turn's one nag on
+   a moment the player was not idle for. This is the regression test for that:
+   let it expire while `rolling`, then return to `choosing` and it must still
+   land. Neither this nor the next leg could have been caught by the original
+   probe, because it never entered either phase. */
+asked.length=0;
+try{_dlgIdleFired=false;_dlgIdleArm();}catch(e){}
+G.phase='rolling';
+await sleep(900);                      /* the clock expires here, mid-roll */
+out.firedDuringRolling=asked.filter(a=>a.cat==='PLAYER_IDLE').length;
+G.phase='choosing';                    /* dice land, the player is deciding */
+await sleep(1100);
+out.firedAfterRollLanded=asked.filter(a=>a.cat==='PLAYER_IDLE').length;
+
+/* ── leg 5c: gamblers_eye is a PLAYER-ACTING phase ─────────────────── */
+asked.length=0;
+try{_dlgIdleFired=false;_dlgIdleArm();}catch(e){}
+G.phase='gamblers_eye';                /* "select dice to keep, tap roll" */
+await sleep(1200);
+out.firedDuringGamblersEye=asked.filter(a=>a.cat==='PLAYER_IDLE').length;
+G.phase='idle';
+
 /* ── leg 6: nothing in the tables is stranded any more ─────────────── */
 const moments=new Set();
 PATRON_LINES.forEach(r=>{const m=/^patron:[a-z]+:([a-zA-Z]+)$/.exec(r.p);if(m)moments.add(m[1]);});
@@ -99,6 +124,9 @@ out.VERDICT={
   butNaggedOnceTheyStop:     out.nagAfterStopping===1,
   silentDuringRivalTurn:     out.firedDuringOppTurn===0,
   nothingStrandedAnyMore:    out.stillStranded.length===0,
+  /* P875b, both found by a phase census rather than by re-reading the code */
+  nagSurvivesTheRollAnimation: out.firedDuringRolling===0&&out.firedAfterRollLanded===1,
+  gamblersEyeCountsAsActing:   out.firedDuringGamblersEye===1,
 };
 out.PASS=Object.keys(out.VERDICT).every(k=>out.VERDICT[k]===true);
 return out;

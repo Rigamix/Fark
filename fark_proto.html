@@ -20007,6 +20007,18 @@ var _DLG_MOMENT={OPP_BUST:'bust',PLAYER_BUST:'yourBust',
    them - instrumenting N call sites is how this kind of mechanism ends up
    missing the N+1th. */
 var DLG_IDLE_MS=9000;      /* long enough to read the board, short enough to land */
+/* P875b: ONE definition of "the player may act", because the fire guard and
+   the re-arm hook both need it and two copies would drift. `gamblers_eye` is
+   in the list and was missed first time round: activateGamblersEye writes it
+   and it means "select dice to keep, tap roll" - the player is deciding,
+   exactly as in `choosing`. Without it the clock could neither fire nor be
+   re-armed by tapping during a Gambler's Eye selection. */
+function _dlgPlayerActing(){
+  try{
+    if(typeof G==='undefined'||!G)return false;
+    return G.phase==='idle'||G.phase==='choosing'||G.phase==='gamblers_eye';
+  }catch(e){return false;}
+}
 var _dlgIdleT=null,_dlgIdleFired=false,_dlgIdleHooked=false;
 function _dlgIdleClear(){if(_dlgIdleT){clearTimeout(_dlgIdleT);_dlgIdleT=null;}}
 function _dlgIdleFire(){
@@ -20016,9 +20028,19 @@ function _dlgIdleFire(){
        version of this bug: the match must exist, must not have ended, and the
        phase must still be one the player can act in. */
     if(typeof G==='undefined'||!G||G._endMatchFired)return;
-    if(G.phase!=='idle'&&G.phase!=='choosing')return;
     var sc=document.getElementById('screen-match');
     if(!sc||!sc.classList.contains('active'))return;
+    /* P875b: TRANSIENT PHASES RE-ARM RATHER THAN DROP. `rolling` sits between
+       the player pressing ROLL and the dice landing, and the clock was
+       re-armed by that very press - so it could expire mid-animation, return
+       here, and silently spend the turn's one nag on a moment the player was
+       not idle for. Someone who rolled, watched, then thought for a minute
+       was never nagged at all. Only the rival's turn drops the clock, and
+       runOppTurn clears it there anyway. */
+    if(!_dlgPlayerActing()){
+      if(G.phase!=='opp')_dlgIdleArm();
+      return;
+    }
     _dlgIdleFired=true;                 /* once per turn - latched here, not on arm */
     if(window.DLG)DLG.trigger('PLAYER_IDLE');
   }catch(e){}
@@ -20031,8 +20053,7 @@ function _dlgIdleArm(){
 function _dlgIdleHook(){
   if(_dlgIdleHooked)return;_dlgIdleHooked=true;
   try{document.addEventListener('pointerdown',function(){
-    if(typeof G==='undefined'||!G)return;
-    if(G.phase!=='idle'&&G.phase!=='choosing')return;
+    if(!_dlgPlayerActing())return;      /* P875b: the shared test */
     _dlgIdleArm();
   },true);}catch(e){}
 }
