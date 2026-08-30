@@ -119,10 +119,12 @@ out.VERDICT={
   peckHasAVoice:           out.peck.rows>0&&out.peck.saysSomething,
   noStruckWords:           offenders.length===0,
   onlyRaskSwearsAmongHigh: out.highVoicesThatSwear.length===1&&out.highVoicesThatSwear[0]==='rask',
-  /* the two known-stranded moments, NAMED rather than counted: a third
-     appearing is a new dead pool and a regression; these two disappearing
-     means the missing engine beats have landed. */
-  onlyPrerollAndWaitingStranded: out.reachability.unreachable.join(',')==='preroll,waiting',
+  /* WAS "exactly preroll,waiting". P875 built those two triggers, so the
+     stranded set is now empty and the assertion tightens to match: any moment
+     the tables use must be one the game can fire. This is the verdict going
+     from "these two are known-dead" to "nothing is dead", which is the whole
+     point of having written it as a named set rather than a count. */
+  nothingStranded: out.reachability.unreachable.length===0,
 };
 out.PASS=Object.keys(out.VERDICT).every(k=>out.VERDICT[k]===true);
 return out;

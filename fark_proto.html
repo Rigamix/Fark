@@ -19991,7 +19991,51 @@ function _dlgOutcome(won){
 var _DLG_MOMENT={OPP_BUST:'bust',PLAYER_BUST:'yourBust',
                  OPP_BIG_BANK:'bank',BIG_BANK:'yourBank',
                  OPP_HESITATE_PUSH:'push',OPP_HESITATE_BANK:'banksafe',
+                 /* P875: the two the voice pass wrote lines for and nothing
+                    could fire. preroll is the patron about to throw; waiting
+                    is the patron waiting on YOU. */
+                 OPP_TURN_START:'preroll',PLAYER_IDLE:'waiting',
                  GRUDGE_TAKEN:'grudge'/* P720: you kept a die of theirs */};
+
+/* ═══ P875: THE IDLE CLOCK ═══════════════════════════════════════════
+   The only new mechanism in this patch, and it is a setTimeout rather than an
+   interval on purpose: nothing polls, the clock is re-armed by player input,
+   and while somebody is actually playing it simply never fires.
+   RE-ARMED FROM ONE HOOK. A single capture-phase pointerdown on the document
+   resets it, so committing a die, dragging a card, opening a panel and
+   pressing a button all count as "still there" without instrumenting any of
+   them - instrumenting N call sites is how this kind of mechanism ends up
+   missing the N+1th. */
+var DLG_IDLE_MS=9000;      /* long enough to read the board, short enough to land */
+var _dlgIdleT=null,_dlgIdleFired=false,_dlgIdleHooked=false;
+function _dlgIdleClear(){if(_dlgIdleT){clearTimeout(_dlgIdleT);_dlgIdleT=null;}}
+function _dlgIdleFire(){
+  _dlgIdleT=null;
+  try{
+    /* THREE GUARDS, because a timer outliving its match is the classic
+       version of this bug: the match must exist, must not have ended, and the
+       phase must still be one the player can act in. */
+    if(typeof G==='undefined'||!G||G._endMatchFired)return;
+    if(G.phase!=='idle'&&G.phase!=='choosing')return;
+    var sc=document.getElementById('screen-match');
+    if(!sc||!sc.classList.contains('active'))return;
+    _dlgIdleFired=true;                 /* once per turn - latched here, not on arm */
+    if(window.DLG)DLG.trigger('PLAYER_IDLE');
+  }catch(e){}
+}
+function _dlgIdleArm(){
+  _dlgIdleClear();
+  if(_dlgIdleFired)return;              /* already nagged this turn */
+  _dlgIdleT=setTimeout(_dlgIdleFire,DLG_IDLE_MS);
+}
+function _dlgIdleHook(){
+  if(_dlgIdleHooked)return;_dlgIdleHooked=true;
+  try{document.addEventListener('pointerdown',function(){
+    if(typeof G==='undefined'||!G)return;
+    if(G.phase!=='idle'&&G.phase!=='choosing')return;
+    _dlgIdleArm();
+  },true);}catch(e){}
+}
 /* sitting down opposite them is where a patron's OWN voice belongs, and it
    routes through _dlgSay so their stage advances and the arc moves */
 var _DLG_PERSONAL={MATCH_START:1,REMATCH_START:1};
@@ -32228,6 +32272,10 @@ function toggleDie(d){
 }
 
 function startPTurn(){
+  /* P875: a fresh turn earns a fresh nag. The latch resets here - the single
+     entry into a player turn - and the clock starts running; any pointerdown
+     re-arms it, so it only ever reaches zero if nothing has happened. */
+  try{_dlgIdleFired=false;_dlgIdleHook();_dlgIdleArm();}catch(e){}
   if(G)G._anyPlayerRoll=false;/* yield earns its place per turn, not per match */
   try{_renderSelTags([],0,true);}catch(e){}
   if(typeof famFire==='function'&&G){famFire('turnStart',{actor:'p'});try{famRenderRow();}catch(e){}}
@@ -36234,6 +36282,13 @@ function _oHandAfterSweep(){
   return Math.max(1,_all);
 }
 function runOppTurn(){
+  /* P875: THE PATRON IS ABOUT TO THROW. This is the head of runOppTurn, which
+     runs exactly once per rival turn - its internal step() is what loops per
+     roll - so the beat cannot double-fire. The player's idle clock is stopped
+     in the same breath: their turn is over, and a pending nag must not survive
+     into the rival's. */
+  try{_dlgIdleClear();}catch(e){}
+  try{if(window.DLG)DLG.trigger('OPP_TURN_START');}catch(e){}
   if(typeof _npcArmActives==='function')_npcArmActives();
   if(G&&G._famTarPit&&G._famTarPit.turns>0){
     G._famTarPit.turns--;
@@ -39387,7 +39442,15 @@ const LEDGER_LINES={
     prob:{MATCH_START:1,REMATCH_START:1,GRUDGE_TAKEN:1,CARD_EFFECT:.8,RISKY_REROLL:.5,GREEDY_REROLL:.5,EARLY_BANK:.3,BIG_BANK:.6,PLAYER_BUST:.85,PLAYER_HOT_DICE:1,PLAYER_TRIPLE:.4,PLAYER_STRAIGHT:1,PLAYER_SIX_KIND:1,PLAYER_TAKES_LEAD:.45,PLAYER_NEAR_WIN:.7,OPP_BUST:.8,OPP_BIG_BANK:.6,OPP_TAKES_LEAD:.45,OPP_NEAR_WIN:.7,MATCH_CLOSE:.4,LOSING_BADLY:.35,WINNING_BADLY:.35,OPP_WINS:1,CARD_FIRE:1,PLAYER_CARD_REACT:1,TELL:1,/* P632: low on purpose. A rival turn holds three or four decisions, so a
        high number stops the pause reading as a pause; and these share the
        spacing gate with OPP_BUST and OPP_BIG_BANK, which are the payoff
-       beats. This is the dial - there is no other. */OPP_HESITATE_PUSH:.3,OPP_HESITATE_BANK:.3},
+       beats. This is the dial - there is no other. */OPP_HESITATE_PUSH:.3,OPP_HESITATE_BANK:.3,
+      /* P875. OPP_TURN_START matches the hesitation dial for the reason that
+         dial's own note gives - a rival turn holds three or four decisions,
+         and this beat now competes with the hesitation, the bust and the big
+         bank for the same window.
+         PLAYER_IDLE is 1 because its gate is elsewhere and is already strict:
+         nine seconds of no input, once per turn. A coin flip on top would make
+         a "get on with it" line feel random rather than earned. */
+      OPP_TURN_START:.3,PLAYER_IDLE:1},
     init(rungName,rungKey){this.oppKey=rungName.toUpperCase();this.portraitKey=rungKey||rungName.toLowerCase();this.lastTime=0;this.active=false;this.usedLines={};this.cardFiredThisMatch={};if(this.hideTimer)clearTimeout(this.hideTimer);this.hide();},
     getLine(cat){const data=OPP_DIALOGUE[this.oppKey]||{};/* P818: the
       emptied bark store no longer kills the LEDGER_LINES and class-line

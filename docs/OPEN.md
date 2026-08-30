@@ -97,32 +97,32 @@ them together and the two directions net out to noise.
   untagged pool draws identically on and off. Tag more pools whenever; it
   degrades to today's behaviour with none.
 
-**THE VOICE PASS IS IN (P874), BUT TWO MOMENTS HAVE NO TRIGGER.** The line
-tables use eight moments. `_DLG_MOMENT` maps seven categories and only SIX
-of the eight are among them:
+**THE VOICE PASS IS COMPLETE (P874 + P875).** The two stranded moments have
+triggers now, so all 91 rows that could not fire are live. Nothing in the
+patron tables is unreachable — driven, and the probe asserts it as
+`nothingStranded` rather than as a count.
 
-```
-live now   bust  yourBust  bank  yourBank  push  banksafe
-no trigger                              preroll  waiting
-```
+- **preroll** rides the head of `runOppTurn`, which runs exactly once per
+  rival turn (its internal `step()` is the per-roll loop), at probability
+  **.3** — matching the hesitation dial, for the reason that dial's own
+  comment gives: a rival turn already holds three or four beats.
+- **waiting** is a `setTimeout`, not a poll: **9 seconds** of no input on
+  the player's turn, **once per turn**, probability 1 because the threshold
+  and the latch are already the gate. Re-armed by a single capture-phase
+  pointerdown listener, so every interaction counts as “still there”
+  without instrumenting any of them.
 
-Nothing in the build fires a “patron is about to roll” or “player is
-dawdling” event — there is no DLG category for either — so **91 rows are
-stranded**, measured, not estimated. They are shipped complete and unedited
-because the brief says the engine beats live in `FARK_DIALOGUE_BUILD.md`
-Part One and “stand unchanged”; I do not have that document, and inventing
-the triggers would mean inventing a nag cadence, which is a design call.
-They go live untouched the day those beats land. **Send me Part One, or say
-the word and I’ll wire both.** The probe asserts the stranded set is
-EXACTLY `preroll,waiting`, so a third appearing is a regression and these
-two vanishing means Part One arrived.
+**Two numbers are mine, not the brief's** — `DLG_IDLE_MS = 9000` and
+`OPP_TURN_START = .3`. They are one-line dials; say the word if either
+feels wrong in play. Bosses stay silent on both beats, which is a
+consequence rather than a choice: they resolve through the trait pools and
+the voice brief wrote patron lines only. Boss lines for these two moments
+are a separate ask.
 
-Two smaller notes from the same pass: `nv:1` on Golgoth’s rows has no
-reader in this build (kept, inert, clearly meant for a future non-verbal
-styling — his breathing renders as ordinary speech today); and
-`_dlgOutcome` still passes `null` where the skip map goes, which is
-deliberate — win/loss fire once per match, so a per-match de-dup could not
-do anything there.
+Still true from the same pass: `nv:1` on Golgoth's rows has no reader
+(inert, kept); and `_dlgOutcome` still passes `null` where the skip map
+goes, deliberately — win/loss fire once per match, so a per-match de-dup
+could not do anything there.
 
 **Also found, not acted on:** `getDie()` never returns null — it falls back to
 `DICE_TYPES[0]`, so a card id fed to the die namespace silently yields the
