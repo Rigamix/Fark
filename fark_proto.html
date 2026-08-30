@@ -11265,6 +11265,17 @@ function _getS(){
        removal migration beyond this list, and a phantom here is draggable into
        a deck slot - so a dead id could be shuffled around a run forever. */
     S.run.pouch=S.run.pouch.map(function(cid){return _cardGone(cid)?null:cid;});
+    /* P871: THE THIRD FIELD. S.npcWonCards holds cards the RIVAL won off the
+       player, and generateOppCards pushes them straight into their hand - so a
+       returning save could deal an opponent a card the catalog no longer has.
+       P863 stripped the player's two fields and missed this one, which is the
+       same "what else reads this" question one table over. */
+    if(S.npcWonCards&&typeof S.npcWonCards==='object'){
+      Object.keys(S.npcWonCards).forEach(function(k){
+        if(Array.isArray(S.npcWonCards[k]))
+          S.npcWonCards[k]=S.npcWonCards[k].filter(function(cid){return !_cardGone(cid);});
+      });
+    }
     /* P4 migration: the 160-renown perk changed from a 4th-slot unlock to
        +1 night seat. Anyone who had it keeps a granted extraSeat; slot 3 now
        rides the 60-renown perk, and slot 2 is base — nobody can LOSE a slot. */
@@ -39837,6 +39848,60 @@ var NPC_RESCUES=[
 {id:'grogs_flask',need:function(bl){return bl.length>=2;},fix:function(bl){
     bl.slice(0,2).forEach(function(d){_npcRescueSet(d,rollFaceExclude(d.mat,d.val));});
     return "GROG'S FLASK — REROLLED";}},
+];
+/* P871: RESTORED. P863 deleted this entire table as collateral when it
+   removed NPC_RESCUES' last row, and the parse error that followed named a
+   missing bracket - so only the bracket came back. Its absence threw on
+   every rival bust, which is why the freeze was intermittent rather than
+   constant, and why no probe caught it: none of them makes a rival bust. */
+var NPC_BUST_SAVES=[
+  {name:'surviveOrImmune',try:function(ctx){
+    var hit=null;
+    (G.oCards||[]).some(function(cid){
+      var npc=getNpcCard(cid);if(!npc||!npc.effect)return false;
+      var eff=npc.effect;
+      if(eff.mechanic==='bust_immune_turns'&&G.npcCardState.oppTurnCount<=(eff.turns||2)){
+        hit={cid:cid};return true;
+      }
+      if(eff.mechanic==='bust_survive'&&(G.npcCardState.usedOnce[cid]||0)<_useCap(cid)&&Math.random()<eff.chance){
+        G.npcCardState.usedOnce[cid]=(G.npcCardState.usedOnce[cid]||0)+1;
+        /* survival costs half the turn's points - see the card text */
+        ctx.oppBank=Math.floor(ctx.oppBank/2);
+        hit={cid:cid};return true;
+      }
+      return false;
+    });
+    return hit?{kind:'survive',cid:hit.cid}:null;
+  }},
+  {name:'bankHalf',try:function(ctx){
+    var out=null;
+    (G.oCards||[]).some(function(cid){
+      var npc=getNpcCard(cid);if(!npc)return false;
+      if(npc.effect.mechanic==='bust_bank_half'&&(G.npcCardState.usedOnce[cid]||0)<_useCap(cid)&&ctx.oppBank>0){
+        G.npcCardState.usedOnce[cid]=(G.npcCardState.usedOnce[cid]||0)+1;
+        var half=Math.floor(ctx.oppBank/2);
+        out={kind:'bank',pts:half,cid:cid,
+          msg:npc.name+'! '+G.rung.name+' SAVES '+half};
+        return true;
+      }
+      return false;
+    });
+    return out;
+  }},
+  {name:'secondWind',try:function(ctx){
+    if(!npcHasActive('second_wind'))return null;
+    npcUseActive('second_wind');
+    var vals=[],mats=[];
+    for(var i=0;i<3;i++){var m=(G.matchOppDice&&G.matchOppDice[i])||'bone';mats.push(m);vals.push(rollFace(m));}
+    var r=_scoreRollBest(vals,G.oCards,0,{crowsLuck:false,crowsLuckRemaining:0},mats);
+    /* P871: the NAME comes from the card row. second_wind displays as
+       MABEL'S STITCH since the boss-card pass, so two hardcoded strings
+       here would announce a card the player cannot find anywhere. */
+    var _swN=((typeof getCard==='function'&&getCard('second_wind'))||{}).name||'SECOND WIND';
+    return {kind:'bank',pts:(r&&r.total)||0,cid:'second_wind',
+      msg:G.rung.name+' — '+_swN+'! ROLLING 3 DICE',
+      label:G.rung.name+' '+_swN+'!'};
+  }}
 ];
 var NPC_ARMS=[
 {id:'loan',moment:'turnStart',try:function(ctx){

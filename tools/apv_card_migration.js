@@ -24,6 +24,12 @@ const fresh=JSON.parse(JSON.stringify(S));
 fresh.run._p12CardsConverted=1;
 fresh.run.cards=['second_wind','the_tab','wild_die','loan'];
 fresh.run.pouch=['coin_flip','the_pyre','mabels_stitch'];
+/* P871: THE THIRD PERSISTED CARD FIELD. npcWonCards holds what the RIVAL won
+   off the player and generateOppCards pushes it straight into their hand, so a
+   phantom here is dealt to an opponent rather than sitting in a slot. It was
+   missed when the other two were migrated. */
+fresh.npcWonCards={soldier:['the_tab','all_in','hold_the_line'],
+                   bishop:['sleight_of_hand','the_pyre']};
 localStorage.setItem('gambit4_proto',JSON.stringify(fresh));
 
 S=null;            /* force the `if(!S)` first-load branch */
@@ -31,6 +37,7 @@ _getS();
 
 const cards=(S.run.cards||[]).slice(0,4);
 const pouch=(S.run.pouch||[]).slice(0,3);
+const won=S.npcWonCards||{};
 return {
   cardsAfter:cards,
   pouchAfter:pouch,
@@ -38,6 +45,14 @@ return {
   deletedStripped: cards[1]===null&&cards[2]===null&&pouch[0]===null&&pouch[2]===null,
   survivorsKept: cards[0]==='second_wind'&&cards[3]==='loan'&&pouch[1]==='the_pyre',
   catalogReachable: (function(){try{return !!(CARDS_MAP['second_wind']&&!CARDS_MAP['the_tab']);}catch(e){return 'THREW: '+e.message;}})(),
+  wonAfter:won,
+  /* same two controls as the deck: the dead ids must go AND the live ones stay */
+  wonPhantomsStripped:(won.soldier||[]).indexOf('the_tab')<0&&(won.soldier||[]).indexOf('all_in')<0
+                      &&(won.bishop||[]).indexOf('sleight_of_hand')<0,
+  wonSurvivorsKept:(won.soldier||[]).indexOf('hold_the_line')>=0&&(won.bishop||[]).indexOf('the_pyre')>=0,
   VERDICT:(cards[1]===null&&cards[2]===null&&pouch[0]===null&&pouch[2]===null
-           &&cards[0]==='second_wind'&&cards[3]==='loan'&&pouch[1]==='the_pyre')?'PASS':'FAIL',
+           &&cards[0]==='second_wind'&&cards[3]==='loan'&&pouch[1]==='the_pyre'
+           &&(won.soldier||[]).indexOf('the_tab')<0&&(won.soldier||[]).indexOf('all_in')<0
+           &&(won.bishop||[]).indexOf('sleight_of_hand')<0
+           &&(won.soldier||[]).indexOf('hold_the_line')>=0&&(won.bishop||[]).indexOf('the_pyre')>=0)?'PASS':'FAIL',
 };
