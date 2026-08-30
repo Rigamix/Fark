@@ -97,6 +97,33 @@ them together and the two directions net out to noise.
   untagged pool draws identically on and off. Tag more pools whenever; it
   degrades to today's behaviour with none.
 
+**THE VOICE PASS IS IN (P874), BUT TWO MOMENTS HAVE NO TRIGGER.** The line
+tables use eight moments. `_DLG_MOMENT` maps seven categories and only SIX
+of the eight are among them:
+
+```
+live now   bust  yourBust  bank  yourBank  push  banksafe
+no trigger                              preroll  waiting
+```
+
+Nothing in the build fires a “patron is about to roll” or “player is
+dawdling” event — there is no DLG category for either — so **91 rows are
+stranded**, measured, not estimated. They are shipped complete and unedited
+because the brief says the engine beats live in `FARK_DIALOGUE_BUILD.md`
+Part One and “stand unchanged”; I do not have that document, and inventing
+the triggers would mean inventing a nag cadence, which is a design call.
+They go live untouched the day those beats land. **Send me Part One, or say
+the word and I’ll wire both.** The probe asserts the stranded set is
+EXACTLY `preroll,waiting`, so a third appearing is a regression and these
+two vanishing means Part One arrived.
+
+Two smaller notes from the same pass: `nv:1` on Golgoth’s rows has no
+reader in this build (kept, inert, clearly meant for a future non-verbal
+styling — his breathing renders as ordinary speech today); and
+`_dlgOutcome` still passes `null` where the skip map goes, which is
+deliberate — win/loss fire once per match, so a per-match de-dup could not
+do anything there.
+
 **Also found, not acted on:** `getDie()` never returns null — it falls back to
 `DICE_TYPES[0]`, so a card id fed to the die namespace silently yields the
 *wrong die* rather than an error. That is the mechanism behind the

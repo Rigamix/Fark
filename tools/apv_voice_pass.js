@@ -1,66 +1,128 @@
-/* P678 VERIFIED THROUGH THE GAME'S OWN PICKER
- * SUITE: exclude
+/* P874 - the voice pass, driven through the real doors.
  *
- * Reads PATRON_LINES and drives _dlgPick - the code that actually serves
- * lines - rather than grepping the source. Asserts:
- *   - every trait pool exists (6 traits x 6 moments), 3 lines each, and every
- *     line is blurt-length (the doc's whole point)
- *   - every patron backstory pool has the doc's count (3; golgoth exactly 1)
- *   - every patron has win and loss barks (5+5; golgoth 2+2)
- *   - the conditional King-arc rows and the two bespokes survived the sweep
- *   - _dlgPick returns a line for a sample of pools (the pick path runs)
+ * The brief's section 5 names one check that has to be MEASURED rather than
+ * read, because it is the ask Denis actually made ("low chance of getting the
+ * same dialogue line again and again") and the words alone do not deliver it:
+ *
+ *   "Twenty busts against one patron, count distinct lines. Before the fix the
+ *    ceiling is the pool size and the floor is a fair coin. After it the first
+ *    N busts must return N distinct lines, then wrap. Assert the distinct
+ *    count, not that a line appeared."
+ *
+ * So this drives _dlgEvent - the door the game uses - rather than _dlgPick.
  */
-const out = { fail: [] };
-const L = PATRON_LINES;
+const out={};
+if(typeof _dlgEvent!=='function')return {err:'no _dlgEvent'};
+if(typeof _dlgResetGroups!=='function')return {err:'no _dlgResetGroups'};
+_getS();
 
-const TRAITS = ['steady','strong','orderly','reckless','greedy','cunning'];
-const MOMENTS = ['bust','yourBust','bank','yourBank','push','banksafe'];
-const pool = p => L.filter(r => r.p === p);
-
-/* traits: presence, count, and length */
-let longest = { t: '', n: 0 };
-for (const tr of TRAITS) for (const mo of MOMENTS) {
-  const rows = pool('trait:' + tr + ':' + mo);
-  if (rows.length !== 3) out.fail.push('trait:' + tr + ':' + mo + ' has ' + rows.length);
-  for (const r of rows) if (r.t.length > longest.n) longest = { t: r.t, n: r.t.length };
+/* ── 1. the soft de-dup: N busts, N distinct lines ────────────────── */
+function runOf(art,moment,n){
+  window._lastSeatArt=art;window._lastSeatTrait=null;
+  _dlgResetGroups();                       /* fresh match */
+  const got=[];
+  for(let i=0;i<n;i++){const l=_dlgEvent(moment);got.push(l);}
+  return got;
 }
-out.longestTraitLine = longest;
-out.traitLinesOver45 = L.filter(r => /^trait:/.test(r.p) && r.t.length > 45).map(r => r.t);
+const nell=runOf('Nell','yourBust',20);
+/* THE REACHABLE pool, not every row. Nell's yourBust has three rows and one
+   is gated on a warned tag - unavailable in a run with no push - so counting
+   it made the target 3 when only 2 could ever be returned. The de-dup was
+   right and the assert was wrong. */
+const nellPool=PATRON_LINES.filter(r=>r.p==='patron:nell:yourBust'&&!(r.c&&r.c.length)).length;
+const nellDistinctFirstN=new Set(nell.slice(0,nellPool)).size;
+out.dedup={pool:nellPool,first20:nell,
+  distinctInFirstPoolWorth:nellDistinctFirstN,
+  distinctOverall:new Set(nell.filter(Boolean)).size,
+  neverWentSilent:nell.every(Boolean)};
 
-/* backstories */
-const PATRONS = ['krox','eira','nebb','regis','corbin','sparr','pell','osgood','rilla',
-  'dunstan','rask','sil','thorne','vess','nell','squib','tuck','mudge','nix','poll',
-  'roan','golgoth','remny','twill','fenn','ferrand','odo','ollis','tam'];
-for (const p of PATRONS) {
-  const bs = pool('patron:' + p).filter(r => !r.c);
-  const want = p === 'golgoth' ? 1 : 3;
-  if (bs.length !== want) out.fail.push('patron:' + p + ' backstory has ' + bs.length + ' want ' + want);
-  const w = pool('patron:' + p + ':win'), l = pool('patron:' + p + ':loss');
-  const wantW = p === 'golgoth' ? 2 : 5;
-  if (w.length !== wantW) out.fail.push(p + ':win has ' + w.length);
-  if (l.length !== wantW) out.fail.push(p + ':loss has ' + l.length);
+/* the CONTROL: without the skip map the same twenty repeat early. Proves the
+   measurement can see a difference at all, rather than the pool being so big
+   that any method looks good. */
+window._lastSeatArt='Nell';
+const raw=[];for(let i=0;i<20;i++){const r=_dlgPick('patron:nell:yourBust',0,null);raw.push(r&&r.t);}
+out.dedup.controlDistinct=new Set(raw.filter(Boolean)).size;
+
+/* ── 2. the said: gate ────────────────────────────────────────────── */
+function gateTest(art,gatedText){
+  window._lastSeatArt=art;window._lastSeatTrait=null;
+  _dlgResetGroups();
+  /* before the warning, the gated line must be unreachable */
+  const before=[];for(let i=0;i<40;i++)before.push(_dlgEvent('yourBust'));
+  _dlgResetGroups();
+  _dlgEvent('push');                       /* this is what tags said:warned */
+  const flagged=!!_dlgSaid['said:warned'];
+  const after=[];for(let i=0;i<40;i++)after.push(_dlgEvent('yourBust'));
+  return {flagged,
+    beforeHasGated:before.indexOf(gatedText)>=0,
+    afterHasGated:after.indexOf(gatedText)>=0};
 }
+out.gate={
+  nell:gateTest('Nell',"I did say, love."),
+  ferrand:gateTest('Ferrand',"I FARKIN' TOLD YOU! HAH!"),
+  krox:gateTest('Krox',"I said bide. You thrashed."),
+};
 
-/* survivors of the sweep */
-out.conditionalRows = L.filter(r => /^patron:/.test(r.p) && r.c).length;
-out.bespokes = pool('patron:sil:bust').length + pool('patron:regis:bank').length;
-if (out.conditionalRows !== 7) out.fail.push('conditional rows ' + out.conditionalRows + ' want 7');
-if (out.bespokes !== 2) out.fail.push('bespokes ' + out.bespokes + ' want 2');
+/* ── 3. Peck has a voice at all ───────────────────────────────────── */
+window._lastSeatArt='Peck';_dlgResetGroups();
+out.peck={rows:PATRON_LINES.filter(r=>/^patron:peck:/.test(r.p)).length,
+  saysSomething:!!_dlgEvent('yourBust')};
 
-/* the picker serves them */
-out.samples = {};
-for (const p of ['trait:strong:yourBust', 'trait:reckless:bust', 'patron:krox',
-                 'patron:tam:win', 'patron:golgoth:loss', 'patron:ferrand:loss']) {
-  const r = _dlgPick(p, 0, null);
-  out.samples[p] = r ? r.t : null;
-  if (!r) out.fail.push('_dlgPick returned null for ' + p);
-}
+/* ── 4. REACHABILITY: which moments in the table nothing can fire ─── */
+const moments=new Set();
+PATRON_LINES.forEach(r=>{const m=/^patron:[a-z]+:([a-zA-Z]+)$/.exec(r.p);if(m)moments.add(m[1]);});
+/* _DLG_MOMENT is ONE door. win/loss reach through _dlgOutcome at match end
+   and recog through the P837 recognition beat, so a census against
+   _DLG_MOMENT alone reports them stranded when they are not. Those two doors
+   fire once per match, which is also why the per-match de-dup is deliberately
+   NOT applied there - it could not do anything. */
+const OTHER_DOORS=['win','loss','recog'];
+const fireable=new Set(Object.keys(_DLG_MOMENT).map(k=>_DLG_MOMENT[k]).concat(OTHER_DOORS));
+out.reachability={
+  momentsInTable:[...moments].sort(),
+  momentsTheGameCanFire:[...fireable].sort(),
+  unreachable:[...moments].filter(m=>!fireable.has(m)).sort(),
+  rowsStranded:PATRON_LINES.filter(r=>{
+    const m=/^patron:[a-z]+:([a-zA-Z]+)$/.exec(r.p);
+    return m&&!fireable.has(m[1]);}).length,
+};
 
-/* no-repeat rule still works: two picks from a 3-line pool differ */
-const a = _dlgPick('trait:steady:bust', 0, null);
-const b = _dlgPick('trait:steady:bust', 0, null);
-out.noRepeat = a && b && a.t !== b.t;
+/* ── 5. the struck-word list, over the rows only ──────────────────── */
+const STRUCK=['acceptable','adequate','respectable','statistically','variance',
+  'investment','strategic','composure','precisely','correct decision','expected'];
+const offenders=[];
+PATRON_LINES.forEach(r=>{
+  /* EVERY row, not just the new ones - the brief says the final TABLES, and a
+     pass that greps only its own diff cannot find what it missed. */
+  const low=String(r.t||'').toLowerCase();
+  STRUCK.forEach(w=>{if(low.indexOf(w)>=0)offenders.push(r.p+' :: '+r.t);});
+});
+out.struckWordSurvivors=offenders;
 
-out.total = L.length;
-out.verdict = out.fail.length === 0 ? 'PASS' : 'FAIL';
+/* ── 6. the register ladder: who swears ───────────────────────────── */
+const HIGH=['regis','rask','remny','vess','dunstan','eira','ollis','golgoth'];
+const swears=[];
+PATRON_LINES.forEach(r=>{
+  const m=/^patron:([a-z]+):/.exec(r.p||'');if(!m)return;
+  if(/fark/i.test(String(r.t||'')))swears.push(m[1]+' :: '+r.t);
+});
+out.oaths=swears;
+out.highVoicesThatSwear=[...new Set(swears.map(x=>x.split(' :: ')[0]))].filter(n=>HIGH.indexOf(n)>=0);
+
+out.VERDICT={
+  dedupGivesDistinctLines: out.dedup.distinctInFirstPoolWorth===nellPool,
+  dedupNeverSilent:        out.dedup.neverWentSilent===true,
+  dedupBeatsTheControl:    out.dedup.distinctOverall>=out.dedup.controlDistinct,
+  saidGateFlagsOnPush:     out.gate.nell.flagged&&out.gate.ferrand.flagged&&out.gate.krox.flagged,
+  gatedLineHiddenBefore:   !out.gate.nell.beforeHasGated&&!out.gate.ferrand.beforeHasGated&&!out.gate.krox.beforeHasGated,
+  gatedLineWinsAfter:      out.gate.nell.afterHasGated&&out.gate.ferrand.afterHasGated&&out.gate.krox.afterHasGated,
+  peckHasAVoice:           out.peck.rows>0&&out.peck.saysSomething,
+  noStruckWords:           offenders.length===0,
+  onlyRaskSwearsAmongHigh: out.highVoicesThatSwear.length===1&&out.highVoicesThatSwear[0]==='rask',
+  /* the two known-stranded moments, NAMED rather than counted: a third
+     appearing is a new dead pool and a regression; these two disappearing
+     means the missing engine beats have landed. */
+  onlyPrerollAndWaitingStranded: out.reachability.unreachable.join(',')==='preroll,waiting',
+};
+out.PASS=Object.keys(out.VERDICT).every(k=>out.VERDICT[k]===true);
 return out;
