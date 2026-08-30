@@ -5,12 +5,17 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const until=async(fn,ms)=>{const t0=Date.now();while(Date.now()-t0<ms){try{if(fn())return true;}catch(e){}await sleep(120);}return false;};
 await until(()=>typeof showScreen==='function',20000);
 _getS();
-const TRAITS={ones:['Slowhand','Tallyman','Pennyweight','Twicecount','Coldfoot'],
-  hoard:['Tightfist','Magpie','Deeppurse','Sockful','Neverlends'],
-  aggro:['Neverblink','Breakneck','Hotblood','Onemore','Firebrand'],
-  triples:['Threefold','Bullneck','Ironjaw','Thricelucky','Trebles'],
-  straights:['Inarow','Straightlace','Dominoes','Ladderman','Onetosix'],
-  combo:['Sleight','Sidewinder','Threadneedle','Foxglove','Everyangle']};
+/* THE POOLS ARE READ OUT OF THE PAGE, not copied here. _FAMN_BY_TRAIT is a
+   local inside _ptOpenPanel so it cannot be referenced directly - but a second
+   copy in the probe is a copy that drifts, and a probe asserting against its
+   own stale list is worse than no probe. Parsed from the source instead, so
+   there is exactly one place the names live. */
+const _src=document.documentElement.outerHTML;
+const _tblM=_src.match(/_FAMN_BY_TRAIT=\{([\s\S]*?)\};/);
+if(!_tblM)return {err:'could not read _FAMN_BY_TRAIT out of the page'};
+const TRAITS={};
+_tblM[1].replace(/(\w+):\[([^\]]*)\]/g,(m,k,list)=>{
+  TRAITS[k]=list.split(',').map(x=>x.trim().replace(/^'|'$/g,''));return m;});
 
 const seen=[],mismatches=[],lengths=new Set();
 /* sweep several nights so plenty of given names and personas are covered */
