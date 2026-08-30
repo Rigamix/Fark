@@ -34,6 +34,10 @@ const sample = async (ms) => {
 const spread = xs => Math.max(...xs) - Math.min(...xs);
 
 const KEYS = [{o:0},{o:.25,dx:-7,e:'ease-in'},{o:.5,dx:7},{o:.75,dx:-3},{o:1,dx:0,t:240}];
+/* P882: rt is driven now, so the face-holding claim is tested where it can
+   actually fail - a keyframe set that DOES twist. STRIKE's keys carry no rt,
+   so the quaternion check above stays a control on the no-rt path. */
+const TWIST = [{o:0,rt:0},{o:.5,rt:-2},{o:1,rt:0,t:240}];
 
 /* ══ baseline: the mesh is still ═════════════════════════════════════ */
 const before = await sample(2000);
@@ -97,6 +101,32 @@ out.liveRoute = {
                   paired.every(z => z.viaByChip.chip === z.gameEl),
 };
 
+/* ══ 5. THE TWIST KEEPS THE FACE ═════════════════════════════════════
+   A yaw about world up is the kick's own axis (P821): the die turns and the
+   scoring face stays up. So the test is not "the quaternion never changes" -
+   it is "the quaternion changes AND the up-facing normal does not". */
+D3X.NUDGE.ms = 9000;
+/* "the face stays up" is not "local Y is unmoved" - a yaw about world up
+   rotates every local axis in world space. The invariant is that whichever
+   local axis is pointing UP keeps pointing up by exactly as much, which is
+   what P821 means by the scoring face staying up. Measured as the best
+   y-component over the six face normals. */
+const AX = [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
+const upness = q => Math.max.apply(null, AX.map(a =>
+  new THREE.Vector3(a[0],a[1],a[2]).applyQuaternion(q).y));
+const upBefore = upness(die.obj.quaternion);
+FKFX._motion(die.chip, TWIST);
+out.twist = {armed: !!(die.nudge && die.nudge.rt), rtRad: die.nudge ? +die.nudge.rt.toFixed(5) : null};
+await FXH.sleep(1200);
+const qMid = die.obj.quaternion.clone();
+out.twist.quaternionMoved = ['x','y','z','w'].some(k => Math.abs(qMid[k] - q0[k]) > 1e-6);
+out.twist.upnessBefore = +upBefore.toFixed(5);
+out.twist.upnessDuring = +upness(qMid).toFixed(5);
+out.twist.wasRestingFlat = upBefore > 0.99;
+out.twist.upAxisHeld = Math.abs(upness(qMid) - upBefore) < 1e-3;
+await FXH.until(() => !die.nudge, 15000);
+D3X.NUDGE.ms = wasMs;
+
 out.VERDICT = {
   meshWasStillBefore:        out.before.n > 3 && out.before.spread < 1e-4,
   ownedDieGetsNoDomAnimation: out.owned.chipAnimationsAdded === 0,
@@ -106,7 +136,15 @@ out.VERDICT = {
   ownedDieGetsANudge:        out.owned.nudgeArmed === true &&
                              Math.abs(out.owned.nudgeAmp) > 0,
   theMeshActuallyMoved:      out.during.n > 3 && out.during.spread > 1e-3,
-  rotationWasNotTouched:     out.quaternionHeld === true,
+  /* control: keys with no rt must not rotate anything */
+  noRtMeansNoRotation:       out.quaternionHeld === true,
+  /* and with rt, it turns without changing the number */
+  twistIsArmed:              out.twist.armed === true && Math.abs(out.twist.rtRad) > 0,
+  twistActuallyRotates:      out.twist.quaternionMoved === true,
+  /* gated on the die actually lying flat first: on a cocked die the yaw
+     would not preserve the face and the check would be measuring nothing. */
+  dieWasRestingFlat:         out.twist.wasRestingFlat === true,
+  twistKeepsTheFaceUp:       out.twist.upAxisHeld === true,
   theNudgeExpires:           out.nudgeCleared === true,
   itEndsWhereItBegan:        out.returnedHome === true,
   meshIsStillAgainAfter:     out.after.n > 3 && out.after.spread < 1e-4,
