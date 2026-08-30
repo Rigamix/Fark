@@ -46793,8 +46793,10 @@ function _runBalanceSim(cfg){
   /* ═══ HARNESS EXT 2 (brief §9 / audit 3.2): deterministic card effects,
      player AND NPC symmetric. Modeled: bloom, slow_cook, short_fuse,
      insurance, retort, reprisal, pickpocket, falling_star,
-     double_or_nothing, encore/fool's-gold/transmute as bust mitigation,
-     ward + the silver die as bust saves. Unmodeled ids in a loadout are
+     double_or_nothing, encore/fool's-gold/transmute as bust mitigation.
+     P888: ward and silver are NOT bust saves and are no longer modelled as
+     them - silver's save is retired and its def says so, and ward is an
+     enchant that halves rather than rescuing. Unmodeled ids in a loadout are
      simply inert (targeted actives, preserve, honeytrap). ═══ */
   function mkCards(list){
     var st={ids:{},tiers:{},charges:{}};
@@ -46827,7 +46829,28 @@ function _runBalanceSim(cfg){
   function simTurn(side,dice6,bankAdd,cs,bankFn,myTotal,oppTotal,target,oppDone,pushHot,rung){/* P772: rung threads to the chooser */
     var mats=dice6.slice(),turn=0,rolls=0;
     var out={banked:0,busted:false,rolls:0,oppDelta:0,selfBurn:0,extra:false};
-    var saves=(dice6.indexOf('silver')>=0?1:0)+(cs.charges.ward||0);
+    /* P888: A FREE BUST SAVE FOR OWNING SILVER, AND IT IS RETIRED. This
+       seeded a per-turn counter from the whole loadout and spent it at the
+       bust check - and a turn reaches that check at most once, because the
+       save banks and ends the turn. So one silver die anywhere was a 100%
+       bust save every turn for the whole run, and it did not even need to
+       still be in hand: the seed was dice6, not the shrinking mats.
+       Silver's own def says the save is gone - "RELIABILITY, NOT SAFETY...
+       It never removes the zero; every roll is still a real roll" - and its
+       effect is null. It pays through its weighted rollTable, which this sim
+       already gets through _rollTable, so this was counting a retired
+       mechanic twice. bust()'s own comment below has said the same thing
+       about the retired insurance for as long as it has been there.
+       MEASURED, 100 tier-0 matches, one bone swapped for one silver: 84
+       player rolls scored nothing and produced zero busts, while the same
+       hand with a byte-identical clone of silver's roll table under another
+       id produced 80. patronWin ran 18% / 24% / 22% across none / silver /
+       clone, so half of silver's apparent gain was this line.
+       THE WARD TERM WAS DEAD, not merely wrong: famDef('ward') is false -
+       Ward is an enchant, not a family card - and mkCards drops unknown ids,
+       so the charge could never be non-zero. It is removed rather than left,
+       because the enchant HALVES rather than rescuing and leaving the term
+       would re-create this bug the day a ward card exists. */
     function lit(){return cs.ids.short_fuse&&rolls>=3;}
     function bank(){
       var b=turn+(turn>0?bankAdd:0);
@@ -46863,7 +46886,6 @@ function _runBalanceSim(cfg){
           if(r2.total>0){vals=v2;r=r2;}
           else{bust();out.selfBurn=Math.max(out.selfBurn,turn);return out;}/* double fail burns the bank */
         }
-        else if(saves>0){saves--;return bank();/* ward / silver: the bust is absorbed, the turn stands */}
         else return bust();
       }
       /* P772: THE SIM RUNS THE REAL CHOOSER for the rival. The old line
