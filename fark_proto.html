@@ -24426,6 +24426,13 @@ function _kindredActive(){
 function _iconFire(d,side){
   var def=ENCH_ICONS[d&&d.ench&&d.ench.t];
   if(!def)return 0;
+  /* P877: REFUSED, AND THE ORDER IS THE POINT. This returns before the beat,
+     before def.fire, before the zero_hour check and before brand-spent -
+     because a brand that did not fire must not play its effect's sound, must
+     not end the turn, and must not be marked spent. _splitIcons should mean
+     this is never reached; it is kept so the law holds for any caller that
+     reaches the handler directly. */
+  if(_iconRefused(d))return 0;
   /* KINDRED DOUBLES BY WHITELIST, ONE ENCHANT WIDE. `doubles` is opt-in and
      never a default: "twice as much gold" is the only reading of double
      strength the brief has settled, and it settled it against a sim. Ward's
@@ -24503,10 +24510,42 @@ function _zeroHourClose(){
    icon dice it must not. An icon die withheld here can never be scored and
    can never be reported as "unused", which is what makes a zero-point keep
    legal without touching the engine. */
+/* P877 (brief 9b): WHICH ENCHANTS HOLD A SPOT. Fog, snuff and snare arm a
+   lane and pay out on the rival's turn, so they occupy it for a window. Tithe,
+   trade, break and ward resolve on the spot or on your own turn, hold nothing,
+   and are never refused. The ruling is per SPOT, not per type: a second fog
+   and a snuff on top of a fog are refused on the same grounds. */
+var _LM_OCCUPYING={fog:1,snuff:1,snare:1};
+var _LM_KEYS=['_fog','_snuff','_snare'];
+function _lmOccupied(lane){
+  if(!G||lane===null||lane===undefined||lane<0)return false;
+  for(var i=0;i<_LM_KEYS.length;i++){
+    var m=G[_LM_KEYS[i]];
+    if(m&&m.live&&m.lane===lane)return true;
+  }
+  return false;
+}
+/* would this brand be turned away this instant? Pure read - it is consulted
+   from the preview as well as the commit, which is what makes what the player
+   is SHOWN and what they GET agree by construction. */
+function _iconRefused(d){
+  try{
+    if(!d||!d.ench||!_LM_OCCUPYING[d.ench.t])return false;
+    return _lmOccupied(_laneOf(d));
+  }catch(e){return false;}
+}
 function _splitIcons(dice){
-  var icons=[],rest=[];
-  (dice||[]).forEach(function(d){(_dieIsIcon(d)?icons:rest).push(d);});
-  return {icons:icons,rest:rest};
+  var icons=[],rest=[],refused=[];
+  (dice||[]).forEach(function(d){
+    if(!_dieIsIcon(d)){rest.push(d);return;}
+    /* P877: A REFUSED BRAND IS NOT AN ICON THIS TURN. _iconFire is built on
+       one law - a brand banks zero BECAUSE it fired - so a refused fire must
+       not take the zero with it. It joins `rest` and scores its natural face,
+       which it always has: only a 1 or a 5 can be branded. */
+    if(_iconRefused(d)){refused.push(d);rest.push(d);return;}
+    icons.push(d);
+  });
+  return {icons:icons,rest:rest,refused:refused};
 }
 /* is any FREE die showing its branded face? Then the roll is not a bust:
    there is a legal keep on the table even though it scores nothing. */
@@ -32918,6 +32957,13 @@ function handleRoll(){
   if(selDice.length){
     /* icons are withheld from scoring entirely - see _splitIcons */
     var _sp=_splitIcons(selDice),_iconSel=_sp.icons,_scoreDice=_sp.rest;
+    /* P877: say why, or a refused brand reads as the enchant being broken.
+       Nothing was lost - the die scored - so this is information, not a
+       penalty, and it is gold rather than red. */
+    if(_sp.refused&&_sp.refused.length){
+      try{setStatusMsg('THAT SEAT IS ALREADY MARKED','gold');}catch(e){}
+      try{famLog('THE SPOT IS TAKEN \u2014 THE BRAND KEEPS ITS FACE');}catch(e){}
+    }
     var _selVals=_scoreDice.map(d=>d.val);var _selMats=_scoreDice.map(d=>d.mat);var _selEnch=_scoreDice.map(d=>d.ench||null);const locked=G.kept.reduce((a,k)=>a+k.pts,0);const cards=effectiveCards();
     /* ── ANCHOR pre-processing ──
        Position-last die showing a 6, when committed, gets a +150 bonus.
