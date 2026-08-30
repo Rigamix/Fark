@@ -1,18 +1,27 @@
-/* P881 - _motion routes by owner (FX brief step 5, the motion half).
+/* P885 - the owned motion path plays the AUTHORED keyframes.
  *
- * Three claims, each with the control that could refute it:
- *   1. a settled match die gets NO DOM animation - so translate is left to
- *      _slaveHost and the hit box stays on the die. Control: the same call on
- *      an element D3X does not own still animates, so the DOM path is intact.
- *   2. the MESH moves instead, and returns to exactly where it started.
- *      Control: the same sampling before the effect is flat.
- *   3. an instrument cannot fade a die out of existence. Control: read the
- *      keyframe back and check the clamp, rather than trusting the source.
+ * REWRITTEN. The previous version had four verdicts that could not fail. The
+ * settled branch re-bases position, scale and quaternion from d.phys at the
+ * top of EVERY frame, so "the mesh was still before", "still again after" and
+ * "it ends where it began" were all testing the re-basing rather than the
+ * effect - true whenever d.nudge is null, whatever the nudge did. And "the
+ * twist keeps the face up" was arithmetically forced: upness is the max
+ * y-component over the six face normals, and ANY rotation about world Y
+ * preserves every y-component exactly, so it only ever tested that the axis
+ * constant is (0,1,0). That IS a real guard against P821's local-frame bug, so
+ * it is kept below under a name that says what it actually checks.
  *
- * NUDGE.ms is raised for the run. The effect is 260ms and this harness renders
- * the 3D layer at ~1fps, so at shipped timings the nudge would begin and end
- * between two frames and every sample would be a baseline - a flat series that
- * would read as "the mesh never moved". Restored at the end.
+ * SAMPLING. D3X.frame() is callable, so time is not waited out: the nudge's t0
+ * is BACKDATED to put the effect at a chosen phase and one real frame is
+ * driven. Every sample below is therefore deterministic and immune to the
+ * ~1fps headless render - which is also the only way to sample a 240ms effect
+ * here at all.
+ *
+ * The yaw is recovered exactly rather than estimated. The frame premultiplies
+ * the settled pose by a rotation about world up, so off = obj.q * phys.q^-1 is
+ * that rotation and 2*atan2(off.y, off.w) is its SIGNED angle. An unsigned
+ * angleTo() would read a clean 360 turn as up-then-down and could not tell it
+ * from the whirl that is the thing under test.
  */
 eval(await (await fetch('/tools/_fxh.js')).text());
 const out = {};
@@ -26,140 +35,175 @@ if (!r.ok) return Object.assign(out, {err: 'never got to the dice: ' + r.why});
 const die = D3X.dice.filter(d => d.match && d.phys && d.obj && d.obj.visible)[0];
 if (!die) return Object.assign(out, {err: 'no settled die'});
 
-const sample = async (ms) => {
-  const xs = [], t0 = Date.now();
-  while (Date.now() - t0 < ms) { xs.push(die.obj.position.x); await FXH.sleep(150); }
+const atPhase = (t) => {
+  if (!die.nudge) return false;
+  die.nudge.t0 = performance.now() - t * die.nudge.ms;
+  D3X.frame();
+  return true;
+};
+const yawDeg = () => {
+  const off = die.obj.quaternion.clone().multiply(die.phys.q.clone().invert());
+  return 2 * Math.atan2(off.y, off.w) * 180 / Math.PI;
+};
+const sweep = (read, n) => {
+  const xs = [];
+  for (let i = 0; i <= n; i++) { atPhase(i / n * 0.985); xs.push(read()); }
   return xs;
 };
-const spread = xs => Math.max(...xs) - Math.min(...xs);
+const arm = (keys) => { die.nudge = null; FKFX._motion(die.chip, keys); return die.nudge; };
+const spread = a => Math.max(...a) - Math.min(...a);
 
-const KEYS = [{o:0},{o:.25,dx:-7,e:'ease-in'},{o:.5,dx:7},{o:.75,dx:-3},{o:1,dx:0,t:240}];
-/* P882: rt is driven now, so the face-holding claim is tested where it can
-   actually fail - a keyframe set that DOES twist. STRIKE's keys carry no rt,
-   so the quaternion check above stays a control on the no-rt path. */
-const TWIST = [{o:0,rt:0},{o:.5,rt:-2},{o:1,rt:0,t:240}];
-
-/* ══ baseline: the mesh is still ═════════════════════════════════════ */
-const before = await sample(2000);
-out.before = {n: before.length, spread: +spread(before).toFixed(5)};
-
-/* ══ 1 + 2. the owned path ═══════════════════════════════════════════ */
-const wasMs = D3X.NUDGE.ms;
-D3X.NUDGE.ms = 9000;
-const q0 = {x: die.obj.quaternion.x, y: die.obj.quaternion.y,
-            z: die.obj.quaternion.z, w: die.obj.quaternion.w};
-const chipAnimBefore = die.chip.getAnimations().length;
-
-FKFX._motion(die.chip, KEYS);
-
-out.owned = {
-  nudgeArmed: !!die.nudge,
-  nudgeAmp: die.nudge ? +die.nudge.amp.toFixed(4) : null,
-  chipAnimationsAdded: die.chip.getAnimations().length - chipAnimBefore,
+/* the shipped families' literal keyframes */
+const KEYS = {
+  SET:       [{o:0,sc:1},{o:.18,sc:.95,rt:-2,e:'ease-in'},{o:.35,sc:.93,rt:2},
+              {o:.6,sc:.93,rt:-1},{o:1,sc:1,rt:0,e:'cubic-bezier(.3,1.4,.4,1)'}],
+  ARM:       [{o:0,sc:1},{o:.23,sc:1.08,e:'cubic-bezier(.3,1.4,.4,1)'},{o:.5,sc:1},
+              {o:.73,sc:1.05},{o:1,sc:1,t:600}],
+  TRANSFORM: [{o:0},{o:.5,rt:180,sc:1.08},{o:1,rt:360,sc:1,t:620,e:'cubic-bezier(.3,1.4,.4,1)'}],
+  STRIKE:    [{o:0},{o:.25,dx:-7,e:'ease-in'},{o:.5,dx:7},{o:.75,dx:-3},{o:1,dx:0,t:240}],
+  LANDED:    [{o:0,sc:1},{o:.5,sc:1.06},{o:1,sc:1,t:200}],
+  DYONLY:    [{o:0},{o:.5,dy:9},{o:1,dy:0,t:240}],
 };
-const during = await sample(3000);
-out.during = {n: during.length, spread: +spread(during).toFixed(5)};
-out.quaternionHeld = ['x','y','z','w'].every(k =>
-  Math.abs(die.obj.quaternion[k] - q0[k]) < 1e-6);
 
-/* it must end where it began - a settled die's position is what the hit box
-   and the shadow are read from, so a leftover offset is worse than no effect */
-const cleared = await FXH.until(() => !die.nudge, 15000);
-out.nudgeCleared = cleared != null;
-const after = await sample(2000);
-out.after = {n: after.length, spread: +spread(after).toFixed(5)};
-out.returnedHome = before.length && after.length &&
-  Math.abs(after[after.length-1] - before[before.length-1]) < 1e-4;
-D3X.NUDGE.ms = wasMs;
+/* ══ A. THE AUTHORED DURATION SURVIVES ═══════════════════════════════
+   Every owned effect used to run at one global 260ms. */
+out.durations = {};
+for (const k of Object.keys(KEYS)) {
+  const n = arm(KEYS[k]);
+  out.durations[k] = n ? n.ms : null;
+}
 
-/* ══ 3. the DOM path is intact, and the clamp is on it ═══════════════ */
+/* ══ B. TRANSFORM IS ONE TURN, NOT A WHIRL ═══════════════════════════ */
+arm(KEYS.TRANSFORM);
+const yaws = sweep(yawDeg, 16);
+let dips = 0, signFlips = 0;
+for (let i = 1; i < yaws.length; i++) if (yaws[i] < yaws[i - 1] - 2) dips++;
+for (let i = 1; i < yaws.length; i++)
+  if (Math.sign(yaws[i]) && Math.sign(yaws[i - 1]) &&
+      Math.sign(yaws[i]) !== Math.sign(yaws[i - 1])) signFlips++;
+out.transform = {yaws: yaws.map(v => +v.toFixed(1)),
+                 peak: +Math.max(...yaws.map(Math.abs)).toFixed(1),
+                 backwardSteps: dips, signFlips};
+
+/* ══ C. ARM KEEPS ITS TWO BUMPS ══════════════════════════════════════ */
+arm(KEYS.ARM);
+const arms = sweep(() => die.obj.scale.x, 24);
+let peaks = 0;
+for (let i = 1; i < arms.length - 1; i++)
+  if (arms[i] > arms[i - 1] && arms[i] >= arms[i + 1] && arms[i] > 1.015) peaks++;
+out.armShape = {series: arms.map(v => +v.toFixed(4)),
+                localMaxima: peaks, max: +Math.max(...arms).toFixed(4)};
+
+/* ══ D. SET REACHES ITS AUTHORED DEPTH ═══════════════════════════════
+   The old envelope halved it: an authored .93 arrived as about .96. */
+arm(KEYS.SET);
+const sets = sweep(() => die.obj.scale.x, 20);
+out.setDepth = {min: +Math.min(...sets).toFixed(4), series: sets.map(v => +v.toFixed(3))};
+
+/* ══ E. THE PULSE NO LONGER ERASES THE BEAT ══════════════════════════ */
+const wasPulse = die.pulseOn;
+die.pulseOn = true;  arm(KEYS.LANDED); atPhase(0.5);
+const withPulse = die.obj.scale.x;
+die.pulseOn = false; arm(KEYS.LANDED); atPhase(0.5);
+const withoutPulse = die.obj.scale.x;
+die.pulseOn = true;  die.nudge = null; D3X.frame();
+const pulseAlone = die.obj.scale.x;
+die.pulseOn = wasPulse; die.nudge = null;
+out.pulseCompose = {withPulse: +withPulse.toFixed(4),
+                    withoutPulse: +withoutPulse.toFixed(4),
+                    pulseAlone: +pulseAlone.toFixed(4), pulseAmp: D3X.PULSE.amp};
+
+/* ══ F. dy IS ITS OWN AXIS ═══════════════════════════════════════════ */
+arm(KEYS.DYONLY); const ys = sweep(() => die.obj.position.y, 10);
+arm(KEYS.DYONLY); const xs = sweep(() => die.obj.position.x, 10);
+out.dyAxis = {ySpread: +spread(ys).toFixed(5), xSpread: +spread(xs).toFixed(5)};
+
+/* ══ G. STRIKE STILL SHAKES; the face is still held; easing is real ══ */
+arm(KEYS.STRIKE);
+const shake = sweep(() => die.obj.position.x, 16);
+out.strike = {spread: +spread(shake).toFixed(5)};
+
+const AX = [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
+const upness = q => Math.max.apply(null, AX.map(a =>
+  new THREE.Vector3(a[0],a[1],a[2]).applyQuaternion(q).y));
+die.nudge = null; D3X.frame();
+const upRest = upness(die.obj.quaternion);
+arm(KEYS.TRANSFORM); atPhase(0.5);
+out.faceAxis = {atRest: +upRest.toFixed(5), midTurn: +upness(die.obj.quaternion).toFixed(5)};
+die.nudge = null;
+
+out.easing = {
+  overshoots: D3X._ease('cubic-bezier(.3,1.4,.4,1)', 0.55),
+  linearIsIdentity: Math.abs(D3X._ease('linear', 0.5) - 0.5) < 1e-6,
+  easeOutIsAhead: D3X._ease('ease-out', 0.5) > 0.5,
+  unknownFallsBack: D3X._ease('nonsense-easing', 0.5) > 0,
+};
+
+/* ══ H. the chip is left alone, and the DOM path is intact ═══════════ */
+const chipKids = die.chip.children.length, chipAnims = die.chip.getAnimations().length;
+arm(KEYS.SET);
+out.chipUntouched = {kidsAdded: die.chip.children.length - chipKids,
+                     animationsAdded: die.chip.getAnimations().length - chipAnims};
+die.nudge = null;
+
 const spare = document.createElement('div');
 spare.style.cssText = 'position:absolute;left:0;top:0;width:10px;height:10px';
 document.body.appendChild(spare);
 FKFX._motion(spare, [{o:0,op:1},{o:.5,op:0},{o:1,op:1,t:300}]);
 const anims = spare.getAnimations();
 const kf = anims.length ? anims[0].effect.getKeyframes() : [];
-out.domPath = {
-  animated: anims.length > 0,
-  opacities: kf.map(k => +Number(k.opacity).toFixed(3)),
-  hasTranslate: kf.some(k => k.translate && k.translate !== 'none'),
-};
+out.domPath = {animated: anims.length > 0,
+               opacities: kf.map(k => +Number(k.opacity).toFixed(3)),
+               hasTranslate: kf.some(k => k.translate && k.translate !== 'none')};
 spare.remove();
 
-/* ══ 4. THE ROUTE THIS PATCH DOES NOT CONTROL ════════════════════════
-   Everything above drives _byChip with D3X's own d.chip. The live call site
-   (24476) hands it the GAME's d.el instead. If those are different nodes the
-   lookup never matches on the real path and none of the above is reachable,
-   so the identity is asserted rather than assumed. */
 const pool = ((typeof G !== 'undefined' && G && G.pool) || []).filter(x => x.el);
-const paired = pool.map(x => ({gameEl: x.el, viaByChip: D3X._byChip(x.el)}))
-                   .filter(z => z.viaByChip);
-out.liveRoute = {
-  poolWithElements: pool.length,
-  resolvedByChip: paired.length,
-  sameNodeAsChip: paired.length > 0 &&
-                  paired.every(z => z.viaByChip.chip === z.gameEl),
-};
-
-/* ══ 5. THE TWIST KEEPS THE FACE ═════════════════════════════════════
-   A yaw about world up is the kick's own axis (P821): the die turns and the
-   scoring face stays up. So the test is not "the quaternion never changes" -
-   it is "the quaternion changes AND the up-facing normal does not". */
-D3X.NUDGE.ms = 9000;
-/* "the face stays up" is not "local Y is unmoved" - a yaw about world up
-   rotates every local axis in world space. The invariant is that whichever
-   local axis is pointing UP keeps pointing up by exactly as much, which is
-   what P821 means by the scoring face staying up. Measured as the best
-   y-component over the six face normals. */
-const AX = [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
-const upness = q => Math.max.apply(null, AX.map(a =>
-  new THREE.Vector3(a[0],a[1],a[2]).applyQuaternion(q).y));
-const upBefore = upness(die.obj.quaternion);
-FKFX._motion(die.chip, TWIST);
-out.twist = {armed: !!(die.nudge && die.nudge.rt), rtRad: die.nudge ? +die.nudge.rt.toFixed(5) : null};
-await FXH.sleep(1200);
-const qMid = die.obj.quaternion.clone();
-out.twist.quaternionMoved = ['x','y','z','w'].some(k => Math.abs(qMid[k] - q0[k]) > 1e-6);
-out.twist.upnessBefore = +upBefore.toFixed(5);
-out.twist.upnessDuring = +upness(qMid).toFixed(5);
-out.twist.wasRestingFlat = upBefore > 0.99;
-out.twist.upAxisHeld = Math.abs(upness(qMid) - upBefore) < 1e-3;
-await FXH.until(() => !die.nudge, 15000);
-D3X.NUDGE.ms = wasMs;
+out.liveRoute = {poolWithElements: pool.length,
+                 resolved: pool.map(x => D3X._byChip(x.el)).filter(Boolean).length};
 
 out.VERDICT = {
-  meshWasStillBefore:        out.before.n > 3 && out.before.spread < 1e-4,
-  ownedDieGetsNoDomAnimation: out.owned.chipAnimationsAdded === 0,
-  /* the sign is meaningful and kept: mx takes the largest-magnitude dx with
-     its sign, so STRIKE's leading -7 makes the shake start left the way the
-     instrument wrote it. Magnitude is what has to be non-zero. */
-  ownedDieGetsANudge:        out.owned.nudgeArmed === true &&
-                             Math.abs(out.owned.nudgeAmp) > 0,
-  theMeshActuallyMoved:      out.during.n > 3 && out.during.spread > 1e-3,
-  /* control: keys with no rt must not rotate anything */
-  noRtMeansNoRotation:       out.quaternionHeld === true,
-  /* and with rt, it turns without changing the number */
-  twistIsArmed:              out.twist.armed === true && Math.abs(out.twist.rtRad) > 0,
-  twistActuallyRotates:      out.twist.quaternionMoved === true,
-  /* gated on the die actually lying flat first: on a cocked die the yaw
-     would not preserve the face and the check would be measuring nothing. */
-  dieWasRestingFlat:         out.twist.wasRestingFlat === true,
-  twistKeepsTheFaceUp:       out.twist.upAxisHeld === true,
-  theNudgeExpires:           out.nudgeCleared === true,
-  itEndsWhereItBegan:        out.returnedHome === true,
-  meshIsStillAgainAfter:     out.after.n > 3 && out.after.spread < 1e-4,
-  /* controls: the DOM path is untouched for anything D3X does not own */
+  /* A - authored duration, which used to be one global number */
+  transformRunsFor620: out.durations.TRANSFORM === 620,
+  armRunsFor600:       out.durations.ARM === 600,
+  strikeRunsFor240:    out.durations.STRIKE === 240,
+  landedRunsFor200:    out.durations.LANDED === 200,
+  setFallsBackTo500:   out.durations.SET === 500,
+  /* B - the regression P882 shipped, and the shape that replaces it */
+  transformTurnsOneWay:   out.transform.backwardSteps === 0,
+  transformNeverReverses: out.transform.signFlips === 0,
+  transformReaches360:    Math.abs(out.transform.peak - 360) < 20,
+  /* C/D - shape and depth survive the trip */
+  armKeepsBothBumps:  out.armShape.localMaxima >= 2,
+  armReachesItsPeak:  Math.abs(out.armShape.max - 1.08) < 0.02,
+  setReachesItsDepth: Math.abs(out.setDepth.min - 0.93) < 0.02,
+  /* E - the beat composes with the pulse instead of losing to it */
+  pulseDoesNotEraseTheBeat: out.pulseCompose.withPulse >
+                            out.pulseCompose.pulseAlone + 0.005,
+  beatAloneStillSwells:     out.pulseCompose.withoutPulse > 1.005,
+  pulseAloneIsJustThePulse: out.pulseCompose.pulseAlone <= 1 + D3X.PULSE.amp + 1e-6,
+  /* F - the axis trap */
+  dyMovesY:       out.dyAxis.ySpread > 1e-4,
+  dyDoesNotMoveX: out.dyAxis.xSpread < 1e-6,
+  /* G - nothing regressed; the easing is honoured; the axis is still world-up.
+     NOTE this last one is near-tautological by construction - any rotation
+     about world Y preserves every y-component - so it is a guard that the AXIS
+     CONSTANT has not drifted back to P821's local frame, and nothing more. */
+  strikeStillShakes:       out.strike.spread > 1e-3,
+  yawAxisIsStillWorldUp:   Math.abs(out.faceAxis.midTurn - out.faceAxis.atRest) < 1e-3,
+  bezierOvershootsPastOne: out.easing.overshoots > 1,
+  linearIsIdentity:        out.easing.linearIsIdentity === true,
+  easeOutLeadsLinear:      out.easing.easeOutIsAhead === true,
+  unknownEasingFallsBack:  out.easing.unknownFallsBack === true,
+  /* H - unchanged guarantees */
+  ownedDieGetsNoDomAnimation: out.chipUntouched.kidsAdded === 0 &&
+                              out.chipUntouched.animationsAdded === 0,
   unownedElementStillAnimates: out.domPath.animated === true &&
                                out.domPath.hasTranslate === true,
-  opacityIsClamped:            out.domPath.opacities.length > 0 &&
-                               out.domPath.opacities.every(o => o >= 0.05),
-  clampDidNotFlattenIt:        out.domPath.opacities.some(o => o < 1),
-  /* the route the instruments actually take */
-  liveCallSiteElementResolves: out.liveRoute.resolvedByChip > 0 &&
-                               out.liveRoute.sameNodeAsChip === true,
-  mostOfThePoolResolves:       out.liveRoute.poolWithElements > 0 &&
-                               out.liveRoute.resolvedByChip >=
-                               out.liveRoute.poolWithElements,
+  opacityIsClamped: out.domPath.opacities.length > 0 &&
+                    out.domPath.opacities.every(o => o >= 0.05),
+  clampDidNotFlattenIt: out.domPath.opacities.some(o => o < 1),
+  liveCallSiteResolves: out.liveRoute.poolWithElements > 0 &&
+                        out.liveRoute.resolved === out.liveRoute.poolWithElements,
 };
 out.PASS = Object.keys(out.VERDICT).every(k => out.VERDICT[k] === true);
 return out;
