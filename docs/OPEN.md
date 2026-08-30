@@ -32,12 +32,35 @@ flooring it (`Math.max(160, _oppDelay(260))`) keeps the pickup window while
 still accelerating everything else. *Recommendation: ship as-is and watch for
 it; the floor is a one-line change if you see it.*
 
-**One loose thread found in passing, unrelated to `window.G`:** every balance-sim
-row reports `bustsPerMatch: 0`, identical across every tier, policy and repeat.
-A player policy pushing to a 500 threshold with four dice left should bust
-sometimes. A flat zero on a stochastic counter is the shape of a metric that is
-never incremented — worth a look at `playMatch`'s bust accumulation before the
-ladder numbers are trusted.
+**The flat `bustsPerMatch` is found, fixed and measured (P888) — and it was
+not a metric bug.** `simTurn` gave a free bust save to any loadout containing a
+silver die: a per-turn counter, spent by returning `bank()` instead of
+`bust()`, and a turn reaches that check at most once. So **one silver die was
+100% bust immunity every turn for the whole run**, on the rival's seat as well
+as yours, and it did not even need to still be in hand.
+
+Silver's own definition says the save was retired — *"the old bust-save is
+gone… it never removes the zero"* — and its `effect` is `null`. It pays through
+its weighted roll table, which the sim already gets for free, so the line was
+counting a retired mechanic twice.
+
+Measured, 100 tier-0 matches, one bone swapped for one silver: 91 busts with
+bone, **zero** with silver and 84 saves consumed, 80 with a clone of silver's
+roll table under a different id. After the fix: bone 0.78, silver 0.62, clone
+0.58. The persona path went from exactly 0.000 on all six personas to
+0.13–0.247.
+
+**This is a balance-measurement defect, not a display one.** Every `patronWin`
+and `bossWin` ever produced for a silver-bearing loadout is inflated — at tier
+0, patronWin ran 18% / 24% / 22% across none / silver / clone, so about half of
+silver's apparent gain was the retired save. It lands before the ladder re-run,
+alongside the sim's `G` isolation.
+
+**Correction to what I told you.** I said every row read `bustsPerMatch: 0`. It
+did not — it was zero exactly when the gear contained silver, which is G2-mid
+and G3-late, half the default table, and normal for G0-bone and G1-early. The
+rows I was looking at came through callers that pin a silver-bearing gear, so I
+generalised from a filtered view.
 
 ---
 
