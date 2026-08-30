@@ -5,44 +5,39 @@ is a valid answer.** Answered items are deleted, not marked — this stays short
 
 ---
 
-## `window.G` IS UNDEFINED — THREE LIVE SITES STILL READ IT
+## `window.G` — ALL THREE FIXED (P886). One residual, and it is a real question.
 
-`G` is declared `let G=null,LO=null;` (30882). A `let` at top level makes a
-global BINDING, never a property of `window`, so **`window.G` is undefined for
-the life of the page** and any guard beginning `window.G&&` is dead.
+`G` is a `let`, so `window.G` was undefined for the life of the page and every
+`window.G&&` guard was dead. All three are now on the binding, driven 18/18:
 
-The file already knows: 31018 carries the note verbatim, earned when the same
-mistake silently no-opped a whole migration. I walked into it anyway building
-moment 2 — the beat was unreachable until P884c — which is how I found the rest.
+- **The bank sound pitches again.** Measured 520/660/900 at 20% of target,
+  598/759/1035 at 70%, 676/858/1170+**1287** at 88%, 780/990/1350+**1485** at
+  98%. The hot harmonic had never played.
+- **Tap-to-fast-forward works.** A real pointerdown on the board takes
+  `_ffMult` 1 → 0.15 and `_oppDelay(1900)` from 1900ms to 285ms; off the board,
+  on a button, and outside a rival turn all correctly do nothing.
+- **The sim really isolates `oppShouldBank` now.** 10,733 calls during a sim,
+  not one of which saw a live `G` or an active sealed rule, and a forced throw
+  still restores the binding through the `finally`. **Safe for the ladder
+  re-run.**
 
-**Three more sites read it, and all three are yours, because each is a
-behaviour change rather than a typo.** I have not touched them.
+**THE RESIDUAL — yours, because it is a judgement about feel, not a bug.**
+With the tap live, `_afterOppSettle`'s `MIN = _oppDelay(260)` drops from 260ms
+to **40ms**. That window exists to cover the 3D layer picking the dice up. It is
+a pre-existing shape — the shipped `fastRival` setting already takes it to
+104ms — and I could not time it honestly on a ~1fps harness, so I changed
+nothing and am telling you instead of guessing. If a fast-forwarded rival turn
+ever looks like it skips a beat rather than running fast, this is the line:
+flooring it (`Math.max(160, _oppDelay(260))`) keeps the pickup window while
+still accelerating everything else. *Recommendation: ship as-is and watch for
+it; the floor is a one-line change if you see it.*
 
-**1. `12561` — a pressure ratio that is permanently 1.**
-`if(window.G&&G.target&&G.pPts){var p=G.pPts/G.target; r=p>=0.95?1.5:...}`
-The guard never passes, so `r` never leaves 1 and the 1.15 / 1.3 / 1.5 steps
-have never fired. Whatever this scales has never scaled near target.
-*Recommendation: fix, but look at what `r` feeds first — fixing it makes
-something stronger in the last stretch of a night, and that is a difficulty
-change you should see coming rather than discover.*
-
-**2. `46902` — a function that has never run.**
-`if(!(window.G&&G._oppTurnActive))return;` always returns early.
-*Recommendation: read what follows the guard before fixing it. An
-always-returning guard can be load-bearing by accident, and turning on a path
-that has never executed in play is not a one-line change.*
-
-**3. `46654` / `46877` — a sim isolation that does not isolate.**
-`var _savedG=window.G; window.G=null;` around the sim, restored after, with the
-stated intent that `oppShouldBank` be neutral during it. It writes a window
-property nothing reads, so the live `G` is visible to the sim throughout.
-*Recommendation: fix. The intent is written down, the sim is meant to be
-isolated, and this is the one of the three where the current behaviour is
-clearly not what anybody chose.*
-
-**The general form, if you want one guard rather than three fixes:** anything
-matching `window.G&&` in this file is dead by construction. That is a
-grep-able invariant and it could be a line in the parse gate.
+**One loose thread found in passing, unrelated to `window.G`:** every balance-sim
+row reports `bustsPerMatch: 0`, identical across every tier, policy and repeat.
+A player policy pushing to a 500 threshold with four dice left should bust
+sometimes. A flat zero on a stochastic counter is the shape of a metric that is
+never incremented — worth a look at `playMatch`'s bust accumulation before the
+ladder numbers are trusted.
 
 ---
 
