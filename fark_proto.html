@@ -12943,7 +12943,7 @@ var DICE_STORE=[
   /* Amber 120→180 to match DICE_TYPES.cost (and the +200 triple buff).
      Re-sorted after Lead so the store stays cheap→expensive. */
   {mat:'amber',    price:180, stock:2, label:'Amber'},
-  {mat:'silver',   price:580, stock:1, label:'Silver'},
+  {mat:'silver',   price:320, stock:1, label:'Silver'},/* P892: was 580 */
   {mat:'obsidian', price:500, stock:2, label:'Obsidian'},
   /* Ruby removed from the store — faces 1/1/5/5/6/6 removed the gamble
      entirely (stack a few and you literally can't bust). The red-gem
@@ -14418,7 +14418,15 @@ const DICE_TYPES=[
      2/3/4/6 instead - measured over 200k turns at a 500-point banking
      policy, an all-silver hand busts 28.2% of turns against bone's 53.3%.
      It never removes the zero; every roll is still a real roll. */
-  {id:'silver',name:'SILVER',icon:'🔘',cost:580,
+  /* P892: 580 -> 320. Measured, two silver beat two 100g irons by 0.8-1.3pp,
+     inside noise - a 580g die buying what 200g of iron buys - and the economy
+     model's win rate for the band silver occupies was overstated by ~18pp, so
+     580 was harder to reach than intended as well. 320 keeps the consistency
+     premium (its per-turn bust rate is about a third of bone's, and that
+     advantage grows the deeper a player pushes) while putting a die with
+     effect:null below the effect-carrying family dice rather than above
+     obsidian. */
+  {id:'silver',name:'SILVER',icon:'🔘',cost:320,
    faces:[1,2,3,4,5,6],
    rollTable:[1,5,1,5,2,3,4,6],
    effect:null,
@@ -46668,18 +46676,43 @@ document.addEventListener('DOMContentLoaded', function(){
 function _runEconomySim(cfg){
   cfg=cfg||{};
   var RUNS=cfg.runs||2000;
-  var FAM_PRICE={amber:180,obsidian:500,silver:580,starstone:700,vagabond:700,jade:750,jade2:1800};
+  /* P892: silver 580 -> 320 here too. Three places hold this price - the
+     shop row, the die def and this table - and they have to move together. */
+  var FAM_PRICE={amber:180,obsidian:500,silver:320,starstone:700,vagabond:700,jade:750,jade2:1800};
   var FAMS=['amber','jade','jade2','silver','obsidian','starstone','vagabond'];
-  var PWIN=cfg.pwin||{0:0.48,1:0.55,2:0.62,3:0.68};
-  var BWIN=cfg.bwin||{0:0.30,1:0.45,2:0.55,3:0.62};
+  /* P892: BAND 0 IS GONE. `fam` is seeded with one family die by the starter
+     draft and never shrinks, so gearLevel cannot return 0 and these rows were
+     never read - proven by a 40,000-run occupancy census and by moving the
+     old PWIN[0] between 0.0 and 1.0 with no effect on runsWon. A dead row in
+     a four-entry table invites tuning a number that does nothing.
+     STALE, NOT CONTAMINATED, and dated: git log -S on each literal returns
+     only its birth commit, and that file predates the silver bust-save defect
+     by 91 minutes. But 1,140 commits of tuning later, PWIN[2] measures 0.443
+     against the 0.62 below - ~18pp overstated, and the band silver lives in.
+     Left as-is pending the real-engine ladder, which is the only measurement
+     that is not this model. */
+  var PWIN=cfg.pwin||{1:0.55,2:0.62,3:0.68};
+  var BWIN=cfg.bwin||{1:0.45,2:0.55,3:0.62};
   function gearLevel(fam){
     var strong=fam.filter(function(m){return m==='jade'||m==='jade2'||m==='starstone';}).length;
     if(fam.length>=4&&strong>=2)return 3;
     if(fam.length>=2)return 2;
-    if(fam.length>=1)return 1;
-    return 0;
+    /* P892: the floor is 1, not 0. `fam` always holds the starter draft's
+       die, so this branch is unreachable - and it is where the invariant
+       belongs, because deleting PWIN[0] would otherwise turn a future
+       reachable band 0 into an undefined win rate, which reads as "the
+       player loses every seat" rather than as an error. */
+    return 1;
   }
-  var agg={g2ByN3:0,g3ByN6:0,noBuyByN3:0,dead:0,won:0,
+  /* P892: reachedN3 is the pity metric's DENOMINATOR, counted at the test.
+     noBuyByN3 can only increment for a run that survived to the night-3 shop,
+     and the old output divided it by RUNS - a survivor numerator over the
+     whole population. Worse, the two failure modes coincide: a run that
+     cannot afford a 180g amber on 100 gold is a run that also loses its seats
+     and dies before night 3, so the numerator empties exactly when pity is
+     most severe. alive[2] would still be wrong - it counts runs that STARTED
+     night 3, and this test runs after night 3's match. */
+  var agg={g2ByN3:0,g3ByN6:0,noBuyByN3:0,reachedN3:0,dead:0,won:0,
     buys:[0,0,0,0,0,0,0,0],alive:[0,0,0,0,0,0,0,0],gold:[0,0,0,0,0,0,0,0]};
   for(var r=0;r<RUNS;r++){
     var gold=100,hearts=3,dead=false,boughtEver=false,g2Stamp=false,g3Stamp=false;
@@ -46731,7 +46764,7 @@ function _runEconomySim(cfg){
         var pick=(options.indexOf('jade')>=0&&Math.random()<0.6)?'jade':options[0];
         gold-=FAM_PRICE[pick];fam.push(pick);boughtEver=true;agg.buys[t]++;
       }
-      if(night===3){if(gearLevel(fam)>=2)g2Stamp=true;if(!boughtEver)agg.noBuyByN3++;}
+      if(night===3){agg.reachedN3++;if(gearLevel(fam)>=2)g2Stamp=true;if(!boughtEver)agg.noBuyByN3++;}
       if(night===6&&gearLevel(fam)>=3)g3Stamp=true;
     }
     if(g2Stamp)agg.g2ByN3++;
@@ -46742,7 +46775,13 @@ function _runEconomySim(cfg){
     runs:RUNS,
     pG2byN3:Math.round(100*agg.g2ByN3/RUNS),
     pG3byN6:Math.round(100*agg.g3ByN6/RUNS),
-    pityNoBuyByN3:Math.round(100*agg.noBuyByN3/RUNS),
+    /* P892: OF THE RUNS THAT GOT THERE, not of all runs - see reachedN3.
+       pityBase is reported beside it so the denominator is never in doubt.
+       pG2byN3 and pG3byN6 above are deliberately left over RUNS: they are
+       JOINT probabilities - what fraction of all runs reach G2 by night 3 -
+       and a run that died did not reach it. Do not "fix" them by analogy. */
+    pityNoBuyByN3:agg.reachedN3?Math.round(100*agg.noBuyByN3/agg.reachedN3):0,
+    pityBase:agg.reachedN3,
     runsWon:Math.round(100*agg.won/RUNS),
     buysPerNight:agg.buys.map(function(b,i){return agg.alive[i]?+(b/agg.alive[i]).toFixed(2):0;}),
     avgGoldAtNight:agg.gold.map(function(gd,i){return agg.alive[i]?Math.round(gd/agg.alive[i]):0;}),
