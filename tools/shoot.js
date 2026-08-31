@@ -179,6 +179,13 @@ var PROFILE_ROOT = path.join(os.tmpdir(), 'shoot-profiles');
    It sits after both sweeps and before this run makes its own profile, so a
    run never counts itself and abandoned profiles are already gone.
 
+   IT IS CHECK-THEN-ACT, NOT ATOMIC. A run counts profiles and then creates
+   its own, so two runs starting in the same instant can both pass a cap of 2
+   and make three. Human-paced invocation and a sequential batch never surface
+   it; a fan-out that launches N at once would. Nobody should read this as a
+   hard limit - it is a throttle, and making it atomic would mean a real lock
+   file with its own stale-lock problem, which is a worse trade at this cap.
+
    --max N or FARK_SHOOT_MAX override the default; --max 0 disables the gate
    for someone who is not using the machine. A waiting run says so once and
    gives up after fifteen minutes with its own exit code, because a silent
@@ -217,8 +224,11 @@ if (SHOOT_MAX > 0) {
       _said = true;
     }
     if (_waited >= _WAIT_CAP) {
+      /* name the run, or a batch log says "gave up" with nothing to act on */
       console.log('shoot: no slot after ' + Math.round(_WAIT_CAP / 60000) +
-                  'm - giving up rather than hanging the batch');
+                  'm - giving up rather than hanging the batch. pid ' +
+                  process.pid + ', url ' + (URL_ || '(none)') +
+                  ', eval-file ' + (EVALF || '(none)'));
       process.exit(3);
     }
     /* a real synchronous sleep, no dependency and no busy-spin */
