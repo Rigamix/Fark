@@ -395,12 +395,15 @@ function afterRollLite(){
   var mats=free.map(function(d){return d.mat;});
   var cards=effectiveCards();
   if(!anyScoring(vals,cards,mats,free)&&!_anchorRescues(cards)){
-    /* SHIPPED-COMPAT: not a rule, an emulation of a KNOWN STALE assumption in
-       the game's own in-file _runBalanceSim (it grants one free bust-save a
-       turn for owning a silver die — Silver's deleted identity). Off by
-       default; used once, by sim_verify, to prove the gap between the two
-       harnesses is that stale assumption and not a bug in this one. */
-    if(F.__shippedCompat&&_compatSaveLeft>0){_compatSaveLeft--;return 'compatsave';}
+    /* P890: THE COMPAT BUST-SAVE IS DELETED, because the assumption it
+       emulated is gone. The shipped _runBalanceSim used to grant one free
+       bust-save a turn for owning a silver die - Silver's retired identity -
+       and this emulated it so sim_verify could show the gap between the two
+       harnesses was that staleness rather than a bug here. P888 removed the
+       save from the shipped sim. Keeping the emulation would have inverted
+       the control: the compat arm would grant a save the shipped sim no
+       longer has, reporting a gap in FSIM's favour, which is the worst
+       direction for a check whose job is to catch FSIM being wrong. */
     if(_tryBustSave(free))return 'saved';
     doBust();
     return G._bustImmuneTurn?'ok':'bust';
@@ -408,7 +411,8 @@ function afterRollLite(){
   G.phase='choosing';
   return 'ok';
 }
-var _compatSaveLeft=0;
+/* P890: __shippedCompat now emulates ONE difference, not two - the missing
+   hot-dice bonus. Its bust-save half went with the shipped sim's own. */
 F.__shippedCompat=false;
 
 /* The commit, exactly as the roll commit runs it: split the icons out, score
@@ -498,14 +502,12 @@ F.simTurn=function(policy,state){
   G=getG();
   if(G._endMatchFired)return res;
   G.phase='idle';
-  _compatSaveLeft=F.__shippedCompat?1:0;
   var guard=0;
   while(guard++<60){
     rollPool();
     res.rolls++;
     var st=afterRollLite();
     if(st==='bust'){res.busted=true;break;}
-    if(st==='compatsave'){try{handleBank();}catch(e){}break;}
     if(st==='saved'){res.saved=true;
       /* _tryBustSave cleared the free dice and set phase idle: the real code
          then auto-rolls after 1.7s. Same thing, without the wait. */

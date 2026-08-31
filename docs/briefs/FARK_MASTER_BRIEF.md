@@ -125,7 +125,10 @@ FAMILY DICE (each anchors a card family, carries its colour):
 - Jade II (gold-green), 1800g: as Jade, plus 6s fill any gap in a
   straight. Same silhouette as Jade, richer material. Tier visuals must be
   glance-readable.
-- Silver (white), 580g: saves you from one bust per match.
+- Silver (white), 580g: weighted to 1s and 5s (rollTable
+  [1,5,1,5,2,3,4,6]), so it busts far less often - but never safely. *(The
+  bust-save this line used to describe was retired; the die's `effect` is
+  null. Measured: about a third of bone's per-turn bust rate.)*
 - Obsidian (black, ember cracks), 500g: 6% per roll to shatter (lost for
   the match), shatter scores +1000. Cracked texture state on shatter.
 - Starstone (night blue), 700g: every bank +500.
@@ -400,7 +403,9 @@ purchases approach zero, relics are overtuned.
 - Finnick's Palm (vagabond): reorders like Vagabond; kept dice adjacent
   to it score +100.
 - Corvus's Ledger (starstone): +300 per bank and +5g per bank.
-- Brutus's Shield (silver): two bust saves per match.
+- Brutus's Shield (silver): silver's weighted table plus a born Ward on the
+  5 face. *(Not two bust saves - its `effect` is null and Ward halves a
+  busted turn rather than rescuing it.)*
 - Aldric's Square (jade): 6s wild for triples only (side-grade rule; sim may relax).
 - Whisper's Fang (vagabond): its scores are doubled; bust while holding
   it kept and lose an extra 200.
@@ -502,10 +507,26 @@ debug-triggered). Additional acceptance work for this rewrite:
 - Card sim coverage for the deterministic passives and the flagged set:
   Double or Nothing, Short Fuse burn, Falling Star thresholds, Preserve
   III, Honeytrap+family stacking, Fool's Gold burn, Reprisal, Ill Omen
-  numbers vs real persona bust rates, cross-family bust-immunity stacks (run-sim verdict: full silver
-   stacking is a TRAP at 4% run wins, not a menace - low priority; the
-   real risk is defense-only builds lacking any win condition)
-  (Silver die + Ward + Insurance), For Keeps economy impact, every relic,
+  numbers vs real persona bust rates, cross-family bust-immunity stacks.
+  **VERDICT WITHDRAWN, not re-run.** The "TRAP at 4% run wins" number came
+  from a sim whose match layer hard-coded the very immunity under test - one
+  free bust-save a turn for owning a silver die, plus one per ward charge
+  (fixed P888). It did not measure the stack, it granted it. It also cannot
+  be repaired by re-running: `_runBalanceSim` is MATCH-level and nothing in
+  it can fail a run, and two of the three named components no longer exist -
+  Insurance is retired and Ward halves rather than rescues.
+  **Re-measured on the fixed sim** (2,000 matches/cell, tiers 1 and 4, two
+  policies, noise floor 2.1pp patron / 2.5pp boss): six-silver is
+  INDISTINGUISHABLE from the shipped G2-mid gear (-0.6 to +2.4pp patron,
+  -0.6 to +0.8pp boss) and +22 to +25pp over all-bone. Not a trap, not a
+  menace.
+  **And six-silver is unbuildable:** DICE_STORE stocks silver at 1 per run
+  and the starter draft adds at most one more, so the ceiling is two (three
+  with Brutus's Shield). The buildable two-silver stack beats two IRONS by
+  +0.8 to +1.3pp - inside noise. **The live question is Silver's 580g price,
+  not bust-immunity stacking.**
+  **RUN-level impact is still unmeasured.** `tools/sim_power_e.js` is the
+  only harness that can answer it and has never been pointed here., For Keeps economy impact, every relic,
   RECKONING badge dominance.
 - Targets: patron win rate 60-70% at intended gear, boss 45-55%, median
   match 5-7 banked turns per side inside the caps. RUN-level target:
