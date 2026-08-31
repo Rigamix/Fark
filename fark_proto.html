@@ -3998,15 +3998,11 @@ html.fk3d #screen-match .die-wrap:has(.die.d3on.selected)::after{
   border:3px solid var(--gold);background:transparent;
   clip-path:polygon(5px 0,calc(100% - 5px) 0,100% 5px,100% calc(100% - 5px),calc(100% - 5px) 100%,5px 100%,0 calc(100% - 5px),0 5px);
 }
-.die.combo-glow{animation:comboGlow .45s ease-out both;animation-delay:var(--gd,0s)}
-@keyframes comboGlow{0%{filter:brightness(1);box-shadow:0 0 8px rgba(200,160,80,.4)}40%{filter:brightness(1.25);box-shadow:0 0 14px 3px rgba(255,200,80,.65)}100%{filter:brightness(1);box-shadow:0 0 8px rgba(200,160,80,.4)}}
-.die.combo-glow::after{
-  content:'';position:absolute;inset:0;border-radius:2px;z-index:3;pointer-events:none;
-  background:linear-gradient(105deg,transparent 40%,rgba(255,240,200,.15) 48%,rgba(255,255,255,.2) 50%,rgba(255,240,200,.15) 52%,transparent 60%);
-  background-size:300% 100%;
-  animation:comboSheen .5s ease-out both;animation-delay:var(--gd,0s);
-}
-@keyframes comboSheen{0%{background-position:200% 0;opacity:0}12%{opacity:1}80%{opacity:1}100%{background-position:-100% 0;opacity:0}}
+/* P895: .die.combo-glow deleted. Its pulse was a box-shadow, which around a
+   cube is an axis-aligned square that does not touch the silhouette, and its
+   ::after sheen never painted at all - 2812 sets display:none!important on
+   every .d3on pseudo-element and this rule never declared display. The class
+   is still added and removed by the combo code; it is inert now. */
 /* ── IDLE BREATH (Option K) ──
    Smooth ±2px translateY cycle on match dice at rest. Applies ONLY to #playerDiceRow
    dice that aren't in a transient state (rolling/committed/bust/long-pressed/selected).
@@ -4150,81 +4146,31 @@ html.fk3d #screen-match .die-wrap:has(.die.d3on.selected)::after{
 .die-eff-pop.blue{background:rgba(40,100,180,.95);border:1px solid rgba(80,160,255,.5);text-shadow:0 1px 2px rgba(0,0,0,.6)}
 @keyframes dieEffPop{0%{opacity:0;transform:translateX(-50%) translateY(4px) scale(.8)}10%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}65%{opacity:1;transform:translateX(-50%) translateY(-2px)}100%{opacity:0;transform:translateX(-50%) translateY(-10px)}}
 /* ── Die effect glow ── */
-.die.eff-glow-gold,.die.eff-glow-green,.die.eff-glow-red,.die.eff-glow-blue{transition:box-shadow .3s ease,filter .3s ease}
-.die.eff-glow-gold{box-shadow:0 0 12px 3px rgba(255,200,60,.6),0 0 4px rgba(255,180,40,.35)!important;filter:brightness(1.15)}
-.die.eff-glow-green{box-shadow:0 0 12px 3px rgba(60,200,90,.6),0 0 4px rgba(40,180,60,.35)!important;filter:brightness(1.12)}
-.die.eff-glow-red{box-shadow:0 0 12px 3px rgba(220,60,40,.6),0 0 4px rgba(200,40,30,.35)!important;filter:brightness(1.1)}
-.die.eff-glow-blue{box-shadow:0 0 12px 3px rgba(80,160,240,.6),0 0 4px rgba(60,140,220,.35)!important;filter:brightness(1.12)}
-/* Sawdust dampened die */
-/* dieDampen used to set `animation:` which overrode the .rolling
-   keyframes — dampened dice appeared to skip rolling and just appear at
-   their final face. Use a `transition:` on filter instead so it stacks
-   cleanly on top of the rolling rotation. */
-/* Sawdust dampened die — clearly tinted brown with a sepia/dust look so the player
-   can see at a glance which opp dice the Sawdust card neutered. */
-.die.die-dampened{
-  filter:brightness(.55) saturate(.3) sepia(.6) hue-rotate(-15deg);
-  transition:filter .5s ease-out;
-  position:relative;
-}
-.die.die-dampened::before{
-  content:'';position:absolute;inset:0;pointer-events:none;border-radius:inherit;
-  background:radial-gradient(circle at 50% 30%,rgba(200,160,100,.25) 0%,rgba(120,80,40,.18) 60%,transparent 100%);
-  mix-blend-mode:multiply;z-index:1;
-}
-.die.die-dampened.dampen-fade{filter:brightness(1) saturate(1) sepia(0) hue-rotate(0)}
-.die.die-dampened.dampen-fade::before{opacity:0;transition:opacity .5s ease-out}
-/* Sawdust spray — quick poof when the die is initially dampened.
-   CRITICAL: this MUST run on a ::after pseudo-element, NOT on the die
-   itself. Setting `animation:` on `.die` overrides the `.rolling` spin
-   keyframes — the exact bug the comment above warns about, which got
-   reintroduced. Driving the poof on ::after leaves the die's own
-   `animation` slot free for `.rolling` (and its `filter` free for the
-   `.die-dampened` brown tint). */
-.die.die-dampened-fresh::after{
-  content:'';position:absolute;inset:-5px;pointer-events:none;border-radius:6px;
-  z-index:3;
-  background:radial-gradient(circle,rgba(210,165,95,.65) 0%,rgba(160,115,55,.32) 42%,transparent 72%);
-  animation:sawdustPoof .55s ease-out both;
-}
-@keyframes sawdustPoof{
-  0%  {opacity:0;transform:scale(.35)}
-  35% {opacity:1;transform:scale(1.25)}
-  100%{opacity:0;transform:scale(1.7)}
-}
+/* P895: the four .die.eff-glow-* deleted - four coloured squares around a
+   cube, each winning over 2811 on source order. The sparks at these sites are
+   untouched: spawnPixelSparks goes through FX.emit, which is the one pipeline
+   that always worked on a match die. */
+/* P895: the sawdust rules deleted, and the state is a roster row now
+   ({id:'damp'}, a CRUST in this tint). The filter tinted the CHIP, which in
+   3D is a transparent host with the die on a canvas - so it browned nothing;
+   the ::before wash and the ::after poof both never painted, because 2812's
+   display:none!important on .d3on pseudo-elements is a property neither of
+   them declared. The long comment that used to sit here warned against
+   putting `animation:` on .die because it overrides .rolling; that hazard is
+   real and now moot, since nothing here animates the element any more. */
 /* Echo armed indicator on card */
 .mcard[data-cid="the_echo"].echo-armed .gcard{box-shadow:inset 0 0 0 1px rgba(100,180,255,.5),inset 0 0 0 5px var(--cface),inset 0 0 0 6px var(--ctrim2),0 0 8px 2px rgba(100,180,255,.35),0 5px 20px rgba(0,0,0,.85);border-color:rgba(100,180,255,.45)}
 .mcard[data-cid="the_echo"].echo-armed .card-outer::after{content:'';position:absolute;inset:0;z-index:10;pointer-events:none;border-radius:4px;background:repeating-conic-gradient(rgba(100,180,255,.12) 0% 25%,transparent 0% 50%) 0 0/4px 4px;image-rendering:pixelated;mix-blend-mode:screen;animation:echoArmedPulse 1.2s ease-in-out infinite}
 @keyframes echoArmedPulse{0%,100%{opacity:.4}50%{opacity:1}}
 /* ── Card-triggered reroll effect ── */
-.die.card-reroll{
-  box-shadow:0 0 14px 4px rgba(255,180,40,.7),0 0 6px rgba(255,220,80,.4)!important;
-  filter:brightness(1.25)!important;
-  animation:dRoll .4s linear infinite,cardRerollPulse .6s ease-in-out infinite!important;
-  z-index:6;
-}
-@keyframes cardRerollPulse{
-  0%,100%{box-shadow:0 0 14px 4px rgba(255,180,40,.7),0 0 6px rgba(255,220,80,.4)}
-  50%{box-shadow:0 0 20px 6px rgba(255,180,40,.9),0 0 10px rgba(255,220,80,.6)}
-}
-/* P828: encore's shimmer is STARSTONE BLUE - the spec's contrast with
-   powder keg's explosion. The modifier swaps the animation, not just
-   the static shadow: keyframe box-shadows beat any static override. */
-.die.card-reroll.crr-blue{
-  box-shadow:0 0 14px 4px rgba(143,168,255,.7),0 0 6px rgba(190,205,255,.4)!important;
-  animation:dRoll .4s linear infinite,cardRerollPulseBlue .6s ease-in-out infinite!important;
-}
-@keyframes cardRerollPulseBlue{
-  0%,100%{box-shadow:0 0 14px 4px rgba(143,168,255,.7),0 0 6px rgba(190,205,255,.4)}
-  50%{box-shadow:0 0 20px 6px rgba(143,168,255,.9),0 0 10px rgba(190,205,255,.6)}
-}
-.die.card-reroll-settle{
-  animation:cardRerollSettle .4s ease-out forwards!important;
-}
-@keyframes cardRerollSettle{
-  0%{box-shadow:0 0 18px 5px rgba(255,180,40,.8);filter:brightness(1.3)}
-  100%{box-shadow:0 0 0 0 transparent;filter:brightness(1)}
-}
+/* P895: .die.card-reroll, its blue modifier and the settle deleted - three
+   more box-shadow squares around a cube. They also drove `dRoll` on the chip,
+   which is the flat path's spin and does nothing to a mesh; the dRoll
+   keyframes themselves stay, they have seventeen other references. P828's
+   point stands and is worth keeping in view if these come back through
+   _fxMark: encore is starstone blue against powder keg's gold, and the
+   modifier has to swap the whole animation, because keyframe box-shadows beat
+   any static override. The classes are still added and removed; inert now. */
 /* ─── BIG BANK CELEBRATION ─── */
 @keyframes bankPulse{0%{transform:scale(1)}35%{transform:scale(1.12)}100%{transform:scale(1)}}
 /* bankGlow removed: a box-shadow on the full-width dice area read as a gold
@@ -4295,15 +4241,19 @@ body.crit-dilate{animation:critDilate .55s ease-out both}
 .die-wrap:nth-child(5) .die.opp-scatter,.die.opp-scatter:nth-child(5){transform:translate(-2px,3px) rotate(-4deg)}
 .die-wrap:nth-child(6) .die.opp-scatter,.die.opp-scatter:nth-child(6){transform:translate(3px,-3px) rotate(4deg)}
 /* ─── BROKEN LANTERN: blind dice ─── */
-.die.die-blind{background:#1a1a2a!important;color:transparent!important;border-color:#333!important;box-shadow:0 0 8px rgba(0,0,0,.6)!important;position:relative}
-.die.die-blind::after{content:'?';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:1.3em;font-weight:bold;color:rgba(180,180,200,.7);text-shadow:0 0 6px rgba(100,100,150,.4)}
-.die.die-blind .pip{visibility:hidden!important}
-.die.die-blind .inner-die{visibility:hidden!important}
+/* P895: the blind rules deleted; blind is a roster row now ({id:'blind'}, a
+   VEIL over the dice in this rule's own #1a1a2a). The background painted a
+   dark square BEHIND the mesh rather than over the face, so it dimmed the gap
+   between dice instead of the die; the '?' never painted (2812); and the two
+   visibility rules hid pips that 2814 has already hidden in 3D. */
 .die-reveal{animation:dieReveal .5s ease-out}
 @keyframes dieReveal{0%{transform:rotateY(90deg);opacity:.3}50%{transform:rotateY(-10deg);opacity:1}100%{transform:rotateY(0deg);opacity:1}}
 /* ─── FROZEN DIE: ice glow ─── */
-.die.die-frozen{box-shadow:0 0 14px 4px rgba(100,180,255,.5),0 0 4px rgba(60,140,220,.3)!important;border-color:rgba(100,180,255,.7)!important;position:relative}
-.die.die-frozen::before{content:'❄';position:absolute;top:-6px;right:-4px;font-size:10px;z-index:2;filter:drop-shadow(0 0 3px rgba(100,180,255,.8))}
+/* P895: the frozen rules deleted; frozen is a roster row now ({id:'frozen'},
+   a CRUST in this rule's own blue). The box-shadow was a square, and the ❄
+   corner badge never painted (2812) - which §13 would have retired anyway: a
+   glyph is centred on the hull at 40% of the die's width or it does not
+   exist. The -mark and -entry rules below are different classes and stay. */
 /* After Frozen Die is activated on the currently-selected die, swap its selection outline
    from gold to blue so the player sees which die was saved. */
 .die.die-frozen-mark.selected{box-shadow:0 0 8px rgba(100,180,255,.45)}
@@ -10079,26 +10029,12 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
   100%{opacity:0;box-shadow:0 0 0 0 transparent;transform:scale(1.02)}}
 
 /* ── Counterfeit dice — purple smoke + skull overlay ── */
-.die.die-kindred{position:relative}
-.die.die-kindred::after{
-  content:'💀';position:absolute;top:-2px;right:-2px;font-size:10px;
-  filter:drop-shadow(0 0 3px rgba(180,80,200,.8));pointer-events:none;
-  animation:cfSkullFloat 2.6s ease-in-out infinite;
-}
-.die.die-kindred::before{
-  content:'';position:absolute;inset:-4px;pointer-events:none;
-  background:radial-gradient(circle at 50% 60%, rgba(180,80,220,.35) 0%, rgba(120,40,160,.18) 35%, transparent 70%);
-  filter:blur(2px);
-  animation:cfSmoke 3s ease-in-out infinite;
-}
-@keyframes cfSmoke{
-  0%,100%{opacity:.5;transform:translateY(0) scale(1)}
-  50%{opacity:.85;transform:translateY(-3px) scale(1.06)}
-}
-@keyframes cfSkullFloat{
-  0%,100%{transform:translateY(0) rotate(-3deg)}
-  50%{transform:translateY(-2px) rotate(3deg)}
-}
+/* P895: the kindred rules and their two keyframes deleted. Both pseudo
+   elements were dead twice over - killed by 2812, and on a class no
+   classList.add anywhere in the file ever writes. That second fact is the
+   half of brief step 14 this settles: there was nothing to wire, only a
+   decision to delete. cfSmoke and cfSkullFloat had no other user; cfBankPuff
+   below does and stays, as does .die.die-palmed. */
 @keyframes cfBankPuff{
   0%{opacity:0;transform:translate(0,0) scale(.6)}
   20%{opacity:1;transform:translate(0,-6px) scale(1)}
@@ -27450,6 +27386,30 @@ var D3X={
            if(ds[i].chip.classList.contains('oppkeep'))return true;
          return false;
        }}]},
+    /* P895: THE STATES. through:true is what makes them states - a frozen die
+       stays frozen while the others tumble, which is exactly the guard the
+       old global _rolling() skip could not express. The inks are the deleted
+       CSS rules' own colours converted, never new ones: #64b4ff is
+       rgba(100,180,255) from .die.die-frozen, #c8a064 is the sawdust tint's
+       rgba(200,160,100), #1a1a2a is .die.die-blind's own background.
+       THESE READ THE CHIP, NOT THE RECORD. `d` here is D3X's {chip,obj,mat}
+       row; the game's `_frozen` flag lives on the pool die, so a predicate
+       reading d._frozen would be undefined on every die forever and this row
+       would paint nothing while looking right.
+       ORDER against the two rows above does not matter - every form goes
+       through _paintHalo, which composites with 'lighter', and step 7 proved
+       that pass byte-identical with the order swapped. */
+    {id:'frozen',layer:'under',through:true,style:'crust',ink:'#64b4ff',
+     on:function(d){return d.chip.classList.contains('die-frozen');}},
+    /* dampened ends when the fade begins. `dampen-fade` is the class that used
+       to restore the filter, so it is already this file's own signal that the
+       state is over - and it has to be read, because `die-dampened` itself is
+       never removed from the die. */
+    {id:'damp',layer:'under',through:true,style:'crust',ink:'#c8a064',
+     on:function(d){return d.chip.classList.contains('die-dampened')&&
+       !d.chip.classList.contains('dampen-fade');}},
+    {id:'blind',layer:'over',through:true,style:'veil',ink:'#1a1a2a',
+     on:function(d){return d.chip.classList.contains('die-blind');}},
   ],
   /* CRUST is the keep glow's painter with a tight profile: a hard edge and
      almost no falloff, so it reads as a treatment ON the edges with the face
