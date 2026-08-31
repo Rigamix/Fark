@@ -96,12 +96,17 @@ defect cannot by itself explain a "stacking is a trap" verdict.
    starstone. `G2-mid` measured as unmoved by the fix (inside noise), but G3
    has not been checked and it is an "intended gear" row in the acceptance
    targets.
-3. **A cross-harness discrepancy, flagged not concluded.** Measured per-turn
-   player bust rate is silver/bone ≈ **0.33–0.40**; the recorded anchor in
-   `FARK_ENCHANT_BADGE_REWORK.md` is **0.54–0.58**. The denominators genuinely
-   differ — `FSIM.measureTurnBust` plays turns with no match around them, so it
-   has no early exit at target and no last-licks branch — so this is a lead for
-   a dedicated check, **not** a finding.
+3. ~~**A cross-harness discrepancy.**~~ **RESOLVED — and the archive had
+   already answered it before I raised it.** I measured a per-turn silver/bone
+   bust ratio of **0.33–0.40** against the **0.54–0.58** anchor and flagged it
+   as a lead. Ruling #24 in `docs/archive/SIM_RESULTS_2026-07-31.md` had
+   already swept that ratio across **seventeen policy cells** and found it runs
+   **0.126 → 0.864**, monotone in how deep the turn pushes, and is explicitly
+   **not policy-invariant**. My number sits inside that sweep. It is the
+   documented policy dependence, not a discrepancy — and those figures came
+   through FSIM, whose compat bust-save is off by default, so they were never
+   contaminated. **No action.** What the anchor is missing is the caveat that
+   it holds at one policy only, which Ruling #24 already says.
 
 **Fixed on the way (P890), because my own P888 broke it:** FSIM's
 `__shippedCompat` emulated two differences from the shipped sim, one of which

@@ -21,10 +21,10 @@ to what it was made against, not because anything still reads it.
 | `FEEL_2026-07-31.md` | Self-declared answered, same way. |
 | `VISUAL_INTEGRITY_CORRECTIONS.md` | Both corrections applied into `VISUAL_INTEGRITY_PLAN.md`. |
 | `FEAT_DISCREPANCIES.md` | Migration done (`d6772fc`). Carries its own correction header — it counted two rosters and there were four. The live account is Phase 4 in `PHASE_REPORTS.md`. |
-| `SIM_RESULTS_2026-07-31.md` | **Every figure is stale** — predates the sweep removal, the Trade harness fix and the 2026-08-02 rulings. Directions hold, magnitudes do not. Re-run before tuning anything against it. |
+| `SIM_RESULTS_2026-07-31.md` | Still the best source on one thing: **Ruling #24's finding that the Silver:bone bust ratio is NOT policy-invariant** (0.126–0.864 across seventeen policy cells, monotone in push depth) is sound and was measured through FSIM, whose compat bust-save is off by default — so it is untouched by the defect P888 removed, and it explains any silver ratio that disagrees with the 0.54–0.58 anchor. Otherwise: **every figure is stale** — predates the sweep removal, the Trade harness fix and the 2026-08-02 rulings. Directions hold, magnitudes do not. Re-run before tuning anything against it. |
 | `MASTER_PLAN.md` | Targets `fark_nights.html`, a vehicle that no longer exists — the nights rework landed in `fark_proto.html`. |
 | `NIGHTS_NOTES.md` | Same dead vehicle. |
-| `FARK_MASTER_BRIEF.md` | **Stale duplicate**, eight days behind `briefs/FARK_MASTER_BRIEF.md` and still being read from. Same trap as the match brief below, found the same way. |
+| `FARK_MASTER_BRIEF.md` | **Stale duplicate**, eight days behind `briefs/FARK_MASTER_BRIEF.md` and still being read from. Same trap as the match brief below, found the same way. **Its §9 still carries the full-silver "TRAP at 4% run wins" verdict, which is WITHDRAWN** — the sim that produced it hard-coded the bust immunity it was used to judge (fixed P888) and is match-level, so it could not have produced a run number at all. The live brief has the withdrawal and the re-measurement. |
 | `QUESTIONS_2026-07-31b.md` | Folded into `docs/OPEN.md`, which is now the single questions file. Kept for the long-form reasoning behind each item — OPEN.md carries the question and the recommendation, not the derivation. |
 
 ## The 2026-08-21 sweep (54 files, ahead of a new reader joining)
