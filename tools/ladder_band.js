@@ -107,7 +107,16 @@ S.settings = S.settings || {}; S.settings.fastRival = true;
 S.run._bossSeen = {drunkard:1, peasant:1, commoner:1, merchant:1, soldier:1, knight:1, noble:1, bishop:1};
 setInterval(() => { try { if (typeof G !== 'undefined' && G && (G.phase === 'opp' || G._oppTurnActive)) G._ffMult = 0.05; } catch (e) {} }, 150);
 
-let wins = 0, done = 0, stalls = 0;
+/* A BATCH MUST COME BACK. The first version of this ran a whole 130-match cell
+   in one invocation; the connection died at an unknown point and the entire
+   cell was lost, with nothing on disk to say whether it had reached match 20 or
+   match 129. Cells are now assembled from small batches by the runner, and this
+   is the belt to that braces: past the budget the loop stops and reports what it
+   has, so an invocation always yields data instead of a maybe. */
+const BUDGET_MIN = +((location.hash.match(/budget=(\d+)/) || [])[1]) || 25;
+const DEADLINE = Date.now() + BUDGET_MIN * 60000;
+
+let wins = 0, done = 0, stalls = 0, budgetStopped = 0;
 const byTier = {};
 const LOG = [];
 const say = t => { LOG.push(t); try { console.log(t); } catch (e) {} };
@@ -115,6 +124,11 @@ say('LB-START;band=' + band + ';seat=' + seat + ';policy=' + polName +
     ';n=' + N + ';dice=' + dice.join('|') + ';famScored=' + actual);
 
 for (let m = 0; m < N; m++) {
+  if (Date.now() > DEADLINE) {
+    budgetStopped = 1;
+    say('LB-BUDGET;band=' + band + ';seat=' + seat + ';stopped=' + m + '/' + N);
+    break;
+  }
   const t0 = Date.now();
   /* TIER UNIFORM per match - see the header. Recorded, so the curve survives. */
   const tier = Math.floor(Math.random() * 8);
@@ -188,6 +202,6 @@ say('LB-CELL;band=' + band + ';seat=' + seat + ';policy=' + polName +
     ';n=' + done + ';wins=' + wins + ';rate=' + (rate * 100).toFixed(1) +
     ';wilson=' + (ph * 100).toFixed(1) + '±' + (hw * 100).toFixed(1) +
     ';stalls=' + stalls + ';byTier=' + tierStr);
-return {band, seat, policy: polName, n: done, wins,
+return {band, seat, policy: polName, asked: N, n: done, wins,
         rate: +(rate * 100).toFixed(1), wilsonHalfWidth: +(hw * 100).toFixed(1),
-        stalls, byTier, dice, log: LOG};
+        stalls, budgetStopped, byTier, dice, log: LOG};

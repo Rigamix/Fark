@@ -395,6 +395,10 @@ async function findTarget() {
   throw new Error('browser never opened a debug port\n' + browserErr.slice(-800));
 }
 
+/* Set on the one path that closes the socket deliberately. Without it the
+   close handler below cannot tell "we finished" from "it died under us". */
+var RUN_DONE = false;
+
 function connect(wsUrl) {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(wsUrl);
@@ -407,7 +411,34 @@ function connect(wsUrl) {
         const { res, rej } = pending.get(m.id);
         pending.delete(m.id);
         m.error ? rej(new Error(m.error.message)) : res(m.result);
-      } else if (m.method) events.push(m);
+      } else if (m.method) {
+        /* A WINDOW, not a hoard. This array grew for the whole run with nothing
+           trimming it; the reports at the end read at most a dozen entries, and
+           a multi-hour batch put hours of network and console traffic in a
+           node process that has no reason to hold it. */
+        events.push(m);
+        if (events.length > 4000) events.splice(0, events.length - 4000);
+      }
+    });
+    /* A CLOSE IS A FAILURE AND IT MUST SAY SO. There was no close handler here,
+       so a dropped connection left every pending call unsettled: the event loop
+       emptied and node exited 0 having printed nothing. That is how a 2h30m
+       ladder cell came back as an empty file - the run's silence looked exactly
+       like a run that had gone fine.
+       Two states, because a close can land in either:
+         something in flight -> reject it, and the awaiting evaluate() throws
+           into the top-level catch, which reports and exits 1 already;
+         nothing in flight (we were inside a sleep) -> nobody is listening, so
+           it gets said here. */
+    ws.addEventListener('close', () => {
+      const inFlight = pending.size;
+      pending.forEach(p => p.rej(new Error(
+        'the browser closed the debug connection mid-run')));
+      pending.clear();
+      if (inFlight || RUN_DONE) return;
+      console.error('FAILED: the browser closed the debug connection with ' +
+                    'nothing in flight - the run is over and produced no result');
+      process.exit(4);
     });
     ws.addEventListener('error', e => reject(new Error('ws error')));
     ws.addEventListener('open', () => resolve({
@@ -548,6 +579,7 @@ async function evaluate(cdp, expr, awaitPromise) {
   console.log('wrote:\n' + shots.join('\n'));
 
   /* the kill itself belongs to cleanup(), which process.exit reaches */
+  RUN_DONE = true;                /* so the close handler stays quiet below */
   if (!KEEP) cdp.close();
   else console.log('browser asked to stay on port ' + PORT +
                    '\n  profile at ' + PROFILE +
