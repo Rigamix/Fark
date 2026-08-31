@@ -508,13 +508,30 @@ debug-triggered). Additional acceptance work for this rewrite:
   Double or Nothing, Short Fuse burn, Falling Star thresholds, Preserve
   III, Honeytrap+family stacking, Fool's Gold burn, Reprisal, Ill Omen
   numbers vs real persona bust rates, cross-family bust-immunity stacks.
-  **VERDICT WITHDRAWN, not re-run.** The "TRAP at 4% run wins" number came
-  from a sim whose match layer hard-coded the very immunity under test - one
-  free bust-save a turn for owning a silver die, plus one per ward charge
-  (fixed P888). It did not measure the stack, it granted it. It also cannot
-  be repaired by re-running: `_runBalanceSim` is MATCH-level and nothing in
-  it can fail a run, and two of the three named components no longer exist -
-  Insurance is retired and Ward halves rather than rescues.
+  **VERDICT WITHDRAWN, not re-run.** Two reasons make it unrepairable rather
+  than merely stale. `_runBalanceSim` is **MATCH-level** - nothing in it can
+  fail a run - so it could never have produced a run-win number at all; and
+  two of the three named components are not modellable, since `famDef('ward')`
+  is false and Insurance is retired. On top of that the verdict was measured
+  against a game that no longer exists: at the time the LIVE game carried a
+  real silver bust-shield, with its own VFX and sound, which has since been
+  retired (*"RELIABILITY, NOT SAFETY"*).
+  **A correction to an earlier version of this note.** It said the 4% "came
+  from a sim whose match layer hard-coded the very immunity under test (fixed
+  P888)". That is **chronologically impossible** and was my error: the
+  constants and the 4% were committed at 11:27 and 12:53, and the offending
+  line entered `_runBalanceSim` at 12:58 - four and a half minutes *after* the
+  claim. The sim defect is real and is fixed, but it is not this number's
+  parent.
+  **The 4% does have a reproducible parent, and it is not silver.**
+  `_runEconomySim` with the shipped constants returns `runsWon` = 4% in 5 of 5
+  replicates of 10,000 runs **when every band is pinned to band-1 rates** - a
+  run that never gets past a single family die. Band-2 pinned gives 20.4%,
+  unpinned 23%. That matches the second half of this very sentence - *"the
+  real risk is defense-only builds lacking any win condition"* - and not the
+  silver label, since silver is not in `gearLevel`'s `strong` set and a
+  full-silver stack sits at band 2. The number was most likely produced for
+  the no-win-condition case and the silver label attached to it.
   **Re-measured on the fixed sim** (2,000 matches/cell, tiers 1 and 4, two
   policies, noise floor 2.1pp patron / 2.5pp boss): six-silver is
   INDISTINGUISHABLE from the shipped G2-mid gear (-0.6 to +2.4pp patron,
@@ -525,8 +542,22 @@ debug-triggered). Additional acceptance work for this rewrite:
   with Brutus's Shield). The buildable two-silver stack beats two IRONS by
   +0.8 to +1.3pp - inside noise. **The live question is Silver's 580g price,
   not bust-immunity stacking.**
-  **RUN-level impact is still unmeasured.** `tools/sim_power_e.js` is the
-  only harness that can answer it and has never been pointed here., For Keeps economy impact, every relic,
+  **RUN-level impact is still unmeasured for silver specifically.**
+  `tools/sim_power_e.js` is the only harness that can answer it and has never
+  been pointed here.
+  **Separately, and bigger than the silver line was:** `_runEconomySim`'s
+  `PWIN`/`BWIN` constants are **stale, not contaminated** - `git log -S` dates
+  them to their birth commit, unedited since, and they match readings recorded
+  in `PROTO_NOTES` the same hour, so the header sentence is literally true.
+  But 1,140 commits of tuning later, occupancy-weighted against the fixed sim,
+  **`PWIN[2]` is overstated by ~18pp** (0.62 against a measured 0.443); the
+  other three live constants are within a few points. Feeding the corrected
+  values through takes `runsWon` from **23% to 4.6-10%**, against the
+  **25-35%** run-win target recorded in this section. Gold does not move
+  (survivor bias), and the pity metric reads 0% under every input including
+  all-zero win rates, so it is insensitive to these constants. **Band 0 is
+  dead code** - `fam` always starts with one family die, so `gearLevel` can
+  never return 0 and `PWIN[0]`/`BWIN[0]` are never read., For Keeps economy impact, every relic,
   RECKONING badge dominance.
 - Targets: patron win rate 60-70% at intended gear, boss 45-55%, median
   match 5-7 banked turns per side inside the caps. RUN-level target:

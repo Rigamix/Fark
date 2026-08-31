@@ -87,15 +87,30 @@ defect cannot by itself explain a "stacking is a trap" verdict.
 
 **Still carrying the same contamination, not yet re-derived:**
 
-1. **`_runEconomySim`'s `PWIN`/`BWIN` constants.** It is run-level but rolls no
-   dice — it takes win rates as hard-coded numbers copied from the balance
-   sim's gear-band rows, which were silver-bearing. Every `runsWon` and pity
-   number it has produced rests on them, and **this is the most likely ancestor
-   of the "4% run wins" figure.**
-2. **`G3-late` is untested.** It carries silver plus `bankAdd:500` and
-   starstone. `G2-mid` measured as unmoved by the fix (inside noise), but G3
-   has not been checked and it is an "intended gear" row in the acceptance
-   targets.
+1. ~~**`PWIN`/`BWIN` are contaminated.**~~ **WRONG, AND MINE.** Measured:
+   the constants are **stale, not contaminated**. `git log -S` on each literal
+   returns exactly one commit — their birth — and that file contains zero
+   occurrences of the contaminating line, which arrived **91 minutes later**.
+   They match readings recorded in `PROTO_NOTES` the same hour, so the header
+   sentence is literally true. **The "4% run wins" figure was committed four
+   and a half minutes BEFORE the defect existed**, so the defect cannot be its
+   parent and my "most likely ancestor" was chronologically impossible.
+   What IS true, and matters more: **1,140 commits later they are badly out of
+   date.** Occupancy-weighted against the fixed sim, `PWIN[2]` is **overstated
+   by ~18pp** (0.62 vs a measured 0.443); the other three live constants are
+   within a few points. Corrected, `runsWon` goes **23% → 4.6–10%** against
+   the brief's recorded **25–35%** target — *that* is the conclusion this
+   moves. The silver defect changes nothing here (4.6% vs 5.0%). Gold does not
+   move; **the pity metric is insensitive to these constants entirely** — it
+   reads 0% under every input including all-zero win rates, so my claim that
+   pity numbers rest on them was also wrong. **Band 0 is dead code:**
+   `gearLevel` can never return 0, proven by a 40,000-run occupancy census and
+   by moving `PWIN[0]` between 0 and 1 with no effect.
+   *Recommendation: correct the constants before quoting the run-win target
+   again. Yours — it is a design target question, not a bug.*
+2. ~~**`G3-late` is untested.**~~ **MEASURED, no action.** Across arms it
+   moves +0.29pp patron and −1.87pp boss, at or barely outside a 1.0pp floor
+   (n=14,400 matches per band per arm). The fix does not move it.
 3. ~~**A cross-harness discrepancy.**~~ **RESOLVED — and the archive had
    already answered it before I raised it.** I measured a per-turn silver/bone
    bust ratio of **0.33–0.40** against the **0.54–0.58** anchor and flagged it
