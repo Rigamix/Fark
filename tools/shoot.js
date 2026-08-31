@@ -165,6 +165,68 @@ var PROFILE_ROOT = path.join(os.tmpdir(), 'shoot-profiles');
   if (n) console.log('swept ' + n + ' stale shoot-* profile(s)');
 })();
 
+/* ── the concurrency cap ───────────────────────────────────────────
+   A ladder batch once fanned out to 61 live browsers and had to be killed
+   because the machine became unusable. The sweeps above clean up after a run
+   DIES; nothing limited how many could be alive at once.
+
+   IT COUNTS RUNS, NOT PROCESSES, using fs alone. Every run writes its pid to
+   .shoot-owner in its profile directory - that is how the sweep tells "still
+   running" from "abandoned" - so profile directories with a live owner ARE
+   the concurrent runs. No PowerShell: the gate polls, and the sweep's
+   enumeration costs about a second a call.
+
+   It sits after both sweeps and before this run makes its own profile, so a
+   run never counts itself and abandoned profiles are already gone.
+
+   --max N or FARK_SHOOT_MAX override the default; --max 0 disables the gate
+   for someone who is not using the machine. A waiting run says so once and
+   gives up after fifteen minutes with its own exit code, because a silent
+   wait is indistinguishable from a hang. */
+const SHOOT_MAX = (function(){
+  var i = process.argv.indexOf('--max');
+  var v = (i >= 0 && process.argv[i + 1] !== undefined)
+    ? parseInt(process.argv[i + 1], 10)
+    : parseInt(process.env.FARK_SHOOT_MAX || '', 10);
+  return (Number.isFinite(v) && v >= 0) ? v : 2;
+})();
+function liveShootRuns(){
+  var dirs;
+  try { dirs = fs.readdirSync(PROFILE_ROOT); } catch (e) { return 0; }
+  var n = 0;
+  for (var i = 0; i < dirs.length; i++) {
+    if (dirs[i].indexOf('shoot-') !== 0) continue;
+    var owner = null;
+    try {
+      owner = parseInt(fs.readFileSync(
+        path.join(PROFILE_ROOT, dirs[i], '.shoot-owner'), 'utf8').trim(), 10);
+    } catch (e) { continue; }        /* no claim - the sweep's problem, not ours */
+    if (!owner) continue;
+    /* sends no signal, throws if gone. PID reuse reads as "alive", which fails
+       SAFE here: the worst case is waiting for a slot we could have taken. */
+    try { process.kill(owner, 0); n++; } catch (e) {}
+  }
+  return n;
+}
+if (SHOOT_MAX > 0) {
+  var _waited = 0, _WAIT_CAP = 15 * 60 * 1000, _said = false;
+  while (liveShootRuns() >= SHOOT_MAX) {
+    if (!_said) {
+      console.log('shoot: ' + liveShootRuns() + ' run(s) already active, cap ' +
+                  SHOOT_MAX + ' - waiting for a slot (--max 0 disables)');
+      _said = true;
+    }
+    if (_waited >= _WAIT_CAP) {
+      console.log('shoot: no slot after ' + Math.round(_WAIT_CAP / 60000) +
+                  'm - giving up rather than hanging the batch');
+      process.exit(3);
+    }
+    /* a real synchronous sleep, no dependency and no busy-spin */
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1500);
+    _waited += 1500;
+  }
+}
+
 /* A FIXED root, not the per-session scratchpad: the sweep above has to be
    able to recognise last week's orphans, and a path that changes every
    session cannot be a marker. */
@@ -190,10 +252,44 @@ const FLAGS = [
   '--disable-renderer-backgrounding',
   '--disable-backgrounding-occluded-windows',
   '--use-gl=angle', '--use-angle=swiftshader',
+  /* the two multiply: the cap above bounds how many BROWSERS, this bounds how
+     many processes each one is. Neither alone would have prevented 61. */
+  '--renderer-process-limit=2',
   '--window-size=' + VW + ',' + VH,
   'about:blank',
 ];
 const proc = spawn(EDGE, FLAGS, { stdio: ['ignore', 'pipe', 'pipe'] });
+/* BELOW NORMAL, so a background batch yields to whoever is actually using the
+   machine. Best effort throughout: a platform that refuses must cost the run
+   nothing but noise. */
+try { os.setPriority(proc.pid, os.constants.priority.PRIORITY_BELOW_NORMAL); }
+catch (e) {}
+/* THE PARENT IS NOT THE TREE, measured. Sampling our own processes while a run
+   was live gave BelowNormal 7, AboveNormal 1, Normal 2, Idle 1 - so about two
+   thirds inherit and the rest do not, because Chromium sets priorities on some
+   of its own children deliberately (the GPU process highest). An earlier
+   version of this comment claimed the parent call covered the tree; it covered
+   a third of it.
+   So: a second pass, two seconds in - the children that miss inheritance are
+   spawned during startup, and a pass at spawn time would find only the parent.
+   Matched on THIS run's profile basename, which is unique per run and needs no
+   path escaping. Async and unref'd so it never delays or holds open a run.
+   Chromium re-tunes renderer priorities as pages load, so this is a floor for
+   the steady state, not a guarantee for every instant. */
+setTimeout(function () {
+  try {
+    var mark = path.basename(PROFILE);
+    var ps = 'Get-CimInstance Win32_Process -Filter "Name=\'msedge.exe\' or ' +
+             'Name=\'chrome.exe\'" | Where-Object { $_.CommandLine -like ' +
+             "'*" + mark + "*' } | ForEach-Object { try { " +
+             '(Get-Process -Id $_.ProcessId).PriorityClass = ' +
+             "'BelowNormal' } catch {} }";
+    require('child_process').execFile('powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-EncodedCommand',
+       Buffer.from(ps, 'utf16le').toString('base64')],
+      function () {});
+  } catch (e) {}
+}, 2000).unref();
 let browserErr = '';
 proc.stderr.on('data', d => { browserErr += d.toString(); });
 
