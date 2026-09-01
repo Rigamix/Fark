@@ -15249,11 +15249,16 @@ CFX.encore={
     }
     var free=G.pool.filter(function(d){return !d.committed&&!d._frozen;});
     if(!free.length)return false;
-    free.forEach(function(d){
+    free.forEach(function(d,_i){
       _setDieVal(d,_rollD(d));d.sel=false;
-      if(d.el){d.el.classList.remove('selected');d.el.classList.add('card-reroll','crr-blue');
-        try{_fxSpray(d.el,'#8fa8ff',8,{speed:65,g:-20,size:5,spread:2.0});}catch(e){}/* P828: starstone motes */
-        setTimeout(function(){d.el.classList.remove('card-reroll','crr-blue');},400);}
+      if(d.el){d.el.classList.remove('selected');
+        /* §18: RIM in the card's ink at +140, staggered 70ms, 100/hold/200.
+           P828's starstone blue is the card's ink and the motes already use
+           it - the rim and the spray are now the same colour by construction
+           rather than by two literals agreeing. */
+        _dieBeat(d.el,'rim',D3X.BEAT_INK.encore,
+                 {delay:140+_i*70,env:D3X.BEAT_ENV.reroll});
+        try{_fxSpray(d.el,D3X.BEAT_INK.encore,8,{speed:65,g:-20,size:5,spread:2.0});}catch(e){}}
     });
     try{SFX.roll();}catch(e){}
     G.turnRollCount++;
@@ -27416,7 +27421,6 @@ var D3X={
      still legible, rather than as light thrown off them. */
   CRUST:{soft:3,rim:1.6,strength:0.95,line:2.6},
   VEIL:{alpha:0.42},
-  DIM:{alpha:0.46,ink:'#12141a'},
   /* a dial name on D3X, a global name, or a literal */
   _markInk:function(name,fallback){
     if(!name)return fallback||'#ffffff';
@@ -27457,23 +27461,29 @@ var D3X={
      there. So this darkens and adds no colour. True desaturation already has
      a home in _settleDim / _dimMap, which dim the die's own material maps,
      and that is the right route if step 8 wants it. */
-  _paintForm:function(style,cv,x,sc,dpr,hulls,col,soft){
+  _paintForm:function(style,cv,x,sc,dpr,hulls,col,soft,alphaMul){
+    /* P896: the multiplier is what lets a BEAT share this painter. A state is
+       either worn or not, so it always passes 1; a beat rides an envelope. It
+       existed as a parameter of _paintHalo all along - the forms just never
+       passed it through, which left the beat painter making its own identical
+       _paintHalo call and free to drift away from the form it was already
+       drawing. */
+    var AM=(alphaMul==null?1:alphaMul);
     if(style==='crust'){
       var C=this.CRUST;
-      this._paintHalo(cv,x,sc,dpr,hulls,col,soft,1,C.line,C);
+      this._paintHalo(cv,x,sc,dpr,hulls,col,soft,AM,C.line,C);
       return;
     }
-    if(style==='veil'||style==='dim'){
-      var A=(style==='dim')?this.DIM:this.VEIL;
+    if(style==='veil'){
       var self=this;
       x.save();
-      x.globalAlpha=A.alpha;
-      x.fillStyle=(style==='dim')?this._markInk(A.ink,'#12141a'):col;
+      x.globalAlpha=this.VEIL.alpha*AM;
+      x.fillStyle=col;
       hulls.forEach(function(h){self._traceHull(x,h);x.fill();});
       x.restore();
       return;
     }
-    this._paintHalo(cv,x,sc,dpr,hulls,col,soft,1);
+    this._paintHalo(cv,x,sc,dpr,hulls,col,soft,AM);
   },
   /* paint every row on one layer, in roster order. ONE _paintHalo per ROW,
      not per die: a row's hulls are collected and painted together, so the
@@ -27512,11 +27522,69 @@ var D3X={
      outside would live exactly one frame. An entry is
      {d, kind:'glow'|'flash'|'beam', ink, t0, ms}. */
   FX_MARKS:[],
-  _fxMark:function(d,kind,ink,ms){
+  /* P896: an entry is ARMED WITH ITS INK, and that is the whole answer to
+     "one form, many colours". eff-glow is not four forms - it is one rim whose
+     colour is chosen per firing, from the effect's type, on whichever die that
+     firing landed on. A row cannot hold that: a row's ink is a property of the
+     thing worn, and this is a property of the event. Two firings can also
+     overlap on one die, which the old CSS resolved by stylesheet source order
+     rather than by which effect fired; two entries hold two colours.
+     `delay` is the sheet's stagger and wind-up. `env` is {in,hold,out} in ms
+     for a beat whose shape §18 specifies; without one the alpha is a sine
+     swell over `ms`, which is what every beat did before this. */
+  _fxMark:function(d,kind,ink,ms,delay,env,tag){
     if(!d||!d.obj)return false;
+    var E=env||null;
+    var life=E?(E['in']+E.hold+E.out):(ms||500);
+    /* A TAG IS "THIS BEAT, AGAIN". The combo fires on every selection change
+       while the combo holds, and the CSS version restarted by removing the
+       class and forcing a reflow. Arming stacks instead of restarting, and
+       stacked rims composite with 'lighter', so a player toggling dice would
+       have got a brighter and brighter die. Same die, same tag, one entry. */
+    if(tag)this.FX_MARKS=(this.FX_MARKS||[]).filter(function(mk){
+      return !(mk.d===d&&mk.tag===tag);
+    });
     (this.FX_MARKS||(this.FX_MARKS=[])).push(
-      {d:d,kind:kind,ink:ink||'#ffffff',t0:performance.now(),ms:ms||500});
+      {d:d,kind:kind,ink:ink||'#ffffff',t0:performance.now(),
+       ms:life,delay:delay||0,env:E,tag:tag||null});
     return true;
+  },
+  /* the beat's alpha at `now`, which is the only thing `delay` and `env`
+     change. Returns 0 before the delay elapses, so an armed-but-not-yet-due
+     beat costs a hull and nothing else. */
+  _beatAlpha:function(mk,now){
+    var t=now-mk.t0-(mk.delay||0);
+    if(t<=0)return 0;
+    var E=mk.env;
+    if(!E)return Math.sin(Math.min(1,t/mk.ms)*Math.PI);
+    if(t<E['in'])return t/E['in'];
+    if(t<E['in']+E.hold)return 1;
+    var o=(t-E['in']-E.hold)/E.out;
+    return o>=1?0:1-o;
+  },
+  /* THE INKS ARE THE DELETED RULES' OWN, converted. §13 rule 2: one ink per
+     idea, and never a new colour picked at the moment of wiring. gold/green/
+     red/blue are .die.eff-glow-*'s rgba() triples; reroll is .die.card-reroll;
+     encore is P828's starstone blue from .crr-blue; combo is comboGlow's
+     brightest stop. */
+  BEAT_INK:{gold:'#ffc83c',green:'#3cc85a',red:'#dc3c28',blue:'#50a0f0',
+            reroll:'#ffb428',encore:'#8fa8ff',combo:'#ffc850'},
+  /* §18's card-reroll sheet, as a shape: 100ms in, hold, 200ms out. The
+     stagger and the +140 wind-up are per-die and passed as `delay`. */
+  BEAT_ENV:{reroll:{'in':100,hold:140,out:200}},
+  /* arm a beat from a CHIP rather than a record, because every call site in
+     the card code has an element and none of them has a D3X row. Returns
+     false when the die is not in the 3D layer, so a caller can tell "no die"
+     from "no beat" - the distinction the eff-glow classes never made. */
+  beat:function(el,style,ink,opt){
+    if(!el)return false;
+    var d=null;
+    for(var i=0;i<this.dice.length;i++)
+      if(this.dice[i].chip===el){d=this.dice[i];break;}
+    if(!d)return false;
+    var o=(typeof opt==='number')?{ms:opt}:(opt||{});
+    return this._fxMark(d,style==='veil'?'flash':'glow',ink,
+                        o.ms||500,o.delay||0,o.env||null,o.tag||null);
   },
   /* the hull as a path. A small sibling of the tracer inside _paintHalo, not
      a refactor of it: that one also does shrink, lean, stretch and the stamp
@@ -27548,7 +27616,10 @@ var D3X={
        outlived its die would paint over an empty seat. */
     var _now=performance.now();
     var beats=this.FX_MARKS=(this.FX_MARKS||[]).filter(function(mk){
-      return mk.d&&mk.d.obj&&mk.d.obj.visible&&(_now-mk.t0)<mk.ms;
+      /* the delay is part of the life, or a staggered beat expires before it
+         is due and never paints at all */
+      return mk.d&&mk.d.obj&&mk.d.obj.visible&&
+             (_now-mk.t0)<((mk.delay||0)+mk.ms);
     });
     var rolling=this._rolling();
     var live=this._marksLive('over',rolling);
@@ -27582,18 +27653,18 @@ var D3X={
     for(i=0;i<beats.length;i++){
       var mk=beats[i],hb=this._hullOf(mk.d,sc,G.grow);
       if(!hb)continue;
-      var tt=(_now-mk.t0)/mk.ms;
+      var am=this._beatAlpha(mk,_now);
+      if(am<=0&&mk.kind!=='beam')continue;/* armed, not yet due */
+      var tt=(_now-mk.t0-(mk.delay||0))/mk.ms;
       if(tt<0)tt=0;if(tt>1)tt=1;
       if(mk.kind==='glow'){
-        /* the keep glow's own painter, alpha on a sine: it swells and leaves */
-        this._paintHalo(cv,x,sc,dpr,[hb],mk.ink,mk.ink,Math.sin(tt*Math.PI));
+        /* P896: THROUGH THE FORM, not beside it. This was its own _paintHalo
+           call with the same arguments _paintForm's rim branch passes - the
+           beat and the state were the same drawing by coincidence, and either
+           could have been retuned without the other. */
+        this._paintForm('rim',cv,x,sc,dpr,[hb],mk.ink,mk.ink,am);
       }else if(mk.kind==='flash'){
-        x.save();
-        x.globalAlpha=Math.max(0,1-tt)*0.8;
-        x.fillStyle=mk.ink;
-        this._traceHull(x,hb);
-        x.fill();
-        x.restore();
+        this._paintForm('veil',cv,x,sc,dpr,[hb],mk.ink,mk.ink,am*1.9);
       }else if(mk.kind==='beam'){
         /* a column out of the die's own box, in the proportions the DOM
            version used, so it reads as the effect it has always been */
@@ -30129,6 +30200,16 @@ var D3X={
   };
   requestAnimationFrame(raf);
 })();
+
+/* P896: ONE GUARD FOR EIGHTEEN CALL SITES. The card code has an element and
+   no D3X row, and half of it runs on paths where the 3D layer may not be up.
+   Wrapping here means a site is one short line that cannot throw, instead of
+   eighteen copies of `try{if(window.D3X&&...)}catch(e){}` - which is the
+   hand-maintained shape this brief keeps deleting. */
+function _dieBeat(el,style,ink,opt){
+  try{return (window.D3X&&D3X.beat)?D3X.beat(el,style,ink,opt):false;}
+  catch(e){return false;}
+}
 
 function mkDie(val,mat,sizeClass,still,ench){
   if(window.D3_MATCH!==false){
@@ -33890,9 +33971,9 @@ function _afterRollImpl(){
     /* P830: the re-tumble already happens (adopted dice re-throw through
        reDrawDieFace) - it now wears the reroll glow and the roll sound
        so it reads as THEIR act, not a glitch. */
-    _slFree.forEach(function(d){d.val=_rollD(d);
-      if(d.el){d.el.classList.add('card-reroll');
-        setTimeout(function(){if(d.el)d.el.classList.remove('card-reroll');},700);}
+    _slFree.forEach(function(d,_i){d.val=_rollD(d);
+      if(d.el)_dieBeat(d.el,'rim',D3X.BEAT_INK.reroll,
+                       {delay:140+_i*70,env:D3X.BEAT_ENV.reroll});
       try{reDrawDieFace(d);}catch(e){}});
     famLog('SLEIGHT — YOUR ROLL COMES BACK DIFFERENT');
     try{SFX.roll&&SFX.roll();}catch(e){}
@@ -34056,7 +34137,7 @@ function _afterRollImpl(){
     if(_ftBlanks.length>0){
       var _ftVic=_ftBlanks[Math.floor(Math.random()*_ftBlanks.length)];
       _ftVic.val=5;reDrawDieFace(_ftVic);
-      if(_ftVic.el){_ftVic.el.classList.add('eff-glow-gold');spawnPixelSparks(_ftVic.el,4);setTimeout(function(){if(_ftVic.el)_ftVic.el.classList.remove('eff-glow-gold');},700);}
+      if(_ftVic.el){_dieBeat(_ftVic.el,'rim',D3X.BEAT_INK.gold,700);spawnPixelSparks(_ftVic.el,4);}
       triggerCard('finnicks_trick','TRICK → 5!',true);
     }
   }
@@ -34069,7 +34150,7 @@ function _afterRollImpl(){
       if(_ldCandidates.length===0)break;
       var _ldVic=_ldCandidates[Math.floor(Math.random()*_ldCandidates.length)];
       _ldVic.val=1;reDrawDieFace(_ldVic);
-      if(_ldVic.el){_ldVic.el.classList.add('eff-glow-gold');spawnPixelSparks(_ldVic.el,4);setTimeout(function(){if(_ldVic.el)_ldVic.el.classList.remove('eff-glow-gold');},700);}
+      if(_ldVic.el){_dieBeat(_ldVic.el,'rim',D3X.BEAT_INK.gold,700);spawnPixelSparks(_ldVic.el,4);}
       triggerCard('loaded_die',_ldHits>1?'LOADED ×'+(_ldI+1)+'!':'LOADED!',true);
     }
   }
@@ -34080,7 +34161,7 @@ function _afterRollImpl(){
     if(_ggCandidates.length>0){
       var _ggVic=_ggCandidates[Math.floor(Math.random()*_ggCandidates.length)];
       _ggVic.val=1;reDrawDieFace(_ggVic);
-      if(_ggVic.el){_ggVic.el.classList.add('eff-glow-blue');spawnPixelSparks(_ggVic.el,4);setTimeout(function(){if(_ggVic.el)_ggVic.el.classList.remove('eff-glow-blue');},700);}
+      if(_ggVic.el){_dieBeat(_ggVic.el,'rim',D3X.BEAT_INK.blue,700);spawnPixelSparks(_ggVic.el,4);}
       triggerCard('gamblers_ghost','GHOST 1!',true);
     }
   }
@@ -34093,7 +34174,7 @@ function _afterRollImpl(){
       if(_gtBlanks.length===0)break;
       var _gtVic=_gtBlanks[Math.floor(Math.random()*_gtBlanks.length)];
       _gtVic.val=5;reDrawDieFace(_gtVic);
-      if(_gtVic.el){_gtVic.el.classList.add('eff-glow-green');spawnPixelSparks(_gtVic.el,4);setTimeout(function(){if(_gtVic.el)_gtVic.el.classList.remove('eff-glow-green');},700);}
+      if(_gtVic.el){_dieBeat(_gtVic.el,'rim',D3X.BEAT_INK.green,700);spawnPixelSparks(_gtVic.el,4);}
       triggerCard('gamblers_thumb',_gtHits>1?'THUMB ×'+(_gtI+1)+' → 5!':'THUMB → 5!',true);
     }
   }
@@ -34109,14 +34190,14 @@ function _afterRollImpl(){
     if(_hsC1.length>0){
       var _hsV1=_hsC1[Math.floor(Math.random()*_hsC1.length)];
       _hsV1.val=1;reDrawDieFace(_hsV1);
-      if(_hsV1.el){_hsV1.el.classList.add('eff-glow-red');spawnPixelSparks(_hsV1.el,4);setTimeout(function(){if(_hsV1.el)_hsV1.el.classList.remove('eff-glow-red');},700);}
+      if(_hsV1.el){_dieBeat(_hsV1.el,'rim',D3X.BEAT_INK.red,700);spawnPixelSparks(_hsV1.el,4);}
     }
     /* Then pick a non-1, non-5 die (and not the same one) for the 5 conversion */
     var _hsC5=free.filter(function(d){return d!==(_hsC1&&_hsC1.length?_hsV1:null)&&d.val!==1&&d.val!==5;});
     if(_hsC5.length>0){
       var _hsV5=_hsC5[Math.floor(Math.random()*_hsC5.length)];
       _hsV5.val=5;reDrawDieFace(_hsV5);
-      if(_hsV5.el){_hsV5.el.classList.add('eff-glow-red');spawnPixelSparks(_hsV5.el,4);setTimeout(function(){if(_hsV5.el)_hsV5.el.classList.remove('eff-glow-red');},700);}
+      if(_hsV5.el){_dieBeat(_hsV5.el,'rim',D3X.BEAT_INK.red,700);spawnPixelSparks(_hsV5.el,4);}
     }
     triggerCard('hot_streak','HOT STREAK!',true);
   }
@@ -34270,9 +34351,8 @@ function _afterRollImpl(){
             var dots=victim.el.children;var nd=FACE_DOTS[_sbTo]||FACE_DOTS[1];
             for(var i=0;i<49;i++){if(!dots[i])continue;dots[i].className=nd.includes(i)?'dc dot':'dc';}
             }
-            victim.el.classList.add('eff-glow-red');
+            _dieBeat(victim.el,'rim',D3X.BEAT_INK.red,900);
             spawnPixelSparks(victim.el,8);
-            (function(_v){setTimeout(function(){if(_v.el)_v.el.classList.remove('eff-glow-red');},900);})(victim);
           }
         });
         /* Pulse the NPC card so it's obvious which card fired - inside the
@@ -34291,8 +34371,12 @@ function _afterRollImpl(){
       G.npcCardState.usedOnce[cid]=(G.npcCardState.usedOnce[cid]||0)+1;
       /* Flash every kept die red + spark before wiping */
       try{
-        document.querySelectorAll('#keptTray .die').forEach(function(el){
-          el.classList.add('eff-glow-red');
+        /* P896: this one had NO removal - the class lived until a sweep
+           list happened to clear it, which is what an armed clock replaces.
+           Staggered, because it is a set and a set that flashes as one block
+           reads as a screen effect rather than as something done to dice. */
+        document.querySelectorAll('#keptTray .die').forEach(function(el,_i){
+          _dieBeat(el,'rim',D3X.BEAT_INK.red,{ms:700,delay:_i*70});
           spawnPixelSparks(el,6);
         });
       }catch(e){}
@@ -34418,8 +34502,13 @@ function _showDieEffects(selDice,effects){
     el.appendChild(pop);
     setTimeout(function(){pop.remove();},1150);
     // Add glow
-    var glowCls='eff-glow-'+color;
-    el.classList.add(glowCls);
+    /* P896: THE SITE THAT DECIDED THE ROSTER SHAPE. `color` is chosen from
+       the effect's TYPE two dozen lines up - gold for a triple bonus, green
+       for a wild - so the ink belongs to this firing, not to this die, and no
+       declared row could hold it. Armed instead. It also had no removal at
+       all, and two effects on one die used to resolve by stylesheet order
+       rather than by which fired; two entries hold two colours. */
+    _dieBeat(el,'rim',D3X.BEAT_INK[color]||D3X.BEAT_INK.gold,700);
   });
 }
 function _selPts(){
@@ -34660,7 +34749,7 @@ function refreshSelUI(){
      branded 1 previewed as +100 and then banked nothing. */
   const _pvSplit=_splitIcons(selD),_scoreD=_pvSplit.rest,_pvIcons=_pvSplit.icons;
   const selV=_scoreD.map(d=>d.val);const selMats=_scoreD.map(d=>d.mat);const _pvEnch=_scoreD.map(d=>d.ench||null);const locked=G.kept.reduce((a,k)=>a+k.pts,0);const cards=effectiveCards();
-  if(!selV.length&&!_pvIcons.length){G.turnPts=locked+(G._turnBonusPot||0);updHUD();setBtns(false,locked>0||(G._turnBonusPot||0)>0);setStatusMsg('','');_renderSelTags([],0,true);_clearDieEffects();G.pool.forEach(d=>{d.el.classList.remove('combo-glow');d.el.style.removeProperty('--gd');});G._comboGlow=false;return;}
+  if(!selV.length&&!_pvIcons.length){G.turnPts=locked+(G._turnBonusPot||0);updHUD();setBtns(false,locked>0||(G._turnBonusPot||0)>0);setStatusMsg('','');_renderSelTags([],0,true);_clearDieEffects();return;}
   /* Bookends row-eligibility stamp (see handleRoll) — preview must agree
      with the commit/bank paths. */
   var _beE=_bookendsEligible(selD);
@@ -34714,18 +34803,20 @@ function refreshSelUI(){
     var hasDieBoost=_sr.effects&&_sr.effects.length>0;
     setStatusMsg('','');_renderSelTags(selD,pts,true);
   }else{SFX.err();setStatusMsg('','');_renderSelTags(selD,0,false);}
-  /* combo glow sweep */
+  /* P896: THE COMBO GLOW IS A BEAT, and its whole apparatus was life-support
+     for a CSS class. The --gd stagger is the beat's delay; the reflow that
+     restarted the animation is replaced by re-arming under a tag; the timer
+     that took the class off again is replaced by the beat's own clock; and
+     G._comboGlow was written in four places and read in none.
+     A beat that is armed and then un-combo'd plays out its 450ms rather than
+     being cut - §19: a beat finishes on its own layer and never blocks or
+     is blocked by input. */
   const nowCombo=ok&&isCombo(selV);
-  G.pool.forEach(d=>{if(!d.sel||d.committed){d.el.classList.remove('combo-glow');d.el.style.removeProperty('--gd');}});
   if(nowCombo){
-    // Always restart anim — cancel any pending timer so re-selects retrigger
-    clearTimeout(G._comboTimer);
-    selD.forEach((d,i)=>{d.el.classList.remove('combo-glow');void d.el.offsetWidth;d.el.style.setProperty('--gd',(i*0.07)+'s');d.el.classList.add('combo-glow');});
+    selD.forEach((d,i)=>_dieBeat(d.el,'rim',D3X.BEAT_INK.combo,
+                                 {ms:450,delay:i*70,tag:'combo'}));
     SFX.combo(selD.length);
-    G._comboTimer=setTimeout(function(){G.pool.forEach(function(d){d.el.classList.remove('combo-glow');d.el.style.removeProperty('--gd');});G._comboGlow=false;},500+selD.length*70+50);
   }
-  else{G.pool.forEach(d=>{d.el.classList.remove('combo-glow');d.el.style.removeProperty('--gd');});clearTimeout(G._comboTimer);}
-  G._comboGlow=nowCombo;
   /* perfect 6 glow: straight (1-2-3-4-5-6) or six of a kind */
   const isStraight=ok&&allFreeSelected&&selV.length===6&&new Set(selV).size===6;
   const isSixKind=ok&&allFreeSelected&&selV.length===6&&new Set(selV).size===1;
@@ -37220,12 +37311,12 @@ function runOppTurn(){
       if(_ohsCand.length>0){
         var _ohsV1=_ohsCand[Math.floor(Math.random()*_ohsCand.length)];
         _ohsV1.val=1;reDrawDieFace(_ohsV1);
-        if(_ohsV1.el){_ohsV1.el.classList.add('eff-glow-red');setTimeout(function(){if(_ohsV1.el)_ohsV1.el.classList.remove('eff-glow-red');},_oppDelay(700));}
+        if(_ohsV1.el){_dieBeat(_ohsV1.el,'rim',D3X.BEAT_INK.red,_oppDelay(700));}
         var _ohsRest=_ohsCand.filter(function(d){return d!==_ohsV1;});
         if(_ohsRest.length>0){
           var _ohsV5=_ohsRest[Math.floor(Math.random()*_ohsRest.length)];
           _ohsV5.val=5;reDrawDieFace(_ohsV5);
-          if(_ohsV5.el){_ohsV5.el.classList.add('eff-glow-red');setTimeout(function(){if(_ohsV5.el)_ohsV5.el.classList.remove('eff-glow-red');},_oppDelay(700));}
+          if(_ohsV5.el){_dieBeat(_ohsV5.el,'rim',D3X.BEAT_INK.red,_oppDelay(700));}
         }
         triggerCard('hot_streak','HOT STREAK!',false);
       }
@@ -37242,9 +37333,10 @@ function runOppTurn(){
       if(G._famSleightGo){
         G._famSleightGo=false;
         G.oppDice.filter(function(d){return !d.kept;})
-          .forEach(function(d){d.val=rollFace(d.mat);
-            if(d.el){d.el.classList.add('card-reroll');
-              setTimeout(function(){if(d.el)d.el.classList.remove('card-reroll');},700);}
+          .forEach(function(d,_i){d.val=rollFace(d.mat);
+            /* the rival's seat runs on its own clock, so the stagger does too */
+            if(d.el)_dieBeat(d.el,'rim',D3X.BEAT_INK.reroll,
+                             {delay:_oppDelay(140+_i*70),env:D3X.BEAT_ENV.reroll});
             try{reDrawDieFace(d);}catch(e){}});
         setStatusMsg('SLEIGHT — THEIR ROLL COMES BACK DIFFERENT','gold');
         try{SFX.roll&&SFX.roll();}catch(e){}
@@ -37692,7 +37784,7 @@ function runOppTurn(){
           _stVic.kept=false;if(_stVic.el){_stVic.el.classList.remove('selected','oppkeep');if(_stVic.el._d3)D3.draw(_stVic.el._d3);}
           /* Re-roll the slipped die */
           var _stMat=_stVic.mat||'bone';_stVic.val=rollFace(_stMat);reDrawDieFace(_stVic);
-          if(_stVic.el){_stVic.el.classList.add('eff-glow-red');spawnPixelSparks(_stVic.el,4);setTimeout(function(){if(_stVic.el)_stVic.el.classList.remove('eff-glow-red');},_oppDelay(700));}
+          if(_stVic.el){_dieBeat(_stVic.el,'rim',D3X.BEAT_INK.red,_oppDelay(700));spawnPixelSparks(_stVic.el,4);}
           /* Re-score this roll's ENTIRE dice set fresh and re-keep from the
              result. The old code did `oppBank-=total` first — but this roll's
              total was never added to oppBank (the single accumulation happens
@@ -40671,11 +40763,14 @@ function activateGrogsFlask(){
   free.forEach((d,i)=>{if(d.val!==1&&d.val!==5)nonScoring.push(d);});
   const toReroll=nonScoring.slice(0,2);
   if(!toReroll.length){setStatusMsg("NO NON-SCORING DICE TO REROLL",'red');refundActiveCardUse('grogs_flask');return;}
-  toReroll.forEach(d=>{
+  toReroll.forEach((d,_i)=>{
     _setDieVal(d,rollFaceExclude(d.mat,d.val,d));
-    if(d.el){d.el.classList.add('card-reroll');
-      setTimeout(()=>{d.el.classList.remove('card-reroll');d.el.classList.add('card-reroll-settle');settleDie(d.el);
-        setTimeout(()=>{d.el.classList.remove('card-reroll-settle');},400);},400);}
+    /* §18's sheet exactly: the card fires, then die 1 winds up at +140 and
+       die 2 at +210. settleDie stays on its own timer - it is the flat path's
+       landing, not part of the beat. */
+    if(d.el){_dieBeat(d.el,'rim',D3X.BEAT_INK.reroll,
+                      {delay:140+_i*70,env:D3X.BEAT_ENV.reroll});
+      setTimeout(()=>{settleDie(d.el);},400);}
   });
   SFX.roll();
   setTimeout(()=>{
@@ -41218,9 +41313,8 @@ function activateAlchemistsChisel(){
     leftDie.el.classList.remove('dtype-'+oldMat);
     leftDie.el.classList.add('dtype-'+newMat);
     try{reDrawDieFace(leftDie);}catch(e){}
-    leftDie.el.classList.add('eff-glow-gold');
+    _dieBeat(leftDie.el,'rim',D3X.BEAT_INK.gold,900);
     spawnPixelSparks(leftDie.el,8);
-    setTimeout(function(){if(leftDie.el)leftDie.el.classList.remove('eff-glow-gold');},900);
   }
   /* Clear selection so the swap reads as a clean act. */
   selDice.forEach(function(d){d.sel=false;if(d.el){d.el.classList.remove('selected');if(d.el._d3)D3.draw(d.el._d3);}});

@@ -37,37 +37,28 @@ wall-clock at two concurrent, whenever you want it started.
 
 ---
 
-## Nine classes are now inert, and it is one decision, not nine — YOURS
+## Which canvas does a beat's RIM belong on? — YOURS, and it is one line
 
-Step 8 deleted thirteen CSS rules (P895). Four were painting nothing at all, so
-nobody loses anything. The other nine were painting an **axis-aligned box
-around a cube** — every one sat after `.die.d3on{box-shadow:none!important}` at
-equal specificity, so every one won.
+The eight inert classes are routed (P896, 18 call sites). Doing it surfaced a
+disagreement between two good arguments that has been sitting there since P883.
 
-Three of those nine are now covered properly: frozen and dampened are CRUST
-rows, blind is a VEIL, all measured in their own inks and surviving a roll,
-which the old global `_rolling()` skip could not express.
+**§13 says RIM goes UNDER the dice.** P883 put the beat painter OVER them, and
+its reason is sound: *"beats last, so a transient reads ON TOP of the state it
+belongs to rather than under it."* A beat's rim is currently over.
 
-**The other six were beats, and the JS still adds and removes their classes:**
-`combo-glow`, `card-reroll`, `crr-blue`, `card-reroll-settle`, and the four
-`eff-glow-*`. They are no-ops now. They are not silent — every `eff-glow` site
-also calls `spawnPixelSparks`, which goes through `FX.emit`, the one pipeline
-that always worked on a match die — but the die-local part of them is gone.
+**It has gone unnoticed because it almost never shows.** `_paintHalo` punches
+its subject out of its own glow, so a rim is a ring by construction and looks
+identical on either surface — the only case that differs is **two dice
+overlapping**, where an over-rim draws across its neighbour and an under-rim
+goes behind it.
 
-*Recommendation: route them through `_fxMark`, which already exists and already
-paints transient beats on the state canvas, rather than deleting the call
-sites.* That keeps the combo pulse and the reroll shimmer as light on the
-silhouette instead of a square behind it, and P828's point survives the move —
-encore is starstone blue against powder keg's gold, and the modifier has to
-swap the whole thing, not just a static colour. It is about six one-line
-changes. **Say the word and it goes in; I have not done it because it is a
-decision about feel, not a mechanical follow-on to a deletion.**
-
-*(Two small things found while doing it, neither needing an answer: `.die
-.die-frozen-mark` and `.die.die-frozen-entry` are dead CSS with no
-`classList.add` anywhere — §9's inventory missed them — and the first would
-paint a box on a selected die if anything ever added it. Left in place, since
-the brief did not list them.)*
+*Recommendation: leave beats over.* A beat is a moment and should not be
+occluded by the thing it is about; a state is a property of the die and should
+sit behind it. That makes "the form decides the canvas" a rule about states,
+with lifetime deciding it for beats — which is one extra sentence in §13 rather
+than an exception. **The alternative is a one-word change** (`'over'` to
+`'under'` in the beat painter's canvas), so this is cheap either way and I have
+not guessed.
 
 ---
 
