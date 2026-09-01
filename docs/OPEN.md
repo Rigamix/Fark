@@ -37,6 +37,46 @@ wall-clock at two concurrent, whenever you want it started.
 
 ---
 
+## Item 0 is my mistake — the flask DOES tumble. The real question is timing
+
+**Retracting it plainly:** I wrote that `activateGrogsFlask` never sets
+`d.roll`, and I labelled it *measured*. It was a reading. You promoted it to
+open item 0 on that word, so the correction is mine to make loudly.
+
+`_setDieVal` → `reDrawDieFace` → `D3.roll(…, {dur:420})` → `D3X._physQueue`
+whenever the die's group is `match` — the same entry an ordinary roll uses.
+Driven on a real match die: `d.roll` appears **63 ms** later and the solution is
+**1017 frame-ms of flight**, against **1433** for an ordinary roll. Same
+physics, slightly shorter throw. The instrument's control is the ordinary roll
+in the same run, so the positive is not an instrument artefact.
+
+**What the wrong claim was standing on is a real conflict, and it survives.**
+§18 budgets the whole card reroll at 400 ms and puts the value change at +210.
+The die is in the air for about a second. The envelope now shipping ends at
+580 ms — roughly **440 ms before the die lands** — so the rim decorates the
+throw and is gone by the time the face is readable.
+
+*Recommendation: anchor the reroll rim to the settle rather than to a clock,
+which §16 already asks for — "anchor everything to the roll".* But that makes
+its end **condition-bound**, and by your new rule that makes it a `MARKS` row,
+not an `FX_MARKS` entry: *"this die is being re-thrown"* is a state with a
+predicate (`d.roll`), a duration set by the flight, and `through:true` by
+necessity.
+
+**And the per-firing ink objection does not apply to this one.** It was the
+reason beats could not be rows — one die, two overlapping firings, one ink
+slot. A die is in exactly one flight at a time, so the condition is exclusive
+and a per-die ink is well defined here. That is either a neat consequence of
+your rule or the first crack in it, and I would rather you looked at it than
+have me pick.
+
+*The alternative is to re-time the sheet to the flight — rim in at +140, hold
+until the die settles, fade over 200. Same look, no new row.* I have changed
+nothing: the numbers are as you authored them and the discrepancy is recorded
+at `BEAT_ENV.reroll`.
+
+---
+
 ## Which canvas does a beat's RIM belong on? — YOURS, and it is one line
 
 The eight inert classes are routed (P896, 18 call sites). Doing it surfaced a

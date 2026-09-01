@@ -27575,7 +27575,18 @@ var D3X={
   BEAT_INK:{gold:'#ffc83c',green:'#3cc85a',red:'#dc3c28',blue:'#50a0f0',
             reroll:'#ffb428',encore:'#8fa8ff',combo:'#ffc850'},
   /* §18's card-reroll sheet, as a shape: 100ms in, hold, 200ms out. The
-     stagger and the +140 wind-up are per-die and passed as `delay`. */
+     stagger and the +140 wind-up are per-die and passed as `delay`.
+     P898 - MEASURED AND MISTIMED, and left as authored rather than guessed
+     at. The sheet budgets the whole card reroll at 400ms with the value
+     changing at +210, which reads as a die that snaps to its new face. It
+     does not: _setDieVal calls reDrawDieFace, which calls D3.roll, which
+     calls _physQueue - the same entry an ordinary roll uses - and the
+     solution is 1017 frame-milliseconds of flight against 1433 for an
+     ordinary roll. So this envelope is over at 580ms, about 440ms before the
+     die lands, and the rim decorates the throw rather than the result.
+     All four reroll sites share this shape and all four take that flight, so
+     the note is here rather than copied beside each of them.
+     Re-timing it is a change to the sheet, which is Denis's - see OPEN.md. */
   BEAT_ENV:{reroll:{'in':100,hold:140,out:200}},
   /* arm a beat from a CHIP rather than a record, because every call site in
      the card code has an element and none of them has a D3X row. Returns
@@ -40798,9 +40809,9 @@ function activateGrogsFlask(){
   if(!toReroll.length){setStatusMsg("NO NON-SCORING DICE TO REROLL",'red');refundActiveCardUse('grogs_flask');return;}
   toReroll.forEach((d,_i)=>{
     _setDieVal(d,rollFaceExclude(d.mat,d.val,d));
-    /* §18's sheet exactly: the card fires, then die 1 winds up at +140 and
-       die 2 at +210. settleDie stays on its own timer - it is the flat path's
-       landing, not part of the beat. */
+    /* §18's stagger: die 1 winds up at +140, die 2 at +210. The envelope's
+       own timing is under question - see BEAT_ENV.reroll. settleDie stays on
+       its timer: it is the flat path's landing, not part of the beat. */
     if(d.el){_dieBeat(d.el,'rim',D3X.BEAT_INK.reroll,
                       {delay:140+_i*70,env:D3X.BEAT_ENV.reroll});
       setTimeout(()=>{settleDie(d.el);},400);}
