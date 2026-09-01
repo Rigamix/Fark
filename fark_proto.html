@@ -27461,7 +27461,7 @@ var D3X={
      there. So this darkens and adds no colour. True desaturation already has
      a home in _settleDim / _dimMap, which dim the die's own material maps,
      and that is the right route if step 8 wants it. */
-  _paintForm:function(style,cv,x,sc,dpr,hulls,col,soft,alphaMul){
+  _paintForm:function(style,cv,x,sc,dpr,hulls,col,soft,alphaMul,over){
     /* P896: the multiplier is what lets a BEAT share this painter. A state is
        either worn or not, so it always passes 1; a beat rides an envelope. It
        existed as a parameter of _paintHalo all along - the forms just never
@@ -27469,9 +27469,13 @@ var D3X={
        _paintHalo call and free to drift away from the form it was already
        drawing. */
     var AM=(alphaMul==null?1:alphaMul);
+    /* `over` is the caller's canvas, not the form's - see the third-case note
+       in _paintHalo. A VEIL needs nothing: it is a fill on the hull and has no
+       geometry outside the silhouette to cut. */
     if(style==='crust'){
       var C=this.CRUST;
-      this._paintHalo(cv,x,sc,dpr,hulls,col,soft,AM,C.line,C);
+      this._paintHalo(cv,x,sc,dpr,hulls,col,soft,AM,C.line,
+        over?{soft:C.soft,rim:C.rim,strength:C.strength,overSubject:1}:C);
       return;
     }
     if(style==='veil'){
@@ -27483,7 +27487,8 @@ var D3X={
       x.restore();
       return;
     }
-    this._paintHalo(cv,x,sc,dpr,hulls,col,soft,AM);
+    this._paintHalo(cv,x,sc,dpr,hulls,col,soft,AM,undefined,
+                    over?{overSubject:1}:undefined);
   },
   /* paint every row on one layer, in roster order. ONE _paintHalo per ROW,
      not per die: a row's hulls are collected and painted together, so the
@@ -27511,7 +27516,7 @@ var D3X={
         if(h)hulls.push(h);
       }
       if(!hulls.length)continue;
-      this._paintForm(row.style,cv,x,sc,dpr,hulls,col,soft);
+      this._paintForm(row.style,cv,x,sc,dpr,hulls,col,soft,1,layer==='over');
       n++;
     }
     return n;
@@ -27662,9 +27667,9 @@ var D3X={
            call with the same arguments _paintForm's rim branch passes - the
            beat and the state were the same drawing by coincidence, and either
            could have been retuned without the other. */
-        this._paintForm('rim',cv,x,sc,dpr,[hb],mk.ink,mk.ink,am);
+        this._paintForm('rim',cv,x,sc,dpr,[hb],mk.ink,mk.ink,am,true);
       }else if(mk.kind==='flash'){
-        this._paintForm('veil',cv,x,sc,dpr,[hb],mk.ink,mk.ink,am*1.9);
+        this._paintForm('veil',cv,x,sc,dpr,[hb],mk.ink,mk.ink,am*1.9,true);
       }else if(mk.kind==='beam'){
         /* a column out of the die's own box, in the proportions the DOM
            version used, so it reads as the effect it has always been */
@@ -27919,6 +27924,34 @@ var D3X={
         if(sh&&sh.stamp)return;
         trace(gx,sh&&sh.hull||sh,0);gx.stroke();
       });
+    }
+    /* P897: P777'S THIRD CASE - a canvas that sits OVER its subject.
+       That note distinguishes two punches: the dice's, which WIDENS by
+       G.clear because their canvas is over the painted TABLE and a wash on
+       the die is the failure, and punchUnder, which cuts inward for a canvas
+       beneath its subject. A canvas over the DICE is neither, and the reason
+       it needs a third cut is the line rather than the punch.
+       The line is stroked after the cut-out on purpose, so it and the halo
+       composite as one glow. At lineWidth 3.2 centred on a hull grown 1.004 -
+       0.1px outside the true silhouette on a 51px die - about 1.5px of it
+       falls INSIDE the die. Under the dice that half is occluded and the dial
+       reads as 1.6px of light outside the edge, which is what it was tuned
+       against; over them the whole 3.2 shows and half paints on the die's own
+       face. One dial, two weights, decided by the caller's canvas.
+       So: cut once more, after the line, a HAIR inside rather than exactly on
+       the silhouette - `shrink:+G.clear` lands at true - 0.6px, and that
+       fraction tucks under the die's own edge instead of leaving a seam to
+       line up perfectly. Measured at 1231 of 11350 lit pixels inside the
+       subject before this. Opt-in, so the under layer - where the selection
+       halo lives - is untouched. */
+    if(opts&&opts.overSubject){
+      gx.globalCompositeOperation='destination-out';
+      gx.globalAlpha=1;
+      sel.forEach(function(sh){
+        if(sh&&sh.stamp)return;
+        lay(gx,sh,null,{shrink:G.clear});
+      });
+      gx.globalCompositeOperation='source-over';
     }
     /* additive, so it reads as light rather than paint */
     x.save();
