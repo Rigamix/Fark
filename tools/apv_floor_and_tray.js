@@ -5,6 +5,16 @@
  *    cell counted twice. So: warm, then twenty adjacent full paints, every pair
  *    diffed. All zero says creation-scoped. Sporadic nonzero says a real floor.
  *
+ *    RESULT, and the correction that matters to anyone resuming: the surviving
+ *    nonzero was ONE pair, at INDEX 0 of the FIRST block. "Sporadic, ~1.7% of
+ *    pairs" and "one occurrence, at the first pair measured" are different
+ *    claims and the data says the second - which is still the position every
+ *    dead hypothesis predicted. So if it ever matters, the distinguishing run is
+ *    MORE BLOCKS WITH A TALLY BY INDEX, not more pairs: scattered means noise,
+ *    clustered at zero means positional and the fresh-block test missed
+ *    something. Left here deliberately: 290 bytes at one per channel on 70
+ *    pixels of a 6.2MB surface, and the shipped test clears it by 23x.
+ *
  *    AND IT IS ESTABLISHED POSITIVELY, not by absence. A second block FORCES the
  *    scratches to be re-created - _glowTmp, _haloS and both mip arrays dropped -
  *    and repeats the twenty. If instability appears there and only there, the
