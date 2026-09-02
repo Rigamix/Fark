@@ -238,6 +238,15 @@ window.FDRV = (function () {
          turnNum increments at the handover to the rival (36848) and came back
          as 10 on patron matches whose cap is 8, which is what made the first
          envelope run's per-turn arithmetic untrustworthy. */
+      /* P917: WHY IT ENDED, and what added turns past the cap. The cap is soft -
+         starstone grants a turn (24867/36945), the trailing player always gets
+         a final answer turn, and a dead-even match takes another round. An
+         envelope that does not separate those is measuring a longer match than
+         it claims. _endReason is set at the cap branch itself, so it is read
+         rather than inferred. */
+      endReason: (function(){ try { return G ? (G._endReason || null) : null; } catch(e){ return null; } })(),
+      finalAnswerUsed: (function(){ try { return G ? !!G._finalAnswerUsed : null; } catch(e){ return null; } })(),
+      extraTurnsLeft: (function(){ try { return G ? (G._extraTurn || 0) : null; } catch(e){ return null; } })(),
       pTurns: (function(){ try { return G ? (G.pTurns || 0) : null; } catch(e){ return null; } })(),
       turnNum: (function(){ try { return G ? G.turnNum : null; } catch(e){ return null; } })(),
       turnCap: (function(){ try { return G ? G.turnCap : null; } catch(e){ return null; } })(),

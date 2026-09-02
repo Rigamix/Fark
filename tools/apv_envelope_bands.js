@@ -78,17 +78,36 @@ async function cell(band, policy) {
     rows.push(r && r.err ? {err: r.err}
       : {pPts: r.pPts, oPts: r.oPts, target: r.target, dealt,
          pTurns: r.pTurns, turnCap: r.turnCap, hitTheCap: r.hitTheCap,
+         endReason: r.endReason, finalAnswerUsed: r.finalAnswerUsed,
+         extraTurnsLeft: r.extraTurnsLeft,
+         overran: (r.pTurns != null && r.turnCap) ? (r.pTurns > r.turnCap) : null,
          banks: r.banks, busts: r.busts, stalled: r.stalled});
     await FDRV.sleep(300);
   }
   const good = rows.filter(r => r && !r.err && !r.stalled);
   const totals = good.map(r => r.pPts);
+  /* THE CEILING AT EXACTLY THE CAP, apart from the overrun ones. The cap is
+     soft three ways and an envelope that mixes them is measuring a longer match
+     than it claims - and the trailing-player final answer turn fires in EVERY
+     match here, because an envelope is taken where the player cannot win. */
+  const atCap = good.filter(r => r.pTurns != null && r.turnCap &&
+                                 r.pTurns === r.turnCap);
+  const over = good.filter(r => r.overran === true);
+  const maxOf = a => a.length ? Math.max.apply(null, a.map(r => r.pPts)) : null;
   return {
     rows, matches: good.length,
     ranToTheCap: good.filter(r => r.hitTheCap).length,
+    exactlyAtCap: atCap.length, overran: over.length,
+    endedEarly: good.length - atCap.length - over.length,
+    endReasons: good.map(r => r.endReason),
+    finalAnswerUsed: good.filter(r => r.finalAnswerUsed).length,
     dealt: good.length ? good[0].dealt : null,
     pTurns: good.map(r => r.pTurns),
     totals,
+    /* the honest ceiling: exactly-at-cap only. maxAny is reported beside it so
+       the inflation is visible rather than absorbed. */
+    ceilingAtCap: maxOf(atCap),
+    ceilingOverran: maxOf(over),
     max: totals.length ? Math.max.apply(null, totals) : null,
     mean: totals.length ? Math.round(totals.reduce((a, b) => a + b, 0) / totals.length) : null,
   };
@@ -110,12 +129,18 @@ for (const band of BAND_LIST) {
 out.table = [];
 Object.keys(out.cells).forEach(key => {
   const c = out.cells[key];
-  if (c.max == null) return;
-  const bossCeil = Math.round(c.max * (out.caps.boss / out.caps.patron));
+  /* THE TABLE USES THE AT-CAP CEILING, falling back to the overall max only
+     when no match landed exactly on the cap - and saying which, because a
+     pruning decision built on an overrun ceiling would strike off fewer cells
+     than it should and look conservative while being wrong. */
+  const ceil = (c.ceilingAtCap != null) ? c.ceilingAtCap : c.max;
+  const ceilFrom = (c.ceilingAtCap != null) ? 'at-cap' : 'any';
+  if (ceil == null) return;
+  const bossCeil = Math.round(ceil * (out.caps.boss / out.caps.patron));
   out.targets.forEach(t => {
-    out.table.push({cell: key, tier: t.tier,
-      patronTarget: t.patronMax, patronCeiling: c.max,
-      patronReachable: c.max >= t.patronMax,
+    out.table.push({cell: key, tier: t.tier, ceilFrom,
+      patronTarget: t.patronMax, patronCeiling: ceil,
+      patronReachable: ceil >= t.patronMax,
       bossTarget: t.boss, bossCeiling: bossCeil,
       bossReachable: t.boss ? bossCeil >= t.boss : null});
   });
@@ -142,6 +167,11 @@ out.VERDICT = {
   /* and the matches must have spent their turns, or these are not ceilings */
   mostRanToTheCap: Object.keys(out.cells)
     .every(k => out.cells[k].ranToTheCap >= Math.max(1, out.cells[k].matches - 1)),
+  /* the finding this patch exists for: an envelope taken where the player
+     cannot win collects the trailing-player final answer turn every time, so
+     if NOTHING overran, the soft cap is not doing what the code says */
+  theSoftCapIsVisible: Object.keys(out.cells)
+    .some(k => out.cells[k].overran > 0 || out.cells[k].finalAnswerUsed > 0),
   theCapIsCountedOnPlayerTurns: Object.keys(out.cells).every(k =>
     (out.cells[k].pTurns || []).every(p => p == null || p <= out.caps.boss)),
   /* gear must move the line, or bands are not the axis the constants think */
