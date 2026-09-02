@@ -190,8 +190,40 @@ window.FDRV = (function () {
       await sleep(230);
     }
 
+    /* P912: LET THE END-ROUTE LAND BEFORE ANYONE STARTS ANOTHER MATCH.
+       launchBossMatch calls showScreen('match', ...) inside a setTimeout of
+       80ms, so a caller that launches the instant _endMatchFired goes true is
+       racing the navigation the finished match is about to do - and the loser
+       is the new match, which is exactly the screen-gauntlet-with-G-null the
+       boss path kept returning.
+       Waits for the ACTIVE SCREEN TO STOP CHANGING rather than for a duration:
+       two consecutive reads the same, with a bounded give-up so a game that
+       never settles costs one match and not the run. */
+    const screensNow = () => {
+      try { return [].slice.call(document.querySelectorAll('.screen.active'))
+        .map(function (e) { return e.id; }).join(','); } catch (e) { return '?'; }
+    };
+    /* MEASURED, and the first version of this waited for the wrong thing. It
+       stopped as soon as two consecutive reads matched - but immediately after
+       _endMatchFired the screen is still screen-match and momentarily STABLE,
+       so it returned in 358ms, the caller launched, and the end-route then
+       navigated to the gauntlet on top of the new match. Stability is not the
+       signal; DEPARTURE is. Wait for the match screen to go, then for whatever
+       replaces it to hold still. */
+    let prevScreens = null, settleMs = null, leftMatch = false;
+    const settleT0 = Date.now();
+    while (Date.now() - settleT0 < 12000) {
+      const now = screensNow();
+      if (!leftMatch) {
+        if (now.indexOf('screen-match') < 0) { leftMatch = true; prevScreens = now; }
+      } else if (now === prevScreens) { settleMs = Date.now() - settleT0; break; }
+      else prevScreens = now;
+      await sleep(300);
+    }
+
     const pPts = (G && G.pPts) || 0, oPts = (G && G.oPts) || 0;
     return {
+      settledOn: prevScreens, settleMs, leftMatchScreen: leftMatch,
       ok: !stalled, stalled, policy: policy.key, target,
       pPts, oPts, win: pPts > oPts ? 1 : 0,
       busts, banks, rolls, keeps,
