@@ -30,12 +30,28 @@ window.FXH = (function(){
 
   /* poll a predicate. Returns how long it took, or null - a caller that wants
      to know "did this happen" must be able to tell it from "I gave up". */
+  /* A PREDICATE THAT ALWAYS THROWS IS NOT A PREDICATE THAT IS NEVER TRUE, and
+     conflating them cost four runs and three wrong theories. A probe declared
+     `const G = D3X.GLOW` near its foot; this file is eval'd into that same
+     function scope, so every `G` in here - including `typeof G` - was in the
+     const's temporal dead zone and threw ReferenceError. The catch swallowed
+     it, the poll timed out, and the report said "match never became idle",
+     which sent the search to boot races, showScreen and boss splashes in turn.
+     Throws are counted now and the last message kept on until.lastError. Still
+     caught, because a predicate that throws once while the page settles is
+     normal - but no longer silent when it throws every single time. */
   async function until(fn, ms){
     const t0 = Date.now();
+    let threw = 0, tries = 0, last = null;
     while (Date.now() - t0 < ms){
-      try { if (fn()) return Date.now() - t0; } catch(e){}
+      tries++;
+      try { if (fn()) { until.lastError = null; return Date.now() - t0; } }
+      catch(e){ threw++; last = (e && e.message) || String(e); }
       await sleep(120);
     }
+    until.lastError = (tries && threw === tries)
+      ? 'the predicate threw on all ' + tries + ' attempts: ' + last
+      : (threw ? threw + '/' + tries + ' attempts threw: ' + last : null);
     return null;
   }
 
@@ -64,7 +80,27 @@ window.FXH = (function(){
     try { showScreen('gauntlet'); } catch(e){}
     launchBossMatch();
     const t = await until(() => typeof G !== 'undefined' && G && G.phase === 'idle', ms || 25000);
-    if (t == null) return {ok:false, why:'match never became idle'};
+    if (t == null) {
+      /* REPORT THE STATE, NOT THE VERDICT. "never became idle" cost four runs
+         and three wrong theories because it said nothing about WHERE it was
+         stuck. */
+      const ms = document.getElementById('screen-match');
+      /* READ G DEFENSIVELY. `typeof G` is NOT safe when a caller has shadowed
+         G with a let or const in the enclosing scope - it throws rather than
+         answering, which is the trap that hid this for four runs. A reporter
+         that throws reports nothing. */
+      let phase = null, gWhy = null;
+      try { phase = (typeof G !== 'undefined' && G) ? G.phase : null; }
+      catch (e) { gWhy = 'G is shadowed by the caller: ' + ((e && e.message) || e); }
+      return {ok:false, why:'match never became idle',
+              predicate:until.lastError || null, gRead:gWhy,
+              d3xReady:!!(window.D3X && D3X.ready), phase:phase,
+              hasSplash:!!(ms && ms.classList.contains('has-splash')),
+              overlays:[].slice.call(document.querySelectorAll(
+                '.handicap-splash,.boss-splash,.dlg-wrap,.modal.active')).length,
+              activeScreens:[].slice.call(document.querySelectorAll('.screen.active'))
+                .map(function(e){return e.id;})};
+    }
     await sleep(1200);
     return {ok:true, tookMs:t};
   }
