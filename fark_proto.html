@@ -15244,7 +15244,12 @@ CFX.encore={
     if(actor==='o'){
       var _oFree2=(G.oppDice||[]).filter(function(d){return !d.kept;});
       if(!_oFree2.length)return false;
-      _oFree2.forEach(function(d){d.val=rollFace(d.mat);try{reDrawDieFace(d);}catch(e){}});
+      /* P901: the SAME CARD as the player's encore, so the same starstone
+         blue. The player's copy was tagged in P899 and this one was not -
+         one seat marked and the other not, on one card. */
+      _oFree2.forEach(function(d){
+        if(d.el)_dieReroll(d.el,D3X.BEAT_INK.encore);
+        d.val=rollFace(d.mat);try{reDrawDieFace(d);}catch(e){}});
       setStatusMsg((G.rung&&G.rung.name||'RIVAL')+': ENCORE — THEY ROLL AGAIN','red');
       return true;
     }
@@ -17577,7 +17582,10 @@ function famFoolsGold(free){
   if(!inst||inst.charges<=0)return false;
   inst.charges--;try{famRenderRow();}catch(e){}
   famLog("FOOL'S GOLD — EVERYTHING REROLLS");
-  free.forEach(function(d){d.val=_rollD(d);try{reDrawDieFace(d);}catch(e){}});
+  /* P901: it says everything rerolls and nothing showed it. */
+  free.forEach(function(d){
+    if(d.el)_dieReroll(d.el,D3X.BEAT_INK.reroll);
+    d.val=_rollD(d);try{reDrawDieFace(d);}catch(e){}});
   var fv=free.map(function(d){return d.val;}),fm=free.map(function(d){return d.mat;});
   if(anyScoring(fv,effectiveCards(),fm,free)){
     _steadyDisarm();/* these dice are new - the arm was about the old ones */
@@ -24859,7 +24867,10 @@ var BREAK_TRIGGERS={
     G._breakBankNow=true;}},
   jade:{msg:'JADE SCATTERS — EVERYTHING ROLLS AGAIN',fire:function(){
     var free=G.pool.filter(function(d){return !d.committed;});
-    free.forEach(function(d){d.val=_rollD(d);d.sel=false;try{reDrawDieFace(d);}catch(e){}});
+    /* P901: jade scatters the whole table and said so only in the log */
+    free.forEach(function(d){
+      if(d.el)_dieReroll(d.el,D3X.BEAT_INK.reroll);
+      d.val=_rollD(d);d.sel=false;try{reDrawDieFace(d);}catch(e){}});
     try{refreshSelUI();}catch(e){}
     /* NO DEAD-HAND CHECK HERE, AND THE REMOVAL IS THE FIX. _breakDie's tail
        resumes the roll Break interrupted, and handleRoll re-rolls every free
@@ -27454,10 +27465,15 @@ var D3X={
          _setDieVal covers five of the seven, but sleight (both seats) bypasses
            it deliberately: it fires famTableChanged, whose _clearRollForces
            would eat the roll-scoped buffers those two sites run inside.
-       SO: seven sites, and here is how to find an eighth. Every in-place value
-       change in this file is a `_setDieVal(` or a `reDrawDieFace(` call. Any
-       reroll outside that union does not exist; any inside it without a
-       _dieReroll beside it is an unmarked one. */
+       SO: many sites, and no number here - `node tools/zv_reroll_census.js`
+       is the count, derived from the code every time it runs. A number in a
+       comment is a number to bump, and this one was already wrong: it said
+       seven, the census found eleven, and the four it added included the
+       RIVAL's copy of the same encore whose player copy was already tagged.
+       The tool classifies every `_setDieVal(` and `reDrawDieFace(` by whether
+       its value comes from a random face source, names any reroll without a
+       tag, and takes an inline NOT-A-REROLL comment as the exemption so the
+       reason lives with the code it excuses. */
     {id:'reroll',layer:'under',through:true,style:'rim',fallback:'#ffb428',
      inkOf:function(d){return d.chip._rrInk;},
      on:function(d){return !!d.roll&&!!(d.chip&&d.chip._rrInk);}},
@@ -35192,7 +35208,12 @@ function doBust(){
       if(anyScoring(_amFree.map(function(d){return d.val;}),effectiveCards(),
                     _amFree.map(function(d){return d.mat;}),_amFree)){_amOK=true;break;}
     }
-    _amFree.forEach(function(d){try{reDrawDieFace(d);}catch(e){}});
+    /* P901b: a REAL twelfth, found only because the window widened. Ambrose's
+       Grace rolls in a retry loop until something scores and redraws once at
+       the end, so the flight starts here rather than beside the roll. */
+    _amFree.forEach(function(d){
+      if(d.el)_dieReroll(d.el,D3X.BEAT_INK.reroll);
+      try{reDrawDieFace(d);}catch(e){}});
     if(!_amOK){
       /* astronomically unlikely, but never leave the turn unplayable: bank
          what is there rather than hang. NOTHING TO CLEAR HERE ANY MORE - the
@@ -37919,6 +37940,9 @@ function runOppTurn(){
           var _stVic=_stKept[Math.floor(Math.random()*_stKept.length)];
           _stVic.kept=false;if(_stVic.el){_stVic.el.classList.remove('selected','oppkeep');if(_stVic.el._d3)D3.draw(_stVic.el._d3);}
           /* Re-roll the slipped die */
+          /* P901: the slip already fires a red beat; the rim says the die is
+             being re-thrown, in the same red, so the two read as one idea. */
+          if(_stVic.el)_dieReroll(_stVic.el,D3X.BEAT_INK.red);
           var _stMat=_stVic.mat||'bone';_stVic.val=rollFace(_stMat);reDrawDieFace(_stVic);
           if(_stVic.el){_dieBeat(_stVic.el,'rim',D3X.BEAT_INK.red,_oppDelay(700));spawnPixelSparks(_stVic.el,4);}
           /* Re-score this roll's ENTIRE dice set fresh and re-keep from the
@@ -41203,6 +41227,10 @@ function activateLoan(){
    break reproduces that. Whether fall-through would be better is a
    behaviour question, not a refactor's call. */
 function _npcRescueSet(d,v){
+  /* NOT-A-REROLL: `v` is the value the rescue DECIDED on - a 1, a 5, a chosen
+     face - and it arrives as an argument. The census sees this because the
+     NPC_RESCUES table below it mentions roll sources, which is a neighbour and
+     not this function's own source. */
   d.val=v;
   try{reDrawDieFace(d);}catch(e){}
   try{if(d.el)spawnPixelSparks(d.el,3);}catch(e){}
