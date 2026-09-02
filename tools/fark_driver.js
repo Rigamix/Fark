@@ -136,6 +136,12 @@ window.FDRV = (function () {
 
     const target = targetOf();
     let busts = 0, banks = 0, rolls = 0, keeps = 0, stalled = null;
+    /* P914: EVERY BANK AMOUNT, because the envelope question is per TURN and
+       not per match. TURN_CAP_PATRON is 8 and TURN_CAP_BOSS is 10, and the
+       comment at 12715 is load-bearing: "bank AND bust both count", so the
+       resource is eight ATTEMPTS. A match total divided by banks would miss
+       the busted turns entirely and overstate the yield. */
+    const bankAmounts = [];
 
     while (!G._endMatchFired) {
       if (Date.now() > deadline) { stalled = 'deadline at phase=' + G.phase; break; }
@@ -185,7 +191,7 @@ window.FDRV = (function () {
       else if (hot && policy.pushHot && turn < 3000) doBank = false;
       else doBank = !!bankRule(policy, turn, diceLeft);
 
-      if (doBank) banks++;
+      if (doBank) { banks++; bankAmounts.push(turn); }
       tap(document.getElementById(doBank ? 'btnBank' : 'btnRoll'));
       await sleep(230);
     }
@@ -226,7 +232,11 @@ window.FDRV = (function () {
       settledOn: prevScreens, settleMs, leftMatchScreen: leftMatch,
       ok: !stalled, stalled, policy: policy.key, target,
       pPts, oPts, win: pPts > oPts ? 1 : 0,
-      busts, banks, rolls, keeps,
+      busts, banks, rolls, keeps, bankAmounts,
+      turnsUsed: (function(){ try { return G ? G.turnNum : null; } catch(e){ return null; } })(),
+      turnCap: (function(){ try { return G ? G.turnCap : null; } catch(e){ return null; } })(),
+      hitTheCap: (function(){ try { return !!(G && G.turnCap && G.turnNum >= G.turnCap); }
+                              catch(e){ return null; } })(),
       pOverTarget: target ? +(pPts / target).toFixed(3) : null,
       winnerOverTarget: target ? +(Math.max(pPts, oPts) / target).toFixed(3) : null,
     };
@@ -245,9 +255,21 @@ window.FDRV = (function () {
     if (res.stalled) return {ok: false, why: 'the match stalled: ' + res.stalled};
     if (!(res.banks > 0)) return {ok: false,
       why: 'the player banked nothing in a completed match - it is not playing'};
-    if (!(res.winnerOverTarget >= 0.8 && res.winnerOverTarget <= 2.5))
-      return {ok: false, why: 'nobody reached the target: winner had ' +
-        Math.max(res.pPts, res.oPts) + ' against ' + res.target};
+    /* A MATCH ENDS TWO WAYS, and only one of them is "somebody reached the
+       target". TURN_CAP_PATRON is 8 and TURN_CAP_BOSS is 10, so a tier whose
+       target sits outside the policy's envelope ends on the CAP - normally,
+       every time, by arithmetic. This used to refuse those: measured, a hard
+       cell match ended 6250 against 9500 and was scored a failure.
+       Not widened - widening a threshold to fit a real result is how the last
+       two gates went wrong. Asked instead: reached, or capped, are both
+       complete. Neither being true is the only broken case. */
+    const reached = res.winnerOverTarget >= 0.8 && res.winnerOverTarget <= 2.5;
+    if (!reached && !res.hitTheCap)
+      return {ok: false, why: 'the match ended without reaching the target (' +
+        Math.max(res.pPts, res.oPts) + ' against ' + res.target +
+        ') and without hitting the turn cap' +
+        (res.turnsUsed != null ? ' (turn ' + res.turnsUsed + ' of ' +
+          res.turnCap + ')' : '') + ' - so it ended for neither legitimate reason'};
     return {ok: true, pOverTarget: res.pOverTarget};
   }
 
@@ -290,11 +312,16 @@ window.FDRV = (function () {
      on one tier is that shape again: 2 of 10 is both a limping driver and a
      genuinely hard cell, so its lower edge can refuse a real finding, and a
      brutal band-2 boss cell is exactly what the ladder exists to discover.
-     Two tiers, and the win rate must FALL. Flatness is the tell for the outcome
-     the way it is for the score.
-     SAME SCOPE NOTE AS THE OTHER PAIR: at ten matches a cell the variance is
-     large, so this catches a driver that does not play, not one that plays
-     slightly wrong. A pass is a smoke test, not calibration. */
+     Two tiers, and the win rate must not RISE. Say that precisely, because
+     the loose version is worse than useless: what the code below tests is
+     `hw >= ew` refused, which is "the outcome did not rise, and the easy cell
+     cleared the floor" - NOT "the outcome falls". At ten matches a cell, two
+     wins against zero is a difference of two events with heavily overlapping
+     intervals, and a flat driver produces that pairing routinely.
+     SO A PASS IS NOT EVIDENCE ABOUT DIFFICULTY, and nobody should later cite a
+     2-then-0 as if it were. Same scope note as the other pair: this catches a
+     driver that does not play, not one that plays slightly wrong. A smoke
+     test, not calibration. */
   const WIN_N = 10;
   function sanityWinRate(easy, hard) {
     const clean = a => (a || []).filter(r => r && !r.err && !r.stalled);
