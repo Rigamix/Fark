@@ -27483,6 +27483,15 @@ var D3X={
      still legible, rather than as light thrown off them. */
   CRUST:{soft:3,rim:1.6,strength:0.95,line:2.6},
   VEIL:{alpha:0.42},
+  /* P903: THE FLIGHT DIAL - what a mark costs while its die is in the air.
+     through:true is about PRESENCE, not fidelity: the requirement is that no
+     frame is missing the mark, and §13 rule 4 says a state is for the settled
+     read. Nobody studies a CRUST on a tumbling die.
+     These are the pass counts, and passes are the dominant term: blurOnto
+     builds its pyramid once whatever this says (~1.7 screens of traffic) and
+     then composites the result once per pass, a full screen each time. The
+     shipped 1 + 5 is six full-screen composites; 1 + 1 is two. */
+  FLIGHT:{softPasses:1,rimPasses:1},
   /* a dial name on D3X, a global name, or a literal */
   _markInk:function(name,fallback){
     if(!name)return fallback||'#ffffff';
@@ -27523,7 +27532,7 @@ var D3X={
      there. So this darkens and adds no colour. True desaturation already has
      a home in _settleDim / _dimMap, which dim the die's own material maps,
      and that is the right route if step 8 wants it. */
-  _paintForm:function(style,cv,x,sc,dpr,hulls,col,soft,alphaMul,over){
+  _paintForm:function(style,cv,x,sc,dpr,hulls,col,soft,alphaMul,over,cheap){
     /* P896: the multiplier is what lets a BEAT share this painter. A state is
        either worn or not, so it always passes 1; a beat rides an envelope. It
        existed as a parameter of _paintHalo all along - the forms just never
@@ -27533,11 +27542,26 @@ var D3X={
     var AM=(alphaMul==null?1:alphaMul);
     /* `over` is the caller's canvas, not the form's - see the third-case note
        in _paintHalo. A VEIL needs nothing: it is a fill on the hull and has no
-       geometry outside the silhouette to cut. */
+       geometry outside the silhouette to cut.
+       `cheap` is P903's flight quality, and it is a property of the MOMENT
+       rather than of the form or the canvas - the third independent thing this
+       call carries, so they are assembled into one opts object here instead of
+       being spelled out per branch. */
+    var F=cheap?this.FLIGHT:null;
+    var opt=function(base){
+      var o=base||{};
+      if(over)o.overSubject=1;
+      if(F){o.softPasses=F.softPasses;o.rimPasses=F.rimPasses;}
+      for(var k in o)return o;
+      return undefined;/* nothing to say: keep the old undefined-opts path */
+    };
     if(style==='crust'){
       var C=this.CRUST;
+      /* a FRESH object, never the shared CRUST dial itself - it used to be
+         passed straight through as opts, so anything that wrote to opts would
+         have retuned every crust in the game */
       this._paintHalo(cv,x,sc,dpr,hulls,col,soft,AM,C.line,
-        over?{soft:C.soft,rim:C.rim,strength:C.strength,overSubject:1}:C);
+        opt({soft:C.soft,rim:C.rim,strength:C.strength}));
       return;
     }
     if(style==='veil'){
@@ -27549,8 +27573,7 @@ var D3X={
       x.restore();
       return;
     }
-    this._paintHalo(cv,x,sc,dpr,hulls,col,soft,AM,undefined,
-                    over?{overSubject:1}:undefined);
+    this._paintHalo(cv,x,sc,dpr,hulls,col,soft,AM,undefined,opt());
   },
   /* paint every row on one layer, in roster order. ONE _paintHalo per ROW,
      not per die: a row's hulls are collected and painted together, so the
@@ -27623,15 +27646,17 @@ var D3X={
     }
     return s;
   },
-  _paintPlan:function(groups,cv,x,sc,dpr,layer){
+  _paintPlan:function(groups,cv,x,sc,dpr,layer,cheap){
     for(var i=0;i<groups.length;i++){
       var g=groups[i];
-      this._paintForm(g.style,cv,x,sc,dpr,g.hulls,g.col,g.soft,1,layer==='over');
+      this._paintForm(g.style,cv,x,sc,dpr,g.hulls,g.col,g.soft,1,
+                      layer==='over',cheap);
     }
     return groups.length;
   },
   _drawMarks:function(layer,cv,x,sc,dpr,rolling){
-    return this._paintPlan(this._markPlan(layer,sc,rolling),cv,x,sc,dpr,layer);
+    return this._paintPlan(this._markPlan(layer,sc,rolling),cv,x,sc,dpr,layer,
+                           rolling);
   },
   /* P883: TRANSIENT BEATS on the same surface. A state is a class that is
      either there or not; a beat has a clock. Both are painted by the pass
@@ -27779,7 +27804,7 @@ var D3X={
        animates is the one thing excluded, which cannot go subtly stale. */
     var plan=this._markPlan('over',sc,rolling);
     if(!beats.length){
-      var sig=cv.width+'x'+cv.height+'|'+this._planSig(plan);
+      var sig=(rolling?'F':'S')+'|'+cv.width+'x'+cv.height+'|'+this._planSig(plan);
       if(this._stateInk&&sig===this._stateSig)return;
       this._stateSig=sig;
     }else{
@@ -27790,7 +27815,7 @@ var D3X={
     x.clearRect(0,0,sc.width,sc.height);
     this._stateInk=true;
     var G=this.GLOW;
-    this._paintPlan(plan,cv,x,sc,dpr,'over');
+    this._paintPlan(plan,cv,x,sc,dpr,'over',rolling);
     /* P883: beats last, so a transient reads ON TOP of the state it belongs
        to rather than under it. */
     for(i=0;i<beats.length;i++){
@@ -28018,13 +28043,16 @@ var D3X={
        pass 1/1. The borrowed 1.24 was a 15px top/bottom smear on a
        card (dyF, the card's own vertical dial, is authored at 0). */
     sel.forEach(function(sh){lay(sxc,sh,SOFT,{dy:(DY!==null)?DY:G.dy,sx:G.sx,sy:G.sy});});
-    blurOnto(gx,SOFTR,G.softPasses||1);
+    /* P903: the caller may spend less here - see FLIGHT. The pyramid is built
+       either way; `passes` is how many times its result is composited, which
+       is a full screen each and the biggest single cost in this function. */
+    blurOnto(gx,SOFTR,(opts&&opts.softPasses)||G.softPasses||1);
     /* then the bright rim, stacked - the punch-out below throws away the
        inner half of every blur, so a single pass never reads as strong */
     sxc.setTransform(dpr,0,0,dpr,0,0);
     sxc.clearRect(0,0,sc.width,sc.height);
     sel.forEach(function(sh){lay(sxc,sh,COL,(DY!==null)?{dy:DY}:{});});
-    blurOnto(gx,RIMR,G.rimPasses||1);
+    blurOnto(gx,RIMR,(opts&&opts.rimPasses)||G.rimPasses||1);
     /* cut the subject back out EXACTLY on its painted edge: everything
        left is outside the shape, which is the whole point. clear widens
        the cut a hair past the edge - see the note above GLOW. */
@@ -28343,14 +28371,18 @@ var D3X={
        identical frame returns without clearing and without painting, and the
        canvas still holds the paint that signature describes. */
     var plan=this._markPlan('under',sc,rolling);
-    var sig=cv.width+'x'+cv.height+'|'+this._planSig(plan);
+    /* P903: the quality is IN the signature. The last flying frame and the
+       first settled one then differ even if the dice stopped exactly where
+       they were, so the snap back to full quality is guaranteed rather than
+       inferred from the hulls having moved. */
+    var sig=(rolling?'F':'S')+'|'+cv.width+'x'+cv.height+'|'+this._planSig(plan);
     if(this._glowInk&&sig===this._glowSig)return;
     this._glowSig=sig;
     this._glowInk=true;
     var x=cv.getContext('2d');
     x.setTransform(dpr,0,0,dpr,0,0);
     x.clearRect(0,0,sc.width,sc.height);
-    this._paintPlan(plan,cv,x,sc,dpr,'under');
+    this._paintPlan(plan,cv,x,sc,dpr,'under',rolling);
   },
   /* ONE GROUP PER ROW. This used to be a single shared group whose position
      and scale were written per die inside the frame loop, so with two rows
