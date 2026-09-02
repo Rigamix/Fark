@@ -111,17 +111,52 @@ window.FXH = (function(){
     return threw;
   }
 
+  /* WHAT THE PAINTERS SIZE THEIR CANVASES TO. Every surface in this layer
+     computes the same thing - the match screen's rect at min(dpr, the glow
+     cap) - so `sized` can be checked against it rather than against zero.
+     Returns null when the screen is not up, so "cannot tell" stays distinct
+     from "wrong size". */
+  function expectedSize(){
+    const el = document.getElementById('screen-match');
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    if (r.width < 10) return null;
+    const dpr = Math.min(devicePixelRatio || 1,
+                         (window.D3X && D3X.GLOW_DPR_MAX) || 3);
+    return {w: Math.round(r.width * dpr), h: Math.round(r.height * dpr)};
+  }
+
   /* alpha-coverage of a canvas. `exists` is deliberately separate from `px`:
      a missing canvas and an empty one are different findings, and conflating
-     them turns "the canvas is clean" into an assertion that cannot fail. */
+     them turns "the canvas is clean" into an assertion that cannot fail.
+     P899a: and `sized` is separate from both. _glowCv creates the element,
+     _drawGlow sizes the backing store, and the sleep path returns before that
+     - so a canvas can exist at its 300x150 default while the painter draws at
+     a dpr transform, putting the subject off the surface. That reads 0 lit
+     with no error anywhere. 300x150 is not zero, so a width check cannot see
+     it; only a comparison with what the painters use can. null when there is
+     no canvas to size, because absence is not mis-sizing. */
+  function sizedOf(cv){
+    if (!cv) return null;
+    const e = expectedSize();
+    if (!e) return null;
+    return cv.width === e.w && cv.height === e.h;
+  }
+
   function ink(id){
     const cv = document.getElementById(id || 'dgCanvas');
-    if (!cv) return {exists:false, px:0, why:'no canvas'};
-    if (!cv.width) return {exists:true, px:0, why:'zero-width canvas'};
+    if (!cv) return {exists:false, sized:null, px:0, why:'no canvas'};
+    if (!cv.width) return {exists:true, sized:false, px:0, why:'zero-width canvas'};
     const d = cv.getContext('2d').getImageData(0,0,cv.width,cv.height).data;
     let n = 0;
     for (let i = 3; i < d.length; i += 4) if (d[i] > 8) n++;
-    return {exists:true, px:n, w:cv.width, h:cv.height};
+    const e = expectedSize();
+    return {exists:true, sized:sizedOf(cv), px:n, w:cv.width, h:cv.height,
+            expected:e, why:(sizedOf(cv) === false
+              ? 'canvas is ' + cv.width + 'x' + cv.height + ', painters use ' +
+                (e ? e.w + 'x' + e.h : '?') + ' - a reading from this surface '
+                + 'cannot be trusted'
+              : undefined)};
   }
 
   /* paint one configuration and read it back, in one call, so a probe cannot
@@ -143,8 +178,8 @@ window.FXH = (function(){
      is - a probe that gets a 3% plurality has not measured a colour. */
   function hue(id, minA){
     const cv = document.getElementById(id || 'dgCanvas');
-    if (!cv) return {exists:false, why:'no canvas'};
-    if (!cv.width) return {exists:true, why:'zero-width canvas'};
+    if (!cv) return {exists:false, sized:null, why:'no canvas'};
+    if (!cv.width) return {exists:true, sized:false, why:'zero-width canvas'};
     const d = cv.getContext('2d').getImageData(0,0,cv.width,cv.height).data;
     const A = minA == null ? 40 : minA, bin = {};
     let n = 0;
@@ -154,12 +189,14 @@ window.FXH = (function(){
       const k = (d[i]>>4<<8) | (d[i+1]>>4<<4) | (d[i+2]>>4);
       bin[k] = (bin[k]||0) + 1;
     }
-    if (!n) return {exists:true, lit:0, why:'nothing above alpha floor'};
+    if (!n) return {exists:true, sized:sizedOf(cv), lit:0,
+                    why:'nothing above alpha floor'};
     let best = -1, bk = 0;
     for (const k in bin) if (bin[k] > best){ best = bin[k]; bk = +k; }
     const r = (bk>>8&15)*17, g = (bk>>4&15)*17, b = (bk&15)*17;
     const hex = '#' + [r,g,b].map(v => v.toString(16).padStart(2,'0')).join('');
-    return {exists:true, lit:n, hex, rgb:[r,g,b], share:+(best/n).toFixed(3),
+    return {exists:true, sized:sizedOf(cv), lit:n, hex, rgb:[r,g,b],
+            share:+(best/n).toFixed(3),
             reddish: r > g + 24 && r > b + 24,
             goldish: r > b + 40 && g > b + 40 && Math.abs(r-g) < 90};
   }
@@ -170,5 +207,5 @@ window.FXH = (function(){
   });
 
   return {sleep, until, tap, settled, match, loadDice, rollAndSettle,
-          draw, ink, hue, paintWith, clearMarks};
+          draw, ink, hue, paintWith, clearMarks, expectedSize, sizedOf};
 })();

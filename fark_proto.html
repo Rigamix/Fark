@@ -15049,6 +15049,7 @@ CFX.steady_hand={
         /* .selected is what the glow is DRAWN from, so clearing d.sel alone left
            the die wearing a gold ring while the model and the preview had it
            unselected - the table claiming a die scores when it does not. */
+        if(d.el)_dieReroll(d.el,D3X.BEAT_INK.reroll);
         _setDieVal(d,_rollD(d));d.sel=false;
         if(d.el)d.el.classList.remove('selected');
         /* P856b: AFTER the reroll, not before - _setDieVal fires
@@ -15249,15 +15250,15 @@ CFX.encore={
     }
     var free=G.pool.filter(function(d){return !d.committed&&!d._frozen;});
     if(!free.length)return false;
-    free.forEach(function(d,_i){
+    free.forEach(function(d){
+      /* the tag goes on BEFORE the value changes: _setDieVal is what starts
+         the flight, and the row reads its cause from the first frame.
+         P828's starstone blue is the card's ink and the motes already use it,
+         so the rim and the spray share a colour by construction rather than by
+         two literals agreeing. */
+      if(d.el)_dieReroll(d.el,D3X.BEAT_INK.encore);
       _setDieVal(d,_rollD(d));d.sel=false;
       if(d.el){d.el.classList.remove('selected');
-        /* §18: RIM in the card's ink at +140, staggered 70ms, 100/hold/200.
-           P828's starstone blue is the card's ink and the motes already use
-           it - the rim and the spray are now the same colour by construction
-           rather than by two literals agreeing. */
-        _dieBeat(d.el,'rim',D3X.BEAT_INK.encore,
-                 {delay:140+_i*70,env:D3X.BEAT_ENV.reroll});
         try{_fxSpray(d.el,D3X.BEAT_INK.encore,8,{speed:65,g:-20,size:5,spread:2.0});}catch(e){}}
     });
     try{SFX.roll();}catch(e){}
@@ -17722,6 +17723,10 @@ CFX.powder_keg={
     G.kept=[];
     G.pool.forEach(function(d){
       d.committed=false;d._frozen=false;d.sel=false;
+      /* P828 puts the keg's explosion opposite encore's starstone, so the keg
+         takes the plain reroll gold - and it rerolls the KEPT dice too, which
+         is the one thing the card has to say. */
+      if(d.el)_dieReroll(d.el,D3X.BEAT_INK.reroll);
       _setDieVal(d,_rollD(d));
       /* P824: the spec's one demand - every die VISIBLY detonates, the
          signal that kept dice are back in play. Same shards sacrifice's
@@ -25659,6 +25664,10 @@ function famQuicksilver(){
   var d=(G.pool||[]).filter(function(x){return x.ench&&x.ench.t==='quicksilver'&&!x.committed&&!x._frozen;})[0];
   if(!d)return;
   G._qsTurn=G.turnNum;
+  /* P684 recorded this reroll as invisible - "the face just changed" - and
+     the spray it added is the only thing that ever marked it. In quicksilver's
+     own ink, which is that spray's. */
+  if(d.el)_dieReroll(d.el,D3X.BEAT_INK.quicksilver);
   _setDieVal(d,_rollD(d));d.sel=false;/* P846: the R1 gap no card list could cover */
   /* P684: the free reroll was invisible - the face just changed */
   try{if(d.el&&typeof _fxSpray==='function')_fxSpray(d.el,'#eef4fb',10,{speed:75,g:50,size:6,spread:2.6});}catch(eQ){}
@@ -27415,6 +27424,21 @@ var D3X={
        !d.chip.classList.contains('dampen-fade');}},
     {id:'blind',layer:'over',through:true,style:'veil',ink:'#1a1a2a',
      on:function(d){return d.chip.classList.contains('die-blind');}},
+    /* P899: A CARD'S REROLL IS A STATE. The card firing is the beat; the die
+       being in the air is the state that beat causes, and origin is not
+       lifetime. Present tense, condition-bound, so it goes here rather than in
+       FX_MARKS - and `through:true` is load-bearing for the first time outside
+       the enchants, because this row's condition IS the roll.
+       BARE d.roll WOULD MATCH EVERY DIE IN AN ORDINARY ROLL. The tag names the
+       cause and carries the ink, which is a legitimate parameter: an ink would
+       duplicate what the firing already knows, but WHY this die is in the air
+       exists nowhere else. `inkOf` is read per die, and _drawMarks groups by
+       resolved ink so the cost stays one call per ink present.
+       UNDER, like every state - a state is part of the table and is occluded
+       by the dice. Only beats sit on top. */
+    {id:'reroll',layer:'under',through:true,style:'rim',fallback:'#ffb428',
+     inkOf:function(d){return d.chip._rrInk;},
+     on:function(d){return !!d.roll&&!!(d.chip&&d.chip._rrInk);}},
   ],
   /* CRUST is the keep glow's painter with a tight profile: a hard edge and
      almost no falloff, so it reads as a treatment ON the edges with the face
@@ -27495,12 +27519,40 @@ var D3X={
      cost is bounded by the roster rather than by the board. */
   _drawMarks:function(layer,cv,x,sc,dpr,rolling){
     var self=this,G=this.GLOW,M=this.MARKS||[],n=0;
+    /* P899: collect a set's hulls and paint them once. Pulled out because a
+       row can now resolve its ink PER DIE, and a parameterised row cannot
+       share the one-call-per-row bound - it is one call per distinct ink
+       present instead, which is the bound with beats and tagged states in the
+       same table. */
+    var paintSet=function(style,list,col,soft){
+      var hulls=[],i,h;
+      for(i=0;i<list.length;i++){
+        h=self._hullOf(list[i],sc,G.grow);
+        if(h)hulls.push(h);
+      }
+      if(!hulls.length)return 0;
+      self._paintForm(style,cv,x,sc,dpr,hulls,col,soft,1,layer==='over');
+      return 1;
+    };
     for(var r=0;r<M.length;r++){
       var row=M[r];
       if(row.layer!==layer)continue;
       if(rolling&&!row.through)continue;
       var ds=this._markDice(row);
       if(!ds.length)continue;
+      if(row.inkOf){
+        /* one group per resolved ink. inkWhen is a SET-level override and does
+           not apply here: a row that takes its colour from each die has
+           already answered the question inkWhen exists to ask. */
+        var byInk={},kk,q;
+        for(q=0;q<ds.length;q++){
+          try{kk=this._markInk(row.inkOf(ds[q]),row.fallback);}
+          catch(e){kk=this._markInk(null,row.fallback);}
+          (byInk[kk]||(byInk[kk]=[])).push(ds[q]);
+        }
+        for(kk in byInk)n+=paintSet(row.style,byInk[kk],kk,kk);
+        continue;
+      }
       var col=this._markInk(row.ink,row.fallback);
       var soft=row.soft?this._markInk(row.soft,row.fallback):col;
       var over=row.inkWhen||[];
@@ -27510,14 +27562,7 @@ var D3X={
         if(hit){col=this._markInk(over[o].ink,over[o].fallback);
                 if(over[o].both)soft=col;}
       }
-      var hulls=[];
-      for(var i=0;i<ds.length;i++){
-        var h=self._hullOf(ds[i],sc,G.grow);
-        if(h)hulls.push(h);
-      }
-      if(!hulls.length)continue;
-      this._paintForm(row.style,cv,x,sc,dpr,hulls,col,soft,1,layer==='over');
-      n++;
+      n+=paintSet(row.style,ds,col,soft);
     }
     return n;
   },
@@ -27573,21 +27618,19 @@ var D3X={
      encore is P828's starstone blue from .crr-blue; combo is comboGlow's
      brightest stop. */
   BEAT_INK:{gold:'#ffc83c',green:'#3cc85a',red:'#dc3c28',blue:'#50a0f0',
-            reroll:'#ffb428',encore:'#8fa8ff',combo:'#ffc850'},
-  /* §18's card-reroll sheet, as a shape: 100ms in, hold, 200ms out. The
-     stagger and the +140 wind-up are per-die and passed as `delay`.
-     P898 - MEASURED AND MISTIMED, and left as authored rather than guessed
-     at. The sheet budgets the whole card reroll at 400ms with the value
-     changing at +210, which reads as a die that snaps to its new face. It
-     does not: _setDieVal calls reDrawDieFace, which calls D3.roll, which
-     calls _physQueue - the same entry an ordinary roll uses - and the
-     solution is 1017 frame-milliseconds of flight against 1433 for an
-     ordinary roll. So this envelope is over at 580ms, about 440ms before the
-     die lands, and the rim decorates the throw rather than the result.
-     All four reroll sites share this shape and all four take that flight, so
-     the note is here rather than copied beside each of them.
-     Re-timing it is a change to the sheet, which is Denis's - see OPEN.md. */
-  BEAT_ENV:{reroll:{'in':100,hold:140,out:200}},
+            reroll:'#ffb428',encore:'#8fa8ff',combo:'#ffc850',
+            /* P899: quicksilver's own, taken from the spray P684 added when it
+               recorded that enchant's reroll as invisible. */
+            quicksilver:'#eef4fb'},
+  /* P899: BEAT_ENV.reroll is gone with the beats it timed. It gave the card
+     reroll 100/hold/200 from +140 against a measured 1017ms flight, so it was
+     over about 440ms before the die landed - and re-timing it turned out to be
+     the wrong fix, because the mark is a state whose end is the flight's end.
+     The `env` parameter on _fxMark stays and currently has NO CALLER. That is
+     said plainly rather than left to be found: §18 sheets three more shapes
+     that want an in/hold/out - moment 2's 120ms rim-in, moment 4's lane veil,
+     the miss - and deleting a tested evaluator to re-add it next patch is
+     churn. If none of them wants it, it should go. */
   /* arm a beat from a CHIP rather than a record, because every call site in
      the card code has an element and none of them has a D3X row. Returns
      false when the die is not in the 3D layer, so a caller can tell "no die"
@@ -28159,6 +28202,22 @@ var D3X={
      live rows are through:false, so nothing paints and the pass still sleeps.
      The probe re-proves the output byte-identical to the explicit calls. */
   _drawGlow:function(){
+    /* P899: THE REROLL TAG'S ONE EXIT. A card tags the die it is re-throwing
+       so the row can tell its reroll from an ordinary one; left on, the die's
+       NEXT ordinary roll would wear the card's ink.
+       Cleared on a TRANSITION, not a clock: the tag is set before the throw is
+       queued and d.roll appears about 60ms later, so "no roll" cannot mean
+       "landed" until this die has been seen in the air.
+       Here rather than in the row's predicate, because a predicate with a side
+       effect answers differently depending on who asked - and above the wake
+       test rather than below it, because the frame the last mark goes out on
+       is exactly the frame this has to run on. */
+    for(var _q=0;_q<this.dice.length;_q++){
+      var _rd=this.dice[_q];
+      if(!_rd.chip||!_rd.chip._rrInk)continue;
+      if(_rd.roll)_rd._rrSeen=1;
+      else if(_rd._rrSeen){_rd.chip._rrInk=null;_rd._rrSeen=0;}
+    }
     var cv=document.getElementById('dgCanvas');
     /* not _matchOn: that is turned off whenever ANY sized .d3chip exists
        anywhere in the document, which is a statement about the shop and the
@@ -30253,6 +30312,15 @@ var D3X={
 function _dieBeat(el,style,ink,opt){
   try{return (window.D3X&&D3X.beat)?D3X.beat(el,style,ink,opt):false;}
   catch(e){return false;}
+}
+
+/* P899: name the card that is re-throwing this die. Called BEFORE the value
+   changes, because the value change is what starts the flight and the row has
+   to be able to read its cause from the first frame. The tag is the condition
+   AND the ink; D3X clears it when the flight ends. */
+function _dieReroll(el,ink){
+  try{if(el)el._rrInk=ink||'#ffb428';}catch(e){}
+  return !!el;
 }
 
 function mkDie(val,mat,sizeClass,still,ench){
@@ -34015,9 +34083,8 @@ function _afterRollImpl(){
     /* P830: the re-tumble already happens (adopted dice re-throw through
        reDrawDieFace) - it now wears the reroll glow and the roll sound
        so it reads as THEIR act, not a glitch. */
-    _slFree.forEach(function(d,_i){d.val=_rollD(d);
-      if(d.el)_dieBeat(d.el,'rim',D3X.BEAT_INK.reroll,
-                       {delay:140+_i*70,env:D3X.BEAT_ENV.reroll});
+    _slFree.forEach(function(d){d.val=_rollD(d);
+      if(d.el)_dieReroll(d.el,D3X.BEAT_INK.reroll);/* before reDrawDieFace */
       try{reDrawDieFace(d);}catch(e){}});
     famLog('SLEIGHT — YOUR ROLL COMES BACK DIFFERENT');
     try{SFX.roll&&SFX.roll();}catch(e){}
@@ -37377,10 +37444,10 @@ function runOppTurn(){
       if(G._famSleightGo){
         G._famSleightGo=false;
         G.oppDice.filter(function(d){return !d.kept;})
-          .forEach(function(d,_i){d.val=rollFace(d.mat);
-            /* the rival's seat runs on its own clock, so the stagger does too */
-            if(d.el)_dieBeat(d.el,'rim',D3X.BEAT_INK.reroll,
-                             {delay:_oppDelay(140+_i*70),env:D3X.BEAT_ENV.reroll});
+          .forEach(function(d){d.val=rollFace(d.mat);
+            /* no _oppDelay: the mark lasts as long as the rival's throw does,
+               and their throw is already on their clock. */
+            if(d.el)_dieReroll(d.el,D3X.BEAT_INK.reroll);
             try{reDrawDieFace(d);}catch(e){}});
         setStatusMsg('SLEIGHT — THEIR ROLL COMES BACK DIFFERENT','gold');
         try{SFX.roll&&SFX.roll();}catch(e){}
@@ -40807,14 +40874,12 @@ function activateGrogsFlask(){
   free.forEach((d,i)=>{if(d.val!==1&&d.val!==5)nonScoring.push(d);});
   const toReroll=nonScoring.slice(0,2);
   if(!toReroll.length){setStatusMsg("NO NON-SCORING DICE TO REROLL",'red');refundActiveCardUse('grogs_flask');return;}
-  toReroll.forEach((d,_i)=>{
+  toReroll.forEach(d=>{
+    /* tag first - _setDieVal is what starts the flight. settleDie keeps its
+       own timer: it is the flat path's landing, not part of the mark. */
+    if(d.el)_dieReroll(d.el,D3X.BEAT_INK.reroll);
     _setDieVal(d,rollFaceExclude(d.mat,d.val,d));
-    /* §18's stagger: die 1 winds up at +140, die 2 at +210. The envelope's
-       own timing is under question - see BEAT_ENV.reroll. settleDie stays on
-       its timer: it is the flat path's landing, not part of the beat. */
-    if(d.el){_dieBeat(d.el,'rim',D3X.BEAT_INK.reroll,
-                      {delay:140+_i*70,env:D3X.BEAT_ENV.reroll});
-      setTimeout(()=>{settleDie(d.el);},400);}
+    if(d.el)setTimeout(()=>{settleDie(d.el);},400);
   });
   SFX.roll();
   setTimeout(()=>{
