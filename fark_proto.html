@@ -27555,23 +27555,23 @@ var D3X={
   /* paint every row on one layer, in roster order. ONE _paintHalo per ROW,
      not per die: a row's hulls are collected and painted together, so the
      cost is bounded by the roster rather than by the board. */
-  _drawMarks:function(layer,cv,x,sc,dpr,rolling){
-    var self=this,G=this.GLOW,M=this.MARKS||[],n=0;
-    /* P899: collect a set's hulls and paint them once. Pulled out because a
-       row can now resolve its ink PER DIE, and a parameterised row cannot
-       share the one-call-per-row bound - it is one call per distinct ink
-       present instead, which is the bound with beats and tagged states in the
-       same table. */
-    var paintSet=function(style,list,col,soft){
+  /* P902: THE PLAN, so a pass can ask "has anything changed?" before it
+     repaints. Exactly the grouping _drawMarks used to do inline - one entry per
+     distinct ink present, hulls collected - but returned instead of painted, so
+     the same object can be hashed and then drawn without doing the work twice.
+     _drawMarks below is now these two steps in a row, so every existing caller
+     behaves as before. */
+  _markPlan:function(layer,sc,rolling){
+    var self=this,G=this.GLOW,M=this.MARKS||[],groups=[];
+    var addSet=function(style,list,col,soft){
       var hulls=[],i,h;
       for(i=0;i<list.length;i++){
         h=self._hullOf(list[i],sc,G.grow);
         if(h)hulls.push(h);
       }
-      if(!hulls.length)return 0;
-      self._paintForm(style,cv,x,sc,dpr,hulls,col,soft,1,layer==='over');
-      return 1;
+      if(hulls.length)groups.push({style:style,col:col,soft:soft,hulls:hulls});
     };
+    var paintSet=addSet;
     for(var r=0;r<M.length;r++){
       var row=M[r];
       if(row.layer!==layer)continue;
@@ -27588,7 +27588,7 @@ var D3X={
           catch(e){kk=this._markInk(null,row.fallback);}
           (byInk[kk]||(byInk[kk]=[])).push(ds[q]);
         }
-        for(kk in byInk)n+=paintSet(row.style,byInk[kk],kk,kk);
+        for(kk in byInk)paintSet(row.style,byInk[kk],kk,kk);
         continue;
       }
       var col=this._markInk(row.ink,row.fallback);
@@ -27600,9 +27600,38 @@ var D3X={
         if(hit){col=this._markInk(over[o].ink,over[o].fallback);
                 if(over[o].both)soft=col;}
       }
-      n+=paintSet(row.style,ds,col,soft);
+      paintSet(row.style,ds,col,soft);
     }
-    return n;
+    return groups;
+  },
+  /* THE SIGNATURE OF A PAINT. Rounded to a tenth of a CSS pixel: below that no
+     difference is visible, and the raw floats out of the projection jitter
+     enough to invalidate every frame - a cache that never hits is only a
+     slower painter. Everything that can change the picture is in here: the
+     rows present, the dice each matched, every resolved ink, every hull. */
+  _planSig:function(groups){
+    var s='',i,j,k,g,h;
+    for(i=0;i<groups.length;i++){
+      g=groups[i];
+      s+=g.style+'|'+g.col+'|'+g.soft+'|';
+      for(j=0;j<g.hulls.length;j++){
+        h=g.hulls[j];
+        for(k=0;k<h.length;k++)s+=h[k][0].toFixed(1)+','+h[k][1].toFixed(1)+' ';
+        s+=';';
+      }
+      s+='#';
+    }
+    return s;
+  },
+  _paintPlan:function(groups,cv,x,sc,dpr,layer){
+    for(var i=0;i<groups.length;i++){
+      var g=groups[i];
+      this._paintForm(g.style,cv,x,sc,dpr,g.hulls,g.col,g.soft,1,layer==='over');
+    }
+    return groups.length;
+  },
+  _drawMarks:function(layer,cv,x,sc,dpr,rolling){
+    return this._paintPlan(this._markPlan(layer,sc,rolling),cv,x,sc,dpr,layer);
   },
   /* P883: TRANSIENT BEATS on the same surface. A state is a class that is
      either there or not; a beat has a clock. Both are painted by the pass
@@ -27728,6 +27757,7 @@ var D3X={
         var c0=cv.getContext('2d');
         c0.setTransform(1,0,0,1,0,0);c0.clearRect(0,0,cv.width,cv.height);
         this._stateInk=false;
+        this._stateSig='';/* same as the glow: an empty surface must repaint */
       }
       return;
     }
@@ -27742,12 +27772,25 @@ var D3X={
     if(cv.width!==Math.round(sc.width*dpr)||cv.height!==Math.round(sc.height*dpr)){
       cv.width=Math.round(sc.width*dpr);cv.height=Math.round(sc.height*dpr);
     }
+    /* P902: the same cache as the glow, with ONE exemption stated rather than
+       hidden - a beat rides an envelope, so its alpha moves every frame and no
+       signature that included it could ever match. Rather than pretend, the
+       cached path is taken only when no beat is live: the one thing that
+       animates is the one thing excluded, which cannot go subtly stale. */
+    var plan=this._markPlan('over',sc,rolling);
+    if(!beats.length){
+      var sig=cv.width+'x'+cv.height+'|'+this._planSig(plan);
+      if(this._stateInk&&sig===this._stateSig)return;
+      this._stateSig=sig;
+    }else{
+      this._stateSig='';/* a beat is animating; the next still frame repaints */
+    }
     var x=cv.getContext('2d');
     x.setTransform(dpr,0,0,dpr,0,0);
     x.clearRect(0,0,sc.width,sc.height);
     this._stateInk=true;
     var G=this.GLOW;
-    this._drawMarks('over',cv,x,sc,dpr,rolling);
+    this._paintPlan(plan,cv,x,sc,dpr,'over');
     /* P883: beats last, so a transient reads ON TOP of the state it belongs
        to rather than under it. */
     for(i=0;i<beats.length;i++){
@@ -28271,12 +28314,13 @@ var D3X={
         var c0=cv.getContext('2d');
         c0.setTransform(1,0,0,1,0,0);c0.clearRect(0,0,cv.width,cv.height);
         this._glowInk=false;
+        this._glowSig='';/* the surface is empty; the next wake must paint */
       }
       return;
     }
     cv=this._glowCv();if(!cv)return;
-    this._glowInk=true;
     var scEl=document.getElementById('screen-match');
+    if(!scEl)return;
     var sc=scEl.getBoundingClientRect();
     if(sc.width<10)return;
     /* P739: THE GLOW PAINTS AT THE DISPLAY'S RESOLUTION. Every canvas in
@@ -28292,10 +28336,21 @@ var D3X={
     if(cv.width!==Math.round(sc.width*dpr)||cv.height!==Math.round(sc.height*dpr)){
       cv.width=Math.round(sc.width*dpr);cv.height=Math.round(sc.height*dpr);
     }
+    /* P902: REPAINT ONLY WHAT CHANGED. Through:true is what a state needs and
+       what cost this pass its sleep - a dampened rival die kept the whole blur
+       chain running every frame for a mark that had not moved a pixel. The plan
+       is built first (hull projection, not a blur), hashed, and compared; an
+       identical frame returns without clearing and without painting, and the
+       canvas still holds the paint that signature describes. */
+    var plan=this._markPlan('under',sc,rolling);
+    var sig=cv.width+'x'+cv.height+'|'+this._planSig(plan);
+    if(this._glowInk&&sig===this._glowSig)return;
+    this._glowSig=sig;
+    this._glowInk=true;
     var x=cv.getContext('2d');
     x.setTransform(dpr,0,0,dpr,0,0);
     x.clearRect(0,0,sc.width,sc.height);
-    this._drawMarks('under',cv,x,sc,dpr,rolling);
+    this._paintPlan(plan,cv,x,sc,dpr,'under');
   },
   /* ONE GROUP PER ROW. This used to be a single shared group whose position
      and scale were written per die inside the frame loop, so with two rows
