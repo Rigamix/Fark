@@ -272,7 +272,14 @@ window.FDRV = (function () {
            ' easy and ' + h.length + ' hard. A win rate over fewer is not this ' +
            'check'};
     const ew = e.filter(r => r.win).length, hw = h.filter(r => r.win).length;
-    /* the two that fail on sight, whatever the other cell says */
+    /* THE FLOOR ON THE EASY TIER IS ONE, and one is the most it can honestly
+       be. One win proves the driver can win. Zero is indistinguishable from
+       broken - and at zero wins everywhere, "the driver does not play" and "the
+       game is several times harder than the design target" become the same
+       observation, which no gate can separate. A floor of two or three would
+       refuse exactly the finding the ladder exists to produce, which is the
+       trap the absolute band fell into one level up. So: easy 1 / hard 0
+       PASSES, deliberately. */
     if (ew === 0) return {ok: false, easyWins: ew, hardWins: hw,
       why: 'zero wins in ' + e.length + ' at the EASY tier. A driver that never ' +
            'wins where it should is not playing - the run this replaces went 0 ' +
