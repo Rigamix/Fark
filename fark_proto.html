@@ -27435,7 +27435,29 @@ var D3X={
        exists nowhere else. `inkOf` is read per die, and _drawMarks groups by
        resolved ink so the cost stays one call per ink present.
        UNDER, like every state - a state is part of the table and is occluded
-       by the dice. Only beats sit on top. */
+       by the dice. Only beats sit on top.
+
+       SEVEN CALL SITES, AND NO SEAM - which is the same shape as the defect
+       this row was built out of, so it is stated rather than left to be
+       rediscovered. §9's censuses count MARKERS, not mechanics: `card-reroll`
+       was added at four sites and missed Steady Hand, Powder Keg and
+       Quicksilver, under-reporting the reroll scope by 43%. A class census is
+       only safe where a canonical seam exists - _setDieVal for a value change,
+       _removeDieAt for a removal - because then every path goes through it.
+       Three candidates were checked for this tag and none works:
+         no card-resolving flag exists, and one would not help - the flight
+           starts ~60ms AFTER activation returns (P898 measured d.roll at 63ms),
+           so a flag true only during activation is false when there is
+           something to attribute, and one left set would claim the next roll;
+         D3.roll is the universal flight entry - the only caller of _physQueue
+           - but carries no cause and the deal uses it too;
+         _setDieVal covers five of the seven, but sleight (both seats) bypasses
+           it deliberately: it fires famTableChanged, whose _clearRollForces
+           would eat the roll-scoped buffers those two sites run inside.
+       SO: seven sites, and here is how to find an eighth. Every in-place value
+       change in this file is a `_setDieVal(` or a `reDrawDieFace(` call. Any
+       reroll outside that union does not exist; any inside it without a
+       _dieReroll beside it is an unmarked one. */
     {id:'reroll',layer:'under',through:true,style:'rim',fallback:'#ffb428',
      inkOf:function(d){return d.chip._rrInk;},
      on:function(d){return !!d.roll&&!!(d.chip&&d.chip._rrInk);}},
@@ -27601,7 +27623,13 @@ var D3X={
   },
   /* the beat's alpha at `now`, which is the only thing `delay` and `env`
      change. Returns 0 before the delay elapses, so an armed-but-not-yet-due
-     beat costs a hull and nothing else. */
+     beat costs a hull and nothing else.
+     `env` HAS NO CALLER as of P899, when BEAT_ENV.reroll went with the beats
+     it timed. Kept for §18's remaining sheeted shapes - moment 2's 120ms
+     brand-landing rim-in, the miss, and the lane mark's fade - each of which
+     specifies an in/hold/out. DELETE IT IF THOSE LAND WITHOUT IT. Written here
+     rather than at the tombstone because a comment documents only its own
+     site, and this is the site. */
   _beatAlpha:function(mk,now){
     var t=now-mk.t0-(mk.delay||0);
     if(t<=0)return 0;
@@ -27626,11 +27654,8 @@ var D3X={
      reroll 100/hold/200 from +140 against a measured 1017ms flight, so it was
      over about 440ms before the die landed - and re-timing it turned out to be
      the wrong fix, because the mark is a state whose end is the flight's end.
-     The `env` parameter on _fxMark stays and currently has NO CALLER. That is
-     said plainly rather than left to be found: §18 sheets three more shapes
-     that want an in/hold/out - moment 2's 120ms rim-in, moment 4's lane veil,
-     the miss - and deleting a tested evaluator to re-add it next patch is
-     churn. If none of them wants it, it should go. */
+     The `env` parameter it fed is still on _fxMark; its no-caller note lives
+     at _beatAlpha, which is where it is read. */
   /* arm a beat from a CHIP rather than a record, because every call site in
      the card code has an element and none of them has a D3X row. Returns
      false when the die is not in the 3D layer, so a caller can tell "no die"
