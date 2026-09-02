@@ -233,9 +233,15 @@ window.FDRV = (function () {
       ok: !stalled, stalled, policy: policy.key, target,
       pPts, oPts, win: pPts > oPts ? 1 : 0,
       busts, banks, rolls, keeps, bankAmounts,
-      turnsUsed: (function(){ try { return G ? G.turnNum : null; } catch(e){ return null; } })(),
+      /* pTurns, NOT turnNum. 36870: "a completed player turn (bank or bust)" -
+         which is exactly what TURN_CAP counts, per its own comment at 12715.
+         turnNum increments at the handover to the rival (36848) and came back
+         as 10 on patron matches whose cap is 8, which is what made the first
+         envelope run's per-turn arithmetic untrustworthy. */
+      pTurns: (function(){ try { return G ? (G.pTurns || 0) : null; } catch(e){ return null; } })(),
+      turnNum: (function(){ try { return G ? G.turnNum : null; } catch(e){ return null; } })(),
       turnCap: (function(){ try { return G ? G.turnCap : null; } catch(e){ return null; } })(),
-      hitTheCap: (function(){ try { return !!(G && G.turnCap && G.turnNum >= G.turnCap); }
+      hitTheCap: (function(){ try { return !!(G && G.turnCap && (G.pTurns||0) >= G.turnCap); }
                               catch(e){ return null; } })(),
       pOverTarget: target ? +(pPts / target).toFixed(3) : null,
       winnerOverTarget: target ? +(Math.max(pPts, oPts) / target).toFixed(3) : null,
@@ -268,7 +274,7 @@ window.FDRV = (function () {
       return {ok: false, why: 'the match ended without reaching the target (' +
         Math.max(res.pPts, res.oPts) + ' against ' + res.target +
         ') and without hitting the turn cap' +
-        (res.turnsUsed != null ? ' (turn ' + res.turnsUsed + ' of ' +
+        (res.pTurns != null ? ' (player turn ' + res.pTurns + ' of ' +
           res.turnCap + ')' : '') + ' - so it ended for neither legitimate reason'};
     return {ok: true, pOverTarget: res.pOverTarget};
   }
