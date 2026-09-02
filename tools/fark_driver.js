@@ -87,6 +87,14 @@ window.FDRV = (function () {
     if (!policy) return {err: 'no policy ' + opt.policy};
     const deadline = Date.now() + (opt.timeoutMs || 240000);
 
+    /* PLAY A MATCH SOMEBODY ELSE STARTED. The launch and the play are separate
+       jobs, and a caller measuring how the GAME gets from one match to the next
+       needs the second without the first. */
+    if (opt.alreadyStarted) {
+      const live = await until(() => { try { return typeof G !== 'undefined' && G &&
+        G.phase === 'idle' && !G._endMatchFired; } catch (e) { return false; } }, 15000);
+      if (live == null) return {err: 'alreadyStarted, but no live match'};
+    } else {
     /* start it. A FRESH RUN EVERY TIME, which is what the game does at 11273.
        Without it the third match never launched - bank300 won, bank500 lost,
        and losing a boss match ends the run, so `hot` had nothing to play. And
@@ -121,6 +129,7 @@ window.FDRV = (function () {
                                     catch(e){ return 'threw'; } })(),
               activeScreens: [].slice.call(document.querySelectorAll('.screen.active'))
                 .map(function(e){ return e.id; })};
+    }
     }
     await sleep(300);
     try { G.pF = []; } catch (e) {}   /* bare gear: no family cards, no enchants */
@@ -216,6 +225,14 @@ window.FDRV = (function () {
      against 12500. A floor on one match passes the first and would have to be
      set so high it refuses honest losses. Two targets a factor apart, and the
      totals have to move with them. */
+  /* WHAT THIS CATCHES AND WHAT IT DOES NOT, because a pass will be read as
+     more than it is. 2.5x targets against 1.5x totals catches NOT PLAYING THE
+     GAME - a score that is flat against the match it is in. It does not catch
+     playing it slightly wrong: a driver scaling at 1.6x passes here while being
+     meaningfully off. At n=2, where the variance is enormous, that is the right
+     trade - but a pass is a smoke test, NOT CALIBRATION, and nothing downstream
+     should treat it as evidence that the driver plays well. It is evidence that
+     the driver plays. */
   const TARGET_SPREAD = 2.5, TOTAL_SPREAD = 1.5;
   function sanityScale(lowRes, highRes) {
     const a = sanity(lowRes), b = sanity(highRes);
@@ -236,7 +253,41 @@ window.FDRV = (function () {
     return {ok: true, targetRatio: +tRatio.toFixed(2), totalRatio: +pRatio.toFixed(2)};
   }
 
+  /* THE OUTCOME CHECK, on the axis the pair test cannot see. Scoring that
+     scales correctly and winning 0% or 100% are both broken, and the score
+     gate would pass either. Ten matches at one tier before six hours are
+     committed; two to eight wins. That band is deliberately wide - this is a
+     smoke test for a broken driver, not a measurement of difficulty, and a
+     narrow one would refuse real results. The original run's 0 from 8 fails it
+     immediately, with no argument about luck required. */
+  const WIN_MIN = 2, WIN_MAX = 8, WIN_N = 10;
+  function sanityWinRate(results) {
+    const done = (results || []).filter(r => r && !r.err && !r.stalled);
+    if (done.length < WIN_N) return {ok: false,
+      why: 'only ' + done.length + ' of ' + WIN_N + ' matches completed; a win ' +
+           'rate over fewer is not the check this is'};
+    const wins = done.filter(r => r.win).length;
+    if (wins < WIN_MIN || wins > WIN_MAX) return {ok: false, wins, n: done.length,
+      why: wins + ' wins in ' + done.length + '. Anything outside ' + WIN_MIN +
+           '-' + WIN_MAX + ' at one tier is a driver that is not playing, not a ' +
+           'difficulty finding - the run this replaces went 0 from 8 while ' +
+           'scoring a quarter of the target. Fix the driver, not the band.'};
+    return {ok: true, wins, n: done.length};
+  }
+
+  /* ONE MATCH PER PAGE, and the runner enforces it rather than this file.
+     Independence is the property a ladder is made of, and a reloaded page gives
+     it by construction instead of by argument about what state was carried. The
+     cost is a boot per match - about ten seconds against a seventy-second match
+     - and one thing it hides: whether the GAME can run consecutive matches.
+     That is left open rather than closed. launchSeat(seatIdx) at 45740 is the
+     gauntlet's own entry and S.run.night.seatsPlayed says which remain; two
+     attempts to reach it by tapping DOM found no .seat-row at all, which is a
+     fact about my selector or my timing and not yet about the game. */
+  const RELOAD_PER_MATCH = true;
+
   return {POLICIES, bankRule, policyByKey, playMatch, sanity, sanityScale,
-          targetOf, extractWhy, until, sleep, tap,
-          TARGET_SPREAD, TOTAL_SPREAD};
+          sanityWinRate, targetOf, extractWhy, until, sleep, tap,
+          TARGET_SPREAD, TOTAL_SPREAD, WIN_MIN, WIN_MAX, WIN_N,
+          RELOAD_PER_MATCH};
 })();
