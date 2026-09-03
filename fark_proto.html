@@ -14404,7 +14404,11 @@ const DICE_TYPES=[
      advantage grows the deeper a player pushes) while putting a die with
      effect:null below the effect-carrying family dice rather than above
      obsidian. */
-  {id:'silver',name:'SILVER',icon:'🔘',cost:320,
+  /* P939 (brief 3.9): cost 320 -> 120, with the shop row. This is NOT
+     cosmetic - dieRank() is getDie(id).cost and Fair Trade ranks by it, so at
+     320 silver outranked lead, amber and flint. At 120 it ranks just above
+     iron, which is what the measurement says it is worth. */
+  {id:'silver',name:'SILVER',icon:'🔘',cost:120,
    faces:[1,2,3,4,5,6],
    rollTable:[1,5,1,5,2,3,4,6],
    effect:null,
@@ -47301,9 +47305,22 @@ document.addEventListener('DOMContentLoaded', function(){
 function _runEconomySim(cfg){
   cfg=cfg||{};
   var RUNS=cfg.runs||2000;
-  /* P892: silver 580 -> 320 here too. Three places hold this price - the
-     shop row, the die def and this table - and they have to move together. */
-  var FAM_PRICE={amber:180,obsidian:500,silver:320,starstone:700,vagabond:700,jade:750,jade2:1800};
+  /* P939: DERIVED FROM THE SHOP, not retyped from it. P892's note here said
+     "three places hold this price - the shop row, the die def and this table -
+     and they have to move together", and then P931 moved the shop row to 120
+     and left this at 320. A note asking future authors to keep three copies in
+     step is the thing that fails; this table was DICE_STORE's prices written
+     out a second time, every entry identical, so it reads them instead.
+     Two homes are left and they hold different things - a shop row is price,
+     stock and label, a die definition is faces, effect and cost - so
+     tools/zv_price_homes.js asserts the two agree rather than pretending one
+     can be deleted. */
+  var FAM_PRICE=(function(){
+    var o={};
+    try{(typeof DICE_STORE!=='undefined'?DICE_STORE:[]).forEach(function(d){
+      if(d&&d.mat)o[d.mat]=d.price;});}catch(e){}
+    return o;
+  })();
   var FAMS=['amber','jade','jade2','silver','obsidian','starstone','vagabond'];
   /* P892: BAND 0 IS GONE. `fam` is seeded with one family die by the starter
      draft and never shrinks, so gearLevel cannot return 0 and these rows were
