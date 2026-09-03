@@ -148,6 +148,36 @@ async function one(dice, policy, tier) {
   return {
     pPts: r.pPts, oPts: r.oPts, pTurns: r.pTurns, turnCap: cap,
     endReason: r.endReason, banks: r.banks, busts: r.busts, stalled: r.stalled,
+    /* EVERY TURN'S OUTCOME, which is the unit the cap actually counts. A match
+       total is a sum of eight or nine of these, so the reach question - "does
+       this cell ever make target T" - is answerable by resampling turns rather
+       than by fitting a normal to ten match totals and reading its tail. The
+       tail is where a normal fit is least trustworthy and these outcomes are
+       right-skewed (a bust is a hard zero, a hot streak has no ceiling), so the
+       fit understates reach, which for pruning is the direction that strikes
+       cells that were reachable.
+       A busted turn is a zero, not a missing entry - that is what makes the
+       lengths check below meaningful. */
+    /* P921: THE ORDERED RECORD. The first version appended busts as zeros at the
+       END, which loses position - and position is exactly what separates the two
+       exchangeability failures, since heterogeneity by turn makes a pooled
+       resample run hot while coupling makes the observed spread run hot, and a
+       single ratio cannot tell them apart. turnSeq comes from the driver, one
+       entry per completed turn, in order. */
+    turnSeq: r.turnSeq || [],
+    turnSeqComplete: r.turnSeqComplete === true,
+    turnSeqBusts: r.turnSeqBusts,
+    /* THE IDENTITY THAT VALIDATES THE PER-TURN RECORD, and it is a different
+       pair of sources from P920's: pPts is the game's running score, turnSeq is
+       a wrap reading turnPts once per endPTurn. A match total is the sum of its
+       turns, so a mismatch means the record is missing or inventing one - which
+       resampling would never reveal, it would just answer confidently about the
+       wrong distribution. */
+    turnSeqSum: (r.turnSeq || []).reduce(function (a, b) { return a + b; }, 0),
+    turnSeqSumsToTotal: (r.turnSeq || []).reduce(function (a, b) { return a + b; }, 0) === r.pPts,
+    turnOutcomes: (r.bankAmounts || []).concat(
+      new Array(Math.max(0, r.busts || 0)).fill(0)),
+    turnOutcomesComplete: ((r.bankAmounts || []).length + (r.busts || 0)) === r.pTurns,
     /* game-side, and the control that says whether to believe it.
        THIS PROBE'S WRAP IS DELIBERATELY LEFT IN PLACE NOW THAT THE DRIVER HAS
        ITS OWN (P920). The driver wraps on top of this one, so both count and
@@ -220,6 +250,13 @@ async function cell(dice, policy, tier, n) {
     bustsSeen: good.map(r => r.bustsSeen), bustsEaten: good.map(r => r.bustsEaten),
     driverBusts: good.map(r => r.busts),
     endPTurnsVsPTurns: good.map(r => r.endPTurnsSeen + '/' + r.pTurns),
+    /* the turn-level sample, pooled across the cell's matches */
+    turns: good.reduce((a, r) => a.concat(r.turnOutcomes || []), []),
+    turnsComplete: good.every(r => r.turnOutcomesComplete === true),
+    /* the ordered records, kept per match rather than flattened - flattening is
+       what threw the position away the first time */
+    turnSeqs: good.map(r => r.turnSeq),
+    turnSeqsComplete: good.every(r => r.turnSeqComplete === true),
     bustRate: (function () {
       const b = good.reduce((a, r) => a + (r.bustsSeen || 0), 0);
       const t = good.reduce((a, r) => a + (r.pTurns || 0), 0);
@@ -275,8 +312,19 @@ if (JOB === 'probe') {
     pctPerTurn: (b.meanPerTurn && a.meanPerTurn)
       ? Math.round((b.meanPerTurn / a.meanPerTurn - 1) * 100) : null,
     /* AND THE SPREAD, because a difference smaller than the run-to-run spread
-       is not a price, it is noise with a sign. */
+       is not a price, it is noise with a sign.
+       SIZING IS TWO-SAMPLE. Both arms are measured here, so n per arm is
+       2(z_a/2 + z_b)^2 * CV^2 / d^2 - the leading 2 and the power term z_b are
+       both required. Sizing this as one arm against a known mean halves every
+       figure, which is the error the first pass made: it read 13/36/80 per arm
+       for 25/15/10% effects when the answer is 26/72/163. This pair is sized
+       for a 50% effect (~7 per arm), which is the resolution the decision
+       actually needs - silver at 580g has to earn ~5.8x iron to be priced
+       right and is measuring about 1x, so the live question is "about iron"
+       versus "about 1.5x iron", not a 10% distinction no player can feel. */
     ironSpread: a.perTurn, silverSpread: b.perTurn,
+    ironTotals: a.totals, silverTotals: b.totals,
+    ironMeanTotal: a.meanTotal, silverMeanTotal: b.meanTotal,
   };
 } else {
   out.err = 'unknown job ' + JOB;
@@ -300,6 +348,13 @@ out.VERDICT = {
   /* P920's identity: a player turn ends in exactly one of a bank or a bust */
   theTurnsAddUp: keys.every(k =>
     (out.cells[k].rows || []).filter(r => r && !r.err).every(r => r.driverTurnsAddUp === true)),
+  /* every turn is accounted for as a bank or a zero, or the resample is drawing
+     from a sample with holes in it */
+  everyTurnIsRecorded: keys.every(k => out.cells[k].turnsComplete === true),
+  /* and recorded IN ORDER, or the stratified baseline cannot be built */
+  everyTurnHasAPosition: keys.every(k => out.cells[k].turnSeqsComplete === true),
+  theTurnRecordSumsToTheTotal: keys.every(k =>
+    (out.cells[k].rows || []).filter(r => r && !r.err).every(r => r.turnSeqSumsToTotal === true)),
   /* and the two independent wraps see the same events */
   theTwoWrapsAgree: keys.every(k =>
     (out.cells[k].rows || []).filter(r => r && !r.err).every(r => r.probeAndDriverAgree === true)),

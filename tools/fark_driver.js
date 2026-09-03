@@ -147,6 +147,21 @@ window.FDRV = (function () {
        path the game calls, which is exactly how the first zero survived three
        matches. A bust count is only readable when bustHookOnPath is true. */
     let bustsInferred = 0, endPTurnsSeen = 0, bustJustFired = false;
+    /* P921: ONE ENTRY PER COMPLETED TURN, IN ORDER - points banked, or 0 for a
+       bust. bankAmounts holds the banked turns in order and the busts used to be
+       appended as zeros at the END, so a busted turn 2 and a busted turn 9 were
+       indistinguishable and "resample turn i from turn i's own bag" was not
+       computable. That matters because the exchangeability check on a reach
+       resample has to separate two failure modes with OPPOSITE signs -
+       heterogeneity by position makes the resample run hot, coupling across
+       positions makes the observed run hot - and a single ratio cannot, because
+       both can be present and cancel.
+       RECORDED AT endPTurn, NOT AT doBust: amber eats a bust and the turn
+       CONTINUES, so a zero pushed at every doBust would invent a turn that never
+       ended. doBust spends _bustImmuneTurn on entry, so the wrap has to read the
+       flag BEFORE delegating - that is the only moment at which "will this bust
+       actually end the turn" can be answered. */
+    const turnSeq = [];
     const _origBust = window.doBust, _origEndPT = window.endPTurn;
     const bustHooked = typeof _origBust === 'function' && typeof _origEndPT === 'function';
     if (bustHooked) {
@@ -156,6 +171,19 @@ window.FDRV = (function () {
       };
       window.endPTurn = function () {
         endPTurnsSeen++;
+        /* P921b: THE GAME'S OWN NUMBER, read at the game's own moment. endPTurn's
+           first statement is `var _pTurnPts=(G.turnPts||0)` under a comment that
+           says "A bust is a turn worth ZERO, not no turn - it happened and it
+           produced a value", and that records the measurement: of TEN endPTurn
+           call sites, seven clear turnPts first - the five bust paths plus
+           steal_low_bank and block_low_bank - and the normal bank routes via
+           handleYield, which never touches turnPts.
+           The harness modelled two of those ten. Reconstructing the value from
+           bank taps and bust events would have recorded 0 for amber's `!_amOK`
+           bank-out, where the bust is eaten and the player banks anyway without
+           the driver ever tapping bank. Reading the field covers every path by
+           construction instead of by enumeration. */
+        try { turnSeq.push(G ? (G.turnPts || 0) : 0); } catch (e) { turnSeq.push(0); }
         return _origEndPT.apply(this, arguments);
       };
     }
@@ -290,6 +318,11 @@ window.FDRV = (function () {
          own event. They share nothing but the game, so their agreement is
          evidence rather than an echo. */
       bustsInferred, endPTurnsSeen, bustHooked,
+      /* P921: the ordered per-turn record. Its length must equal pTurns - the
+         same identity P920 asserts from the other side - or a resample built on
+         it is drawing from a sample with holes. */
+      turnSeq, turnSeqComplete: (_pT != null) && turnSeq.length === _pT,
+      turnSeqBusts: turnSeq.filter(function (x) { return x === 0; }).length,
       bustHookOnPath: bustHooked && _pT != null && endPTurnsSeen === _pT,
       bustsDerived: (_pT != null) ? _pT - banks : null,
       bustCountsAgree: (_pT != null) ? (_pT - banks) === busts : null,
