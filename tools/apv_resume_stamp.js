@@ -1,19 +1,18 @@
-/* P933 - does a turn survive a turnNum restore with its banked amount intact?
+/* P934 - the invariant, tested in the order the game actually runs.
  *
- * THE SCENARIO. The resume path writes G.turnNum=rd.turnNum. P932 stamped
- * _pTurnBankedTurn only in startPTurn, which does NOT write turnNum - so after a
- * resume the stamp was stale against a restored turn number, the guard failed,
- * and endPTurn fell back to (G.turnPts||0)||0. On a banking turn that is 0,
- * which is P929's Ill Omen defect coming back through the resume path.
+ * THE PREVIOUS VERSION OF THIS FILE TESTED A SCENARIO THAT CANNOT HAPPEN. It ran
+ * startPTurn's reset FIRST and the turnNum restore SECOND, then asserted the
+ * bank was lost - but the real sequence is restore -> startPTurn -> bank ->
+ * endPTurn, because initMatchScreen's tail reaches
+ * `setTimeout(startPTurn,_matchStartDelay)` unconditionally and the early
+ * returns above it are all inside `if(!params._resumeData)`. Its control arm
+ * reproduced a state the shipping code never reaches, so the clean separation
+ * between its two arms was an artefact of the inversion, not a finding.
  *
- * THE CONTROL IS THE SAME RESTORE WITHOUT THE RESET, which is exactly what the
- * code did before this patch. Both arms restore turnNum to a different value;
- * only one calls the helper the patched resume path now calls. If both arms
- * agree, the probe is not testing the fix.
- *
- * AND THE STATE IS THE ONE handleBank LEAVES: turnPts cleared, the credited
- * total in _pTurnBanked. Setting turnPts instead would pass on the broken build,
- * because turnPts is the field that was never the problem.
+ * WHAT IS ACTUALLY WORTH ASSERTING: after startPTurn, the stamp matches turnNum,
+ * whatever turnNum was set to beforehand - so a banked turn reports its bank.
+ * The negative arm is the one state that would break it: a turn ENTERED WITHOUT
+ * startPTurn, which is the only thing the guard now claims to catch.
  */
 eval(await (await fetch('/tools/_fxh.js')).text());
 const out = {};
@@ -21,62 +20,57 @@ const out = {};
 const m = await FXH.match(1);
 if (!m.ok) return {err: m.why, detail: m};
 
-out.seam = {
-  helper: typeof _pTurnBankReset === 'function',
-  guardReadable: true,
-};
-if (typeof _pTurnBankReset !== 'function')
-  return Object.assign(out, {err: '_pTurnBankReset is not defined'});
+out.seam = {helper: typeof _pTurnBankReset === 'function',
+            startPTurn: typeof startPTurn === 'function'};
+if (!out.seam.helper || !out.seam.startPTurn)
+  return Object.assign(out, {err: 'seam missing'});
 
-/* one turn, played through endPTurn, after a turnNum restore */
-function turnAfterRestore(callTheReset) {
+function bankedTurn(goThroughStartPTurn, restoreTurnNumTo) {
   try {
     G.phase = 'idle'; G._oppTurnActive = false; G._endMatchFired = false;
     G.oF = []; G._oIllOmen = null; G._famIllOmen = null;
+    G._pTurnBankedStale = 0;
   } catch (e) { return {err: 'cannot reset phase'}; }
 
-  /* the turn begins normally: startPTurn's pair for the current turn */
-  _pTurnBankReset();
-  const stampAtStart = G._pTurnBankedTurn, turnAtStart = G.turnNum;
+  /* THE RESTORE FIRST, as initMatchScreen does it */
+  if (restoreTurnNumTo != null) G.turnNum = restoreTurnNumTo;
+  const turnAfterRestore = G.turnNum;
 
-  /* THE RESUME: turnNum is restored to a different value. Pre-P933 nothing
-     re-stamped here; post-P933 the resume path calls the helper. */
-  G.turnNum = turnAtStart + 7;
-  if (callTheReset) _pTurnBankReset();
+  /* THEN the turn begins - or, in the negative arm, does not */
+  if (goThroughStartPTurn) { try { startPTurn(); } catch (e) { return {err: 'startPTurn: ' + e.message}; } }
 
-  /* then the player banks, exactly as handleBank leaves it */
+  /* then the player banks, in the state handleBank leaves */
   G.turnPts = 0; G.kept = [];
   G._pTurnBanked = 1000;
+  if (!goThroughStartPTurn) G._pTurnBankedTurn = turnAfterRestore - 3;/* a turn that never started */
 
-  const before = G.pPts;
   try { endPTurn(); } catch (e) { return {err: 'endPTurn: ' + e.message}; }
   return {
-    calledTheReset: callTheReset,
-    turnAtStart, stampAtStart,
-    turnAfterRestore: turnAtStart + 7,
-    stampAtEnd: G._pTurnBankedTurn,
-    pTurnPts: G._pTurnPts,
+    wentThroughStartPTurn: goThroughStartPTurn,
+    turnAfterRestore, pTurnPts: G._pTurnPts,
     staleCount: G._pTurnBankedStale || 0,
   };
 }
 
-/* ── the patched resume path: reset called ────────────────────────── */
-out.withReset = turnAfterRestore(true);
-/* ── the pre-P933 behaviour: turnNum restored, nothing re-stamped ─── */
-out.withoutReset = turnAfterRestore(false);
+/* ── the real sequence: restore, then startPTurn, then bank ───────── */
+out.restoredThenStarted = bankedTurn(true, (G.turnNum || 1) + 7);
+/* ── a plain turn with no restore at all ──────────────────────────── */
+out.plainTurn = bankedTurn(true, null);
+/* ── the negative arm: a turn that never went through startPTurn ──── */
+out.neverStarted = bankedTurn(false, null);
 
-const a = out.withReset, b = out.withoutReset;
+const a = out.restoredThenStarted, b = out.plainTurn, c = out.neverStarted;
 out.VERDICT = {
-  theHelperExists: out.seam.helper === true,
-  bothArmsRan: !a.err && !b.err,
-  /* THE FIX: a banked turn after a restore still reports its bank */
-  theBankSurvivedTheRestore: a.pTurnPts === 1000,
-  /* THE CONTROL: without the reset it does not - so the arms must differ, or
-     this probe is measuring something the patch does not touch */
-  theUnresetArmLostTheBank: b.pTurnPts === 0,
-  theTwoArmsDiffer: a.pTurnPts !== b.pTurnPts,
-  /* and the guard noticed, rather than silently returning 0 */
-  theGuardFlaggedTheUnresetArm: b.staleCount > a.staleCount,
+  allArmsRan: !a.err && !b.err && !c.err,
+  /* A RESTORE DOES NOT BREAK THE BANK, because startPTurn follows it */
+  theBankSurvivesARestore: a.pTurnPts === 1000,
+  aPlainTurnAlsoCarriesItsBank: b.pTurnPts === 1000,
+  /* and the restore arm is not special - which is the point of the retraction */
+  theRestoreArmMatchesThePlainTurn: a.pTurnPts === b.pTurnPts,
+  /* THE GUARD STILL CATCHES ITS ONE REAL CASE: a turn that never started */
+  theGuardCatchesAnUnstartedTurn: c.staleCount > 0 && c.pTurnPts === 0,
+  /* the arms must differ, or the negative arm is testing nothing */
+  theNegativeArmDiffers: c.pTurnPts !== b.pTurnPts,
 };
 out.PASS = Object.keys(out.VERDICT).every(k => out.VERDICT[k] === true);
 out.FAILED = Object.keys(out.VERDICT).filter(k => out.VERDICT[k] !== true);

@@ -12893,12 +12893,7 @@ var BOSS_ACCENT={grog:'#ffc070',mabel:'#90b8ff',finnick:'#b0d070',corvus:'#c090e
 /* Sorted ascending by price so the shop reads left-to-right cheap→expensive */
 var DICE_STORE=[
   {mat:'bone',     price:0,   stock:99,label:'Bone'},
-  {mat:'flint',    price:150, stock:3, label:'Flint'},
   {mat:'iron',     price:100, stock:4, label:'Iron'},
-  {mat:'lead',     price:200, stock:3, label:'Lead'},
-  /* Amber 120→180 to match DICE_TYPES.cost (and the +200 triple buff).
-     Re-sorted after Lead so the store stays cheap→expensive. */
-  {mat:'amber',    price:180, stock:2, label:'Amber'},
   /* P931 (brief 3.9, ruled by Denis 2026-09-03): 320 -> 120, stock 1 -> 3.
      P892 had already cut 580 -> 320; the brief's "from 580" is a patch stale.
      THIS NUMBER IS A PLACEHOLDER AND THE INSTRUMENT THAT PRODUCED IT IS BLIND
@@ -12918,6 +12913,15 @@ var DICE_STORE=[
      "premium" is written down, and repricing alone would ship a cheap die
      carrying jade's scarcity. 3 puts it beside lead and amber. */
   {mat:'silver',   price:120, stock:3, label:'Silver'},
+  {mat:'flint',    price:150, stock:3, label:'Flint'},
+  /* Amber 120→180 to match DICE_TYPES.cost (and the +200 triple buff).
+     P935 (brief 3.11): the store is now genuinely sorted by price. This note
+     used to say Amber had been "re-sorted after Lead so the store stays
+     cheap→expensive", which put 180 after 200 and was self-contradicting -
+     flint 150 also sat before iron 100. The order is generated from the prices
+     now rather than maintained by hand. */
+  {mat:'amber',    price:180, stock:2, label:'Amber'},
+  {mat:'lead',     price:200, stock:3, label:'Lead'},
   {mat:'obsidian', price:500, stock:2, label:'Obsidian'},
   /* Ruby removed from the store — faces 1/1/5/5/6/6 removed the gamble
      entirely (stack a few and you literally can't bust). The red-gem
@@ -31570,18 +31574,24 @@ function newG(rung,pCards,oCards,pStake,oStake){
    turn state belongs after this call, and can now be documented against it
    rather than against a comment. */
 function _turnScoreClear(){if(!G)return;G.turnPts=0;G.kept=[];}
-/* P933: THE BANKED AMOUNT IS MEANINGLESS WITHOUT ITS TURN, so the pair is
-   re-established wherever that turn number changes. G.turnNum has three
-   writers - endPTurn's increment, the resume restore, and nothing else - and
-   P932 stamped in startPTurn, which is not one of them. The resume path
-   therefore restored turnNum without stamping, and the first player turn after
-   a resume read a stale stamp: the guard failed, dev threw, and production fell
-   back to 0 on a banking turn, which is P929's Ill Omen defect returning
-   through the resume path.
-   CALL THIS AT EVERY WRITE OF G.turnNum. A post-assert enforces it, so a fourth
-   writer added later fails the patch rather than the player - the invariant
-   lives in the check instead of in someone's memory, which is the shape four
-   lane-record bugs and one peek-snapshot bug have all had. */
+/* THE PAIR IS RESET WHERE A PLAYER TURN BEGINS - startPTurn, its only caller.
+   P933 tried to reset it at every writer of G.turnNum instead and was RETRACTED
+   (P934) on three counts, all worth keeping because the reasoning is the useful
+   part:
+     THE PREMISE WAS FALSE. It claimed the resume path restores turnNum without
+     passing through startPTurn. initMatchScreen's tail is unconditional -
+     `setTimeout(startPTurn,_matchStartDelay)` - and the three early returns
+     above it are all inside `if(!params._resumeData)`, so a resume reaches it
+     and startPTurn stamps against the restored value before anything reads it.
+     THE COUNT WAS WRONG. turnNum has FOUR writers, not two: newG's returned
+     literal (`turnNum:1`) and dbgWin's whole-object replacement (`turnNum:3`)
+     are writes that a `G.turnNum` search cannot see. Neither stamps, and
+     neither needs to - for the same reason.
+     AND THE RULE WAS THE WRONG SHAPE. turnNum changes at the END of a turn and
+     at match construction; the pair belongs to the turn that is STARTING. "Where
+     a player turn begins" is one place, and every path into a match reaches it.
+   So the invariant is: after startPTurn, _pTurnBankedTurn === turnNum, and
+   endPTurn's guard reads it. Nothing else may write the stamp. */
 function _pTurnBankReset(){
   if(typeof G==='undefined'||!G)return;
   G._pTurnBanked=0;G._pTurnBankedTurn=G.turnNum;
@@ -37123,7 +37133,7 @@ function endPTurn(){
     throw new Error('[fark P930] _pTurnBanked was stale (stamped turn '+
       G._pTurnBankedTurn+', current '+G.turnNum+'). A player turn was entered '+
       'without startPTurn and the reset was skipped.');
-  G.phase='opp';G.turnPts=0;G.kept=[];G.numDice=6;G.turnNum++;_pTurnBankReset();/* P933 */
+  G.phase='opp';G.turnPts=0;G.kept=[];G.numDice=6;G.turnNum++;
   /* P692: THE POST-BANK BOUNDARY. The only snapshot used to be the next
      startPTurn - a full round away - so a banked turn evaporated on any
      exit during the rival's animation. The four turn-start anchors are
@@ -42170,11 +42180,12 @@ function initMatchScreen(data){
       save();
     }}catch(e){}
     G.pPts=rd.pPts;G.oPts=rd.oPts;G.turnNum=rd.turnNum;G.numDice=rd.numDice;
-    /* P933: THE WRITER THAT WAS MISSED. A resumed match has no in-flight banked
-       amount - the snapshot is taken at a turn boundary - so 0 against the
-       restored turnNum is the correct pair. Without this the first player turn
-       after a resume read a stamp from before the restore. */
-    _pTurnBankReset();
+    /* P934: NO STAMP NEEDED HERE, and P933 was wrong to add one. This restores
+       turnNum, and initMatchScreen's tail then reaches
+       `setTimeout(startPTurn,_matchStartDelay)` unconditionally - the three
+       early returns between here and there all sit inside
+       `if(!params._resumeData)`, so a resume passes them. startPTurn stamps
+       against the restored value 200ms later, before anything can read it. */
     G.pTurns=(typeof rd.pTurns==='number')?rd.pTurns:Math.max(0,(rd.turnNum||1)-1);
     G.oTurns=(typeof rd.oTurns==='number')?rd.oTurns:Math.max(0,(rd.turnNum||1)-1);
     /* Target was saved but never restored — for generated patrons (and
@@ -47620,9 +47631,19 @@ function _runBalanceSim(cfg){
       if(cs.ids.slow_cook&&rolls>2)turn+=cardP(cs,'slow_cook');
       if(cs.ids.bloom&&bloomHit(vals,mats,_usedMask))turn+=cardP(cs,'bloom');
       var left=[];for(var i=0;i<mats.length;i++)if(!_usedMask[i])left.push(mats[i]);
+      /* P935 (brief 3.10): THE TARGET CHECK COMES FIRST. It used to sit BELOW
+         the hot-dice reset, and that reset `continue`s - so a pushHot policy
+         that cleared the table rolled straight past a winning total.
+         _handBackOrCap ends the match the moment pPts>=target, so those extra
+         rolls could only lose a match already won. No player does that, and
+         `hot` and `push750` are PLAYER policies, so the sim was modelling a
+         mistake rather than a persona. The browser driver has always had the
+         two in this order, which means the two engines were not running the
+         same policy - every stored sim finding involving those two policies
+         needs re-deriving. */
+      if((myTotal+turn+bankAdd)>=target)return bank();
       if(!left.length){mats=dice6.slice();if(pushHot&&turn<3000)continue;}
       else mats=left;
-      if((myTotal+turn+bankAdd)>=target)return bank();
       if(oppDone){
         if(myTotal+turn+bankAdd>oppTotal)return bank();
         continue;/* last licks */
