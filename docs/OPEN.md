@@ -5,6 +5,60 @@ is a valid answer.** Answered items are deleted, not marked — this stays short
 
 ---
 
+## THE LADDER IS RUNNING - AND 0.443 IS NOT ITS COMPARATOR (2026-09-03)
+
+480 matches, band 2 first (120 per seat), two concurrent, batches of 15. First
+boss batch died - three browsers were live because I left turn-level
+re-collection running when I launched. My scheduling error, not a harness fault;
+it announced itself with P894's message rather than exiting silently, and the
+runner banks completed batches and abandons a cell only after three consecutive
+failures.
+
+### Do not compare the result to 0.443. There are FOUR mismatches, not one.
+
+1. **PWIN[2]=0.62 is a hardcoded model constant** (47319), not a measurement of
+   anything. A ladder result near 0.62 would mean the SIM is wrong and PWIN was
+   right - a larger and different finding than "the projection stands".
+2. **0.443 measures the SIM**, the ladder measures the real engine.
+3. **0.443 IS ON THE RE-DERIVE LIST.** `_runBalanceSim`'s default policies are
+   bank300, bank500 and **hot - and hot carries `pushHot:true`**, which is
+   exactly what 3.10 fixed. The bug made a hot hand roll past a winning total
+   and risk busting it away, so it DEPRESSED that arm's win rate. **0.443 is a
+   lower bound on the corrected sim's number**, and the true sim-vs-PWIN gap is
+   smaller than 18pp by an unknown amount.
+4. **The weightings differ.** 0.443 was occupancy-weighted; the ladder draws
+   tiers uniformly, and `ladder_band.js`'s own header says comparing the two
+   "compares two different quantities". The per-tier breakdown is reported so a
+   weighted figure can be formed afterwards.
+
+And the policies differ: the ladder runs **carl** (a persona, thresh 300),
+while 0.443 averaged three threshold policies. Ruling #24 already established
+these ratios are explicitly NOT policy-invariant.
+
+### What the ladder can say on its own
+
+At n=120 the SE on a proportion near 0.5 is 0.046, so **+/-9pp at 95%**. 0.44
+and 0.62 are 3.9 SE apart, so it separates them cleanly *if* the comparison were
+valid. **A result near 0.52 sits ~1.7 SE from both and says neither stored value
+is right** - that is a real outcome, not a failure to land on one of the two.
+
+**The honest statement the ladder supports is absolute, not comparative:** band
+2's real-engine win rate under carl, with an interval, per seat and per tier.
+Everything comparative needs the sim re-run first.
+
+### Blocked on you, and only this
+
+**Which quantity should the reach resample model?** sum(turnSeq) is what the
+player BANKED; pPts is the NET score. Three sites move pPts after the credit
+inside handleBank - the challenge penalty, SCORE_DRAIN.periodic_drain, and a
+-200 - so they are different quantities and 3 of 12 matches diverged, in both
+directions. A resample reproducing MATCH TOTALS (what determines reaching a
+target) must carry that term; one modelling the player's dice-and-policy output
+should use turnSeq and say so. Choosing silently is how a proxy gets measured
+instead of the property.
+
+---
+
 ## 4b IS UNBLOCKED, AND A REGRESSION I SHIPPED IS FIXED (2026-09-03)
 
 **Two of your calls I have read as decided.** You marked them "NEEDS YOUR EYES"
