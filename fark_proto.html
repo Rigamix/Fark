@@ -17492,6 +17492,37 @@ function _famLaneGhosts(){
   return [].concat(window._pkGhosts||[],window._htMarks||[])
     .filter(function(g){return g&&g.dataset;});
 }
+/* P922: AND THE LANE-STAMPED STATE RECORDS, which is the half P919 missed.
+   _famLaneGhosts names the DOM elements; these are the objects those elements
+   are drawn FROM, and they are the half that decides what actually happens.
+   G._famPeekVals[i] is {lane,val} and the peek float's dataset.lane is copied
+   straight off it (17946), so teaching the float to follow its die while the
+   record stayed behind put a float promising 5 over a die that rolls 6.
+   EVERY LANE-STAMPED RECORD GOES IN THIS LIST, and _commitVagabondDrag's carry
+   loop iterates it - so a new one is a line here rather than a branch someone
+   has to remember to add to the reorder. That is the difference between the
+   rule being enforced and the rule being asserted in a comment, which is what
+   P919 did while two records sat outside it.
+   `lane` ONLY, NEVER `oLane` (P531): lane indexes the player's board, oLane the
+   rival's, and a player reorder renumbers only the player's seats.
+   A non-numeric lane is excluded rather than sentinelled - the _slots gate in
+   the carry rejects any pool with a non-numeric or negative lane, so a real
+   die's lane can never match a sentinel anyway. That also correctly excludes
+   the legacy bare-number _famPeekVals save shape (17542), which is index-keyed
+   rather than lane-keyed. */
+function _famLaneRecords(){
+  var out=[];
+  if(typeof G==='undefined'||!G)return out;
+  try{
+    if(G._fairTrade&&typeof G._fairTrade.lane==='number')out.push(G._fairTrade);/* P530 */
+    (G._tradeSwaps||[]).forEach(function(t){
+      if(t&&typeof t.lane==='number')out.push(t);});                            /* P531 */
+    (G._famPeekVals||[]).forEach(function(p){
+      if(p&&typeof p.lane==='number')out.push(p);});                            /* P922 */
+    if(G._famPreserve&&typeof G._famPreserve.lane==='number')out.push(G._famPreserve);
+  }catch(e){}
+  return out;
+}
 function _famRefloatGhosts(){
   try{
     var byLane={};(G&&G.pool||[]).forEach(function(d){if(d.el&&!d.committed)byLane[d.lane]=d;});
@@ -46842,53 +46873,42 @@ function _commitVagabondDrag(){
                   :((G.matchDice&&q.lane<G.matchDice.length)?G.matchDice[q.lane]:undefined),
               ench:(G._enchArr&&q.lane<G._enchArr.length)?(G._enchArr[q.lane]||null):null};
           });
-          /* P530: THE LOAN'S SEAT MOVES TOO. P520 permuted matchDice, _enchArr
-             and d.lane and left G._fairTrade.lane behind, so after a reorder the
-             loan protected whichever die had moved INTO the seat it used to
-             hold - which is S7(b)'s real mechanism, the lane gate having already
-             ruled out the material test on its own. */
-          var _ftBefore=(G._fairTrade&&typeof G._fairTrade.lane==='number')?G._fairTrade.lane:-1;
-          /* P531: AND THE TRADE LEDGER'S PLAYER-SIDE SEAT. P530 taught this loop to
-             carry the loan and left its sibling behind - measured, the die moved
-             from seat 0 to seat 3, the loan followed and the ledger stayed at 0.
-             ONLY `lane` MOVES, NEVER `oLane`: lane indexes the player's board,
-             oLane the rival's, and a player reorder renumbers only the player's
-             seats. Carrying both would repair the wrong die on the rival's board,
-             which is the error P527 caught in its own first draft.
-             Snapshotted before the loop writes anything, like the pairs beside it,
-             or an entry that has already moved gets matched a second time. */
-          var _tsBefore=(G._tradeSwaps||[]).map(function(t){
-            return (t&&typeof t.lane==='number')?t.lane:-1;});
-          /* P919 (brief 3.8): AND THE LANE-STAMPED GHOSTS - the pickpocket
-             floats and the honeytrap marks. P844 already stated the behaviour,
-             "the floats just follow their dice", and this loop is why they did
-             not: the reorder renumbers d.lane while a ghost's dataset.lane
-             keeps the stamp from mint, and _famRefloatGhosts runs AFTER the
-             renumbering, so it reads a fresh lane against a stale stamp and
-             floats the ghost onto whichever die moved into that seat. Nothing
-             in _famRefloatGhosts changes; the lane is just correct when it runs.
-             EVERY LANE-STAMPED THING ENROLS HERE. That is the rule, written
-             once instead of the history: P530 carried the loan, P531 carried
-             the ledger and recorded that P530 "left its sibling behind", and
-             these were the next straggler for as long as P844 has existed. A
-             fourth one goes in this loop on the day it is created, not on the
-             day somebody notices the float landed on the wrong die.
-             Snapshot before the loop writes, like the pairs above, or an entry
-             that has already moved is matched a second time. `lane` only: a
-             ghost has no oLane, and a player reorder renumbers only the
-             player's seats. */
+          /* P922: EVERY LANE-STAMPED THING FOLLOWS ITS DIE, and this loop no
+             longer holds a hand-written branch per kind. Two rosters -
+             _famLaneRecords() for the state objects, _famLaneGhosts() for the
+             DOM elements they are drawn from - and the loop repairs whatever is
+             in them.
+             THE HISTORY IS WHY THE SHAPE CHANGED. P520 permuted matchDice,
+             _enchArr and d.lane and left G._fairTrade.lane behind, so a reorder
+             left the loan protecting whichever die had moved INTO its seat.
+             P530 carried the loan and left G._tradeSwaps[].lane behind -
+             measured: the die moved seat 0 to seat 3, the loan followed, the
+             ledger stayed at 0. P531 carried the ledger. P919 carried the DOM
+             floats and left G._famPeekVals[].lane behind, which was worse than
+             all of them, because the float and the record disagreed ON SCREEN:
+             a float promising 5 sitting over a die that rolls 6. Four patches,
+             each finding the previous one's leftover.
+             A branch per kind is what made that possible, so there is no longer
+             a branch per kind. Add a record to _famLaneRecords and it is
+             carried; nothing here needs editing.
+             SNAPSHOT BEFORE THE LOOP WRITES, or an entry that has already moved
+             is matched a second time. `lane` only, never `oLane` - P531's rule,
+             now enforced in the roster rather than repeated here. */
+          var _recs=(typeof _famLaneRecords==='function')?_famLaneRecords():[];
+          var _recBefore=_recs.map(function(r){return r.lane;});
+          /* P919 + P922: the DOM half. _famRefloatGhosts is unchanged - it
+             reads a fresh lane against a stamp that is now correct. */
           var _ghosts=(typeof _famLaneGhosts==='function')?_famLaneGhosts():[];
           var _ghBefore=_ghosts.map(function(g){
             var L=parseInt(g.dataset.lane,10);
             return isFinite(L)?L:-1;});
           _carry.forEach(function(c,i){
-            if(_ftBefore>=0&&c.die&&c.die.lane===_ftBefore)G._fairTrade.lane=_slots[i];
-            if(c.die&&typeof c.die.lane==='number')(G._tradeSwaps||[]).forEach(function(t,ti){
-              if(t&&_tsBefore[ti]===c.die.lane)t.lane=_slots[i];
-            });
-            if(c.die&&typeof c.die.lane==='number')_ghosts.forEach(function(g,gi){
-              if(_ghBefore[gi]===c.die.lane)g.dataset.lane=String(_slots[i]);
-            });
+            if(c.die&&typeof c.die.lane==='number'){
+              _recs.forEach(function(r,ri){
+                if(_recBefore[ri]===c.die.lane)r.lane=_slots[i];});
+              _ghosts.forEach(function(g,gi){
+                if(_ghBefore[gi]===c.die.lane)g.dataset.lane=String(_slots[i]);});
+            }
             var L=_slots[i];
             if(G.matchDice&&L<G.matchDice.length&&c.mat!==undefined)G.matchDice[L]=c.mat;
             if(G._enchArr&&L<G._enchArr.length)G._enchArr[L]=c.ench;
