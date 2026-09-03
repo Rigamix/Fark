@@ -136,6 +136,33 @@ window.FDRV = (function () {
 
     const target = targetOf();
     let busts = 0, banks = 0, rolls = 0, keeps = 0, stalled = null;
+    /* P920: THE BUST IS COUNTED WHERE IT HAPPENS, and endPTurn is the control.
+       The old count inferred a bust from a scoreless `choosing` phase, which a
+       farkle never produces - the game runs doBust and hands over, so the wait
+       below timed out and the turn went uncounted. Measured: 1, 2 and 0 real
+       busts across three matches, all three reported as zero.
+       endPTurn is wrapped BESIDE it and is not decoration. Every player turn
+       ends there, bank or bust, so its count must equal pTurns; without that a
+       zero from the bust wrap cannot be told apart from a wrap sitting off the
+       path the game calls, which is exactly how the first zero survived three
+       matches. A bust count is only readable when bustHookOnPath is true. */
+    let bustsInferred = 0, endPTurnsSeen = 0, bustJustFired = false;
+    const _origBust = window.doBust, _origEndPT = window.endPTurn;
+    const bustHooked = typeof _origBust === 'function' && typeof _origEndPT === 'function';
+    if (bustHooked) {
+      window.doBust = function () {
+        busts++; bustJustFired = true;
+        return _origBust.apply(this, arguments);
+      };
+      window.endPTurn = function () {
+        endPTurnsSeen++;
+        return _origEndPT.apply(this, arguments);
+      };
+    }
+    const unhook = function () {
+      if (!bustHooked) return;
+      window.doBust = _origBust; window.endPTurn = _origEndPT;
+    };
     /* P914: EVERY BANK AMOUNT, because the envelope question is per TURN and
        not per match. TURN_CAP_PATRON is 8 and TURN_CAP_BOSS is 10, and the
        comment at 12715 is load-bearing: "bank AND bust both count", so the
@@ -148,10 +175,22 @@ window.FDRV = (function () {
       if (G.phase === 'idle' && !G._oppTurnActive) {
         tap(document.getElementById('btnRoll')); rolls++; await sleep(260);
       }
-      const got = await until(() => G._endMatchFired ||
+      /* P920: A BUSTED TURN ENDS THIS WAIT. It used to run the full twelve
+         seconds and return null, because a farkle never reaches a choosing
+         phase - twelve seconds of nothing per bust, which over a ladder is
+         hours. The wrap knows the moment it happens. */
+      bustJustFired = false;
+      const got = await until(() => G._endMatchFired || bustJustFired ||
         (G.phase === 'choosing' &&
          (G.pool || []).some(d => !d.committed && d.el && d.el.onclick)), 12000);
       if (G._endMatchFired) break;
+      if (bustJustFired) {
+        /* let the handover land before the loop looks for the next roll */
+        const turnWas = G.turnNum;
+        await until(() => G._endMatchFired || G.turnNum !== turnWas ||
+                          G.phase === 'idle', 12000);
+        continue;
+      }
       if (got == null) continue;
       await sleep(110);
 
@@ -165,7 +204,11 @@ window.FDRV = (function () {
          loop sat until its guard: no legal keep, so it slept and retried on a
          table that could never change. */
       if (!r || !r.total || r.total <= 0) {
-        busts++;
+        /* P920: THE OLD INFERENCE, KEPT AND RENAMED. It is not the bust count
+           any more - the event is - but a disagreement between the two is the
+           signature of the UI shape changing under the harness, which is worth
+           seeing rather than silently repairing. */
+        bustsInferred++;
         const turnWas = G.turnNum;
         await until(() => G._endMatchFired || G.turnNum !== turnWas ||
                           G.phase === 'idle', 12000);
@@ -227,12 +270,30 @@ window.FDRV = (function () {
       await sleep(300);
     }
 
+    unhook();
     const pPts = (G && G.pPts) || 0, oPts = (G && G.oPts) || 0;
+    /* read once - four fields below compare against it and a re-read between
+       them would let them disagree about the same match */
+    const _pT = (function () { try { return G ? (G.pTurns || 0) : null; }
+                               catch (e) { return null; } })();
     return {
       settledOn: prevScreens, settleMs, leftMatchScreen: leftMatch,
       ok: !stalled, stalled, policy: policy.key, target,
       pPts, oPts, win: pPts > oPts ? 1 : 0,
       busts, banks, rolls, keeps, bankAmounts,
+      /* P920: THE CHECK THAT WAS COMPUTABLE ALL ALONG. A player turn ends in
+         exactly one of a bank or a bust, so banks + busts === pTurns. Nine
+         banks and nine pTurns with a bust among them is impossible, and the
+         driver returned that triple three times without anyone able to see it,
+         because the identity was never written down. bustsDerived comes from a
+         DOM-tap counter and a game field; busts comes from a wrap on the game's
+         own event. They share nothing but the game, so their agreement is
+         evidence rather than an echo. */
+      bustsInferred, endPTurnsSeen, bustHooked,
+      bustHookOnPath: bustHooked && _pT != null && endPTurnsSeen === _pT,
+      bustsDerived: (_pT != null) ? _pT - banks : null,
+      bustCountsAgree: (_pT != null) ? (_pT - banks) === busts : null,
+      turnsAddUp: (_pT != null) ? (banks + busts) === _pT : null,
       /* pTurns, NOT turnNum. 36870: "a completed player turn (bank or bust)" -
          which is exactly what TURN_CAP counts, per its own comment at 12715.
          turnNum increments at the handover to the rival (36848) and came back
@@ -247,10 +308,10 @@ window.FDRV = (function () {
       endReason: (function(){ try { return G ? (G._endReason || null) : null; } catch(e){ return null; } })(),
       finalAnswerUsed: (function(){ try { return G ? !!G._finalAnswerUsed : null; } catch(e){ return null; } })(),
       extraTurnsLeft: (function(){ try { return G ? (G._extraTurn || 0) : null; } catch(e){ return null; } })(),
-      pTurns: (function(){ try { return G ? (G.pTurns || 0) : null; } catch(e){ return null; } })(),
+      pTurns: _pT,
       turnNum: (function(){ try { return G ? G.turnNum : null; } catch(e){ return null; } })(),
       turnCap: (function(){ try { return G ? G.turnCap : null; } catch(e){ return null; } })(),
-      hitTheCap: (function(){ try { return !!(G && G.turnCap && (G.pTurns||0) >= G.turnCap); }
+      hitTheCap: (function(){ try { return !!(G && G.turnCap && _pT != null && _pT >= G.turnCap); }
                               catch(e){ return null; } })(),
       pOverTarget: target ? +(pPts / target).toFixed(3) : null,
       winnerOverTarget: target ? +(Math.max(pPts, oPts) / target).toFixed(3) : null,
