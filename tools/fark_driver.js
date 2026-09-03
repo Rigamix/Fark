@@ -146,7 +146,18 @@ window.FDRV = (function () {
        zero from the bust wrap cannot be told apart from a wrap sitting off the
        path the game calls, which is exactly how the first zero survived three
        matches. A bust count is only readable when bustHookOnPath is true. */
-    let bustsInferred = 0, endPTurnsSeen = 0, bustJustFired = false;
+    /* P926: RENAMED FROM bustsInferred, because P920's reading of it was too
+       strong and the correction makes it useful. P920 said the old inferred
+       path "never fires at all"; a later match returned 16. Both hold once the
+       claim narrows: it never fires on a real FARKLE - a farkle produces no
+       choosing phase, so the branch is unreachable from the event it was
+       written to detect - and it DOES fire when the loop finds a choosing
+       phase whose dice score nothing and which never resolves. That is the
+       driver spinning on a board it has lost, not a bust.
+       Sixteen of them appeared in the one match that also returned three banks
+       against two completed turns. Nonzero here means the numbers from that
+       match are about nothing, so it is asserted rather than reported. */
+    let lostTheTable = 0, endPTurnsSeen = 0, bustJustFired = false;
     /* P921: ONE ENTRY PER COMPLETED TURN, IN ORDER - points banked, or 0 for a
        bust. bankAmounts holds the banked turns in order and the busts used to be
        appended as zeros at the END, so a busted turn 2 and a busted turn 9 were
@@ -236,7 +247,7 @@ window.FDRV = (function () {
            any more - the event is - but a disagreement between the two is the
            signature of the UI shape changing under the harness, which is worth
            seeing rather than silently repairing. */
-        bustsInferred++;
+        lostTheTable++;
         const turnWas = G.turnNum;
         await until(() => G._endMatchFired || G.turnNum !== turnWas ||
                           G.phase === 'idle', 12000);
@@ -317,7 +328,11 @@ window.FDRV = (function () {
          DOM-tap counter and a game field; busts comes from a wrap on the game's
          own event. They share nothing but the game, so their agreement is
          evidence rather than an echo. */
-      bustsInferred, endPTurnsSeen, bustHooked,
+      lostTheTable, endPTurnsSeen, bustHooked,
+      /* the driver held the table for the whole match - a false here says the
+         loop sat on a board it could not act on, and every count below it is
+         about a match that did not happen the way it looks */
+      heldTheTable: lostTheTable === 0,
       /* P921: the ordered per-turn record. Its length must equal pTurns - the
          same identity P920 asserts from the other side - or a resample built on
          it is drawing from a sample with holes. */

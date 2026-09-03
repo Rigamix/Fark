@@ -184,7 +184,8 @@ async function one(dice, policy, tier) {
        both delegate - two independent tallies of the same event, and if they
        disagree one of the two wraps is not seeing every call. */
     wrapsInstalled, bustsSeen, bustsEaten, endPTurnsSeen,
-    driverBusts: r.busts, driverBustsInferred: r.bustsInferred,
+    driverBusts: r.busts, driverLostTheTable: r.lostTheTable,
+    driverHeldTheTable: r.heldTheTable,
     driverBustsDerived: r.bustsDerived, driverHookOnPath: r.bustHookOnPath,
     driverCountsAgree: r.bustCountsAgree, driverTurnsAddUp: r.turnsAddUp,
     probeAndDriverAgree: r.busts === bustsSeen,
@@ -267,7 +268,7 @@ async function cell(dice, policy, tier, n) {
        contaminated is worth seeing. */
     discarded: good.filter(r => !r.usedInResult).map(r => ({
       pPts: r.pPts, pTurns: r.pTurns, banks: r.banks, busts: r.busts,
-      inferred: r.driverBustsInferred, endReason: r.endReason,
+      lostTheTable: r.driverLostTheTable, endReason: r.endReason,
       targetHeld: r.targetHeld, addUp: r.driverTurnsAddUp})),
     /* the ordered records, kept per match rather than flattened - flattening is
        what threw the position away the first time */
@@ -381,11 +382,30 @@ out.VERDICT = {
       .every(r => r.probeAndDriverAgree === true)),
   /* the soft cap should be visible somewhere - it fires in every match where
      the player trails, and with the rival unable to win it often will */
-  /* stated, not hidden: how many rows were thrown away, and whether any of
-     them carried impossible arithmetic */
+  /* THE IDENTITY IS STILL EVALUATED OVER EVERY ROW, not skipped on the ones the
+     cap filter discarded. P924 scoped the FAILING check to used rows, which was
+     right - a row that reached no reported number should not fail the run - but
+     scoping the EVALUATION too would have thrown away the more interesting
+     signal. The two filters currently agree on which rows are contaminated, and
+     the day they stop agreeing is the day one of them has drifted. A row that
+     one keeps and the other rejects is the thing to watch for, so both
+     directions are computed and named rather than skipped. */
   discardedRows: keys.reduce((n, k) => n + (out.cells[k].discarded || []).length, 0),
   aDiscardedRowWasImpossible: keys.some(k =>
     (out.cells[k].discarded || []).some(r => r.addUp === false)),
+  /* the other direction, reported so divergence is visible from both sides */
+  discardedButArithmeticallySound: keys.reduce((n, k) => n +
+    (out.cells[k].discarded || []).filter(r => r.addUp === true).length, 0),
+  /* THE DANGEROUS DIRECTION, and the only one that fails: the identity rejects
+     a row the cap filter KEPT */
+  theFiltersAgree: keys.every(k =>
+    (out.cells[k].rows || []).filter(r => r && !r.err && r.usedInResult)
+      .every(r => r.driverTurnsAddUp === true)),
+  /* and the harness held the table on every row that reached a number - the
+     signal P920 dismissed as dead and P926 renamed */
+  theDriverHeldTheTable: keys.every(k =>
+    (out.cells[k].rows || []).filter(r => r && !r.err && r.usedInResult)
+      .every(r => r.driverHeldTheTable === true)),
   theSoftCapIsVisible: keys.some(k =>
     out.cells[k].overran > 0 || out.cells[k].finalAnswerUsed > 0),
 };
@@ -400,7 +420,8 @@ if (JOB === 'tier') {
 }
 /* discardedRows is a count and aDiscardedRowWasImpossible is information about
    rows that reached nothing, so neither is a pass/fail term */
-const INFO = ['discardedRows', 'aDiscardedRowWasImpossible'];
+const INFO = ['discardedRows', 'aDiscardedRowWasImpossible',
+              'discardedButArithmeticallySound'];
 out.PASS = Object.keys(out.VERDICT).filter(k => INFO.indexOf(k) < 0)
   .every(k => out.VERDICT[k] === true);
 out.FAILED = Object.keys(out.VERDICT).filter(k => INFO.indexOf(k) < 0)

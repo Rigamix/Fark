@@ -12087,7 +12087,16 @@ famState:{
      share a lifetime with */
   famSleight:!!G._famSleight,
   famIllOmen:G._famIllOmen?JSON.parse(JSON.stringify(G._famIllOmen)):null,
-  famPeekVals:Array.isArray(G._famPeekVals)?G._famPeekVals.slice():null,
+  /* P925: DEEP, like famIllOmen on the line above. The entries are {lane,val}
+     objects, so .slice() copied references - harmless while nothing wrote
+     p.lane after mint, and P922's reorder carry writes exactly that, in place.
+     A shallow copy meant the snapshot aliased the live records and drifted with
+     any reorder that happened after the save; saveMatchState runs from
+     startPTurn, so that window was every turn boundary. Every other
+     lane-bearing record here is already deep (_tradeSwaps, famPreserve, ftDead)
+     or flat-by-value (_fairTrade); this was the only array of objects. */
+  famPeekVals:Array.isArray(G._famPeekVals)
+    ?JSON.parse(JSON.stringify(G._famPeekVals)):null,
   famHoneyVal:(G._famHoneyVal===undefined)?null:G._famHoneyVal,
   famKegTriple:(G._famKegTriple===undefined)?null:G._famKegTriple,
   /* and the two match counters. _famBankCount seeds "is this your FIRST bank"
@@ -33198,6 +33207,11 @@ function toggleDie(d){
 }
 
 function startPTurn(){
+  /* P927: STAMPED ON ENTRY so the rebuild below can tell "left over from last
+     turn" - which is fine and is what the rebuild is for - from "set during
+     THIS startPTurn, above the rebuild" - which is the bug that has now hit
+     three times. See the check beside the rebuild. */
+  try{if(G)G._ndAtTurnTop=G.numDice;}catch(e){}
   /* P875: a fresh turn earns a fresh nag. The latch resets here - the single
      entry into a player turn - and the clock starts running; any pointerdown
      re-arms it, so it only ever reaches zero if nothing has happened. */
@@ -33219,7 +33233,25 @@ function startPTurn(){
      endMatch deleted it, resurrecting a RESUME for a match already lost). */
   if(!G||G._endMatchFired)return;
   if(typeof _checkDeadAir==='function')_checkDeadAir();
-  G.phase='idle';G.turnPts=0;G.kept=[];G.numDice=G.matchDice?G.matchDice.length:6;/* P515: refresh the First Strike reveal. It renders from matchDice live but had only two one-shot callers, so a Break or a steal left it showing a loadout that no longer exists - the exact lie the panel exists to prevent. No-op while the panel is closed. */try{_firstStrikeRender();}catch(e){}G.pool=[];G.turnRollCount=0;G._encorePending=false;G._slowHandUsedThisTurn=false;G._warmHandsActive=false;G._lastHotDice=false;G._firstRollCommitted=0;G._bustSavedThisTurn=false;
+  G.phase='idle';G.turnPts=0;G.kept=[];
+  /* P927: THE THRICE-FAILED COMMENT, MADE A CHECK. Anything that sets numDice
+     between the top of startPTurn and this line is about to be discarded, and
+     there is no legitimate case - a dice-count effect belongs BELOW here, where
+     Whisper's Hex has always been and which is the entire reason the Hex has
+     always worked. Preserve was caught by this shape twice and Tar Pit once
+     (P923: charge spent, log reading "TAR PIT - YOU ROLL 5", six dice rolled).
+     Three failures of a comment means the rule wanted a mechanism. */
+  try{
+    if(G&&G._ndAtTurnTop!==undefined&&G.numDice!==G._ndAtTurnTop){
+      G._ndDiscarded=(G._ndDiscarded||0)+1;
+      G._ndDiscardedVal=G.numDice;
+      if(window.console&&console.warn)console.warn(
+        '[fark P927] numDice was set to '+G.numDice+' above the turn rebuild '+
+        '(was '+G._ndAtTurnTop+' on entry) and is being discarded. A dice-count '+
+        'effect belongs BELOW the rebuild, beside Whisper\'s Hex - see P923.');
+    }
+  }catch(e){}
+  G.numDice=G.matchDice?G.matchDice.length:6;/* P515: refresh the First Strike reveal. It renders from matchDice live but had only two one-shot callers, so a Break or a steal left it showing a loadout that no longer exists - the exact lie the panel exists to prevent. No-op while the panel is closed. */try{_firstStrikeRender();}catch(e){}G.pool=[];G.turnRollCount=0;G._encorePending=false;G._slowHandUsedThisTurn=false;G._warmHandsActive=false;G._lastHotDice=false;G._firstRollCommitted=0;G._bustSavedThisTurn=false;
   /* per-turn icon state. Ward lasts one turn by definition. AMBER IS A
      ONE-SHOT NOW, not a turn-long immunity - doBust spends it on the single
      bust it eats, so this line only reaches a save that was never called on,
@@ -42092,7 +42124,12 @@ if(_rdFam){
   if(_rdFam.famIllOmen!==undefined)
     G._famIllOmen=_rdFam.famIllOmen?JSON.parse(JSON.stringify(_rdFam.famIllOmen)):null;
   if(_rdFam.famPeekVals!==undefined)
-    G._famPeekVals=Array.isArray(_rdFam.famPeekVals)?_rdFam.famPeekVals.slice():[];
+    /* P925: and the restore too - the same shape in the other direction. A
+       shallow restore left the LIVE records aliasing the saved snapshot, so the
+       next reorder mutated the save. A snapshot that changes after it is taken
+       is not a snapshot in either direction. */
+    G._famPeekVals=Array.isArray(_rdFam.famPeekVals)
+      ?JSON.parse(JSON.stringify(_rdFam.famPeekVals)):[];
   if(_rdFam.famHoneyVal!==undefined&&_rdFam.famHoneyVal!==null)G._famHoneyVal=_rdFam.famHoneyVal;
   if(_rdFam.famKegTriple!==undefined&&_rdFam.famKegTriple!==null)G._famKegTriple=_rdFam.famKegTriple;
   if(_rdFam.famBankCount!==undefined&&_rdFam.famBankCount!==null)G._famBankCount=_rdFam.famBankCount;
