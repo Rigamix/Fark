@@ -117,6 +117,11 @@ const BUDGET_MIN = +((location.hash.match(/budget=(\d+)/) || [])[1]) || 25;
 const DEADLINE = Date.now() + BUDGET_MIN * 60000;
 
 let wins = 0, done = 0, stalls = 0, budgetStopped = 0;
+/* P936: how often a persona's own code was silently replaced by the
+   harness's fallback. Both fallbacks stay - a stalled cell is worse than a
+   substituted keep - but a run that substituted is a run about a different
+   policy than the one every output line names, so it says so. */
+let subBank = 0, subKeep = 0, subBankErr = null, subKeepErr = null;
 const byTier = {};
 const LOG = [];
 const say = t => { LOG.push(t); try { console.log(t); } catch (e) {} };
@@ -166,15 +171,36 @@ for (let m = 0; m < N; m++) {
     const free = G.pool.filter(d => !d.committed && !d._frozen);
     const keeps = FSIM.legalKeeps(free);
     if (!keeps.length) { await sleep(400); continue; }
+    /* P936: A SUBSTITUTED KEEP IS RECORDED. policy.keep throwing used to fall
+       through to "the last legal keep" in silence, so a persona that failed on
+       some state was measured as a different one - under its own name, in every
+       line of output. The fallback stays (a stalled cell is worse) but the cell
+       now reports how often it fired. */
     let sel = null;
-    try { sel = policy.keep(free, {keeps: keeps, G: G, state: state, rolls: G.turnRollCount || 0}); } catch (e) {}
-    if (!sel || !sel.length) sel = keeps[keeps.length - 1].sel;
+    try { sel = policy.keep(free, {keeps: keeps, G: G, state: state, rolls: G.turnRollCount || 0}); }
+    catch (e) { subKeepErr = subKeepErr || String(e && e.message || e); }
+    if (!sel || !sel.length) { subKeep++; sel = keeps[keeps.length - 1].sel; }
     for (const d of sel) { if (d.el && !d.sel) tap(d.el); await sleep(60); }
     await sleep(180);
-    state.oppTotal = G.oPts; state.lastTurn = (G.turnNum || 1) >= (G.turnCap || 10);
+    state.oppTotal = G.oPts;
+    /* P936: FROM THE ONE DEFINITION, not a second one. This used to read
+       `(G.turnNum||1) >= (G.turnCap||10)`, which is wrong twice: the capped
+       resource is pTurns, not turnNum (P917 - turnNum increments at the
+       handover and read 10 on patron matches whose cap is 8), so it told every
+       persona "last turn" before it was; and it dropped the rival-reached-
+       target clause that sim_harness has. Four persona bankAt bodies branch on
+       this, so the personas were playing a different endgame here than in the
+       sim, on a value both call by the same name. */
+    state.lastTurn = FSIM.lastTurnFlag(G, G.pTurns || 0, G.turnCap || 0);
+    /* P936: AND A SUBSTITUTED BANK RULE IS RECORDED. This used to silently
+       become "bank at 300" whenever a persona's bankAt threw - a policy
+       substitution invisible in the output, on a run whose every line names the
+       policy it believes it measured. */
     let bank = false;
     try { bank = policy.bankAt({turnPts: G.turnPts || 0, diceLeft: free.length - sel.length,
-      rolls: G.turnRollCount || 0, state: state, G: G}); } catch (e) { bank = (G.turnPts || 0) >= 300; }
+      rolls: G.turnRollCount || 0, state: state, G: G}); }
+    catch (e) { subBank++; subBankErr = subBankErr || String(e && e.message || e);
+                bank = (G.turnPts || 0) >= 300; }
     tap(document.getElementById(bank ? 'btnBank' : 'btnRoll'));
     await sleep(250);
   }
@@ -201,7 +227,11 @@ const tierStr = Object.keys(byTier).sort().map(t =>
 say('LB-CELL;band=' + band + ';seat=' + seat + ';policy=' + polName +
     ';n=' + done + ';wins=' + wins + ';rate=' + (rate * 100).toFixed(1) +
     ';wilson=' + (ph * 100).toFixed(1) + '±' + (hw * 100).toFixed(1) +
-    ';stalls=' + stalls + ';byTier=' + tierStr);
+    ';stalls=' + stalls + ';subBank=' + subBank + ';subKeep=' + subKeep + ';byTier=' + tierStr);
 return {band, seat, policy: polName, asked: N, n: done, wins,
+        /* P936: a nonzero substitution count means this cell did not measure
+           the policy it names. Reported, not hidden in a log line. */
+        subBank, subKeep, subBankErr, subKeepErr,
+        policyRanUnsubstituted: subBank === 0 && subKeep === 0,
         rate: +(rate * 100).toFixed(1), wilsonHalfWidth: +(hw * 100).toFixed(1),
         stalls, budgetStopped, byTier, dice, log: LOG};

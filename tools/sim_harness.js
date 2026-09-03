@@ -795,7 +795,7 @@ F.simMatch=function(policy,opts){
         var extra=1;
         while(extra-->0){
           /* informed-Greg needs to know whether a future turn exists */
-          var lastTurn=(pTurns+1>=cap)||((G.oPts>=G.target));
+          var lastTurn=F.lastTurnFlag(G,pTurns,cap);/* P936: one definition */
           var t=F.simTurn(policy,{lastTurn:lastTurn,turnsLeft:cap-pTurns,
             oppTotal:G.oPts,target:G.target});
           pTurns++;rolls+=t.rolls;icons+=t.iconsFired;hots+=t.hot;
@@ -907,6 +907,22 @@ function breakRowValue(mat){
   var fam=_matFam(mat);
   return({obsidian:5,vagabond:4,starstone:3,amber:2,silver:1,jade:1}[fam])||0;
 }
+
+/* P936: THE ONE DEFINITION OF "THIS IS THE LAST TURN". Four persona bankAt
+   bodies branch on state.lastTurn, and it was computed independently by this
+   file and by ladder_band.js - differently. The ladder keyed it on G.turnNum
+   against G.turnCap, but the capped resource is pTurns (P917: turnNum
+   increments at the handover and read 10 on patron matches whose cap is 8), so
+   it fired EARLY on every match; and it dropped the rival-reached-target
+   clause. Personas therefore played a different endgame in the ladder than in
+   the sim, on a value they both call by the same name.
+   BOTH CLAUSES MATTER. There is no future turn worth saving for when the
+   allowance is spent, and none when the rival has already crossed the target. */
+F.lastTurnFlag=function(G,pTurns,cap){
+  if(!G)return false;
+  var c=cap||G.turnCap||8;
+  return ((pTurns||0)+1>=c)||((G.oPts||0)>=(G.target||Infinity));
+};
 
 F.POLICIES={};
 
