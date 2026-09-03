@@ -5,6 +5,78 @@ is a valid answer.** Answered items are deleted, not marked — this stays short
 
 ---
 
+## 4b IS UNBLOCKED, AND A REGRESSION I SHIPPED IS FIXED (2026-09-03)
+
+**Two of your calls I have read as decided.** You marked them "NEEDS YOUR EYES"
+and then said you would take both cheaply, so I acted on them. Say if that was
+the wrong reading.
+
+- **The envelope is dropped; reach probability replaces it.** It answers the
+  same question directly, with a confidence attached, from ladder-shaped data.
+- **Silver sized for a 50% effect** — 7 per arm, ~35 minutes. Running now.
+  For the record the corrected two-sample numbers are 21 / 57 / 128 per arm at
+  25 / 15 / 10%; my earlier 13/36/80 were the one-sample n, exactly half, as you
+  spotted.
+
+**P919 WAS HALF-APPLIED AND I HAD DEPLOYED IT.** Fixed in P922. The stargazer
+promise lives in two places: `G._famPeekVals[i]={lane,val}`, which decides which
+die RECEIVES the face, and the DOM float whose `dataset.lane` is copied off it.
+P919 taught the float to follow its die and left the record behind, so **a float
+promising 5 sat over a die that rolled 6** — measured, a clean 3-cycle on the
+three dice that moved. Before P919 both were stale together, so it was wrong
+relative to mint but never contradictory on screen. Fixing one half of a
+two-part invariant was worse than fixing neither.
+
+The carry loop no longer holds a branch per record: `_famLaneRecords()` names
+them (`_fairTrade`, `_tradeSwaps[]`, `_famPeekVals[]`, `_famPreserve`) and the
+loop iterates it. Four patches have each found the previous one's leftover; a
+branch per kind is what made that possible.
+
+**TAR PIT NEVER TOOK A DIE AWAY** — P923, found in passing. It sat nine lines
+above the line that rebuilds the hand, so `numDice` went to 5 and was
+overwritten with 6 while the charge was still spent and the log still read "TAR
+PIT — YOU ROLL 5". Measured 6 dice before, 5 after. The file had already named
+this exact hazard twice, about Preserve, in a comment forty lines away.
+
+### One question, and it is yours
+
+**Do you want the driver to mirror the sim's `pushHot`, or is the divergence
+acceptable?** Three differences between `tools/fark_driver.js` and `simTurn`,
+all inert under the unreachable-target harness, all live for any sim-vs-engine
+comparison:
+
+1. **Branch order.** `simTurn` puts the hot-dice re-roll ABOVE the target check
+   and `continue`s, so a `hot` policy that clears the table rolls straight past
+   a reached target. The driver checks the target first and banks the win. Same
+   three rules, opposite behaviour at the moment the match is decided.
+2. **`bankAdd` is missing** from the driver's target test — 500 per starstone
+   die in the sim.
+3. **A fourth stopping rule** the driver has no equivalent of:
+   `if(turn>=400&&mats.length<=3)return bank();`, inside the transmute-charge
+   branch. Any statement of the form "simTurn stops on the target check, the
+   oppDone check, and bankFn" is incomplete.
+
+My inclination is to mirror all three, because the driver's whole value is that
+its rules come from the model rather than from me. But it changes `hot`'s
+measured behaviour, so it is your call.
+
+### Two things settled, not asked
+
+- **`famTableChanged`'s ghost gate stays as it is.** It asks "does
+  `_clearRollForces` have work?", which is a different question from "which
+  ghosts carry a repairable lane stamp". `_clearRollForces` resets every array
+  entry unconditionally, so routing the gate through the filtered roster would
+  make it blind to exactly the entries the reader detaches without splicing.
+- **Turns are NOT exchangeable in general**, so the reach resample cannot pool
+  them naively: charges are match-scoped and spent early, and a dozen
+  accumulators make late turns depend on earlier ones. The harness sets
+  `G.pF=[]`, which should make most of that inert for these measurements, and
+  the two-sided control now in `zv_reach.py` will say whether it did. If it
+  refuses, the fallback is resampling whole matches, which is always valid and
+  costs precision.
+
+---
+
 ## THE LADDER RE-RUN IS STILL UNMEASURED, and the instrument was why
 
 Band 2 ran for **two and a half hours across both seats and returned nothing** —

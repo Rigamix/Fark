@@ -235,6 +235,13 @@ async function cell(dice, policy, tier, n) {
   if (good.length && !good.every(r => r.loadoutDealt))
     reasons.push('the table was dealt something else: dealt ' +
       JSON.stringify(good.map(r => r.dealt)) + ' wanted ' + (good[0] || {}).want);
+  /* MARK THE ROWS THAT REACHED THE RESULT. The identity checks below were
+     scanning every non-error row, including ones the cap-run filter had already
+     thrown away - so a contaminated row that never touched a reported number
+     failed the whole run, which conflates "a number I published is wrong" with
+     "a row I correctly discarded was broken". Both are worth seeing; only the
+     first should fail. */
+  good.forEach(r => { r.usedInResult = capRuns.indexOf(r) >= 0; });
   const totals = capRuns.map(r => r.pPts);
   const yields = capRuns.map(r => r.perTurn);
   const mean = a => a.length ? Math.round(a.reduce((x, y) => x + y, 0) / a.length) : null;
@@ -253,6 +260,15 @@ async function cell(dice, policy, tier, n) {
     /* the turn-level sample, pooled across the cell's matches */
     turns: good.reduce((a, r) => a.concat(r.turnOutcomes || []), []),
     turnsComplete: good.every(r => r.turnOutcomesComplete === true),
+    /* the discarded rows, reported rather than silently dropped - two of them in
+       the silver run carried impossible arithmetic (banks 3 with pTurns 2; four
+       banks and zero points), and both were the same rows the cap-run filter
+       had already refused. Two independent filters agreeing on which rows are
+       contaminated is worth seeing. */
+    discarded: good.filter(r => !r.usedInResult).map(r => ({
+      pPts: r.pPts, pTurns: r.pTurns, banks: r.banks, busts: r.busts,
+      inferred: r.driverBustsInferred, endReason: r.endReason,
+      targetHeld: r.targetHeld, addUp: r.driverTurnsAddUp})),
     /* the ordered records, kept per match rather than flattened - flattening is
        what threw the position away the first time */
     turnSeqs: good.map(r => r.turnSeq),
@@ -339,27 +355,37 @@ out.VERDICT = {
   everyCellIsCapRuns: keys.every(k => out.cells[k].capRuns === out.cells[k].matches),
   /* the loadout reached the table, not merely the config */
   everyLoadoutWasDealt: keys.every(k =>
-    (out.cells[k].rows || []).filter(r => r && !r.err).every(r => r.loadoutDealt === true)),
+    (out.cells[k].rows || []).filter(r => r && !r.err && r.usedInResult)
+      .every(r => r.loadoutDealt === true)),
   /* THE CONTROL, NOT THE FINDING. This says the bust hook is on the path the
      game actually calls; it says nothing about how many busts there were. A
      bust count is only readable when this is true. */
   theBustHookIsOnThePath: keys.every(k =>
-    (out.cells[k].rows || []).filter(r => r && !r.err).every(r => r.wrapIsOnThePath === true)),
+    (out.cells[k].rows || []).filter(r => r && !r.err && r.usedInResult)
+      .every(r => r.wrapIsOnThePath === true)),
   /* P920's identity: a player turn ends in exactly one of a bank or a bust */
   theTurnsAddUp: keys.every(k =>
-    (out.cells[k].rows || []).filter(r => r && !r.err).every(r => r.driverTurnsAddUp === true)),
+    (out.cells[k].rows || []).filter(r => r && !r.err && r.usedInResult)
+      .every(r => r.driverTurnsAddUp === true)),
   /* every turn is accounted for as a bank or a zero, or the resample is drawing
      from a sample with holes in it */
   everyTurnIsRecorded: keys.every(k => out.cells[k].turnsComplete === true),
   /* and recorded IN ORDER, or the stratified baseline cannot be built */
   everyTurnHasAPosition: keys.every(k => out.cells[k].turnSeqsComplete === true),
   theTurnRecordSumsToTheTotal: keys.every(k =>
-    (out.cells[k].rows || []).filter(r => r && !r.err).every(r => r.turnSeqSumsToTotal === true)),
+    (out.cells[k].rows || []).filter(r => r && !r.err && r.usedInResult)
+      .every(r => r.turnSeqSumsToTotal === true)),
   /* and the two independent wraps see the same events */
   theTwoWrapsAgree: keys.every(k =>
-    (out.cells[k].rows || []).filter(r => r && !r.err).every(r => r.probeAndDriverAgree === true)),
+    (out.cells[k].rows || []).filter(r => r && !r.err && r.usedInResult)
+      .every(r => r.probeAndDriverAgree === true)),
   /* the soft cap should be visible somewhere - it fires in every match where
      the player trails, and with the rival unable to win it often will */
+  /* stated, not hidden: how many rows were thrown away, and whether any of
+     them carried impossible arithmetic */
+  discardedRows: keys.reduce((n, k) => n + (out.cells[k].discarded || []).length, 0),
+  aDiscardedRowWasImpossible: keys.some(k =>
+    (out.cells[k].discarded || []).some(r => r.addUp === false)),
   theSoftCapIsVisible: keys.some(k =>
     out.cells[k].overran > 0 || out.cells[k].finalAnswerUsed > 0),
 };
@@ -372,6 +398,11 @@ if (JOB === 'tier') {
       ? Math.round(Math.abs(b.meanPerTurn / a.meanPerTurn - 1) * 100) : null,
   };
 }
-out.PASS = Object.keys(out.VERDICT).every(k => out.VERDICT[k] === true);
-out.FAILED = Object.keys(out.VERDICT).filter(k => out.VERDICT[k] !== true);
+/* discardedRows is a count and aDiscardedRowWasImpossible is information about
+   rows that reached nothing, so neither is a pass/fail term */
+const INFO = ['discardedRows', 'aDiscardedRowWasImpossible'];
+out.PASS = Object.keys(out.VERDICT).filter(k => INFO.indexOf(k) < 0)
+  .every(k => out.VERDICT[k] === true);
+out.FAILED = Object.keys(out.VERDICT).filter(k => INFO.indexOf(k) < 0)
+  .filter(k => out.VERDICT[k] !== true);
 return out;
