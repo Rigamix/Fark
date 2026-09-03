@@ -194,8 +194,16 @@ window.FDRV = (function () {
            bank-out, where the bust is eaten and the player banks anyway without
            the driver ever tapping bank. Reading the field covers every path by
            construction instead of by enumeration. */
-        try { turnSeq.push(G ? (G.turnPts || 0) : 0); } catch (e) { turnSeq.push(0); }
-        return _origEndPT.apply(this, arguments);
+        /* P929: READ AFTER THE ORIGINAL RUNS, from G._pTurnPts - the field
+           endPTurn computes. This used to read G.turnPts BEFORE delegating, on
+           the strength of endPTurn's own comment, and got 0 on every banked
+           turn across sixteen matches: handleBank credits pPts and calls
+           _turnScoreClear() before endPTurn is ever reached. Taking the game's
+           computed field after the fact means the harness inherits the P929
+           fix rather than duplicating the reasoning behind it. */
+        const ret = _origEndPT.apply(this, arguments);
+        try { turnSeq.push(G ? (G._pTurnPts || 0) : 0); } catch (e) { turnSeq.push(0); }
+        return ret;
       };
     }
     const unhook = function () {
