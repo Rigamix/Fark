@@ -52,7 +52,14 @@ async function arm(banked) {
      living in _pTurnBanked. Setting turnPts instead would pass pre-fix. */
   G.turnPts = 0;
   G.kept = [];
+  /* BOTH FIELDS, because handleBank writes both. P930 stamps the banked total
+     with the turn it belongs to and endPTurn refuses a value whose stamp does
+     not match - so a probe setting only the amount gets 0, correctly. That is
+     the invariant working; it is also a standing hazard for this probe, which
+     synthesises the post-handleBank state by hand and must be updated whenever
+     that write site gains a field. */
   G._pTurnBanked = banked;
+  G._pTurnBankedTurn = G.turnNum;
   const pBefore = G.pPts, oBefore = G.oPts;
   try { endPTurn(); } catch (e) { return {err: 'endPTurn: ' + e.message}; }
   return {

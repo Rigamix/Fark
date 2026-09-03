@@ -33325,7 +33325,7 @@ function startPTurn(){
      cannot inherit the previous turn's bank. _lastBankAmount itself must NOT be
      reset - THE RECKONING compares the rival's bank against it across the
      rival's turn - which is why this is a separate field. */
-  G._pTurnBanked=0;
+  G._pTurnBanked=0;G._pTurnBankedTurn=-1;/* P930: the stamp resets with it */
   /* P928: AND IT THROWS IN DEV. A console line in a game is easy to miss, and
      this comment has failed three times precisely because the warning was
      passive. The throw is OUTSIDE the try above on purpose - inside it, the
@@ -36831,7 +36831,7 @@ function handleBank(){
        The points aren't lost, just delayed one turn. */
     G._tabArmedVsPlayer=false;
     G._tabHeldPlayer=(G._tabHeldPlayer||0)+total;
-    G._lastBankAmount=total;G._pTurnBanked=total;/* P929 */spawnBankPop(total);
+    G._lastBankAmount=total;G._pTurnBanked=total;G._pTurnBankedTurn=G.turnNum;/* P929/P930 */spawnBankPop(total);
     triggerCard('the_tab','ON THE TAB — '+total.toLocaleString()+' HELD',false);
     setStatusMsg('ON THE TAB — '+total.toLocaleString()+' POINTS HELD A TURN','red');
   }else{
@@ -36850,7 +36850,7 @@ function handleBank(){
       famLog('HAIR OF THE DOG — FIRST BANK DOUBLED');_famPop('×2 HAIR OF THE DOG');
     }
     G._famMinBank=(G._famBankCount===1)?total:Math.min(G._famMinBank,total);
-    G.pPts+=total;G._lastBankAmount=total;G._pTurnBanked=total;/* P929 */spawnBankPop(total);
+    G.pPts+=total;G._lastBankAmount=total;G._pTurnBanked=total;G._pTurnBankedTurn=G.turnNum;/* P929/P930 */spawnBankPop(total);
     /* relic: Corvus's Ledger — +5g on every bank (the +300 rides the
        starstone_bonus mechanic in scoring) */
     if(Array.isArray(G.matchDice)&&G.matchDice.indexOf('corvus_ledger_d')>=0){
@@ -37036,8 +37036,35 @@ function endPTurn(){
      _pTurnBanked is captured at the credit in handleBank, two lines before the
      clear, and reset at the top of each player turn - so a bust still reads 0,
      which is what the paragraph above correctly wants. */
-  var _pTurnPts=(G.turnPts||0)||(G._pTurnBanked||0);
+  /* P930: THE STAMP IS CHECKED, NOT TRUSTED. _pTurnBanked is a second field
+     that has to stay in step with a first, which is the shape that has cost
+     four bugs in the lane records and one in the peek snapshot. If a path ever
+     enters a player turn without startPTurn, the reset is skipped and a BUSTED
+     turn would read the previous turn's bank - P929's bug with the sign
+     flipped, and just as invisible.
+     NOT "pPts after minus pPts before": that invariant is false, because pPts
+     moves within a turn for Reprisal, Pickpocket, the tab release, Thick Skin,
+     Last Stitch, the challenge penalty, SCORE_DRAIN and Ill Omen itself. A
+     check that fires on legitimate card activity is noise, and a noisy check
+     gets switched off - which reads as coverage while being none. */
+  var _pTurnBankedOK=(G._pTurnBanked||0)===0||G._pTurnBankedTurn===G.turnNum;
+  if(!_pTurnBankedOK){
+    G._pTurnBankedStale=(G._pTurnBankedStale||0)+1;
+    if(window.console&&console.warn)console.warn(
+      '[fark P930] _pTurnBanked='+G._pTurnBanked+' is stamped for turn '+
+      G._pTurnBankedTurn+' but this is turn '+G.turnNum+
+      ' - a player turn was entered without startPTurn, so the reset was '+
+      'skipped. Reading 0 instead.');
+  }
+  var _pTurnPts=(G.turnPts||0)||(_pTurnBankedOK?(G._pTurnBanked||0):0);
   G._pTurnPts=_pTurnPts;
+  /* P930: loud in dev, for the reason P927 is - this file's history is of
+     passive warnings surviving two hundred patches. Raised after _pTurnPts is
+     published so the value is consistent for anything already reading it. */
+  if(!_pTurnBankedOK&&window._fkDbgOn)
+    throw new Error('[fark P930] _pTurnBanked was stale (stamped turn '+
+      G._pTurnBankedTurn+', current '+G.turnNum+'). A player turn was entered '+
+      'without startPTurn and the reset was skipped.');
   G.phase='opp';G.turnPts=0;G.kept=[];G.numDice=6;G.turnNum++;
   /* P692: THE POST-BANK BOUNDARY. The only snapshot used to be the next
      startPTurn - a full round away - so a banked turn evaporated on any
