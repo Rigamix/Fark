@@ -17479,10 +17479,23 @@ function famTableChanged(){
 /* P844: a vagabond reorder is COSMETIC - same dice, same values, new
    seats. It must not void a promise; the floats just follow their
    dice. Ghosts and marks are lane-stamped at mint for exactly this. */
+/* P919: THE LANE-STAMPED GHOSTS, IN ONE PLACE. Every element here carries a
+   dataset.lane naming the die it belongs to, which means every one of them has
+   to be repaired when a vagabond reorder renumbers the lanes - see the third
+   entry in _commitVagabondDrag's carry loop, which calls this. Adding a kind to
+   this list is therefore the whole job; the reader and the carry both follow.
+   The two had separate copies of this expression for one patch and that was
+   already one copy too many: a third kind added to the reader alone would look
+   correct - the floats would track their die - right up until someone dragged
+   a die, and then the mark would sit on a stranger. */
+function _famLaneGhosts(){
+  return [].concat(window._pkGhosts||[],window._htMarks||[])
+    .filter(function(g){return g&&g.dataset;});
+}
 function _famRefloatGhosts(){
   try{
     var byLane={};(G&&G.pool||[]).forEach(function(d){if(d.el&&!d.committed)byLane[d.lane]=d;});
-    [].concat(window._pkGhosts||[],window._htMarks||[]).forEach(function(g){
+    _famLaneGhosts().forEach(function(g){
       if(!g.isConnected)return;
       var d=byLane[+g.dataset.lane];
       if(!d){if(g.parentNode)g.remove();return;}
@@ -46846,10 +46859,35 @@ function _commitVagabondDrag(){
              or an entry that has already moved gets matched a second time. */
           var _tsBefore=(G._tradeSwaps||[]).map(function(t){
             return (t&&typeof t.lane==='number')?t.lane:-1;});
+          /* P919 (brief 3.8): AND THE LANE-STAMPED GHOSTS - the pickpocket
+             floats and the honeytrap marks. P844 already stated the behaviour,
+             "the floats just follow their dice", and this loop is why they did
+             not: the reorder renumbers d.lane while a ghost's dataset.lane
+             keeps the stamp from mint, and _famRefloatGhosts runs AFTER the
+             renumbering, so it reads a fresh lane against a stale stamp and
+             floats the ghost onto whichever die moved into that seat. Nothing
+             in _famRefloatGhosts changes; the lane is just correct when it runs.
+             EVERY LANE-STAMPED THING ENROLS HERE. That is the rule, written
+             once instead of the history: P530 carried the loan, P531 carried
+             the ledger and recorded that P530 "left its sibling behind", and
+             these were the next straggler for as long as P844 has existed. A
+             fourth one goes in this loop on the day it is created, not on the
+             day somebody notices the float landed on the wrong die.
+             Snapshot before the loop writes, like the pairs above, or an entry
+             that has already moved is matched a second time. `lane` only: a
+             ghost has no oLane, and a player reorder renumbers only the
+             player's seats. */
+          var _ghosts=(typeof _famLaneGhosts==='function')?_famLaneGhosts():[];
+          var _ghBefore=_ghosts.map(function(g){
+            var L=parseInt(g.dataset.lane,10);
+            return isFinite(L)?L:-1;});
           _carry.forEach(function(c,i){
             if(_ftBefore>=0&&c.die&&c.die.lane===_ftBefore)G._fairTrade.lane=_slots[i];
             if(c.die&&typeof c.die.lane==='number')(G._tradeSwaps||[]).forEach(function(t,ti){
               if(t&&_tsBefore[ti]===c.die.lane)t.lane=_slots[i];
+            });
+            if(c.die&&typeof c.die.lane==='number')_ghosts.forEach(function(g,gi){
+              if(_ghBefore[gi]===c.die.lane)g.dataset.lane=String(_slots[i]);
             });
             var L=_slots[i];
             if(G.matchDice&&L<G.matchDice.length&&c.mat!==undefined)G.matchDice[L]=c.mat;
