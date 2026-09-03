@@ -31570,6 +31570,22 @@ function newG(rung,pCards,oCards,pStake,oStake){
    turn state belongs after this call, and can now be documented against it
    rather than against a comment. */
 function _turnScoreClear(){if(!G)return;G.turnPts=0;G.kept=[];}
+/* P933: THE BANKED AMOUNT IS MEANINGLESS WITHOUT ITS TURN, so the pair is
+   re-established wherever that turn number changes. G.turnNum has three
+   writers - endPTurn's increment, the resume restore, and nothing else - and
+   P932 stamped in startPTurn, which is not one of them. The resume path
+   therefore restored turnNum without stamping, and the first player turn after
+   a resume read a stale stamp: the guard failed, dev threw, and production fell
+   back to 0 on a banking turn, which is P929's Ill Omen defect returning
+   through the resume path.
+   CALL THIS AT EVERY WRITE OF G.turnNum. A post-assert enforces it, so a fourth
+   writer added later fails the patch rather than the player - the invariant
+   lives in the check instead of in someone's memory, which is the shape four
+   lane-record bugs and one peek-snapshot bug have all had. */
+function _pTurnBankReset(){
+  if(typeof G==='undefined'||!G)return;
+  G._pTurnBanked=0;G._pTurnBankedTurn=G.turnNum;
+}
 function _turnTableClear(){clearRow('playerDiceRow');if(G)G.pool=[];}
 function clearRow(id){
   const el=document.getElementById(id);if(el)el.innerHTML='';
@@ -33361,7 +33377,7 @@ function startPTurn(){
      player turn entered without startPTurn. That is a fault worth throwing on.
      Same move as 3.6 - the rule lives where every path goes through, not on one
      branch. */
-  G._pTurnBanked=0;G._pTurnBankedTurn=G.turnNum;
+  _pTurnBankReset();/* P933 */
   /* P928: AND IT THROWS IN DEV. A console line in a game is easy to miss, and
      this comment has failed three times precisely because the warning was
      passive. The throw is OUTSIDE the try above on purpose - inside it, the
@@ -37107,7 +37123,7 @@ function endPTurn(){
     throw new Error('[fark P930] _pTurnBanked was stale (stamped turn '+
       G._pTurnBankedTurn+', current '+G.turnNum+'). A player turn was entered '+
       'without startPTurn and the reset was skipped.');
-  G.phase='opp';G.turnPts=0;G.kept=[];G.numDice=6;G.turnNum++;
+  G.phase='opp';G.turnPts=0;G.kept=[];G.numDice=6;G.turnNum++;_pTurnBankReset();/* P933 */
   /* P692: THE POST-BANK BOUNDARY. The only snapshot used to be the next
      startPTurn - a full round away - so a banked turn evaporated on any
      exit during the rival's animation. The four turn-start anchors are
@@ -42154,6 +42170,11 @@ function initMatchScreen(data){
       save();
     }}catch(e){}
     G.pPts=rd.pPts;G.oPts=rd.oPts;G.turnNum=rd.turnNum;G.numDice=rd.numDice;
+    /* P933: THE WRITER THAT WAS MISSED. A resumed match has no in-flight banked
+       amount - the snapshot is taken at a turn boundary - so 0 against the
+       restored turnNum is the correct pair. Without this the first player turn
+       after a resume read a stamp from before the restore. */
+    _pTurnBankReset();
     G.pTurns=(typeof rd.pTurns==='number')?rd.pTurns:Math.max(0,(rd.turnNum||1)-1);
     G.oTurns=(typeof rd.oTurns==='number')?rd.oTurns:Math.max(0,(rd.turnNum||1)-1);
     /* Target was saved but never restored — for generated patrons (and
