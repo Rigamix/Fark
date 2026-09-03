@@ -33211,10 +33211,9 @@ function startPTurn(){
      every turn (old stacking seal is dead — it emptied a 3-slot loadout). */
   /* Confession's card-sealing retired; Still Waters suppresses a worked
      die's FAMILY TRAIT instead - see _dieEffect. */
-  if(G&&G._oTarPit>0){
-    G._oTarPit--;G.numDice=Math.min(G.numDice||6,5);
-    famLog('TAR PIT — YOU ROLL '+G.numDice);
-  }
+  /* P923: TAR PIT MOVED DOWN, beside Whisper's Hex - see there. It sat here,
+     above `G.kept=[];G.numDice=matchDice.length`, so it spent its charge, said
+     "YOU ROLL 5" and was overwritten with 6 before the turn began. */
   /* Ghost-timer guard: a scheduled callback from a fled/finished match must
      not start a player turn (it used to re-create S.pendingMatch after
      endMatch deleted it, resurrecting a RESUME for a match already lost). */
@@ -33334,6 +33333,27 @@ function startPTurn(){
     G._loanRemaining--;
     triggerCard('loan','LOAN −'+_lnPay+' ('+G._loanRemaining+' LEFT)',true);
     updHUD();
+  }
+  /* P923: TAR PIT, which never took a die away. It used to sit nine lines
+     above `G.kept=[];G.numDice=G.matchDice?G.matchDice.length:6`, so numDice
+     went to 5 and was immediately overwritten with 6 - while the charge was
+     still spent and famLog still said "TAR PIT - YOU ROLL 5". A card that did
+     nothing, with a message vouching for it.
+     IT BELONGS HERE BECAUSE WHISPER'S HEX IS HERE. Both are rival-cast dice
+     reducers, and the Hex has always worked for exactly one reason: it runs
+     BELOW the rebuild. Both also survive the clamp at the roll, which is
+     Math.min(loadout, numDice) - a CEILING, not a floor, as that line's own
+     comment says, so anything lowering numDice from below the rebuild holds.
+     THE FILE HAD ALREADY NAMED THIS HAZARD, about Preserve, twice: "four lines
+     above `G.kept=[];G.numDice=matchDice.length`, so the data was overwritten
+     before the turn began and Preserve announced 'THE AMBER CRACKS' having
+     delivered nothing." Same wipe, same position, same announce-without-effect.
+     That comment ends "anything added below that clears the row belongs ABOVE
+     this block"; the reciprocal - anything the rebuild would overwrite belongs
+     BELOW the rebuild - is the half that was never written down. It is now. */
+  if(G&&G._oTarPit>0){
+    G._oTarPit--;G.numDice=Math.min(G.numDice||6,5);
+    famLog('TAR PIT — YOU ROLL '+G.numDice);
   }
   /* NPC-armed Whisper's Hex: reduce player's dice count this turn */
   if(G._npcHexArmed){G._npcHexArmed=false;G.numDice=Math.max(3,G.numDice-1);triggerCard('whispers_hex',G.rung.name+" HEX — YOU HAVE "+G.numDice+" DICE",false);try{famFire('cardHit',{actor:'p',src:'whispers_hex'});}catch(e){}}
