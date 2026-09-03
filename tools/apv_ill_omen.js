@@ -52,12 +52,13 @@ async function arm(banked) {
      living in _pTurnBanked. Setting turnPts instead would pass pre-fix. */
   G.turnPts = 0;
   G.kept = [];
-  /* BOTH FIELDS, because handleBank writes both. P930 stamps the banked total
-     with the turn it belongs to and endPTurn refuses a value whose stamp does
-     not match - so a probe setting only the amount gets 0, correctly. That is
-     the invariant working; it is also a standing hazard for this probe, which
-     synthesises the post-handleBank state by hand and must be updated whenever
-     that write site gains a field. */
+  /* THE STAMP STANDS IN FOR startPTurn, which this probe never calls. Under
+     P932 the stamp is written once per turn by startPTurn and handleBank
+     touches only the amount - so a synthetic turn has to supply the stamp the
+     way a real turn start would, or endPTurn correctly refuses the value.
+     (Under P930 this had to mirror handleBank's pair instead; the probe needing
+     an edit when the write site moved is exactly the coupling P932 removed from
+     the game code, and it survives here only because the probe fakes a turn.) */
   G._pTurnBanked = banked;
   G._pTurnBankedTurn = G.turnNum;
   const pBefore = G.pPts, oBefore = G.oPts;

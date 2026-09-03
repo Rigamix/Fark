@@ -46,13 +46,28 @@ this exact hazard twice, about Preserve, in a comment forty lines away.
 |---|---|---|
 | mean match total | 4543 | 4508 |
 
-Difference **-35 points (-0.8%)**, 95% CI **[-29%, +28%]**. 1.5x iron would need
-+2271; the interval's upper bound is +1250, so **1.5x is excluded** and parity
-sits inside. The two batches disagree in SIGN on the arm difference (+192, -205),
-both tiny, so the conclusion survives any batch effect between them.
+**THE RESULT IS THE INTERVAL, NOT THE MIDPOINT.** Difference -35 points, 95% CI
+**[-29%, +28%]** - i.e. fair value **0.71-1.28x iron**. What makes it decisive is
+that *every point in that interval prices silver near iron*, not that the centre
+happens to sit near zero. 1.5x would need +2271 against an upper bound of +1250,
+so it is excluded.
 
-**Silver measures as parity with iron.** At 580g that is the finding 3.9's price
-hangs on.
+**The between-batch sign flip is a NULL, not corroboration.** +192 then -205 are
+both well inside one batch SE of about 1005, so there is no detectable batch
+effect. That licenses pooling and does nothing more. Reading an undetectable
+difference as support is the same move as calling 2/10 against 0/10 a result -
+which is the error this file exists to catch.
+
+**SHIPPED (P931):** silver to **120g, stock 3**. 120 sits near the top of the
+measured band deliberately - the benefit of the doubt goes to end-game defensive
+value, which the unreachable-target harness is blind to *by construction*, since
+it removes the target so the cap is the only way a match ends. The stock moved
+with the price because a stock of 1 is the second place "premium" is written
+down. Saved runs get a migration, mirroring the starstone precedent, because
+_initDiceStock freezes stock into S.run at run start.
+
+Note for the brief: 3.9 says "from 580g"; the file already read **320** (P892),
+so that starting point is a patch stale. The destination is unaffected.
 
 ### TURN-LEVEL COLLECTION HAS TO BE RE-RUN
 
