@@ -116,12 +116,13 @@ setInterval(() => { try { if (typeof G !== 'undefined' && G && (G.phase === 'opp
 const BUDGET_MIN = +((location.hash.match(/budget=(\d+)/) || [])[1]) || 25;
 const DEADLINE = Date.now() + BUDGET_MIN * 60000;
 
+const SUB_REFUSE = 0.05;/* P937: above this fraction of substituted decisions the cell refuses */
 let wins = 0, done = 0, stalls = 0, budgetStopped = 0;
 /* P936: how often a persona's own code was silently replaced by the
    harness's fallback. Both fallbacks stay - a stalled cell is worse than a
    substituted keep - but a run that substituted is a run about a different
    policy than the one every output line names, so it says so. */
-let subBank = 0, subKeep = 0, subBankErr = null, subKeepErr = null;
+let subBank = 0, subKeep = 0, subBankErr = null, subKeepErr = null, decisions = 0;
 const byTier = {};
 const LOG = [];
 const say = t => { LOG.push(t); try { console.log(t); } catch (e) {} };
@@ -176,6 +177,7 @@ for (let m = 0; m < N; m++) {
        some state was measured as a different one - under its own name, in every
        line of output. The fallback stays (a stalled cell is worse) but the cell
        now reports how often it fired. */
+    decisions++;
     let sel = null;
     try { sel = policy.keep(free, {keeps: keeps, G: G, state: state, rolls: G.turnRollCount || 0}); }
     catch (e) { subKeepErr = subKeepErr || String(e && e.message || e); }
@@ -200,7 +202,16 @@ for (let m = 0; m < N; m++) {
     try { bank = policy.bankAt({turnPts: G.turnPts || 0, diceLeft: free.length - sel.length,
       rolls: G.turnRollCount || 0, state: state, G: G}); }
     catch (e) { subBank++; subBankErr = subBankErr || String(e && e.message || e);
-                bank = (G.turnPts || 0) >= 300; }
+                /* P937: THE FALLBACK BANKS A WON MATCH. `turnPts>=300` alone
+                   changed TWO things when it fired - the threshold, and the
+                   willingness to bank a match already won. Every persona opens
+                   its bankAt with `pPts+turnPts>=target -> true` (mkPolicy's
+                   default at 888 and each named persona), except Randy, whose
+                   comment says randomness at every exposed decision is the
+                   point. A substituted turn should be a different threshold, not
+                   a turn that throws the match away. */
+                bank = ((G.pPts || 0) + (G.turnPts || 0) >= (G.target || Infinity))
+                       || (G.turnPts || 0) >= 300; }
     tap(document.getElementById(bank ? 'btnBank' : 'btnRoll'));
     await sleep(250);
   }
@@ -231,7 +242,24 @@ say('LB-CELL;band=' + band + ';seat=' + seat + ';policy=' + polName +
 return {band, seat, policy: polName, asked: N, n: done, wins,
         /* P936: a nonzero substitution count means this cell did not measure
            the policy it names. Reported, not hidden in a log line. */
-        subBank, subKeep, subBankErr, subKeepErr,
+        subBank, subKeep, subBankErr, subKeepErr, decisions,
+        subRate: decisions ? +((subBank + subKeep) / decisions).toFixed(4) : 0,
+        /* P937: A COUNT GETS READ ONCE AND THEN IGNORED - the cap-run filter
+           taught that, by being a reported field the first band table was
+           printed straight over. So this REFUSES. Above SUB_REFUSE of its
+           decisions, the cell did not measure the policy every one of its
+           output lines names, and it returns a refusal instead of a win rate.
+           The line is a judgement: 2% is incidental, 90% is a different policy,
+           and 5% is where a persona failing once every twenty decisions stops
+           being incidental. subRate is reported either way so a different line
+           can be drawn afterwards without re-running. */
+        refusal: (decisions && (subBank + subKeep) / decisions > SUB_REFUSE)
+          ? ('the harness substituted its own keep/bank on ' +
+             Math.round(100 * (subBank + subKeep) / decisions) + '% of ' + decisions +
+             ' decisions (bank ' + subBank + ', keep ' + subKeep + '; first errors: ' +
+             (subBankErr || '-') + ' / ' + (subKeepErr || '-') +
+             ') - this cell did not measure ' + polName)
+          : null,
         policyRanUnsubstituted: subBank === 0 && subKeep === 0,
         rate: +(rate * 100).toFixed(1), wilsonHalfWidth: +(hw * 100).toFixed(1),
         stalls, budgetStopped, byTier, dice, log: LOG};
