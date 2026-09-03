@@ -38,6 +38,32 @@ overwritten with 6 while the charge was still spent and the log still read "TAR
 PIT — YOU ROLL 5". Measured 6 dice before, 5 after. The file had already named
 this exact hazard twice, about Preserve, in a comment forty lines away.
 
+### SILVER IS PRICED FOR A MULTIPLE IT DOES NOT DELIVER
+
+**Measured, 14 matches per arm, cap runs only, zero discards.**
+
+| | iron | silver |
+|---|---|---|
+| mean match total | 4543 | 4508 |
+
+Difference **-35 points (-0.8%)**, 95% CI **[-29%, +28%]**. 1.5x iron would need
++2271; the interval's upper bound is +1250, so **1.5x is excluded** and parity
+sits inside. The two batches disagree in SIGN on the arm difference (+192, -205),
+both tiny, so the conclusion survives any batch effect between them.
+
+**Silver measures as parity with iron.** At 580g that is the finding 3.9's price
+hangs on.
+
+### TURN-LEVEL COLLECTION HAS TO BE RE-RUN
+
+All 16 matches of the silver batches recorded **0 for every turn** - that is the
+P929 bug, and it means `turnOutcomes` was a column of zeros. So the stratified
+resampler and the two-sided exchangeability control in `zv_reach.py` have never
+run on real data: not passed, not refused, no input. The match-level result above
+is unaffected (`pPts` and `pTurns` are the game's own), but **4c's tail work and
+4d's coupling question both need turn-level collection re-run now that P929 makes
+it possible for the first time.**
+
 ### One question, and it is yours
 
 **Do you want the driver to mirror the sim's `pushHot`, or is the divergence
