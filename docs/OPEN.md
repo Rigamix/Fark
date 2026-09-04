@@ -5,6 +5,49 @@ is a valid answer.** Answered items are deleted, not marked — this stays short
 
 ---
 
+## PARKED WHEN THE LADDER LANDS - a debt list, so none of it is lost
+
+Ruled by Denis 2026-09-04: the balance thread parks once the ladder result is
+recorded, and FX work resumes at build-order step 9. These are PARKED, NOT
+CANCELLED, and each is written here because the alternative is that it quietly
+stops existing.
+
+**1. THE RE-DERIVATION DEBT - the real one.** Two tools carried a corrupted word
+boundary (a backslash-b written through a heredoc arriving as byte 0x08), and
+their archived conclusions still stand on the broken runs.
+
+- `tools/mirror_diff.py` - **DONE (P944).** Re-derived against the Aug-21
+  snapshot to separate tool from drift: the record should read 3 clean mirrors
+  and 4 rulings, not 4 and 3. `flat_bonus` is the one - same effect function
+  both seats, guards differing in both directions, latent because only
+  `old_partners_badge` carries it today.
+- `tools/apv_observers.js` - **STILL OWED.** Its regex is a FINDER
+  (`src.match(/...G\.\w+.../g)`), not a filter, so a broken word boundary makes
+  it match nothing and **under-report**. `docs/archive/P5_OBSERVERS.md` concludes
+  "**1 gated call site, 0 raw**" and "**0 checks read a field the view does not
+  carry**" - two zeros, from an instrument that could not see. Those are exactly
+  the conclusions a blind finder produces. It is a browser probe, so it needs a
+  free slot; it was not run because a third browser is what killed the first
+  sweep's opening batch.
+
+**2. Bands 1 and 3** - corroboration, deferred. They measured close to their
+stored values before, so they only matter if band 2 comes back surprising.
+
+**3. Turn-level re-collection and 4c/4d.** The collection now works (P929/P933)
+and produced real per-turn data. What is NOT settled is which quantity the
+resample should model - `sum(turnSeq)` is what the player BANKED, `pPts` is the
+NET score, and three sites move pPts after the credit inside handleBank. 3 of 12
+matches diverged, in both directions. The exchangeability control in
+`zv_reach.py` has therefore still never run on real input: not passed, not
+refused, no input.
+
+**4. `_paintHalo`'s punch, carried into step 9.** It was tuned for two canvas
+positions and there are now three; a canvas over the DICE is the third case. The
+cut has to land at the silhouette or a hair inside it, and the case to check is
+**two dice overlapping**.
+
+---
+
 ## THE LADDER IS RUNNING - AND 0.443 IS NOT ITS COMPARATOR (2026-09-03)
 
 480 matches, band 2 first (120 per seat), two concurrent, batches of 15. First
