@@ -93,7 +93,7 @@ cell() {
   echo "=== CELL-DONE band=$b seat=$s n=$got $(date +%H:%M:%S) ===" >> "$OUT"
 }
 
-echo "=== BAND SWEEP START policy=$POL batch=$BATCH budget=${BUDGET}m $(date +%Y-%m-%d\ %H:%M:%S) ===" >> "$OUT"
+echo "=== BAND SWEEP START policy=$POL batch=patron:$BATCH_PATRON,boss:$BATCH_BOSS budget=${BUDGET}m $(date +%Y-%m-%d\ %H:%M:%S) ===" >> "$OUT"
 cell 2 boss 120 & cell 2 patron 120 & wait
 cell 3 boss 60  & cell 3 patron 60  & wait
 cell 1 boss 60  & cell 1 patron 60  & wait
