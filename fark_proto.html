@@ -24912,7 +24912,14 @@ function _lmArm(type,lane,turns,extra){
   if(typeof lane!=='number'||lane<0)return false;
   var M=_lmMap(),cur=M[lane];
   if(cur&&cur.live)return false;
-  var m={t:type,lane:lane,live:true,turn:(G.oppTurnCount||0)+1,turns:turns||1};
+  /* P948 (3.13): armedOn is the PLAYER turn this mark was placed on, and it is
+     a separate field because `turn` cannot answer the question. _lmSpend
+     re-stamps `turn` for a Kindred mark's second attempt, so an old mark that
+     has already been paid for by a bank and a mark placed thirty seconds ago
+     are indistinguishable by it. G.pTurns counts COMPLETED player turns and is
+     incremented in endPTurn, so it is constant across the turn being played. */
+  var m={t:type,lane:lane,live:true,turn:(G.oppTurnCount||0)+1,turns:turns||1,
+         armedOn:(G.pTurns||0)};
   if(extra)for(var k in extra)if(extra.hasOwnProperty(k))m[k]=extra[k];
   M[lane]=m;
   return true;
@@ -24921,6 +24928,26 @@ function _lmArm(type,lane,turns,extra){
    P945: a TYPE can now have more than one live mark, so the gate answers "is
    any mark of this type due" and _lmDueList hands back which. A read site that
    took the single stored lane would arm two and apply one. */
+/* P948 (brief 3.13): A BUST TAKES THIS TURN'S ARMINGS WITH THE POINTS.
+   Bank keeps, bust clears. Arming used to be free of risk, which made "push or
+   lock it in?" a non-decision; a brand already banks nothing under 3.4, so this
+   is the jeopardy that makes the commitment mean something.
+   ONLY THIS TURN'S. A mark armed on an earlier turn was already paid for by the
+   bank that ended that turn, and survives. A mark with no armedOn at all - one
+   restored from a snapshot written before this patch - also survives, which is
+   the conservative direction for a save that never knew the risk existed. */
+function _lmBustDisarm(){
+  if(typeof G==='undefined'||!G)return 0;
+  var now=(G.pTurns||0),M=_lmMap(),n=0;
+  for(var L in M){
+    if(!M.hasOwnProperty(L))continue;
+    var m=M[L];
+    if(!m||!m.live)continue;
+    if(m.armedOn!==now)continue;
+    m.live=false;n++;
+  }
+  return n;
+}
 function _lmDueList(type){
   var c=(typeof G!=='undefined'&&G&&G.oppTurnCount)||0;
   return _lmLive(type).filter(function(m){return m.turn===c;});
@@ -35652,6 +35679,16 @@ function doBust(){
   /* THE bust event, on the path where a bust actually happened. Everything
      above either returned or continued the turn. */
   try{famFire('bust',{actor:'p',lost:_bustLost});}catch(e){}
+  /* P948 (3.13): AND THE ARMINGS GO WITH THE POINTS. This is the one place the
+     file already identifies as "a bust actually happened", which is exactly the
+     scope the ruling needs: Amber's shield returns above it, so an eaten bust
+     disarms nothing and the turn continues, while the ward branch sits below it
+     and does disarm - the ward pays half and ENDS the turn, which is a bust with
+     a consolation rather than a bank. */
+  try{
+    var _lmGone=_lmBustDisarm();
+    if(_lmGone)famLog(_lmGone>1?'THE BRANDS GO WITH THE TURN':'THE BRAND GOES WITH THE TURN');
+  }catch(e){}
   /* THE BUST TOLLS. Ill Omen and Whisper's Fang, hoisted out of the
      Silver-shield branch that used to be their only home. That branch ran
      ONLY when a shield BLOCKED the bust, so on every real bust the rival's
