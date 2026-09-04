@@ -115,6 +115,44 @@ plays full boss matches (scores to 7375 over many turns).
 
 ---
 
+## THE TABLE MARK IS IN (P950/P951) - AND SNUFF CANNOT BE SEEN
+
+Shipped: the state (landed / hit / how it ended) and the paint (three
+silhouettes, two endings, into the under-canvas plan). 16/16 on the paint, 5/5
+on the outcome ordering, and screenshots at each step.
+
+**TWO THINGS THE SCREENSHOTS TAUGHT, neither of which was reasoning.**
+
+1. `rim` CAN ONLY DRAW AN OUTLINE. _paintHalo punches its subject back out of
+   its own glow, so a cloud hull came out as a cloud-SHAPED RING and read as
+   nothing. The brief says it plainly for the die case - "the ring is a ring by
+   construction, not by occlusion" - and it applies just as hard with no die
+   there. Snare survived it only by being thin: an outline of a lens IS a cord.
+   Fog and snuff moved to `veil`, the only form that fills.
+
+2. Before that, at full alpha, both halo forms blew out to white: _paintHalo
+   composites with 'lighter', so a pale ink on this table adds toward white
+   whatever shape it is.
+
+🔴 **DENIS - SNUFF IS INVISIBLE AND IT IS AN ART-DIRECTION COLLISION, not a
+bug.** Snuff's ink is #b09470, a warm tan, and the table is brown wood. Filled
+at 0.42 it cannot be picked out at all; fog's grey and snare's lavender both
+read fine because they are off-hue from the table. §11 says a state wears its
+enchant's own ink, and for this one enchant that rule and the table's own value
+collide.
+
+My proposal, and it is a design call rather than a fix: **snuff reads as a
+DARKENING rather than a tint.** Absence is what snuff means - the die is gone
+for a turn - and a dark patch on the table says that better than a tan wisp
+would even if the tan were visible. It also solves the contrast by construction,
+because the table is mid-brown and nothing else on the surface is dark.
+Alternatives if you would rather hold the ink rule: raise snuff alone to near-
+opaque, or outline the wisp in crust the way snare is.
+
+Nothing else is blocked on the answer - fog and snare are done.
+
+---
+
 ## 3.12 / 3.13 - WHAT IS SHIPPED, AND WHAT THE TABLE MARK NOW RESTS ON
 
 **3.13 SHIPPED (P948): bank keeps, bust clears.** Denis ruled upstream of a

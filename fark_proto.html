@@ -24936,6 +24936,36 @@ function _lmArm(type,lane,turns,extra){
    bank that ended that turn, and survives. A mark with no armedOn at all - one
    restored from a snapshot written before this patch - also survives, which is
    the conservative direction for a save that never knew the risk existed. */
+/* P950 (3.12): THE MARK REACHED THE TABLE. Called from the bank seam, once per
+   mark. `flourish` says whether the bank that carried it actually paid - a
+   voided bank (LAST CALL, The Reckoning) still arms and still lands the mark,
+   but lands it quietly.
+   STAMPED ONCE. An older mark that landed on a previous turn keeps its own
+   moment; re-stamping every mark on every bank would restart the entrance
+   animation of a cloud that has been sitting there for a turn, which is a group
+   stamp resetting a per-item ramp. */
+function _lmLand(flourish){
+  if(typeof G==='undefined'||!G)return 0;
+  var M=_lmMap(),n=0;
+  for(var L in M){
+    if(!M.hasOwnProperty(L))continue;
+    var m=M[L];
+    if(!m||!m.live||m.shownAt)continue;
+    m.shownAt=Date.now();m.flourish=!!flourish;n++;
+  }
+  return n;
+}
+/* P950: THIS MARK LANDED ON SOMETHING. Reported by lane because the fire sites
+   resolve several due marks at once and only the site knows which seat it
+   actually took - the snuff's one-die floor can refuse a seat that was due, and
+   a fog whose seat is the last readable one is dropped the same way. */
+function _lmHit(lane){
+  if(typeof G==='undefined'||!G)return false;
+  var m=_lmMap()[lane];
+  if(!m||!m.live)return false;
+  m.hit=true;
+  return true;
+}
 function _lmBustDisarm(){
   if(typeof G==='undefined'||!G)return 0;
   var now=(G.pTurns||0),M=_lmMap(),n=0;
@@ -24972,12 +25002,29 @@ function _lmDue(type){
    mark either fires or misses and both cost an attempt, so two due fogs cost
    two attempts whether one, both or neither landed. Spending only the first
    would let a second fog lurk for ever. */
+/* P950 (3.3 + 3.12): A MARK ENDS ONE OF TWO WAYS AND THE ENDING IS RECORDED
+   HERE, because _lmSpend is the one place a mark dies. `hit` is stamped by the
+   fire site that took a seat; anything that comes due and takes nothing has
+   MISSED, which is a real outcome under 3.2 - a due mark costs an attempt
+   whether it lands or not - and under 3.3 must look different.
+   endedAt is the exit animation's clock. The mark stays in the map, dead, so
+   the ending has something to play; _lmArm tests `live`, so the lane is free
+   again the instant it dies, which is unchanged. */
+function _lmEnd(m){
+  if(!m)return;
+  m.live=false;
+  m.outcome=m.hit?'fire':'miss';
+  m.endedAt=Date.now();
+}
 function _lmSpend(type){
   if(typeof G==='undefined'||!G)return;
   _lmDueList(type).forEach(function(m){
     m.turns=(m.turns||1)-1;
     if(m.turns>0)m.turn=(G.oppTurnCount||0)+1;
-    else m.live=false;
+    /* P950: out of attempts. _lmEnd does what `m.live=false` did and also
+       records WHICH of the two endings this was - a fire if any site stamped
+       hit, a miss otherwise. 3.3 requires both from the start. */
+    else _lmEnd(m);
   });
 }
 /* P878: _lmDefer is DELETED. It re-armed a mark without spending, which only
@@ -27781,10 +27828,225 @@ var D3X={
     }
     return out;
   },
+  /* ═══ P951 (3.12): THE MARK ON THE TABLE ═══
+     A third ANCHOR, not a third lifetime. MARKS is one row per thing a DIE
+     wears and _markDice requires match && obj.visible && chip; FX_MARKS is
+     die-bound too. A table mark has no die, so it produces its own groups and
+     joins at _markPlan, which is the one anchor-agnostic point in the pipeline.
+     Timings in ms. The miss runs nearly twice as long as the fire: a thing
+     dispersing takes longer than a thing being consumed. */
+  SEAT_MS:{enter:420,fire:620,miss:1100},
+  /* one row per occupying enchant. `ink` names the enchant, so the colour has
+     ONE home - ENCH_ICONS - and this cannot drift from the card, the brand or
+     the beat. `shape` is a silhouette, not a size: three enchants, three forms,
+     because one shape in three colours reads as tooling. */
+  /* P951c: FOG AND SNUFF ARE FILLS, AND THIS IS NOT A TASTE CALL.
+     _paintHalo punches its subject back out of its own glow - destination-out
+     on the hull, widened by GLOW.clear - so it can only ever draw an OUTLINE of
+     whatever hull it is given. The brief states it plainly for the die case:
+     "the ring is a ring by construction, not by occlusion." Screenshotted, that
+     is exactly what happened: the cloud came out as a pale cloud-SHAPED ring
+     and read as nothing, while snare's thin lens came out as a curved line and
+     read as a taut cord - correct by accident of being thin.
+     A cloud has to be filled, and `veil` is the only form that fills. Snuff
+     goes with it for the same reason. Snare keeps `crust`, whose hard edge and
+     near-zero falloff is what made it the one form that worked at full strength.
+     alpha rides ON TOP of VEIL.alpha (0.42), so 1 here is 0.42 on the table. */
+  SEAT_FORMS:{
+    _fog:{ink:'fog',style:'veil',shape:'cloud',alpha:1},
+    _snare:{ink:'snare',style:'crust',shape:'cord',alpha:1},
+    _snuff:{ink:'snuff',style:'veil',shape:'wisp',alpha:0.9}
+  },
+  _seatInk:function(type){
+    try{
+      var d=ENCH_ICONS[(type||'').replace(/^_/,'')];
+      if(d&&d.ink)return d.ink;
+    }catch(e){}
+    return '#c8b48a';
+  },
+  /* WHERE LANE N IS, in #screen-match CSS pixels - the space _paintHalo works
+     in. Three answers, in descending order of authority. */
+  _seatBounds:function(lane,sc){
+    var od=[];
+    try{od=(typeof G!=='undefined'&&G&&G.oppDice)||[];}catch(e){od=[];}
+    var mid=function(el){
+      var r=el.getBoundingClientRect();
+      if(!(r.width>2))return null;
+      return {cx:r.left-sc.left+r.width/2,cy:r.top-sc.top+r.height/2,
+              w:r.width,h:r.height};
+    };
+    /* 1. MEASURED. Their own die in that lane is the position, full stop. */
+    var i,b,lo=null,hi=null;
+    for(i=0;i<od.length;i++){
+      if(!od[i]||!od[i].el||typeof od[i].lane!=='number')continue;
+      if(od[i].lane===lane){b=mid(od[i].el);if(b){b.how='die';return b;}}
+      if(od[i].lane<lane&&(!lo||od[i].lane>lo.lane))lo=od[i];
+      if(od[i].lane>lane&&(!hi||od[i].lane<hi.lane))hi=od[i];
+    }
+    /* 2. THE GAP THE ROW CLOSED OVER. A snuffed seat has no die by
+       definition, and the row is justify-content:center so it shuts the gap -
+       the full-grid prediction would point at empty table. The midpoint of the
+       surviving neighbours IS where the missing die was. */
+    if(od.length){
+      var a=lo&&mid(lo.el),c=hi&&mid(hi.el);
+      if(a&&c)return {cx:(a.cx+c.cx)/2,cy:(a.cy+c.cy)/2,w:a.w,h:a.h,how:'gap'};
+      if(a||c){
+        var one=a||c,ref=a?lo:hi,step=one.w*1.28;
+        return {cx:one.cx+(a?step:-step)*Math.abs(lane-ref.lane),
+                cy:one.cy,w:one.w,h:one.h,how:'edge'};
+      }
+    }
+    /* 3. PREDICTED, for the window where their row does not exist. #throwLine
+       is the datum P683 established for exactly this: the rows collapse to
+       zero when empty and the cell does not. Die 13cqw, gap 3.8cqw, container
+       query unit = #screen-match; measured against real seats to the pixel. */
+    var tl=document.getElementById('throwLine');
+    if(!tl)return null;
+    var T=tl.getBoundingClientRect();
+    if(!(T.width>2)||!(sc.width>10))return null;
+    var cq=sc.width/100,n=0;
+    try{n=((G.matchOppDice||[]).length)||0;}catch(e){}
+    if(!n)n=6;
+    return {cx:(T.left-sc.left)+T.width/2+(lane-(n-1)/2)*16.8*cq,
+            cy:(T.top-sc.top)+T.height/2,w:13*cq,h:13*cq,how:'cell'};
+  },
+  /* THE SILHOUETTES. Each returns a closed polygon of [x,y] in the same space,
+     which is all _paintForm asks of a hull. */
+  _seatShape:function(name,b,phase,grow){
+    var pts=[],i,t,e,a,k,N;
+    if(name==='cloud'){
+      /* three frequencies so no two lobes match, and the phase drifts */
+      N=30;
+      var rx=b.w*0.62*grow,ry=b.h*0.34*grow;
+      for(i=0;i<N;i++){
+        a=i/N*Math.PI*2;
+        k=1+0.20*Math.sin(3*a+phase)+0.12*Math.sin(5*a-phase*1.7)
+           +0.06*Math.sin(8*a+phase*0.5);
+        pts.push([b.cx+Math.cos(a)*rx*k,b.cy+Math.sin(a)*ry*k]);
+      }
+      return pts;
+    }
+    if(name==='cord'){
+      /* a lens whose profile reaches zero at both ends - that is what makes
+         them points. The sag is small and constant, so it reads as a line
+         under tension rather than a hanging rope. */
+      N=20;
+      var cx2=b.w*0.60*grow,th=b.h*0.15*grow,sag=b.h*0.09;
+      for(i=0;i<=N;i++){
+        t=-1+2*i/N;e=Math.pow(Math.max(0,1-t*t),0.72);
+        pts.push([b.cx+t*cx2,b.cy+sag*e-th*e]);
+      }
+      for(i=N;i>=0;i--){
+        t=-1+2*i/N;e=Math.pow(Math.max(0,1-t*t),0.72);
+        pts.push([b.cx+t*cx2,b.cy+sag*e+th*e]);
+      }
+      return pts;
+    }
+    if(name==='wisp'){
+      /* narrow, rising, tapering, and small enough that the seat around it
+         still reads empty - the absence is the mark */
+      N=18;
+      var wx=b.w*0.26*grow,hh=b.h*0.74*grow,up=[],dn=[],x,y,hw;
+      for(i=0;i<=N;i++){
+        t=i/N;
+        x=b.cx+Math.sin(t*Math.PI*1.7+phase)*wx*(0.22+0.78*t);
+        y=b.cy+hh*(0.5-t);
+        hw=b.w*0.085*grow*(1-0.72*t)+0.6;
+        up.push([x-hw,y]);dn.push([x+hw,y]);
+      }
+      return up.concat(dn.reverse());
+    }
+    /* NO SILHOUETTE: fall back to the bounds themselves, deliberately. A
+       missing form should look WRONG - a rectangle on the table is obviously
+       not a cloud - rather than plausible. Same principle as P949's default. */
+    return this._rectHull(b.cx-b.w/2,b.cy-b.h/2,b.w,b.h,Math.min(b.w,b.h)*0.3);
+  },
+  /* IS ANYTHING WORN BY THE TABLE RIGHT NOW. Geometry-free, because the wake
+     test runs before the screen rect is even read. */
+  _seatsLive:function(){
+    try{
+      if(typeof G==='undefined'||!G||!G._laneMark)return false;
+      var M=G._laneMark,now=Date.now(),S=this.SEAT_MS;
+      for(var L in M){
+        if(!M.hasOwnProperty(L))continue;
+        var m=M[L];
+        if(!m||!m.shownAt||!this.SEAT_FORMS[m.t])continue;
+        if(m.live)return true;
+        if(m.endedAt&&(now-m.endedAt)<((m.outcome==='miss')?S.miss:S.fire))return true;
+      }
+    }catch(e){}
+    return false;
+  },
+  /* THE GROUPS. Same shape _markPlan produces, plus `am` - the per-mark alpha,
+     which the roster never needed because a state is either worn or not. */
+  _seatPlan:function(sc){
+    var groups=[];
+    if(!sc||!(sc.width>10))return groups;
+    var M=null;
+    try{
+      if(typeof G==='undefined'||!G||!G._laneMark)return groups;
+      M=G._laneMark;
+    }catch(e){return groups;}
+    var now=Date.now(),S=this.SEAT_MS;
+    for(var L in M){
+      if(!M.hasOwnProperty(L))continue;
+      var m=M[L];
+      /* NOT LANDED, NOT PAINTED. An armed brand that has not been banked shows
+         nothing at all - which is what makes 3.13's jeopardy legible. */
+      if(!m||!m.shownAt)continue;
+      var F=this.SEAT_FORMS[m.t];
+      if(!F)continue;
+      var am=1,grow=1,dx=0,dy=0,age;
+      if(m.live){
+        age=now-m.shownAt;
+        if(age<S.enter){
+          var p=age/S.enter;
+          am=p;grow=0.70+0.30*p;
+          /* the flourish is the bank's beat: a mark that arrived on a paying
+             bank overshoots on the way in. A voided bank still lands it, flat. */
+          if(m.flourish)grow*=1+0.20*Math.sin(p*Math.PI);
+        }
+      }else{
+        if(!m.endedAt)continue;
+        var miss=(m.outcome==='miss'),dur=miss?S.miss:S.fire,e=(now-m.endedAt)/dur;
+        if(e>=1)continue;
+        if(miss){
+          /* THINS AND DRIFTS OFF, their dice untouched */
+          am=(1-e)*(1-e);grow=1+0.45*e;dx=28*e;dy=-15*e;
+        }else{
+          /* BLOOMS, then is consumed */
+          am=(e<0.28)?(1+0.55*(e/0.28)):Math.max(0,1-(e-0.28)/0.72);
+          grow=1+0.32*e;
+        }
+      }
+      if(!(am>0.02))continue;
+      var b=this._seatBounds(+L,sc);
+      if(!b)continue;
+      var phase=((now-(m.shownAt||now))/1000)*(m.t==='_fog'?0.55:0.95);
+      var hull=this._seatShape(F.shape,
+        {cx:b.cx+dx,cy:b.cy+dy,w:b.w,h:b.h},phase,grow);
+      if(!hull||hull.length<3)continue;
+      /* P951b: A PER-FORM CEILING, and it is about the PAINTER rather than
+         taste. _paintHalo composites with 'lighter', so a pale ink on this
+         table adds toward white: screenshotted at full alpha, fog's grey and
+         snuff's tan both blew out to a white smear while snare - the one form
+         on `crust`, whose profile is a hard edge with almost no falloff -
+         read exactly as intended. The two halo forms are pulled down to where
+         the ink still reads as its own colour. */
+      var col=this._seatInk(F.ink);
+      groups.push({style:F.style,col:col,soft:col,hulls:[hull],
+                   am:am*(F.alpha==null?1:F.alpha)});
+    }
+    return groups;
+  },
   /* THE WAKE TEST. Any row on this layer that is allowed to paint right now
      and has at least one die - so adding a row cannot leave it stale, and a
      roll with nothing through:true live still puts the whole pass to sleep. */
   _marksLive:function(layer,rolling){
+    /* P951: THE TABLE WEARS MARKS TOO, and no `rolling` gate - a seat mark's
+       whole job is to be there when their dice land in it, which is the one
+       moment a roll is happening. */
+    if(layer==='under'&&this._seatsLive())return true;
     var M=this.MARKS||[];
     for(var r=0;r<M.length;r++){
       var row=M[r];
@@ -27920,6 +28182,15 @@ var D3X={
       }
       paintSet(row.style,ds,col,soft);
     }
+    /* P951: and the marks worn by the TABLE, which have no roster row because
+       they have no die. Appended here rather than painted separately because
+       _planSig and _paintPlan walk the PLAN - so these are signed and drawn by
+       the machinery that already exists, and a second writer to dgCanvas (which
+       _drawGlow clears every frame) is avoided by construction. */
+    if(layer==='under'){
+      var seats=this._seatPlan(sc);
+      for(var sg=0;sg<seats.length;sg++)groups.push(seats[sg]);
+    }
     return groups;
   },
   /* THE SIGNATURE OF A PAINT. Rounded to a tenth of a CSS pixel: below that no
@@ -27931,7 +28202,12 @@ var D3X={
     var s='',i,j,k,g,h;
     for(i=0;i<groups.length;i++){
       g=groups[i];
-      s+=g.style+'|'+g.col+'|'+g.soft+'|';
+      /* P951: ALPHA IS PART OF THE PICTURE. It was absent because a state is
+         either worn or not, so every group was opaque and the omission cost
+         nothing. A seat mark fades in, blooms or thins, and without this the
+         cache would hold the first frame of an animation on screen and never
+         repaint it - a signature that cannot see the thing that is changing. */
+      s+=g.style+'|'+g.col+'|'+g.soft+'|'+((g.am==null?1:g.am).toFixed(2))+'|';
       for(j=0;j<g.hulls.length;j++){
         h=g.hulls[j];
         for(k=0;k<h.length;k++)s+=h[k][0].toFixed(1)+','+h[k][1].toFixed(1)+' ';
@@ -27944,8 +28220,8 @@ var D3X={
   _paintPlan:function(groups,cv,x,sc,dpr,layer,cheap){
     for(var i=0;i<groups.length;i++){
       var g=groups[i];
-      this._paintForm(g.style,cv,x,sc,dpr,g.hulls,g.col,g.soft,1,
-                      layer==='over',cheap);
+      this._paintForm(g.style,cv,x,sc,dpr,g.hulls,g.col,g.soft,
+                      (g.am==null?1:g.am),layer==='over',cheap);
     }
     return groups.length;
   },
@@ -28632,7 +28908,11 @@ var D3X={
     var anyMatch=false;
     for(var mi=0;mi<this.dice.length;mi++)if(this.dice[mi].match){anyMatch=true;break;}
     var rolling=this._rolling();
-    if(!anyMatch||!this._marksLive('under',rolling)){
+    /* P951: anyMatch was a fair precondition while every mark belonged to a
+       die. A seat mark outlives the dice - it lands when the player's row is
+       cleared at the bank and waits for the rival's row to be dealt - so for
+       the whole window it is the only thing on the surface. */
+    if(!(anyMatch||this._seatsLive())||!this._marksLive('under',rolling)){
       if(cv&&this._glowInk){
         var c0=cv.getContext('2d');
         c0.setTransform(1,0,0,1,0,0);c0.clearRect(0,0,cv.width,cv.height);
@@ -37073,6 +37353,16 @@ function handleBank(){
     }
     famFire('bank',{actor:'p',amt:total});try{famRenderRow();}catch(e){}
   }
+  /* P950 (3.12): THE MARKS REACH THE TABLE. Here rather than at the credit,
+     because The Tab's escrow branch does not credit and does not fire the bank
+     hook yet still ends the turn through this line - a hook at G.pPts+= would
+     miss it. This is the last point in handleBank where the turn is known to
+     have ended in a bank at all.
+     UNGATED, per the ruling: a voided bank still arms, so it still lands. Only
+     the FLOURISH is gated - LAST CALL and The Reckoning zero the total and fall
+     through to here, and a mark landing after a bank that paid nothing should
+     not be celebrating. */
+  try{_lmLand(!_bankRefused&&total>0);}catch(e){}
   _turnScoreClear();G.numDice=6;
   /* THE GRUDGE NPC mirror: increment opp's grudge stack when player banks
      (max 750). Consumed in finOpp at NPC's next bank. Mirrors the
@@ -37779,7 +38069,6 @@ function runOppTurn(){
        Kindred snuff with two attempts that misses the first still gets the
        second. P876 moved this inside the guard on the reading that a no-op
        should cost nothing; the ruling says otherwise and this is the revert. */
-    _lmSpend('_snuff');
     /* THE ONE-DIE FLOOR IS PER SEAT TAKEN, not per mark due. Two snuffs on a
        two-die hand take one seat, not two, and the published list must hold
        only the seats actually dropped - otherwise a reader skips a seat that
@@ -37788,10 +38077,21 @@ function runOppTurn(){
       if(left>1){
         left--;/* the seat itself is dropped where rungDice is built, below */
         _snuffLanes.push(L);
+        try{_lmHit(L);}catch(e){}/* P950: inside the floor, so only seats really taken */
         try{setStatusMsg('THEIR '+(L+1)+(L===0?'ST':(L===1?'ND':(L===2?'RD':'TH')))+' DIE IS SNUFFED','gold');}catch(e){}
         try{famLog('SNUFF — THEY PLAY ONE SHORT');}catch(e){}
       }
     });
+    /* P950b: SPENT AFTER THE SEATS ARE TAKEN, not before. It ran above the
+       loop, so _lmEnd computed the outcome while `hit` was still false and a
+       snuff that took a seat recorded a MISS - measured: the rival dealt
+       [0,1,3,4,5] with published [2], and the mark said miss. Fog and snare
+       already determine, stamp, then spend; snuff alone inverted it.
+       P878's ruling is untouched and this is still the unconditional charge it
+       demands - the loop has no early exit, so the spend runs whether any seat
+       was taken or not. A due mark that finds no room has MISSED, and a miss
+       costs an attempt exactly as a hit does. */
+    _lmSpend('_snuff');
   }
   clearRow('oppDiceRow');G.oppDice=[];
   /* P761: THE AMBER RETURNS - the rival's preserved die, rebuilt the
@@ -38148,6 +38448,13 @@ function runOppTurn(){
           _fogV.splice(ix,1);_fogM.splice(ix,1);if(_fogE)_fogE.splice(ix,1);/* P762 */
         });
         if(_fogCuts.length){
+          /* P950: which LANES were actually blinded - not which were due. The
+             one-readable-seat floor above drops cuts, so a due fog can take
+             nothing and that is a miss under 3.3. */
+          try{_fogCuts.forEach(function(_fc){
+            var _fl=_oFree[_fc]&&_oFree[_fc].lane;
+            if(typeof _fl==='number')_lmHit(_fl);
+          });}catch(e){}
           try{famLog('FOG — THEY MISREAD '+(_fogCuts.length>1?'TWO SEATS':'A SEAT'));}catch(e){}
           /* P823: THE FOG SHOWS. Chip overlays are invisible under the 3D
              canvas (screenshot-proven), so the blinded die goes DARK
@@ -38232,6 +38539,7 @@ function runOppTurn(){
           for(var _si=0;_si<_oFree.length;_si++)if(_oFree[_si].lane===m.lane){_snIdx=_si;break;}
           if(total>0&&_snIdx>=0&&used&&used[_snIdx]){
             var _snX2=!!m.x2;
+            try{_lmHit(m.lane);}catch(e){}/* P950: it caught something */
             total=Math.floor(total/(_snX2?4:2));/* Kindred halves it twice */
             try{famLog('THE SNARE BITES — '+(_snX2?'HALVED TWICE':'HALVED'));}catch(e){}
             try{setStatusMsg('YOUR SNARE CATCHES THEM — '+(_snX2?'A QUARTER':'HALF'),'gold');}catch(e){}
