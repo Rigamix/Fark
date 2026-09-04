@@ -68,6 +68,20 @@ try {
 if (!window.FSIM || !FSIM.POLICIES[polName]) return {err: 'no policy ' + polName};
 const policy = FSIM.POLICIES[polName];
 
+/* #sab=bank - THE FORCED-THROW CONTROL FOR THE catch FALLBACK. Every smoke run
+   reported subBank 0, which means the fallback has never executed: the runs
+   verified the file works, not the substitution path inside it. A bug in a
+   catch block is the least visible kind there is, so this makes the path
+   reachable on demand - policy.bankAt throws on every call, the fallback takes
+   every bank decision, subBank should equal decisions and the cell should
+   REFUSE. It is a control, not a mode: it only arms from the hash. */
+const SAB = /[#&]sab=bank/.test(location.hash);
+if (SAB) {
+  const realBankAt = policy.bankAt;
+  policy.bankAt = function () { throw new Error('sab: forced throw'); };
+  policy.__realBankAt = realBankAt;
+}
+
 /* ── the band rule, taken from the model rather than restated ─────── */
 let gearLevel = null, FAMS = null;
 try {
@@ -159,6 +173,24 @@ for (let m = 0; m < N; m++) {
   if (!okStart) { stalls++; say('LB;' + band + ';' + seat + ';' + polName + ';' + tier + ';' + m + ';stall-start'); continue; }
   await sleep(400);
   G.pF = [];/* bare gear convention, stated - no family cards, no enchants */
+  /* PLAYBACK SPEED WAS ALREADY AT THE FLOOR - this only closes a gap in WHEN.
+     Both levers were already set at the top of this file: fastRival=true (0.4x)
+     and an interval driving G._ffMult to 0.05, which is lower than any value
+     worth proposing. _bossSeen is preset too, so no match gets the
+     _bossFirstEnc exemption. The 68-248s boss timings were therefore ALREADY
+     the sped-up numbers, and there is no further multiple available here.
+     THE ONE GAP: that interval only lowers _ffMult while the phase is 'opp' or
+     _oppTurnActive. _oppDelay is also called at the handover
+     (setTurnMode/startPTurn at 800ms, the cap branches at 900ms), where
+     _ffMult would otherwise be unset and the multiplier would fall back to
+     fastRival's 0.4. Setting it per match closes that, at the same 0.05 the
+     interval uses so the two cannot disagree.
+     AND IT CANNOT MOVE AN OUTCOME: the multiplier scales DELAYS only. It does
+     not reach a die's value or a policy's decision. What it also does not
+     shorten is _afterOppSettle's wait, which polls _rowSettled on the rival's
+     row - 3D playback, not a delay - under a flat CAP=4200 that no multiplier
+     scales. */
+  try { G._ffMult = 0.05; } catch (e) {}
   const state = {};
   let guard = Date.now() + 240000, dead = false;
   while (!G._endMatchFired) {
@@ -248,6 +280,8 @@ say('LB-CELL;band=' + band + ';seat=' + seat + ';policy=' + polName +
     ';wilson=[' + (lo * 100).toFixed(1) + ',' + (hi * 100).toFixed(1) + ']' +
     ';stalls=' + stalls + ';subBank=' + subBank + ';subKeep=' + subKeep + ';byTier=' + tierStr);
 return {band, seat, policy: polName, asked: N, n: done, wins,
+        /* a sabotaged run must be unmistakable in its own output */
+        sabotaged: SAB || undefined,
         /* P936: a nonzero substitution count means this cell did not measure
            the policy it names. Reported, not hidden in a log line. */
         subBank, subKeep, subBankErr, subKeepErr, decisions,

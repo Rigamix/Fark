@@ -29,8 +29,16 @@
 # than by this file, and the browsers run below normal priority.
 set -u
 cd "$(dirname "$0")/.."
-OUT="${1:?usage: _run_band_ladder.sh <results-file> [policy]}"
+OUT="${1:?usage: _run_band_ladder.sh <results-file> [policy] [n-per-seat] [bands]}"
 POL="${2:-carl}"
+# N IS SIZED TO THE QUESTION, NOT TRIMMED TO FIT THE CLOCK. Separating
+# PWIN[2]=0.62 from the sim's 0.443 is a 17.7pp gap; n=50 gives a Wilson
+# half-width near 13.9pp, which excludes 0.62 if the result lands near 0.44.
+# n=120's 8.9pp is precision this question does not consume. Bands 1 and 3 are
+# corroboration - they ran close to their stored values - so they are deferred
+# and run only if band 2 comes back surprising.
+NPER="${3:-120}"
+BANDS="${4:-2 3 1}"
 # BATCH IS SEAT-AWARE, and both halves of this were needed. Advancing the
 # counter by the ACHIEVED count is necessary but not sufficient: a boss batch of
 # 15 blows a 25-minute budget every time - measured 68-248s per boss match, so
@@ -93,8 +101,10 @@ cell() {
   echo "=== CELL-DONE band=$b seat=$s n=$got $(date +%H:%M:%S) ===" >> "$OUT"
 }
 
-echo "=== BAND SWEEP START policy=$POL batch=patron:$BATCH_PATRON,boss:$BATCH_BOSS budget=${BUDGET}m $(date +%Y-%m-%d\ %H:%M:%S) ===" >> "$OUT"
-cell 2 boss 120 & cell 2 patron 120 & wait
-cell 3 boss 60  & cell 3 patron 60  & wait
-cell 1 boss 60  & cell 1 patron 60  & wait
+echo "=== BAND SWEEP START policy=$POL n=$NPER bands=$BANDS batch=patron:$BATCH_PATRON,boss:$BATCH_BOSS budget=${BUDGET}m $(date +%Y-%m-%d\ %H:%M:%S) ===" >> "$OUT"
+# BAND ORDER IS PRIORITY ORDER and is driven by the argument, so a scoped run
+# ("2") and the full sweep ("2 3 1") are the same code path rather than two.
+for b in $BANDS; do
+  cell "$b" boss "$NPER" & cell "$b" patron "$NPER" & wait
+done
 echo "=== BAND SWEEP COMPLETE $(date +%H:%M:%S) ===" >> "$OUT"
