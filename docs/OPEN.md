@@ -58,6 +58,49 @@ yet, and the boss cell is the one carrying the unconditional claim.
 
 ---
 
+## THE BOSS 0/30: WHAT IS RULED OUT, AND ONE NEW DEFECT (2026-09-04)
+
+Denis flagged the flatness as a tell - a result that does not move with tier is
+not a difficulty result. Investigated, and the honest state is ELIMINATIONS plus
+one new tooling defect. No conclusion about the balance.
+
+**Corrected first: the win rate is flat, the scores are not.** The player rises
+to tier 4 (3550-7375) and COLLAPSES at tiers 6-7 (0, 30, 50, 550, 555, 827, 900)
+on the same loadout and policy, while the rival scales 3700 -> 17250. My
+"flat at every tier" described the rate and read as though it described the game.
+
+**RULED OUT - the loadout.** Both seats are dealt band 2 correctly. The first
+measurement said otherwise (patron all-bone) and was an ARTIFACT: launchBossMatch
+defers through setTimeout(...,80) and the wait predicate - idle, not ended,
+pTurns 0 - is already satisfied by the PREVIOUS match's G, so every reading was
+shifted by one launch and "patron" reported rung MABEL isBoss true. Waiting on G
+object IDENTITY fixes it and every launch then deals the loadout. Retracted; only
+the repeat caught it, and a single sample would have had me reporting that the
+ladder's patron arm measured the wrong dice.
+
+**STILL OPEN - the drain.** Three matches finished on EXACTLY zero, which
+`Math.max(0,...)` produces and variance does not, and two sites subtract from the
+player's running total: periodic_drain (36797, every N turns) and
+challengePenalty (35950). That is a coherent hypothesis and nothing more.
+Settling it needs the banked-versus-kept record - P921b's turnSeq - ported into
+`ladder_band.js`, because that is the engine that actually plays boss matches.
+
+**NEW DEFECT - FDRV.playMatch({seat:'boss'}) does not play a match.** Measured
+five times across two runs: pTurns=1 every time, stalled="deadline at phase=opp".
+The player banks once, the rival starts (oPts reached 1200 once), and the driver
+never regains the table before its 240s deadline. **Every boss measurement taken
+through fark_driver.js is invalid**, and it would have been invisible without a
+plausibility gate - the first run reported "OUT-SCORED: the player never banked
+enough" with all its consistency checks green, because one turn is trivially
+consistent. A LEAD, not a cause: ladder_band sets G._ffMult=0.05 and the driver
+sets nothing, so rival turns run at full presentation pace against a 12s wait
+window. Unconfirmed.
+
+The ladder's own boss cell is NOT affected - it runs through ladder_band, which
+plays full boss matches (scores to 7375 over many turns).
+
+---
+
 ## PARKED WHEN THE LADDER LANDS - a debt list, so none of it is lost
 
 Ruled by Denis 2026-09-04: the balance thread parks once the ladder result is
