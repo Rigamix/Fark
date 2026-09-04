@@ -12024,6 +12024,13 @@ function saveMatchState(){
        lane with no record it had ever been borrowed - and the restore at that
        match's end had nothing left to undo. */
     _tradeSwaps:G._tradeSwaps?JSON.parse(JSON.stringify(G._tradeSwaps)):null,
+    /* P947: THE LANE MARKS, for exactly the reason stated above them. A fog,
+       snuff or snare arms MID-turn - inside _iconFire, on the keep path - and
+       resolves on the rival's next turn, so it has the same lifetime as the
+       trade ledger and had the same hole: none of the three was ever carried,
+       before or after P945's re-key. A player who branded a snare for 400g,
+       kept it and resumed the match got nothing. */
+    _laneMark:G._laneMark?JSON.parse(JSON.stringify(G._laneMark)):null,
     originalPlayerDice:[...G.originalPlayerDice],
     thriftyBonus:G.thriftyBonus||0,spurActive:G.spurActive||0,
     martyrUsed:G.martyrUsed||false,
@@ -25363,6 +25370,10 @@ function _snapDiceOnly(alsoOpp){
     S.pendingMatch.numDice=G.numDice;
     S.pendingMatch._fairTrade=G._fairTrade?{...G._fairTrade}:null;
     try{S.pendingMatch._tradeSwaps=G._tradeSwaps?JSON.parse(JSON.stringify(G._tradeSwaps)):null;}catch(e){}
+    /* P947: and the marks, because THIS is the writer that matters for them -
+       they are armed mid-turn, so the turn-boundary snapshot alone would miss
+       every mark placed after it. */
+    try{S.pendingMatch._laneMark=G._laneMark?JSON.parse(JSON.stringify(G._laneMark)):null;}catch(e){}
     S.pendingMatch._diceOut=(G._diceOut||[]).map(function(o){return{lane:o.lane,mat:o.mat,ench:o.ench};});
     save();
   }catch(e){}
@@ -42510,6 +42521,43 @@ var _rdTs=params._resumeData._tradeSwaps;
         mine:t.mine,theirs:t.theirs,myEn:t.myEn||null,cnt:t.cnt,
         seatGone:!!t.seatGone};})
       :null;
+    /* P947: THE LANE MARKS COME BACK REBASED, NOT AS THEY WERE.
+       A mark is due when `m.turn === G.oppTurnCount` (24918), and oppTurnCount
+       is NOT carried across a resume - it restarts at 0 (31590/31619). A mark
+       restored with its original stamp would therefore never come due, never be
+       swept by the `oppTurnCount > m.turn+1` rule (37690), and would hold its
+       lane for the rest of the match against _lmArm's occupancy refusal: the
+       player loses the effect AND the seat, which is worse than dropping the
+       mark outright. Saving oppTurnCount instead would move the Jinx (37663),
+       Whisper's Veil (37666), Leaky Cup (37830) and The Sting (37693), all of
+       which key their cadence off it - a balance change, not a repair.
+       So each live mark is re-stamped for the rival's NEXT turn, which is what
+       the mark has always meant. Dead marks are dropped rather than carried:
+       they hold no lane and answer no question. */
+    var _rdLM=params._resumeData._laneMark;
+    if(_rdLM&&typeof _rdLM==='object'){
+      var _lmOut={},_lmBase=(G.oppTurnCount||0)+1;
+      for(var _lmK in _rdLM){
+        if(!_rdLM.hasOwnProperty(_lmK))continue;
+        var _lmSrc=_rdLM[_lmK];
+        if(!_lmSrc||!_lmSrc.live)continue;
+        var _lmL=+_lmK;
+        if(!isFinite(_lmL)||_lmL<0)continue;
+        /* P947b: A COPY, NEVER THE SNAPSHOT'S OWN OBJECT. The first version put
+           _rdLM[k] straight into G._laneMark, and _rdLM IS S.pendingMatch's map
+           - so the restored mark and the saved mark were ONE object and live
+           play wrote through into the save. Measured: a mark snapshotted
+           live/turn 5/1 attempt read back dead/turn 1/0 attempts once it fired,
+           because _lmSpend had mutated the snapshot. Every other record
+           restored here builds fresh objects - _tradeSwaps maps to a literal -
+           and this is the reason why. */
+        var _lmM={};
+        for(var _lmF in _lmSrc)if(_lmSrc.hasOwnProperty(_lmF))_lmM[_lmF]=_lmSrc[_lmF];
+        _lmM.lane=_lmL;_lmM.turn=_lmBase;
+        _lmOut[_lmL]=_lmM;
+      }
+      G._laneMark=_lmOut;
+    }
   }
   /* ── Apply patron Tell (signature passive rule) ── */
   _applyTellAndSleeve();
