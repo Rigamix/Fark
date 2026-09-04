@@ -24876,9 +24876,19 @@ function _oRemoveOppDieAt(L){
   (G._oppHeld||[]).forEach(function(d){
     if(typeof d.lane==='number'&&d.lane>L)d.lane--;
   });
-  if(typeof G._oSnuffLane==='number'){
-    if(G._oSnuffLane===L)G._oSnuffLane=-1;
-    else if(G._oSnuffLane>L)G._oSnuffLane--;
+  /* P946: RE-KEY THE LIST, WHICH IS THE ONE ANYTHING READS. This maintained
+     the scalar P945 left behind, so a removal kept a field nobody consults
+     correct and let G._oSnuffLanes - read by _lmSnuffed and _oHandAfterSweep -
+     go stale: every published snuff lane above the removal pointed one seat
+     too high, which is the off-by-one-per-seat error the snuff seat machinery
+     exists to prevent. A lane that WAS the removed die drops out rather than
+     being kept as -1: _lmSnuffed does indexOf, and a -1 in the list would
+     answer true for any caller that passed one. */
+  if(G._oSnuffLanes&&G._oSnuffLanes.length){
+    G._oSnuffLanes=G._oSnuffLanes.map(function(n){
+      if(typeof n!=='number')return n;
+      return (n===L)?-1:((n>L)?n-1:n);
+    }).filter(function(n){return n>=0;});
   }
   (G.oppDice||[]).forEach(function(d){
     if(typeof d.lane==='number'&&d.lane>L)d.lane--;
@@ -37531,9 +37541,9 @@ function _npcArmActives(){
 /* P525: HOW MANY DICE THE RIVAL GETS WHEN THE TABLE IS SWEPT.
    Needed outside runOppTurn - the combo persona's EV table used to hard-code
    six here, from a hand-copied transcript of a line P521 has since changed.
-   A sweep clears the held dice but NOT the snuff: _snuffLane is set once and
+   A sweep clears the held dice but NOT the snuff: _snuffLanes is set once and
    never cleared for the turn, which is the whole reason P521 stopped assigning
-   the literal 6. G._oSnuffLane is published by runOppTurn so this and _oSeats
+   the literal 6. G._oSnuffLanes is published by runOppTurn so this and _oSeats
    read the same source rather than two copies of the same idea. */
 function _oHandAfterSweep(){
   if(typeof G==='undefined'||!G)return 6;
@@ -37748,11 +37758,14 @@ function runOppTurn(){
   /* P525: publish the turn's snuffed seat so readers outside this function
      get the same answer instead of assuming one. The combo persona's EV
      table was the reader that had assumed. */
-  /* P945: a LIST now - see _lmSnuffed. The old scalar is still assigned so a
-     reader outside this file's census keeps working, and it carries the first
-     lane, which is exactly what it carried when only one could exist. */
+  /* P945: a LIST now - see _lmSnuffed.
+     P946: AND ONLY THE LIST. The scalar was kept here for "a reader outside
+     this file's census" - a reader never named and never found; _lmSnuffed and
+     _oHandAfterSweep are the readers and both take the list. It survived as a
+     second home for one fact, and _oRemoveOppDieAt was re-keying THAT one
+     while leaving this one stale, so the removal kept the dead copy correct.
+     A flagged assumption that is never closed is still a guess. */
   G._oSnuffLanes=_snuffLanes.slice();
-  G._oSnuffLane=_snuffLanes.length?_snuffLanes[0]:-1;
   function _oSeats(ignoreHeld){
     var _all=(G.matchOppDice&&G.matchOppDice.length)?G.matchOppDice.length
             :((((G.rung||{}).dice)||[]).length||6);
@@ -37842,9 +37855,22 @@ function runOppTurn(){
     const _rungAll=G.matchOppDice||((G.rung&&G.rung.dice)||['bone','bone','bone','bone','bone','bone']);
     var _rungMats=_rungAll.slice(),rungLanes=[];
     for(var _rl=0;_rl<_rungAll.length;_rl++)rungLanes.push(_rl);
-    if(_snuffLane>=0&&_rungMats.length>1){
-      _rungMats.splice(_snuffLane,1);rungLanes.splice(_snuffLane,1);
-    }
+    /* P946: EVERY SNUFFED SEAT - and this line is where the rival's turn
+       died. P945 renamed the local to `_snuffLanes` and published a list; this
+       reader, a closure inside step() declared 155 lines below it, kept the old
+       name. Unguarded, so it threw ReferenceError on EVERY rival turn rather
+       than only a snuffed one.
+       DESCENDING, for the reason the fog site carries: each splice shifts the
+       indices the next was computed against. The one-die floor is re-tested per
+       cut instead of once, because two snuffs on a two-seat hand must take one
+       seat, not both - the same floor _snuffLanes itself applies when it is
+       built. */
+    var _snCuts=(_snuffLanes||[]).filter(function(L){
+      return typeof L==='number'&&L>=0&&L<_rungMats.length;
+    }).sort(function(a,b){return b-a;});
+    _snCuts.forEach(function(L){
+      if(_rungMats.length>1){_rungMats.splice(L,1);rungLanes.splice(L,1);}
+    });
     const rungDice=_rungMats;
     /* WHICH SEATS ARE ACTUALLY FREE. Everything the rival is still holding sits
        in a seat, and the snuffed seat is empty for the turn - so the dice about
