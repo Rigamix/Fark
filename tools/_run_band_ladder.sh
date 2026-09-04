@@ -39,6 +39,13 @@ POL="${2:-carl}"
 # and run only if band 2 comes back surprising.
 NPER="${3:-120}"
 BANDS="${4:-2 3 1}"
+# BOSS GETS ITS OWN n BECAUSE THE ARMS ARE UNBALANCED. Boss matches run ~167s
+# against patron's ~100s, so equal n makes boss alone set the wall clock. Boss is
+# also not the decisive cell: PWIN[2] is the constant identified as overstated
+# and that is the PATRON rate. Boss at 30 gives a Wilson half-width near 16pp -
+# enough to catch a large miss against BWIN[2] - and lands both arms near the
+# same duration instead of one waiting on the other.
+NBOSS="${5:-$NPER}"
 # BATCH IS SEAT-AWARE, and both halves of this were needed. Advancing the
 # counter by the ACHIEVED count is necessary but not sufficient: a boss batch of
 # 15 blows a 25-minute budget every time - measured 68-248s per boss match, so
@@ -101,10 +108,10 @@ cell() {
   echo "=== CELL-DONE band=$b seat=$s n=$got $(date +%H:%M:%S) ===" >> "$OUT"
 }
 
-echo "=== BAND SWEEP START policy=$POL n=$NPER bands=$BANDS batch=patron:$BATCH_PATRON,boss:$BATCH_BOSS budget=${BUDGET}m $(date +%Y-%m-%d\ %H:%M:%S) ===" >> "$OUT"
+echo "=== BAND SWEEP START policy=$POL n=patron:$NPER,boss:$NBOSS bands=$BANDS batch=patron:$BATCH_PATRON,boss:$BATCH_BOSS budget=${BUDGET}m $(date +%Y-%m-%d\ %H:%M:%S) ===" >> "$OUT"
 # BAND ORDER IS PRIORITY ORDER and is driven by the argument, so a scoped run
 # ("2") and the full sweep ("2 3 1") are the same code path rather than two.
 for b in $BANDS; do
-  cell "$b" boss "$NPER" & cell "$b" patron "$NPER" & wait
+  cell "$b" boss "$NBOSS" & cell "$b" patron "$NPER" & wait
 done
 echo "=== BAND SWEEP COMPLETE $(date +%H:%M:%S) ===" >> "$OUT"

@@ -72,7 +72,7 @@ v.dlgWritesNothing = (function(){
     for (const k of Object.keys(DLG)) {
       try { if (typeof DLG[k] === 'function') src += DLG[k].toString(); } catch (e) {}
     }
-    v._dlgWrites = (src.match(/G\.\w+\s*(?:=[^=]|\+\+|--|\+=|-=)/g) || []).slice(0, 5);
+    v._dlgWrites = (src.match(/\bG\.\w+\s*(?:=[^=]|\+\+|--|\+=|-=)/g) || []).slice(0, 5);
     return v._dlgWrites.length === 0;
   } catch (e) { return false; }
 })();

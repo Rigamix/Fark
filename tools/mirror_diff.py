@@ -90,7 +90,7 @@ def facts(t):
     # as every other instrument bug here - measuring any 2-4 digit number
     # instead of the rule's actual arguments.
     t = re.sub(r'setTimeout\s*\((?:[^()]|\([^()]*\))*\)', '', t)
-    t = re.sub(r'(spawnPixelSparks|triggerCard|spawnPop|setStatusMsg|famLog|DLG\.\w+)'
+    t = re.sub(r'\b(spawnPixelSparks|triggerCard|spawnPop|setStatusMsg|famLog|DLG\.\w+)'
                r'\s*\((?:[^()]|\([^()]*\))*\)', '', t)
     return {
         'threshold': ','.join(sorted(set(re.findall(r'eff\.(threshold|amount|pct|interval|uses)', t)))) or '-',

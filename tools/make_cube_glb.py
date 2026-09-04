@@ -49,7 +49,7 @@ GAME = os.path.join(ROOT, 'fark_proto.html')
 ART = os.path.abspath(os.path.join(ROOT, '..', '..', '..',
                                    'Art', 'Assets', 'Dice', 'Bone', 'texture'))
 # WRITE INTO THE WORKTREE, NOT THE MAIN CHECKOUT. The generator used to emit
-# into ..\..\..ssets\models, i.e. the main checkout, while the git work
+# into ..\..\..\assets\models, i.e. the main checkout, while the git work
 # happens here - so a routine `cp worktree main` afterwards silently
 # overwrote the FRESH build with the STALE one, and the check page then
 # rendered a model built from the wrong face table. Two copies of one asset,

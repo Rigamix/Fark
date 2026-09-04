@@ -362,7 +362,7 @@ is right.
 
 **Why this failure is a different category** from every other instrument bug
 this project has had: the string verdict, the prose-counting assert, the
-mangled ``, the zero-overlap check — each ran against the real game and
+mangled `\b`, the zero-overlap check — each ran against the real game and
 misjudged what it saw. There was signal underneath the mistake. This one runs
 against **nothing** and returns a verdict anyway, and no probe can tell
 "verified absent" from "never actually looked".

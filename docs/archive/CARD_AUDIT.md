@@ -35,7 +35,7 @@ text writes `1,200`, and a plain 2–6 digit match splits that into `200`;
 `2,000` becomes `000` → 0.
 
 **And the first fix silently did nothing.** It went through a bash heredoc, and
-the `` in `\d{3}` was written as a **literal backspace byte**. The pattern
+the `\b` in `\d{3}\b` was written as a **literal backspace byte**. The pattern
 became `(?=\d{3}<BS>)` — which prints looking correct, matches nothing, and
 leaves the false findings in place *while appearing repaired*. Three further
 rounds of debugging chased a function whose printed source was right.
