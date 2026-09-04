@@ -5,6 +5,59 @@ is a valid answer.** Answered items are deleted, not marked — this stays short
 
 ---
 
+## THE LADDER LANDED. BAND 2, bea, REAL ENGINE (2026-09-04)
+
+50 patron and 30 boss, uniform tier draw, subRate 0.000 in both cells across 457
+and 540 decisions - so both measured bea unsubstituted. Raw log:
+`docs/ladder_bea_band2.txt`.
+
+| seat | n | wins | rate | Wilson 95% |
+|---|---|---|---|---|
+| patron | 50 | 11 | **22.0%** | **[12.8, 35.2]** |
+| boss | 30 | 0 | **0.0%** | **[0.0, 11.4]** |
+
+Per tier, patron: 0: 5/11 (45.5%) | 1: 1/8 | 2: 4/7 (57.1%) | 3: 0/3 | 4: 0/1 |
+5: 1/6 | 6: 0/4 | 7: 0/10. Boss is 0 at every tier.
+
+### What is settled
+
+**`PWIN[2]`=0.62 is excluded, and under ANY weighting.** A weighted average
+cannot exceed the highest single-tier rate, and that is 57.1% (tier 2, n=7). No
+occupancy distribution reaches 62%.
+
+**`BWIN[2]`=0.55 is excluded unconditionally.** 0 for 30, across all eight
+tiers. There is no weighting story here at all.
+
+**The band-2 difficulty curve is real and steep**: winnable at tiers 0 and 2,
+zero from tier 3 upward, 0/10 at tier 7.
+
+### What is NOT settled - and the sim is not refuted
+
+**The sim's 0.443 is outside this interval but the two are not comparable.**
+0.443 was OCCUPANCY-WEIGHTED; this draws tiers uniformly, and
+`ladder_band.js`'s own header says comparing them compares two different
+quantities. With tier 0 at 45.5% and tier 2 at 57.1%, an occupancy concentrated
+in low tiers reaches 44% comfortably. So the honest statement is that the sim
+and the engine **may agree entirely**, and the difference may be weighting.
+Settling it needs the occupancy distribution - which is an output of the model
+whose input this was measuring, so importing it puts the circularity back.
+
+**This is ONE policy.** Ruling #24 is explicit that these ratios are not
+policy-invariant. carl's partial (`docs/ladder_carl_partial.txt`) is the
+conservative bound at 3/14 patron, Wilson [7.6, 47.6].
+
+**And 0.443 is pre-3.10**, so the corrected sim's number can only be higher -
+which moves it further from 22%, not closer.
+
+### One thing to look at before leaning on the boss zero
+
+Boss stalled **7 times against patron's 1**, all at `phase=choosing, turn=1`.
+Stalls are excluded from n, so the rate is not arithmetically biased - but a 19%
+one-sided stall rate is a difference between the seats that nothing explains
+yet, and the boss cell is the one carrying the unconditional claim.
+
+---
+
 ## PARKED WHEN THE LADDER LANDS - a debt list, so none of it is lost
 
 Ruled by Denis 2026-09-04: the balance thread parks once the ladder result is
