@@ -85,7 +85,11 @@ challengePenalty (35950). That is a coherent hypothesis and nothing more.
 Settling it needs the banked-versus-kept record - P921b's turnSeq - ported into
 `ladder_band.js`, because that is the engine that actually plays boss matches.
 
-**NEW DEFECT - FDRV.playMatch({seat:'boss'}) does not play a match.** Measured
+**RETRACTED - the "driver defect" was P945 crashing every rival turn.** Left
+here rather than deleted, because the retraction is the useful part. What
+follows was written before the cause was known; P946 has it.
+
+> **NEW DEFECT - FDRV.playMatch({seat:'boss'}) does not play a match.** Measured
 five times across two runs: pTurns=1 every time, stalled="deadline at phase=opp".
 The player banks once, the rival starts (oPts reached 1200 once), and the driver
 never regains the table before its 240s deadline. **Every boss measurement taken
@@ -96,8 +100,55 @@ consistent. A LEAD, not a cause: ladder_band sets G._ffMult=0.05 and the driver
 sets nothing, so rival turns run at full presentation pace against a 12s wait
 window. Unconfirmed.
 
+The lead was wrong and the driver was innocent. P945 left a reader of a renamed
+local behind - `_snuffLane` against `_snuffLanes` - inside runOppTurn's step(),
+unguarded, so **every rival turn threw ReferenceError** and never returned. The
+driver waits at phase=opp because the turn it waits for is dead. A void
+measurement invented a defect in the instrument while the real fault was in the
+game and was mine. P946 fixes it and the phase trace goes opp/0 -> opp/6.
+
+**The ladder's boss 0/30 is untouched by this** - ec70d3b landed before P945's
+ee7e11a - so the drain question is still open exactly as stated above.
+
 The ladder's own boss cell is NOT affected - it runs through ladder_band, which
 plays full boss matches (scores to 7375 over many turns).
+
+---
+
+## STEP 9's SECOND HALF: "BOTH SIDES" CANNOT MEAN WHAT IT SAYS (2026-09-04)
+
+The brief's step 9 asks for lane marks "painted from _lmArm state, ARM-TO-FIRE,
+both sides". Censused before building, and the rival half is not buildable as
+worded. Measured, not reasoned (tools/apv_lane_paint_reach.js):
+
+  ARM WINDOW, the player's turn with a fog armed on lane 0:
+    oppDiceRow children 0, G.oppDice 0, D3X.dice 6 - all playerDiceRow.
+    **There is no rival die in existence to wear the mark.**
+  FIRE WINDOW, the instant the rival's row is dealt:
+    6 chips in the DOM, still only 6 D3X records. The chips exist before the
+    3D layer adopts them.
+  FIRE WINDOW, 504ms later:
+    12 records - 6 player, 6 rival - every one match+visible+chip, so every
+    one paintable. Rival lanes [0,1,2,3,4,5], all stamped.
+  AND the player's own row stays paintable right through the rival's turn.
+
+So the two halves have different lifetimes and only one of them is arm-to-fire:
+
+  **PLAYER SIDE - arm to fire.** The brand die is paintable for the whole
+  window, so the armed mark can show on the player's own seat from _lmArm until
+  _lmSpend. This is the half that carries "the spot is taken".
+
+  **RIVAL SIDE - fire window only.** Their seat does not exist until ~500ms
+  into the turn the mark fires on. Nothing can be painted there earlier because
+  there is nothing there.
+
+🔴 **DENIS - one question, and it is a design one.** Is a rival-side mark that
+appears only as their dice land acceptable, or should something carry the armed
+threat on their side of the table beforehand? The empty row is real estate and
+a seat-shaped ghost on it is buildable; it is also a new form, and this brief's
+own rule is that a state wears its enchant's colour rather than inventing one.
+I will build the two halves above unless you want the ghost, because they are
+what the game's lifecycle permits and neither depends on the answer.
 
 ---
 

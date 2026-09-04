@@ -150,7 +150,20 @@ try {
   reachedOpp = await FXH.until(() =>
     typeof G !== 'undefined' && G && (G.phase === 'opp' || G._oppTurnActive) &&
     (document.getElementById('oppDiceRow') || {children: []}).children.length > 0, 180000);
-  if (reachedOpp != null) oppCensus = census('rival turn, row dealt');
+  if (reachedOpp != null) oppCensus = census('rival turn, row just dealt');
+  /* AND AGAIN AFTER THE RIVAL'S DICE SETTLE. The early census fired the
+     instant oppDiceRow gained a child - the moment the DOM chips exist, which
+     is not the moment D3X adopts them. It reported six rival chips and ZERO
+     D3X records for them, and that reads identically to "the rival's dice are
+     never in the 3D layer at all". Those are different answers and they decide
+     whether a rival seat can wear a mark, so the late sample waits for a
+     record to appear rather than concluding from the early one. */
+  const adopted = await FXH.until(() => ((window.D3X && D3X.dice) || []).some(
+    d => { try { return d.chip && d.chip.closest &&
+                 d.chip.closest('#oppDiceRow'); } catch (e) { return false; } }),
+    90000);
+  out.rivalAdoptedMs = adopted;
+  out.fireWindowSettled = census('rival turn, after the dice are adopted');
 } catch (e) { reachedOpp = 'threw: ' + e.message; }
 try { clearInterval(_ff); clearInterval(_tr); } catch (e) {}
 out.reachedOppMs = reachedOpp;
@@ -181,7 +194,7 @@ out.VERDICT = {
   theMarkWasActuallyArmed: out.armed === true && A.liveMarks === 1,
   /* THE QUESTION. Is there a rival die to wear the mark while it is armed? */
   aRivalSeatExistsDuringTheArmWindow:
-    A.oppRowChildren > 0 && (A.rows['#oppDiceRow'] || {paintable: 0}).paintable > 0,
+    A.oppRowChildren > 0 && (A.rows['oppDiceRow'] || {paintable: 0}).paintable > 0,
   /* and at the moment it fires */
   /* THE TURN ENDED, not "I clicked". The previous form gated on clicked > 0,
      which passed on run 3 while the trace showed the turn never left
@@ -191,13 +204,24 @@ out.VERDICT = {
                         (out.afterBank.pTurns || 0) > 0,
   reachedTheRivalTurn: reachedOpp != null && typeof reachedOpp === 'number',
   aRivalSeatExistsDuringTheFireWindow: F
-    ? (F.oppRowChildren > 0 && (F.rows['#oppDiceRow'] || {paintable: 0}).paintable > 0)
+    ? (F.oppRowChildren > 0 && (F.rows['oppDiceRow'] || {paintable: 0}).paintable > 0)
+    : null,
+  /* THE ONE THAT DECIDES THE DESIGN: can a rival seat ever wear a mark? */
+  aRivalSeatIsPaintableOnceSettled: out.fireWindowSettled
+    ? ((out.fireWindowSettled.rows['oppDiceRow'] || {paintable: 0}).paintable > 0)
     : null,
   /* the player's own brand die stays paintable after the turn ends */
   thePlayerSeatSurvivesTheTurn: F
-    ? ((F.rows['#playerDiceRow'] || {paintable: 0}).paintable +
-       (F.rows['#keptTray'] || {paintable: 0}).paintable +
-       (F.rows['#keptRow'] || {paintable: 0}).paintable) > 0
+    /* NO '#'. rowOf returns el.id, which carries no hash, so every one of
+       these lookups was undefined and the verdict read false against a census
+       that plainly showed six paintable player dice. A false negative from a
+       key that never matched - and the rival verdicts had the same fault, but
+       were saved by the oppRowChildren half of the test being independently
+       true. A probe bug that got the right answer for the wrong reason is
+       still a probe bug. */
+    ? ((F.rows['playerDiceRow'] || {paintable: 0}).paintable +
+       (F.rows['keptTray'] || {paintable: 0}).paintable +
+       (F.rows['keptRow'] || {paintable: 0}).paintable) > 0
     : null,
   rivalDiceCarryTheLaneKey: out.rivalLanes.allStamped === true,
 };
