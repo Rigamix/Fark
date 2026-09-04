@@ -115,6 +115,75 @@ plays full boss matches (scores to 7375 over many turns).
 
 ---
 
+## 3.12 GROUNDWORK - MEASURED BEFORE ANY PAINT CODE (2026-09-04)
+
+Denis's ruling moves the mark from the die to the TABLE, which dissolves the
+reachability problem below rather than working around it. Four things had to be
+true for it to be buildable. All four measured; all four hold, and the last one
+is a build requirement that would otherwise have been found at debug time.
+
+**1. #dgCanvas reaches the rival's row.** It is 430x900 - exactly #screen-match -
+and contains #oppDiceRow with zero overhang on all four sides. It is not a
+player-side strip. (Denis flagged this as the thing to check first, since the
+canvas was built as the die-halo painter.)
+
+**2. THERE IS NO "RIVAL SIDE OF THE TABLE".** The markup already says so:
+
+    <!-- ONE THROWING LINE. Both rows share this grid cell, so whoever is
+         rolling puts their dice in the same place, at the same size, through
+         the same solver. The turns alternate, so only one is ever full. -->
+
+#oppDiceRow and #playerDiceRow are siblings in #throwLine, and the CSS is
+`.throw-line{display:grid}` + `.throw-line>*{grid-area:1/1}` - stacked in one
+cell. Measured: the six opposing seat rects come back byte-identical to the
+player's. **Lane N is one screen position, shared by both sides.** A cloud at
+lane N is where your brand sat and where their die will land, with no side to
+choose. This is better for the ruling than a two-sided design would have been.
+
+**3. THE ANCHOR SURVIVES THE EMPTY WINDOW.** With both rows emptied through the
+game's own clearRow, #throwLine holds {x:6,y:427,w:418,h:56} - identical to when
+it held six dice - while both ROWS collapse to {215,455,0,0}. So the cell is the
+anchor and the rows cannot be. CSS backs it: min-height:13cqw on the cell.
+Seat geometry, for positioning: seat x = [7,79,151,223,295,368], width 56, so
+pitch 72 and lane N sits at x = 7 + 72N.
+
+**4. BUILD REQUIREMENT - THE PAINT PASS SLEEPS WITH NOTHING WORN.** _marksLive
+returns false for both layers when no die wears a mark, _markPlan returns 0
+groups, and **#dgCanvas does not exist at all** - it is created lazily by the
+pass. So a table mark added without widening the wake condition would paint into
+a canvas that was never created, with no error anywhere, which is this layer's
+signature failure mode. The wake test must consult the table list too.
+
+Probes: tools/apv_table_extent.js, tools/apv_throwline_window.js,
+tools/apv_anchor_and_wake.js.
+
+**One probe of mine was vacuous and is recorded as such:** apv_throwline_window
+asserted "the throw line keeps its box when empty" and passed while the row held
+six dice - at _ffMult 0.05 the rival's dice arrive before the sample, so the
+window it named was never entered. apv_anchor_and_wake PRODUCES the state with
+clearRow instead of racing for it. Same species as the boss-drain verdict: a
+check whose scope was never entered reads exactly like a check that passed.
+
+---
+
+## THE BALANCE THREAD, WHEN IT RESUMES: NOT THE DRAIN (2026-09-04)
+
+Denis's redirection, and it retires the hypothesis recorded above:
+
+> the drain hypothesis can't explain 0/30. At tier 0 the player scores 3200 and
+> at tiers 3-4 it scores 7375 - normal numbers - **and still loses every match**,
+> because the rival is on 3700-4600 and 8450-11900. No drain needed there, and
+> those tiers are two thirds of the sample. Whatever explains 0/30 has to explain
+> tier 0.
+
+So the raw scores hold TWO phenomena and I had merged them: a rival out-scoring
+a healthy player across most of the range, and a player collapse at tiers 6-7
+where the exact zeros point at Math.max(0,...). **Chase the rival's per-turn
+yield at boss seats first.** The collapse is a second thing sitting on top of it,
+and the drain is at most an explanation for that second thing.
+
+---
+
 ## STEP 9's SECOND HALF: "BOTH SIDES" CANNOT MEAN WHAT IT SAYS (2026-09-04)
 
 The brief's step 9 asks for lane marks "painted from _lmArm state, ARM-TO-FIRE,
