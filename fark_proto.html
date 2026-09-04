@@ -27844,7 +27844,31 @@ var D3X={
       x.restore();
       return;
     }
-    this._paintHalo(cv,x,sc,dpr,hulls,col,soft,AM,undefined,opt());
+    /* P949: RIM IS A NAMED FORM, NOT THE FALL-THROUGH. It reached _paintHalo
+       by being the last statement in the function, which meant every
+       unrecognised style reached it too and painted a plausible ring instead of
+       failing. A wrong render that looks deliberate is worse than a crash: it
+       reviews cleanly and ships. */
+    if(style==='rim'){
+      this._paintHalo(cv,x,sc,dpr,hulls,col,soft,AM,undefined,opt());
+      return;
+    }
+    /* THE CONSOLE LINE IS THE SIGNAL, NOT THE THROW. tick() wraps _drawGlow and
+       _drawStates in bare try{}catch(e){}, so a throw raised inside the frame
+       pass is swallowed whole - on its own it would trade a silent wrong render
+       for a silent absent one. The error is logged so it reaches a human (it is
+       how P946's ReferenceError surfaced, through shoot.js's page-error
+       stream), and thrown as well because _paintForm is called directly by the
+       beat loop and by probes, where it does propagate.
+       Deduped per style: this is a per-frame pass, and sixty identical lines a
+       second is another way of hiding a fault. */
+    var _pfBad=(this._badForms||(this._badForms={}));
+    if(!_pfBad[style]){
+      _pfBad[style]=1;
+      try{console.error('D3X._paintForm: unknown style '+JSON.stringify(style)+
+        ' - the forms are rim, crust and veil. Nothing was painted for it.');}catch(e){}
+    }
+    throw new Error('_paintForm: unknown style '+style);
   },
   /* paint every row on one layer, in roster order. ONE _paintHalo per ROW,
      not per die: a row's hulls are collected and painted together, so the

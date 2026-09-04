@@ -115,6 +115,51 @@ plays full boss matches (scores to 7375 over many turns).
 
 ---
 
+## 3.12 / 3.13 - WHAT IS SHIPPED, AND WHAT THE TABLE MARK NOW RESTS ON
+
+**3.13 SHIPPED (P948): bank keeps, bust clears.** Denis ruled upstream of a
+proposal of mine that was fitting the display to unruled behaviour. I had found
+that doBust never touches G._laneMark and concluded the reveal could not be the
+bank; the behaviour was the thing that was wrong. Arming was free of risk, so
+"push or lock it in?" was not a decision. Now it is.
+With the disarm in place a mark reaches the rival's turn IF AND ONLY IF the turn
+ended in a bank, so 3.12's original wording is literally correct and the turn-end
+fallback is NOT built. A zeroed bank still arms - the player ended the turn
+voluntarily and got nothing for it - so _bankRefused gates only the flavour beat.
+Only THIS turn's armings are at risk, which needs its own field: _lmSpend
+re-stamps `turn` for a Kindred second attempt, so armedOn records G.pTurns.
+
+**P947: lane marks had never survived a save.** Neither snapshot writer nor the
+restore carried G._laneMark. Marks are rebased on the way in rather than carried
+verbatim, because oppTurnCount is not saved either and a mark restored with its
+old stamp would never come due, never be swept, and hold its lane for the rest of
+the match - losing the player the effect AND the seat.
+
+**P949: _paintForm's fall-through is closed.** `rim` is a named branch; anything
+else logs once and throws. The console line is the signal - tick() swallows
+throws from the frame pass.
+
+**WHAT THE TABLE MARK NOW RESTS ON, all measured rather than reasoned:**
+- `D3X._rectHull(L,T,W,H,rad)` returns a 20-point screen-space polygon and all
+  three forms accept it with no die behind it. Its history exonerates it: it was
+  de-wired by P789 when the whole canvas CARD path was retired for Denis's CSS
+  prototype, and that commit records it as rect-exact, 0.0px deltas.
+- `.seat-mark` (3925) was authored once in P222-P227 and never wired - a gift,
+  not a removal. It carries the art direction: a soft squircle under the seat,
+  explicitly not a lane stripe.
+- lane N centre = throwLine.left + throwLine.width/2 + (N-(count-1)/2)*0.168*W,
+  where W is #screen-match's width. Verified against measured seats to the pixel.
+- **The row re-centres around missing seats**, so the count is not always the
+  loadout. Resolved as PREDICT-THEN-MEASURE per Denis: paint the empty-window
+  mark at a predicted centre, re-derive from the actual die the moment one
+  exists. The prediction yields at the deal; it is not a second authority.
+- The paint pass SLEEPS when no die wears anything, and #dgCanvas does not exist
+  until the pass first runs. The wake condition must consult the table list.
+- `_planSig` carries no alpha and `_paintPlan` hardcodes 1, so a thinning mark
+  would be cached away. Alpha has to enter the signature.
+
+---
+
 ## 3.12 GROUNDWORK - MEASURED BEFORE ANY PAINT CODE (2026-09-04)
 
 Denis's ruling moves the mark from the die to the TABLE, which dissolves the
