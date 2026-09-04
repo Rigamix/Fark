@@ -31,7 +31,14 @@ set -u
 cd "$(dirname "$0")/.."
 OUT="${1:?usage: _run_band_ladder.sh <results-file> [policy]}"
 POL="${2:-carl}"
-BATCH=15
+# BATCH IS SEAT-AWARE, and both halves of this were needed. Advancing the
+# counter by the ACHIEVED count is necessary but not sufficient: a boss batch of
+# 15 blows a 25-minute budget every time - measured 68-248s per boss match, so
+# 15 of them is 17 to 62 minutes - so the counter alone would report the
+# shortfall honestly while it kept happening. Six boss matches fit with room for
+# the slow tail; patron matches run 49-138s and 15 fit.
+BATCH_PATRON=15
+BATCH_BOSS=6
 BUDGET=25          # minutes; the page stops itself past this and reports
 
 # One cell, assembled from batches. Three consecutive failed batches abandons
@@ -39,6 +46,7 @@ BUDGET=25          # minutes; the page stops itself past this and reports
 # the reason is written down where the numbers are.
 cell() {
   b=$1; s=$2; total=$3; got=0; fails=0
+  if [ "$s" = "boss" ]; then BATCH=$BATCH_BOSS; else BATCH=$BATCH_PATRON; fi
   while [ "$got" -lt "$total" ]; do
     n=$BATCH
     if [ $((got + n)) -gt "$total" ]; then n=$((total - got)); fi
@@ -46,9 +54,23 @@ cell() {
     node tools/shoot.js \
       --url "http://localhost:8087/fark_proto.html#lb=$b,$s,$POL,$n&budget=$BUDGET" \
       --eval-file tools/ladder_band.js \
-      --out "$OUT.b${b}_${s}.png" >> "$OUT" 2>&1
+      --out "$OUT.b${b}_${s}.png" > "$OUT.tmp.$b.$s" 2>&1
     rc=$?
-    echo "=== BATCH-END band=$b seat=$s rc=$rc $(date +%H:%M:%S) ===" >> "$OUT"
+    cat "$OUT.tmp.$b.$s" >> "$OUT"
+    # THE COUNTER ADVANCES BY WHAT WAS MEASURED, NOT BY WHAT WAS ASKED. The
+    # first run logged at=15/120 for a batch that completed 9 matches and hit
+    # its budget at 11/15, so a cell would have "finished" 120 having measured
+    # perhaps 70, with nothing reporting the gap. Anchored on "asked":N,"n":M
+    # because a bare "n": also matches the per-tier counts in the same JSON.
+    # AND NO BACKSLASH ESCAPES. The first version was a sed capture group
+    # written through a heredoc and the backslashes did not survive: Python
+    # read the backslash-one as an octal escape and wrote a literal control byte, so the
+    # replacement was EMPTY and every batch would have parsed achieved=0 -
+    # abandoning every cell after three 'empty' batches. grep -o and cut need
+    # no escapes at all.
+    ach=$(grep -o '"asked":[0-9]*,"n":[0-9]*' "$OUT.tmp.$b.$s" | head -1 | cut -d: -f3)
+    rm -f "$OUT.tmp.$b.$s"
+    echo "=== BATCH-END band=$b seat=$s rc=$rc asked=$n achieved=${ach:-0} $(date +%H:%M:%S) ===" >> "$OUT"
     if [ "$rc" -ne 0 ]; then
       fails=$((fails + 1))
       echo "=== BATCH-FAIL band=$b seat=$s rc=$rc consecutive=$fails ===" >> "$OUT"
@@ -56,9 +78,16 @@ cell() {
         echo "=== CELL-ABANDONED band=$b seat=$s at=$got/$total after 3 failed batches ===" >> "$OUT"
         return 1
       fi
+    elif [ -z "$ach" ] || [ "$ach" -eq 0 ] 2>/dev/null; then
+      fails=$((fails + 1))
+      echo "=== BATCH-EMPTY band=$b seat=$s rc=0 achieved=0 consecutive=$fails ===" >> "$OUT"
+      if [ "$fails" -ge 3 ]; then
+        echo "=== CELL-ABANDONED band=$b seat=$s at=$got/$total after 3 empty batches ===" >> "$OUT"
+        return 1
+      fi
     else
       fails=0
-      got=$((got + n))
+      got=$((got + ach))
     fi
   done
   echo "=== CELL-DONE band=$b seat=$s n=$got $(date +%H:%M:%S) ===" >> "$OUT"

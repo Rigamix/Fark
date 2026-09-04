@@ -233,11 +233,19 @@ const rate = done ? (wins / done) : 0;
 const z = 1.96;
 const ph = done ? ((rate + z * z / (2 * done)) / (1 + z * z / done)) : 0;
 const hw = done ? (z * Math.sqrt(rate * (1 - rate) / done + z * z / (4 * done * done)) / (1 + z * z / done)) : 0;
+/* P940: THE INTERVAL IS NOT SYMMETRIC ABOUT THE OBSERVED RATE, and reporting a
+   bare half-width invited exactly that reading. Wilson recentres: 3/14 is a
+   rate of 21.4% but an interval of [7.6, 47.6] centred on 27.6. Quoting
+   "21.4% +/- 20" implies [1.4, 41.4] - wrong at both ends, and wrong in the
+   direction that matters, since 0.443 sits inside the true interval and
+   outside the naive one. Bounds are returned and logged; the centre and
+   half-width stay beside them so nothing is lost. */
+const lo = Math.max(0, ph - hw), hi = Math.min(1, ph + hw);
 const tierStr = Object.keys(byTier).sort().map(t =>
   t + ':' + byTier[t].w + '/' + byTier[t].n).join(' ');
 say('LB-CELL;band=' + band + ';seat=' + seat + ';policy=' + polName +
     ';n=' + done + ';wins=' + wins + ';rate=' + (rate * 100).toFixed(1) +
-    ';wilson=' + (ph * 100).toFixed(1) + '±' + (hw * 100).toFixed(1) +
+    ';wilson=[' + (lo * 100).toFixed(1) + ',' + (hi * 100).toFixed(1) + ']' +
     ';stalls=' + stalls + ';subBank=' + subBank + ';subKeep=' + subKeep + ';byTier=' + tierStr);
 return {band, seat, policy: polName, asked: N, n: done, wins,
         /* P936: a nonzero substitution count means this cell did not measure
@@ -261,5 +269,7 @@ return {band, seat, policy: polName, asked: N, n: done, wins,
              ') - this cell did not measure ' + polName)
           : null,
         policyRanUnsubstituted: subBank === 0 && subKeep === 0,
-        rate: +(rate * 100).toFixed(1), wilsonHalfWidth: +(hw * 100).toFixed(1),
+        rate: +(rate * 100).toFixed(1),
+        wilsonLo: +(lo * 100).toFixed(1), wilsonHi: +(hi * 100).toFixed(1),
+        wilsonCentre: +(ph * 100).toFixed(1), wilsonHalfWidth: +(hw * 100).toFixed(1),
         stalls, budgetStopped, byTier, dice, log: LOG};
