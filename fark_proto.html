@@ -27687,6 +27687,32 @@ var D3X={
     var angle=Math.acos(Math.max(0,Math.min(1,dot/(norm||1))));
     return Math.max(Math.abs(b.x-a.x)+Math.abs(b.y-a.y)+Math.abs(b.z-a.z),angle);
   },
+  /* A long throw can finish with seconds of slow contact shuffling.
+     Keep the opening second, airborne motion and the final landing blend.
+     Gently retime only the slow tail of the already solved shared tape;
+     contact forces, requested faces and the exact landing stay in the solve. */
+  _settleTape:function(frames){
+   var first=Math.ceil(1/this.PHYS.dt),hold=Math.max(1,Math.ceil(this.TABLE.land||10));
+   if(frames.length<Math.ceil(1.8/this.PHYS.dt)||frames.length<=first+hold+1)return frames;
+   var out=frames.slice(0,first+1),last=frames.length-1-hold,at=first,rate=1;
+   while(at<last){
+    var base=Math.floor(at),motion=0,high=false;
+    for(var s=base;s<Math.min(last,base+4);s++)for(var d=0;d<frames[s].length;d++){
+     motion=Math.max(motion,this._poseDelta(frames[s][d],frames[s+1][d]));
+     if(frames[s][d].y>1.35||frames[s+1][d].y>1.35)high=true;
+    }
+    var goal=high?1:Math.max(1,Math.min(3,.04/Math.max(.00001,motion)));
+    rate=goal<rate?goal:Math.min(goal,rate+.12);
+    at=Math.min(last,at+rate);
+    var lo=Math.floor(at),hi=Math.min(last,lo+1),t=at-lo;
+    if(!t){out.push(frames[lo]);continue;}
+    var row=[];for(var k=0;k<frames[lo].length;k++){
+     var a=frames[lo][k],b=frames[hi][k],q=new THREE.Quaternion(a.qx,a.qy,a.qz,a.qw).slerp(new THREE.Quaternion(b.qx,b.qy,b.qz,b.qw),t);
+     row.push({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t,z:a.z+(b.z-a.z)*t,qx:q.x,qy:q.y,qz:q.z,qw:q.w});
+    }out.push(row);
+   }
+   return out.concat(frames.slice(last+1));
+  },
   _physSolve:function(slotX,values,obstacles,limitX,rowPitch,fromFar){
     /* pitch from the slots themselves, so this follows the row rather than
        assuming it. One die on its own has no pitch: fall back to the middle
@@ -28052,7 +28078,7 @@ var D3X={
       _dbg.zLanded[d1]=fin[d1].z;
       _dbg.slide[d1]=want[d1]-fin[d1].x;
     }
-    return {steps:it,frames:frames,rest:rest,slotX:slotX,dbg:_dbg};
+    return {steps:it,frames:this._settleTape(frames),rest:rest,slotX:slotX,dbg:_dbg};
   },
 
   /* ═══ the table: dice lie on it, it leans back toward the lens ═══ */
@@ -31001,7 +31027,7 @@ var D3X={
      The painted-width numbers IMPROVED, which is how it got through - the dice
      measured narrower because they were being squashed. Measuring the symptom
      of a distortion reads exactly like success. Look at the screen. */
-  focus:null,FOV:40,FOV_MATCH:54,RISE_MATCH:20,MSCALE:0.65,_matchOn:false,
+  focus:null,FOV:40,FOV_MATCH:54,RISE_MATCH:20,MSCALE:0.63,_matchOn:false,
   /* built on first use, NOT in the literal: three.js is loaded on demand and
      `new THREE.Color` here would run at parse time, before it exists */
   _hotCol:function(){return this.__hc||(this.__hc=new THREE.Color(0xffd98a));},
