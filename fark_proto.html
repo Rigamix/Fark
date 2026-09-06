@@ -2,18 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<!-- NO viewport-fit=cover, and an OPAQUE status bar. Together those two are
-     what pushed the game up under the status bar on standalone iOS and left
-     the ~47px band at the bottom: WebKit hands the page a surface that
-     reaches the top of the display but reports a height short of it. The
-     layout then differed from every other browser, which makes authoring
-     anything by percentage - prop templates especially - guesswork.
-     Without them the web view starts below the status bar, the viewport is
-     the whole of it, and every env(safe-area-inset-*) resolves to 0, so the
-     max()/calc() fallbacks throughout fall back to their design values. -->
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- Let artwork reach behind iOS status icons. Important controls own their
+     safe-area spacing; the installed game fits the surface WebKit actually gives it. -->
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="assets/Menu_Art/iOS_icon_180.png">
 <!-- P630: a real favicon. The page had NO rel=icon at all, so every load
@@ -200,11 +193,10 @@ body{
   -webkit-font-smoothing:none;
 }
 @supports (height:100dvh){body{height:100dvh}}
-/* The heavy bottom vignettes that used to live here existed only to blend
-   the ~47px system band that black-translucent + viewport-fit=cover left
-   below the game. There is no band now, so fading the bottom of the screen
-   to near-black would just be darkening the table for nothing.
-   `fkSA` is still set, for anything that needs to know it is installed. */
+/* In installed Safari, fixed edges can describe a larger drawable surface
+   than viewport height units. Use those edges, without adding guessed pixels. */
+@media (display-mode:standalone){body{height:auto}}
+html.fkSA body{height:auto}
 html.fkSA #gbSheet,html.fkSA #peekSheet{padding-bottom:env(safe-area-inset-bottom,0px)}
 
 /* ─── TOP BAR ─── */
@@ -862,6 +854,11 @@ body{letter-spacing:.045em}
 #nrBackBtn{position:relative;width:15.2%;margin:3cqh auto 3.4cqh;cursor:pointer;transition:transform .1s}
 #nrBackBtn:active{transform:scale(.9)}
 #nrBackBtn img{width:100%;display:block;pointer-events:none}
+/* Keep the offering's actions above the home indicator; only the description yields space. */
+#nrFocusPanel{bottom:calc(env(safe-area-inset-bottom,0px) + 1cqh);display:flex;flex-direction:column;min-height:0}
+#nrFocusPanel .ffaces,#nrFocusPanel .nr-companion,#nrTakeBtn,#nrBackBtn{flex:0 0 auto}
+#nrFocusPanel .fdesc{flex:0 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y}
+#nrBackBtn{width:min(15.2%,5.5cqh);margin:1.2cqh auto 0}
 /* sheet-open: the painted world blurs and dims behind the parchment */
 #nrStage img.nr-env,#nrDice,#nrChalk,#ptCards{transition:filter .35s}
 body.gbSheetOn #nrStage img.nr-env,body.gbSheetOn #nrDice,body.gbSheetOn #nrChalk,
@@ -2220,7 +2217,7 @@ body.dlg-speaking #screen-match #tellBadge{opacity:0;pointer-events:none}
   /* every piece of the top HUD hangs off this, so the bar moves as one */
   --bar-top:2.7cqw;
   padding-top:calc(env(safe-area-inset-top,0px) + 8px);
-  padding-bottom:calc(env(safe-area-inset-bottom,0px) + 6px)}
+  padding-bottom:6px}
 #screen-match img,#matchPlate,#matchProps img,#screen-match .match-btn,#raceWrap,
 #screen-match .tokImg,#screen-match #turnNum{image-rendering:auto;-webkit-font-smoothing:antialiased}
 #matchPlate{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0}
@@ -17750,7 +17747,7 @@ function _tableImpactDust(row){
   });
 }
 var JADE_MAGIC=(function(){
-  var canvas=null,x=null,jobs=[],frame=0,serial=0;
+  var canvas=null,x=null,jobs=[],frame=0,serial=0,surface=null;
   var green=[106,217,134],gold=[255,219,143],cream=[255,245,191];
   function rgba(c,a){return 'rgba('+c.join(',')+','+Math.max(0,Math.min(1,a))+')';}
   function point(el){
@@ -17758,13 +17755,18 @@ var JADE_MAGIC=(function(){
   }
   function clear(){
     if(frame)cancelAnimationFrame(frame);frame=0;jobs=[];
-    if(canvas)canvas.remove();canvas=null;x=null;
+    if(canvas)canvas.remove();canvas=null;x=null;surface=null;
   }
   function ensure(){
-    if(canvas)return;canvas=document.createElement('canvas');canvas.id='jadeMagicLayer';canvas.setAttribute('aria-hidden','true');
-    canvas.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:9500;image-rendering:auto;width:100%;height:100%';
-    var dpr=Math.min(devicePixelRatio||1,2);canvas.width=Math.round(innerWidth*dpr);canvas.height=Math.round(innerHeight*dpr);
-    x=canvas.getContext('2d');x.setTransform(dpr,0,0,dpr,0,0);x.imageSmoothingEnabled=true;document.body.appendChild(canvas);
+    if(!canvas){
+      canvas=document.createElement('canvas');canvas.id='jadeMagicLayer';canvas.setAttribute('aria-hidden','true');
+      canvas.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:9500;image-rendering:auto;width:100%;height:100%';
+      document.body.appendChild(canvas);x=canvas.getContext('2d');
+    }
+    surface=canvas.getBoundingClientRect();
+    var dpr=Math.min(devicePixelRatio||1,2),w=Math.round(surface.width*dpr),h=Math.round(surface.height*dpr);
+    if(canvas.width!==w)canvas.width=w;if(canvas.height!==h)canvas.height=h;
+    x.setTransform(dpr,0,0,dpr,-surface.left*dpr,-surface.top*dpr);x.imageSmoothingEnabled=true;
   }
   function glow(p,r,c,a,hollow){
     if(a<=0||r<=0)return;var g=x.createRadialGradient(p.x,p.y,0,p.x,p.y,r);
@@ -17784,7 +17786,7 @@ var JADE_MAGIC=(function(){
   function shieldOutline(elements){
     var hulls=elements.filter(function(el){return el&&el.isConnected;}).slice(0,6).map(function(el){var r=_effectBounds(el);return r&&r.hull;}).filter(Boolean);
     if(!hulls.length)return null;var pts=[].concat.apply([],hulls),xs=pts.map(function(p){return p[0];}),ys=pts.map(function(p){return p[1];});
-    var h={hulls:hulls,left:Math.max(0,Math.floor(Math.min.apply(null,xs)-42)),top:Math.max(0,Math.floor(Math.min.apply(null,ys)-42)),right:Math.min(innerWidth,Math.ceil(Math.max.apply(null,xs)+42)),bottom:Math.min(innerHeight,Math.ceil(Math.max.apply(null,ys)+42))};
+    ensure();var h={hulls:hulls,left:Math.max(surface.left,Math.floor(Math.min.apply(null,xs)-42)),top:Math.max(surface.top,Math.floor(Math.min.apply(null,ys)-42)),right:Math.min(surface.right,Math.ceil(Math.max.apply(null,xs)+42)),bottom:Math.min(surface.bottom,Math.ceil(Math.max.apply(null,ys)+42))};
     return h.right>h.left&&h.bottom>h.top?h:null;
   }
   function shieldMist(j){
@@ -17888,8 +17890,8 @@ var JADE_MAGIC=(function(){
     var reduced=!!(S&&S.settings&&S.settings.reducedMotion)||!!(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches),steal=style==='steal',motes=[];
     var seed=(++serial*2654435761)>>>0;function rand(){seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;}
     if(!reduced)for(var i=0;i<(steal?22:8);i++)motes.push({delay:rand()*.25,size:2+rand()*2,sway:(rand()-.5)*14,lift:(rand()-.5)*12});
-    var control=steal?{x:(from.x+to.x)/2,y:Math.max(from.y,to.y)+95}:{x:Math.min(innerWidth-25,Math.max(25,to.x)),y:from.y-45};
-    ensure();jobs.push({kind:'travel',style:style,color:steal?[225,174,246]:[255,218,137],match:G,sources:[from],to:to,control:control,motes:motes,reduced:reduced,start:performance.now(),duration:reduced?550:1050});
+    ensure();var control=steal?{x:(from.x+to.x)/2,y:Math.max(from.y,to.y)+95}:{x:Math.min(surface.right-25,Math.max(surface.left+25,to.x)),y:from.y-45};
+    jobs.push({kind:'travel',style:style,color:steal?[225,174,246]:[255,218,137],match:G,sources:[from],to:to,control:control,motes:motes,reduced:reduced,start:performance.now(),duration:reduced?550:1050});
     if(jobs.length>3)jobs.shift();if(!frame)frame=requestAnimationFrame(tick);return true;
   }
   function bankLight(side,amount,status){
@@ -17974,7 +17976,7 @@ var JADE_MAGIC=(function(){
     if(!posed&&window.D3X&&D3X.ready&&D3X.on&&D3X.mount&&D3X.mount.isConnected){frame=requestAnimationFrame(tick);return;}var screen=document.getElementById('screen-match');
     if(document.hidden||!screen||!screen.classList.contains('active')){clear();return;}
     jobs=jobs.filter(function(j){return j.match===G&&!G._endMatchFired&&now-j.start<j.duration;});
-    if(!jobs.length){clear();return;}x.clearRect(0,0,innerWidth,innerHeight);x.globalCompositeOperation='lighter';
+    if(!jobs.length){clear();return;}ensure();x.clearRect(surface.left,surface.top,surface.width,surface.height);x.globalCompositeOperation='lighter';
     jobs.forEach(function(j){
       var t=(now-j.start)/j.duration,envelope=Math.sin(Math.PI*Math.min(1,t*1.3));
       if(j.kind){drawAtmosphere(j,t);return;}
@@ -23366,9 +23368,8 @@ D3.start=function(){
   }
   requestAnimationFrame(frame);
 };
-/* iOS standalone sizes the layout viewport screen-minus-status-bar but
-   anchors it at the top of the screen — the missing rows show as a dead
-   band at the bottom. Measure the deficit and stretch the body over it. */
+/* Safari fallback for the installed body rule; never infer a drawable area
+   from screen.height, which can include pixels the OS has reserved. */
 if(navigator.standalone===true)document.documentElement.classList.add('fkSA');
 /* match dressing: plate + seeded props + opponent portrait token */
 /* WHERE THE CANDLE IS, as a fraction of the match screen. Everything that
@@ -31569,6 +31570,10 @@ var D3X={
       }
       this.cam.updateProjectionMatrix();
       this._w=mr.width;this._h=mr.height;
+      if(this._matchOn){
+        this._measureHomes();this._shDirty=true;
+        try{_mLightCalc();_drawPropShadows();}catch(e){}
+      }
     }
     /* a die in focus owns the screen: everything else steps aside */
     var focusOpen=!!document.querySelector(
@@ -34201,7 +34206,7 @@ function _applyMetaBoostVisuals(){
    particles can't express. Independent of the particle pool, same canvas.
    ═══════════════════════════════════════════════════════════════════ */
 var FX=(function(){
-  var canvas=null, ctx=null, dpr=1, W=0, H=0;
+  var canvas=null, ctx=null, dpr=1, W=0, H=0, L=0, T=0;
   var running=false, lastT=0, resizeWired=false;
   var POOL_MAX=300;
   var pool=[], active=0;
@@ -34228,12 +34233,10 @@ var FX=(function(){
   function _resize(){
     if(!canvas) return;
     dpr=Math.min(window.devicePixelRatio||1,2);
-    W=window.innerWidth; H=window.innerHeight;
-    canvas.width=Math.round(W*dpr);
-    canvas.height=Math.round(H*dpr);
-    canvas.style.width=W+'px';
-    canvas.style.height=H+'px';
-    ctx.setTransform(dpr,0,0,dpr,0,0);
+    var r=canvas.getBoundingClientRect();W=r.width;H=r.height;L=r.left;T=r.top;
+    var w=Math.round(W*dpr),h=Math.round(H*dpr);
+    if(canvas.width!==w)canvas.width=w;if(canvas.height!==h)canvas.height=h;
+    ctx.setTransform(dpr,0,0,dpr,-L*dpr,-T*dpr);
   }
 
   function _start(){
@@ -34246,7 +34249,7 @@ var FX=(function(){
     if(!lastT) lastT=t;
     var dt=(t-lastT)/1000; lastT=t;
     if(dt>0.032) dt=0.032;   /* clamp catch-up frames */
-    ctx.clearRect(0,0,W,H);
+    _resize();ctx.clearRect(L,T,W,H);
     var anyAlive=false, i;
 
     /* ── particles ── */
@@ -34315,7 +34318,7 @@ var FX=(function(){
     }
 
     if(anyAlive){ requestAnimationFrame(_tick); }
-    else { running=false; ctx.clearRect(0,0,W,H); }
+    else { running=false; ctx.clearRect(L,T,W,H); }
   }
 
   /* P664: THE GAME'S OWN SPARKLE SHAPES, transcribed from the clip-path
@@ -34400,7 +34403,7 @@ var FX=(function(){
       for(var i=0;i<pool.length;i++){ pool[i].a=false; }
       active=0;
       sprites.length=0;
-      if(ctx) ctx.clearRect(0,0,W,H);
+      if(ctx){_resize();ctx.clearRect(L,T,W,H);}
     }
   };
 })();
@@ -34801,11 +34804,12 @@ function _alignOverlayWord(wordEl){
      marginTop on a flex item only shifts content by HALF the value (the
      box is centered including margin), so the word landed at half the
      intended offset. translateY moves the rendered element directly. */
-  var offset=Math.round((anchor.top+anchor.height/2)-window.innerHeight/2);
+  var parent=wordEl.parentElement,overlay=(parent||document.body).getBoundingClientRect();
+  var anchorY=anchor.top+anchor.height/2,offset=Math.round(anchorY-(overlay.top+overlay.height/2));
   wordEl.style.transform='';
   wordEl.style.marginTop='0';
   wordEl.style.translate='0 '+offset+'px';
-  if(wordEl.parentElement)wordEl.parentElement.style.setProperty('--impact-y',(anchor.top+anchor.height/2)+'px');
+  if(parent)parent.style.setProperty('--impact-y',(anchorY-overlay.top)+'px');
 }
 function showHot(){
   document.querySelectorAll('.spop').forEach(function(el){if(el.textContent==='★ CRITICAL ★')el.remove();});/* Hot dice is the larger beat. */
