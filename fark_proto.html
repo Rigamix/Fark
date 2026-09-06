@@ -840,6 +840,11 @@ body{letter-spacing:.045em}
 #nrFocusPanel{position:absolute;left:6%;right:6%;top:57%;z-index:8;text-align:center;color:#fff;
   opacity:0;pointer-events:none;transform:translateY(3%);transition:opacity .4s,transform .4s}
 #famRunDraft.focus #nrFocusPanel{opacity:1;pointer-events:auto;transform:none;transition-delay:.18s}
+
+#nrFocusPanel .nr-companion{display:flex;align-items:center;justify-content:center;gap:1.5cqh;margin:1.5cqh auto 0;text-align:left;max-width:90%;font-size:2.2cqh;line-height:1.25}
+#nrFocusPanel .nr-companion strong{display:block;color:#ffd98a;font-weight:normal}
+#nrFocusPanel .nr-companion small{display:block;color:#f2e9d8;font-size:1.9cqh;margin-top:.4cqh}
+#nrFocusPanel:has(.nr-companion) #nrTakeBtn{margin-top:1.5cqh}
 #nrFocusPanel .ffaces{font-size:3cqh;color:#ffd98a;letter-spacing:.12em;margin-top:1cqh;
   white-space:nowrap;text-shadow:0 2px 0 rgba(58,32,8,.75),0 3px 10px rgba(0,0,0,.5)}
 #nrFocusPanel .fdesc{font-size:2.4cqh;line-height:1.45;color:#f2e9d8;margin:1.3cqh auto 0;max-width:88%;
@@ -2245,7 +2250,7 @@ body.dlg-speaking #screen-match #tellBadge{opacity:0;pointer-events:none}
 /* the dice shadows darken the table rather than painting over it: the grain
    stays visible through them and they can never come out lighter than the
    wood, which is what the masked-table trick was for the long way round */
-#dsCanvas{mix-blend-mode:multiply}
+#dsCanvas,#shCanvas{mix-blend-mode:multiply}
 #matchProps{position:absolute;inset:0;z-index:0;pointer-events:none}
 /* P732: THE LOOK's vignette, from Denis's lab numbers (61% edge
    darkness, pool to 48%). Same z:0 band as the art it darkens; every
@@ -2497,6 +2502,9 @@ body.dlg-speaking #screen-match #tellBadge{opacity:0;pointer-events:none}
   /* a fallback only: _matchDress writes the per-character CROP inline */
   background-size:104%}
 #screen-match .tokPImg{background-color:#44403a}
+/* The painted patron moves inside the well; its frame and tally stay still. */
+#screen-match #tokOImg{overflow:hidden}
+#screen-match .patron-face{position:absolute;inset:0;background-size:cover;background-position:50% 14%;background-repeat:no-repeat;transform-origin:50% 68%;pointer-events:none}
 #screen-match .tok .tokRing{position:relative;width:100%;display:block;z-index:1}
 /* Centred in the visible ribbon: the ring bottoms at 50.7% of the bar and the
    ribbon runs to its notch at 96.2% (left) / 90.2% (right), so 73% sits the
@@ -10249,6 +10257,20 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
 /* P506b: once a real face loads it carries its own frame, exactly as the
    family cards do - so the rarity border, ground and glow all step aside
    rather than ringing someone else's artwork. */
+/* Playthrough: short, adjacent receipts for pending and already-safe effects. */
+.turn-tally{display:flex;justify-content:center;align-items:baseline;gap:1.8cqw;min-height:7.2cqw;max-width:100%;}
+.turn-tally [role="button"]{pointer-events:auto;cursor:pointer}
+.turn-tally [role="button"]:focus-visible{outline:1px solid #e8b681;outline-offset:3px;border-radius:3px}
+@media(max-height:740px){#screen-match .kept-zone{padding-top:8cqw}}
+
+#screen-match .turn-tally .kept-total{flex:none}
+.turn-extra{font:italic 3.2cqw Georgia,serif;color:#e8b681;text-shadow:0 1px 2px #1a1008;white-space:nowrap;line-height:1.15}
+.turn-extra.loss{color:#e49b87}
+.turn-extra[hidden]{display:none}
+#btnBank .btn-cap{display:flex;flex-wrap:wrap;justify-content:center;column-gap:1cqw;line-height:1.12;letter-spacing:0}
+#btnBank .bank-safe{font:italic 2.5cqw Georgia,serif;color:#e8b681}
+#btnBank.bank-to-win .btn-cap.has-safe{display:flex}
+@media(prefers-reduced-motion:reduce){.turn-extra{animation:none}}
 </style>
 </head>
 <body style="background:#0a0806">
@@ -10548,7 +10570,7 @@ body.legend .top-bar .title .letter{animation:legendShimmer 4s ease-in-out infin
          first die lands in it. -->
     <div class="kept-zone" id="keptZone">
       <div class="kept-row" id="keptRow"></div>
-      <div class="kept-total" id="keptTotal"></div>
+      <div class="turn-tally"><div class="kept-total" id="keptTotal" role="button" tabindex="0" title="Peek at this bank" onclick="showBankPreview()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showBankPreview();}"></div><span id="turnExtra" class="turn-extra" aria-live="polite" role="button" tabindex="0" title="Peek at this bank" onclick="showBankPreview()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showBankPreview();}"></span></div>
     </div>
   </div>
 
@@ -12021,6 +12043,7 @@ function saveMatchState(){
      match already recorded as a loss). */
   if(!G||!LO||G._practice||G._endMatchFired)return;
   S.pendingMatch={
+    tableDress:{seed:G._propSeed||0,id:G._propSet||null},
     bankHistory:_bsHistorySnapshot(),
     randomState:_copyMatchRandom(G._random),randomReady:G.phase==='idle',
     rungId:G.rung.id,rungName:G.rung.name,
@@ -12254,7 +12277,7 @@ function abandonMatch(){
     if(_abSnap.isBoss){
       S.run.coins=Math.max(0,(S.run.coins||0)-1);
       if(S.run.coins<=0){S.run._died=true;save();showScreen('gameover');return;}
-      _heartLossReset();S.run._lastOrders=true;/* P710: abandon = the same beat */
+      _bossLossReset();S.run._lastOrders=true;/* A heart buys a rematch, including abandonment. */
     }else{
       /* Patron seat abandoned: it was consumed (and the buy-in paid) at
          launch — no refunds, no re-rolls. The night may now be over. */
@@ -12339,6 +12362,7 @@ function _loadVeilRelease(scope){
 }
 var _veilFirstNav=true;/* boot's first showScreen veils too - black into the title */
 function showScreen(name, data) {
+  if(name!=='match')try{_patronCueClear();}catch(e){}
   var _veilOn=(_currentScreen!==name)||_veilFirstNav;
   _veilFirstNav=false;
   if(_veilOn)_loadVeilShow();
@@ -17114,6 +17138,14 @@ function _famEndReady(){
   try{_endScreenPhase='ready';}catch(e){}
 }
 /* run-start draft: 1 of 3, tier I, no decline (brief §4) */
+/* A small opening interaction; existing effects and tiers, two card slots still open. */
+var FARK_STARTERS={
+ amber:{card:'transmute',hint:'Change one face. Complete a triple.'},
+ silver:{card:'steady_hand',hint:'Reroll one die. Keep the new face.'},
+ obsidian:{card:'double_or_nothing',hint:'Risk one bank on a coin flip.'},
+ starstone:{card:'stargazer',hint:'Peek before you roll again.'},
+ vagabond:{card:'vanguard_f',hint:'Move a scorer to the first spot.'}
+};
 var _starterOffer=null;
 function famRunDraftShow(){
   if(document.getElementById('famRunDraft'))return;
@@ -17223,6 +17255,7 @@ function _nrFocus(i){
   var pan=document.getElementById('nrFocusPanel');
   pan.innerHTML='<div class="ffaces">'+acc((dt.faces||[1,2,3,4,5,6]).join(' · '))+'</div>'
     +(dt.desc?'<div class="fdesc">'+acc(nbh(dt.desc))+'</div>':'')
+    +_starterCompanionHtml(mt)
     +'<div id="nrTakeBtn" onclick="famRunDraftPick('+i+')"><img class="plq" src="Art/Assets/Buttons/optimized/Button_new_02_opt.webp" alt="">'
     +'<img class="nbDmd" src="Art/Assets/Panels/optimized/SitDown_diamond_opt.webp" alt=""><span>TAKE IT</span>'
     +'<img class="nbDmd" src="Art/Assets/Panels/optimized/SitDown_diamond_opt.webp" alt=""></div>'
@@ -17240,13 +17273,22 @@ function _nrUnfocus(){
     setTimeout(function(){die.classList.remove('zoom');die.style.transition='';},470);
   }
 }
+function _starterCompanionHtml(mat){
+  var s=FARK_STARTERS[mat];if(!s)return '';var d=famDef(s.card);
+  return '<div class="nr-companion">'+famCardArt(s.card,1,{style:'width:5.8cqh;flex:none'})
+    +'<span><strong>With '+d.name+'</strong><small>'+s.hint+'</small></span></div>';
+}
 function famRunDraftPick(i){
   var mt=_starterOffer&&_starterOffer[i];if(!mt)return;
   _getS();
   var bi=(S.run.dice||[]).lastIndexOf('bone');
   if(bi>=0)S.run.dice[bi]=mt;
   else{S.run.diceInv=S.run.diceInv||[];S.run.diceInv.push(mt);}
-  S.run._famFirstDraft=false;_starterOffer=null;save();
+  var companion=FARK_STARTERS[mt];
+  S.run._famFirstDraft=false;_starterOffer=null;
+  /* Pick and die are saved together by the acquisition writer. Never replace an existing collection. */
+  if(companion&&!(S.run.fcards||[]).length)famApplyPick({id:companion.card,tier:1});
+  save();
   var ov=document.getElementById('famRunDraft');if(ov)ov.remove();
   /* P606: no announcement here. famLog routes off-match to _famToast, which
      parents to `#phoneShell || document.body` - and #phoneShell does not
@@ -23333,65 +23375,31 @@ function _candleLoop(){
    revealed table slice stays pinned to screen coords so the texture
    never slides against the base table. */
 function _drawPropShadows(tSec){
-  var cv=document.getElementById('shCanvas'),ml=window._mLight;
-  var jobs=window._shJobs||[];
-  if(!cv||!ml||!ml.on)return;
-  var sc=document.getElementById('screen-match').getBoundingClientRect();
-  var W=sc.width,H=sc.height;if(W<10)return;
+  var cv=document.getElementById('shCanvas'),ml=window._mLight;if(!cv)return;
+  var ctx=cv.getContext('2d');ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,cv.width,cv.height);
+  if(!ml||!ml.on)return;
+  var sc=document.getElementById('screen-match').getBoundingClientRect(),W=sc.width,H=sc.height;if(W<10)return;
   var dpr=Math.min(window.devicePixelRatio||1,2);
-  if(cv.width!==Math.round(W*dpr)||cv.height!==Math.round(H*dpr)){
-    cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);
-  }
-  var f=_candleF(tSec===undefined?0.8:tSec);
-  /* flare -> larger, darker, pushed further along its own offset dir */
-  var sMul=1+0.05*f,alpha=0.60+0.12*f,push=0.8*f;
-  var x=cv.getContext('2d');x.setTransform(dpr,0,0,dpr,0,0);
-  x.clearRect(0,0,W,H);
-  var needsLoad=false;
-  jobs.forEach(function(j){
-    if(!j._im){j._im=new Image();j._im.src=j.src;}
-    var im=j._im;
-    if(!im.complete||!im.naturalWidth||!_tblImg.complete||!_tblImg.naturalWidth){needsLoad=true;
-      im.addEventListener('load',function(){_drawPropShadows(tSec);},{once:true});
-      if(!_tblImg.complete)_tblImg.addEventListener('load',function(){_drawPropShadows(tSec);},{once:true});
-      return;}
-    var w0=j.w/100*W,h0=w0*j.a[1]/j.a[0];
-    var pf=push*(j.flat===undefined?1:j.flat);
-    var cx=(j.x+(j.ux||0)*pf)/100*W+w0/2,cy=(j.y+(j.uy||0)*pf)/100*H+h0/2;
-    var w=w0*sMul,h=h0*sMul;
-    /* square tmp big enough for the rotated silhouette */
-    var side=Math.ceil(Math.sqrt(w0*w0+h0*h0)*1.08);
-    var TW=Math.max(2,Math.round(side*dpr)+2),TH=TW;
-    if(!j._tc||j._tc.width!==TW||j._tc.height!==TH){
-      j._tc=document.createElement('canvas');j._tc.width=TW;j._tc.height=TH;
-    }
-    var tw=TW/dpr,th=TH/dpr;
-    var tx2=j._tc.getContext('2d');tx2.setTransform(dpr,0,0,dpr,0,0);
-    tx2.globalCompositeOperation='source-over';
-    tx2.clearRect(0,0,tw,th);
-    /* the rotation lives in the MASK SHAPE only — the revealed texture
-       stays axis-aligned, pixel-identical to the base table.
-       Radial blur: solid core + 8 low-alpha ring stamps feather the
-       rim; fringe radius grows with distance from the light. */
-    /* mirror the MASK the same way the prop is mirrored - the flip reached
-       the <img> in P205 but never got here, so a flipped prop threw the
-       silhouette of its unflipped self */
-    tx2.save();tx2.translate(tw/2,th/2);tx2.rotate(j.rot*Math.PI/180);
-    if((j.fx||1)<0||(j.fy||1)<0)tx2.scale(j.fx||1,j.fy||1);
-    tx2.drawImage(im,-w/2,-h/2,w,h);
-    var bpx=(j.bl||0.8)*W/100;
-    tx2.globalAlpha=0.16;
-    for(var k2=0;k2<8;k2++){
-      var an=k2*Math.PI/4;
-      tx2.drawImage(im,-w/2+Math.cos(an)*bpx,-h/2+Math.sin(an)*bpx,w,h);
-    }
-    tx2.globalAlpha=1;tx2.restore();
-    tx2.globalCompositeOperation='source-in';
-    var tlx=cx-tw/2,tly=cy-th/2;               /* tmp top-left in screen coords */
-    tx2.drawImage(_tblImg,(ml.ox-sc.left)-tlx,(ml.oy-sc.top)-tly,ml.bw,ml.bh);
-    tx2.globalCompositeOperation='source-atop';
-    tx2.fillStyle='rgba(8,4,2,'+alpha.toFixed(3)+')';tx2.fillRect(0,0,tw,th);
-    x.drawImage(j._tc,0,0,TW,TH,cx-tw/2,cy-th/2,tw,th);
+  if(cv.width!==Math.round(W*dpr)||cv.height!==Math.round(H*dpr)){cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);}
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  var f=_candleF(tSec===undefined?.8:tSec),alpha=.58+.09*f,col=window.DICE_SHADOW_COL||'#3a2110';
+  (window._shJobs||[]).forEach(function(j){
+    if(!j._im){j._im=new Image();j._im.onload=function(){_drawPropShadows();};j._im.src=j.src;}
+    var im=j._im;if(!im.complete||!im.naturalWidth)return;
+    var w=(j.baseW||j.w)/100*W,h=w*j.a[1]/j.a[0],flat=j.flat===undefined?1:j.flat;
+    var cx=(j.baseX===undefined?j.x:j.baseX)/100*W+w/2,cy=(j.baseY===undefined?j.y:j.baseY)/100*H+h/2;
+    var dx=cx-W*FK_LIGHT.cx,dy=cy-H*FK_LIGHT.cy,len=Math.hypot(dx,dy)||1;
+    var offset=Math.min(10,1+w*.045)*flat,blur=.8+Math.min(5,w*.035)*flat;
+    var side=Math.ceil(Math.hypot(w,h)+blur*8+8),pixels=Math.ceil(side*dpr);
+    if(!j._tc||j._tc.width!==pixels){j._tc=document.createElement('canvas');j._tc.width=pixels;j._tc.height=pixels;}
+    var tmp=j._tc.getContext('2d');tmp.setTransform(dpr,0,0,dpr,0,0);tmp.clearRect(0,0,side,side);
+    tmp.globalCompositeOperation='source-over';tmp.save();tmp.translate(side/2,side/2);tmp.rotate(j.rot*Math.PI/180);tmp.scale(j.fx||1,j.fy||1);tmp.drawImage(im,-w/2,-h/2,w,h);tmp.restore();
+    tmp.globalCompositeOperation='source-in';tmp.fillStyle=col;tmp.fillRect(0,0,side,side);tmp.globalCompositeOperation='source-over';
+    ctx.save();
+    if(_cfBlur()){ctx.globalAlpha=alpha;ctx.filter='blur('+blur.toFixed(1)+'px)';ctx.drawImage(j._tc,cx+dx/len*offset-side/2,cy+dy/len*offset-side/2,side,side);ctx.filter='none';}
+    else{ctx.globalAlpha=alpha*.35;ctx.drawImage(j._tc,cx+dx/len*offset-side/2,cy+dy/len*offset-side/2,side,side);
+      for(var k=0;k<12;k++){var a=k*Math.PI/6;ctx.globalAlpha=alpha*.065;ctx.drawImage(j._tc,cx+dx/len*offset-side/2+Math.cos(a)*blur,cy+dy/len*offset-side/2+Math.sin(a)*blur,side,side);}}
+    ctx.globalAlpha=alpha*.20;ctx.drawImage(j._tc,cx-side/2,cy-side/2,side,side);ctx.restore();
   });
 }
 /* dice shadows: the die's true silhouette (8 corners through the same
@@ -23646,7 +23654,36 @@ function _drawDiceShadows(tSec){
   });
 }
 window.addEventListener('resize',function(){_mLightCalc();_drawPropShadows();try{_drawCandle(performance.now()/1000);_drawDiceShadows(performance.now()/1000);}catch(e){}});
+/* Presentation only: no game state, random draws, or additional dialogue. */
+var _patronCueOwner=null,_patronCueAnimation=null,_patronCueUntil=0,_patronCueRank=0;
+function _patronCueClear(){
+  if(_patronCueAnimation)_patronCueAnimation.cancel();
+  _patronCueAnimation=null;_patronCueUntil=0;_patronCueRank=0;_patronCueOwner=null;
+}
+function _patronCue(kind){
+  var sc=document.getElementById('screen-match'),face=document.querySelector('#tokOImg .patron-face');
+  if(!G||G!==_patronCueOwner||G._isBoss||G._endMatchFired||!sc||!sc.classList.contains('active')||!face||!face.animate)return false;
+  if((S&&S.settings&&S.settings.reducedMotion)||(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches))return false;
+  var poses={
+    watch:{rank:1,duration:1250,frames:[{transform:'none',offset:0},{transform:'translate(2%, 1%) rotate(-2deg) scale(1.08)',offset:.3},{transform:'translate(2%, 1%) rotate(-2deg) scale(1.08)',offset:.7},{transform:'none',offset:1}]},
+    yourBank:{rank:2,duration:900,frames:[{transform:'none',offset:0},{transform:'translate(-2%, 2%) rotate(4deg) scale(1.03)',offset:.24},{transform:'translate(0, 3%) rotate(-1deg) scale(1.02)',offset:.58},{transform:'none',offset:1}]},
+    ownBank:{rank:2,duration:850,frames:[{transform:'none',offset:0},{transform:'translate(0, 4%) rotate(-2deg) scale(1.04)',offset:.3},{transform:'translate(0, -1%) rotate(1deg) scale(1.02)',offset:.64},{transform:'none',offset:1}]}
+  },pose=poses[kind];if(!pose)return false;
+  var now=performance.now();if(now<_patronCueUntil&&pose.rank<=_patronCueRank)return false;
+  if(_patronCueAnimation)_patronCueAnimation.cancel();
+  _patronCueAnimation=face.animate(pose.frames,{duration:pose.duration,easing:'ease-in-out'});
+  _patronCueUntil=now+pose.duration;_patronCueRank=pose.rank;return true;
+}
+function _patronRiskCue(count){
+  if(G&&G.kept&&G.kept.length&&count>0&&(count<=2||G.turnPts>=600))return _patronCue('watch');
+  return false;
+}
+function _patronBankCue(actor,amount,status){
+  if(status!=='banked'||amount<(actor==='p'?800:600))return false;
+  return _patronCue(actor==='p'?'yourBank':'ownBank');
+}
 function _matchDress(isBoss){
+  _patronCueClear();_patronCueOwner=G;
   var pl=document.getElementById('matchPlate');
   var pr=document.getElementById('matchProps');
   if(!pl||!pr)return;
@@ -23675,7 +23712,9 @@ function _matchDress(isBoss){
        frames nothing in particular. Since every source is now a bust and
        nothing else, one rule covers all of them: cover the well and hold near
        the top, which is where a head is. */
-    tok.style.backgroundImage=(!isBoss&&art)?'url("'+PT_CHAR+art+PT_CHAR_EXT+'")':'none';
+    tok.style.backgroundImage='none';tok.replaceChildren();
+    if(!isBoss&&art){var face=document.createElement('div');face.className='patron-face';
+      face.style.backgroundImage='url("'+PT_CHAR+art+PT_CHAR_EXT+'")';tok.appendChild(face);}
     tok.style.backgroundSize='cover';
     tok.style.backgroundPosition='50% 14%';
     /* the disc behind the character takes the same colour the peek panel
@@ -23833,27 +23872,33 @@ function _matchDress(isBoss){
     var aa=_propAspect(A.n),ab=_propAspect(B.n);
     return (A.y+A.w*(aa[1]/aa[0])*0.52)-(B.y+B.w*(ab[1]/ab[0])*0.52);
   });
-  /* a hand-made template wins over the procedural dressing, used exactly
-     as saved: same order, same offsets, nothing nudged */
+  /* Composed sets: pick once, retain through redraw/resume. Boss dressing stays authored. */
   if(window.FK_PROP_TEMPLATES&&FK_PROP_TEMPLATES.length){
-    var _pool=FK_PROP_TEMPLATES;
-    /* Lives HERE, not in prop_templates.js: that file gets replaced wholesale
-       every time a fresh one is downloaded out of the lab, and the pin would
-       go with it. */
-    if(window.FK_PROP_PIN===undefined)window.FK_PROP_PIN='commoner_01';
-    /* FK_PROP_PIN: dress every table with this one template instead of
-       picking at random. Set it to null to go back to variety. */
-    if(window.FK_PROP_PIN){
-      var _hit=_pool.filter(function(t){return t&&t.name===window.FK_PROP_PIN;});
-      /* named entries are new; a file exported before that is a bare array
-         with the name only in a comment, so fall back to the first one */
-      _pool=_hit.length?_hit:[_pool[0]];
+    var all=FK_PROP_TEMPLATES,explicit=window.FK_PROP_PIN;
+    var pool=all.filter(function(t){return isBoss?t.name==='commoner_01':t.patronSet===true;});
+    if(explicit)pool=all.filter(function(t){return t.name===explicit;});
+    if(!pool.length)pool=[all[0]];
+    var tpl=pool.find(function(t){return t.name===G._propSet;})||pool[(rnd()*pool.length)|0];
+    G._propSet=tpl.name;
+    placed=(tpl.props||tpl).map(function(q){return {n:q.n,x:+q.x,y:+q.y,w:+q.w,rot:+(q.rot||0),fx:+(q.fx||1),fy:+(q.fy||1),cluster:q.cluster||''};});
+    /* The authored order includes deliberate cloth/plate/food overlap. Only
+       translate whole companion clusters if a short screen brings them near dice. */
+    if(tpl.patronSet){
+      var bounds=pr.getBoundingClientRect(),ratio=bounds.width/Math.max(1,bounds.height);
+      var groups={};placed.forEach(function(q,i){(groups[q.cluster||('single'+i)]||(groups[q.cluster||('single'+i)]=[])).push(q);});
+      Object.keys(groups).forEach(function(key){
+        var group=groups[key],lo=Infinity,hi=-Infinity,cross=false;
+        group.forEach(function(q){var ar=_propAspect(q.n),h=q.w*ar[1]/ar[0],r=q.rot*Math.PI/180;
+          var rx=(Math.abs(q.w*Math.cos(r))+Math.abs(h*Math.sin(r)))/2;
+          var ry=(Math.abs(q.w*Math.sin(r))+Math.abs(h*Math.cos(r)))*ratio/2;
+          var cx=q.x+q.w/2,cy=q.y+h*ratio/2;
+          if(cy+ry>38&&cy-ry<60){cross=true;lo=Math.min(lo,cx-rx);hi=Math.max(hi,cx+rx);}
+        });
+        if(cross){var left=group.reduce(function(n,q){return n+q.x+q.w/2;},0)/group.length<50;
+          var shift=left?Math.min(0,12-hi):Math.max(0,88-lo);
+          group.forEach(function(q){q.x+=shift;});}
+      });
     }
-    var _tpl=_pool.length===1?_pool[0]:_pool[(rnd()*_pool.length)|0];
-    var _tp=(_tpl&&_tpl.props)||_tpl;
-    if(_tp&&_tp.length)placed=_tp.map(function(q){
-      return {n:q.n,x:+q.x,y:+q.y,w:+q.w,rot:+(q.rot||0),
-              fx:+(q.fx||1),fy:+(q.fy||1)};});
   }
   /* How far a prop's shadow is allowed to travel, as a fraction of normal.
      1 = a tall object, 0.2 = something lying flat on the wood. The gap between
@@ -23896,7 +23941,7 @@ function _matchDress(isBoss){
     img.src=PP+'optimized/'+q.n+'_opt.webp';/* P721: the webps existed, unreferenced */
     img.style.cssText='left:'+q.x.toFixed(1)+'%;top:'+q.y.toFixed(1)+'%;width:'+w.toFixed(1)+'%;'
       +'transform:rotate('+q.rot+'deg) scale('+(q.fx||1)+','+(q.fy||1)+')';
-    pr.appendChild(img);
+    img.dataset.prop=q.n;img.dataset.cluster=q.cluster||'';pr.appendChild(img);
     /* silhouette shadow job: offset radially away from the overhead
        light centre (50%/44%); drawn on the shadow canvas */
     var a=_propAspect(q.n);
@@ -23921,6 +23966,7 @@ function _matchDress(isBoss){
          wants that spill; a towel lying on the wood does not.
          min(1,flat/0.35) maps the FLAT_PROPS band onto 0..1, so a tall prop
          (flat 1) keeps its 1.10 and the towel (flat 0.05) drops to 1.014. */
+      baseX:q.x,baseY:q.y,baseW:w,
       w:+(w*(1+0.10*Math.min(1,flat/0.35))).toFixed(1),rot:q.rot,fx:q.fx||1,fy:q.fy||1,a:a,flat:flat,
       ux:+(dx/len).toFixed(3),uy:+((dy/len)/1.9).toFixed(3),
       bl:+(Math.min(1.6,0.4+len*0.02)*flat).toFixed(2)});
@@ -27165,75 +27211,36 @@ var D3X={
   /* P821: ms 620->460, dist 0.85->1.15 (Denis: 'scatter more/faster';
      P743's 1.5 was too strong, this splits the difference). spin is a
      dead dial - the per-die value at the launch site is what spins. */
-  KICK:{ms:560,dist:1.65,spin:4.5,edge:2.6},
+  KICK:{ms:700,dist:1.7,spin:4.5,edge:2.6},
   scatterRow:function(sel){
-    if((S&&S.settings&&S.settings.reducedMotion)||matchMedia("(prefers-reduced-motion: reduce)").matches)return 0;
-    if(!this.ready||this.fail||!this.PHYS||!this.PHYS.on)return 0;
-    var self=this,t0=performance.now();
-    /* P799: AN IMPACT, NOT A PARTING. P733 named the disease ('the row
-       PARTED and bunched') and kept its cause - the base angle was still
-       sign(phys.x), and 42 degrees of jitter cannot break a binary
-       (Denis: 'they split into two stacks left and right'). ONE SLAM
-       POINT now, never dead centre and always off the dice line in
-       depth: every die is thrown RADIALLY away from it, so direction is
-       continuous in position and no two-lobe pattern can form; closer
-       dice are hit harder (falloff replaces the old hard-hit lottery);
-       spin scales with the hit; the wave reaches far dice a beat later. */
-    var hit=[];
-    this.dice.forEach(function(d){
-      if(!d.match||!d.phys||d.burst||d.kick)return;
-      if(!d.chip||!d.chip.closest||!d.chip.closest(sel))return;
-      hit.push(d);
-    });
+    if((S&&S.settings&&S.settings.reducedMotion)||matchMedia('(prefers-reduced-motion: reduce)').matches)return 0;
+    if(!this.ready||this.fail||!this.PHYS.on)return 0;
+    var self=this,hit=this.dice.filter(function(d){return d.match&&d.phys&&!d.roll&&!d.burst&&!d.kick&&d.chip&&d.chip.closest(sel);});
     if(!hit.length)return 0;
-    /* P858: THE EDGE IS MEASURED FIRST, because the impact point needs
-       it. Same self-calibration P799b introduced for the wall - the row
-       tells us where it ends - just hoisted above the draw so one
-       measurement serves both. */
-    var edge=this.KICK.edge||2.6;
-    hit.forEach(function(d){var ax=Math.abs(d.phys.x);if(ax+0.45>edge)edge=ax+0.45;});/* P799c: the outermost die was clipping the screen at +0.9 */
-    /* P858: THE IMPACT LANDS ANYWHERE ALONG THE ROW. It used to be
-       (Math.random()-0.5)*1.6 - within +-0.8 of centre against a row
-       running out to ~+-4.8, i.e. the middle ~17%, so every bust was a
-       centre blast by construction and the two centre dice always took
-       the hardest hit (Denis: "sometimes the bust scatter still happens
-       from the center" - it was always). P799's radial model is KEPT
-       deliberately: it is the fix for P733's two-stack parting, and
-       per-die random directions would bring that back. Widening the
-       point moves the blast without touching what makes it read as one
-       impact. */
-    var ix=(Math.random()*2-1)*edge*0.85;
-    var iz=(Math.random()<0.5?-1:1)*(0.35+Math.random()*0.55);
-    this._lastImpact={x:ix,z:iz};/* the probe reads this */
-    /* P799b: the wall sits just past the OUTERMOST die - the fixed 2.6
-       sat INSIDE the row (dice rest out to ~4.8), so the clamp yanked
-       outer dice toward the centre, inverting their kicks (it was
-       doing the same to the old scatter). Self-calibrating: the row
-       tells us where its edge is. (P858: measured above, where the
-       impact point needs it too.) */
-    hit.forEach(function(d){
-      /* P858: DEPTH IS PER DIE. The solver pins every settled die to the
-         row's mean z, so (d.phys.z - iz) was the SAME constant for all
-         six - one coin flip decided "above or below" for the whole row
-         and atan2 collapsed to ~0 or ~pi, giving a flat horizontal fan.
-         A per-die offset around the shared point restores real 2D
-         spread, so the radial field has something to vary over. */
-      var _pz=(d.phys.z||0)+(Math.random()-0.5)*0.9;
-      var dx=d.phys.x-ix,dz=_pz-iz;
-      var L=Math.sqrt(dx*dx+dz*dz)||0.001;
-      var ang=Math.atan2(dz,dx)+(Math.random()-0.5)*0.55;
-      var mag=self.KICK.dist*(0.55+Math.random()*0.35)*(1.75/(0.6+L));
-      var vx=Math.cos(ang)*mag,vz=Math.sin(ang)*mag*1.5;
-      /* P743: THE TABLE HAS EDGES - bounce off them, never leave */
-      var endX=d.phys.x+vx;
-      if(endX>edge)vx=(edge-d.phys.x)-(endX-edge)*0.45;
-      else if(endX<-edge)vx=(-edge-d.phys.x)-(endX+edge)*0.45;
-      if(Math.abs(vz)>edge*0.5)vz=(vz>0?1:-1)*edge*0.5;
-      d.kick={t0:t0+Math.min(80,L*15),vx:vx,vz:vz,lift:.16+Math.random()*.26,/* P821: the wave crosses quicker (was 70ms/die-width) */
-        sp:(Math.random()<0.5?-1:1)*(1.5+mag*3.2+Math.random()*1.6)};
+    var t0=performance.now(),edge=Math.max(this.KICK.edge,...hit.map(function(d){return Math.abs(d.phys.x)+.35;}));
+    var ix=(Math.random()-.5)*edge*.7,iz=(Math.random()-.5)*.9,phase=Math.random()*Math.PI*2;
+    this._lastImpact={x:ix,z:iz};
+    hit.forEach(function(d,i){
+      var from=d.obj.position.clone(),dx=(from.x-ix)*.5,dz=(from.z-iz)+Math.sin(phase+i*2.399)*1.25;
+      var angle=Math.atan2(dz,dx)+(Math.random()-.5)*.65,mag=.85+Math.random()*.95;
+      var tx=Math.max(-edge,Math.min(edge,from.x+Math.cos(angle)*mag));
+      var tz=Math.max(-1.35,Math.min(1.35,from.z+Math.sin(angle)*mag));
+      var axis=new THREE.Vector3((Math.random()<.5?-1:1)*(.7+Math.random()),.15+Math.random()*.3,(Math.random()-.5)*1.6).normalize();
+      d.kick={t0:t0+i*7,from:from,q:d.obj.quaternion.clone(),axis:axis,turns:Math.random()<.65?1:2,
+        vx:tx-from.x,vz:tz-from.z,lift:.5+Math.random()*.45,sp:(Math.random()-.5)*4};
     });
-    this._shDirty=true;
-    return hit.length;
+    this._shDirty=true;return hit.length;
+  },
+  _kickPose:function(d,now){
+    var k=d.kick;if(!k)return;
+    var t=Math.max(0,Math.min(1,(now-k.t0)/this.KICK.ms)),e=1-Math.pow(1-t,2.2);
+    var hop=Math.sin(Math.PI*Math.min(1,t/.78))*k.lift;
+    if(t>.78)hop=Math.sin(Math.PI*(t-.78)/.22)*k.lift*.13;
+    d.obj.position.copy(k.from);d.obj.position.x+=k.vx*e;d.obj.position.z+=k.vz*e;d.obj.position.y+=Math.max(0,hop);
+    var tumble=new THREE.Quaternion().setFromAxisAngle(k.axis,Math.PI*2*k.turns*Math.min(1,t/.78));
+    var yaw=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),k.sp*e);
+    d.obj.quaternion.copy(k.q).premultiply(tumble).premultiply(yaw);
+    if(t<1)this._shDirty=true;
   },
   /* P743: THE BUST BEAT, ONE FUNCTION, EITHER SIDE. Denis: 'it should
      happen the same exact way for the NPC - the dice mechanic should be
@@ -27517,7 +27524,7 @@ var D3X={
      eases back to its own size as it falls, which is the fake perspective
      Denis asked for. airDark 0.35 -> 0.45 because the darkening he also asked
      for ALREADY existed on this ramp and was too faint to read. */
-  airDarkFrom:1.4, airDarkTo:5.4, airDark:0.45, airSwell:0.18,
+  airDarkFrom:1.4, airDarkTo:5.4, airDark:0.64, airSwell:0.32, airGather:0.20,
     /* The collision box is WIDER THAN THE DIE in the plane of the table, so
        two dice simply cannot end up closer than this - no force acting at a
        distance, no push after they have landed. Not taller: a uniformly
@@ -30063,6 +30070,12 @@ var D3X={
   /* P608: 0 on the table, 1 at throw height. THE one height ramp - the air
      darkening and the apex swell both read it, so they cannot come to peak on
      different frames. Two copies of this expression is the bug to avoid. */
+  _throwPose:function(d,pose){
+    var k=this._airRamp(pose.y),r=d.roll;if(!k||!r)return pose;
+    if(!r.sol.visualCup){var first=r.sol.frames[0],cx=0,cz=0;first.forEach(function(p){cx+=p.x;cz+=p.z;});r.sol.visualCup={x:cx/first.length,z:cz/first.length};}
+    var cup=r.sol.visualCup,gather=k*(this.PHYS.airGather||0);
+    return {x:pose.x+(cup.x-pose.x)*gather,y:pose.y,z:pose.z+(cup.z-pose.z)*gather,q:pose.q,done:pose.done};
+  },
   _airRamp:function(y){
     var P=this.PHYS,k=(y-P.airDarkFrom)/(P.airDarkTo-P.airDarkFrom);
     return k<0?0:(k>1?1:k);
@@ -31369,7 +31382,7 @@ var D3X={
         e._d3xOwned=true;
         if(d.roll){
           /* physics owns this die: place it on the tilted table */
-          var pose=D3X._physPose(d);
+          var pose=D3X._throwPose(d,D3X._physPose(d));
           var sz2=tblSz[rkNow]||(d.w0||cr.width)*D3X.MSCALE;
           var root=D3X._tableRoot(D3X._rowKey(d));
           root.rotation.set(THREE.MathUtils.degToRad(D3X.TABLE.tilt),0,0);
@@ -31406,29 +31419,7 @@ var D3X={
           d.obj.visible=true;d.obj.scale.setScalar(1);
           d.obj.position.set(d.phys.x,d.phys.y,d.phys.z);
           d.obj.quaternion.copy(d.phys.q);
-          /* P716: the bust kick rides ON TOP of the frozen pose - ease-out
-             to its displaced rest, spinning about the die's own up axis so
-             the scoring face stays up. Shadows track while it moves. */
-          if(d.kick){
-            var _kt2=(performance.now()-d.kick.t0)/D3X.KICK.ms;
-            if(_kt2>1)_kt2=1;
-            if(_kt2<0)_kt2=0;/* P799: the wave has not reached this die yet */
-            var _ke2=1-Math.pow(1-_kt2,2.4);
-            d.obj.position.x+=d.kick.vx*_ke2;
-            d.obj.position.z+=d.kick.vz*_ke2;
-            d.obj.position.y+=Math.sin(Math.PI*_kt2)*(d.kick.lift||0);
-            var _kq2=(D3X._kq||(D3X._kq=new THREE.Quaternion()));
-            _kq2.setFromAxisAngle(D3X._kup||(D3X._kup=new THREE.Vector3(0,1,0)),d.kick.sp*_ke2*0.65);
-            /* P821: PREmultiply - world-frame yaw about world up. multiply()
-               applied the spin in the die's LOCAL frame, whose Y axis lies
-               HORIZONTAL for faces 1/3/4/6 (only 2 and 5 have their normal
-               on mesh Y), so those dice rolled over and settled cocked -
-               measured: 8 of 10 non-2 dice off-face across two baselines,
-               every 2 perfectly flat. The comment above always said 'the
-               scoring face stays up'; now the math agrees. */
-            d.obj.quaternion.premultiply(_kq2);
-            if(_kt2<1)D3X._shDirty=true;
-          }
+          if(d.kick)D3X._kickPose(d,performance.now());
           /* P881: the nudge rides on top of the kick, same as the kick rides
              on the frozen pose. Damped sine so it returns to exactly where it
              started - an effect must not leave a settled die displaced, since
@@ -32980,58 +32971,401 @@ function drawAllTierBtns(){
    The match brief is explicit that BANK must display the exact amount it
    would bank, rule adjustments included - so the caption reads from this
    too, not just the win test. */
-function _projectedBank(){
-  if(!G)return 0;
-  var t=(G.turnPts||0);
-  try{
-    if(G._tell){
-      if(_ruleActive('steeped','p')&&G._tellState&&G._tellState.bonus>0)t+=G._tellState.bonus;
-      if(typeof _ruleActive==='function'&&_ruleActive('reckoning','p')
-         &&G._tellState&&G._tellState.lastNpcBank>0&&t<G._tellState.lastNpcBank)return 0;
-    }
-    /* P819: LAST CALL refuses sub-threshold banks outright (handleBank
-       zeroes them) - projecting them as bankable was the button lying
-       on the exact seat Denis reported. Same rule source, same gate
-       (_ruleActive, NOT G._tell - sleeves and seals count). */
-    if(typeof _ruleActive==='function'&&_ruleActive('last_call','p')&&t>0){
-      var _lcR=(typeof _tellById==='function')?_tellById('last_call'):null;
-      if(t<((_lcR&&_lcR.minBank)||800))return 0;
-    }
-    /* P819: the two DETERMINISTIC post-refusal bonuses the win check
-       counts - slow_cook's simmer pot (famFire bankBonus adds state.acc
-       flat) and the first-bank hangover double. Escrowed banks skip the
-       bonus branch in handleBank, so they skip it here too. Flip- and
-       rival-dependent rewrites stay unprojected (OPEN.md). */
-    if(t>0&&!G._tabArmedVsPlayer){
-      (G.pF||[]).forEach(function(c){
-        if(c&&c.id==='slow_cook'&&c.state&&c.state.acc>0&&!c.broken)t+=c.state.acc;});
-      if((G._famBankCount||0)===0&&typeof S!=='undefined'&&S&&S.run&&S.run._hotdNext)t*=2;
-    }
-  }catch(e){}
-  return t;
+/* Read-only bank quote. The large own-card stack is shared with settlement;
+   opponent arithmetic uses BANK_FX/BANK_TAKE. Never run live bank hooks here. */
+function _copyBankPreviewState(s){
+  var q=Object.assign({},s),n=s.npcCardState||{};
+  q.npcCardState=Object.assign({},n,{usedOnce:Object.assign({},n.usedOnce),playerOnce:Object.assign({},n.playerOnce)});
+  q.activeCardState=Object.assign({},s.activeCardState);q._abTypes=Object.assign({},s._abTypes);
+  q.kept=(s.kept||[]).map(function(k){return Object.assign({},k,{vals:(k.vals||[]).slice()});});
+  q.pool=(s.pool||[]).map(function(d){return Object.assign({},d,{committed:d.committed||d.sel});});
+  return q;
 }
+function _bankQuote(){
+  var out={amount:0,net:0,heldAmount:0,bankTotal:0,exact:true,min:0,max:0,held:false,refused:false,blocked:false,wouldWin:false,parts:[],note:''};
+  if(!G)return out;
+  var q=_copyBankPreviewState(G),parts=out.parts,base=q.turnPts||0,sel=(G.pool||[]).filter(function(d){return d.sel&&!d.committed;}),split=_splitIcons(sel);
+  function part(name,n){if(n)parts.push({name:name,amount:n});}
+  var locked=q.kept.reduce(function(n,k){return n+(k.pts||0);},0),newPts=base-locked-(q._turnBonusPot||0);
+  if(newPts>0&&split.rest.length)q.kept.push({pts:newPts,vals:split.rest.map(function(d){return d.val;}),ss:_starstonePay(split.rest),dice:split.rest});
+  if(base<=0)return out;
+  part('Dice & their magic',base);
+  var mg=typeof _mendGate==='function'?_mendGate():{blocked:false};
+  if(mg.blocked){out.blocked=true;out.note='Roll again before banking';return out;}
+  if(split.icons.length||q._breakThenBank){out.exact=false;out.min=out.max=null;out.note='After the cast';return out;}
+  if(q._handicap==='bounty_board'||q._handicap==='rising_stakes'){out.exact=false;out.min=out.max=null;out.note='House rule settles on bank';return out;}
+  var own=_ownBankStack(q,base,'',true),total=own.total;q=own.state;part('Card bonuses',total-base);
+  var preTake=total,startP=G.pPts||0,startO=G.oPts||0,aborted=false;
+  function cardP(c){var d=famDef(c.id);return d&&d.p?d.p[(c.tier||1)-1]||0:0;}
+  function hit(state,side){(side==='p'?(G.pF||[]):(G.oF||[])).forEach(function(c){if(c&&!c.broken&&c.id==='retort'){var target=side==='p'?'oPts':'pPts';state[target]=Math.max(0,state[target]-cardP(c));}});}
+  (q.oCards||[]).forEach(function(cid){
+    if(aborted)return;var c=getNpcCard(cid);if(!c||!c.effect)return;var e=c.effect,before=total;
+    if(e.type==='on_player_bank'&&e.mechanic==='steal_pct'){var take=BANK_TAKE.steal_pct(total,e);total-=take;q.oPts+=take;hit(q,'p');}
+    if(e.type==='on_player_bank'&&e.mechanic==='halve_first_bank'&&!q.npcCardState.firstBankDone){total=BANK_FX.halve_first_bank(total,e);hit(q,'p');}
+    if(e.type==='on_player_bank'&&e.mechanic==='halve_big_bank'&&(q.npcCardState.usedOnce[cid]||0)<_useCap(cid)&&total>=(e.threshold||500)){q.npcCardState.usedOnce[cid]=(q.npcCardState.usedOnce[cid]||0)+1;total-=Math.floor(total/2);hit(q,'p');}
+    if(e.type==='once'&&e.mechanic==='steal_low_bank'&&(q.npcCardState.usedOnce[cid]||0)<_useCap(cid)&&total<e.threshold){q.oPts+=total;hit(q,'p');total=0;aborted=true;out.note='Taken by '+c.name;}
+    if(e.type==='once'&&e.mechanic==='challenge'&&q.npcCardState.challengeActive){q.npcCardState.challengeActive=false;if(total<q.npcCardState.challengeThreshold){var penalty=Math.min(q.npcCardState.challengePenalty,(q.pPts||0)+total),fromBank=Math.min(total,penalty);total-=fromBank;q.pPts=Math.max(0,q.pPts-(penalty-fromBank));hit(q,'p');}}
+    part(c.name,total-before);
+  });
+  if(!aborted){
+    (q.oCards||[]).forEach(function(cid){var c=getNpcCard(cid);if(c&&c.effect.mechanic==='periodic_drain'&&q.npcCardState.playerTurnCount>0&&q.npcCardState.playerTurnCount%c.effect.interval===0) {q.pPts=SCORE_DRAIN.periodic_drain(q.pPts,c.effect);hit(q,'p');}});
+    if(q.oCards.includes('cowards_bell')){var cut=Math.ceil(total*.1);total-=cut;part('Coward’s Bell',-cut);if(cut>0)hit(q,'p');}
+    if(q.pCards.includes('the_underdog')&&q.oPts-q.pPts>=1000){total+=200;part('The Underdog',200);}
+    if(q.pCards.includes('turncoat')&&q._turncoatArmed){total+=250;part('Turncoat',250);}
+    var stars=q.kept.reduce(function(n,k){return n+(k.ss||0);},0);total+=stars;part('Starstone',stars);
+    if(q._tell){
+      if(_ruleActive('steeped','p')&&q._tellState&&q._tellState.bonus>0){total+=q._tellState.bonus;part('Steeped',q._tellState.bonus);}
+      if(_ruleActive('reckoning','p')&&q._tellState&&q._tellState.lastNpcBank>0&&total<q._tellState.lastNpcBank){part('The Reckoning',-total);total=0;out.refused=true;out.note='Below their last bank';}
+      var lc=_tellById('last_call'),floor=lc&&lc.minBank||800;
+      if(_ruleActive('last_call','p')&&preTake>0&&preTake<floor){part('Last Call',-total);total=0;out.refused=true;out.note='Last Call needs '+floor.toLocaleString();}
+    }
+    out.held=!!q._tabArmedVsPlayer;
+    if(out.held){out.heldAmount=total;out.note='Held until your next turn';}
+    else{
+      (q.pF||[]).forEach(function(c){if(c&&!c.broken&&c.id==='slow_cook'&&c.state&&c.state.acc>0){total+=c.state.acc;part('Slow Cook',c.state.acc);}});
+      if((q.matchDice||[]).includes('ambrose_weight')&&(q._prevBankAmt||0)>0&&total>q._prevBankAmt){total+=500;part('Ambrose’s Weight',500);}
+      if(!(q._famBankCount||0)&&S&&S.run&&S.run._hotdNext){part('Hair of the Dog',total);total*=2;}
+      q.pPts+=total;
+    }
+  }
+  part('From your saved points',q.pPts-startP-(out.held||aborted?0:total));
+  out.bankTotal=total;
+  var branches=[{pPts:q.pPts,oPts:q.oPts,parts:[]}];
+  if(!aborted&&!out.held){
+    (q.pF||[]).forEach(function(c){
+      if(!c||c.broken)return;var P=cardP(c),next=[];
+      branches.forEach(function(b){
+        if(c.id==='double_or_nothing'&&c.state&&c.state.armed){next.push({pPts:b.pPts+total,oPts:b.oPts,parts:b.parts.slice()},{pPts:Math.max(0,b.pPts-Math.round(total*P)),oPts:b.oPts,parts:b.parts.slice()});out.exact=false;out.note='Double or Nothing';return;}
+        var n=0;if(c.id==='pickpocket')n=P;
+        if(c.id==='reprisal'&&b.oPts-(b.pPts-total)>=1000)n=Math.round(total*P);
+        n=Math.min(b.oPts,Math.max(0,n));if(n){b.pPts+=n;b.oPts-=n;b.parts.push({name:_bsName(c.id),amount:n});var was=b.pPts;hit(b,'o');if(b.pPts!==was)b.parts.push({name:'Their Retort',amount:b.pPts-was});}
+        next.push(b);
+      });branches=next;
+    });
+  }
+  out.min=Math.min.apply(null,branches.map(function(b){return b.pPts-startP;}));out.max=Math.max.apply(null,branches.map(function(b){return b.pPts-startP;}));
+  out.net=out.exact?out.min:null;out.amount=out.held?out.heldAmount:out.min;
+  if(out.exact&&branches[0])branches[0].parts.forEach(function(p){part(p.name,p.amount);});
+  out.wouldWin=!out.held&&!out.blocked&&startP+out.min-(G._sacPot||0)>=G.target;
+  return out;
+}
+function _bankQuoteAmount(q){
+  function num(n){return (n<0?'−':'+')+Math.abs(n).toLocaleString();}
+  if(!q.exact&&q.min==null)return q.note;
+  if(!q.exact)return num(q.min)+' / '+num(q.max);
+  return num(q.amount)+(q.held?' held':'');
+}
+function showBankPreview(){
+  if(!G)return;var q=_bankQuote(),panel=document.getElementById('bankSummaryPanel'),list=document.getElementById('bankSummaryList');if(!panel||!list)return;
+  panel.classList.remove('side-o');panel.classList.add('side-p');
+  list.innerHTML='<header class="bs-mast"><button class="bs-close" onclick="hideBankSummary()" aria-label="Close bank preview">×</button><h2>This bank</h2><div class="bs-tally">'+_bsEscape(_bankQuoteAmount(q))+'</div></header>'
+    +q.parts.map(function(p){return '<div class="bs-line"><span>'+_bsEscape(p.name)+'</span><strong>'+_bsSigned(p.amount)+'</strong></div>';}).join('')
+    +(q.note?'<p class="bs-note">'+_bsEscape(q.note)+'</p>':'');
+  document.getElementById('bank-summary-ov').classList.add('show');
+}
+
+/* Same own-card arithmetic for quote and payout. Dry mode only changes a
+   private snapshot; live mode retains counter spending and existing presentation. */
+function _ownBankStack(state,total,bonusMsg,preview){
+  var G=preview?_copyBankPreviewState(state):state;
+  function _noticeCard(){if(!preview)triggerCard.apply(null,arguments);}
+  function _noticePop(){if(!preview)spawnPop.apply(null,arguments);}
+  function _noticeClear(){if(!preview)clearCardLabel.apply(null,arguments);}
+  const totalCommitted=G.kept.reduce((a,k)=>a+k.vals.length,0);
+  if(G.pCards.includes('half_measure')&&totalCommitted===3){total+=400;bonusMsg+=' +400 HALF MEASURE';_noticeCard('half_measure','+400',true);}
+  var _effectiveRollCount=G.turnRollCount;
+  /* The Hearth: bank within first 2 rolls of a turn → +200 (repeats every turn).
+     Was first-roll only at +100, which felt identical to Beggar's Bowl's
+     one-time match starter. Wider window + bigger bonus + different framing
+     (per-turn quick-bank reward) makes them play distinctly. */
+  if(G.pCards.includes('the_hearth')&&_effectiveRollCount<=2){total+=200;bonusMsg+=' +200 HEARTH';_noticeCard('the_hearth','+200',true);}
+  if(G.pCards.includes('thrifty_gambler')&&total>=400&&total<=600){total+=150;bonusMsg+=' +150 THRIFTY';_noticeCard('thrifty_gambler','+150',true);}
+  if(G.pCards.includes('beggars_bowl')&&!G._beggarsBowlUsed){G._beggarsBowlUsed=true;total+=300;bonusMsg+=' +300 BOWL';_noticeCard('beggars_bowl','+300',true);}
+  if(G.pCards.includes('kings_ransom')&&(G.pPts+total-G.oPts)>=3000){total+=1000;bonusMsg+=' +1000 RANSOM';_noticeCard('kings_ransom','+1000',true);}
+  G.safeTurnStreak=(G.safeTurnStreak||0)+1;
+  if(G.pCards.includes('slow_burn')&&G.safeTurnStreak%3===0){total+=300;bonusMsg+=' +300 SLOW BURN';_noticeCard('slow_burn','+300',true);}
+  if(G.pCards.includes('rusty_spur')){
+    G.spurActive=Math.min(3,(typeof G.spurActive==='number'?G.spurActive:0)+1);
+    _noticeCard('rusty_spur','SPUR +1 ('+G.spurActive+'/3)',true);
+  }
+  if(G.pCards.includes('fools_gold')&&total>0&&total%500===0){total+=300;bonusMsg+=" +300 FOOL'S GOLD";_noticeCard('fools_gold','+300',true);}
+  /* The Whetstone: first 3 rolls each turn score +200 extra (matches desc). */
+  if(G.pCards.includes('the_whetstone')){var _wsRolls=Math.min(G.turnRollCount||1,3);var _wsBonus=_wsRolls*250;total+=_wsBonus;bonusMsg+=' +'+_wsBonus+' WHETSTONE';_noticeCard('the_whetstone','+'+_wsBonus,true);}
+  /* Fortune's Wheel: every 3rd bank is doubled */
+  if(G.pCards.includes('fortunes_wheel')){G._bankCount=(G._bankCount||0)+1;if(G._bankCount%3===0){total*=2;bonusMsg+=' x2 FORTUNE';_noticeCard('fortunes_wheel','x2 BANK!',true);}}
+  /* Corvus's Ledger: +75% on next bank after activation */
+  if(G.activeCardState&&G.activeCardState.ledgerActive){
+    /* +100% (doubles bank) — was +75% which felt weak vs Double Down's
+       2× current points. */
+    var ledgerBonus=total;total+=ledgerBonus;
+    bonusMsg+=' +'+ledgerBonus+' LEDGER';_noticeCard('corvus_ledger','x2 LEDGER',true);
+    G.activeCardState.ledgerActive=false;_noticeClear('corvus_ledger');
+  }
+  /* Greedy Hands: banks under 250 are doubled */
+  if(G.pCards.includes('greedy_hands')&&total<=250){total*=2;bonusMsg+=' x2 GREEDY';_noticeCard('greedy_hands','x2 BANK!',true);}
+  /* Tab at the Bar: +60 per Safe-Banker card equipped (this one counts itself) */
+  if(G.pCards.includes('tab_at_bar')){
+    var _tabBonus=_archCount('safeBanker')*60;
+    if(_tabBonus>0){total+=_tabBonus;bonusMsg+=' +'+_tabBonus+' TAB';_noticeCard('tab_at_bar','+'+_tabBonus,true);}
+  }
+  /* Last Orders: 3+ Safe-Banker → every 3rd bank doubled */
+  if(G.pCards.includes('last_orders')&&_archCount('safeBanker')>=3){
+    G._loBankCount=(G._loBankCount||0)+1;
+    if(G._loBankCount%3===0){total*=2;bonusMsg+=' ×2 LAST ORDERS';_noticeCard('last_orders','×2 BANK!',true);}
+  }
+  /* Stakes Rising: bank 500+ → arm bonus for next turn */
+  if(G.pCards.includes('stakes_rising')&&total>=500){
+    G._stakesRisingNext=true;
+    if(!preview&&typeof _updatePlayerCardVisuals==='function')_updatePlayerCardVisuals();
+  }
+  /* The Ledger: persistent stack added to every bank, grows +75 per bank */
+  if(G.pCards.includes('the_ledger')){
+    G._ledgerStack=G._ledgerStack||0;
+    if(G._ledgerStack>0){total+=G._ledgerStack;bonusMsg+=' +'+G._ledgerStack+' LEDGER';_noticeCard('the_ledger','+'+G._ledgerStack,true);}
+    G._ledgerStack+=75;
+  }
+  /* Compound Interest: bank grows multiplier by +5% per bank, capped at 50% */
+  if(G.pCards.includes('compound_interest')){
+    G._ciMult=G._ciMult||0;
+    if(G._ciMult>0){
+      var _ciBonus=Math.floor(total*G._ciMult);
+      if(_ciBonus>0){total+=_ciBonus;bonusMsg+=' +'+_ciBonus+' COMPOUND';_noticeCard('compound_interest','+'+_ciBonus+' ('+(G._ciMult*100|0)+'%)',true);}
+    }
+    G._ciMult=Math.min(0.5,G._ciMult+0.05);
+  }
+  /* The Estate: linear scaling — 1st bank +150, 2nd +250, 3rd +350…
+     (matches desc; was +50 base which contradicted the card text). */
+  if(G.pCards.includes('the_estate')){
+    G._estateBanks=(G._estateBanks||0)+1;
+    var _esBonus=50+G._estateBanks*100;
+    total+=_esBonus;bonusMsg+=' +'+_esBonus+' ESTATE';_noticeCard('the_estate','+'+_esBonus,true);
+  }
+  /* HONOR GUARD (E1): +50 per non-bone die in loadout, capped at +300. */
+  if(G.pCards.includes('honor_guard')&&G.matchDice){
+    var _hgUpgraded=G.matchDice.filter(function(m){return m!=='bone';}).length;
+    var _hgBonus=Math.min(300,_hgUpgraded*50);
+    if(_hgBonus>0){total+=_hgBonus;bonusMsg+=' +'+_hgBonus+' GUARD';_noticeCard('honor_guard','+'+_hgBonus,true);}
+  }
+  /* STANDARD BEARER (E1): +150 per UNIQUE die material in loadout. */
+  if(G.pCards.includes('standard_bearer')&&G.matchDice){
+    var _sbTypes=Object.keys(G.matchDice.reduce(function(o,m){o[m]=1;return o;},{})).length;
+    var _sbBonus=_sbTypes*150;
+    if(_sbBonus>0){total+=_sbBonus;bonusMsg+=' +'+_sbBonus+' BEARER';_noticeCard('standard_bearer','+'+_sbBonus,true);}
+  }
+  /* OPENING SHOT (opener): +75 per scoring die committed on roll 1. The
+     count is captured in handleRoll/commit when turnRollCount===1. */
+  if(G.pCards.includes('opening_shot')){
+    var _osCount=G._firstRollCommitted||0;
+    if(_osCount>0){var _osBonus=_osCount*75;total+=_osBonus;bonusMsg+=' +'+_osBonus+' OPENING';_noticeCard('opening_shot','+'+_osBonus,true);}
+  }
+  /* PROMPT HAND (opener): bank on roll 1 → x1.5. Strict — no rerolls. */
+  if(G.pCards.includes('prompt_hand')&&(G.turnRollCount||0)===1){
+    var _phBonus=Math.floor(total*0.5);total+=_phBonus;
+    bonusMsg+=' x1.5 PROMPT';_noticeCard('prompt_hand','x1.5!',true);
+  }
+  /* THE HARMONY (utility): +250 if 3+ different archetypes equipped. */
+  if(G.pCards.includes('the_harmony')){
+    var _thArchSet={};
+    G.pCards.forEach(function(cid){var c=getCard(cid);if(c&&c.arch)_thArchSet[c.arch]=1;});
+    if(Object.keys(_thArchSet).length>=3){total+=250;bonusMsg+=' +250 HARMONY';_noticeCard('the_harmony','+250',true);}
+  }
+  /* Coin Jar: every 3rd bank earns stacking bonus 200/400/600… */
+  if(G.pCards.includes('coin_jar')){
+    G._coinJarBanks=(G._coinJarBanks||0)+1;
+    if(G._coinJarBanks%3===0){
+      var _cjBonus=200*(G._coinJarBanks/3);
+      total+=_cjBonus;bonusMsg+=' +'+_cjBonus+' COIN JAR';_noticeCard('coin_jar','+'+_cjBonus,true);
+    }
+  }
+  /* ── Boss SIGNATURE passives (Phase 5) ── */
+  /* Mabel's Ward: +200 every bank, +600 on every 3rd bank */
+  if(G.pCards.includes('mabels_ward')){
+    G._wardBanks=(G._wardBanks||0)+1;
+    var _mwBonus=(G._wardBanks%3===0)?600:200;
+    total+=_mwBonus;bonusMsg+=' +'+_mwBonus+' WARD';_noticeCard('mabels_ward','+'+_mwBonus,true);
+  }
+  /* Player-owned Measure Twice: double the player's first bank once
+     per match. Mirror of the NPC path. */
+  G.npcCardState.playerOnce=G.npcCardState.playerOnce||{};
+  G.pCards.forEach(function(cid){
+    var npc=getNpcCard(cid);if(!npc)return;var eff=npc.effect;
+    if(eff&&eff.type==='on_opp_bank'&&eff.mechanic==='double_first_bank'&&(G.npcCardState.playerOnce[cid]||0)<_useCap(cid)){
+      G.npcCardState.playerOnce[cid]=(G.npcCardState.playerOnce[cid]||0)+1;
+      var _mtBefore=total;total=BANK_FX.double_first_bank(total,eff);
+      var _mtGain=total-_mtBefore;
+      bonusMsg+=' +'+_mtGain+' '+npc.name;
+      _noticeCard(cid,npc.name+' ×2!',true);
+    }
+    /* Player-owned Old Partner's Badge: +250 on every bank. Was NPC-only —
+       the boss-reward draft offered the card to the player with a playerDesc
+       promising the effect, but no player-side handler existed. */
+    if(eff&&eff.mechanic==='flat_bonus'&&(eff.amount||0)>0){
+      total=BANK_FX.flat_bonus(total,eff);
+      bonusMsg+=' +'+eff.amount+' '+npc.name;
+      _noticeCard(cid,npc.name+' +'+eff.amount,true);
+    }
+    /* Player-owned The Audit: banking while AHEAD pays +500. Same dead-card
+       gap as the badge above. */
+    /* P774 RULING: 'ahead' counts the incoming bank on both seats -
+       evaluated on the result of the banking action, matching the
+       rival's reading at _oppFxOwnB. */
+    if(eff&&eff.mechanic==='gain_when_ahead'&&(G.pPts+total)>G.oPts){
+      total=BANK_FX.gain_when_ahead(total,eff);
+      bonusMsg+=' +'+(eff.amount||500)+' '+npc.name;
+      _noticeCard(cid,npc.name+' +'+(eff.amount||500),true);
+    }
+  });
+  /* Corvus's Book: each bank adds +75 (or +150 if bank>=1000) to permanent interest */
+  if(G.pCards.includes('corvus_book')){
+    G._cbInterest=G._cbInterest||0;
+    if(G._cbInterest>0){total+=G._cbInterest;bonusMsg+=' +'+G._cbInterest+' BOOK';_noticeCard('corvus_book','+'+G._cbInterest,true);}
+    G._cbInterest+=(total>=1000?150:75);
+  }
+  /* Baker's Dozen: 13th bank of the match earns +1300 (once) */
+  if(G.pCards.includes('bakers_dozen')){
+    G._bdBanks=(G._bdBanks||0)+1;
+    if(G._bdBanks===13){total+=1300;bonusMsg+=' +1300 BAKER\'S DOZEN';_noticeCard('bakers_dozen','+1300 BAKER!',true);}
+  }
+  /* Brutus's Grit: banks of 500+ gain +15% bonus (reduced from +25% — sim
+     showed +25% kept the build at 89% even after capping bust-save to 1). */
+  if(G.pCards.includes('brutus_grit')&&total>=500){
+    var _bgBonus=Math.floor(total*0.15);
+    total+=_bgBonus;bonusMsg+=' +'+_bgBonus+' GRIT';_noticeCard('brutus_grit','+'+_bgBonus,true);
+  }
+  /* The Heir: turn 4+, each turn adds +75 to every bank (cumulative) */
+  if(G.pCards.includes('the_heir')&&G.turnNum&&G.turnNum>3){
+    var _hrBonus=(G.turnNum-3)*75;
+    total+=_hrBonus;bonusMsg+=' +'+_hrBonus+' HEIR';_noticeCard('the_heir','+'+_hrBonus,true);
+  }
+  /* Ambrose's Chalice: if 3 regular slots are same archetype, +250 every bank.
+     Sim originally had +500, which pushed pure builds to 93% win rate — too dominant. */
+  if(G.pCards.includes('ambrose_chalice')){
+    var _acRegular=[];
+    if(S&&S.run&&S.run.cards){
+      for(var _aci=0;_aci<3;_aci++){
+        var _accid=S.run.cards[_aci];
+        if(_accid){var _acc=getCard(_accid);if(_acc&&_acc.arch)_acRegular.push(_acc.arch);}
+      }
+    }
+    if(_acRegular.length===3&&_acRegular[0]===_acRegular[1]&&_acRegular[1]===_acRegular[2]){
+      total+=250;bonusMsg+=' +250 CHALICE';_noticeCard('ambrose_chalice','+250 PURE',true);
+    }
+  }
+  /* Aldric's Banner: each unique combo type ever scored adds +150 to every bank */
+  if(G.pCards.includes('aldrics_banner')){
+    G._abTypes=G._abTypes||{};
+    if(G.kept){
+      G.kept.forEach(function(k){
+        if(k.vals.length>=3){
+          var _allSame=true;for(var _avi=1;_avi<k.vals.length;_avi++)if(k.vals[_avi]!==k.vals[0]){_allSame=false;break;}
+          if(_allSame)G._abTypes.triple=true;
+          else if(k.vals.length>=5)G._abTypes.straight=true;
+        }
+      });
+    }
+    if(G._lastHotDice)G._abTypes.hotdice=true;
+    var _abN=Object.keys(G._abTypes).length;
+    if(_abN>0){
+      var _abBonus=_abN*150;
+      total+=_abBonus;bonusMsg+=' +'+_abBonus+' BANNER';_noticeCard('aldrics_banner','+'+_abBonus+' ('+_abN+' TYPES)',true);
+    }
+  }
+  /* Underdog: behind by 1000+ → +200 */
+  if(G.pCards.includes('underdog')&&(G.oPts-G.pPts)>=1000){total+=200;bonusMsg+=' +200 UNDERDOG';_noticeCard('underdog','+200',true);}
+  /* Chain Lightning: add stacking bonus from consecutive scoring rolls */
+  if(G.pCards.includes('chain_lightning')&&(G._chainCount||0)>0){var _clBonus=(G._chainCount-1)*50;if(_clBonus>0){total+=_clBonus;bonusMsg+=' +'+_clBonus+' CHAIN';_noticeCard('chain_lightning','+'+_clBonus,true);}G._chainCount=0;}
+  /* The Collector: +100 flat bonus if 3+ unique scoring types this turn */
+  if(G.pCards.includes('the_collector')){
+    var _ctTypes={};
+    G.kept.forEach(function(k){
+      if(k.vals.length>=3)_ctTypes.triple=true;
+      if(k.vals.length>=5)_ctTypes.straight=true;
+      k.vals.forEach(function(v){if(v===1&&k.vals.length<3)_ctTypes.single1=true;if(v===5&&k.vals.length<3)_ctTypes.single5=true;});
+    });
+    var _ctCount=Object.keys(_ctTypes).length;
+    if(_ctCount>=3){total+=400;bonusMsg+=' +400 COLLECTOR';_noticeCard('the_collector','+400 ('+_ctCount+' types)',true);}
+  }
+  /* Last Call: if this bank would win the match, +50% */
+  if(G.pCards.includes('closing_bell')&&(G.pPts+total)>=G.target){var _lcBonus=Math.floor(total*0.5);total+=_lcBonus;bonusMsg+=' +'+_lcBonus+' CLOSING BELL';_noticeCard('closing_bell','+'+_lcBonus,true);}
+  /* The Grudge: add accumulated grudge bonus */
+  if(G.pCards.includes('the_grudge')&&(G._grudgeStack||0)>0){var _grBonus=G._grudgeStack;total+=_grBonus;bonusMsg+=' +'+_grBonus+' GRUDGE';_noticeCard('the_grudge','+'+_grBonus,true);G._grudgeStack=0;}
+  /* Hot Streak: track safe turns and prime next roll */
+  if(G.pCards.includes('hot_streak')&&G.safeTurnStreak>=2){G._hotStreakReady=true;}
+  /* High Roller: bank 800+ → +200 */
+  if(G.pCards.includes('high_roller')&&total>=600){total+=400;bonusMsg+=' +400 HIGH ROLLER';_noticeCard('high_roller','+400',true);}
+  /* Blood Tithe: -50 per turn cost */
+  if(G.pCards.includes('blood_tithe')){var _btCost=50;if(G.pCards.includes('the_alchemist')&&G._alchemistActive)_btCost*=2;total-=_btCost;bonusMsg+=' -'+_btCost+' TITHE';_noticeCard('blood_tithe','-'+_btCost,true);}
+  /* Twin Flames: 2 different triples in this turn → +500 */
+  if(G.pCards.includes('twin_flames')){
+    var _tfTriples={};
+    G.kept.forEach(function(k){if(k.vals.length>=3){var _fc={};k.vals.forEach(function(v){_fc[v]=(_fc[v]||0)+1;});for(var _fk in _fc){if(_fc[_fk]>=3)_tfTriples[_fk]=true;}}});
+    if(Object.keys(_tfTriples).length>=2){total+=750;bonusMsg+=' +750 TWIN FLAMES';_noticeCard('twin_flames','+750',true);}
+  }
+  /* The Alchemist: 3+ tin cards → double tin effect bonuses (applied inline above) */
+  /* The Fence: opponent-disruption 25% stronger (applied in runOppTurn/finOpp) */
+  /* All In: if active, double bank; if doesn't win → -500 */
+  if(G.activeCardState&&G.activeCardState.allInActive){
+    G.activeCardState.allInActive=false;_noticeClear('all_in');
+    total*=2;bonusMsg+=' x2 ALL IN';
+    if((G.pPts+total)<G.target){total-=500;bonusMsg+=' -500 FAILED';_noticeCard('all_in','ALL IN FAILED -500',true);}
+    else{_noticeCard('all_in','ALL IN x2!',true);}
+  }
+  /* The Pyre: if burn bonus active, add it */
+  if(G.activeCardState&&G.activeCardState.pyreBonus>0){total+=G.activeCardState.pyreBonus;bonusMsg+=' +'+G.activeCardState.pyreBonus+' PYRE';G.activeCardState.pyreBonus=0;}
+
+  /* Synergy: Gambler's Kit — +100 on every bank */
+  if(G.activeSynergies&&G.activeSynergies.includes('tin_trio')){total+=100;bonusMsg+=' +100 TIN TRIO';_noticePop('+100');}
+  if(G.activeSynergies&&G.activeSynergies.includes('slow_hand')&&!G._slowHandUsedThisTurn){G._slowHandUsedThisTurn=true;total+=200;bonusMsg+=' +200 SLOW HAND';_noticePop('+200');}
+  /* Synergy: Iron Will — +150 when banking with ≤2 dice remaining */
+  if(G.activeSynergies&&G.activeSynergies.includes('mixed_metals')){var _diceLeft=G.pool.filter(function(d){return!d.committed;}).length;if(_diceLeft<=2){total+=150;bonusMsg+=' +150 MIXED METALS';_noticePop('+150');}}
+  /* ── Boss edicts removed — NPC card effects below provide all
+     patron-side disruption. ── */
+
+  return {total:total,bonusMsg:bonusMsg,state:G};
+}
+
+function _projectedBank(){return _bankQuote().amount;}
 /* P819: THE LABEL IS ITS OWN FUNCTION, fed by the button's live class
    rather than a caller argument, so every site that already calls
    updHUD heals the label for free (Loan and tier-3 tamper moved pPts
    with no label refresh - the structural hole behind 'inconsistently
    becomes BANK TO WIN'). setBtns calls it AFTER the class toggles and
    the drill lock; updHUD calls it after every mutation. */
+function _turnScoreView(){
+  if(!G)return {bank:0,extra:0,paid:0};
+  var owner=_activeTurn(G),mine=owner&&owner.actor==='p'&&!G._endMatchFired;
+  var quote=mine?_bankQuote():null,bank=quote?quote.amount:0;
+  var paid=mine&&Number.isFinite(G._turnScoreBase)?Math.round((G.pPts||0)-G._turnScoreBase-(G._pTurnBanked||0)):0;
+  return {bank:bank,extra:mine?bank-(G.turnPts||0):0,paid:paid,quote:quote};
+}
+function _refreshTurnEffects(){
+  var el=document.getElementById('turnExtra');if(!el)return;
+  var v=_turnScoreView(),parts=[];
+  function number(n){return (n<0?'−':'+')+Math.abs(n).toLocaleString();}
+  if(v.quote&&!v.quote.exact)parts.push(v.quote.min==null?v.quote.note:'Flip decides');
+  else if(v.quote&&v.quote.blocked)parts.push(v.quote.note);
+  else {if(v.extra)parts.push(number(v.extra)+' on bank');if(v.quote&&v.quote.held)parts.push('held a turn');else if(v.quote&&v.quote.refused)parts.push(v.quote.note);}
+  if(v.paid)parts.push(number(v.paid)+(v.paid>0?' safe':' lost'));
+  var text=parts.join(' · ');
+  if(el.textContent!==text){el.textContent=text;if(text&&!((S.settings||{}).reducedMotion)&&!matchMedia('(prefers-reduced-motion: reduce)').matches){el.animate([{opacity:.35,transform:'translateY(4px)'},{opacity:1,transform:'translateY(0)'}],{duration:280});}}
+  el.classList.toggle('loss',v.paid<0||v.extra<0);el.hidden=!text;
+}
 function _refreshBankLabel(){
   var bankBtn=document.getElementById('btnBank');if(!bankBtn)return;
   var b=!bankBtn.classList.contains('disabled');
   try{
     var _verb=document.getElementById('bankVerb'),_cap=document.getElementById('bankCap');
-    var _bpts=_projectedBank();
+    var _quote=_bankQuote(),_bpts=_quote.amount;
     /* P819: an escrowed bank (rival's tab) is held a turn and cannot win
        NOW - the caption may promise the amount, the win state may not. */
-    var _wins=!!(G&&b&&_bpts>0&&(G.pPts+_bpts)>=G.target&&!G._tabArmedVsPlayer);
+    var _wins=!!(G&&b&&_quote.wouldWin);
     if(G&&G._bankedToWin)_wins=true;/* P728: latched at the winning press */
     /* Nothing to bank and only branded faces picked: the one thing this
        button does is fire them, so it says so. Guarded on _bpts, because
        with points already on the line it really is a bank - that just also
        happens to cast. */
     var _selNow=(G&&G.pool)?G.pool.filter(function(d){return d.sel&&!d.committed;}):[];
-    var _castOnly=!!(b&&_bpts<=0&&_selNow.length&&_selNow.every(_dieIsIcon));
+    var _castOnly=!!(b&&(G.turnPts||0)<=0&&_selNow.length&&_selNow.every(_dieIsIcon));
     bankBtn.classList.toggle('bank-to-win',_wins);
     /* P599: the same state on the ROW, because the swap needs to size the ROLL
        button too and it is not this button's child. One class, both rules,
@@ -33041,8 +33375,13 @@ function _refreshBankLabel(){
         if(_ctl)_ctl.classList.toggle('bank-to-win',_wins);}catch(e){}
     bankBtn.classList.toggle('bank-cast',_castOnly);
     if(_verb)_verb.textContent=_castOnly?'CAST':(_wins?'BANK TO WIN':'BANK');
-    /* no running total on the winning press - the button says what it does */
-    if(_cap)_cap.textContent=(b&&_bpts>0&&!_wins)?('+'+_bpts.toLocaleString()):'';
+    /* One bank amount. Flip outcomes and already-paid receipts belong in the tally. */
+    if(_cap){
+      var _amount=_quote.exact?_quote.amount:(_quote.bankTotal||(G&&G.turnPts)||0);
+      _cap.classList.remove('has-safe');
+      _cap.textContent=(b&&!_castOnly)?((_amount<0?'−':'+')+Math.abs(_amount).toLocaleString()):'';
+    }
+    _refreshTurnEffects();
   }catch(e){}
 }
 function setBtns(r,b){
@@ -34351,6 +34690,7 @@ function toggleDie(d){
 
 function startPTurn(){
   var _pScope=_beginTurn(G,'p');if(!_pScope)return;
+  G._turnScoreBase=G.pPts||0;
   /* P927: STAMPED ON ENTRY so the rebuild below can tell "left over from last
      turn" - which is fine and is what the rebuild is for - from "set during
      THIS startPTurn, above the rebuild" - which is the bug that has now hit
@@ -35295,6 +35635,7 @@ G.numDice=Math.min((G.matchDice?G.matchDice.length:6),(G.numDice||(G.matchDice?G
   });
   const needNew=G.numDice-Object.keys(_occNow).length;
   SFX.roll(freeDice.filter(d=>!d._frozen).length+Math.max(0,needNew));
+  try{_patronRiskCue(freeDice.filter(d=>!d._frozen).length+Math.max(0,needNew));}catch(e){}
   // Reuse existing free dice: start spin, crossfade face at 90° (edge-on)
   freeDice.forEach(d=>{
     /* FROZEN DIE (held): keep its current face, don't reroll or animate.
@@ -36298,7 +36639,7 @@ function refreshSelUI(){
      whenever a brand was in the selection - and the press then refused it.
      The anchor is already folded into pts above, so false is correct here. */
   const ok=_keepIsLegal(pts,_pvIcons.length,false);
-  if(ok&&pts>0)pts=famCommitBonus(_scoreD,pts,'p',_sr,true);
+  if(ok&&pts>0)pts=_applyCommitBonuses(_scoreD,pts,cards,_sr,true);
   G.turnPts=locked+(pts>0?pts:0)+(G._turnBonusPot||0);updHUD();
   /* P683: the bottom gold number IS the live turn total now - written here
      because this line already computes it. visibility cleared so it shows
@@ -37014,8 +37355,12 @@ function doBust(){
    these (Vanguard, Sequence, Flanks, Hot Hand, Perfect Storm, Triple Hunter,
    Aldric's Vow doubling, The Echo), silently shorting the turn's final
    selection vs. the printed card text. Returns the adjusted pts. */
-function _applyCommitBonuses(selDice,pts,cards,resolved){
-  pts=famCommitBonus(selDice,pts,'p',resolved);
+function _applyCommitBonuses(selDice,pts,cards,resolved,preview){
+  function _noticeCard(){if(!preview)triggerCard.apply(null,arguments);}
+  function _noticePop(){if(!preview)spawnPop.apply(null,arguments);}
+  function _noticeClear(){if(!preview)clearCardLabel.apply(null,arguments);}
+
+  pts=famCommitBonus(selDice,pts,'p',resolved,preview);
   /* POSITION-BASED CARD BONUSES (Vagabond synergy) — positions are read from
      G.pool (roll order, stable across commits). */
   var rowLen=G.pool.length;
@@ -37023,13 +37368,13 @@ function _applyCommitBonuses(selDice,pts,cards,resolved){
   if(cards.includes('vanguard')){
     var d0=G.pool[0];
     if(d0&&selDice.indexOf(d0)>=0&&(d0.val===1||d0.val===5)){
-      pts+=300;triggerCard('vanguard','VANGUARD +300',true);spawnPop('+300 VANGUARD');
+      pts+=300;_noticeCard('vanguard','VANGUARD +300',true);_noticePop('+300 VANGUARD');
     }
   }
   /* SEQUENCE: on the FIRST commit of this roll, whole row strictly ±1 run. */
   var _sequenceEquipped=cards.includes('sequence')&&(!S||!S.run||!Array.isArray(S.run.cards)||S.run.cards.includes('sequence'));
   if(_sequenceEquipped&&G._sequenceArmedThisRoll){
-    G._sequenceArmedThisRoll=false;
+    if(!preview)G._sequenceArmedThisRoll=false;
     if(rowLen>=3){
       var vals=G.pool.map(function(d){return d.val;});
       var asc=true,desc=true;
@@ -37037,40 +37382,40 @@ function _applyCommitBonuses(selDice,pts,cards,resolved){
         if(vals[i]-vals[i-1]!==1)asc=false;
         if(vals[i-1]-vals[i]!==1)desc=false;
       }
-      if(asc||desc){pts+=1500;triggerCard('sequence','SEQUENCE +1500',true);spawnPop('+1500 SEQUENCE');}
+      if(asc||desc){pts+=1500;_noticeCard('sequence','SEQUENCE +1500',true);_noticePop('+1500 SEQUENCE');}
     }
   }
   /* FLANKS (tin): selection includes BOTH row-end dice → +200. */
   if(cards.includes('flanks')&&rowLen>=2){
     var _fL=G.pool[0],_fR=G.pool[rowLen-1];
     if(_fL&&_fR&&_fL!==_fR&&selDice.indexOf(_fL)>=0&&selDice.indexOf(_fR)>=0){
-      pts+=200;triggerCard('flanks','FLANKS +200',true);spawnPop('+200 FLANKS');
+      pts+=200;_noticeCard('flanks','FLANKS +200',true);_noticePop('+200 FLANKS');
     }
   }
   /* HOT HAND (tin): chain bonus per commit within a turn — +75, +150, +225… */
   if(cards.includes('hot_hand')){
-    G._hotHandChain=(G._hotHandChain||0)+1;
-    var _hhBonus=G._hotHandChain*75;
-    pts+=_hhBonus;triggerCard('hot_hand','HOT HAND +'+_hhBonus,true);
+    var _nextHotHand=(G._hotHandChain||0)+1;if(!preview)G._hotHandChain=_nextHotHand;
+    var _hhBonus=_nextHotHand*75;
+    pts+=_hhBonus;_noticeCard('hot_hand','HOT HAND +'+_hhBonus,true);
   }
   /* PERFECT STORM (tin): committing 5+ scoring dice in one selection: +400 */
   if(cards.includes('perfect_storm')&&selDice.length>=5){
-    pts+=400;triggerCard('perfect_storm','PERFECT STORM +400',true);
+    pts+=400;_noticeCard('perfect_storm','PERFECT STORM +400',true);
   }
   /* TRIPLE HUNTER (silver): first triple of each turn → +500. */
   if(cards.includes('triple_hunter')&&!G._tripleHunterFiredThisTurn){
     var _thCount={};selDice.forEach(function(d){_thCount[d.val]=(_thCount[d.val]||0)+1;});
     var _thFired=false;for(var _thF in _thCount){if(_thCount[_thF]>=3){_thFired=true;break;}}
     if(_thFired){
-      G._tripleHunterFiredThisTurn=true;
+      if(!preview)G._tripleHunterFiredThisTurn=true;
       pts+=500;
-      triggerCard('triple_hunter','TRIPLE HUNTER +500',true);
-      spawnPop('+500 HUNTER');
+      _noticeCard('triple_hunter','TRIPLE HUNTER +500',true);
+      _noticePop('+500 HUNTER');
     }
   }
-  if(G._vowDoubleActive){pts*=2;G._vowDoubleActive=false;spawnPop('VOW x2');}
+  if(G._vowDoubleActive){pts*=2;if(!preview)G._vowDoubleActive=false;_noticePop('VOW x2');}
   /* The Echo: previous roll scored → this selection gets +35% */
-  if(G._echoReady&&G.pCards.includes('the_echo')){var _echoB=Math.floor(pts*0.35);if(_echoB>0){pts+=_echoB;spawnPop('+'+_echoB+' ECHO');triggerCard('the_echo','ECHO +'+_echoB,true);}G._echoReady=false;}
+  if(G._echoReady&&G.pCards.includes('the_echo')){var _echoB=Math.floor(pts*0.35);if(_echoB>0){pts+=_echoB;_noticePop('+'+_echoB+' ECHO');_noticeCard('the_echo','ECHO +'+_echoB,true);}if(!preview)G._echoReady=false;}
   return pts;
 }
 
@@ -37419,256 +37764,7 @@ function handleBank(){
     G._turnBonusPot=0;/* P855: the SAC slice is cleared by the win check
        just below, which needs to read it first - see _sacHeld */
   }
-  const totalCommitted=G.kept.reduce((a,k)=>a+k.vals.length,0);
-  if(G.pCards.includes('half_measure')&&totalCommitted===3){total+=400;bonusMsg+=' +400 HALF MEASURE';triggerCard('half_measure','+400',true);}
-  var _effectiveRollCount=G.turnRollCount;
-  /* The Hearth: bank within first 2 rolls of a turn → +200 (repeats every turn).
-     Was first-roll only at +100, which felt identical to Beggar's Bowl's
-     one-time match starter. Wider window + bigger bonus + different framing
-     (per-turn quick-bank reward) makes them play distinctly. */
-  if(G.pCards.includes('the_hearth')&&_effectiveRollCount<=2){total+=200;bonusMsg+=' +200 HEARTH';triggerCard('the_hearth','+200',true);}
-  if(G.pCards.includes('thrifty_gambler')&&total>=400&&total<=600){total+=150;bonusMsg+=' +150 THRIFTY';triggerCard('thrifty_gambler','+150',true);}
-  if(G.pCards.includes('beggars_bowl')&&!G._beggarsBowlUsed){G._beggarsBowlUsed=true;total+=300;bonusMsg+=' +300 BOWL';triggerCard('beggars_bowl','+300',true);}
-  if(G.pCards.includes('kings_ransom')&&(G.pPts+total-G.oPts)>=3000){total+=1000;bonusMsg+=' +1000 RANSOM';triggerCard('kings_ransom','+1000',true);}
-  G.safeTurnStreak=(G.safeTurnStreak||0)+1;
-  if(G.pCards.includes('slow_burn')&&G.safeTurnStreak%3===0){total+=300;bonusMsg+=' +300 SLOW BURN';triggerCard('slow_burn','+300',true);}
-  if(G.pCards.includes('rusty_spur')){
-    G.spurActive=Math.min(3,(typeof G.spurActive==='number'?G.spurActive:0)+1);
-    triggerCard('rusty_spur','SPUR +1 ('+G.spurActive+'/3)',true);
-  }
-  if(G.pCards.includes('fools_gold')&&total>0&&total%500===0){total+=300;bonusMsg+=" +300 FOOL'S GOLD";triggerCard('fools_gold','+300',true);}
-  /* The Whetstone: first 3 rolls each turn score +200 extra (matches desc). */
-  if(G.pCards.includes('the_whetstone')){var _wsRolls=Math.min(G.turnRollCount||1,3);var _wsBonus=_wsRolls*250;total+=_wsBonus;bonusMsg+=' +'+_wsBonus+' WHETSTONE';triggerCard('the_whetstone','+'+_wsBonus,true);}
-  /* Fortune's Wheel: every 3rd bank is doubled */
-  if(G.pCards.includes('fortunes_wheel')){G._bankCount=(G._bankCount||0)+1;if(G._bankCount%3===0){total*=2;bonusMsg+=' x2 FORTUNE';triggerCard('fortunes_wheel','x2 BANK!',true);}}
-  /* Corvus's Ledger: +75% on next bank after activation */
-  if(G.activeCardState&&G.activeCardState.ledgerActive){
-    /* +100% (doubles bank) — was +75% which felt weak vs Double Down's
-       2× current points. */
-    var ledgerBonus=total;total+=ledgerBonus;
-    bonusMsg+=' +'+ledgerBonus+' LEDGER';triggerCard('corvus_ledger','x2 LEDGER',true);
-    G.activeCardState.ledgerActive=false;clearCardLabel('corvus_ledger');
-  }
-  /* Greedy Hands: banks under 250 are doubled */
-  if(G.pCards.includes('greedy_hands')&&total<=250){total*=2;bonusMsg+=' x2 GREEDY';triggerCard('greedy_hands','x2 BANK!',true);}
-  /* Tab at the Bar: +60 per Safe-Banker card equipped (this one counts itself) */
-  if(G.pCards.includes('tab_at_bar')){
-    var _tabBonus=_archCount('safeBanker')*60;
-    if(_tabBonus>0){total+=_tabBonus;bonusMsg+=' +'+_tabBonus+' TAB';triggerCard('tab_at_bar','+'+_tabBonus,true);}
-  }
-  /* Last Orders: 3+ Safe-Banker → every 3rd bank doubled */
-  if(G.pCards.includes('last_orders')&&_archCount('safeBanker')>=3){
-    G._loBankCount=(G._loBankCount||0)+1;
-    if(G._loBankCount%3===0){total*=2;bonusMsg+=' ×2 LAST ORDERS';triggerCard('last_orders','×2 BANK!',true);}
-  }
-  /* Stakes Rising: bank 500+ → arm bonus for next turn */
-  if(G.pCards.includes('stakes_rising')&&total>=500){
-    G._stakesRisingNext=true;
-    if(typeof _updatePlayerCardVisuals==='function')_updatePlayerCardVisuals();
-  }
-  /* The Ledger: persistent stack added to every bank, grows +75 per bank */
-  if(G.pCards.includes('the_ledger')){
-    G._ledgerStack=G._ledgerStack||0;
-    if(G._ledgerStack>0){total+=G._ledgerStack;bonusMsg+=' +'+G._ledgerStack+' LEDGER';triggerCard('the_ledger','+'+G._ledgerStack,true);}
-    G._ledgerStack+=75;
-  }
-  /* Compound Interest: bank grows multiplier by +5% per bank, capped at 50% */
-  if(G.pCards.includes('compound_interest')){
-    G._ciMult=G._ciMult||0;
-    if(G._ciMult>0){
-      var _ciBonus=Math.floor(total*G._ciMult);
-      if(_ciBonus>0){total+=_ciBonus;bonusMsg+=' +'+_ciBonus+' COMPOUND';triggerCard('compound_interest','+'+_ciBonus+' ('+(G._ciMult*100|0)+'%)',true);}
-    }
-    G._ciMult=Math.min(0.5,G._ciMult+0.05);
-  }
-  /* The Estate: linear scaling — 1st bank +150, 2nd +250, 3rd +350…
-     (matches desc; was +50 base which contradicted the card text). */
-  if(G.pCards.includes('the_estate')){
-    G._estateBanks=(G._estateBanks||0)+1;
-    var _esBonus=50+G._estateBanks*100;
-    total+=_esBonus;bonusMsg+=' +'+_esBonus+' ESTATE';triggerCard('the_estate','+'+_esBonus,true);
-  }
-  /* HONOR GUARD (E1): +50 per non-bone die in loadout, capped at +300. */
-  if(G.pCards.includes('honor_guard')&&G.matchDice){
-    var _hgUpgraded=G.matchDice.filter(function(m){return m!=='bone';}).length;
-    var _hgBonus=Math.min(300,_hgUpgraded*50);
-    if(_hgBonus>0){total+=_hgBonus;bonusMsg+=' +'+_hgBonus+' GUARD';triggerCard('honor_guard','+'+_hgBonus,true);}
-  }
-  /* STANDARD BEARER (E1): +150 per UNIQUE die material in loadout. */
-  if(G.pCards.includes('standard_bearer')&&G.matchDice){
-    var _sbTypes=Object.keys(G.matchDice.reduce(function(o,m){o[m]=1;return o;},{})).length;
-    var _sbBonus=_sbTypes*150;
-    if(_sbBonus>0){total+=_sbBonus;bonusMsg+=' +'+_sbBonus+' BEARER';triggerCard('standard_bearer','+'+_sbBonus,true);}
-  }
-  /* OPENING SHOT (opener): +75 per scoring die committed on roll 1. The
-     count is captured in handleRoll/commit when turnRollCount===1. */
-  if(G.pCards.includes('opening_shot')){
-    var _osCount=G._firstRollCommitted||0;
-    if(_osCount>0){var _osBonus=_osCount*75;total+=_osBonus;bonusMsg+=' +'+_osBonus+' OPENING';triggerCard('opening_shot','+'+_osBonus,true);}
-  }
-  /* PROMPT HAND (opener): bank on roll 1 → x1.5. Strict — no rerolls. */
-  if(G.pCards.includes('prompt_hand')&&(G.turnRollCount||0)===1){
-    var _phBonus=Math.floor(total*0.5);total+=_phBonus;
-    bonusMsg+=' x1.5 PROMPT';triggerCard('prompt_hand','x1.5!',true);
-  }
-  /* THE HARMONY (utility): +250 if 3+ different archetypes equipped. */
-  if(G.pCards.includes('the_harmony')){
-    var _thArchSet={};
-    G.pCards.forEach(function(cid){var c=getCard(cid);if(c&&c.arch)_thArchSet[c.arch]=1;});
-    if(Object.keys(_thArchSet).length>=3){total+=250;bonusMsg+=' +250 HARMONY';triggerCard('the_harmony','+250',true);}
-  }
-  /* Coin Jar: every 3rd bank earns stacking bonus 200/400/600… */
-  if(G.pCards.includes('coin_jar')){
-    G._coinJarBanks=(G._coinJarBanks||0)+1;
-    if(G._coinJarBanks%3===0){
-      var _cjBonus=200*(G._coinJarBanks/3);
-      total+=_cjBonus;bonusMsg+=' +'+_cjBonus+' COIN JAR';triggerCard('coin_jar','+'+_cjBonus,true);
-    }
-  }
-  /* ── Boss SIGNATURE passives (Phase 5) ── */
-  /* Mabel's Ward: +200 every bank, +600 on every 3rd bank */
-  if(G.pCards.includes('mabels_ward')){
-    G._wardBanks=(G._wardBanks||0)+1;
-    var _mwBonus=(G._wardBanks%3===0)?600:200;
-    total+=_mwBonus;bonusMsg+=' +'+_mwBonus+' WARD';triggerCard('mabels_ward','+'+_mwBonus,true);
-  }
-  /* Player-owned Measure Twice: double the player's first bank once
-     per match. Mirror of the NPC path. */
-  G.npcCardState.playerOnce=G.npcCardState.playerOnce||{};
-  G.pCards.forEach(function(cid){
-    var npc=getNpcCard(cid);if(!npc)return;var eff=npc.effect;
-    if(eff&&eff.type==='on_opp_bank'&&eff.mechanic==='double_first_bank'&&(G.npcCardState.playerOnce[cid]||0)<_useCap(cid)){
-      G.npcCardState.playerOnce[cid]=(G.npcCardState.playerOnce[cid]||0)+1;
-      var _mtBefore=total;total=BANK_FX.double_first_bank(total,eff);
-      var _mtGain=total-_mtBefore;
-      bonusMsg+=' +'+_mtGain+' '+npc.name;
-      triggerCard(cid,npc.name+' ×2!',true);
-    }
-    /* Player-owned Old Partner's Badge: +250 on every bank. Was NPC-only —
-       the boss-reward draft offered the card to the player with a playerDesc
-       promising the effect, but no player-side handler existed. */
-    if(eff&&eff.mechanic==='flat_bonus'&&(eff.amount||0)>0){
-      total=BANK_FX.flat_bonus(total,eff);
-      bonusMsg+=' +'+eff.amount+' '+npc.name;
-      triggerCard(cid,npc.name+' +'+eff.amount,true);
-    }
-    /* Player-owned The Audit: banking while AHEAD pays +500. Same dead-card
-       gap as the badge above. */
-    /* P774 RULING: 'ahead' counts the incoming bank on both seats -
-       evaluated on the result of the banking action, matching the
-       rival's reading at _oppFxOwnB. */
-    if(eff&&eff.mechanic==='gain_when_ahead'&&(G.pPts+total)>G.oPts){
-      total=BANK_FX.gain_when_ahead(total,eff);
-      bonusMsg+=' +'+(eff.amount||500)+' '+npc.name;
-      triggerCard(cid,npc.name+' +'+(eff.amount||500),true);
-    }
-  });
-  /* Corvus's Book: each bank adds +75 (or +150 if bank>=1000) to permanent interest */
-  if(G.pCards.includes('corvus_book')){
-    G._cbInterest=G._cbInterest||0;
-    if(G._cbInterest>0){total+=G._cbInterest;bonusMsg+=' +'+G._cbInterest+' BOOK';triggerCard('corvus_book','+'+G._cbInterest,true);}
-    G._cbInterest+=(total>=1000?150:75);
-  }
-  /* Baker's Dozen: 13th bank of the match earns +1300 (once) */
-  if(G.pCards.includes('bakers_dozen')){
-    G._bdBanks=(G._bdBanks||0)+1;
-    if(G._bdBanks===13){total+=1300;bonusMsg+=' +1300 BAKER\'S DOZEN';triggerCard('bakers_dozen','+1300 BAKER!',true);}
-  }
-  /* Brutus's Grit: banks of 500+ gain +15% bonus (reduced from +25% — sim
-     showed +25% kept the build at 89% even after capping bust-save to 1). */
-  if(G.pCards.includes('brutus_grit')&&total>=500){
-    var _bgBonus=Math.floor(total*0.15);
-    total+=_bgBonus;bonusMsg+=' +'+_bgBonus+' GRIT';triggerCard('brutus_grit','+'+_bgBonus,true);
-  }
-  /* The Heir: turn 4+, each turn adds +75 to every bank (cumulative) */
-  if(G.pCards.includes('the_heir')&&G.turnNum&&G.turnNum>3){
-    var _hrBonus=(G.turnNum-3)*75;
-    total+=_hrBonus;bonusMsg+=' +'+_hrBonus+' HEIR';triggerCard('the_heir','+'+_hrBonus,true);
-  }
-  /* Ambrose's Chalice: if 3 regular slots are same archetype, +250 every bank.
-     Sim originally had +500, which pushed pure builds to 93% win rate — too dominant. */
-  if(G.pCards.includes('ambrose_chalice')){
-    var _acRegular=[];
-    if(S&&S.run&&S.run.cards){
-      for(var _aci=0;_aci<3;_aci++){
-        var _accid=S.run.cards[_aci];
-        if(_accid){var _acc=getCard(_accid);if(_acc&&_acc.arch)_acRegular.push(_acc.arch);}
-      }
-    }
-    if(_acRegular.length===3&&_acRegular[0]===_acRegular[1]&&_acRegular[1]===_acRegular[2]){
-      total+=250;bonusMsg+=' +250 CHALICE';triggerCard('ambrose_chalice','+250 PURE',true);
-    }
-  }
-  /* Aldric's Banner: each unique combo type ever scored adds +150 to every bank */
-  if(G.pCards.includes('aldrics_banner')){
-    G._abTypes=G._abTypes||{};
-    if(G.kept){
-      G.kept.forEach(function(k){
-        if(k.vals.length>=3){
-          var _allSame=true;for(var _avi=1;_avi<k.vals.length;_avi++)if(k.vals[_avi]!==k.vals[0]){_allSame=false;break;}
-          if(_allSame)G._abTypes.triple=true;
-          else if(k.vals.length>=5)G._abTypes.straight=true;
-        }
-      });
-    }
-    if(G._lastHotDice)G._abTypes.hotdice=true;
-    var _abN=Object.keys(G._abTypes).length;
-    if(_abN>0){
-      var _abBonus=_abN*150;
-      total+=_abBonus;bonusMsg+=' +'+_abBonus+' BANNER';triggerCard('aldrics_banner','+'+_abBonus+' ('+_abN+' TYPES)',true);
-    }
-  }
-  /* Underdog: behind by 1000+ → +200 */
-  if(G.pCards.includes('underdog')&&(G.oPts-G.pPts)>=1000){total+=200;bonusMsg+=' +200 UNDERDOG';triggerCard('underdog','+200',true);}
-  /* Chain Lightning: add stacking bonus from consecutive scoring rolls */
-  if(G.pCards.includes('chain_lightning')&&(G._chainCount||0)>0){var _clBonus=(G._chainCount-1)*50;if(_clBonus>0){total+=_clBonus;bonusMsg+=' +'+_clBonus+' CHAIN';triggerCard('chain_lightning','+'+_clBonus,true);}G._chainCount=0;}
-  /* The Collector: +100 flat bonus if 3+ unique scoring types this turn */
-  if(G.pCards.includes('the_collector')){
-    var _ctTypes={};
-    G.kept.forEach(function(k){
-      if(k.vals.length>=3)_ctTypes.triple=true;
-      if(k.vals.length>=5)_ctTypes.straight=true;
-      k.vals.forEach(function(v){if(v===1&&k.vals.length<3)_ctTypes.single1=true;if(v===5&&k.vals.length<3)_ctTypes.single5=true;});
-    });
-    var _ctCount=Object.keys(_ctTypes).length;
-    if(_ctCount>=3){total+=400;bonusMsg+=' +400 COLLECTOR';triggerCard('the_collector','+400 ('+_ctCount+' types)',true);}
-  }
-  /* Last Call: if this bank would win the match, +50% */
-  if(G.pCards.includes('closing_bell')&&(G.pPts+total)>=G.target){var _lcBonus=Math.floor(total*0.5);total+=_lcBonus;bonusMsg+=' +'+_lcBonus+' CLOSING BELL';triggerCard('closing_bell','+'+_lcBonus,true);}
-  /* The Grudge: add accumulated grudge bonus */
-  if(G.pCards.includes('the_grudge')&&(G._grudgeStack||0)>0){var _grBonus=G._grudgeStack;total+=_grBonus;bonusMsg+=' +'+_grBonus+' GRUDGE';triggerCard('the_grudge','+'+_grBonus,true);G._grudgeStack=0;}
-  /* Hot Streak: track safe turns and prime next roll */
-  if(G.pCards.includes('hot_streak')&&G.safeTurnStreak>=2){G._hotStreakReady=true;}
-  /* High Roller: bank 800+ → +200 */
-  if(G.pCards.includes('high_roller')&&total>=600){total+=400;bonusMsg+=' +400 HIGH ROLLER';triggerCard('high_roller','+400',true);}
-  /* Blood Tithe: -50 per turn cost */
-  if(G.pCards.includes('blood_tithe')){var _btCost=50;if(G.pCards.includes('the_alchemist')&&G._alchemistActive)_btCost*=2;total-=_btCost;bonusMsg+=' -'+_btCost+' TITHE';triggerCard('blood_tithe','-'+_btCost,true);}
-  /* Twin Flames: 2 different triples in this turn → +500 */
-  if(G.pCards.includes('twin_flames')){
-    var _tfTriples={};
-    G.kept.forEach(function(k){if(k.vals.length>=3){var _fc={};k.vals.forEach(function(v){_fc[v]=(_fc[v]||0)+1;});for(var _fk in _fc){if(_fc[_fk]>=3)_tfTriples[_fk]=true;}}});
-    if(Object.keys(_tfTriples).length>=2){total+=750;bonusMsg+=' +750 TWIN FLAMES';triggerCard('twin_flames','+750',true);}
-  }
-  /* The Alchemist: 3+ tin cards → double tin effect bonuses (applied inline above) */
-  /* The Fence: opponent-disruption 25% stronger (applied in runOppTurn/finOpp) */
-  /* All In: if active, double bank; if doesn't win → -500 */
-  if(G.activeCardState&&G.activeCardState.allInActive){
-    G.activeCardState.allInActive=false;clearCardLabel('all_in');
-    total*=2;bonusMsg+=' x2 ALL IN';
-    if((G.pPts+total)<G.target){total-=500;bonusMsg+=' -500 FAILED';triggerCard('all_in','ALL IN FAILED -500',true);}
-    else{triggerCard('all_in','ALL IN x2!',true);}
-  }
-  /* The Pyre: if burn bonus active, add it */
-  if(G.activeCardState&&G.activeCardState.pyreBonus>0){total+=G.activeCardState.pyreBonus;bonusMsg+=' +'+G.activeCardState.pyreBonus+' PYRE';G.activeCardState.pyreBonus=0;}
-
-  /* Synergy: Gambler's Kit — +100 on every bank */
-  if(G.activeSynergies&&G.activeSynergies.includes('tin_trio')){total+=100;bonusMsg+=' +100 TIN TRIO';spawnPop('+100');}
-  if(G.activeSynergies&&G.activeSynergies.includes('slow_hand')&&!G._slowHandUsedThisTurn){G._slowHandUsedThisTurn=true;total+=200;bonusMsg+=' +200 SLOW HAND';spawnPop('+200');}
-  /* Synergy: Iron Will — +150 when banking with ≤2 dice remaining */
-  if(G.activeSynergies&&G.activeSynergies.includes('mixed_metals')){var _diceLeft=G.pool.filter(function(d){return!d.committed;}).length;if(_diceLeft<=2){total+=150;bonusMsg+=' +150 MIXED METALS';spawnPop('+150');}}
-  /* ── Boss edicts removed — NPC card effects below provide all
-     patron-side disruption. ── */
-
+  var _ownBank=_ownBankStack(G,total,bonusMsg,false);total=_ownBank.total;bonusMsg=_ownBank.bonusMsg;
   /* ── NPC CARD EFFECTS ON PLAYER BANK ── */
   /* Abort sentinel: the steal/block branches end the player's turn themselves
      (they schedule endPTurn). Their `return` only exits the forEach CALLBACK —
@@ -37966,6 +38062,7 @@ function handleBank(){
      not be celebrating. */
   _bsRecordBank('p',total,_bsHeldP?'held':_bankRefused?'refused':'banked',_bsPDice,_bsPMoments,G.turnNum,_bsPBankParts);
   try{JADE_MAGIC.bank('p',total,_bsHeldP?'held':_bankRefused?'refused':'banked');}catch(e){}
+  try{_patronBankCue('p',total,_bsHeldP?'held':_bankRefused?'refused':'banked');}catch(e){}
   try{_lmLand(!_bankRefused&&total>0);}catch(e){}
   _turnScoreClear();G.numDice=6;
   /* THE GRUDGE NPC mirror: increment opp's grudge stack when player banks
@@ -40143,6 +40240,7 @@ function runOppTurn(){
          after a bust for points the rival had already lost. */
       _bsRecordBank('o',pts,_bsHeldO?'held':_npcActuallyBanked?'banked':'stolen',[],G._bsOppCommits||[],G.oppTurnCount,_bsOBankParts);
   try{JADE_MAGIC.bank('o',pts,_bsHeldO?'held':_npcActuallyBanked?'banked':'stolen');}catch(e){}
+  try{_patronBankCue('o',pts,_bsHeldO?'held':_npcActuallyBanked?'banked':'stolen');}catch(e){}
       G._oLastBank=(_npcActuallyBanked&&pts>0)?pts:0;
       /* TELL: Reckoning (Ambrose) — record his last bank only if he actually scored it */
       if(_npcActuallyBanked&&_ruleActive('reckoning','p')&&pts>0){
@@ -40284,6 +40382,7 @@ function endMatch(win){
      "Victory screen audio repeats several times". */
   if(G&&G._endMatchFired)return;
   if(G)G._endMatchFired=true;
+  try{_patronCueClear();}catch(e){}
   /* TRADE IS MATCH-SCOPED: the instant the match ends, win or lose, both
      sides' true loadouts are whole again. Hung on the far side of the guard
      above so it runs exactly once per match, and this early so it lands before
@@ -41244,11 +41343,8 @@ function _settleEndRoute(route){
     S.run.coins=Math.max(0,(S.run.coins||0)-1);
     if(S.run.coins<=0)S.run._died=true;
     else{
-      /* P709/P710: a survived boss loss is a LAST ORDERS beat - the
-         heart is mourned on that screen (initTierScreen consumes the
-         flag, same as a failed night), the boss locks again and the
-         crowd re-rolls. The sign's NEW ROSTER line is true here. */
-      _heartLossReset();
+      /* Keep earned qualification; fresh patrons are optional preparation. */
+      _bossLossReset();
       S.run._lastOrders=true;
     }
   }else if(!route.win&&route.isHandicap){
@@ -43194,6 +43290,16 @@ function matchCloseDiceZoom(){
 }
 
 /* ═══════ INITIALIZATION ═══════ */
+/* Delayed words and head-start receipts belong to the match that queued them.
+   This is presentation only; turn/scoring continuations use their own guards. */
+function _matchPresentationLater(fn,delay){
+  var owner=G;
+  if(!owner)return;
+  return setTimeout(function(){
+    var sc=document.getElementById('screen-match');
+    if(G===owner&&!owner._endMatchFired&&sc&&sc.classList.contains('active'))fn();
+  },delay);
+}
 function initMatchScreen(data){
   /* Nuclear reset — ensure no stale match state bleeds through */
   G=null;
@@ -43210,7 +43316,7 @@ function initMatchScreen(data){
     if(S.pendingMatch.isBoss){
       S.run.coins=Math.max(0,(S.run.coins||0)-1);
       if(S.run.coins<=0)S.run._died=true;/* surfaces at the next tier screen */
-      else{_heartLossReset();S.run._lastOrders=true;}/* P710 */
+      else{_bossLossReset();S.run._lastOrders=true;}/* Same cost when replacing an unfinished boss match. */
     }
     delete S.pendingMatch;save();
   }
@@ -43273,7 +43379,9 @@ function initMatchScreen(data){
     sm.className=sm.className.replace(/\bboss-[\w-]+\b/g,'').replace(/\s+/g,' ').trim();
     var bossKey=(rung.name||'').toLowerCase().replace(/[^a-z0-9-]/g,'');
     if(bossKey)sm.classList.add('boss-'+bossKey);
-    try{_matchDress(/^(grog|mabel|finnick|corvus|brutus|aldric|whisper|ambrose)$/.test(bossKey));}catch(e){}
+    var dress=params._resumeData&&params._resumeData.tableDress;
+    if(dress){G._propSeed=Number.isFinite(dress.seed)?dress.seed:0;G._propSet=typeof dress.id==='string'?dress.id:null;}
+    try{_matchDress(!!params.isBoss);}catch(e){}
   })();
   /* The Alchemist: if 2+ tin cards, activate doubled tin effects */
   if(pCards.includes('the_alchemist')){
@@ -43718,11 +43826,11 @@ var _rdTs=params._resumeData._tradeSwaps;
       /* NPC rivalry + head start still fire on delay */
       var _rivalNs=rung.key&&S.npcState&&S.npcState[rung.key]?S.npcState[rung.key]:null;
       if(_rivalNs){
-        if(_rivalNs.streak<=-3){setTimeout(function(){if(window.DLG)DLG.trigger('RIVALRY_SOFT');},3000);}
-        else if(_rivalNs.streak>=3){setTimeout(function(){if(window.DLG)DLG.trigger('RIVALRY_GRUDGE');},3000);}
+        if(_rivalNs.streak<=-3){_matchPresentationLater(function(){if(window.DLG)DLG.trigger('RIVALRY_SOFT');},3000);}
+        else if(_rivalNs.streak>=3){_matchPresentationLater(function(){if(window.DLG)DLG.trigger('RIVALRY_GRUDGE');},3000);}
       }
-      if(G._headStart>0){setTimeout(function(){setStatusMsg('HEAD START +'+G._headStart+' pts','green');spawnPop('+'+G._headStart);},2500);}
-      if(pCards.includes('jesters_mask')){setTimeout(function(){if(window.DLG)DLG.trigger('CARD_EFFECT');},4500);}
+      if(G._headStart>0){_matchPresentationLater(function(){setStatusMsg('HEAD START +'+G._headStart+' pts','green');spawnPop('+'+G._headStart);},2500);}
+      if(pCards.includes('jesters_mask')){_matchPresentationLater(function(){if(window.DLG)DLG.trigger('CARD_EFFECT');},4500);}
       return;/* splash callback handles match start */
     }
     /* P715: the boss splash is OUT (Denis; it was name-only since P714).
@@ -43740,19 +43848,19 @@ var _rdTs=params._resumeData._tradeSwaps;
     }
     DLG.trigger('MATCH_START');
     /* P720: the archetype you robbed says so at the rematch */
-    if(G.rung&&G.rung.grudge){setTimeout(function(){if(window.DLG)DLG.trigger('GRUDGE_TAKEN');},2000);}
+    if(G.rung&&G.rung.grudge){_matchPresentationLater(function(){if(window.DLG)DLG.trigger('GRUDGE_TAKEN');},2000);}
     /* NPC rivalry dialogue based on streak history */
     var _rivalNs=rung.key&&S.npcState&&S.npcState[rung.key]?S.npcState[rung.key]:null;
     if(_rivalNs){
-      if(_rivalNs.streak<=-3){setTimeout(function(){if(window.DLG)DLG.trigger('RIVALRY_SOFT');},1500);}
-      else if(_rivalNs.streak>=3){setTimeout(function(){if(window.DLG)DLG.trigger('RIVALRY_GRUDGE');},1500);}
+      if(_rivalNs.streak<=-3){_matchPresentationLater(function(){if(window.DLG)DLG.trigger('RIVALRY_SOFT');},1500);}
+      else if(_rivalNs.streak>=3){_matchPresentationLater(function(){if(window.DLG)DLG.trigger('RIVALRY_GRUDGE');},1500);}
     }
     /* NPC living inventory: trigger new-cards dialogue */
     var _npcExtraCards=S.npcWonCards&&rung.key&&S.npcWonCards[rung.key]?S.npcWonCards[rung.key].length:0;
-    if(_npcExtraCards>0){setTimeout(function(){if(window.DLG)DLG.trigger('NEW_CARDS');},2500);}
+    if(_npcExtraCards>0){_matchPresentationLater(function(){if(window.DLG)DLG.trigger('NEW_CARDS');},2500);}
     /* Head start notification from close-loss carryover */
     if(G._headStart>0){
-      setTimeout(function(){setStatusMsg('HEAD START +'+G._headStart+' pts','green');spawnPop('+'+G._headStart);},600);
+      _matchPresentationLater(function(){setStatusMsg('HEAD START +'+G._headStart+' pts','green');spawnPop('+'+G._headStart);},600);
     }
     /* Card synergy notification — single message for all active synergies */
     if(G.activeSynergies&&G.activeSynergies.length>0){
@@ -43760,7 +43868,7 @@ var _rdTs=params._resumeData._tradeSwaps;
     }
     /* If player has Jester's Mask (makes NPC chaotic), trigger NPC confusion after intro */
     if(pCards.includes('jesters_mask')){
-      setTimeout(function(){if(window.DLG)DLG.trigger('CARD_EFFECT');},3200);
+      _matchPresentationLater(function(){if(window.DLG)DLG.trigger('CARD_EFFECT');},3200);
     }
   }
   /* P711/P715: the splash is out per Denis, but its boss music cue stays -
@@ -47051,6 +47159,13 @@ function _heartLossReset(){
   S.run.points=0;S.run._chalkMeta=[];S.run.night=null;
   try{_ensureNight();}catch(e){}
 }
+function _bossLossReset(){
+  S.run.night=null;S.run._rematchTier=S.run.tier;
+  /* A walked-away wager is a loss too; retries never reopen the book. */
+  S.run._bookClosed=S.run._bookClosed||{};S.run._bookClosed[S.run.tier]=true;
+  if(S.run._bookBet){S.run._bookResult={lost:S.run._bookBet.stake};delete S.run._bookBet;}
+  _ensureNight();/* saves the complete retry state, without an intermediate wiped qualification */
+}
 function _showLastOrders(){
   /* addendum-locked: near-dark, one heart visibly breaking, NEXT NIGHT
      button. Must be impossible to misread as a win.
@@ -47112,7 +47227,7 @@ function _renderRoomV2(tier,ready){
   var mp=document.getElementById('marksPlaque');if(!mp)return;
   var pts=(S.run&&S.run.points)||0,need=tier.pointsNeeded||0;
   var tx=document.getElementById('marksTxt');
-  if(tx)tx.textContent=(((tier.boss&&tier.boss.name)||'THE BOSS').toUpperCase())+' WAITS';
+  if(tx)tx.textContent=(S.run._rematchTier===S.run.tier&&ready)?'REMATCH':(((tier.boss&&tier.boss.name)||'THE BOSS').toUpperCase())+' WAITS';
   mp.classList.toggle('lit',!!ready);
   var bs=document.getElementById('bossShadow');
   if(bs)bs.classList.toggle('lit',!!ready);

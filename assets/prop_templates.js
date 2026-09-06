@@ -1,30 +1,82 @@
-/* Match table prop templates — made in prop_lab.html.
-   Each entry is one dressing of the table, drawn in array order.
-   x / y / w are % of the match screen, rot is degrees,
-   fx / fy are -1 when the prop is mirrored on that axis.
-   Set window.FK_PROP_PIN to a name to always use that one. */
+/* Inspected, standalone props at consistent relative sizes. No plated food on another dish.
+   Layouts intentionally leave different areas empty; companions do not have to touch.
+   Original boss/lab templates remain unchanged. */
 window.FK_PROP_TEMPLATES=[
-  {name:"001",props:[{n:"spoon",x:80.86,y:56.11,w:29.42,rot:15},
-    {n:"coins",x:-14.86,y:68.77,w:22.71,rot:356},
-    {n:"bottle",x:84.33,y:51.57,w:37.2,rot:0},
-    {n:"bread",x:-10.55,y:11,w:25.95,rot:0,fx:-1},
-    {n:"package",x:-27.81,y:20.06,w:39.8,rot:-3},
-    {n:"coins",x:88.16,y:16.78,w:17.2,rot:0},
-    {n:"mug01",x:84.05,y:20.92,w:26.09,rot:0,fx:-1},
-    {n:"pouch02",x:-24.16,y:52.04,w:39.28,rot:0,fx:-1},
-    {n:"singleCoin",x:81.16,y:72.76,w:10.88,rot:0},
-    {n:"singleCoin",x:76.17,y:22.33,w:8.32,rot:0},
-    {n:"singleCoin",x:90.53,y:11.23,w:7.71,rot:0}]},
-  {name:"commoner_01",props:[{n:"cork",x:80.04,y:23.03,w:11.08,rot:0},
-    {n:"bottle02",x:88.61,y:14.82,w:16.98,rot:1},
-    {n:"plateMetal",x:81.04,y:57.28,w:37.53,rot:14},
-    {n:"key",x:84.23,y:33.12,w:13.54,rot:-18},
-    {n:"grapes",x:84.56,y:59.55,w:19.66,rot:0},
-    {n:"towel02",x:-5.95,y:16.86,w:27.59,rot:-21,fx:-1},
-    {n:"bowl_dirty",x:-14.58,y:21.31,w:34.01,rot:-4},
-    {n:"singleCoin_02",x:7.87,y:61.55,w:7.97,rot:0},
-    {n:"pouch03",x:-9.65,y:53.76,w:16.36,rot:0},
-    {n:"fork",x:83.34,y:67.37,w:12.95,rot:12},
-    {n:"coins",x:-1.63,y:64.94,w:15.23,rot:0},
-    {n:"bag",x:92.48,y:45.08,w:37.02,rot:0}]}
+  {name:"001",props:[
+    {"n":"spoon","x":80.86,"y":56.11,"w":29.42,"rot":15},
+    {"n":"coins","x":-14.86,"y":68.77,"w":22.71,"rot":356},
+    {"n":"bottle","x":84.33,"y":51.57,"w":37.2,"rot":0},
+    {"n":"bread","x":-10.55,"y":11,"w":25.95,"rot":0,"fx":-1},
+    {"n":"package","x":-27.81,"y":20.06,"w":39.8,"rot":-3},
+    {"n":"coins","x":88.16,"y":16.78,"w":17.2,"rot":0},
+    {"n":"mug01","x":84.05,"y":20.92,"w":26.09,"rot":0,"fx":-1},
+    {"n":"pouch02","x":-24.16,"y":52.04,"w":39.28,"rot":0,"fx":-1},
+    {"n":"singleCoin","x":81.16,"y":72.76,"w":10.88,"rot":0},
+    {"n":"singleCoin","x":76.17,"y":22.33,"w":8.32,"rot":0},
+    {"n":"singleCoin","x":90.53,"y":11.23,"w":7.71,"rot":0}
+  ]},
+  {name:"commoner_01",props:[
+    {"n":"cork","x":80.04,"y":23.03,"w":11.08,"rot":0},
+    {"n":"bottle02","x":88.61,"y":14.82,"w":16.98,"rot":1},
+    {"n":"plateMetal","x":81.04,"y":57.28,"w":37.53,"rot":14},
+    {"n":"key","x":84.23,"y":33.12,"w":13.54,"rot":-18},
+    {"n":"grapes","x":84.56,"y":59.55,"w":19.66,"rot":0},
+    {"n":"towel02","x":-5.95,"y":16.86,"w":27.59,"rot":-21,"fx":-1},
+    {"n":"bowl_dirty","x":-14.58,"y":21.31,"w":34.01,"rot":-4},
+    {"n":"singleCoin_02","x":7.87,"y":61.55,"w":7.97,"rot":0},
+    {"n":"pouch03","x":-9.65,"y":53.76,"w":16.36,"rot":0},
+    {"n":"fork","x":83.34,"y":67.37,"w":12.95,"rot":12},
+    {"n":"coins","x":-1.63,"y":64.94,"w":15.23,"rot":0},
+    {"n":"bag","x":92.48,"y":45.08,"w":37.02,"rot":0}
+  ]},
+  {name:"patron_supper",patronSet:true,props:[
+    {"n":"bowl_full","x":11,"y":22,"w":29.71,"rot":-4,"cluster":"meal"},
+    {"n":"spoon","x":47,"y":30,"w":12.3,"rot":9,"cluster":"meal"},
+    {"n":"bottle02","x":85,"y":15,"w":11.87,"rot":1,"cluster":"drink"},
+    {"n":"mug01","x":64,"y":23,"w":14.89,"rot":-6,"cluster":"drink"},
+    {"n":"pouch03","x":8,"y":63,"w":14.26,"rot":-7,"cluster":"purse"},
+    {"n":"coins","x":27,"y":71,"w":7.77,"rot":12,"cluster":"purse"},
+    {"n":"key","x":84,"y":66,"w":6.66,"rot":-19,"cluster":""}
+  ]},
+  {name:"patron_wine",patronSet:true,props:[
+    {"n":"bottle01","x":6,"y":16,"w":11.9,"rot":-2,"cluster":"drink"},
+    {"n":"mug_empty","x":26,"y":26,"w":15.93,"rot":8,"cluster":"drink"},
+    {"n":"cheese","x":59,"y":22,"w":29.71,"rot":5,"cluster":"meal"},
+    {"n":"knife","x":48,"y":24,"w":5.32,"rot":-16,"cluster":"meal"},
+    {"n":"pouch02","x":13,"y":64,"w":17.35,"rot":-5,"cluster":"purse"},
+    {"n":"singleCoin_02","x":35,"y":71,"w":2.49,"rot":15,"cluster":"purse"}
+  ]},
+  {name:"patron_traveller",patronSet:true,props:[
+    {"n":"jug","x":9,"y":18,"w":19.31,"rot":5,"cluster":"drink"},
+    {"n":"mug01","x":39,"y":28,"w":15.07,"rot":-6,"cluster":"drink"},
+    {"n":"bag","x":70,"y":17,"w":24.77,"rot":-7,"cluster":""},
+    {"n":"loaf","x":44,"y":69,"w":23.73,"rot":8,"cluster":""},
+    {"n":"coins","x":10,"y":66,"w":7.69,"rot":-9,"cluster":""},
+    {"n":"key","x":86,"y":65,"w":6.65,"rot":18,"cluster":""}
+  ]},
+  {name:"patron_bread_and_ale",patronSet:true,props:[
+    {"n":"bread","x":11,"y":23,"w":21.4,"rot":-8,"cluster":"meal"},
+    {"n":"knife","x":38,"y":24,"w":5.32,"rot":11,"cluster":"meal"},
+    {"n":"jug","x":73,"y":17,"w":19.27,"rot":-5,"cluster":"drink"},
+    {"n":"mug_empty","x":48,"y":26,"w":15.93,"rot":7,"cluster":"drink"},
+    {"n":"pouch","x":22,"y":64,"w":14.29,"rot":-9,"cluster":"purse"},
+    {"n":"coins","x":42,"y":71,"w":7.77,"rot":6,"cluster":"purse"},
+    {"n":"towel01","x":79,"y":65,"w":18.41,"rot":16,"cluster":""}
+  ]},
+  {name:"patron_late_cup",patronSet:true,props:[
+    {"n":"mug01","x":23,"y":26,"w":15,"rot":7,"cluster":""},
+    {"n":"spoon","x":44,"y":31,"w":12.33,"rot":-10,"cluster":""},
+    {"n":"towel","x":72,"y":21,"w":16.67,"rot":12,"cluster":""},
+    {"n":"olives","x":61,"y":68,"w":26.77,"rot":-5,"cluster":""},
+    {"n":"coins","x":16,"y":67,"w":7.71,"rot":-8,"cluster":""},
+    {"n":"singleCoin_02","x":29,"y":71,"w":2.49,"rot":16,"cluster":""}
+  ]},
+  {name:"patron_merchant",patronSet:true,props:[
+    {"n":"package","x":9,"y":20,"w":23.1,"rot":-8,"cluster":""},
+    {"n":"bottle02","x":83,"y":15,"w":11.87,"rot":2,"cluster":"drink"},
+    {"n":"mug01","x":60,"y":28,"w":15.07,"rot":-6,"cluster":"drink"},
+    {"n":"pouch02","x":29,"y":69,"w":17.54,"rot":8,"cluster":"purse"},
+    {"n":"singleCoin_02","x":51,"y":73,"w":2.5,"rot":0,"cluster":"purse"},
+    {"n":"key","x":10,"y":67,"w":6.68,"rot":-13,"cluster":""}
+  ]}
 ];
