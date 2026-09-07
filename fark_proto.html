@@ -199,6 +199,23 @@ body{
 html.fkSA body{height:auto}
 html.fkSA #gbSheet,html.fkSA #peekSheet{padding-bottom:env(safe-area-inset-bottom,0px)}
 
+/* A tossed tavern coin: a physical wager, with one settled bank result. */
+.bank-flip{position:absolute;left:50%;top:42%;translate:-50% -50%;width:min(78%,320px);z-index:9600;text-align:center;pointer-events:none;color:#f2e4c3;font-family:var(--font-dlg);text-shadow:0 2px 3px #20160f}
+.bank-flip small{display:block;font-size:clamp(15px,4cqw,20px);margin-bottom:12px}
+.bank-flip-stage{position:relative;height:clamp(90px,28cqw,126px);perspective:650px}
+.bank-flip-shadow{position:absolute;bottom:0;left:50%;width:24%;height:9%;translate:-50% 0;border-radius:50%;background:#160e09;filter:blur(5px);opacity:.55}
+.bank-flip-coin{position:relative;margin:auto;width:clamp(72px,23cqw,105px);aspect-ratio:1;transform-style:preserve-3d;animation:bank-coin-toss 650ms cubic-bezier(.2,.65,.35,1) both}
+.bank-flip-face{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;backface-visibility:hidden;-webkit-backface-visibility:hidden;image-rendering:auto;filter:drop-shadow(1px 3px 1px #34210e)}
+.bank-flip-back{transform:rotateY(180deg)}
+.bank-flip-result{opacity:0;translate:0 6px;transition:opacity .16s,translate .16s}
+.bank-flip.revealed .bank-flip-result{opacity:1;translate:0 0}
+.bank-flip-result strong{display:block;font-size:clamp(20px,6cqw,29px);color:#e3bb70;letter-spacing:.04em}
+.bank-flip.loss .bank-flip-result strong{color:#dcab94}
+.bank-flip-result b{display:block;font-size:clamp(27px,8cqw,38px);margin-top:3px}
+.bank-flip-result span{font-size:.55em;font-weight:normal;margin-left:.35em}
+.bank-flip.reduced .bank-flip-coin{animation:none;transform:rotateY(var(--coin-end))}
+@keyframes bank-coin-toss{0%{transform:translateY(20px) rotateY(0deg) rotateZ(-12deg) scale(.8)}42%{transform:translateY(-28px) rotateY(540deg) rotateZ(9deg) scale(1)}82%{transform:translateY(4px) rotateY(1000deg) rotateZ(-4deg)}100%{transform:translateY(0) rotateY(var(--coin-end)) rotateZ(0)}}
+
 /* ─── TOP BAR ─── */
 .top-bar{
   position:relative;z-index:20;
@@ -12385,6 +12402,7 @@ function _loadVeilRelease(scope){
 }
 var _veilFirstNav=true;/* boot's first showScreen veils too - black into the title */
 function showScreen(name, data) {
+  if(name!=='match')_clearBankFlip();
   if(name!=='match')try{_patronCueClear();}catch(e){}
   var _veilOn=(_currentScreen!==name)||_veilFirstNav;
   _veilFirstNav=false;
@@ -15141,6 +15159,7 @@ function famFire(hook,ev){
      the caller apply `base*mul + delta`, and the answer keeps not caring. _mul starts at 1 so every existing hook
      is unaffected: nothing calls mul() yet. */
   ev=ev||{};ev._delta=0;ev._mul=1;
+  if(hook==='bank')ev._bankFlips=[];
   if(hook==='commit')ev._recipeOps=[];if(hook==='commit'||hook==='bankBonus')ev._bsEffects=[];
   ev.add=function(n){ev._delta+=n;if(hook==='commit'||hook==='bankBonus')ev._bsEffects.push({source:ev.me&&ev.me.id,op:'add',amount:n});};
   ev.mul=function(n){ev._mul*=n;if(hook==='commit')ev._bsEffects.push({source:ev.me&&ev.me.id,op:'multiply',amount:n});};
@@ -15655,6 +15674,38 @@ CFX.encore={
    owner. The rival arms it through famUse('o') at turn start when
    trailing (the lever in _npcArmActives); the bespoke finOpp flip is
    deleted in this patch. */
+var _bankFlipView=null;
+function _clearBankFlip(){
+  if(!_bankFlipView)return;
+  clearTimeout(_bankFlipView.reveal);clearTimeout(_bankFlipView.remove);
+  _bankFlipView.el.remove();_bankFlipView=null;
+}
+function _showBankFlip(result){
+  _clearBankFlip();
+  var screen=document.getElementById('screen-match'),match=G;
+  if(!screen||!match||!screen.classList.contains('active'))return;
+  var reduced=!!(S&&S.settings&&S.settings.reducedMotion)||!!(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches);
+  var flipMs=reduced?0:650,holdMs=reduced?900:1700;
+  match._bankFlipUntil=performance.now()+holdMs;
+  var el=document.createElement('div');el.className='bank-flip '+(result.won?'win':'loss')+(reduced?' reduced':'');
+  el.style.setProperty('--coin-end',result.won?'1080deg':'1260deg');el.dataset.owner=result.owner;
+  var owner=document.createElement('small');owner.textContent=result.owner==='o'?((match.rung&&match.rung.name)||'Their')+' flip':'Your flip';el.appendChild(owner);
+  var stage=document.createElement('div');stage.className='bank-flip-stage';stage.setAttribute('aria-hidden','true');
+  stage.innerHTML='<div class="bank-flip-shadow"></div><div class="bank-flip-coin"><img class="bank-flip-face" src="Art/Assets/Icons/optimized/coin_opt.webp" alt=""><img class="bank-flip-face bank-flip-back" src="Art/Assets/Icons/optimized/coin_02_opt.webp" alt=""></div>';el.appendChild(stage);
+  var outcome=document.createElement('div');outcome.className='bank-flip-result';outcome.setAttribute('aria-hidden','true');
+  var label=document.createElement('strong');label.textContent=result.won?'DOUBLED':result.tier===3?'A QUARTER LOST':result.tier===2?'A THIRD LOST':'HALF LOST';
+  var amount=document.createElement('b');amount.textContent='+'+Math.max(0,Math.round(result.total)).toLocaleString();
+  var saved=document.createElement('span');saved.textContent='saved';amount.appendChild(saved);outcome.appendChild(label);outcome.appendChild(amount);el.appendChild(outcome);screen.appendChild(el);
+  var view=_bankFlipView={el:el,match:match};
+  function reveal(){
+    if(_bankFlipView!==view)return;
+    if(G!==match||!screen.classList.contains('active')){_clearBankFlip();return;}
+    outcome.removeAttribute('aria-hidden');outcome.setAttribute('role','status');el.classList.add('revealed');
+  }
+  if(flipMs)view.reveal=setTimeout(reveal,flipMs);else reveal();
+  view.remove=setTimeout(function(){if(_bankFlipView===view)_clearBankFlip();},holdMs);
+}
+
 CFX.double_or_nothing={
   canUse:function(inst,actor){
     if(actor==='o')return !!(G&&!inst.state.armed);
@@ -15663,28 +15714,26 @@ CFX.double_or_nothing={
     inst.state.armed=true;
     if(actor==='o')setStatusMsg((G.rung&&G.rung.name||'RIVAL')+' ARMS DOUBLE OR NOTHING','red');
     else famLog('DOUBLE OR NOTHING ARMED — NEXT BANK FLIPS');
+    if(actor!=='o')try{_refreshBankLabel();}catch(e){}
     return true;},
-  bank:function(ev){if(!ev.mine||!ev.me.state.armed)return;
+  bank:function(ev){
+    if(!ev.mine||!ev.me.state.armed||ev.credited===false||!(ev.amt>0))return;
     ev.me.state.armed=false;
-    var _meP=(ev.owner==='p');
-    var winFlip=_matchRandom('effects')<0.5;
-    /* P826: the flip gets a BEAT - the card churns as the coin goes up,
-       then swells or takes the hit with the outcome. cardFx is rAF-
-       deferred and descriptor-addressed, so it survives the row rebuild
-       famUse triggers. */
-    if(_meP)cardFx('churn',{myCard:'double_or_nothing'});
-    if(winFlip){
-      if(_meP){G.pPts+=ev.amt;famLog('THE FLIP LANDS — BANK DOUBLED (+'+ev.amt+')');_famPop('x2 BANK');
-        setTimeout(function(){cardFx('gain',{myCard:'double_or_nothing'});},260);}
-      else{G.oPts+=ev.amt;setStatusMsg('THEY FLIP — DOUBLE ('+(ev.amt*2)+')','red');}
-    }else{
-      var lose=Math.round(ev.amt*ev.P);
-      if(_meP){G.pPts=Math.max(0,G.pPts-lose);famLog('THE FLIP FAILS — '+lose+' GONE');_famPop('-'+lose);
-        setTimeout(function(){cardFx('hit',{myCard:'double_or_nothing'});},260);}
-      else{G.oPts=Math.max(0,G.oPts-lose);setStatusMsg('THEY FLIP AND LOSE — '+lose+' GONE','gold');}
-    }
-    try{updHUD();}catch(e){}}
+    var won=_matchRandom('effects')<0.5,key=ev.owner==='p'?'pPts':'oPts',before=G[key];
+    if(won)G[key]+=ev.amt;else G[key]=Math.max(0,G[key]-Math.round(ev.amt*ev.P));
+    var outcome={owner:ev.owner,won:won,base:ev.amt,delta:G[key]-before,total:ev.amt+G[key]-before,tier:ev.me.tier||1};
+    (ev._bankFlips||(ev._bankFlips=[])).push(outcome);
+    try{_showBankFlip(outcome);}catch(e){}
+  }
 };
+/* Presentation owns a deadline, never the score or another random draw. */
+function _bankFlipDelay(ms){return Math.max(ms,Math.ceil(((G&&G._bankFlipUntil)||0)-performance.now()));}
+function _bankFlipReceipt(ev,base,parts){
+  var total=base,flips=ev._bankFlips||[];
+  flips.forEach(function(f){total+=f.delta;parts.push({name:'Double or Nothing',source:'double_or_nothing',pts:f.delta,won:f.won,tier:f.tier,base:f.base});});
+  if(flips.length&&ev.actor==='p')G._bankFlipReceipt={owner:'p',turn:G.turnNum,total:total,delta:total-base};
+  return total;
+}
 
 /* ── bare match UI: chip row (B&W, family colour accent) ── */
 var _famRowDirty=0;
@@ -19402,7 +19451,7 @@ var FKFX={
     return true;
   },
   play:function(id,el){
-    if(!this.on||!id)return false;
+    if(!this.on||!id||id==='double_or_nothing')return false;
     var m=this.resolve(id);
     if(!m)return false;
     var fn=this.fam[m.f];
@@ -30651,37 +30700,31 @@ var D3X={
     });
     this.dice.forEach(function(d){var R=d.roll;if(R&&R._playClock)R.t0=R._playClock.t0;var k=d.kick;if(k&&k._playClock)k.t0=k._playClock.t0;});
   },
-  /* Uniform camera-space containment, shared by the dice, their contact
-     spacing, shadow catcher and hit hosts. Lane-space poses never change.
-     The largest safe scale follows from the frustum's linear clip planes. */
+  /* Keep each outline within the surface without changing the shared table
+     scale or moving its settled neighbours. Client-plane offsets affect only
+     the displayed die; lane-space physics and the camera remain unchanged. */
   _fitTables:function(now,mr){
     this.cam.updateMatrixWorld(true);
     var vp=this._fitVP||(this._fitVP=new THREE.Matrix4());vp.multiplyMatrices(this.cam.projectionMatrix,this.cam.matrixWorldInverse);
-    var roots=[],self=this;
-    this.dice.forEach(function(d){if(!d.match||!d.obj.visible||(!d.roll&&!d.phys))return;
+    var self=this,pad=10,bx=1-2*pad/mr.width,by=1-2*pad/mr.height;
+    this.dice.forEach(function(d){
+      if(!d.match||!d.obj.visible||(!d.roll&&!d.phys))return;
       var root=d.obj.parent;if(!root||root===self.scene)return;
-      var group=roots.find(function(g){return g.root===root;});
-      if(!group){group={root:root,dice:[]};roots.push(group);}group.dice.push(d);
-    });
-    roots.forEach(function(g){
-      var root=g.root,base=root.scale.x,centre=new THREE.Vector4(root.position.x,root.position.y,root.position.z,1).applyMatrix4(vp);
-      var safe=1,pad=10,bx=1-2*pad/mr.width,by=1-2*pad/mr.height;
-      var planes=[[1,0,0,bx],[-1,0,0,bx],[0,1,0,by],[0,-1,0,by],[0,0,1,1],[0,0,-1,1]];
-      g.dice.forEach(function(d){d.obj.updateMatrix();
-        var edge=.5*(d.obj.userData.outScale||1)+(self.OUT_WEIGHT||0),v=new THREE.Vector3();
-        for(var x=-1;x<=1;x+=2)for(var y=-1;y<=1;y+=2)for(var z=-1;z<=1;z+=2){
-          v.set(x*edge,y*edge,z*edge).applyMatrix4(d.obj.matrix).applyQuaternion(root.quaternion).multiplyScalar(base);
-          var off=new THREE.Vector4(v.x,v.y,v.z,0).applyMatrix4(vp);
-          planes.forEach(function(p){var a=p[0]*off.x+p[1]*off.y+p[2]*off.z-p[3]*off.w;
-            if(a>0){var b=p[3]*centre.w-p[0]*centre.x-p[1]*centre.y-p[2]*centre.z;safe=Math.min(safe,b/a);}
-          });
-        }
-      });
-      safe=Math.max(.01,Math.min(1,safe));
-      var old=root._edgeFit===undefined?1:root._edgeFit,dt=Math.max(0,Math.min(80,now-(root._edgeFitAt||now)));
-      var fit=Math.min(safe,old+(1-old)*(1-Math.exp(-dt/140)));
-      root._edgeFit=fit;root._edgeFitAt=now;root._edgeSafe=safe;root.scale.setScalar(base*fit);root.updateMatrixWorld(true);
-      g.dice.forEach(function(d){self._slaveHost(d,root);});
+      root.updateMatrixWorld(true);d.obj.updateMatrix();d.obj.updateMatrixWorld(true);
+      var edge=.5*(d.obj.userData.outScale||1)+(self.OUT_WEIGHT||0),v=new THREE.Vector3();
+      var lx=-Infinity,hx=Infinity,ly=-Infinity,hy=Infinity;
+      for(var x=-1;x<=1;x+=2)for(var y=-1;y<=1;y+=2)for(var z=-1;z<=1;z+=2){
+        v.set(x*edge,y*edge,z*edge).applyMatrix4(d.obj.matrixWorld);
+        var p=new THREE.Vector4(v.x,v.y,v.z,1).applyMatrix4(vp);
+        lx=Math.max(lx,(-bx*p.w-p.x)/vp.elements[0]);hx=Math.min(hx,(bx*p.w-p.x)/vp.elements[0]);
+        ly=Math.max(ly,(-by*p.w-p.y)/vp.elements[5]);hy=Math.min(hy,(by*p.w-p.y)/vp.elements[5]);
+      }
+      var dx=Math.max(lx,Math.min(0,hx)),dy=Math.max(ly,Math.min(0,hy));
+      if(dx||dy){
+        var offset=new THREE.Vector3(dx,dy,0).applyQuaternion(root.quaternion.clone().invert()).divideScalar(root.scale.x);
+        d.obj.position.add(offset);d.obj.updateMatrixWorld(true);
+      }
+      self._slaveHost(d,root);
     });
   },
 
@@ -33301,7 +33344,7 @@ function _bankQuote(){
     (q.pF||[]).forEach(function(c){
       if(!c||c.broken)return;var P=cardP(c),next=[];
       branches.forEach(function(b){
-        if(c.id==='double_or_nothing'&&c.state&&c.state.armed){next.push({pPts:b.pPts+total,oPts:b.oPts,parts:b.parts.slice()},{pPts:Math.max(0,b.pPts-Math.round(total*P)),oPts:b.oPts,parts:b.parts.slice()});out.exact=false;out.note='Double or Nothing';return;}
+        if(c.id==='double_or_nothing'&&c.state&&c.state.armed&&total>0&&!out.refused){next.push({pPts:b.pPts+total,oPts:b.oPts,parts:b.parts.slice()},{pPts:Math.max(0,b.pPts-Math.round(total*P)),oPts:b.oPts,parts:b.parts.slice()});out.exact=false;out.note='Double or Nothing';return;}
         var n=0;if(c.id==='pickpocket')n=P;
         if(c.id==='reprisal'&&b.oPts-(b.pPts-total)>=1000)n=Math.round(total*P);
         n=Math.min(b.oPts,Math.max(0,n));if(n){b.pPts+=n;b.oPts-=n;b.parts.push({name:_bsName(c.id),amount:n});var was=b.pPts;hit(b,'o');if(b.pPts!==was)b.parts.push({name:'Their Retort',amount:b.pPts-was});}
@@ -33322,6 +33365,7 @@ function _bankQuoteAmount(q){
   return num(q.amount)+(q.held?' held':'');
 }
 function showBankPreview(){
+  if(G&&G._bankFlipReceipt&&G._bankFlipReceipt.turn===G.turnNum&&G._pTurnBanked>0){showBankSummary('p');return;}
   if(!G)return;var q=_bankQuote(),panel=document.getElementById('bankSummaryPanel'),list=document.getElementById('bankSummaryList');if(!panel||!list)return;
   panel.classList.remove('side-o');panel.classList.add('side-p');
   list.innerHTML='<header class="bs-mast"><button class="bs-close" onclick="hideBankSummary()" aria-label="Close bank preview">×</button><h2>This bank</h2><div class="bs-tally">'+_bsEscape(_bankQuoteAmount(q))+'</div></header>'
@@ -33610,6 +33654,9 @@ function _refreshTurnEffects(){
   function number(n){return (n<0?'−':'+')+Math.abs(n).toLocaleString();}
   /* Paid receipts stay on the table; rule explanations live with the badge. */
   if(v.paid)parts.push(number(v.paid)+(v.paid>0?' safe':' lost'));
+  var receipt=G._bankFlipReceipt;
+  if(v.quote&&receipt&&receipt.turn===G.turnNum&&G._pTurnBanked>0)parts.push(number(receipt.total)+' banked');
+  else if(v.quote&&!v.quote.held&&!v.quote.refused&&!v.quote.blocked&&v.quote.bankTotal>0&&(G.pF||[]).some(function(c){return c&&!c.broken&&c.id==='double_or_nothing'&&c.state&&c.state.armed;}))parts.push('Flip on bank');
   if(v.extra>0&&v.quote&&v.quote.exact&&!v.quote.blocked&&!v.quote.refused)parts.push(number(v.extra)+(v.quote.held?' held':' on bank'));
   var text=parts.join(' · ');
   if(el.textContent!==text){el.textContent=text;if(text&&!((S.settings||{}).reducedMotion)&&!matchMedia('(prefers-reduced-motion: reduce)').matches){el.animate([{opacity:.35,transform:'translateY(4px)'},{opacity:1,transform:'translateY(0)'}],{duration:280});}}
@@ -34965,7 +35012,7 @@ function toggleDie(d){
 
 function startPTurn(){
   var _pScope=_beginTurn(G,'p');if(!_pScope)return;
-  G._turnScoreBase=G.pPts||0;
+  G._turnScoreBase=G.pPts||0;G._bankFlipReceipt=null;
   /* P927: STAMPED ON ENTRY so the rebuild below can tell "left over from last
      turn" - which is fine and is what the rebuild is for - from "set during
      THIS startPTurn, above the rebuild" - which is the bug that has now hit
@@ -38359,14 +38406,18 @@ function handleBank(){
       total*=2;_bsPBankParts.push({name:'Hair of the Dog',pts:total/2});S.run._hotdNext=false;try{save();}catch(e){}
       famLog('HAIR OF THE DOG — FIRST BANK DOUBLED');_famPop('×2 HAIR OF THE DOG');
     }
-    G._famMinBank=(G._famBankCount===1)?total:Math.min(G._famMinBank,total);
-    G.pPts+=total;G._lastBankAmount=total;G._pTurnBanked=total;/* P929/P932: amount only - startPTurn owns the stamp */spawnBankPop(total);
+    G.pPts+=total;G._lastBankAmount=total;G._pTurnBanked=total;/* StartPTurn owns the turn stamp. */
     /* relic: Corvus's Ledger — +5g on every bank (the +300 rides the
        starstone_bonus mechanic in scoring) */
     if(Array.isArray(G.matchDice)&&G.matchDice.indexOf('corvus_ledger_d')>=0){
       S.run.gold=(S.run.gold||0)+5;try{save();}catch(e){}
     }
-    famFire('bank',{actor:'p',amt:total});try{famRenderRow();}catch(e){}
+    var _bsPEvent={actor:'p',amt:total,credited:!_bankRefused};famFire('bank',_bsPEvent);
+    total=_bankFlipReceipt(_bsPEvent,total,_bsPBankParts);
+    G._lastBankAmount=total;G._pTurnBanked=total;
+    G._famMinBank=(G._famBankCount===1)?total:Math.min(G._famMinBank,total);
+    if(_bsPEvent._bankFlips.length){G._prevBankAmt=total;G._lastBankForDlg=total;setStatusMsg('BANKED '+total.toLocaleString(),'gold');}
+    if(!_bsPEvent._bankFlips.length)spawnBankPop(total);try{famRenderRow();}catch(e){}
   }
   /* P950 (3.12): THE MARKS REACH THE TABLE. Here rather than at the credit,
      because The Tab's escrow branch does not credit and does not fire the bank
@@ -38378,7 +38429,7 @@ function handleBank(){
      through to here, and a mark landing after a bank that paid nothing should
      not be celebrating. */
   _bsRecordBank('p',total,_bsHeldP?'held':_bankRefused?'refused':'banked',_bsPDice,_bsPMoments,G.turnNum,_bsPBankParts);
-  try{JADE_MAGIC.bank('p',total,_bsHeldP?'held':_bankRefused?'refused':'banked');}catch(e){}
+  try{if(!(_bsPEvent&&_bsPEvent._bankFlips.length))JADE_MAGIC.bank('p',total,_bsHeldP?'held':_bankRefused?'refused':'banked');}catch(e){}
   try{_patronBankCue('p',total,_bsHeldP?'held':_bankRefused?'refused':'banked');}catch(e){}
   try{_lmLand(!_bankRefused&&total>0);}catch(e){}
   _turnScoreClear();G.numDice=6;
@@ -38419,8 +38470,8 @@ function handleBank(){
        above already stripped the class it tested. Latch on the fact, then
        re-run the label so the class comes back. */
     G._bankedToWin=true;try{_refreshBankLabel();}catch(e){}
-    _playerLater(()=>endMatch(true),700);return;}
-  if(G.oPts>=G.target){_playerLater(()=>endMatch(false),700);return;}
+    _playerLater(()=>endMatch(true),_bankFlipDelay(700));return;}
+  if(G.oPts>=G.target){_playerLater(()=>endMatch(false),_bankFlipDelay(700));return;}
   showYieldButton();
 }
 
@@ -38442,7 +38493,7 @@ function showYieldButton(){
   SFX.bank();
   setStatusMsg('','');
   var _g=G;
-  _playerLater(function(){if(G===_g&&G&&G.phase==='yielding')handleYield();},900);
+  _playerLater(function(){if(G===_g&&G&&G.phase==='yielding')handleYield();},_bankFlipDelay(900));
 }
 function handleYield(){
   var _owner=_activeTurn(G);
@@ -38548,12 +38599,14 @@ function _handBackOrCap(){
     overtime:'DEAD EVEN AT THE CAP — ONE MORE ROUND ('+G._otRounds+'/3)',
     extra:'FALLING STAR — '+(G.rung?G.rung.name:'THE RIVAL')+' GOES AGAIN'};
   if(decision.message)setStatusMsg(messages[decision.message],decision.message==='extra'?'red':'gold');
-  if(decision.next==='player')flashYourTurn();
+  var _flipReading=_bankFlipDelay(0)>0;
+  if(decision.next==='player'&&!_flipReading)flashYourTurn();
   _turnLater(scope,function(){
+    if(decision.next==='player'&&_flipReading)flashYourTurn();
     if(decision.next==='end')endMatch(decision.win);
     else if(decision.next==='opponent')runOppTurn();
     else{setTurnMode(false);startPTurn();}
-  },_oppDelay(decision.delay),true);
+  },_bankFlipDelay(_oppDelay(decision.delay)),true);
 }
 function endPTurn(){
   var _pScope=_activeTurn(G);
@@ -38959,7 +39012,7 @@ function runOppTurn(){
   var _oppScope=_beginTurn(G,'o');if(!_oppScope)return;
   G._bsOppCommits=[];
   function _oppLater(fn,ms){return _turnLater(_oppScope,fn,ms,false);}
-  function _oppFinishLater(fn,ms){return _turnLater(_oppScope,fn,ms,true);}
+  function _oppFinishLater(fn,ms){return _turnLater(_oppScope,fn,_bankFlipDelay(ms),true);}
   /* P875: THE PATRON IS ABOUT TO THROW. This is the head of runOppTurn, which
      runs exactly once per rival turn - its internal step() is what loops per
      roll - so the beat cannot double-fire. The player's idle clock is stopped
@@ -40550,7 +40603,9 @@ function runOppTurn(){
         (_bsOBonus._bsEffects||[]).forEach(function(e){_bsOBankParts.push({name:_bsName(e.source),pts:e.amount});});
         G.oPts+=pts;_npcActuallyBanked=true;
         G.npcCardState.oppFirstBankDone=true;/* P774: the mirror of firstBankDone */setStatusMsg((G.rung?G.rung.name:'RIVAL')+' BANKED '+pts.toLocaleString(),'active');if(window.DLG&&pts>=600)DLG.trigger('OPP_BIG_BANK');}
-      famFire('bank',{actor:'o',amt:pts});
+      var _bsOEvent={actor:'o',amt:pts,credited:_npcActuallyBanked};famFire('bank',_bsOEvent);
+      pts=_bankFlipReceipt(_bsOEvent,pts,_bsOBankParts);
+      if(_bsOEvent._bankFlips.length)setStatusMsg((G.rung?G.rung.name:'RIVAL')+' BANKED '+pts.toLocaleString(),'active');
       /* WHAT THE RIVAL KEPT, for Vagabond's Break row to take off them. Every
          badge and card adjustment to `pts` has landed by here, so this is the
          real figure rather than a running total mid-turn. Zero when they
@@ -40561,7 +40616,7 @@ function runOppTurn(){
          inside the roll loop, a roll early, and never cleared, so it paid out
          after a bust for points the rival had already lost. */
       _bsRecordBank('o',pts,_bsHeldO?'held':_npcActuallyBanked?'banked':'stolen',[],G._bsOppCommits||[],G.oppTurnCount,_bsOBankParts);
-  try{JADE_MAGIC.bank('o',pts,_bsHeldO?'held':_npcActuallyBanked?'banked':'stolen');}catch(e){}
+  try{if(!(_bsOEvent&&_bsOEvent._bankFlips.length))JADE_MAGIC.bank('o',pts,_bsHeldO?'held':_npcActuallyBanked?'banked':'stolen');}catch(e){}
   try{_patronBankCue('o',pts,_bsHeldO?'held':_npcActuallyBanked?'banked':'stolen');}catch(e){}
       G._oLastBank=(_npcActuallyBanked&&pts>0)?pts:0;
       /* TELL: Reckoning (Ambrose) — record his last bank only if he actually scored it */
@@ -41726,6 +41781,7 @@ function exitMatch(){
   document.querySelectorAll('.card-trig-label').forEach(function(e){e.remove();});
   /* Kill any in-flight FX particles/sprites so a burst from the final roll
      can't keep drawing over the gauntlet/shop screen. */
+  _clearBankFlip();
   try{ if(typeof FX!=='undefined' && FX.clear)FX.clear(); }catch(e){}
   if(window._endTimers){window._endTimers.forEach(t=>clearTimeout(t));window._endTimers=[];}
   document.querySelectorAll('.coin-burst-p').forEach(el=>el.remove());
@@ -42142,6 +42198,7 @@ function dlgBubblePaint(scrollEl, textEl, seed) {
     + ' style="left:' + (-offX).toFixed(1) + 'px;top:' + (-offY).toFixed(1) + 'px">'
     + '<defs>'
       + '<pattern id="par-' + uid + '" patternUnits="userSpaceOnUse" width="500" height="155">'
+        + '<rect width="500" height="155" fill="#ead9b4"/>'
         + '<image href="Art/Assets/optimized/parchment_texture_opt.webp" width="500" height="155"/>'
       + '</pattern>'
       + '<filter id="gr-' + uid + '" x="-20%" y="-20%" width="140%" height="140%">'
@@ -42175,6 +42232,29 @@ function dlgBubblePaint(scrollEl, textEl, seed) {
   /* the emboss is on the TEXT, two offset shadows and not one drop shadow */
   textEl.style.textShadow = (-o.embossDepth) + 'px ' + (-o.embossDepth) + 'px 0 rgba(217,189,144,' + o.embossHighlight + '),'
     + o.embossDepth + 'px ' + o.embossDepth + 'px .4px rgba(74,47,24,' + o.embossShadow + ')';
+}
+
+/* One visible line owns its painter. A hidden/zero-size host can become measurable
+   later, and font or viewport changes must refit this SVG, not the hidden canvas. */
+function dlgBubbleWatch(scrollEl, textEl, seed) {
+  var stopped = false, ro = null, frame = 0;
+  function paint() {
+    if (stopped || !scrollEl || !textEl || !scrollEl.isConnected || !textEl.isConnected) return;
+    try { dlgBubblePaint(scrollEl, textEl, seed); } catch(e) {}
+  }
+  paint();
+  frame = requestAnimationFrame(paint);
+  if (typeof ResizeObserver !== 'undefined' && scrollEl) {
+    ro = new ResizeObserver(paint); ro.observe(scrollEl);
+    if (scrollEl.parentElement) ro.observe(scrollEl.parentElement);
+  }
+  window.addEventListener('resize', paint);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(paint);
+  return function() {
+    stopped = true; cancelAnimationFrame(frame);
+    if (ro) ro.disconnect();
+    window.removeEventListener('resize', paint);
+  };
 }
 
 function jitterText(text,scale){
@@ -42383,18 +42463,18 @@ const LEDGER_LINES={
          so the same words always wear the same bubble and a resize redraw gets
          it back rather than reshuffling. Runs after .show so the box has a
          layout to measure. */
-      try{dlgBubblePaint(document.getElementById('dlgScroll'),textEl,_bbSeed(text));}catch(e){}
+      if(this._bubbleStop)this._bubbleStop();
+      this._bubbleStop=dlgBubbleWatch(document.getElementById('dlgScroll'),textEl,_bbSeed(text));
       /* on <body>: the badge is mounted inside #screen-match and this box is
          fixed, outside it, so there is no closer common ancestor */
       try{document.body.classList.add('dlg-speaking');}catch(e){}
-      // Redraw scroll canvas on show
-      requestAnimationFrame(()=>requestAnimationFrame(()=>{const cv=document.getElementById('dlgCanvas');if(cv)drawPixelScroll(cv);}));
+      // The line's SVG watcher above owns its visible parchment redraws.
       const dur=Math.max(5000,Math.min(9000,text.length*100));
       /* Mark the line's display window so trigger() can enforce the
          no-overlap + post-line buffer rule. */
       this.busyUntil=Date.now()+dur;
       if(this.hideTimer)clearTimeout(this.hideTimer);this.hideTimer=setTimeout(()=>this.hide(),dur);},
-    hide(){const box=document.getElementById('dlgBox');if(!box)return;box.classList.remove('show');box.classList.add('hiding');this.active=false;
+    hide(){if(this._bubbleStop){this._bubbleStop();this._bubbleStop=null;}const box=document.getElementById('dlgBox');if(!box)return;box.classList.remove('show');box.classList.add('hiding');this.active=false;
       try{document.body.classList.remove('dlg-speaking');}catch(e){}}
   };
   /* ONE HOOK FOR ALL FOUR EVENTS. getLine is the single place a bark is
