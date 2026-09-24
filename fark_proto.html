@@ -510,69 +510,13 @@ body{letter-spacing:.045em}
 @keyframes ptCardOut{from{transform:translate3d(0,0,0) rotate(var(--rot,0deg))}
   to{transform:translate3d(0,260%,0) rotate(var(--rot,0deg))}}
 .ptcard .ly{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none;will-change:transform}
-/* THE BUSTS ARE CUT-OUTS NOW, not full-card images. `.ly` above stretches a
-   layer over the whole card and contains it, which was exactly right when every
-   bust was a 443x802 painting matching the frame. These are trimmed to their
-   own content at twenty-four different sizes, so contain would float each one
-   in the middle of a tall card at whatever scale its aspect happened to give.
-   Anchor them to the bottom of the frame's window instead and let height run
-   free: a taller character stands taller, which is what the art intends. */
-/* FILL THE FRAME'S WINDOW - by giving the bust a WIDER box, not by cropping it.
-   Two failed attempts worth recording, because the reason is not obvious.
-   CONTAIN in a narrow box read too small with the cut-out's own bottom edge
-   showing as a line; making the box TALLER does nothing, because a wide bust
-   (Nix is 666x535) is bound by the box's WIDTH, so the extra height is slack it
-   cannot use. COVER filled the frame but cropped the tops off heads, which is
-   the one thing a portrait must never do.
-   And CONTAIN cannot be right either, because it makes the two shapes behave
-   differently: it binds on whichever side runs out first, so Dunstan (466x653,
-   portrait) fills the box top to bottom while Nix (666x535, the one strongly
-   landscape bust) binds on width and uses barely half the height - which is why
-   he read as tiny beside the others despite his file being no smaller.
-   COVER binds on the other side, so every bust is scaled to the same HEIGHT and
-   heads come out a consistent size. Anchored at 0%, the crop can only ever come
-   off the BOTTOM - shoulders, behind the banner - never off the top of a head.
-   That was the flaw in the earlier cover attempt: 10% in a shorter box, which
-   let the tops go.
-   INSET:AUTO GOES FIRST. It is a SHORTHAND for top/right/bottom/left, so
-   writing it after them resets them - which pinned the bust to the very top of
-   the card (measured 0.1%, not the 6% asked for) and ran it up behind the
-   frame's border, clipping the top of a head. `.ly` above sets inset:0, so the
-   reset has to come before the longhands, not after.
-   THE BOX IS MEASURED OFF THE ART, not guessed: frame_fg's top border ends at
-   4.5% and its banner backing starts at 68.2%.
-   IT RUNS PAST THE BANNER ON PURPOSE. Under cover a bust is scaled to fill the
-   box, so the box's HEIGHT is what sets how big a head reads - and stopping at
-   the window's own 68% made them small. Running to 76% scales every bust up by
-   about a quarter, and the overhang is hidden behind the name banner that
-   starts at 68.2%, so nothing is lost to it. The TOP still sits at 6%, below
-   the border, which is the edge that actually matters. */
-/* SIZED IN PER CENT, NOT INSETS. An <img> is a replaced element: with
-   width:auto it takes its INTRINSIC pixel size and left/right insets do not
-   stretch it, so every bust drew at 666px and burst out of the card. Insets
-   size a div that way; an image needs the width and height said outright.
-
-   THIS BLOCK'S OPENING MARKER WAS MISSING, and the rule below paid for it.
-   Everything from "SIZED" onwards was bare text to the CSS parser; error
-   recovery discards until it can resync at a block, and the next block is the
-   rule - so `.ptcard .lwho` was swallowed whole and never applied. What
-   actually rendered was `.ly`'s inset:0, object-fit:contain, 50% 50%: every
-   bust centred in the FULL card, which is why they sat low, and landscape
-   busts binding on width at half height, which is why Nix read tiny beside
-   the others while his file was no smaller. Both symptoms are described as
-   SOLVED in the comment above - the cure was written three times and never
-   once reached the parser.
-   NEVER WRITE EITHER COMMENT MARKER LITERALLY IN HERE. CSS comments do not
-   nest, so a close-marker inside a sentence ABOUT close-markers ends the
-   block early and eats the next rule - which is exactly what the first
-   attempt at this note did, reproducing the bug it was describing. Name them
-   in words.
-   A dropped rule is silent. If this block is edited again, check the
-   COMPUTED style, not the source: tools/apv_bust_placement.js reads
-   object-fit off the live element, and tools/apv_css_dropped.js asserts the
-   selector is in the CSSOM at all, for exactly this reason. */
-.ptcard .lwho{position:absolute;inset:auto;left:2%;top:6%;width:96%;height:76%;
-  transform:none;object-fit:cover;object-position:50% 0%}
+/* Fit the painted bust in the window. Per-patron framing protects a long
+   snout, wide horns or tall ears without enlarging every face to the same crop.
+   The lower edge runs behind the name ribbon; only the artwork is clipped. */
+.ptcard .portrait-window{position:absolute;left:6.5%;top:6%;width:87%;height:64.5%;overflow:hidden;pointer-events:none}
+.ptcard .lwho{position:absolute;inset:auto;left:var(--portrait-bust-left,0%);top:auto;bottom:0;
+  width:var(--portrait-bust-size,100%);height:var(--portrait-bust-size,100%);
+  transform:none;object-fit:contain;object-position:50% 100%}
 .ptcard .lwho.win{inset:auto;left:-11.9%;top:-3.4%;width:119.8%;height:73.6%;
   bottom:auto;transform:none;object-fit:fill}
 .ptcard .lfront{position:absolute;inset:0;pointer-events:none;will-change:transform}
@@ -631,16 +575,10 @@ body{letter-spacing:.045em}
 /* the shield window: room-frame patron over his frame colour, BOTH
    behind the panel plate (the rim overlaps them) */
 #ptPort{position:absolute;left:27.2%;top:1.9%;width:46%;height:27.9%;overflow:hidden;z-index:0}
-/* THE SHIELD SHOWS THE WHOLE BUST. width:140%/top:-16% was aimed at the old
-   443x802 plates, where every bust sat at the same spot on the same canvas.
-   Against a cut-out it is a 1.4x zoom into an image that is already cropped to
-   its subject, which is why Nix arrived with his head out of frame. CONTAIN
-   inside the shield's own box: the bust is scaled to fit, whole, whatever its
-   aspect - tall ones bound by height, wide ones by width, no per-character
-   numbers. Held slightly low so the head sits in the shield's upper half
-   rather than down at the point the shield tapers to. */
-#ptPort .pwho{position:absolute;inset:0;width:100%;height:100%;
-  object-fit:contain;object-position:50% 34%}
+/* The same portrait profile fits the shield, with gentler zoom for its rim. */
+#ptPort .pwho{position:absolute;inset:auto;left:var(--portrait-peek-left,0%);top:auto;bottom:0;
+  width:var(--portrait-peek-size,100%);height:var(--portrait-peek-size,100%);
+  object-fit:contain;object-position:50% 100%}
 #ptPanelSheet.sealed #ptPort .pwho{filter:drop-shadow(4px 0 0 #3d2f52) drop-shadow(-4px 0 0 #3d2f52)
   drop-shadow(0 4px 0 #3d2f52) drop-shadow(0 -4px 0 #3d2f52)}
 #ptPanel .pv{position:absolute;right:13%;font-family:var(--bodyFont);color:#802c10;
@@ -2104,7 +2042,7 @@ body.reduced-motion .cgw .breathe,body.reduced-motion .cgw .bloom{animation:none
 .d3selg i{position:absolute;inset:0;background:#ffd061;border-radius:3px}
 .d3selg2 i{background:#ffbf55;filter:blur(5px);opacity:.8}
 #potTag{display:none !important}
-#screen-match .dlg-portrait{display:none !important}
+#screen-match #dlgPortrait{display:none !important}
 /* P701: 13 + half the fixed 24cqw inner = the old 25cqw centre, so the
    bubble sits exactly where it did - it just stops moving. z 9500: over
    the card focus (9000/9001) and the dice; the end overlay (same 9500,
@@ -2121,7 +2059,7 @@ body.reduced-motion .cgw .breathe,body.reduced-motion .cgw .bloom{animation:none
    flex:0 1 auto rather than the base rule's flex:1 - the bubble has to hug
    the text for the shrink-to-fit search to mean anything, and flex:1 made it
    fill the row regardless. */
-#screen-match .dlg-scroll{background:none;border:0;border-radius:0;
+#screen-match #dlgScroll{background:none;border:0;border-radius:0;
   /* P649b: THE PROTOTYPE'S PADDING, 22px/34px, and in px on purpose. Every
      shape value in DLG_BUBBLE is absolute px, so the padding that sets the
      core's size has to be too or the tuning stops meaning anything at a
@@ -2167,15 +2105,15 @@ body.reduced-motion .cgw .breathe,body.reduced-motion .cgw .bloom{animation:none
    and it would trap the drop shadow now, which has to multiply against the
    TABLE. It lives on an inner <g> holding the parchment and the light; the
    shadow is a sibling outside it. Two blend targets, two scopes. */
-#screen-match .dlg-scroll svg.dlg-bubble{position:absolute;z-index:0;
+#screen-match #dlgScroll svg.dlg-bubble{position:absolute;z-index:0;
   pointer-events:none;overflow:visible}
 /* the flat drop-shadow the darkening layer replaces. Scoped off here rather
    than deleted from .dlg-scroll, which #resDlg and the shop bubble share.
    IT ALSO HAS TO GO FOR THE SHADOW TO WORK AT ALL: a filter on an ancestor
    is a backdrop root, and backdrop-filter cannot see past one. */
-#screen-match .dlg-scroll{filter:none}
+#screen-match #dlgScroll{filter:none}
 /* P660: the cast shadow is gone entirely - see the note in DLG_BUBBLE. */
-#screen-match .dlg-scroll canvas{display:none}
+#screen-match #dlgScroll canvas{display:none}
 /* P651: BIGGER, AND THE THREE-LINE RULE STILL HOLDS - which needed both
    halves of this, because they trade off. Measured across all 1075 lines at
    the shipped 356px of text width:
@@ -2206,7 +2144,7 @@ body.reduced-motion .cgw .breathe,body.reduced-motion .cgw .bloom{animation:none
    not understand color-mix keeps today's colour rather than losing the rule. */
 /* P677: upright, to try - Denis: "use the non italic version ... just to
    see if it works better". One property back if it does not. */
-#screen-match .dlg-text{font-family:var(--font-dlg);font-style:normal;font-weight:400;/* P706 */font-size:3.8cqw;
+#screen-match #dlgText{font-family:var(--font-dlg);font-style:normal;font-weight:400;/* P706 */font-size:3.8cqw;
   color:var(--patCol,#3a2812);
   color:color-mix(in srgb, var(--patCol,#3a2812) 78%, #14100a);
   /* P654: .2px -> .6px. Measured over all 1075 lines: 0.2 costs nothing,
@@ -2509,6 +2447,11 @@ body.dlg-speaking #screen-match #tellBadge{opacity:0;pointer-events:none}
 #screen-match .tokPImg{background-color:#44403a}
 /* The painted patron moves inside the well; its frame and tally stay still. */
 #screen-match #tokOImg{overflow:hidden}
+/* Match and outcome use the same fitted avatar; the enclosing frame stays put. */
+#tokOImg .npc-avatar-art,.res-dlg .dlg-portrait .npc-avatar-art{position:absolute;display:block;
+  left:var(--portrait-avatar-inset,3%);top:var(--portrait-avatar-inset,3%);
+  width:var(--portrait-avatar-size,94%);height:var(--portrait-avatar-size,94%);
+  max-width:none;max-height:none;object-fit:contain;object-position:50% 50%;pointer-events:none;image-rendering:auto}
 #screen-match .patron-face{position:absolute;inset:0;background-size:cover;background-position:50% 14%;background-repeat:no-repeat;transform-origin:50% 68%;pointer-events:none}
 #screen-match .tok .tokRing{position:relative;width:100%;display:block;z-index:1}
 /* Centred in the visible ribbon: the ring bottoms at 50.7% of the bar and the
@@ -3882,8 +3825,8 @@ html.fk3d #screen-match .die-wrap:has(.die.d3on.selected)::after{
    The opacity fade stays underneath; what changed is that something moves. */
 /* P682: .72 -> .55 so the motion carries the entrance; the dead `opacity
    .3s` term went with it (nothing ever changes the scroll's own opacity) */
-#screen-match .dlg-scroll{scale:.55;transition:scale .34s cubic-bezier(.2,1.3,.35,1)}
-#screen-match .dlg-box.show .dlg-scroll{scale:1}
+#screen-match #dlgScroll{scale:.55;transition:scale .34s cubic-bezier(.2,1.3,.35,1)}
+#screen-match .dlg-box.show #dlgScroll{scale:1}
 .dlg-box.show{opacity:1}
 .dlg-inner{display:flex;align-items:center;gap:8px;padding:2px 4px;width:100%;max-width:100vw;justify-content:flex-start}
 .dlg-portrait{
@@ -4749,13 +4692,13 @@ body.crit-dilate{animation:critDilate .55s ease-out both}
 /* (active card styles moved to per-card section above) */
 /* ─── OVERLAYS ─── */
 #bust-ov{position:fixed;inset:0;z-index:9000;pointer-events:none;display:flex;align-items:center;justify-content:center;opacity:0;visibility:hidden}
-#bust-ov.flash{visibility:visible;animation:bFlash 1.1s linear forwards}
+#bust-ov.flash{visibility:visible;animation:bFlash 1.3s linear forwards}
 @keyframes bFlash{0%,78%{opacity:1}100%{opacity:0}}
 .bust-word{font-family:'Uncial Antiqua',serif;font-weight:bold;text-transform:uppercase;font-size:clamp(40px,13vw,72px);letter-spacing:.055em;line-height:1.25;white-space:nowrap;color:#ca724a;
   text-shadow:0 1px 0 #ffe1ab,0 3px 0 #70321e,0 5px 0 #2a170e,0 9px 9px #140a04cc;opacity:0}
 #bust-ov.flash .bust-word{opacity:1}
 .bust-word .beat-letter,.hot-word .beat-letter{display:inline-block;white-space:pre;transform-origin:50% 90%}
-#bust-ov.flash .beat-letter{animation:bustLetter .96s cubic-bezier(.18,.66,.35,1) both;animation-delay:calc(var(--i)*18ms)}
+#bust-ov.flash .beat-letter{animation:bustLetter 1.16s cubic-bezier(.18,.66,.35,1) both;animation-delay:calc(var(--i)*18ms)}
 @keyframes bustLetter{
   0%{transform:translateY(-40px) rotate(var(--lean)) scale(1.45);opacity:0;color:#fae0b0}
   12%{transform:translateY(5px) rotate(calc(var(--lean)*-.3)) scale(1.12,.82);opacity:1;color:#dd9c70}
@@ -5662,7 +5605,7 @@ body:has(#mLoadout-ov.show) #dbgButtons{display:flex !important}
 /* Narrower parchment (82vw / 320px max) but same height; portrait sits
    with a clearer gap (18px) from the scroll so it doesn't feel glued on. */
 .res-dlg{display:flex;align-items:center;gap:18px;margin-top:0;align-self:center;max-width:82vw;width:min(320px,82vw)}
-.res-dlg .dlg-portrait{width:52px;height:52px;border-radius:4px;overflow:hidden;flex-shrink:0}
+.res-dlg .dlg-portrait{position:relative;width:52px;height:52px;border-radius:4px;overflow:hidden;flex-shrink:0}
 .res-dlg .dlg-portrait img{width:100%;height:100%;image-rendering:auto;display:block}
 .res-dlg .dlg-scroll{position:relative;flex:1;min-width:0;padding:8px 16px;display:flex;align-items:center;justify-content:center;min-height:0}
 .res-dlg .dlg-scroll canvas{position:absolute;inset:-6px -18px;width:calc(100% + 36px);height:calc(100% + 12px);z-index:0}
@@ -12890,15 +12833,13 @@ const RUNGS=[
        the enchant-icon fire path. The old wording is also why the designer had
        to ask what Zero Hour even was: its only explanation leaned on a word the
        game never defines. */
-    /* GROG — LAST CALL, restored under its OWN id and retuned to 800.
+    /* GROG — LAST CALL, restored under its OWN id and retuned to 500.
        It never actually went away: the mechanic sat in an `if(false)` block
        at 500 while the ID was recycled to carry ZERO HOUR, which is how the
        retired-rules guard ended up switching off the live rule wearing the
-       dead one's name. 800 is not a fresh number - it is the same bar
-       TEETOTALLER uses for "never a bank under X", so the game states one
-       threshold rather than two arbitrary ones. 500 read weak because most
-       ordinary turns clear it without trying. */
-    tell:{id:'last_call',name:'LAST CALL',desc:"“Nothing under eight hundred crosses my bar. Drink deep or get out.”",icon:'🍻',minBank:800}},
+       dead one's name. The lower floor leaves ordinary lucky turns bankable
+       while still asking the player to press their luck. */
+    tell:{id:'last_call',name:'LAST CALL',desc:"“Nothing under five hundred crosses my bar. Drink deep or get out.”",icon:'🍻',minBank:500}},
   {id:1,name:'MABEL',key:'peasant',icon:'👨‍🌾',tier:'regular',target:5600,gold:175,buyIn:20,
     boss:null,bossDesc:null,
     agg:.58,cardRarity:'tin',wager:true,wagerCount:1,wagerMode:'best',minBank:200,diceStop:2,chaotic:false,adaptive:false,
@@ -13581,7 +13522,7 @@ function _initTellHUD(){
   if(t.id==='reckoning')value='<span class="tb-val tb-val-inline" id="reckoningVal">≥0</span>';
   badge.innerHTML='<img class="tb-art" src="'+_tellBadgeImage(t.id)+'" alt="">'
     +'<span class="tb-copy"><span class="tb-name">'+toTitleCase(t.name)+value+'</span>'
-    +(t.id==='last_call'?'<span class="tb-cue">'+(t.minBank||800).toLocaleString()+'+ to bank</span>':'')+'</span>';
+    +(t.id==='last_call'?'<span class="tb-cue">'+(t.minBank||500).toLocaleString()+'+ to bank</span>':'')+'</span>';
   if(G._isBoss)badge.classList.add('bossbind');
   badge.setAttribute('aria-label',t.name+'. '+t.desc);
   badge.onclick=function(){try{_gbInspect((t.name+' — '+t.desc).replace(/"/g,'&quot;'));}catch(e){}};
@@ -15374,7 +15315,7 @@ CFX.steady_hand={
            the die wearing a gold ring while the model and the preview had it
            unselected - the table claiming a die scores when it does not. */
         if(d.el)_dieReroll(d.el,D3X.BEAT_INK.reroll);
-        _setDieVal(d,_rollD(d));d.sel=false;
+        _setDieVal(d,_rollD(d),{tableReroll:true});d.sel=false;
         if(d.el)d.el.classList.remove('selected');
         /* P856b: AFTER the reroll, not before - _setDieVal fires
            famTableChanged, whose _steadyDisarm strips this very class.
@@ -18357,10 +18298,10 @@ function _famRefloatGhosts(){
    enrolled by construction. The roll path does NOT use this - the
    deal and famApplyRollForces own their own redraw, and their void is
    _clearRollForces at the roll tail. */
-function _setDieVal(d,v){
+function _setDieVal(d,v,rollOptions){
   if(!d)return;
   d.val=v;
-  try{reDrawDieFace(d);}catch(e){}
+  try{reDrawDieFace(d,rollOptions);}catch(e){}
   try{famTableChanged();}catch(e){}
 }
 /* P855: ONE PLACE TO EMPTY THE TURN POT. _turnBonusPot had NINE clear
@@ -18373,6 +18314,7 @@ function _setDieVal(d,v){
 function _clearTurnPot(){
   if(typeof G==='undefined'||!G)return;
   G._turnBonusPot=0;
+  G._shatterTurnPot=0;
   G._sacPot=0;/* P854: sacrifice's slice, which cannot win a match */
 }
 /* A face selected before animation is a result, not a second throw. */
@@ -20668,6 +20610,51 @@ var PT_CHAR_EXT='_opt.webp';
 /* thirty now - the twenty-four painted first, then the seed six whose lines
    had been written and unseatable since the lore system went in. */
 var PT_ART_POOL=['Corbin','Dunstan','Eira','Golgoth','Krox','Mudge','Nebb','Nell','Nix','Osgood','Pell','Poll','Rask','Regis','Remny','Rilla','Roan','Sil','Sparr','Squib','Thorne','Tuck','Twill','Vess','Odo','Ollis','Peck','Ferrand','Fenn','Tam'];
+/* [bust scale, horizontal anchor %, avatar scale], measured against the
+   current cut-outs. One identity map serves room, peek, match and outcome.
+   Tall silhouettes retain their height; wider ones may crop spare shoulders. */
+var PT_PORTRAIT_FRAME={
+  Corbin:[1.27,100,0.94],
+  Dunstan:[1,50,0.94],
+  Eira:[1.2,50,0.96],
+  Fenn:[1.22,65,0.94],
+  Ferrand:[1.4,65,1.06],
+  Golgoth:[1,50,0.94],
+  Krox:[1.22,0,0.94],
+  Mudge:[1.25,50,0.94],
+  Nebb:[1.12,100,0.94],
+  Nell:[1,50,0.92],
+  Nix:[1.35,100,0.9],
+  Odo:[1.3,100,1],
+  Ollis:[1.2,50,0.96],
+  Osgood:[1.3,50,0.94],
+  Peck:[1.17,100,0.94],
+  Pell:[1,50,0.96],
+  Poll:[1.18,50,0.96],
+  Rask:[1.08,50,0.92],
+  Regis:[1.12,50,0.94],
+  Remny:[1.08,50,0.92],
+  Rilla:[1.15,50,0.94],
+  Roan:[1.13,50,0.94],
+  Sil:[1.25,50,0.98],
+  Sparr:[1.1,50,0.94],
+  Squib:[1.15,100,0.94],
+  Tam:[1.45,25,1],
+  Thorne:[1,50,0.92],
+  Tuck:[1,50,0.92],
+  Twill:[1,50,0.94],
+  Vess:[1,50,0.94]
+};
+function _patronFrameVars(art){
+  var f=PT_PORTRAIT_FRAME[art]||[1,50,.94],peek=1+(f[0]-1)*.6;
+  function pct(n){return (Math.round(n*1000)/1000)+'%';}
+  return {'--portrait-bust-size':pct(f[0]*100),'--portrait-bust-left':pct((1-f[0])*f[1]),
+    '--portrait-peek-size':pct(peek*100),'--portrait-peek-left':pct((1-peek)*f[1]),
+    '--portrait-avatar-size':pct(f[2]*100),'--portrait-avatar-inset':pct((1-f[2])*50)};
+}
+function _patronFrameStyle(art){var v=_patronFrameVars(art);return Object.keys(v).map(function(k){return k+':'+v[k];}).join(';');}
+function _patronFrameApply(el,art){var v=_patronFrameVars(art);Object.keys(v).forEach(function(k){el.style.setProperty(k,v[k]);});}
+
 var PT_TRAIT={ones:'steady',hoard:'greedy',aggro:'reckless',triples:'strong',straights:'orderly',combo:'cunning'};
 /* P818: the bosses' lore voice, keyed by rung archetype. Chosen from the
    rung identities (drunkard/soldier/merchant...), flagged in OPEN.md for
@@ -22741,7 +22728,7 @@ function _ptRenderCards(){
       '<div class="cwrap">'
       +'<img class="ly lbg" src="'+PT_P+'bg_'+st.color+'.png?v=2" alt="">'
       +'<img class="ly lback" src="'+PT_P+'frame_bg_'+st.color+'.png?v=2" alt="">'
-      +(st.gone?'':'<img class="ly lwho" src="'+PT_CHAR+st.art+PT_CHAR_EXT+'" alt="">')
+      +(st.gone?'':'<div class="portrait-window" style="'+_patronFrameStyle(st.art)+'"><img class="ly lwho" src="'+PT_CHAR+st.art+PT_CHAR_EXT+'" alt=""></div>')
       +'<div class="lfront">'
         +'<img class="lffg" src="'+PT_P+'frame_fg_'+st.color+'.png?v=2" alt="">'
         +'<canvas class="ctext"></canvas>'
@@ -22854,7 +22841,7 @@ function _ptOpenPanel(st){
   var PT_BGCOL={green:'#505c47',blue:'#45555b',red:'#784a42',purple:'#5c4750'};
   var _pc=PT_BGCOL[st.color]||PT_BGCOL.green;
   var port=document.getElementById('ptPort');
-  port.style.background=_pc;
+  port.style.background=_pc;_patronFrameApply(port,st.art);
   port.innerHTML=(st.art?'<img class="pwho" src="'+PT_CHAR+st.art+PT_CHAR_EXT+'" onerror="this.remove()" alt="">':'');
   /* panel-only family name: the given name alone leaves the parchment empty.
      P872 (Denis: "loooong last names built upon the same kinda vibe... make it
@@ -23335,7 +23322,7 @@ D3.roll=function(d,val,opts){
   if(window.D3X&&d.group==='match'&&D3X.PHYS&&D3X.PHYS.on&&!D3X.fail){
     if(D3X.ready)d.to.spin=Math.round(d.to.spin/360)*360;
     else if(D3X.boot)try{D3X.boot();}catch(e){}
-    D3X._physQueue(d,d.result);
+    D3X._physQueue(d,d.result,opts);
   }else if(window.D3X&&D3X.ready){
     d.to.spin=Math.round(d.to.spin/360)*360;
     {
@@ -23857,8 +23844,10 @@ function _matchDress(isBoss){
        nothing else, one rule covers all of them: cover the well and hold near
        the top, which is where a head is. */
     tok.style.backgroundImage='none';tok.replaceChildren();
+    _patronFrameApply(tok,art);
     if(!isBoss&&art){var face=document.createElement('div');face.className='patron-face';
-      face.style.backgroundImage='url("'+PT_CHAR+art+PT_CHAR_EXT+'")';tok.appendChild(face);}
+      var faceArt=document.createElement('img');faceArt.className='npc-avatar-art';faceArt.alt='';
+      faceArt.src=PT_CHAR+art+PT_CHAR_EXT;face.appendChild(faceArt);tok.appendChild(face);}
     tok.style.backgroundSize='cover';
     tok.style.backgroundPosition='50% 14%';
     /* the disc behind the character takes the same colour the peek panel
@@ -27363,7 +27352,7 @@ var D3X={
     var dx=start.x-impact.x,dz=start.z-impact.z,rad=Math.hypot(dx,dz);
     var angle=Math.atan2(dz,dx)+(random()-.5)*1.1;
     var force=(.85+random()*.30)/(1+rad*.035),speed=(1.5+random()*3.1)*force;
-    var vx=Math.cos(angle)*speed,vz=Math.sin(angle)*speed,vy=(6.6+random()*3.1)*force;
+    var vx=Math.cos(angle)*speed,vz=Math.sin(angle)*speed,vy=(4.2+random()*5.5)*force;
     var drag=.35+random()*1.1,bounce=.22+random()*.34,grip=.24+random()*.43;
     var spin=(random()<.5?-1:1)*(2+random()*5),airSpin=.4+random()*1.5;
     var axis=new THREE.Vector3(random()-.5,(random()-.5)*.45,random()-.5).normalize();
@@ -27858,7 +27847,7 @@ var D3X={
    }
    return out.concat(frames.slice(last+1));
   },
-  _physSolve:function(slotX,values,obstacles,limitX,rowPitch,fromFar){
+  _physSolve:function(slotX,values,obstacles,limitX,rowPitch,fromFar,tableReroll){
     /* pitch from the slots themselves, so this follows the row rather than
        assuming it. One die on its own has no pitch: fall back to the middle
        of the allowed range rather than pinning it to a point. */
@@ -27919,6 +27908,8 @@ var D3X={
       if(_r9>SLOT_R)SLOT_R=_r9;/* the widest any die gets: is the pen live? */
     }
     var P=Object.create(this.PHYS),N=values.length;
+    /* A picked die is tossed from the table, with ordinary gravity. */
+    if(tableReroll){P.dropY=2.2;P.dropZ=0.7;}
     P.limitX=limitX||0;
     var world=new CANNON.World();
     world.gravity.set(0,P.gravity,0);
@@ -28004,7 +27995,7 @@ var D3X={
          was thrown from". */
       b.velocity.set(Math.random()*.24-.12,
                      0.15+Math.random()*0.25,
-                     _zSide*-(2.2+Math.random()*0.6));
+                     _zSide*-((tableReroll?1.0:2.2)+Math.random()*0.6));
       /* Roughly double what P307 left. That cut was made to stop the die
          knocking around, but the knocking turned out to be the die landing on
          TOP of an invisible wall (P310) - so the tumble was paying for
@@ -30362,12 +30353,13 @@ var D3X={
   /* Collect the visibly rolling dice on each row before solving the throw.
      Host creation can cross event-loop ticks; a zero-delay flush otherwise
      turns a shared throw into separate dice hitting predicted static poses. */
-  _physQueue:function(e,val){
+  _physQueue:function(e,val,opts){
     if(!this.PHYS.on)return;
     var self=this;
-    if(!this._pend)this._pend={dice:[],vals:[],deadline:performance.now()+160};
+    if(!this._pend)this._pend={dice:[],vals:[],tableRerolls:[],deadline:performance.now()+160};
     var index=this._pend.dice.indexOf(e);
-    if(index<0){this._pend.dice.push(e);this._pend.vals.push(val);}else this._pend.vals[index]=val;
+    if(index<0){index=this._pend.dice.length;this._pend.dice.push(e);this._pend.vals.push(val);}else this._pend.vals[index]=val;
+    this._pend.tableRerolls[index]=!!(opts&&opts.tableReroll);
     if(this._pendT)return;
     function flush(){
       self._pendT=0;var b=self._pend;if(!b)return;
@@ -30375,7 +30367,9 @@ var D3X={
       b.dice.forEach(function(d,i){
         if(!d||!d.slot||!d.slot.isConnected)return;
         var row=d.slot.closest('#playerDiceRow,#oppDiceRow'),group=groups.find(function(g){return g.row===row;});
-        if(!group){group={row:row,dice:[],vals:[]};groups.push(group);}group.dice.push(d);group.vals.push(b.vals[i]);
+        if(!group){group={row:row,dice:[],vals:[],tableReroll:true};groups.push(group);}group.dice.push(d);group.vals.push(b.vals[i]);
+        /* A mixed batch keeps the normal throw; the short profile is explicit. */
+        group.tableReroll=group.tableReroll&&b.tableRerolls[i];
       });
       var waiting=groups.some(function(g){return g.row&&Array.from(g.row.querySelectorAll('.die.rolling:not(.committed)')).some(function(el){
         if(el._d3&&g.dice.indexOf(el._d3)>=0)return false;
@@ -30508,7 +30502,7 @@ var D3X={
     var rowPitch=lanePitch;
     /* whose side of the table this throw comes from - the only thing that
        distinguishes the rival's throw from the player's */
-    var sol=this._physSolve(slots,b.vals,obst,limitX,rowPitch,key==='oppDiceRow');
+    var sol=this._physSolve(slots,b.vals,obst,limitX,rowPitch,key==='oppDiceRow',b.tableReroll);
     /* one playback per die: two throws can be in the air at once without
        either being dropped */
     var clock={t0:null};
@@ -30784,6 +30778,7 @@ var D3X={
   _giveUp:function(why){
     if(this.fail)return;
     this.fail=true;this.loading=false;this.ready=false;
+    this._matchRecovery=null;
     this._need.length=0;
     this._releaseChipFloat();
     try{this.detach&&this.detach();}catch(e){}
@@ -30799,12 +30794,43 @@ var D3X={
      not-ready branch already call boot(), which rebuilds renderer, scene
      and model on a fresh canvas. Real failures still die in _giveUp. */
   _suspend:function(why){
+    /* GPU objects can go away while the turn is waiting for a landing.
+       Keep the existing throw/pose with its DOM die; rebuilding the mesh
+       must not turn an in-flight die into a pose-less decorative chip. */
+    var recovery=this._matchRecovery||(this._matchRecovery=new WeakMap());
+    var batch={at:performance.now(),delay:null,clocks:new Set()},self=this;
+    this.dice.forEach(function(d){
+      var e=d.chip&&d.chip._d3;
+      if(!d.match||!e||(!d.roll&&!d.phys))return;
+      recovery.set(d.chip,{roll:d.roll,phys:d.phys,row:self._rowKey(d),
+        token:e.t0,batch:batch});
+    });
     this.ready=false;this.loading=false;
     this._need.length=0;
     this._releaseChipFloat();
     try{this.detach&&this.detach();}catch(e){}
     try{document.documentElement.classList.remove('fk3d');}catch(e){}
     try{console.warn('[D3X] suspended, DOM dice up - boot() revives: '+why);}catch(e){}
+  },
+  _restoreMatchPose:function(d){
+    var saved=this._matchRecovery&&this._matchRecovery.get(d.chip);
+    if(!saved)return;
+    this._matchRecovery.delete(d.chip);
+    var e=d.chip._d3;
+    /* A new throw or a different row owns this host now. */
+    if(!e||e.t0!==saved.token||this._rowKey(d)!==saved.row)return;
+    d.roll=saved.roll;d.phys=saved.phys;d.rk=saved.row;
+    if(d.roll){
+      var b=saved.batch,R=d.roll;
+      if(b.delay===null)b.delay=performance.now()-b.at;
+      if(R.t0!==null)R.t0+=b.delay;
+      var clock=R._playClock;
+      if(clock&&!b.clocks.has(clock)){
+        if(clock.t0!==null)clock.t0+=b.delay;
+        b.clocks.add(clock);
+      }
+    }
+    this._shDirty=true;
   },
   boot:function(cb){
     /* P551: NEVER RETRY AFTER A REAL FAILURE. syncMatch's not-ready branch
@@ -31401,9 +31427,10 @@ var D3X={
       obj.quaternion.copy(self._isoQ(val));
       self.scene.add(obj);
       try{el._d3.slot.style.visibility='hidden';}catch(e){}
-      self.dice.push({chip:el,obj:obj,mat:mat,val:val,match:true,
+      var restored={chip:el,obj:obj,mat:mat,val:val,match:true,
         w0:el.getBoundingClientRect().width,/* measured before any tap pop */
-        uYaw:0,uPit:0,t0:performance.now()});
+        uYaw:0,uPit:0,t0:performance.now()};
+      self._restoreMatchPose(restored);self.dice.push(restored);
     });
     /* THE SPENT LOOK IS DERIVED, NOT APPLIED ONCE. Every reroll drops and
        re-registers the match dice, so a die that was made translucent at the
@@ -33325,7 +33352,7 @@ function _bankQuote(){
     if(q._tell){
       if(_ruleActive('steeped','p')&&q._tellState&&q._tellState.bonus>0){total+=q._tellState.bonus;part('Steeped',q._tellState.bonus);}
       if(_ruleActive('reckoning','p')&&q._tellState&&q._tellState.lastNpcBank>0&&total<q._tellState.lastNpcBank){part('The Reckoning',-total);total=0;out.refused=true;out.note='Below their last bank';}
-      var lc=_tellById('last_call'),floor=lc&&lc.minBank||800;
+      var lc=_tellById('last_call'),floor=lc&&lc.minBank||500;
       if(_ruleActive('last_call','p')&&preTake>0&&preTake<floor){part('Last Call',-total);total=0;out.refused=true;out.note='Last Call needs '+floor.toLocaleString();}
     }
     out.held=!!q._tabArmedVsPlayer;
@@ -34015,7 +34042,7 @@ function refreshKeptTray(){
      because _flySelTotal owns it for that half second. */
   const _kt=document.getElementById('keptTotal');
   if(_kt&&_kt.style.visibility!=='hidden')
-    _kt.textContent=(G&&G.turnPts&&document.querySelector('#keptRow .die'))
+    _kt.textContent=(G&&G.turnPts&&(document.querySelector('#keptRow .die')||(G._turnBonusPot||0)>0))
       ?G.turnPts.toLocaleString():'';
   /* the hidden preview is fully replaced by #keptRow under the 3D layer;
      building it anyway made a throwaway 3D die per kept die, every refresh */
@@ -36216,6 +36243,7 @@ function _afterRollImpl(){
      points, ~14.5% of that build's match value) was never being paid. Grog's
      Tooth goes quiet on the same line; relics are not badge-proof. */
   var _preFree=G.pool.filter(d=>!d.committed);
+  var _shatterPaidThisRoll=0;
   if(_preFree.some(function(d){var e=_dieEffect(d);return e&&e.mechanic==='shatter_bonus';})){
     _preFree.forEach(function(d){
       var _odt=getDie(d.mat);var _ofx=_dieEffect(d);
@@ -36224,7 +36252,13 @@ function _afterRollImpl(){
       var _ob=_ofx.amount||500;
       if(_matchRandom('effects')<_oc){
         d._shattered=true;
-        G.pPts+=_ob;
+        /* Shatter adds to this turn's bankable score, including Grog's floor.
+           A later bust can still take it away. */
+        G._turnBonusPot=(G._turnBonusPot||0)+_ob;
+        G._shatterTurnPot=(G._shatterTurnPot||0)+_ob;
+        _shatterPaidThisRoll+=_ob;
+        G._featShatterPend=true;
+        G.turnPts=G.kept.reduce(function(a,k){return a+k.pts;},0)+G._turnBonusPot;
         if(d.el){
           /* Break it apart. D3X.shatter is the one that is actually SEEN: the
              class below animates the host box, and the host box is invisible
@@ -36250,6 +36284,7 @@ function _afterRollImpl(){
         triggerCard('obsidian',_odt.name+' SHATTERED +'+_ob,true);
         spawnPop('+'+_ob+' SHATTER');
         updHUD();
+        try{refreshKeptTray();}catch(e){}
       }
     });
     /* remove each shattered die by seat, highest first so earlier seats stay
@@ -36425,7 +36460,7 @@ function _afterRollImpl(){
   /* Re-read freeV — Loaded Die / Gambler's Ghost / Gambler's Thumb / Hot Streak above
      mutate d.val in place, so the snapshot taken at function entry would be stale. */
   freeV=free.map(d=>d.val);
-  if(!anyScoring(freeV,cards,freeMats,free)&&!_anchorRescues(cards)){
+  if(!_shatterPaidThisRoll&&!anyScoring(freeV,cards,freeMats,free)&&!_anchorRescues(cards)){
     /* THE deadRoll SEAM: nothing scored, and the bust has not resolved yet.
        A hook may claim the roll, which cancels the bust.
        P574: AND IT WAITS FOR THE THROW, for exactly the reason _delayedDoBust
@@ -36619,13 +36654,13 @@ function _afterRollImpl(){
   /* P858: one beat here too - was a 150ms lead-in stacked on the full
      600. The recheck runs after the NPC card effects, so the dice have
      already settled; 450 is the verdict pause, not a pause plus a pause. */
-  if(!anyScoring(freeVN,cardsN,freeMatsN,free)&&!_anchorRescues(cardsN)){if(_tryBustSave(free))return;_delayedDoBust(free,450);return;}
+  if(!_shatterPaidThisRoll&&!anyScoring(freeVN,cardsN,freeMatsN,free)&&!_anchorRescues(cardsN)){if(_tryBustSave(free))return;_delayedDoBust(free,450);return;}
 
   /* Reckless die tracking (Brass): busts cost extra from banked total */
   /* (penalty applied in doBust, no forced bust here) */
 
   free.forEach(d=>{d.el.onclick=()=>toggleDie(d);});G.phase='choosing';
-  setBtns(false,G.kept.length>0);setStatusMsg('','');
+  setBtns(false,G.kept.length>0||(G._turnBonusPot||0)>0);setStatusMsg('','');
   try{_markLoneCast();}catch(e){}
   updHUD();
   });
@@ -37444,7 +37479,7 @@ function doBust(){
     G.safeTurnStreak=0;_turnScoreClear();updHUD();refreshKeptTray();setBtns(false,false);
     /* Full bust feedback: red overlay word, screen shake, vignette, SFX */
     var _tsBov=document.getElementById('bust-ov');
-    if(_tsBov){_alignOverlayWord(_tsBov.querySelector('.bust-word'));_tsBov.classList.add('flash');setTimeout(function(){_tsBov.classList.remove('flash');},1100);}
+    if(_tsBov){_alignOverlayWord(_tsBov.querySelector('.bust-word'));_tsBov.classList.add('flash');setTimeout(function(){_tsBov.classList.remove('flash');},1300);}
     try{SFX.bust&&SFX.bust();}catch(e){}
     try{Haptic.bust&&Haptic.bust();}catch(e){}
     /* the scored dice die with the turn: grey them out for the bust beat
@@ -37489,7 +37524,7 @@ function doBust(){
     (function(){var _r=document.getElementById('playerDiceRow');if(_r)Array.prototype.forEach.call(_r.querySelectorAll('.die'),function(el){el.style.opacity='';el.style.filter='';el.classList.add('bust');if(el._d3)D3.draw(el._d3);});})();
     G.safeTurnStreak=0;_turnScoreClear();updHUD();refreshKeptTray();setBtns(false,false);
     var _lsBov=document.getElementById('bust-ov');
-    if(_lsBov){_alignOverlayWord(_lsBov.querySelector('.bust-word'));_lsBov.classList.add('flash');setTimeout(function(){_lsBov.classList.remove('flash');},1100);}
+    if(_lsBov){_alignOverlayWord(_lsBov.querySelector('.bust-word'));_lsBov.classList.add('flash');setTimeout(function(){_lsBov.classList.remove('flash');},1300);}
     try{SFX.bust&&SFX.bust();}catch(e){}
     try{Haptic.bust&&Haptic.bust();}catch(e){}
     /* the scored dice die with the turn: grey them out for the bust beat
@@ -37698,9 +37733,8 @@ function doBust(){
     /* P833: the DLG.triggerCard bust bark went with the feature - its
        pools were deleted with OPP_DIALOGUE and Denis ruled the call
        sites out rather than revived (trait reactions cover the beat). */
-    /* Extended to 1100ms so the bustPop keyframe (1s) gets to complete its
-       full scale+fade arc instead of being cut off mid-animation. */
-    _playerLater(()=>document.getElementById('bust-ov').classList.remove('flash'),1100);
+    /* Keep the word visible through its longer letter animation and fade. */
+    _playerLater(()=>document.getElementById('bust-ov').classList.remove('flash'),1300);
     _playerLater(()=>{_turnTableClear();
       /* Bust-save credits (Loose Thread, Safety Net, Aegis) can push the
          player to/past the target. Check the win HERE — after every bust
@@ -38121,9 +38155,10 @@ function handleBank(){
        own label mid-turn. Only surface a STAKES label if the player
        actually runs Stakes Rising, so a Flintlock-only player doesn't
        see a phantom "STAKES" pop. The amount is banked either way. */
-    if(G.pCards.includes('stakes_rising')){
-      bonusMsg+=' +'+G._turnBonusPot+' STAKES';
-      triggerCard('stakes_rising','+'+G._turnBonusPot,true);
+    var _stakesLabelPts=Math.max(0,G._turnBonusPot-(G._shatterTurnPot||0));
+    if(G.pCards.includes('stakes_rising')&&_stakesLabelPts){
+      bonusMsg+=' +'+_stakesLabelPts+' STAKES';
+      triggerCard('stakes_rising','+'+_stakesLabelPts,true);
     }
     G._turnBonusPot=0;/* P855: the SAC slice is cleared by the win check
        just below, which needs to read it first - see _sacHeld */
@@ -38353,7 +38388,7 @@ function handleBank(){
       return;
     }
     var _lcRule=_tellById('last_call');
-    var _lcT=(_lcRule&&_lcRule.minBank)||800;
+    var _lcT=(_lcRule&&_lcRule.minBank)||500;
     if(_ruleActive('last_call','p')&&_preTakeTotal>0&&_preTakeTotal<_lcT){
       /* P839: judged on the PRE-take amount. A bank that cleared the
          floor on its own terms pays its post-take remainder; a genuine
@@ -38445,7 +38480,7 @@ function handleBank(){
      neither. Slow Boiled wants the LONGEST turn, which is why it is a max
      and not just the winning turn's count. */
   if(G._featJadePend)G._featJade=true;
-  if(G._featShatterPend)G._featShatterBanked=true;
+  if(G._featShatterPend&&!_bankRefused&&total>0)G._featShatterBanked=true;
   G._featJadePend=false;G._featShatterPend=false;
   if((G.turnRollCount||0)>(G._featMaxRolls||0))G._featMaxRolls=G.turnRollCount||0;
   updHUD();refreshKeptTray();_turnTableClear();setBtns(false,false);
@@ -41177,8 +41212,10 @@ function endMatch(win){
     try{_dlgText=_dlgOutcome(!!win)||'';}catch(e){_dlgText='';}
     var _dlgHTML='';
     if(_portrait||_dlgText){
-      _dlgHTML='<div class="dlg-portrait">';
-      if(_portrait)_dlgHTML+='<img src="'+_portrait+'" style="width:100%;height:100%;object-fit:cover;image-rendering:pixelated">';
+      var _pf=(!isBoss&&window._lastSeatArt)?_patronFrameStyle(window._lastSeatArt):'';
+      _dlgHTML='<div class="dlg-portrait"'+(_pf?' style="'+_pf+'"':'')+'>';
+      if(_portrait)_dlgHTML+=_pf?'<img class="npc-avatar-art" src="'+_portrait+'" alt="">'
+        :'<img src="'+_portrait+'" style="width:100%;height:100%;object-fit:cover;image-rendering:pixelated">';
       /* P655: the end screen speaks in the same kind of box and wraps the same
          way, so it gets the same guarantee. */
       _dlgHTML+='</div><div class="dlg-scroll"><canvas class="res-dlg-canvas"></canvas><div class="dlg-text">'+_noOrphan(_dlgText)+'</div></div>';
@@ -42919,7 +42956,7 @@ function refundActiveCardUse(cardId){
 }
 
 /* Helper: redraw die face dots from d.val */
-function reDrawDieFace(d){
+function reDrawDieFace(d,rollOptions){
   if(!d.el)return;
   /* P830: the true value is stamped FIRST, unconditionally. A rewrite in
      the pre-adoption window (rival deal loop: sleight, their peek, their
@@ -42930,7 +42967,7 @@ function reDrawDieFace(d){
   d.el._trueVal=d.val;
   if(d.el._d3){
     d.el.classList.toggle('die-wild',(/^jade\d?$/.test(d.mat||'')&&d.val===6));
-    D3.roll(d.el._d3,d.val,{dur:420,homeX:0,homeY:0});
+    D3.roll(d.el._d3,d.val,Object.assign({dur:420,homeX:0,homeY:0},rollOptions));
     return;
   }
   const isWildJade=(/^jade\d?$/.test(d.mat||'')&&d.val===6);
